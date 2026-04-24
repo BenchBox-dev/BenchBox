@@ -41,14 +41,14 @@ approach: |
   dual-runtime behavior just for backward compatibility.
 
 anti_patterns:
-- "DO NOT keep metadata enrichment only in `benchbox/cli/execution_pipeline.py` — because that path is not the default runtime
-  — move metadata wiring into shared canonical execution/export code."
-- "DO NOT duplicate export blocks in each `run.py` branch — because drift already exists — centralize export path selection,
+- "DO NOT keep metadata enrichment only in `benchbox/cli/execution_pipeline.py` - because that path is not the default runtime
+  - move metadata wiring into shared canonical execution/export code."
+- "DO NOT duplicate export blocks in each `run.py` branch - because drift already exists - centralize export path selection,
   filename assignment, and format handling in one helper."
-- "DO NOT introduce a third orchestration abstraction — because complexity is already excessive — consolidate around one runtime
+- "DO NOT introduce a third orchestration abstraction - because complexity is already excessive - consolidate around one runtime
   path and reduce adapters/wrappers."
-- "DO NOT keep dead legacy shims (`quick`, `no_regenerate`-style branch logic) solely for compatibility — because this is
-  alpha and complexity cost is higher — remove or hard-fail obsolete paths with clear release notes."
+- "DO NOT keep dead legacy shims (`quick`, `no_regenerate`-style branch logic) solely for compatibility - because this is
+  alpha and complexity cost is higher - remove or hard-fail obsolete paths with clear release notes."
 
 files_affected:
   modified:

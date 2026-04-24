@@ -15,49 +15,51 @@ description: |
 
   Two disambiguators exist today:
 
-  **A. Pipeline — `benchbox/core/explorer_pipeline/transformer.py`**
-    `_disambiguate_platform_labels` (roughly lines 553–615).  Priority
+  **A. Pipeline - `benchbox/core/explorer_pipeline/transformer.py`**
+    `_disambiguate_platform_labels` (roughly lines 553-615).  Priority
     order: driver_version → execution_mode → scale_factor → run_date.
     Suffix format: ``v{x}`` for driver, ``({mode})`` for mode,
     ``SF{x:g}`` for scale.
 
-  **B. CLI visualizer — `benchbox/core/visualization/result_plotter.py`**
-    (roughly lines 68–149).  Priority order: scale_factor → execution_mode
+  **B. CLI visualizer - `benchbox/core/visualization/result_plotter.py`**
+    (roughly lines 68-149).  Priority order: scale_factor → execution_mode
     → driver_version.  Suffix format: ``SF={x}``, raw ``{v}`` appended for
     driver.
 
   The differences mean that the same two results can render with
   different labels in the CLI vs the explorer.  The fix is to extract a
-  single disambiguator — the pipeline version is already parity-tested
-  and matches the explorer's expectations — and have `result_plotter`
+  single disambiguator - the pipeline version is already parity-tested
+  and matches the explorer's expectations - and have `result_plotter`
   import and call it.
 
   This was deliberately deferred from the parent TODO because changing
   `core/visualization/` was out of scope there.  It is purely a
-  consistency cleanup — no user-visible bug unless a user cross-checks
+  consistency cleanup - no user-visible bug unless a user cross-checks
   the CLI's rendered labels against the explorer's.
 
 work:
-- id: w1
-  summary: "Extract _disambiguate_platform_labels into a shared module (e.g. benchbox/core/explorer_pipeline/labels.py or
-    a neutral core.labels) callable from both transformer.py and result_plotter.py"
-  status: done
+  - id: w1
+    summary:
+      "Extract _disambiguate_platform_labels into a shared module (e.g. benchbox/core/explorer_pipeline/labels.py or
+      a neutral core.labels) callable from both transformer.py and result_plotter.py"
+    status: done
 
-- id: w2
-  summary: "Update result_plotter.py to call the shared helper; delete its local implementation"
-  status: done
+  - id: w2
+    summary: "Update result_plotter.py to call the shared helper; delete its local implementation"
+    status: done
 
-- id: w3
-  summary: "Add a unit test that asserts CLI and artifact labels agree for a canonical fixture (two results, same platform,
-    different driver_version)"
-  status: done
+  - id: w3
+    summary:
+      "Add a unit test that asserts CLI and artifact labels agree for a canonical fixture (two results, same platform,
+      different driver_version)"
+    status: done
 
 metadata:
   tags:
-  - explorer
-  - visualization
-  - refactoring
-  - consistency
+    - explorer
+    - visualization
+    - refactoring
+    - consistency
   estimated_effort: "Small"
   created_date: "2026-04-16"
   source_review: "Post-merge review of explorer-emit-comparison-artifact-from-pipeline (commits 416881312, e6f65a8b1, 53fe98258)"
@@ -73,8 +75,8 @@ impact:
     tweaks only need to happen in one place.
 
 must_preserve:
-- "Pipeline-emitted ComparisonArtifact labels continue to match the parity fixtures in tests/parity/fixtures/comparison_artifact_*.json"
-- "CLI rendering of result_plotter.py stays visually unchanged for the single-result case (no disambiguation suffix)"
+  - "Pipeline-emitted ComparisonArtifact labels continue to match the parity fixtures in tests/parity/fixtures/comparison_artifact_*.json"
+  - "CLI rendering of result_plotter.py stays visually unchanged for the single-result case (no disambiguation suffix)"
 
 approach: |
   Lift-and-shift: extract the pipeline helper (the parity-tested one)
@@ -82,29 +84,29 @@ approach: |
   No behavioural changes to either caller.
 
 anti_patterns:
-- "DO NOT change the pipeline's disambiguator output format — because parity fixtures pin the current strings — only move
-  the code, do not edit it"
-- "DO NOT keep both implementations by introducing a feature flag — because that preserves the drift this TODO exists to remove"
+  - "DO NOT change the pipeline's disambiguator output format - because parity fixtures pin the current strings - only move
+    the code, do not edit it"
+  - "DO NOT keep both implementations by introducing a feature flag - because that preserves the drift this TODO exists to remove"
 
 verification:
-- description: "Unit test for label agreement passes"
-  command: "uv run -- python -m pytest tests/ -k 'disambiguate or platform_label' -m fast -q"
-  expected_output: "all tests pass"
-- description: "Parity fixtures still hold after the move"
-  command: "uv run -- python -m pytest tests/parity/ -m fast -q"
-  expected_output: "all tests pass"
+  - description: "Unit test for label agreement passes"
+    command: "uv run -- python -m pytest tests/ -k 'disambiguate or platform_label' -m fast -q"
+    expected_output: "all tests pass"
+  - description: "Parity fixtures still hold after the move"
+    command: "uv run -- python -m pytest tests/parity/ -m fast -q"
+    expected_output: "all tests pass"
 
 scope_limit:
   only_modify:
-  - "benchbox/core/explorer_pipeline/transformer.py"
-  - "benchbox/core/explorer_pipeline/labels.py"
-  - "benchbox/core/visualization/result_plotter.py"
-  - "tests/unit/**"
+    - "benchbox/core/explorer_pipeline/transformer.py"
+    - "benchbox/core/explorer_pipeline/labels.py"
+    - "benchbox/core/visualization/result_plotter.py"
+    - "tests/unit/**"
   do_not_modify:
-  - "tests/parity/fixtures/**"
-  - "results-explorer/**"
+    - "tests/parity/fixtures/**"
+    - "results-explorer/**"
 
 commits:
-- "e6f65a8b1"    # Original feat commit that introduced the second implementation
-- "416881312"    # Parent TODO setup
-- "53fe98258"    # Parent TODO completion
+  - "e6f65a8b1" # Original feat commit that introduced the second implementation
+  - "416881312" # Parent TODO setup
+  - "53fe98258" # Parent TODO completion

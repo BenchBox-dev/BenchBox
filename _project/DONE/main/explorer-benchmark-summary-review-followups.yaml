@@ -18,7 +18,7 @@ work:
   needs: []
   status: done
   notes: |
-    pipeline.py:78-87 — _platform_row_sort_key hardcodes sort direction: negate
+    pipeline.py:78-87 - _platform_row_sort_key hardcodes sort direction: negate
     power_score (higher-is-better), use geomean_ms as-is (lower-is-better).
     This is correct for all current benchmark families but duplicates logic
     already encoded in RankingConfig.primary_order.
@@ -43,7 +43,7 @@ work:
   needs: []
   status: done
   notes: |
-    pipeline.py:54-56 — re.split(r"(\d+)", s) produces empty strings between
+    pipeline.py:54-56 - re.split(r"(\d+)", s) produces empty strings between
     number groups (e.g., "Q10" → ["", "Q", "10", ""]). Python's sort handles
     empty strings correctly (they sort first), but the intent is clearer with:
       return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", s) if c]
@@ -55,11 +55,11 @@ work:
   needs: []
   status: done
   notes: |
-    transformer.py:272 — filter `dt.display_ms is not None and dt.display_ms > 0`
+    transformer.py:272 - filter `dt.display_ms is not None and dt.display_ms > 0`
     excludes zero-millisecond measurements. For extremely fast queries (sub-ms
     rounded to 0), this would silently exclude them from percentile stats.
 
-    Fix: add a comment explaining the reason — presumably 0ms indicates a
+    Fix: add a comment explaining the reason - presumably 0ms indicates a
     timing error or warmup artifact, not a genuine instant result. If the
     intent is to exclude non-positive values, document it. If 0ms is valid,
     change to `>= 0`.
@@ -69,7 +69,7 @@ work:
   needs: []
   status: done
   notes: |
-    pipeline.py:381,395 — Path traversal check uses string prefix:
+    pipeline.py:381,395 - Path traversal check uses string prefix:
       if not str(detail_path).startswith(str(details_dir.resolve()) + "/"):
 
     Python 3.9+ has Path.is_relative_to() which is more readable and avoids
@@ -83,7 +83,7 @@ work:
   needs: []
   status: done
   notes: |
-    pipeline.py:165-256 — _build_meta_leaderboard is ~90 lines with nested
+    pipeline.py:165-256 - _build_meta_leaderboard is ~90 lines with nested
     functions and multiple accumulation passes. Consider extracting:
       _rank_platforms_in_cohort(summary) → list[dict]
       _compute_average_ranks(cohort_rows) → dict[str, float]
@@ -97,8 +97,8 @@ files_affected:
   - "benchbox/core/explorer_pipeline/transformer.py"
 
 must_preserve:
-- "_platform_row_sort_key behavior for all current benchmark families — only extensibility changes in w1"
-- "_natural_sort_key output for all current query IDs — empty-string filter is behavior-equivalent in w2"
+- "_platform_row_sort_key behavior for all current benchmark families - only extensibility changes in w1"
+- "_natural_sort_key output for all current query IDs - empty-string filter is behavior-equivalent in w2"
 
 verification:
 - description: "Benchmark summary tests still pass"
@@ -109,7 +109,7 @@ verification:
   expected_output: "all green"
 
 anti_patterns:
-- "DO NOT change sort behavior in w1 for any currently-registered benchmark family — only the mechanism changes"
+- "DO NOT change sort behavior in w1 for any currently-registered benchmark family - only the mechanism changes"
 
 metadata:
   tags: ["explorer", "pipeline", "artifact", "review-followup"]

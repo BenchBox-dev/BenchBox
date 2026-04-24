@@ -12,7 +12,7 @@ description: |
   FlightData is a 3-table benchmark (flights fact table + airlines/airports dimensions)
   with 20 queries across 5 categories: on-time performance (5), delay analysis (4),
   route analytics (4), temporal patterns (4), and carrier comparisons (3). The queries
-  use standard OLAP patterns — GROUP BY with aggregations, LEFT JOINs to dimension
+  use standard OLAP patterns - GROUP BY with aggregations, LEFT JOINs to dimension
   tables, CASE expressions, HAVING clauses, date filtering, and ROUND/AVG/SUM/COUNT.
 
   This is one of the simpler benchmarks to port because the schema is small (3 tables),
@@ -42,7 +42,7 @@ work:
     - HAVING COUNT(*) >= N -> filter after group_by
     - Integer division for dep_hour -> (col("crs_dep_time") / lit(100)).cast(int)
 
-    Queries use parameterized date ranges ({start_date}, {end_date}) — implement
+    Queries use parameterized date ranges ({start_date}, {end_date}) - implement
     a parameters dict similar to TPCH_DEFAULT_PARAMS in tpch/dataframe_queries.py.
 
     All 20 queries should be implementable; no SQL-only constructs present.
@@ -73,7 +73,7 @@ work:
        that imports and returns the QueryRegistry from dataframe_queries.py
     2. Set supports_dataframe: True in benchmark_registry.py for flightdata entry
     3. Ensure FlightData data loader works with DataFrame platforms (CSV/Parquet loading)
-    4. Add any skip lists if needed (unlikely — all queries are standard OLAP)
+    4. Add any skip lists if needed (unlikely - all queries are standard OLAP)
 
 - id: w4
   summary: "Add unit tests for FlightData DataFrame queries"
@@ -121,7 +121,7 @@ files_affected:
   - benchbox/core/benchmark_registry.py
 
 must_preserve:
-- "FlightDataBenchmark SQL execution path remains unchanged — all existing SQL queries and parameterized date ranges work
+- "FlightDataBenchmark SQL execution path remains unchanged - all existing SQL queries and parameterized date ranges work
   identically"
 - "FlightDataDownloader data generation produces files loadable by both SQL and DataFrame paths"
 - "benchbox run --platform duckdb --benchmark flightdata still works (SQL mode unaffected)"
@@ -132,7 +132,7 @@ approach: |
   QueryRegistry. Use the get_dataframe_queries() fallback method on the benchmark
   class (no hard-coded dispatch needed).
 
-  Reference benchbox/core/flightdata/queries.py for the SQL source — each query's
+  Reference benchbox/core/flightdata/queries.py for the SQL source - each query's
   SQL maps directly to DataFrame operations. Start with the 5 on-time performance
   queries (simplest aggregation patterns), then delay analysis, route analytics,
   temporal patterns, and carrier comparisons.
@@ -144,13 +144,13 @@ approach: |
 implementation_order: |
   Implement FIRST among the 5 DataFrame support TODOs. FlightData is the simplest
   benchmark (3 tables, standard OLAP patterns) and establishes the reference pattern
-  for the others. All 5 TODOs modify benchmark_registry.py — sequential implementation
+  for the others. All 5 TODOs modify benchmark_registry.py - sequential implementation
   avoids merge conflicts.
 
 anti_patterns:
-- "DO NOT implement queries as SQL strings passed to DataFrame engines — because that defeats the purpose of DataFrame benchmarking
-  — implement using native DataFrame API (col/lit/join/groupby)"
-- "DO NOT hardcode date ranges — because FlightData uses parameterized {start_date}/{end_date} based on available data — use
+- "DO NOT implement queries as SQL strings passed to DataFrame engines - because that defeats the purpose of DataFrame benchmarking
+  - implement using native DataFrame API (col/lit/join/groupby)"
+- "DO NOT hardcode date ranges - because FlightData uses parameterized {start_date}/{end_date} based on available data - use
   the parameter override pattern from tpch/dataframe_queries.py"
 
 verification:

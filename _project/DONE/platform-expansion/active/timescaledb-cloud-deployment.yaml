@@ -18,7 +18,7 @@ description: |
   alignment and the documentation/example gap.
 
   Note: TigerData still uses *.tsdb.cloud.timescale.com hostnames, tsdbadmin
-  default user, and tsdb default database — the infrastructure is unchanged,
+  default user, and tsdb default database - the infrastructure is unchanged,
   only the branding.
 
 context_sections:
@@ -113,21 +113,21 @@ technical_requirements:
 must_preserve:
 - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
 - "Platform registry autodiscovery continues working for all existing platforms"
-- "Existing self-hosted TimescaleDB mode unchanged — no behavior change for self-hosted users"
+- "Existing self-hosted TimescaleDB mode unchanged - no behavior change for self-hosted users"
 - "Existing TimescaleDB unit tests continue to pass: uv run -- python -m pytest tests/unit/platforms/test_timescaledb_adapter.py
   -v"
 - "TIMESCALE_* environment variables still work (backward compatibility)"
 - "timescaledb:cloud colon syntax unchanged"
 
 anti_patterns:
-- "DO NOT break existing self-hosted TimescaleDB mode — because self-hosted users depend on current behavior — cloud rebrand
+- "DO NOT break existing self-hosted TimescaleDB mode - because self-hosted users depend on current behavior - cloud rebrand
   changes only affect cloud-mode code paths and user-facing strings"
-- "DO NOT remove TIMESCALE_* env var support — because existing users may have these configured — add TIGERDATA_* as primary
+- "DO NOT remove TIMESCALE_* env var support - because existing users may have these configured - add TIGERDATA_* as primary
   with TIMESCALE_* as documented fallback"
-- "DO NOT rename the adapter module from timescaledb.py — because TimescaleDB is still the extension name and the platform
-  identifier — only update display names and user-facing strings"
-- "DO NOT change the colon syntax from timescaledb:cloud — because this is the established convention and TimescaleDB is still
-  the extension name — update only display_name and description in registry"
+- "DO NOT rename the adapter module from timescaledb.py - because TimescaleDB is still the extension name and the platform
+  identifier - only update display names and user-facing strings"
+- "DO NOT change the colon syntax from timescaledb:cloud - because this is the established convention and TimescaleDB is still
+  the extension name - update only display_name and description in registry"
 
 verification:
 - description: "TimescaleDB cloud unit tests pass"

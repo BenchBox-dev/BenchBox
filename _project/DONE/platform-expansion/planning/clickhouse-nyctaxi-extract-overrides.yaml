@@ -43,12 +43,12 @@ files_affected:
     - "benchbox/core/nyctaxi/queries/clickhouse_sql/trips-by-day-of-week.sql"
 
 must_preserve:
-  - "Base nyctaxi queries unchanged — other platforms use standard EXTRACT syntax"
+  - "Base nyctaxi queries unchanged - other platforms use standard EXTRACT syntax"
   - "Override queries return identical column names, types, and row semantics"
 
 anti_patterns:
-  - "DO NOT modify base query files — because other platforms depend on standard SQL EXTRACT — create clickhouse_sql/ overrides instead"
-  - "DO NOT use toDayOfWeek() directly as DOW replacement — because ClickHouse returns 1=Monday while SQL standard DOW is 0=Sunday — apply % 7 adjustment"
+  - "DO NOT modify base query files - because other platforms depend on standard SQL EXTRACT - create clickhouse_sql/ overrides instead"
+  - "DO NOT use toDayOfWeek() directly as DOW replacement - because ClickHouse returns 1=Monday while SQL standard DOW is 0=Sunday - apply % 7 adjustment"
 
 approach: |
   Check the existing nyctaxi query structure for override patterns. Create

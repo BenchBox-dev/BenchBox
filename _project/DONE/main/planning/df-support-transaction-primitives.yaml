@@ -17,146 +17,146 @@ description: "Complete and integrate the existing DataFrame operations module fo
   \ different from SQL.\nSQL uses BEGIN/COMMIT/ROLLBACK; Delta Lake uses atomic writes\
   \ with RESTORE for\nrollback; Iceberg uses snapshot-based isolation. Polars/Pandas\
   \ have NO transaction\nsupport. This benchmark is PySpark-only in DataFrame mode.\n\
-  \nThe work is primarily integration — wiring the existing operations module into\
-  \ the\nbenchmark class, runner, and registry — plus filling in any incomplete operation\n\
+  \nThe work is primarily integration - wiring the existing operations module into\
+  \ the\nbenchmark class, runner, and registry - plus filling in any incomplete operation\n\
   implementations and adding tests.\n"
 category: Core Functionality
 work:
-- id: w1
-  summary: Audit existing dataframe_operations.py — map operations to benchmark operations,
-    identify gaps
-  status: done
-  notes: 'Read benchbox/core/transaction_primitives/dataframe_operations.py (1290
-    lines) thoroughly.
+  - id: w1
+    summary: Audit existing dataframe_operations.py - map operations to benchmark operations,
+      identify gaps
+    status: done
+    notes: "Read benchbox/core/transaction_primitives/dataframe_operations.py (1290
+      lines) thoroughly.
 
-    Compare against the 23 SQL operations defined in catalog/operations.yaml.
-
-
-    Create a mapping table:
-
-    - Which SQL operations have DataFrame equivalents already implemented?
-
-    - Which operations are impossible in DataFrame mode (e.g., SQL-level savepoints)?
-
-    - Which operations need new implementations?
-
-    - Which DataFrameTransactionCapabilities are fully implemented vs stubs?
+      Compare against the 23 SQL operations defined in catalog/operations.yaml.
 
 
-    Check integration points:
+      Create a mapping table:
 
-    - Does the module use get_maintenance_operations_for_platform() correctly?
+      - Which SQL operations have DataFrame equivalents already implemented?
 
-    - Does it handle DataFrameMaintenanceCapabilities properly?
+      - Which operations are impossible in DataFrame mode (e.g., SQL-level savepoints)?
 
-    - Are the TransactionIsolation levels correctly mapped?
+      - Which operations need new implementations?
+
+      - Which DataFrameTransactionCapabilities are fully implemented vs stubs?
 
 
-    Document findings in a comment block at the top of the file or in a separate
+      Check integration points:
 
-    audit notes file to guide w2.
+      - Does the module use get_maintenance_operations_for_platform() correctly?
 
-    '
-- id: w2
-  summary: Complete missing operation implementations and add skip lists for unsupported
-    operations
-  needs:
-  - w1
-  status: done
-  notes: "Based on the w1 audit:\n\n1. Complete any stub implementations in dataframe_operations.py\n\
-    2. Define SKIP_FOR_DATAFRAME list for operations that have no DataFrame equivalent:\n\
-    \   - SQL-level savepoints (SAVEPOINT/ROLLBACK TO) — no Delta Lake/Iceberg equivalent\n\
-    \   - Explicit isolation level setting (SET TRANSACTION ISOLATION LEVEL)\n   -\
-    \ Operations requiring explicit BEGIN/COMMIT blocks\n3. Define SKIP_FOR_POLARS\
-    \ and SKIP_FOR_PANDAS as complete skip lists (all operations)\n   since transaction\
-    \ primitives only work on PySpark+Delta/Iceberg\n4. Ensure error handling for\
-    \ unsupported platforms returns clear skip messages\n\nThe operations manager\
-    \ pattern (not QueryRegistry pattern) is correct for this\nbenchmark — transaction\
-    \ operations are stateful and sequential, not independent\nqueries.\n"
-- id: w3
-  summary: Wire up TransactionPrimitivesBenchmark class and registry for DataFrame
-    dispatch
-  needs:
-  - w2
-  status: done
-  notes: "Integration steps:\n1. Add get_dataframe_operations() method to TransactionPrimitivesBenchmark\
-    \ in\n   benchmark.py — similar to write_primitives pattern:\n   ```python\n \
-    \  def get_dataframe_operations(self, platform_name):\n       from .dataframe_operations\
-    \ import get_transaction_manager\n       return get_transaction_manager(platform_name)\n\
-    \   ```\n2. Set supports_dataframe: True in benchmark_registry.py for transaction_primitives\n\
-    3. Verify the dataframe_runner.py handles operations-based benchmarks correctly\n\
-    \   (it should fall through to get_dataframe_operations if no get_dataframe_queries)\n\
-    4. Add platform capability checks — only PySpark with Delta Lake or Iceberg\n\
-    \   should attempt this benchmark in DataFrame mode\n"
-- id: w4
-  summary: Add unit tests for Transaction Primitives DataFrame operations
-  needs:
-  - w3
-  status: done
-  notes: 'Create tests/unit/core/transaction_primitives/test_dataframe_operations.py:
+      - Does it handle DataFrameMaintenanceCapabilities properly?
 
-    - Test TransactionOperationType enum values match expected operations
+      - Are the TransactionIsolation levels correctly mapped?
 
-    - Test DataFrameTransactionCapabilities for PySpark reports correct support
 
-    - Test Polars/Pandas capabilities report all operations as unsupported
+      Document findings in a comment block at the top of the file or in a separate
 
-    - Test skip list generation for non-PySpark platforms
+      audit notes file to guide w2.
 
-    - Test operation manager instantiation with mock platform
+      "
+  - id: w2
+    summary: Complete missing operation implementations and add skip lists for unsupported
+      operations
+    needs:
+      - w1
+    status: done
+    notes: "Based on the w1 audit:\n\n1. Complete any stub implementations in dataframe_operations.py\n\
+      2. Define SKIP_FOR_DATAFRAME list for operations that have no DataFrame equivalent:\n\
+      \   - SQL-level savepoints (SAVEPOINT/ROLLBACK TO) - no Delta Lake/Iceberg equivalent\n\
+      \   - Explicit isolation level setting (SET TRANSACTION ISOLATION LEVEL)\n   -\
+      \ Operations requiring explicit BEGIN/COMMIT blocks\n3. Define SKIP_FOR_POLARS\
+      \ and SKIP_FOR_PANDAS as complete skip lists (all operations)\n   since transaction\
+      \ primitives only work on PySpark+Delta/Iceberg\n4. Ensure error handling for\
+      \ unsupported platforms returns clear skip messages\n\nThe operations manager\
+      \ pattern (not QueryRegistry pattern) is correct for this\nbenchmark - transaction\
+      \ operations are stateful and sequential, not independent\nqueries.\n"
+  - id: w3
+    summary: Wire up TransactionPrimitivesBenchmark class and registry for DataFrame
+      dispatch
+    needs:
+      - w2
+    status: done
+    notes: "Integration steps:\n1. Add get_dataframe_operations() method to TransactionPrimitivesBenchmark\
+      \ in\n   benchmark.py - similar to write_primitives pattern:\n   ```python\n \
+      \  def get_dataframe_operations(self, platform_name):\n       from .dataframe_operations\
+      \ import get_transaction_manager\n       return get_transaction_manager(platform_name)\n\
+      \   ```\n2. Set supports_dataframe: True in benchmark_registry.py for transaction_primitives\n\
+      3. Verify the dataframe_runner.py handles operations-based benchmarks correctly\n\
+      \   (it should fall through to get_dataframe_operations if no get_dataframe_queries)\n\
+      4. Add platform capability checks - only PySpark with Delta Lake or Iceberg\n\
+      \   should attempt this benchmark in DataFrame mode\n"
+  - id: w4
+    summary: Add unit tests for Transaction Primitives DataFrame operations
+    needs:
+      - w3
+    status: done
+    notes: "Create tests/unit/core/transaction_primitives/test_dataframe_operations.py:
 
-    - Mock-based tests (real PySpark+Delta tests belong in integration suite)
+      - Test TransactionOperationType enum values match expected operations
 
-    - Mark all tests @pytest.mark.fast
+      - Test DataFrameTransactionCapabilities for PySpark reports correct support
 
-    '
+      - Test Polars/Pandas capabilities report all operations as unsupported
+
+      - Test skip list generation for non-PySpark platforms
+
+      - Test operation manager instantiation with mock platform
+
+      - Mock-based tests (real PySpark+Delta tests belong in integration suite)
+
+      - Mark all tests @pytest.mark.fast
+
+      "
 deferred:
-- summary: Integration tests with real PySpark + Delta Lake
-  reason: Requires PySpark + Delta Lake runtime. Add to live_integration test suite
-    with @pytest.mark.live_integration.
-- summary: Iceberg table format support testing
-  reason: Iceberg support depends on PySpark + Iceberg catalog setup. Defer until
-    Delta Lake path is validated.
-- summary: Map all 23 SQL operations to DataFrame equivalents with full parity
-  reason: Some SQL operations (savepoints, explicit isolation levels) have no DataFrame
-    equivalent. Document the parity gap rather than attempting impossible translations.
+  - summary: Integration tests with real PySpark + Delta Lake
+    reason: Requires PySpark + Delta Lake runtime. Add to live_integration test suite
+      with @pytest.mark.live_integration.
+  - summary: Iceberg table format support testing
+    reason: Iceberg support depends on PySpark + Iceberg catalog setup. Defer until
+      Delta Lake path is validated.
+  - summary: Map all 23 SQL operations to DataFrame equivalents with full parity
+    reason: Some SQL operations (savepoints, explicit isolation levels) have no DataFrame
+      equivalent. Document the parity gap rather than attempting impossible translations.
 metadata:
   tags:
-  - dataframe
-  - transaction-primitives
-  - pyspark
-  - delta-lake
-  - iceberg
-  - acid
+    - dataframe
+    - transaction-primitives
+    - pyspark
+    - delta-lake
+    - iceberg
+    - acid
   estimated_effort: 2-3 days
-  created_date: '2026-04-10'
+  created_date: "2026-04-10"
 impact:
-  business_value: 'Enables transaction semantics benchmarking on lakehouse platforms
+  business_value: "Enables transaction semantics benchmarking on lakehouse platforms
     (Delta Lake,
 
     Iceberg) via PySpark DataFrames. Critical for organizations evaluating lakehouse
 
     ACID guarantees vs traditional databases.
 
-    '
-  user_impact: 'Users can run `benchbox run --platform pyspark-df --benchmark transaction_primitives`
+    "
+  user_impact: "Users can run `benchbox run --platform pyspark-df --benchmark transaction_primitives`
 
     to measure Delta Lake/Iceberg transaction overhead and compare with SQL databases.
 
-    '
+    "
 files_affected:
   modified:
-  - benchbox/core/transaction_primitives/dataframe_operations.py
-  - benchbox/core/transaction_primitives/benchmark.py
-  - benchbox/core/benchmark_registry.py
+    - benchbox/core/transaction_primitives/dataframe_operations.py
+    - benchbox/core/transaction_primitives/benchmark.py
+    - benchbox/core/benchmark_registry.py
   added:
-  - tests/unit/core/transaction_primitives/test_dataframe_operations.py
+    - tests/unit/core/transaction_primitives/test_dataframe_operations.py
 must_preserve:
-- TransactionPrimitivesBenchmark SQL execution path unchanged — all 23 SQL operations
-  still work via OperationExecutor interface
-- TPC-H staging table schema (txn_orders, txn_lineitem, txn_customer) unchanged
-- Platform overrides for SQL mode (e.g., DuckDB savepoint skips) still work
-approach: 'This benchmark already has substantial DataFrame operations code (1290
+  - TransactionPrimitivesBenchmark SQL execution path unchanged - all 23 SQL operations
+    still work via OperationExecutor interface
+  - TPC-H staging table schema (txn_orders, txn_lineitem, txn_customer) unchanged
+  - Platform overrides for SQL mode (e.g., DuckDB savepoint skips) still work
+approach: "This benchmark already has substantial DataFrame operations code (1290
   lines).
 
   The work is primarily audit + integration, not greenfield implementation.
@@ -171,11 +171,11 @@ approach: 'This benchmark already has substantial DataFrame operations code (129
   already handles this via the operations manager path.
 
 
-  Start with the audit (w1) to understand what''s implemented vs stub. The
+  Start with the audit (w1) to understand what's implemented vs stub. The
 
   existing code uses DataFrameMaintenanceCapabilities and TransactionIsolation
 
-  from benchbox/core/dataframe/maintenance_interface.py — verify these are
+  from benchbox/core/dataframe/maintenance_interface.py - verify these are
 
   correctly integrated.
 
@@ -184,47 +184,47 @@ approach: 'This benchmark already has substantial DataFrame operations code (129
 
   and other platforms should be explicitly skipped with clear messaging.
 
-  '
-implementation_order: 'Implement THIRD or FOURTH (interchangeable with metadata-primitives).
+  "
+implementation_order: "Implement THIRD or FOURTH (interchangeable with metadata-primitives).
   Both use
 
-  the operations manager pattern (not QueryRegistry), so order between them doesn''t
+  the operations manager pattern (not QueryRegistry), so order between them doesn't
 
   matter. Implement after df-support-flightdata establishes the QueryRegistry reference
 
-  pattern. All 5 DataFrame support TODOs modify benchmark_registry.py — sequential
+  pattern. All 5 DataFrame support TODOs modify benchmark_registry.py - sequential
 
   implementation avoids merge conflicts.
 
-  '
+  "
 anti_patterns:
-- DO NOT attempt to implement transactions on Polars/Pandas — because they have no
-  ACID semantics — skip cleanly with informative messages
-- DO NOT map SQL BEGIN/COMMIT/ROLLBACK directly — because Delta Lake uses atomic writes,
-  not explicit transaction blocks — use the Delta Lake/Iceberg native patterns documented
-  in dataframe_operations.py
-- DO NOT rewrite the existing 1290-line module from scratch — because significant
-  work is already done — audit and complete what exists
+  - DO NOT attempt to implement transactions on Polars/Pandas - because they have no
+    ACID semantics - skip cleanly with informative messages
+  - DO NOT map SQL BEGIN/COMMIT/ROLLBACK directly - because Delta Lake uses atomic writes,
+    not explicit transaction blocks - use the Delta Lake/Iceberg native patterns documented
+    in dataframe_operations.py
+  - DO NOT rewrite the existing 1290-line module from scratch - because significant
+    work is already done - audit and complete what exists
 verification:
-- description: Transaction Primitives reports supports_dataframe=True
-  command: uv run -- python -c "from benchbox.core.benchmark_registry import BENCHMARK_REGISTRY;
-    print(BENCHMARK_REGISTRY['transaction_primitives']['supports_dataframe'])"
-  expected_output: 'True'
-- description: Operations manager loads without error
-  command: uv run -- python -c "from benchbox.core.transaction_primitives.dataframe_operations
-    import TransactionOperationType; print(f'{len(TransactionOperationType)} operation
-    types')"
-  expected_output: 10 operation types
-- description: Unit tests pass
-  command: uv run -- python -m pytest tests/unit/core/transaction_primitives/ -v
-  expected_output: all tests pass, 0 failures
+  - description: Transaction Primitives reports supports_dataframe=True
+    command: uv run -- python -c "from benchbox.core.benchmark_registry import BENCHMARK_REGISTRY;
+      print(BENCHMARK_REGISTRY['transaction_primitives']['supports_dataframe'])"
+    expected_output: "True"
+  - description: Operations manager loads without error
+    command: uv run -- python -c "from benchbox.core.transaction_primitives.dataframe_operations
+      import TransactionOperationType; print(f'{len(TransactionOperationType)} operation
+      types')"
+    expected_output: 10 operation types
+  - description: Unit tests pass
+    command: uv run -- python -m pytest tests/unit/core/transaction_primitives/ -v
+    expected_output: all tests pass, 0 failures
 scope_limit:
   only_modify:
-  - benchbox/core/transaction_primitives/
-  - benchbox/core/benchmark_registry.py
-  - tests/unit/core/transaction_primitives/
+    - benchbox/core/transaction_primitives/
+    - benchbox/core/benchmark_registry.py
+    - tests/unit/core/transaction_primitives/
   do_not_modify:
-  - benchbox/core/runner/dataframe_runner.py
-  - benchbox/core/dataframe/
-  - benchbox/platforms/
-completed_date: '2026-04-10'
+    - benchbox/core/runner/dataframe_runner.py
+    - benchbox/core/dataframe/
+    - benchbox/platforms/
+completed_date: "2026-04-10"

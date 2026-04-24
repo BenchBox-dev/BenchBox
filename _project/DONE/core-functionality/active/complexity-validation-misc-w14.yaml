@@ -9,7 +9,7 @@ description: |
   Grouped into 6 sub-areas for sequential implementation. Each sub-area shares a common
   refactoring pattern.
 
-  Sub-area A — Validation functions (8 functions):
+  Sub-area A - Validation functions (8 functions):
     benchbox/core/tpc_validation.py:validate (TimingValidator, 16)
     benchbox/core/tpc_validation.py:validate (MetricsValidator, 15)
     benchbox/core/tpch/reporting.py:_validate_result             (15)
@@ -19,7 +19,7 @@ description: |
     benchbox/core/query_plans/parsers/postgresql.py:_extract_operator_specific_info (16)
     benchbox/core/query_plans/visualization.py:render_comparison  (15)
 
-  Sub-area B — CLI output and runner helpers (7 functions):
+  Sub-area B - CLI output and runner helpers (7 functions):
     benchbox/cli/output.py:_display_platform_result              (19)
     benchbox/core/runner/dataframe_runner.py:_get_queries_for_benchmark (19)
     benchbox/core/tpcds/parameter_extractor.py:_extract_common_params  (19)
@@ -28,7 +28,7 @@ description: |
     benchbox/core/concurrency/analyzer.py:analyze_scaling        (16)
     benchbox/core/results/loader.py:reconstruct_benchmark_results (15)
 
-  Sub-area C — CLI display and tuning (6 functions):
+  Sub-area C - CLI display and tuning (6 functions):
     benchbox/cli/commands/df_tuning.py:create_sample             (17)
     benchbox/cli/commands/df_tuning.py:show_defaults             (16)
     benchbox/cli/commands/tuning_group.py:show_defaults          (16)
@@ -36,13 +36,13 @@ description: |
     benchbox/cli/commands/run.py:setup_verbose_logging           (16)
     benchbox/cli/platform.py:numbered_platform_select            (15)
 
-  Sub-area D — CLI metrics and comparison (4 functions):
+  Sub-area D - CLI metrics and comparison (4 functions):
     benchbox/cli/commands/calculate_qphh.py:calculate_qphh      (17)
     benchbox/cli/commands/metrics.py:qphh                        (17)
     benchbox/cli/commands/compare.py:_format_html_comparison     (17)
     benchbox/cli/exceptions.py:_handle_cli_error                 (15)
 
-  Sub-area E — Platform and utility functions (7 functions):
+  Sub-area E - Platform and utility functions (7 functions):
     benchbox/platforms/databricks/adapter.py:_auto_detect_databricks_config (16)
     benchbox/platforms/base/data_loading.py:get_data_source      (16)
     benchbox/platforms/firebolt.py:__init__                      (15)
@@ -51,7 +51,7 @@ description: |
     benchbox/utils/file_format.py:has_trailing_delimiter         (15)
     benchbox/core/ai_primitives/dataframe_operations.py:extract_entities (16)
 
-  Sub-area F — Benchmark query helpers and write primitives (5 functions):
+  Sub-area F - Benchmark query helpers and write primitives (5 functions):
     benchbox/core/tpcds/benchmark/runner.py:get_query            (15)
     benchbox/core/tpch/benchmark.py:get_query                    (16)
     benchbox/core/write_primitives/benchmark.py:execute_operation (15)
@@ -70,102 +70,102 @@ category: "Core Functionality"
 
 deps:
   needs:
-  - "complexity-dict-dispatch-w14"
-  - "complexity-field-extraction-w14"
+    - "complexity-dict-dispatch-w14"
+    - "complexity-field-extraction-w14"
 
 work:
-- id: w1
-  summary: "Sub-area A: Extract validate() helper methods and simplify query plan parsers"
-  status: done
-  notes: |
-    tpc_validation.py both validate() methods: extract check_X() private methods per
-    validation rule. Pattern: repeated try-except-add_issue → list of validator functions.
-    _validate_result (tpch/reporting.py): same — extract per-category check helpers.
-    compare_dataframes: extract _check_row_count, _check_columns, _check_values phases.
-    _extract_operator_specific_info (postgresql): strategy dict keyed by operator type.
-    compute_complexity_score: extract _analyze_node recursive helper as standalone function.
-    render_comparison: extract _render_diff_section, _render_operator_counts helpers.
-    validate_data_directory: extract _validate_with_manifest, _validate_without_manifest.
+  - id: w1
+    summary: "Sub-area A: Extract validate() helper methods and simplify query plan parsers"
+    status: done
+    notes: |
+      tpc_validation.py both validate() methods: extract check_X() private methods per
+      validation rule. Pattern: repeated try-except-add_issue → list of validator functions.
+      _validate_result (tpch/reporting.py): same - extract per-category check helpers.
+      compare_dataframes: extract _check_row_count, _check_columns, _check_values phases.
+      _extract_operator_specific_info (postgresql): strategy dict keyed by operator type.
+      compute_complexity_score: extract _analyze_node recursive helper as standalone function.
+      render_comparison: extract _render_diff_section, _render_operator_counts helpers.
+      validate_data_directory: extract _validate_with_manifest, _validate_without_manifest.
 
-- id: w2
-  summary: "Sub-area B: Simplify CLI output and runner helper functions"
-  status: done
-  notes: |
-    _display_platform_result: extract validation status lookup dict, extract _format_query_row.
-    _get_queries_for_benchmark: replace benchmark if/elif with registry dict lookup.
-    _extract_common_params: unify 3 extraction loops into single generic loop.
-    compare_with_uniform: extract _validate_inputs, _run_uniform_comparison helpers.
-    run_benchmark (ai_primitives): extract _check_platform, _select_queries, _run_with_cost.
-    analyze_scaling: extract single-result vs multi-result calculation to shared helper.
-    reconstruct_benchmark_results: extract per-section loaders as small helpers.
+  - id: w2
+    summary: "Sub-area B: Simplify CLI output and runner helper functions"
+    status: done
+    notes: |
+      _display_platform_result: extract validation status lookup dict, extract _format_query_row.
+      _get_queries_for_benchmark: replace benchmark if/elif with registry dict lookup.
+      _extract_common_params: unify 3 extraction loops into single generic loop.
+      compare_with_uniform: extract _validate_inputs, _run_uniform_comparison helpers.
+      run_benchmark (ai_primitives): extract _check_platform, _select_queries, _run_with_cost.
+      analyze_scaling: extract single-result vs multi-result calculation to shared helper.
+      reconstruct_benchmark_results: extract per-section loaders as small helpers.
 
-- id: w3
-  summary: "Sub-area C: Simplify CLI display/tuning and platform select functions"
-  needs: []
-  status: done
-  notes: |
-    create_sample (df_tuning): replace profile branches with PROFILE_CONFIG dict.
-    show_defaults (df_tuning, tuning_group): extract _add_table_rows(table, config_group).
-    show_cli (results): use early returns for default-value checks; extract display helper.
-    setup_verbose_logging: replace level if/elif with LEVEL_MAP = {"DEBUG": logging.DEBUG, ...}.
-    numbered_platform_select: extract _group_platforms(platforms) → (enabled, available, missing).
+  - id: w3
+    summary: "Sub-area C: Simplify CLI display/tuning and platform select functions"
+    needs: []
+    status: done
+    notes: |
+      create_sample (df_tuning): replace profile branches with PROFILE_CONFIG dict.
+      show_defaults (df_tuning, tuning_group): extract _add_table_rows(table, config_group).
+      show_cli (results): use early returns for default-value checks; extract display helper.
+      setup_verbose_logging: replace level if/elif with LEVEL_MAP = {"DEBUG": logging.DEBUG, ...}.
+      numbered_platform_select: extract _group_platforms(platforms) → (enabled, available, missing).
 
-- id: w4
-  summary: "Sub-area D: Simplify CLI metrics, compare, and exception handling"
-  needs: []
-  status: done
-  notes: |
-    calculate_qphh and qphh are near-identical — extract shared _load_and_compute_qphh helper.
-    _format_html_comparison: extract _html_summary_table(), _html_query_table() helpers.
-    _handle_cli_error: if already done in dict-dispatch batch, skip; else do it here.
+  - id: w4
+    summary: "Sub-area D: Simplify CLI metrics, compare, and exception handling"
+    needs: []
+    status: done
+    notes: |
+      calculate_qphh and qphh are near-identical - extract shared _load_and_compute_qphh helper.
+      _format_html_comparison: extract _html_summary_table(), _html_query_table() helpers.
+      _handle_cli_error: if already done in dict-dispatch batch, skip; else do it here.
 
-- id: w5
-  summary: "Sub-area E: Simplify platform adapters and utility functions"
-  needs: []
-  status: done
-  notes: |
-    _auto_detect_databricks_config: extract _select_warehouse(warehouses) → warehouse.
-    get_data_source: unify v1/v2 manifest handling with shared file-loading helper.
-    firebolt __init__: extract _detect_deployment_mode(config) → str.
-    apply_ctas_sort: extract _extract_sort_columns(tuning, table) → list[str].
-    validate_athena_credentials: extract _check_boto3_available(), _build_connection_kwargs().
-    has_trailing_delimiter: unify compressed vs uncompressed paths with shared reader.
-    extract_entities (ai_primitives): extract _spacy_extraction, _regex_fallback as helpers.
+  - id: w5
+    summary: "Sub-area E: Simplify platform adapters and utility functions"
+    needs: []
+    status: done
+    notes: |
+      _auto_detect_databricks_config: extract _select_warehouse(warehouses) → warehouse.
+      get_data_source: unify v1/v2 manifest handling with shared file-loading helper.
+      firebolt __init__: extract _detect_deployment_mode(config) → str.
+      apply_ctas_sort: extract _extract_sort_columns(tuning, table) → list[str].
+      validate_athena_credentials: extract _check_boto3_available(), _build_connection_kwargs().
+      has_trailing_delimiter: unify compressed vs uncompressed paths with shared reader.
+      extract_entities (ai_primitives): extract _spacy_extraction, _regex_fallback as helpers.
 
-- id: w6
-  summary: "Sub-area F: Simplify benchmark query helpers and write primitives"
-  needs: []
-  status: done
-  notes: |
-    get_query (tpch, tpcds): validation blocks are near-identical — extract shared
-    _validate_query_params(query_id, stream_id, benchmark_name) helper.
-    execute_operation (write_primitives): extract _setup_operation, _run_sql_operation.
-    load_data_to_database (benchmark_mixins): extract _create_schema, _insert_rows.
-    convert_csv_to_parquet and _convert_data: extract _build_type_map(schema) → dict.
+  - id: w6
+    summary: "Sub-area F: Simplify benchmark query helpers and write primitives"
+    needs: []
+    status: done
+    notes: |
+      get_query (tpch, tpcds): validation blocks are near-identical - extract shared
+      _validate_query_params(query_id, stream_id, benchmark_name) helper.
+      execute_operation (write_primitives): extract _setup_operation, _run_sql_operation.
+      load_data_to_database (benchmark_mixins): extract _create_schema, _insert_rows.
+      convert_csv_to_parquet and _convert_data: extract _build_type_map(schema) → dict.
 
-- id: w7
-  summary: "Sub-area G: Release functions"
-  needs: []
-  status: done
-  notes: |
-    _should_exclude_file: extract guard functions and apply as list.
-    cmd_status: extract _print_file_section(files, header, limit) helper (3 call sites).
+  - id: w7
+    summary: "Sub-area G: Release functions"
+    needs: []
+    status: done
+    notes: |
+      _should_exclude_file: extract guard functions and apply as list.
+      cmd_status: extract _print_file_section(files, header, limit) helper (3 call sites).
 
-- id: w8
-  summary: "Final complexity check — verify all remaining WARN functions are resolved or approved"
-  needs: [w1, w2, w3, w4, w5, w6, w7]
-  status: done
+  - id: w8
+    summary: "Final complexity check - verify all remaining WARN functions are resolved or approved"
+    needs: [w1, w2, w3, w4, w5, w6, w7]
+    status: done
 
 metadata:
   estimated_effort: "3-4 days"
   tags: ["complexity", "refactor", "misc", "validation"]
 
 must_preserve:
-- "tpc_validation validate(): validation issue counts and messages must be identical"
-- "compare_dataframes: any difference between DataFrames must still raise the same errors"
-- "get_query (tpch/tpcds): query permutation logic must be spec-compliant and unchanged"
-- "calculate_qphh / qphh: metric calculation must be numerically identical"
-- "_display_platform_result: all display fields and formatting must be identical"
+  - "tpc_validation validate(): validation issue counts and messages must be identical"
+  - "compare_dataframes: any difference between DataFrames must still raise the same errors"
+  - "get_query (tpch/tpcds): query permutation logic must be spec-compliant and unchanged"
+  - "calculate_qphh / qphh: metric calculation must be numerically identical"
+  - "_display_platform_result: all display fields and formatting must be identical"
 
 approach: |
   Work sub-area by sub-area; each is mostly independent of the others.
@@ -175,54 +175,54 @@ approach: |
   extract shared logic to a _shared_*() helper; do NOT merge the public functions.
 
 anti_patterns:
-- "DO NOT change the output of get_query — permutation order is spec-mandated"
-- "DO NOT add new abstraction layers in validation — extract to private methods, not new classes"
-- "DO NOT skip the smoke test between sub-areas — catch regressions early"
-- "DO NOT merge functions that serve different purposes just because they look similar"
+  - "DO NOT change the output of get_query - permutation order is spec-mandated"
+  - "DO NOT add new abstraction layers in validation - extract to private methods, not new classes"
+  - "DO NOT skip the smoke test between sub-areas - catch regressions early"
+  - "DO NOT merge functions that serve different purposes just because they look similar"
 
 verification:
-- description: "Smoke tests pass after each sub-area"
-  command: "uv run -- python -m pytest -m fast -q"
-  expected_output: "all tests pass, 0 failures"
-- description: "Full complexity check shows all warnings resolved or approved"
-  command: "uv run -- python scripts/check_complexity.py --top 150"
-  expected_output: "PASSED: all functions within complexity limit of 20; Warnings count significantly reduced"
+  - description: "Smoke tests pass after each sub-area"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Full complexity check shows all warnings resolved or approved"
+    command: "uv run -- python scripts/check_complexity.py --top 150"
+    expected_output: "PASSED: all functions within complexity limit of 20; Warnings count significantly reduced"
 
 scope_limit:
   only_modify:
-  - "benchbox/core/tpc_validation.py"
-  - "benchbox/core/tpch/reporting.py"
-  - "benchbox/core/dataframe/validation.py"
-  - "benchbox/utils/data_validation.py"
-  - "benchbox/core/query_plans/insights.py"
-  - "benchbox/core/query_plans/parsers/postgresql.py"
-  - "benchbox/core/query_plans/visualization.py"
-  - "benchbox/cli/output.py"
-  - "benchbox/core/runner/dataframe_runner.py"
-  - "benchbox/core/tpcds/parameter_extractor.py"
-  - "benchbox/core/tpch_skew/benchmark.py"
-  - "benchbox/core/ai_primitives/benchmark.py"
-  - "benchbox/core/concurrency/analyzer.py"
-  - "benchbox/core/results/loader.py"
-  - "benchbox/cli/commands/df_tuning.py"
-  - "benchbox/cli/commands/tuning_group.py"
-  - "benchbox/cli/commands/results.py"
-  - "benchbox/cli/commands/run.py"
-  - "benchbox/cli/platform.py"
-  - "benchbox/cli/commands/calculate_qphh.py"
-  - "benchbox/cli/commands/metrics.py"
-  - "benchbox/cli/commands/compare.py"
-  - "benchbox/platforms/databricks/adapter.py"
-  - "benchbox/platforms/base/data_loading.py"
-  - "benchbox/platforms/firebolt.py"
-  - "benchbox/platforms/base/adapter.py"
-  - "benchbox/platforms/credentials/athena.py"
-  - "benchbox/utils/file_format.py"
-  - "benchbox/core/ai_primitives/dataframe_operations.py"
-  - "benchbox/core/tpcds/benchmark/runner.py"
-  - "benchbox/core/tpch/benchmark.py"
-  - "benchbox/core/write_primitives/benchmark.py"
-  - "benchbox/core/benchmark_mixins.py"
-  - "benchbox/core/dataframe/data_loader.py"
-  - "benchbox/release/workflow.py"
-  - "benchbox/release/sync.py"
+    - "benchbox/core/tpc_validation.py"
+    - "benchbox/core/tpch/reporting.py"
+    - "benchbox/core/dataframe/validation.py"
+    - "benchbox/utils/data_validation.py"
+    - "benchbox/core/query_plans/insights.py"
+    - "benchbox/core/query_plans/parsers/postgresql.py"
+    - "benchbox/core/query_plans/visualization.py"
+    - "benchbox/cli/output.py"
+    - "benchbox/core/runner/dataframe_runner.py"
+    - "benchbox/core/tpcds/parameter_extractor.py"
+    - "benchbox/core/tpch_skew/benchmark.py"
+    - "benchbox/core/ai_primitives/benchmark.py"
+    - "benchbox/core/concurrency/analyzer.py"
+    - "benchbox/core/results/loader.py"
+    - "benchbox/cli/commands/df_tuning.py"
+    - "benchbox/cli/commands/tuning_group.py"
+    - "benchbox/cli/commands/results.py"
+    - "benchbox/cli/commands/run.py"
+    - "benchbox/cli/platform.py"
+    - "benchbox/cli/commands/calculate_qphh.py"
+    - "benchbox/cli/commands/metrics.py"
+    - "benchbox/cli/commands/compare.py"
+    - "benchbox/platforms/databricks/adapter.py"
+    - "benchbox/platforms/base/data_loading.py"
+    - "benchbox/platforms/firebolt.py"
+    - "benchbox/platforms/base/adapter.py"
+    - "benchbox/platforms/credentials/athena.py"
+    - "benchbox/utils/file_format.py"
+    - "benchbox/core/ai_primitives/dataframe_operations.py"
+    - "benchbox/core/tpcds/benchmark/runner.py"
+    - "benchbox/core/tpch/benchmark.py"
+    - "benchbox/core/write_primitives/benchmark.py"
+    - "benchbox/core/benchmark_mixins.py"
+    - "benchbox/core/dataframe/data_loader.py"
+    - "benchbox/release/workflow.py"
+    - "benchbox/release/sync.py"

@@ -66,8 +66,8 @@ must_preserve:
   - "generate_time_dimension returns count extracted from query result, not pre-computed"
 
 anti_patterns:
-  - "DO NOT assume record count is always a pre-computed variable — generate_time_dimension extracts it from the query result — the helper must accept an optional count and fall back to result extraction"
-  - "DO NOT hardcode count formula as base_X * scale_factor — generate_account_dimension uses num_customers * 1.5 — each caller computes its own count before invoking the helper"
+  - "DO NOT assume record count is always a pre-computed variable - generate_time_dimension extracts it from the query result - the helper must accept an optional count and fall back to result extraction"
+  - "DO NOT hardcode count formula as base_X * scale_factor - generate_account_dimension uses num_customers * 1.5 - each caller computes its own count before invoking the helper"
 
 metadata:
   tags:

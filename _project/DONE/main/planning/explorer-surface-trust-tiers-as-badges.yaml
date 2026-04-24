@@ -23,78 +23,78 @@ description: |
      (shows every tier) with chips for each tier a user can deselect.
 
   3. Sorts rows by primary metric within the default "All" view, not by
-     trust tier — the trust model is informational, not a sort key.
+     trust tier - the trust model is informational, not a sort key.
 
   4. Propagates trust_label through to the Compare page header so trust
      disparities in a comparison are also visible there.
 
   Explicitly rejected: defaulting to "maintainer-run only" or visually
   de-emphasizing community results via reduced opacity. BenchBox's
-  differentiator is the explicit trust model — make it pop.
+  differentiator is the explicit trust model - make it pop.
 
 deps:
   needs:
-  - explorer-emit-benchmark-summary-artifact
-  - explorer-matrix-leaderboard-view
+    - explorer-emit-benchmark-summary-artifact
+    - explorer-matrix-leaderboard-view
 
 work:
-- id: w1
-  summary: "Add TrustBadge component at src/components/TrustBadge.tsx"
-  status: done
-  notes: |
-    Props: tier (string). Renders a small pill with tier-specific
-    background and tooltip. Colors: maintainer = emerald-500,
-    community = sky-500, ci = slate-400, local/unknown = slate-300.
-    All colors must meet WCAG AA contrast for the foreground text.
+  - id: w1
+    summary: "Add TrustBadge component at src/components/TrustBadge.tsx"
+    status: done
+    notes: |
+      Props: tier (string). Renders a small pill with tier-specific
+      background and tooltip. Colors: maintainer = emerald-500,
+      community = sky-500, ci = slate-400, local/unknown = slate-300.
+      All colors must meet WCAG AA contrast for the foreground text.
 
-- id: w2
-  summary: "Add sticky Trust column to QueryHeatmap between Platform and primary metric"
-  needs: [w1]
-  status: done
-  notes: |
-    Column is sticky left-side (part of the fixed-column group) so it
-    stays visible during horizontal scroll. Uses TrustBadge.
+  - id: w2
+    summary: "Add sticky Trust column to QueryHeatmap between Platform and primary metric"
+    needs: [w1]
+    status: done
+    notes: |
+      Column is sticky left-side (part of the fixed-column group) so it
+      stays visible during horizontal scroll. Uses TrustBadge.
 
-- id: w3
-  summary: "Add trust tier filter chips to BenchmarkIndex filter bar"
-  needs: [w1]
-  status: done
-  notes: |
-    All tiers selected by default. Deselecting a tier hides those rows
-    client-side (no refetch). Render selected count: 'Trust: all' or
-    'Trust: maintainer, community'.
+  - id: w3
+    summary: "Add trust tier filter chips to BenchmarkIndex filter bar"
+    needs: [w1]
+    status: done
+    notes: |
+      All tiers selected by default. Deselecting a tier hides those rows
+      client-side (no refetch). Render selected count: 'Trust: all' or
+      'Trust: maintainer, community'.
 
-- id: w4
-  summary: "Add trust comparability indicator to Compare.tsx header"
-  needs: [w1]
-  status: done
-  notes: |
-    If selected results span multiple trust tiers, show a muted note
-    'Comparing across trust tiers: maintainer, community' (not a
-    warning — just transparency).
+  - id: w4
+    summary: "Add trust comparability indicator to Compare.tsx header"
+    needs: [w1]
+    status: done
+    notes: |
+      If selected results span multiple trust tiers, show a muted note
+      'Comparing across trust tiers: maintainer, community' (not a
+      warning - just transparency).
 
-- id: w5
-  summary: "Write snapshot tests for TrustBadge with all tiers and axe-core contrast check"
-  needs: [w1]
-  status: done
+  - id: w5
+    summary: "Write snapshot tests for TrustBadge with all tiers and axe-core contrast check"
+    needs: [w1]
+    status: done
 
 files_affected:
   added:
-  - "results-explorer/src/components/TrustBadge.tsx"
-  - "results-explorer/src/components/__tests__/TrustBadge.test.tsx"
+    - "results-explorer/src/components/TrustBadge.tsx"
+    - "results-explorer/src/components/__tests__/TrustBadge.test.tsx"
   modified:
-  - "results-explorer/src/components/QueryHeatmap.tsx"
-  - "results-explorer/src/pages/BenchmarkIndex.tsx"
-  - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/components/QueryHeatmap.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
 
 must_preserve:
-- "Default view shows all trust tiers — never hide community results by default"
-- "Trust tier does not affect row ordering within the leaderboard — ranking stays metric-based"
-- "Existing trust_label values in manifest.json — do not reshape the vocabulary"
+  - "Default view shows all trust tiers - never hide community results by default"
+  - "Trust tier does not affect row ordering within the leaderboard - ranking stays metric-based"
+  - "Existing trust_label values in manifest.json - do not reshape the vocabulary"
 
 approach: |
   The trust field already flows through the manifest. This TODO is
-  entirely about rendering — no data pipeline changes. Build the badge
+  entirely about rendering - no data pipeline changes. Build the badge
   first as an isolated component (snapshot-tested), then drop it into
   three places (QueryHeatmap, BenchmarkIndex list view, Compare header).
 
@@ -103,38 +103,38 @@ approach: |
   native rather than bolted on.
 
 anti_patterns:
-- "DO NOT default to hiding community results — because that defeats the trust model — default to showing everything with
-  visible tier labels"
-- "DO NOT use opacity or gray-out to de-emphasize non-maintainer tiers — because that reads as 'don't trust this' rather than
-  'here's the tier' — use explicit badge colors instead"
-- "DO NOT sort by trust tier — because metric-based ranking is the leaderboard's core value — trust is informational, not
-  a sort key"
-- "DO NOT invent new trust vocabulary — because the existing manifest values are the source of truth — render whatever the
-  manifest provides, fall back gracefully on unknown values"
+  - "DO NOT default to hiding community results - because that defeats the trust model - default to showing everything with
+    visible tier labels"
+  - "DO NOT use opacity or gray-out to de-emphasize non-maintainer tiers - because that reads as 'don't trust this' rather than
+    'here's the tier' - use explicit badge colors instead"
+  - "DO NOT sort by trust tier - because metric-based ranking is the leaderboard's core value - trust is informational, not
+    a sort key"
+  - "DO NOT invent new trust vocabulary - because the existing manifest values are the source of truth - render whatever the
+    manifest provides, fall back gracefully on unknown values"
 
 scope_limit:
   only_modify:
-  - "results-explorer/src/components/TrustBadge.tsx"
-  - "results-explorer/src/components/__tests__/TrustBadge.test.tsx"
-  - "results-explorer/src/components/QueryHeatmap.tsx"
-  - "results-explorer/src/pages/BenchmarkIndex.tsx"
-  - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/components/TrustBadge.tsx"
+    - "results-explorer/src/components/__tests__/TrustBadge.test.tsx"
+    - "results-explorer/src/components/QueryHeatmap.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
   do_not_modify:
-  - "benchbox/**"
+    - "benchbox/**"
 
 verification:
-- description: "TrustBadge component exists and exports default"
-  command: "grep -n 'export default' results-explorer/src/components/TrustBadge.tsx"
-  expected_output: "default export present"
-- description: "TypeScript compiles"
-  command: "cd results-explorer && npm run typecheck"
-  expected_output: "no errors"
-- description: "Snapshot tests pass for all known tiers"
-  command: "cd results-explorer && npm test -- TrustBadge"
-  expected_output: "all tests pass"
-- description: "BenchmarkIndex does not default-hide community results"
-  command: "grep -nE 'default.*maintainer|trust.*!==.*community' results-explorer/src/pages/BenchmarkIndex.tsx"
-  expected_output: "no matches (no default hide)"
+  - description: "TrustBadge component exists and exports default"
+    command: "grep -n 'export default' results-explorer/src/components/TrustBadge.tsx"
+    expected_output: "default export present"
+  - description: "TypeScript compiles"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "no errors"
+  - description: "Snapshot tests pass for all known tiers"
+    command: "cd results-explorer && npm test -- TrustBadge"
+    expected_output: "all tests pass"
+  - description: "BenchmarkIndex does not default-hide community results"
+    command: "grep -nE 'default.*maintainer|trust.*!==.*community' results-explorer/src/pages/BenchmarkIndex.tsx"
+    expected_output: "no matches (no default hide)"
 
 metadata:
   tags: ["results", "explorer", "trust", "transparency", "ui"]

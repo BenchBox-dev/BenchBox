@@ -3,7 +3,7 @@
 Runs `pylint --disable=all --enable=duplicate-code` against `benchbox/` at
 the 15-line similarity threshold, reports new clusters above a baseline
 count, and ALWAYS exits 0 (warn-only). The baseline is intentionally loose
-— this hook exists to surface drift, not to block commits. Promote to
+- this hook exists to surface drift, not to block commits. Promote to
 hard-fail in a follow-up TODO once the deferred refactors documented in
 docs/development/duplication-residuals.md (R-06, R-07, R-08, R-09) land
 and the cluster count drops materially below current.

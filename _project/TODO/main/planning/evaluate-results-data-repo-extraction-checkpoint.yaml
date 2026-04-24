@@ -7,8 +7,8 @@ category: Core Functionality
 
 deps:
   needs:
-  - implement-pr-based-result-submission-workflow
-  - define-phase-3-promotion-metrics
+    - implement-pr-based-result-submission-workflow
+    - define-phase-3-promotion-metrics
 
 description: |
   The strategy doc says: "A dedicated `benchbox-results` repository remains
@@ -29,108 +29,108 @@ description: |
   intentional, not forgotten.
 
 work:
-- id: w1
-  summary: "Define the evaluation trigger conditions"
-  status: pending
-  notes: |
-    Pick 2-3 quantitative triggers (any one fires the evaluation):
-      - `results-data/` exceeds 250MB in the main repo
-      - Sustained 20+ community PRs/month (3 consecutive months)
-      - Contributor-reported fork/clone times > 60 seconds on broadband
-    And 1-2 qualitative triggers:
-      - A maintainer formally requests evaluation citing operational pain
-      - Phase 3 design begins (extraction may be a precondition)
-    Document in `_project/analysis/results-data-extraction-trigger.md`.
+  - id: w1
+    summary: "Define the evaluation trigger conditions"
+    status: pending
+    notes: |
+      Pick 2-3 quantitative triggers (any one fires the evaluation):
+        - `results-data/` exceeds 250MB in the main repo
+        - Sustained 20+ community PRs/month (3 consecutive months)
+        - Contributor-reported fork/clone times > 60 seconds on broadband
+      And 1-2 qualitative triggers:
+        - A maintainer formally requests evaluation citing operational pain
+        - Phase 3 design begins (extraction may be a precondition)
+      Document in `_project/analysis/results-data-extraction-trigger.md`.
 
-- id: w2
-  summary: "Write the ADR template covering the trade-offs"
-  needs: [w1]
-  status: pending
-  notes: |
-    Template `docs/development/adr/TEMPLATE-results-data-extraction.md`:
-      - Context (repo size, PR volume at time of decision)
-      - Options:
-          A. Stay in monorepo (status quo)
-          B. Extract to `joeharris76/benchbox-results` (or similar)
-          C. Extract with selective sync (data repo + lightweight pointer
-             in main repo)
-      - For each option:
-          - CI implications (workflows currently in main repo)
-          - Contributor friction (one-repo vs two-repo PR flow)
-          - Hash stability (SHAs change if history is rewritten on extract)
-          - Cross-repo SHA tracking (does the explorer pin a data repo
-             commit?)
-          - Operational cost
-      - Recommended decision matrix scoring template
-      - Decision section (filled in at evaluation time, not now)
-      - Rollback path: how to merge back into the monorepo if extraction
-        proves wrong
-    Reference: `git filter-repo` for the extraction mechanic.
+  - id: w2
+    summary: "Write the ADR template covering the trade-offs"
+    needs: [w1]
+    status: pending
+    notes: |
+      Template `docs/development/adr/TEMPLATE-results-data-extraction.md`:
+        - Context (repo size, PR volume at time of decision)
+        - Options:
+            A. Stay in monorepo (status quo)
+            B. Extract to `joeharris76/benchbox-results` (or similar)
+            C. Extract with selective sync (data repo + lightweight pointer
+               in main repo)
+        - For each option:
+            - CI implications (workflows currently in main repo)
+            - Contributor friction (one-repo vs two-repo PR flow)
+            - Hash stability (SHAs change if history is rewritten on extract)
+            - Cross-repo SHA tracking (does the explorer pin a data repo
+               commit?)
+            - Operational cost
+        - Recommended decision matrix scoring template
+        - Decision section (filled in at evaluation time, not now)
+        - Rollback path: how to merge back into the monorepo if extraction
+          proves wrong
+      Reference: `git filter-repo` for the extraction mechanic.
 
-- id: w3
-  summary: "Add a one-line check in the Phase 3 metrics script that flags trigger"
-  needs: [w1]
-  status: pending
-  notes: |
-    Extend `scripts/phase2_metrics.py` (from `define-phase-3-promotion-metrics`)
-    with a final section that runs the quantitative checks from w1 and
-    prints a clear "EXTRACTION EVALUATION RECOMMENDED: <reason>" message
-    when triggered. This piggybacks on the existing quarterly review
-    cadence — no separate scheduling needed.
+  - id: w3
+    summary: "Add a one-line check in the Phase 3 metrics script that flags trigger"
+    needs: [w1]
+    status: pending
+    notes: |
+      Extend `scripts/phase2_metrics.py` (from `define-phase-3-promotion-metrics`)
+      with a final section that runs the quantitative checks from w1 and
+      prints a clear "EXTRACTION EVALUATION RECOMMENDED: <reason>" message
+      when triggered. This piggybacks on the existing quarterly review
+      cadence - no separate scheduling needed.
 
-- id: w4
-  summary: "Document the evaluation procedure"
-  needs: [w2, w3]
-  status: pending
-  notes: |
-    Append to `_project/analysis/results-data-extraction-trigger.md`:
-      Procedure when triggered:
-        1. Open new TODO `evaluate-results-data-extraction-decision`
-           (active, owner = current maintainer rotation).
-        2. Copy the ADR template to `docs/development/adr/{date}-results-data-extraction.md`.
-        3. Fill in current measurements, score the matrix, write the
-           recommendation.
-        4. Get review from at least one other maintainer.
-        5. Commit decision; if "extract", file a follow-up implementation
-           TODO with explicit migration plan including history-preservation
-           strategy.
-        6. Mark this checkpoint TODO Completed.
+  - id: w4
+    summary: "Document the evaluation procedure"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Append to `_project/analysis/results-data-extraction-trigger.md`:
+        Procedure when triggered:
+          1. Open new TODO `evaluate-results-data-extraction-decision`
+             (active, owner = current maintainer rotation).
+          2. Copy the ADR template to `docs/development/adr/{date}-results-data-extraction.md`.
+          3. Fill in current measurements, score the matrix, write the
+             recommendation.
+          4. Get review from at least one other maintainer.
+          5. Commit decision; if "extract", file a follow-up implementation
+             TODO with explicit migration plan including history-preservation
+             strategy.
+          6. Mark this checkpoint TODO Completed.
 
 verification:
-- description: "Trigger doc exists with quantitative + qualitative conditions"
-  command: "test -f _project/analysis/results-data-extraction-trigger.md && grep -c 'trigger' _project/analysis/results-data-extraction-trigger.md"
-  expected_output: ">= 2"
-- description: "ADR template exists with decision matrix scaffold"
-  command: "test -f docs/development/adr/TEMPLATE-results-data-extraction.md"
-  expected_output: "file exists"
+  - description: "Trigger doc exists with quantitative + qualitative conditions"
+    command: "test -f _project/analysis/results-data-extraction-trigger.md && grep -c 'trigger' _project/analysis/results-data-extraction-trigger.md"
+    expected_output: ">= 2"
+  - description: "ADR template exists with decision matrix scaffold"
+    command: "test -f docs/development/adr/TEMPLATE-results-data-extraction.md"
+    expected_output: "file exists"
 
 must_preserve:
-- The strategy doc's "extract only if churn justifies it" disposition — this TODO encodes the trigger, doesn't pre-decide the extraction.
-- Existing `results-data/` location and structure on `published-results` branch.
-- Working CI workflows that reference `results-data/`.
+  - The strategy doc's "extract only if churn justifies it" disposition - this TODO encodes the trigger, doesn't pre-decide the extraction.
+  - Existing `results-data/` location and structure on `published-results` branch.
+  - Working CI workflows that reference `results-data/`.
 
 anti_patterns:
-- DO NOT pre-commit to extraction — because the trade-offs depend on numbers we don't have yet; this TODO is a forcing function, not a decision.
-- DO NOT pick triggers that require manual measurement — because they will be ignored; favor checks the metrics script can compute.
-- DO NOT design the extracted-repo architecture in this TODO — because that's the work that follows the decision; designing it now anchors the decision.
+  - DO NOT pre-commit to extraction - because the trade-offs depend on numbers we don't have yet; this TODO is a forcing function, not a decision.
+  - DO NOT pick triggers that require manual measurement - because they will be ignored; favor checks the metrics script can compute.
+  - DO NOT design the extracted-repo architecture in this TODO - because that's the work that follows the decision; designing it now anchors the decision.
 
 scope_limit:
   only_modify:
-  - _project/analysis/results-data-extraction-trigger.md
-  - docs/development/adr/TEMPLATE-results-data-extraction.md
-  - scripts/phase2_metrics.py  # one new section appended
+    - _project/analysis/results-data-extraction-trigger.md
+    - docs/development/adr/TEMPLATE-results-data-extraction.md
+    - scripts/phase2_metrics.py # one new section appended
   do_not_touch:
-  - results-data/  # no actual extraction here
-  - benchbox/
-  - .github/workflows/
+    - results-data/ # no actual extraction here
+    - benchbox/
+    - .github/workflows/
 
 metadata:
   tags:
-  - results
-  - architecture
-  - adr
-  - governance
-  - checkpoint
+    - results
+    - architecture
+    - adr
+    - governance
+    - checkpoint
   estimated_effort: "Small"
   created_date: "2026-04-12"
 

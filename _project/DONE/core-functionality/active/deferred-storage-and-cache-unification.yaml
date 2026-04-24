@@ -26,7 +26,7 @@ metadata:
   - storage
   - cache
   - deferred-followup
-  estimated_effort: "Small — 1-2 days"
+  estimated_effort: "Small - 1-2 days"
   created_date: "2026-02-18"
   split_from: unify-dataframe-sql-default-storage-location
 
@@ -64,7 +64,7 @@ scope_limit:
   - "benchbox/results/"
 
 verification:
-- description: "Existing tests pass — storage paths unchanged by default"
+- description: "Existing tests pass - storage paths unchanged by default"
   command: "uv run -- python -m pytest tests/unit/core/dataframe/ -v --tb=short"
   expected_output: "all tests pass, 0 failures"
 - description: "--global-cache flag routes to ~/.benchbox/ location"
@@ -81,7 +81,7 @@ work:
   notes: |
     Wire as a Click option in run.py, pass through the config/context object, thread
     into benchmark_mixin.py and down to data_loader.py. Keep the default branch
-    (no flag) identical to current behavior — only the opt-in path changes.
+    (no flag) identical to current behavior - only the opt-in path changes.
 
 - id: w2
   summary: "Add explicit migration command for existing ~/.benchbox/dataframe-data/ contents to project-local"
@@ -94,6 +94,6 @@ work:
   summary: "Unify cache subdirectory naming between SQL (datagen/) and DataFrame (dataframe-data/) paths"
   status: done
   notes: |
-    Independent of w1 — rename applies to the project-local path regardless of whether
+    Independent of w1 - rename applies to the project-local path regardless of whether
     --global-cache exists. Removed needs: [w1] dependency since local naming and the
     global cache flag are orthogonal concerns.

@@ -17,7 +17,7 @@ description: |
      bound (`<2.4`) and pandas 3.x are mutually exclusive. No modin release
      beyond 0.37.1 exists as of 2026-04-22 that relaxes this cap. Modin is a
      first-class BenchBox platform (benchbox/platforms/dataframe/modin_df.py,
-     extras modin / dataframe-pandas-family / all) — silently excluding it
+     extras modin / dataframe-pandas-family / all) - silently excluding it
      from the resolved environment is not acceptable.
      Watch: https://github.com/modin-project/modin/releases
 
@@ -26,11 +26,11 @@ description: |
      would silently break Python 3.10 users. Either (a) raise the project
      minimum to 3.11 (requires a separate decision and full CI matrix change)
      or (b) confirm that pandas can remain at 2.x for Python 3.10 via
-     environment markers — and verify uv resolves that correctly.
+     environment markers - and verify uv resolves that correctly.
 
   ── PRE-FLIGHT CODE FIXES (required before lock bump, no behaviour change) ──
 
-  3. pandas_df.py:145-155 — `pd.options.mode.copy_on_write` assignment.
+  3. pandas_df.py:145-155 - `pd.options.mode.copy_on_write` assignment.
      In pandas 3.0 this option is deprecated and a no-op. The current code
      sets it unconditionally (guarded only by `pandas_version >= (2, 0)`).
      Fix: add an upper guard `pandas_version < (3, 0)` so the assignment is
@@ -47,22 +47,22 @@ description: |
      different results under 3.x. Audit and add explicit `dtype_backend`,
      `parse_dates=False`, or explicit resolution normalization where the
      downstream code is resolution-sensitive. (CoW in-place mutation audit was
-     clean — no fixes needed there.)
+     clean - no fixes needed there.)
 
   ── EVALUATION SUMMARY ───────────────────────────────────────────────────────
 
   Evaluated 2026-04-22. pandas 3.x breaking changes cross-referenced against
   BenchBox codebase:
-  - DataFrame.swapaxes / append / Index.format() — not used, no impact.
-  - groupby/resample keyword changes — not used in DataFrame platform layer.
-  - datetime-unit changes in read/normalize paths — affects the TPC-DI ingest
+  - DataFrame.swapaxes / append / Index.format() - not used, no impact.
+  - groupby/resample keyword changes - not used in DataFrame platform layer.
+  - datetime-unit changes in read/normalize paths - affects the TPC-DI ingest
     and ETL pipeline only (item 4).
-  - CoW mandatory — in-place mutation audit clean; only item 3 needs a guard.
-  Estimated effort once gates clear: 1–2 days.
+  - CoW mandatory - in-place mutation audit clean; only item 3 needs a guard.
+  Estimated effort once gates clear: 1-2 days.
 
 work:
   - id: w1
-    summary: "Confirm modin ≥ X.Y ships with pandas ≥ 3.0 support — update pyproject.toml modin lower-bound and run `uv lock --upgrade-package modin pandas` to verify resolver accepts it"
+    summary: "Confirm modin ≥ X.Y ships with pandas ≥ 3.0 support - update pyproject.toml modin lower-bound and run `uv lock --upgrade-package modin pandas` to verify resolver accepts it"
     status: pending
 
   - id: w2
@@ -84,7 +84,7 @@ work:
     status: pending
 
   - id: w6
-    summary: "Run targeted pandas/modin/dask/tpcdi suite: `uv run -- python -m pytest tests/unit/platforms/dataframe/ tests/unit/core/tpcdi/ -n 0 -q` — green or explain any new failures before committing"
+    summary: "Run targeted pandas/modin/dask/tpcdi suite: `uv run -- python -m pytest tests/unit/platforms/dataframe/ tests/unit/core/tpcdi/ -n 0 -q` - green or explain any new failures before committing"
     needs: [w5]
     status: pending
 
@@ -101,9 +101,9 @@ files_affected:
 
 must_preserve:
   - "modin platform fully functional after bump (benchbox run --platform modin-df --benchmark tpch works)"
-  - "TPC-DI date/time correctness — no silent 1000x resolution change in datetime → int conversions"
+  - "TPC-DI date/time correctness - no silent 1000x resolution change in datetime → int conversions"
   - "Python 3.10 users either still supported (via marker) or explicitly told the minimum raised"
-  - "Fast test suite baseline: currently 19 pre-existing failures — bump must not add new failures"
+  - "Fast test suite baseline: currently 19 pre-existing failures - bump must not add new failures"
 
 approach: |
   Gate-first for the actual pandas bump, not for every defensive code change.
@@ -117,13 +117,13 @@ approach: |
   change in modin's metadata is the signal.
 
   For the Python gate: the cleanest option is to raise the project minimum to
-  3.11 in a separate, clearly-scoped commit before this item starts — that
+  3.11 in a separate, clearly-scoped commit before this item starts - that
   avoids environment-marker complexity in pyproject.toml.
 
 anti_patterns:
-  - "DO NOT run `uv lock --upgrade-package pandas` before w1 and w2 are done — because the resolver will either fail (modin conflict) or silently install an environment that breaks 3.10 users"
-  - "DO NOT assume the CoW audit applies to future TPC-DS query additions — because new DataFrames created from slice operations (df[mask]) are copy-on-write in 3.x; always use .copy() on slice results before mutation"
-  - "DO NOT change datetime parsing behaviour as part of this item — because read_csv format changes affect result correctness not just performance; audit and preserve existing semantics"
+  - "DO NOT run `uv lock --upgrade-package pandas` before w1 and w2 are done - because the resolver will either fail (modin conflict) or silently install an environment that breaks 3.10 users"
+  - "DO NOT assume the CoW audit applies to future TPC-DS query additions - because new DataFrames created from slice operations (df[mask]) are copy-on-write in 3.x; always use .copy() on slice results before mutation"
+  - "DO NOT change datetime parsing behaviour as part of this item - because read_csv format changes affect result correctness not just performance; audit and preserve existing semantics"
 
 verification:
   - description: "modin platform still functional after pandas 3.x bump"
@@ -135,7 +135,7 @@ verification:
   - description: "TPC-DI datetime correctness"
     command: "uv run -- python -m pytest tests/unit/core/tpcdi/ -n 0 -q"
     expected_output: "All tests pass, 0 new failures"
-  - description: "Full fast smoke suite — no new failures beyond the 19 pre-existing baseline"
+  - description: "Full fast smoke suite - no new failures beyond the 19 pre-existing baseline"
     command: "uv run -- python -m pytest -m fast -q"
     expected_output: "Same 19 pre-existing failures; 0 new failures"
 
@@ -154,9 +154,9 @@ scope_limit:
 
 deferred:
   - summary: "Audit pandas 3.1+ changes (DataFrame constructor string dtype inference, future removals)"
-    reason: "Scope creep — 3.0 compat is the goal here; track 3.1+ removals in the next quarterly bounds review."
+    reason: "Scope creep - 3.0 compat is the goal here; track 3.1+ removals in the next quarterly bounds review."
   - summary: "Upgrade Modin to leverage pandas 3.x-native features (CoW-aware internals, future copy elision)"
-    reason: "Performance optimization, not a compatibility fix — belongs in a dedicated Modin platform improvement item once 3.x compat is confirmed."
+    reason: "Performance optimization, not a compatibility fix - belongs in a dedicated Modin platform improvement item once 3.x compat is confirmed."
 
 metadata:
   tags: ["deps", "pandas", "modin", "python-version", "breaking-change"]

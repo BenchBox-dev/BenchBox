@@ -32,11 +32,11 @@ files_affected:
     - "benchbox/core/h2odb/queries/clickhouse_sql/q9.sql"
 
 must_preserve:
-  - "Base h2odb Q9 query unchanged — other platforms use standard PERCENTILE_CONT syntax"
+  - "Base h2odb Q9 query unchanged - other platforms use standard PERCENTILE_CONT syntax"
   - "ClickHouse override returns identical column names and semantics as the base query"
 
 anti_patterns:
-  - "DO NOT modify base queries.py or default SQL files — because other platforms depend on standard SQL PERCENTILE_CONT — create clickhouse_sql/ override instead"
+  - "DO NOT modify base queries.py or default SQL files - because other platforms depend on standard SQL PERCENTILE_CONT - create clickhouse_sql/ override instead"
 
 approach: |
   Follow existing ClickHouse override patterns in other benchmarks. Check how

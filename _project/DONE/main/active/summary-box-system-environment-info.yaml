@@ -37,9 +37,9 @@ description: |
 
 metadata:
   tags:
-  - visualization
-  - ascii-charts
-  - ux
+    - visualization
+    - ascii-charts
+    - ux
   estimated_effort: Small
   created_date: "2026-02-10"
   last_updated: "2026-02-10"
@@ -50,12 +50,12 @@ impact:
     environment without having to open the JSON result file. Especially useful
     for comparing results across machines or environments.
   technical_debt: |
-    None — this is a new feature addition to existing rendering infrastructure.
+    None - this is a new feature addition to existing rendering infrastructure.
 
 must_preserve:
-- "Existing single-run and comparison summary box layouts still render correctly when system_profile is None"
-- "ASCIISummaryBox.render() remains a pure function (no side effects, no I/O)"
-- "Box width auto-detection still works; environment column only appears when terminal is wide enough"
+  - "Existing single-run and comparison summary box layouts still render correctly when system_profile is None"
+  - "ASCIISummaryBox.render() remains a pure function (no side effects, no I/O)"
+  - "Box width auto-detection still works; environment column only appears when terminal is wide enough"
 
 approach: |
   1. Add optional environment fields to SummaryStats dataclass (os, python, cpus, memory).
@@ -72,50 +72,50 @@ approach: |
   ANSI color handling, and visible-length padding calculations.
 
 anti_patterns:
-- "DO NOT call platform.uname() or psutil at render time — because the renderer should be pure and system info should come
-  from the result object — use result.system_profile"
-- "DO NOT hard-code a fixed box width — because terminal widths vary — use options.get_effective_width() and fall back to
-  single-column if too narrow"
+  - "DO NOT call platform.uname() or psutil at render time - because the renderer should be pure and system info should come
+    from the result object - use result.system_profile"
+  - "DO NOT hard-code a fixed box width - because terminal widths vary - use options.get_effective_width() and fall back to
+    single-column if too narrow"
 
 verification:
-- description: "Existing summary box tests still pass"
-  command: "uv run -- python -m pytest tests/unit/core/visualization/test_post_run_summary.py -v --tb=short"
-  expected_output: "all tests pass, 0 failures"
-- description: "New environment info renders in summary box"
-  command: "uv run -- python -m pytest tests/unit/core/visualization/ -k 'system_environment or env_info' -v --tb=short"
-  expected_output: "new tests pass showing environment details in box"
+  - description: "Existing summary box tests still pass"
+    command: "uv run -- python -m pytest tests/unit/core/visualization/test_post_run_summary.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "New environment info renders in summary box"
+    command: "uv run -- python -m pytest tests/unit/core/visualization/ -k 'system_environment or env_info' -v --tb=short"
+    expected_output: "new tests pass showing environment details in box"
 
 success_metrics:
-- "Summary box displays OS, Python, CPUs, Memory when system_profile is available"
-- "Layout gracefully degrades to single-column when system_profile is None"
-- "Layout gracefully degrades to single-column when terminal width < 60"
-- "Comparison summary boxes also show environment details"
+  - "Summary box displays OS, Python, CPUs, Memory when system_profile is available"
+  - "Layout gracefully degrades to single-column when system_profile is None"
+  - "Layout gracefully degrades to single-column when terminal width < 60"
+  - "Comparison summary boxes also show environment details"
 
 files_affected:
   modified:
-  - "benchbox/core/visualization/ascii/summary_box.py"
-  - "benchbox/core/visualization/post_run_summary.py"
-  - "tests/unit/core/visualization/test_post_run_summary.py"
+    - "benchbox/core/visualization/ascii/summary_box.py"
+    - "benchbox/core/visualization/post_run_summary.py"
+    - "tests/unit/core/visualization/test_post_run_summary.py"
 
 scope_limit:
   only_modify:
-  - "benchbox/core/visualization/ascii/summary_box.py"
-  - "benchbox/core/visualization/post_run_summary.py"
-  - "tests/unit/core/visualization/"
+    - "benchbox/core/visualization/ascii/summary_box.py"
+    - "benchbox/core/visualization/post_run_summary.py"
+    - "tests/unit/core/visualization/"
   do_not_modify:
-  - "benchbox/core/results/"
-  - "benchbox/core/schemas.py"
-  - "benchbox/cli/"
+    - "benchbox/core/results/"
+    - "benchbox/core/schemas.py"
+    - "benchbox/cli/"
 
 work:
-- id: w1
-  summary: "Add optional environment fields to SummaryStats and render two-column layout in ASCIISummaryBox"
-  status: done
-- id: w2
-  summary: "Wire system_profile data from BenchmarkResults into SummaryStats in generate_post_run_summary()"
-  status: done
-  needs: [w1]
-- id: w3
-  summary: "Add tests for environment info rendering (present, absent, narrow terminal)"
-  status: done
-  needs: [w1]
+  - id: w1
+    summary: "Add optional environment fields to SummaryStats and render two-column layout in ASCIISummaryBox"
+    status: done
+  - id: w2
+    summary: "Wire system_profile data from BenchmarkResults into SummaryStats in generate_post_run_summary()"
+    status: done
+    needs: [w1]
+  - id: w3
+    summary: "Add tests for environment info rendering (present, absent, narrow terminal)"
+    status: done
+    needs: [w1]

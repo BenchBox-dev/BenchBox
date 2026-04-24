@@ -166,7 +166,7 @@ metadata:
 
 work:
 # ============================================================================
-# RESEARCH GATES — Must complete before any implementation
+# RESEARCH GATES - Must complete before any implementation
 # ============================================================================
 - id: w1
   summary: "Research gate: spec-governed benchmarks (TPC-DS, SSB, ClickBench)"
@@ -177,7 +177,7 @@ work:
     **TPC-DS** (likely already on target):
     - Read the TPC-DS specification (check _sources/tpc-ds/specification/ if available)
     - Confirm: SF=1 in TPC-DS produces ~1GB per the official spec
-    - Determine: the 379MB compressed / ~1GB uncompressed finding — is this confirmed?
+    - Determine: the 379MB compressed / ~1GB uncompressed finding - is this confirmed?
     - Decision: if confirmed on-target, mark TPC-DS as "no change needed, spec-compliant"
 
     **SSB (Star Schema Benchmark)**:
@@ -189,7 +189,7 @@ work:
     **ClickBench**:
     - Find the original ClickBench benchmark definition (ClickHouse team, GitHub)
     - The original uses 99,997,497 real records (a single fixed dataset, not scalable)
-    - BenchBox uses synthetic generation with 1M base records — this is already a deviation
+    - BenchBox uses synthetic generation with 1M base records - this is already a deviation
     - Since BenchBox's generator is custom and already ~0.9GB at SF=1: likely no change needed
     - If the ClickBench spec defines a standard dataset size, document compliance status
 
@@ -206,7 +206,7 @@ work:
     **CoffeeShop**:
     - Reference: https://github.com/JosueBogran/coffeeshopdatageneratorv2
     - This is a BenchBox-adapted benchmark inspired by a public generator, not a published spec
-    - Likely fully adjustable — confirm no published paper defines 50M orders as canonical
+    - Likely fully adjustable - confirm no published paper defines 50M orders as canonical
     - Current: 50M orders → ~6GB uncompressed (6x over). Target: ~8M orders → ~1GB
     - Decision: determine exact base order count for ~1GB uncompressed output
 
@@ -233,7 +233,7 @@ work:
     - Reference: https://github.com/h2oai/db-benchmark (H2O.ai, 2018)
     - The original defines tiers: 0.5GB, 5GB, 50GB
     - Key question: does the 0.5GB tier correspond to ~1M rows? What does 1GB correspond to?
-    - The standard "small" tier uses 10M rows — matching this is valuable and important
+    - The standard "small" tier uses 10M rows - matching this is valuable and important
     - If 10M rows produces ~1.5GB: use 10M anyway (matching a published sizing takes precedence)
     - If there is a tier that naturally produces ~1GB: prefer that
     - Determine the recommended base_trips value
@@ -260,14 +260,14 @@ work:
     - Key question: does the TSBS spec define "100 hosts, 1 day" as canonical SF=1?
     - Key question: should we increase hosts (100→N), duration (1→N days), or both?
     - Increasing hosts changes cardinality (more distinct time series). Increasing days changes
-      temporal coverage. These have different benchmark characteristics — determine which is
+      temporal coverage. These have different benchmark characteristics - determine which is
       preferred for join/aggregation query patterns used in BenchBox's TSBS query set
     - CompressionMixin: TSBS currently outputs uncompressed CSV. Adding compression is likely
-      fine — the TSBS spec is about query patterns, not file format. Confirm.
+      fine - the TSBS spec is about query patterns, not file format. Confirm.
 
     **FlightData**:
     - Reference: US Bureau of Transportation Statistics (BTS) dataset
-    - No formal benchmark specification — this is a real-data analytics benchmark
+    - No formal benchmark specification - this is a real-data analytics benchmark
     - Code comments claim SF=1 ≈ 1GB (downloader.py:91) but actual is 416MB uncompressed
     - Key question: is the 416MB from synthetic fallback or real BTS download?
     - If synthetic: the synthetic generator may undercount rows per month. Investigate.
@@ -277,7 +277,7 @@ work:
 
     **NYC Taxi**:
     - Reference: NYC TLC Trip Record Data (public dataset)
-    - No formal benchmark specification — this is a real-data analytics benchmark
+    - No formal benchmark specification - this is a real-data analytics benchmark
     - Current: sample_rate = SF/100, so SF=1 = 1% sample → 96MB uncompressed
     - Key question: what sample rate produces ~1GB? Is SF=1 → 10% sample appropriate?
     - Changing divisor from 100 to 10 makes SF=1 = 10% sample, SF=10 = full dataset
@@ -288,7 +288,7 @@ work:
     semantic meaning to preserve in documentation/comments.
 
 # ============================================================================
-# IMPLEMENTATIONS — Oversized benchmarks (reduce to ~1GB)
+# IMPLEMENTATIONS - Oversized benchmarks (reduce to ~1GB)
 # ============================================================================
 - id: w4
   summary: "CoffeeShop: reduce base order count to target ~1GB uncompressed at SF=1"
@@ -328,7 +328,7 @@ work:
     6. Run fast tests to verify no regressions
 
 # ============================================================================
-# IMPLEMENTATIONS — Undersized synthetic benchmarks (increase to ~1GB)
+# IMPLEMENTATIONS - Undersized synthetic benchmarks (increase to ~1GB)
 # ============================================================================
 - id: w6
   summary: "H2O DB: increase base_trips to match published tier targeting ~1GB at SF=1"
@@ -340,7 +340,7 @@ work:
 
     If w2 determines H2O's published 0.5GB tier = X rows and 1GB tier = Y rows, use Y.
     If H2O's "small" tier (10M rows) is the closest standard sizing, use 10M even if it
-    produces ~1.5GB — matching a published sizing takes precedence over exact 1GB parity.
+    produces ~1.5GB - matching a published sizing takes precedence over exact 1GB parity.
 
     Steps:
     1. Apply constant change from w2 findings
@@ -376,7 +376,7 @@ work:
 
     IF w1 determines SSB spec defines SF=1 = 6M lineorders as mandatory:
     - Document ~720MB as spec-compliant in generator docstring
-    - Mark this work item as "no change — spec-locked" and skip
+    - Mark this work item as "no change - spec-locked" and skip
     - Still create a datagen test that validates the spec-compliant size
 
     IF w1 determines SSB base counts are adjustable:
@@ -386,7 +386,7 @@ work:
     - Run fast tests
 
 # ============================================================================
-# IMPLEMENTATIONS — Real-data / time-series benchmarks (adjust + add compression)
+# IMPLEMENTATIONS - Real-data / time-series benchmarks (adjust + add compression)
 # ============================================================================
 - id: w9
   summary: "NYC Taxi: change sample rate to target ~1GB at SF=1 + add CompressionMixin"
@@ -449,7 +449,7 @@ work:
     7. Run fast tests
 
 # ============================================================================
-# IMPLEMENTATIONS — Near-target benchmarks (minor adjustments if needed)
+# IMPLEMENTATIONS - Near-target benchmarks (minor adjustments if needed)
 # ============================================================================
 - id: w12
   summary: "ClickBench: apply minor adjustment if research gate identifies need"
@@ -466,7 +466,7 @@ work:
     - Consider whether bumping to 1.1M records would better align with a published reference
     - Only change if there's a clear specification basis
 
-    IF no published sizing applies (likely — original ClickBench is a fixed dataset):
+    IF no published sizing applies (likely - original ClickBench is a fixed dataset):
     - Accept ~0.9GB as within tolerance, document, skip
     - Still create a datagen test that validates current size
 
@@ -484,7 +484,7 @@ work:
 
     This work item should be built incrementally: create the test file and scaffold after
     research gates complete, then add each benchmark's size assertion as its implementation
-    (w4-w12) finishes. Do not wait for all implementations — add tests as benchmarks land.
+    (w4-w12) finishes. Do not wait for all implementations - add tests as benchmarks land.
 
     For each benchmark that was modified, create a test that:
     1. Generates data at SF=0.01 (fast, suitable for CI)

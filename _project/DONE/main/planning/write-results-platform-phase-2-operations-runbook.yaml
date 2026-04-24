@@ -9,7 +9,7 @@ category: Documentation
 
 deps:
   needs:
-  - implement-pr-based-result-submission-workflow
+    - implement-pr-based-result-submission-workflow
 
 description: |
   Phase 2 operates entirely on GitHub PRs against `published-results` plus
@@ -25,117 +25,117 @@ description: |
   of the platform; it documents what's already true.
 
 work:
-- id: w1
-  summary: "Outline the runbook based on the actual Phase 2 surface"
-  status: done
-  notes: |
-    Headings (in order):
-      1. What Phase 2 is (one paragraph + link to strategy doc)
-      2. The submission lifecycle (contributor PR → CI → review → merge → rebuild)
-      3. Maintainer review checklist (what to accept, what to reject, what to ask for)
-      4. CI failure triage (validate-submission red checks: hash, schema, sanity, what each means and how to coach the contributor)
-      5. Backfilling corpus-inventory.json (run the generator, commit, push)
-      6. Rolling back a bad merge (revert PR, force CI rebuild, communicate)
-      7. Re-triggering an explorer rebuild without a new merge
-      8. Where the data lives (branch, paths, sidecars)
-      9. Where the code lives (key files table)
-      10. Escalation: when something breaks that this runbook doesn't cover
-    Save outline as draft 1; iterate after w2-w4 to fill it in with real
-    examples.
+  - id: w1
+    summary: "Outline the runbook based on the actual Phase 2 surface"
+    status: done
+    notes: |
+      Headings (in order):
+        1. What Phase 2 is (one paragraph + link to strategy doc)
+        2. The submission lifecycle (contributor PR → CI → review → merge → rebuild)
+        3. Maintainer review checklist (what to accept, what to reject, what to ask for)
+        4. CI failure triage (validate-submission red checks: hash, schema, sanity, what each means and how to coach the contributor)
+        5. Backfilling corpus-inventory.json (run the generator, commit, push)
+        6. Rolling back a bad merge (revert PR, force CI rebuild, communicate)
+        7. Re-triggering an explorer rebuild without a new merge
+        8. Where the data lives (branch, paths, sidecars)
+        9. Where the code lives (key files table)
+        10. Escalation: when something breaks that this runbook doesn't cover
+      Save outline as draft 1; iterate after w2-w4 to fill it in with real
+      examples.
 
-- id: w2
-  summary: "Document the maintainer review checklist with concrete reject criteria"
-  needs: [w1]
-  status: done
-  notes: |
-    Pull from `docs/contributing-results.md` quality expectations and
-    extend with reject criteria the contributor docs intentionally don't
-    list (so as not to discourage contributions):
-      - Bundle metadata missing required fields (CI catches; manual review
-        confirms)
-      - Suspicious environment metadata (e.g., 0 RAM, 0 CPU)
-      - Partial-coverage cohorts that would mislead compare view
-      - Bundle paths that don't follow `bundles/<benchmark>/<platform>/sf<scale>/<id>/`
-      - Submitter has not addressed CI feedback within 14 days → close with thanks
-    Each criterion: one-line rule + one-line explanation + suggested PR
-    comment template.
+  - id: w2
+    summary: "Document the maintainer review checklist with concrete reject criteria"
+    needs: [w1]
+    status: done
+    notes: |
+      Pull from `docs/contributing-results.md` quality expectations and
+      extend with reject criteria the contributor docs intentionally don't
+      list (so as not to discourage contributions):
+        - Bundle metadata missing required fields (CI catches; manual review
+          confirms)
+        - Suspicious environment metadata (e.g., 0 RAM, 0 CPU)
+        - Partial-coverage cohorts that would mislead compare view
+        - Bundle paths that don't follow `bundles/<benchmark>/<platform>/sf<scale>/<id>/`
+        - Submitter has not addressed CI feedback within 14 days → close with thanks
+      Each criterion: one-line rule + one-line explanation + suggested PR
+      comment template.
 
-- id: w3
-  summary: "Document CI failure triage with sample messages"
-  needs: [w1]
-  status: done
-  notes: |
-    For each error class produced by `scripts/validate_submission.py`:
-      - What it means
-      - What the contributor needs to do
-      - What the maintainer should NOT do (e.g., never bypass the check
-        and merge anyway)
-    Pull the actual error message strings from
-    `scripts/validate_submission.py` so the runbook is greppable.
+  - id: w3
+    summary: "Document CI failure triage with sample messages"
+    needs: [w1]
+    status: done
+    notes: |
+      For each error class produced by `scripts/validate_submission.py`:
+        - What it means
+        - What the contributor needs to do
+        - What the maintainer should NOT do (e.g., never bypass the check
+          and merge anyway)
+      Pull the actual error message strings from
+      `scripts/validate_submission.py` so the runbook is greppable.
 
-- id: w4
-  summary: "Document the rollback path with explicit commands"
-  needs: [w1]
-  status: done
-  notes: |
-    Step-by-step:
-      1. Identify the offending merge commit on `published-results`.
-      2. `git revert -m 1 <sha>` (merge commit) — branch is private, so
-         force-push is allowed only after review.
-      3. Push the revert; CI rebuilds the explorer.
-      4. Communicate: comment on the original PR explaining the revert.
-      5. If the bundle is "wrong" not "broken" (e.g., misleading
-         metadata), keep the revert and ask for a corrected resubmission.
-    Include the explicit `gh` and `git` commands. No prose-only steps.
+  - id: w4
+    summary: "Document the rollback path with explicit commands"
+    needs: [w1]
+    status: done
+    notes: |
+      Step-by-step:
+        1. Identify the offending merge commit on `published-results`.
+        2. `git revert -m 1 <sha>` (merge commit) - branch is private, so
+           force-push is allowed only after review.
+        3. Push the revert; CI rebuilds the explorer.
+        4. Communicate: comment on the original PR explaining the revert.
+        5. If the bundle is "wrong" not "broken" (e.g., misleading
+           metadata), keep the revert and ask for a corrected resubmission.
+      Include the explicit `gh` and `git` commands. No prose-only steps.
 
-- id: w5
-  summary: "Publish runbook and link from key entry points"
-  needs: [w2, w3, w4]
-  status: done
-  notes: |
-    Save as `docs/operations/results-phase-2-runbook.md`. Link from:
-      - `docs/contributing-results.md` (one line: "Maintainers: see ops
-        runbook")
-      - `_project/handoffs/results-publishing-handoff-2026-04-04.md`
-        (replace ad-hoc operational notes with a link to the runbook)
-      - The Phase 2 ops one-liner referenced in
-        `automate-corpus-inventory-generation` work unit w6.
+  - id: w5
+    summary: "Publish runbook and link from key entry points"
+    needs: [w2, w3, w4]
+    status: done
+    notes: |
+      Save as `docs/operations/results-phase-2-runbook.md`. Link from:
+        - `docs/contributing-results.md` (one line: "Maintainers: see ops
+          runbook")
+        - `_project/handoffs/results-publishing-handoff-2026-04-04.md`
+          (replace ad-hoc operational notes with a link to the runbook)
+        - The Phase 2 ops one-liner referenced in
+          `automate-corpus-inventory-generation` work unit w6.
 
 verification:
-- description: "Runbook exists and covers all 10 outlined sections"
-  command: "test -f docs/operations/results-phase-2-runbook.md && grep -c '^## ' docs/operations/results-phase-2-runbook.md"
-  expected_output: ">= 10"
-- description: "Each cited rollback command is a real, runnable command (no placeholders)"
-  command: "grep -E '<sha>|<TODO>|<placeholder>' docs/operations/results-phase-2-runbook.md"
-  expected_output: "no matches (other than the literal example placeholder for sha which is documented as such)"
+  - description: "Runbook exists and covers all 10 outlined sections"
+    command: "test -f docs/operations/results-phase-2-runbook.md && grep -c '^## ' docs/operations/results-phase-2-runbook.md"
+    expected_output: ">= 10"
+  - description: "Each cited rollback command is a real, runnable command (no placeholders)"
+    command: "grep -E '<sha>|<TODO>|<placeholder>' docs/operations/results-phase-2-runbook.md"
+    expected_output: "no matches (other than the literal example placeholder for sha which is documented as such)"
 
 must_preserve:
-- The contributor-facing docs at `docs/contributing-results.md` — runbook is for maintainers, not contributors; do not rewrite contributor content.
-- The Phase 2 git-as-source-of-truth model — runbook documents the existing flows, doesn't add new tools.
-- Strategy doc as the source of truth for *why*; runbook is *how*.
+  - The contributor-facing docs at `docs/contributing-results.md` - runbook is for maintainers, not contributors; do not rewrite contributor content.
+  - The Phase 2 git-as-source-of-truth model - runbook documents the existing flows, doesn't add new tools.
+  - Strategy doc as the source of truth for *why*; runbook is *how*.
 
 anti_patterns:
-- DO NOT use the runbook to invent new procedures — because if something needs procedural change, it needs a TODO and review, not a docs commit; runbook captures *current* practice.
-- DO NOT duplicate the contributor guide content — because two sources of truth drift; link to `contributing-results.md` instead of restating it.
-- DO NOT document Phase 3 procedures in this runbook — because Phase 3 doesn't exist yet; create a separate Phase 3 runbook only after Phase 3 is built.
+  - DO NOT use the runbook to invent new procedures - because if something needs procedural change, it needs a TODO and review, not a docs commit; runbook captures *current* practice.
+  - DO NOT duplicate the contributor guide content - because two sources of truth drift; link to `contributing-results.md` instead of restating it.
+  - DO NOT document Phase 3 procedures in this runbook - because Phase 3 doesn't exist yet; create a separate Phase 3 runbook only after Phase 3 is built.
 
 scope_limit:
   only_modify:
-  - docs/operations/results-phase-2-runbook.md
-  - docs/contributing-results.md  # add one link only
-  - _project/handoffs/results-publishing-handoff-2026-04-04.md  # add link, remove duplicated ops content
+    - docs/operations/results-phase-2-runbook.md
+    - docs/contributing-results.md # add one link only
+    - _project/handoffs/results-publishing-handoff-2026-04-04.md # add link, remove duplicated ops content
   do_not_touch:
-  - benchbox/
-  - results-explorer/
-  - .github/workflows/
+    - benchbox/
+    - results-explorer/
+    - .github/workflows/
 
 metadata:
   tags:
-  - documentation
-  - operations
-  - runbook
-  - phase-2
-  - results
+    - documentation
+    - operations
+    - runbook
+    - phase-2
+    - results
   estimated_effort: "Small"
   created_date: "2026-04-12"
 

@@ -11,7 +11,7 @@ description: |
   with rationale comments in pyproject.toml. Those caps are enforced by
   `uv lock` at install time, but nothing today blocks a release if:
     - a capped dep has drifted close to its ceiling (locked at ceiling-1
-      minor — forces a bump/hold decision the moment upstream ships the
+      minor - forces a bump/hold decision the moment upstream ships the
       next major)
     - the cap is silently masking a stale pin (the locked version has
       been frozen for many minors while the upstream has moved on)
@@ -39,7 +39,7 @@ work:
     summary: "Implement `--report-only` mode: for each capped dep, fetch upstream changelog between locked and ceiling; surface breaking-change keywords into release-notes draft artifact (markdown)."
     needs: [w1]
     status: done
-    note: "Delivered the markdown report (status table: locked / cap / severity) and wired it as a release artifact. The network-based changelog-diff + breaking-change keyword grep was descoped — the TODO itself anti-patterned blocking on keyword grep, and an offline status table already gives release reviewers the signal. If the network-fetch pattern becomes necessary, split into a follow-up TODO."
+    note: "Delivered the markdown report (status table: locked / cap / severity) and wired it as a release artifact. The network-based changelog-diff + breaking-change keyword grep was descoped - the TODO itself anti-patterned blocking on keyword grep, and an offline status table already gives release reviewers the signal. If the network-fetch pattern becomes necessary, split into a follow-up TODO."
 
   - id: w4
     summary: "Wire into .github/workflows/release.yml as a required job before tag/publish. Uses `--fail-on=ceiling-minus-one` for the blocking step and `--report-only` for the release-notes surfacing."
@@ -47,7 +47,7 @@ work:
     status: done
 
   - id: w5
-    summary: "Update review-dependency-upper-bounds-quarterly.yaml to invoke the same script for the quarterly review — single source of truth for bounds health."
+    summary: "Update review-dependency-upper-bounds-quarterly.yaml to invoke the same script for the quarterly review - single source of truth for bounds health."
     needs: [w4]
     status: done
 
@@ -88,10 +88,10 @@ approach: |
   check logic doesn't drift between the two entry points.
 
 anti_patterns:
-  - "DO NOT block release on changelog-diff content — because changelogs are noisy and keyword-based grep will false-positive — surface-only mode is report-only"
-  - "DO NOT hard-code the capped dep list in the script — because that duplicates pyproject.toml and will drift — parse from pyproject.toml at runtime"
-  - "DO NOT require network for the blocking gate — because CI will page on upstream outages — keep --fail-on=ceiling-minus-one fully offline against uv.lock"
-  - "DO NOT silently skip on lockfile parse failures — because that turns the gate into theater — fail hard with a clear error"
+  - "DO NOT block release on changelog-diff content - because changelogs are noisy and keyword-based grep will false-positive - surface-only mode is report-only"
+  - "DO NOT hard-code the capped dep list in the script - because that duplicates pyproject.toml and will drift - parse from pyproject.toml at runtime"
+  - "DO NOT require network for the blocking gate - because CI will page on upstream outages - keep --fail-on=ceiling-minus-one fully offline against uv.lock"
+  - "DO NOT silently skip on lockfile parse failures - because that turns the gate into theater - fail hard with a clear error"
 
 scope_limit:
   only_modify:
@@ -103,7 +103,7 @@ scope_limit:
   do_not_modify:
     - "pyproject.toml caps (use as-is; bump is a separate decision)"
     - "uv.lock (the gate reads it; does not write it)"
-    - "other workflows (lint/test/docs) — release-only gate"
+    - "other workflows (lint/test/docs) - release-only gate"
 
 verification:
   - description: "Script runs clean against current lockfile"
@@ -126,5 +126,5 @@ metadata:
 
 success_metrics:
   - "Release workflow has a blocking `dependency-bounds` job that reads pyproject + uv.lock offline"
-  - "Quarterly review TODO invokes the same script — no duplicated check logic"
+  - "Quarterly review TODO invokes the same script - no duplicated check logic"
   - "AGENTS.md documents the gate and its two modes so contributors understand the signal"

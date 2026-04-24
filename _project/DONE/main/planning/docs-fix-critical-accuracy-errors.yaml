@@ -1,5 +1,5 @@
 id: docs-fix-critical-accuracy-errors
-title: "Fix critical documentation accuracy errors — broken code, phantom benchmark, wrong flags"
+title: "Fix critical documentation accuracy errors - broken code, phantom benchmark, wrong flags"
 worktree: main
 priority: High
 status: Completed
@@ -43,9 +43,9 @@ impact:
     ai-primitives will find it doesn't exist. Users following dataframe
     quickstart will get CLI errors from wrong flags.
   maintainer_impact: |
-    None — documentation-only changes.
+    None - documentation-only changes.
   regression_risk: |
-    Zero — no code changes.
+    Zero - no code changes.
 
 work:
 - id: w1
@@ -60,7 +60,7 @@ work:
   - docs/advanced/custom-benchmarks.md
 
 - id: w2
-  summary: "Remove or stub ai-primitives.md — no implementation exists"
+  summary: "Remove or stub ai-primitives.md - no implementation exists"
   status: done
   needs: []
   description: |

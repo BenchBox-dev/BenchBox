@@ -67,7 +67,7 @@ work:
       `results-explorer/test-fixtures/.generated/` with the curated public
       corpus untouched, (3) Chromium full suite is the required blocking
       gate while Firefox and WebKit run `@smoke` only and graduate on flake
-      data, (4) no production-code seam is added for failure injection —
+      data, (4) no production-code seam is added for failure injection -
       all error paths are exercised through Playwright `page.route()`,
       `setOffline`, permissions grants, and download events.
 
@@ -287,11 +287,11 @@ approach: |
   7. wire CI and residual manual release checks
 
 anti_patterns:
-  - "DO NOT begin implementation before the research gate closes the open questions — because the built-app target, fixture location, and browser matrix materially change the shape of the solution — lock those decisions first."
-  - "DO NOT point the browser suite at ad-hoc mocked JSON or a jsdom-only harness — because the missing coverage is specifically real browser DuckDB-WASM, routing, clipboard, and download behavior — run against generated `results.duckdb` and actual built assets."
-  - "DO NOT rely on whichever artifacts happen to exist in `results-explorer/public/data/` — because the working tree is not deterministic and may not include the variants needed for coverage — generate a fixture corpus per run."
-  - "DO NOT mutate `results-data/bundles/` or the committed curated corpus to create edge cases — because that pollutes real published data with test-only scenarios — synthesize variants in an isolated fixture workspace."
-  - "DO NOT make all three browsers blocking before flake characteristics are known — because a noisy gate will stall adoption — require Chromium first and graduate Firefox/WebKit based on research-gate evidence."
+  - "DO NOT begin implementation before the research gate closes the open questions - because the built-app target, fixture location, and browser matrix materially change the shape of the solution - lock those decisions first."
+  - "DO NOT point the browser suite at ad-hoc mocked JSON or a jsdom-only harness - because the missing coverage is specifically real browser DuckDB-WASM, routing, clipboard, and download behavior - run against generated `results.duckdb` and actual built assets."
+  - "DO NOT rely on whichever artifacts happen to exist in `results-explorer/public/data/` - because the working tree is not deterministic and may not include the variants needed for coverage - generate a fixture corpus per run."
+  - "DO NOT mutate `results-data/bundles/` or the committed curated corpus to create edge cases - because that pollutes real published data with test-only scenarios - synthesize variants in an isolated fixture workspace."
+  - "DO NOT make all three browsers blocking before flake characteristics are known - because a noisy gate will stall adoption - require Chromium first and graduate Firefox/WebKit based on research-gate evidence."
 
 verification:
   - description: "The TODO item itself validates cleanly"
@@ -324,7 +324,7 @@ verification:
   - description: "Any Python-side fixture-generation or explorer-pipeline glue stays green"
     command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline -q"
     expected_output: "All targeted Python explorer-pipeline tests pass"
-  - description: "Residual manual release check is executed after meaningful explorer changes (manual — no command by design)"
+  - description: "Residual manual release check is executed after meaningful explorer changes (manual - no command by design)"
     expected_output: "One short Chrome/Firefox/Safari pass is documented for Home, BenchmarkIndex, ResultDetail, Compare, and Query pages"
 
 scope_limit:

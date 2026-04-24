@@ -114,10 +114,10 @@ must_preserve:
 - "No new required dependencies added to core install"
 
 anti_patterns:
-- "DO NOT modify spark.py or pyspark adapters — because LakeSail should be additive — create separate lakesail.py"
-- "DO NOT add pyspark as a required dependency — because it is large and only needed for LakeSail/Spark users — keep it as
+- "DO NOT modify spark.py or pyspark adapters - because LakeSail should be additive - create separate lakesail.py"
+- "DO NOT add pyspark as a required dependency - because it is large and only needed for LakeSail/Spark users - keep it as
   an optional dependency"
-- "DO NOT create a local SparkSession directly — because LakeSail uses Spark Connect to a Sail server — connect via remote
+- "DO NOT create a local SparkSession directly - because LakeSail uses Spark Connect to a Sail server - connect via remote
   endpoint"
 
 verification:

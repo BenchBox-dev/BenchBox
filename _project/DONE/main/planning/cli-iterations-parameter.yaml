@@ -8,7 +8,7 @@ completed_date: "2026-04-10"
 description: |
   The power test runs a fixed 3 measurement iterations (GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
   in benchbox/core/constants.py). Users have no way to control this from the CLI, which makes
-  isolation testing and statistical analysis cumbersome — the only workaround is looping the
+  isolation testing and statistical analysis cumbersome - the only workaround is looping the
   CLI command manually.
 
   The orchestrator and RunConfig already fully support variable iteration counts:
@@ -46,10 +46,10 @@ justification: |
 
   --benchmark-option was considered but rejected: BenchmarkHookRegistry.parse_options
   raises BenchmarkOptionError for unregistered keys, and power_iterations is not a
-  benchmark-specific setting — it's a run-control setting that applies universally.
+  benchmark-specific setting - it's a run-control setting that applies universally.
 
   @advanced_option (hidden from --help, visible in --help-topic all) is the right
-  tier — matches how --seed and --mode are handled.
+  tier - matches how --seed and --mode are handled.
 
 work:
 - id: w1
@@ -94,10 +94,10 @@ must_preserve:
 - "Orchestrator and RunConfig require no changes"
 
 anti_patterns:
-- "DO NOT use @click.option instead of @advanced_option — --iterations should be hidden from --help to avoid parameter bloat"
-- "DO NOT add --warmup-iterations in this change — out of scope"
-- "DO NOT update the MCP tool — it hardcodes phases=power and is out of scope"
-- "DO NOT change the default in constants.py — only the CLI wiring changes"
+- "DO NOT use @click.option instead of @advanced_option - --iterations should be hidden from --help to avoid parameter bloat"
+- "DO NOT add --warmup-iterations in this change - out of scope"
+- "DO NOT update the MCP tool - it hardcodes phases=power and is out of scope"
+- "DO NOT change the default in constants.py - only the CLI wiring changes"
 
 verification:
 - description: "Default still produces 3 iterations"

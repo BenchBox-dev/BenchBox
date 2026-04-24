@@ -73,11 +73,11 @@ must_preserve:
 - "Existing ClickHouse unit and integration tests continue to pass"
 
 anti_patterns:
-- "DO NOT break existing ClickHouse self-hosted modes (server, chdb) — because self-hosted users must not be affected — add
+- "DO NOT break existing ClickHouse self-hosted modes (server, chdb) - because self-hosted users must not be affected - add
   cloud mode as a new code path alongside existing modes"
-- "DO NOT refactor existing ClickHouse connection logic — because server and chdb modes are stable — add cloud authentication
+- "DO NOT refactor existing ClickHouse connection logic - because server and chdb modes are stable - add cloud authentication
   as an additional branch"
-- "DO NOT require cloud credentials for non-cloud modes — because self-hosted users should not need cloud configuration —
+- "DO NOT require cloud credentials for non-cloud modes - because self-hosted users should not need cloud configuration -
   gate cloud config behind deployment mode checks"
 
 verification:

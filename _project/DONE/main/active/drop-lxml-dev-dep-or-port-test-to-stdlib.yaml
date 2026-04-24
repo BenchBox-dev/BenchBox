@@ -61,7 +61,7 @@ approach: |
   what lxml feature it actually uses. Don't blindly remove and break.
 
 anti_patterns:
-  - "DO NOT remove lxml without porting the test — because `pytest tests/unit/core/tpcdi/test_etl_sources.py` would break — port first, remove second"
+  - "DO NOT remove lxml without porting the test - because `pytest tests/unit/core/tpcdi/test_etl_sources.py` would break - port first, remove second"
 
 verification:
   - description: "Test still passes"
@@ -91,7 +91,7 @@ impact:
   business_value: |
     One fewer dep to keep installed for contributors. Smaller dev environment.
   user_impact: |
-    None directly — lxml is dev-only today. Indirectly, faster `uv sync --group dev`.
+    None directly - lxml is dev-only today. Indirectly, faster `uv sync --group dev`.
   technical_debt: |
     Closes finding F3 from the dependency-inventory audit.
 

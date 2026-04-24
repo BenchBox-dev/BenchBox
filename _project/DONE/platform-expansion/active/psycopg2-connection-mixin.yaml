@@ -33,7 +33,7 @@ work:
   summary: "Audit methods shared by PostgreSQLAdapter and QuestDBAdapter; decide mixin boundary"
   status: done
   notes: |
-    Candidates: _validate_identifier (diverges on length limit — needs class constant),
+    Candidates: _validate_identifier (diverges on length limit - needs class constant),
     close_connection (identical), _get_existing_tables (both now cursor-based),
     execute_query (QuestDB should delegate to execute_sql_query() helper instead of inlining).
     Not in scope: get_query_plan (EXPLAIN ANALYZE vs plain EXPLAIN), _get_connection_params
@@ -67,7 +67,7 @@ work:
 must_preserve:
 - "PostgreSQLAdapter continues to support TimescaleDB extensions via enable_timescale flag"
 - "QuestDBAdapter continues to use REST API/ILP for its primary data loading path"
-- "QuestDB _validate_identifier uses 127-char limit, PostgreSQL uses 63-char limit — do not unify to one value"
+- "QuestDB _validate_identifier uses 127-char limit, PostgreSQL uses 63-char limit - do not unify to one value"
 - "CedarDB, TimescaleDB, pg_duckdb, pg_mooncake continue to work unchanged via transitive PostgreSQLAdapter inheritance"
 - "execute_sql_query() helper in base/sql_execution.py remains the canonical implementation for cursor-based query execution"
 
@@ -88,18 +88,18 @@ approach: |
      - _validate_identifier() using the class constant
      - close_connection() (identical in both)
      - _get_existing_tables() using information_schema.tables cursor-based default
-  3. Write mixin unit tests (w3) — mock psycopg2, no live DB.
+  3. Write mixin unit tests (w3) - mock psycopg2, no live DB.
   4. Refactor PostgreSQLAdapter (w4): inherit Psycopg2ConnectionMixin, delete duplicated methods.
   5. Refactor QuestDBAdapter (w5): inherit Psycopg2ConnectionMixin, set _max_identifier_length=127,
      override _get_existing_tables() to use tables() function, make execute_query() delegate to
      execute_sql_query() helper instead of inlining.
 
 anti_patterns:
-- "DO NOT inherit QuestDBAdapter from PostgreSQLAdapter — because they diverge fundamentally in database management, data
-  loading, and catalog queries — use Psycopg2ConnectionMixin directly."
-- "DO NOT unify _validate_identifier length limits to a single constant — because QuestDB (127) and PostgreSQL (63) have different
-  limits and unifying silently applies the wrong limit — use a class constant _max_identifier_length that each adapter sets."
-- "DO NOT move get_query_plan to the mixin — because PostgreSQL uses EXPLAIN ANALYZE and QuestDB uses plain EXPLAIN — they
+- "DO NOT inherit QuestDBAdapter from PostgreSQLAdapter - because they diverge fundamentally in database management, data
+  loading, and catalog queries - use Psycopg2ConnectionMixin directly."
+- "DO NOT unify _validate_identifier length limits to a single constant - because QuestDB (127) and PostgreSQL (63) have different
+  limits and unifying silently applies the wrong limit - use a class constant _max_identifier_length that each adapter sets."
+- "DO NOT move get_query_plan to the mixin - because PostgreSQL uses EXPLAIN ANALYZE and QuestDB uses plain EXPLAIN - they
   must stay as adapter-specific overrides."
 
 verification:

@@ -8,29 +8,29 @@ description: |
   Documentation audit (2026-04-01) found several docs referencing deprecated
   commands, stale module paths, or outdated information:
 
-  1. docs/guides/dataframe-comparison.md — documents deprecated
+  1. docs/guides/dataframe-comparison.md - documents deprecated
      compare-dataframes command. Has deprecation notice but entire file
      still walks through old workflow.
 
-  2. docs/reference/cli/tuning.md — still references create-sample-tuning
+  2. docs/reference/cli/tuning.md - still references create-sample-tuning
      (hidden/deprecated in code). Should only document tuning init.
 
-  3. docs/advanced/power-run-concurrent-queries.md — may reference an
+  3. docs/advanced/power-run-concurrent-queries.md - may reference an
      outdated execution model. PowerRunExecutor actually exists at
      benchbox.utils.execution_manager (line 148). Verify doc accuracy
      against current API rather than assuming it's wrong.
 
-  4. docs/performance/dataframe-benchmarks.md — verify module paths.
+  4. docs/performance/dataframe-benchmarks.md - verify module paths.
      Note: benchbox.core.dataframe.profiling.DataFrameProfiler actually
      EXISTS (line 439). Check each path individually rather than assuming
      all are stale.
 
-  5. docs/development/roadmap.md — platform count (28) is slightly stale;
+  5. docs/development/roadmap.md - platform count (28) is slightly stale;
      codebase has 27 concrete adapters (not 40+ as previously claimed).
      Verify exact count before updating. Phase 1 completion status not
      updated.
 
-  6. docs/development/adding-dataframe-platform.md — doesn't mention
+  6. docs/development/adding-dataframe-platform.md - doesn't mention
      ExpressionFamilyAdapter / PandasFamilyAdapter base classes. Code
      examples use outdated query patterns.
 
@@ -38,10 +38,10 @@ category: Documentation
 
 metadata:
   tags:
-  - documentation
-  - cleanup
-  - deprecated
-  - staleness
+    - documentation
+    - cleanup
+    - deprecated
+    - staleness
   estimated_effort: "Medium"
   created_date: "2026-04-01"
   source_review: "Comprehensive documentation audit conversation"
@@ -54,125 +54,125 @@ impact:
   maintainer_impact: |
     Stale docs erode trust in documentation accuracy over time.
   regression_risk: |
-    Zero — documentation-only changes.
+    Zero - documentation-only changes.
 
 work:
-- id: w1
-  summary: "Rewrite or remove dataframe-comparison.md — compare-dataframes deprecated"
-  status: done
-  needs: []
-  description: |
-    Either rewrite file to use `benchbox compare` workflow, or replace
-    with a redirect/pointer to compare command docs. Ensure no references
-    to `compare-dataframes` command remain.
-  files:
-  - docs/guides/dataframe-comparison.md
+  - id: w1
+    summary: "Rewrite or remove dataframe-comparison.md - compare-dataframes deprecated"
+    status: done
+    needs: []
+    description: |
+      Either rewrite file to use `benchbox compare` workflow, or replace
+      with a redirect/pointer to compare command docs. Ensure no references
+      to `compare-dataframes` command remain.
+    files:
+      - docs/guides/dataframe-comparison.md
 
-- id: w2
-  summary: "Remove create-sample-tuning references from tuning.md"
-  status: done
-  needs: []
-  description: |
-    Update tuning.md to document only `tuning init` as the primary command.
-    Remove all examples using `create-sample-tuning`. A brief migration
-    note is acceptable but not a full deprecated section.
-  files:
-  - docs/reference/cli/tuning.md
+  - id: w2
+    summary: "Remove create-sample-tuning references from tuning.md"
+    status: done
+    needs: []
+    description: |
+      Update tuning.md to document only `tuning init` as the primary command.
+      Remove all examples using `create-sample-tuning`. A brief migration
+      note is acceptable but not a full deprecated section.
+    files:
+      - docs/reference/cli/tuning.md
 
-- id: w3
-  summary: "Verify and update power-run docs against current executor API"
-  status: done
-  needs: []
-  description: |
-    PowerRunExecutor EXISTS at benchbox.utils.execution_manager (line 148).
-    Compare doc's description against actual class API. Fix any inaccurate
-    method names, parameters, or import paths — but don't remove valid
-    references. Also check if BenchmarkExecutor (benchbox.cli.execution)
-    should be mentioned as the higher-level orchestrator.
-  approach: |
-    Read benchbox/utils/execution_manager.py to understand PowerRunExecutor API.
-    Read benchbox/cli/execution.py for BenchmarkExecutor.
-    Compare against what the doc claims. Fix only what's actually wrong.
-  files:
-  - docs/advanced/power-run-concurrent-queries.md
-  - benchbox/utils/execution_manager.py   # source of truth
-  - benchbox/cli/execution.py             # source of truth
+  - id: w3
+    summary: "Verify and update power-run docs against current executor API"
+    status: done
+    needs: []
+    description: |
+      PowerRunExecutor EXISTS at benchbox.utils.execution_manager (line 148).
+      Compare doc's description against actual class API. Fix any inaccurate
+      method names, parameters, or import paths - but don't remove valid
+      references. Also check if BenchmarkExecutor (benchbox.cli.execution)
+      should be mentioned as the higher-level orchestrator.
+    approach: |
+      Read benchbox/utils/execution_manager.py to understand PowerRunExecutor API.
+      Read benchbox/cli/execution.py for BenchmarkExecutor.
+      Compare against what the doc claims. Fix only what's actually wrong.
+    files:
+      - docs/advanced/power-run-concurrent-queries.md
+      - benchbox/utils/execution_manager.py # source of truth
+      - benchbox/cli/execution.py # source of truth
 
-- id: w4
-  summary: "Verify and update dataframe-benchmarks.md module paths"
-  status: done
-  needs: []
-  description: |
-    Note: benchbox.core.dataframe.profiling.DataFrameProfiler EXISTS
-    (line 439). Don't blindly remove paths — grep each one against the
-    codebase and only fix those that are genuinely wrong. Verify all
-    module paths individually against actual codebase imports.
-  approach: |
-    Extract all dotted module paths from the doc. For each, run:
-      grep -r "class ClassName" benchbox/ or
-      python -c "import benchbox.module.path"
-    Fix only confirmed-broken paths.
-  files:
-  - docs/performance/dataframe-benchmarks.md
-  - benchbox/core/dataframe/profiling.py  # DataFrameProfiler source
+  - id: w4
+    summary: "Verify and update dataframe-benchmarks.md module paths"
+    status: done
+    needs: []
+    description: |
+      Note: benchbox.core.dataframe.profiling.DataFrameProfiler EXISTS
+      (line 439). Don't blindly remove paths - grep each one against the
+      codebase and only fix those that are genuinely wrong. Verify all
+      module paths individually against actual codebase imports.
+    approach: |
+      Extract all dotted module paths from the doc. For each, run:
+        grep -r "class ClassName" benchbox/ or
+        python -c "import benchbox.module.path"
+      Fix only confirmed-broken paths.
+    files:
+      - docs/performance/dataframe-benchmarks.md
+      - benchbox/core/dataframe/profiling.py # DataFrameProfiler source
 
-- id: w5
-  summary: "Update roadmap.md with current platform count and phase status"
-  status: done
-  needs: []
-  description: |
-    Update platform count. Actual count is 27 concrete adapters (not 40+).
-    Verify by running: ls benchbox/platforms/*.py benchbox/platforms/dataframe/*.py | wc -l
-    Mark completed roadmap items as complete. Ensure future items reflect
-    current plans.
-  approach: |
-    Count adapters by grepping for class.*Adapter in benchbox/platforms/.
-    Current count: 27 (Athena, Azure Synapse, BigQuery, ClickHouse Cloud,
-    cuDF, DataFusion, Doris, DuckDB, Fabric Lakehouse, Fabric Warehouse,
-    Firebolt, LakeSail, MotherDuck, PgDuckDB, PgMooncake, Polars,
-    PostgreSQL, Presto, QuestDB, Redshift, Snowflake, Snowpark Connect,
-    Spark, SQLite, Starburst, TimescaleDB, Trino).
-  files:
-  - docs/development/roadmap.md
+  - id: w5
+    summary: "Update roadmap.md with current platform count and phase status"
+    status: done
+    needs: []
+    description: |
+      Update platform count. Actual count is 27 concrete adapters (not 40+).
+      Verify by running: ls benchbox/platforms/*.py benchbox/platforms/dataframe/*.py | wc -l
+      Mark completed roadmap items as complete. Ensure future items reflect
+      current plans.
+    approach: |
+      Count adapters by grepping for class.*Adapter in benchbox/platforms/.
+      Current count: 27 (Athena, Azure Synapse, BigQuery, ClickHouse Cloud,
+      cuDF, DataFusion, Doris, DuckDB, Fabric Lakehouse, Fabric Warehouse,
+      Firebolt, LakeSail, MotherDuck, PgDuckDB, PgMooncake, Polars,
+      PostgreSQL, Presto, QuestDB, Redshift, Snowflake, Snowpark Connect,
+      Spark, SQLite, Starburst, TimescaleDB, Trino).
+    files:
+      - docs/development/roadmap.md
 
-- id: w6
-  summary: "Update adding-dataframe-platform.md with current adapter base classes"
-  status: done
-  needs: []
-  description: |
-    Document ExpressionFamilyAdapter and PandasFamilyAdapter base classes.
-    Update code examples to use current API patterns. Verify import paths
-    match actual codebase.
-  approach: |
-    Key classes:
-    - ExpressionFamilyAdapter: benchbox.platforms.dataframe.expression_family (line 765)
-      Used by: Polars, PySpark, DataFusion
-    - PandasFamilyAdapter: benchbox.platforms.dataframe.pandas_family (line 441)
-      Used by: Pandas, Modin, cuDF, Vaex, Dask
-    Use an existing adapter (e.g., polars_platform.py) as example code.
-  files:
-  - docs/development/adding-dataframe-platform.md
-  - benchbox/platforms/dataframe/expression_family.py  # source of truth
-  - benchbox/platforms/dataframe/pandas_family.py      # source of truth
+  - id: w6
+    summary: "Update adding-dataframe-platform.md with current adapter base classes"
+    status: done
+    needs: []
+    description: |
+      Document ExpressionFamilyAdapter and PandasFamilyAdapter base classes.
+      Update code examples to use current API patterns. Verify import paths
+      match actual codebase.
+    approach: |
+      Key classes:
+      - ExpressionFamilyAdapter: benchbox.platforms.dataframe.expression_family (line 765)
+        Used by: Polars, PySpark, DataFusion
+      - PandasFamilyAdapter: benchbox.platforms.dataframe.pandas_family (line 441)
+        Used by: Pandas, Modin, cuDF, Vaex, Dask
+      Use an existing adapter (e.g., polars_platform.py) as example code.
+    files:
+      - docs/development/adding-dataframe-platform.md
+      - benchbox/platforms/dataframe/expression_family.py # source of truth
+      - benchbox/platforms/dataframe/pandas_family.py # source of truth
 
 verification:
-- description: "No deprecated compare-dataframes or create-sample-tuning commands in docs"
-  command: "grep -rn 'compare-dataframes\\|create-sample-tuning\\|df-tuning' docs/ || echo 'PASS: no deprecated commands'"
-  expected_output: "PASS: no deprecated commands"
-- description: "Roadmap platform count is accurate (27)"
-  command: "grep -oP '\\d+(?=.*(?:platform|adapter))' docs/development/roadmap.md | head -3"
-  expected_output: "Should show 27 (not 28 or 40+)"
-- description: "Adding-dataframe-platform.md mentions current base classes"
-  command: "grep -c 'ExpressionFamilyAdapter\\|PandasFamilyAdapter' docs/development/adding-dataframe-platform.md | xargs -I{} test {} -ge 2 && echo 'PASS' || echo 'FAIL: base classes missing'"
-  expected_output: "PASS"
+  - description: "No deprecated compare-dataframes or create-sample-tuning commands in docs"
+    command: "grep -rn 'compare-dataframes\\|create-sample-tuning\\|df-tuning' docs/ || echo 'PASS: no deprecated commands'"
+    expected_output: "PASS: no deprecated commands"
+  - description: "Roadmap platform count is accurate (27)"
+    command: "grep -oP '\\d+(?=.*(?:platform|adapter))' docs/development/roadmap.md | head -3"
+    expected_output: "Should show 27 (not 28 or 40+)"
+  - description: "Adding-dataframe-platform.md mentions current base classes"
+    command: "grep -c 'ExpressionFamilyAdapter\\|PandasFamilyAdapter' docs/development/adding-dataframe-platform.md | xargs -I{} test {} -ge 2 && echo 'PASS' || echo 'FAIL: base classes missing'"
+    expected_output: "PASS"
 
 scope_limit:
   only_modify:
-  - "docs/guides/dataframe-comparison.md"
-  - "docs/reference/cli/tuning.md"
-  - "docs/advanced/power-run-concurrent-queries.md"
-  - "docs/performance/dataframe-benchmarks.md"
-  - "docs/development/roadmap.md"
-  - "docs/development/adding-dataframe-platform.md"
+    - "docs/guides/dataframe-comparison.md"
+    - "docs/reference/cli/tuning.md"
+    - "docs/advanced/power-run-concurrent-queries.md"
+    - "docs/performance/dataframe-benchmarks.md"
+    - "docs/development/roadmap.md"
+    - "docs/development/adding-dataframe-platform.md"
   do_not_touch:
-  - "Any source code files"
+    - "Any source code files"

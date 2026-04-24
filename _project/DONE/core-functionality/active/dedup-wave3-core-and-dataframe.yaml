@@ -21,7 +21,7 @@ description: |
   G10 (48 dup lines): get_create_tables_sql in transaction_primitives/benchmark.py:741
       and write_primitives/benchmark.py:898. 2 copies with identical pattern:
       iterate table_order -> call per-table SQL builder -> collect and join.
-      Related to G4 — both are in the same two primitives benchmark files.
+      Related to G4 - both are in the same two primitives benchmark files.
 
   G13 (46 dup lines): _rank_by_geometric_mean and _rank_by_total_time in
       analysis/ranking.py:168 and :215. 2 methods in the same file with
@@ -248,11 +248,11 @@ must_preserve:
   - "Registry query listings return identical dictionaries"
 
 anti_patterns:
-  - "DO NOT change public method signatures — because callers across 20+ platform adapters and benchmark modules depend on the current signatures; changing them silently breaks the contract without a test failure — only extract internal dispatch logic"
-  - "DO NOT use getattr-based dynamic dispatch for _apply_cast — because explicit type strings preserve IDE navigability and static analysis across the 3 cast methods — pass string literals like 'float64', not Python type objects"
-  - "DO NOT merge transaction_primitives and write_primitives benchmark modules — because they represent distinct TPC benchmark categories with independent evolution paths; a merge couples unrelated feature work — only share the specific _table_exists and get_create_tables_sql helper functions"
-  - "DO NOT create abstract base classes for the registries — because 4 registries with a 14-line shared pattern doesn't justify the cognitive overhead of an ABC; contributors adding a new benchmark would need to understand the class hierarchy instead of copying a simple function call — use a plain shared function"
-  - "DO NOT combine the ranking refactor with ranking algorithm changes — because the ranking algorithms are validated against TPC official QphH formulas; mixing structural refactoring with logic changes makes regressions harder to isolate — only extract the shared scaffolding, keep metric computation untouched"
+  - "DO NOT change public method signatures - because callers across 20+ platform adapters and benchmark modules depend on the current signatures; changing them silently breaks the contract without a test failure - only extract internal dispatch logic"
+  - "DO NOT use getattr-based dynamic dispatch for _apply_cast - because explicit type strings preserve IDE navigability and static analysis across the 3 cast methods - pass string literals like 'float64', not Python type objects"
+  - "DO NOT merge transaction_primitives and write_primitives benchmark modules - because they represent distinct TPC benchmark categories with independent evolution paths; a merge couples unrelated feature work - only share the specific _table_exists and get_create_tables_sql helper functions"
+  - "DO NOT create abstract base classes for the registries - because 4 registries with a 14-line shared pattern doesn't justify the cognitive overhead of an ABC; contributors adding a new benchmark would need to understand the class hierarchy instead of copying a simple function call - use a plain shared function"
+  - "DO NOT combine the ranking refactor with ranking algorithm changes - because the ranking algorithms are validated against TPC official QphH formulas; mixing structural refactoring with logic changes makes regressions harder to isolate - only extract the shared scaffolding, keep metric computation untouched"
 
 metadata:
   tags:

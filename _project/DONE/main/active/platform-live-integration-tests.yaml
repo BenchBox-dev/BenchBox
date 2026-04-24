@@ -88,7 +88,7 @@ work:
     Add `test-live-redshift` and `test-live-athena` Makefile targets for w8.
 
     Create a shared helper in tests/integration/platforms/conftest.py:
-    - `skip_unless_docker_service(host, port, timeout=5)` — attempts TCP connection,
+    - `skip_unless_docker_service(host, port, timeout=5)` - attempts TCP connection,
       skips test if service unreachable. Used by all Docker live tests.
 
 - id: w3
@@ -96,7 +96,7 @@ work:
   status: done
   needs: []
   description: |
-    LakeSail is the only platform without a stub — it gets zero CI coverage.
+    LakeSail is the only platform without a stub - it gets zero CI coverage.
 
     Create install_lakesail_stub() in tests/integration/platforms/common.py:
     - Mock pyspark.sql.SparkSession with .builder.remote().config().getOrCreate() chain
@@ -105,7 +105,7 @@ work:
     - Mock SparkSession.read.csv() and DataFrame.write.saveAsTable()
     - Mock SparkSession.version property and .stop()
     - The adapter uses SparkDataLoadMixin and SparkQueryExecutionMixin from
-      benchbox.platforms.base.spark_execution_mixin — stub must satisfy that interface
+      benchbox.platforms.base.spark_execution_mixin - stub must satisfy that interface
 
     Create tests/integration/platforms/test_lakesail_stub_smoke.py:
     - Follow pattern of test_trino_smoke.py / test_presto_smoke.py
@@ -149,7 +149,7 @@ work:
 
     Same test structure as w4, plus:
     - Trino: TRINO_HOST=localhost, TRINO_PORT=8080, TRINO_CATALOG=memory
-      Trino has a built-in tpch connector — configure in compose catalog properties.
+      Trino has a built-in tpch connector - configure in compose catalog properties.
       Test should verify queries work against the tpch catalog directly.
     - Presto: PRESTO_HOST=localhost, PRESTO_PORT=8080, PRESTO_CATALOG=memory
       Similar catalog configuration to Trino but with prestodb driver.
@@ -168,7 +168,7 @@ work:
     - Test HTTP Stream Load path (both platforms use HTTP for bulk data ingest)
     - StarRocks: ports 9030 (MySQL) + 8040 (HTTP Stream Load)
     - Doris: ports 9030 (MySQL) + 8030 (HTTP Stream Load)
-    - Doris already has docker/doris/docker-compose.yml — verify it works with
+    - Doris already has docker/doris/docker-compose.yml - verify it works with
       the test, update healthcheck if needed
 
 - id: w7
@@ -187,7 +187,7 @@ work:
     - Uses influxdb3-python or flightsql-dbapi
     - Docker compose with auto-setup (org, bucket, token)
     - Test: connection, write data (line protocol), query via FlightSQL, verify
-    - InfluxDB is time-series so TPC-H doesn't directly apply — use TSBS-DevOps
+    - InfluxDB is time-series so TPC-H doesn't directly apply - use TSBS-DevOps
       benchmark tables or custom time-series test data
 
 - id: w8
@@ -217,7 +217,7 @@ deferred:
     Could use scheduled runs (nightly) rather than per-PR."
 - summary: "Athena Spark, EMR Serverless, GCP Dataproc live tests"
   reason: "These Spark-on-cloud platforms require significant cloud infrastructure
-    (clusters, IAM roles, S3/GCS staging). Lower priority — the Spark execution
+    (clusters, IAM roles, S3/GCS staging). Lower priority - the Spark execution
     path is partially covered by PySpark/LakeSail local tests."
 - summary: "ClickHouse Cloud live tests"
   reason: "ClickHouse server mode covers the query execution path. Cloud mode
@@ -245,16 +245,16 @@ verification:
   expected: "Stub count includes LakeSail; live test count >= 13 (5 existing + 8 Docker); docker compose >= 8; Makefile has docker targets; LakeSail stub exists; smoke tests all pass"
 
 must_preserve:
-- "Existing stub-based smoke tests must continue to pass — live tests are additive, not replacement"
+- "Existing stub-based smoke tests must continue to pass - live tests are additive, not replacement"
 - "Existing live tests (Snowflake, BigQuery, Databricks) must not be modified"
-- "Docker compose files must not require persistent state — use volumes that are cleaned up on down -v"
-- "All live tests must skip gracefully when their service is unreachable — no hard failures in CI"
+- "Docker compose files must not require persistent state - use volumes that are cleaned up on down -v"
+- "All live tests must skip gracefully when their service is unreachable - no hard failures in CI"
 - "run_smoke_benchmark() helper in common.py must remain backward compatible"
 
 anti_patterns:
-- "DO NOT make Docker a hard requirement for running the test suite — because developers must be able to run `make test-fast` without Docker — Docker tests are opt-in via `make test-docker-*`"
-- "DO NOT store credentials or secrets in docker-compose files — because compose files are committed to git — use environment variables with documented defaults for local dev"
-- "DO NOT duplicate adapter testing logic — because each adapter already has unit + stub tests — live tests should focus on real query execution, data loading, and result correctness, not re-test adapter wiring"
+- "DO NOT make Docker a hard requirement for running the test suite - because developers must be able to run `make test-fast` without Docker - Docker tests are opt-in via `make test-docker-*`"
+- "DO NOT store credentials or secrets in docker-compose files - because compose files are committed to git - use environment variables with documented defaults for local dev"
+- "DO NOT duplicate adapter testing logic - because each adapter already has unit + stub tests - live tests should focus on real query execution, data loading, and result correctness, not re-test adapter wiring"
 
 scope_limit:
   include:

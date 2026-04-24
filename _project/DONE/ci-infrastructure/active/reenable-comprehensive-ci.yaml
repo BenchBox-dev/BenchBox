@@ -22,16 +22,16 @@ category: Testing and Quality Assurance
 
 metadata:
   owners:
-  - joe
+    - joe
   tags:
-  - ci
-  - quality
-  - documentation
+    - ci
+    - quality
+    - documentation
   estimated_effort: "1-2 days"
   created_date: "2026-01-18"
 
   related:
-  - fix-ci-critical-issues
+    - fix-ci-critical-issues
   migration_review_required: true
 impact:
   business_value: |
@@ -45,188 +45,190 @@ impact:
 
 files_affected:
   modified:
-  - ".github/workflows/docs.yml"
-  - ".github/workflows/test.yml"
-  - "docs/conf.py"
-  - "pyproject.toml"
-  - "Makefile"
+    - ".github/workflows/docs.yml"
+    - ".github/workflows/test.yml"
+    - "docs/conf.py"
+    - "pyproject.toml"
+    - "Makefile"
   added:
-  - "docs/linkcheck_ignore.txt"
-  - ".safety-policy.yml"    # Or equivalent ignore file
+    - "docs/linkcheck_ignore.txt"
+    - ".safety-policy.yml" # Or equivalent ignore file
 
 open_questions:
-- "Should TPC-H C-compatible tests be implemented? (Currently broken workflow was removed - separate TODO needed if desired)"
+  - "Should TPC-H C-compatible tests be implemented? (Currently broken workflow was removed - separate TODO needed if desired)"
 
 decisions:
-- question: "Which security scanner should gate CI?"
-  answer: "Compared Safety, pip-audit, and Dependabot-only gating. Selected pip-audit for reproducible local+CI runs via uvx
-    and immediate vulnerability DB coverage without platform lock-in."
-  decided: "2026-02-24"
-- question: "How should false positives be managed for security audit?"
-  answer: "Use a comma-separated allowlist variable (PIP_AUDIT_IGNORE_VULNS) in CI/local make target. Keep it empty by default
-    and require explicit documented entries when needed."
-  decided: "2026-02-24"
-- question: "What docstring coverage threshold is now practical?"
-  answer: "Raise interrogate fail-under from 64 to 90 based on current measured 93.1% local coverage."
-  decided: "2026-02-24"
+  - question: "Which security scanner should gate CI?"
+    answer:
+      "Compared Safety, pip-audit, and Dependabot-only gating. Selected pip-audit for reproducible local+CI runs via uvx
+      and immediate vulnerability DB coverage without platform lock-in."
+    decided: "2026-02-24"
+  - question: "How should false positives be managed for security audit?"
+    answer:
+      "Use a comma-separated allowlist variable (PIP_AUDIT_IGNORE_VULNS) in CI/local make target. Keep it empty by default
+      and require explicit documented entries when needed."
+    decided: "2026-02-24"
+  - question: "What docstring coverage threshold is now practical?"
+    answer: "Raise interrogate fail-under from 64 to 90 based on current measured 93.1% local coverage."
+    decided: "2026-02-24"
 
 success_metrics:
-- "All comprehensive checks pass consistently"
-- "No false positive failures in CI"
-- "Linkcheck catches real broken links"
-- "Security audit catches real vulnerabilities"
+  - "All comprehensive checks pass consistently"
+  - "No false positive failures in CI"
+  - "Linkcheck catches real broken links"
+  - "Security audit catches real vulnerabilities"
 
 must_preserve:
-- "Existing passing CI jobs (lint, test-fast, docs-build) remain passing"
-- "No increase in CI runtime >20%"
-- "make ci-test continues to work"
+  - "Existing passing CI jobs (lint, test-fast, docs-build) remain passing"
+  - "No increase in CI runtime >20%"
+  - "make ci-test continues to work"
 
 anti_patterns:
-- "DO NOT make linkcheck blocking on first attempt — because external URLs are flaky — add it as warning first, then promote
-  to blocking after 2 weeks of clean runs"
-- "DO NOT re-enable all checks simultaneously — because a single failure blocks all PRs — re-enable one at a time with monitoring"
+  - "DO NOT make linkcheck blocking on first attempt - because external URLs are flaky - add it as warning first, then promote
+    to blocking after 2 weeks of clean runs"
+  - "DO NOT re-enable all checks simultaneously - because a single failure blocks all PRs - re-enable one at a time with monitoring"
 
 verification:
-- description: "Existing CI checks still pass"
-  command: "make ci-lint && make ci-test"
-  expected_output: "all checks pass"
-- description: "Documentation link checking is stable with configured ignores"
-  command: "make docs-linkcheck"
-  expected_output: "linkcheck completes with only expected/allowlisted external failures"
-- description: "Security audit is configured and passing"
-  command: "make security-audit"
-  expected_output: "security audit completes with no untriaged blockers"
-- description: "Docstring coverage threshold is enforced at target level"
-  command: "make docstring-coverage"
-  expected_output: "interrogate passes at configured fail-under threshold"
-- description: "Example reference and syntax validation passes"
-  command: "make docs-validate"
-  expected_output: "example reference and syntax checks pass"
+  - description: "Existing CI checks still pass"
+    command: "make ci-lint && make ci-test"
+    expected_output: "all checks pass"
+  - description: "Documentation link checking is stable with configured ignores"
+    command: "make docs-linkcheck"
+    expected_output: "linkcheck completes with only expected/allowlisted external failures"
+  - description: "Security audit is configured and passing"
+    command: "make security-audit"
+    expected_output: "security audit completes with no untriaged blockers"
+  - description: "Docstring coverage threshold is enforced at target level"
+    command: "make docstring-coverage"
+    expected_output: "interrogate passes at configured fail-under threshold"
+  - description: "Example reference and syntax validation passes"
+    command: "make docs-validate"
+    expected_output: "example reference and syntax checks pass"
 
 scope_limit:
   only_modify:
-  - ".github/workflows/docs.yml"
-  - ".github/workflows/test.yml"
-  - "docs/conf.py"
-  - "docs/linkcheck_ignore.txt"
-  - "pyproject.toml"
-  - "Makefile"
-  - ".safety-policy.yml"
-  - "scripts/validate_example_references.py"
-  - "scripts/check_example_syntax.py"
+    - ".github/workflows/docs.yml"
+    - ".github/workflows/test.yml"
+    - "docs/conf.py"
+    - "docs/linkcheck_ignore.txt"
+    - "pyproject.toml"
+    - "Makefile"
+    - ".safety-policy.yml"
+    - "scripts/validate_example_references.py"
+    - "scripts/check_example_syntax.py"
   do_not_modify:
-  - "benchbox/core/**"
-  - "benchbox/platforms/**"
-  - "tests/live/**"
-  - "_binaries/**"
+    - "benchbox/core/**"
+    - "benchbox/platforms/**"
+    - "tests/live/**"
+    - "_binaries/**"
 
 work:
-- id: w1
-  summary: "Create linkcheck ignore list for known-flaky URLs"
-  status: done
-- id: w2
-  summary: "Add docs/linkcheck_ignore.txt with external URLs to skip"
-  needs:
-  - w1
-  status: done
-- id: w3
-  summary: "Configure sphinx linkcheck_ignore in conf.py"
-  needs:
-  - w1
-  - w2
-  status: done
-- id: w4
-  summary: "Fix or remove genuinely broken links"
-  needs:
-  - w3
-  status: done
-- id: w5
-  summary: "Re-enable linkcheck as blocking (or keep as warning)"
-  needs:
-  - w4
-  - w6
-  status: done
-- id: w6
-  summary: "Add `make docs-linkcheck` for local testing"
-  needs:
-  - w3
-  status: done
-- id: w7
-  summary: "Evaluate security scanning options"
-  status: done
-- id: w8
-  summary: "safety vs pip-audit vs GitHub Dependabot"
-  needs:
-  - w7
-  status: done
-- id: w9
-  summary: "Choose tool that minimizes false positives"
-  needs:
-  - w8
-  status: done
-- id: w10
-  summary: "Create security ignore list for false positives"
-  needs:
-  - w9
-  status: done
-- id: w11
-  summary: "Re-enable security job as blocking"
-  needs:
-  - w10
-  - w12
-  - w5
-  status: done
-- id: w12
-  summary: "Add `make security-audit` for local testing"
-  needs:
-  - w9
-  status: done
-- id: w13
-  summary: "Review current coverage threshold (64%)"
-  status: done
-- id: w14
-  summary: "Add docstrings to undocumented public APIs"
-  needs:
-  - w13
-  status: done
-- id: w15
-  summary: "Update threshold to achievable level"
-  needs:
-  - w13
-  - w14
-  - w16
-  status: done
-- id: w16
-  summary: "Configure interrogate ignore patterns for internal modules"
-  needs:
-  - w13
-  status: done
-- id: w17
-  summary: "Re-enable docstring-coverage as blocking"
-  needs:
-  - w15
-  - w11
-  status: done
-- id: w18
-  summary: "Test validate_example_references.py locally"
-  status: done
-- id: w19
-  summary: "Fix any broken example references"
-  needs:
-  - w18
-  status: done
-- id: w20
-  summary: "Test check_example_syntax.py locally"
-  status: done
-- id: w21
-  summary: "Fix any syntax errors in examples"
-  needs:
-  - w20
-  status: done
-- id: w22
-  summary: "Re-enable example-validation as blocking"
-  needs:
-  - w19
-  - w21
-  - w17
-  status: done
+  - id: w1
+    summary: "Create linkcheck ignore list for known-flaky URLs"
+    status: done
+  - id: w2
+    summary: "Add docs/linkcheck_ignore.txt with external URLs to skip"
+    needs:
+      - w1
+    status: done
+  - id: w3
+    summary: "Configure sphinx linkcheck_ignore in conf.py"
+    needs:
+      - w1
+      - w2
+    status: done
+  - id: w4
+    summary: "Fix or remove genuinely broken links"
+    needs:
+      - w3
+    status: done
+  - id: w5
+    summary: "Re-enable linkcheck as blocking (or keep as warning)"
+    needs:
+      - w4
+      - w6
+    status: done
+  - id: w6
+    summary: "Add `make docs-linkcheck` for local testing"
+    needs:
+      - w3
+    status: done
+  - id: w7
+    summary: "Evaluate security scanning options"
+    status: done
+  - id: w8
+    summary: "safety vs pip-audit vs GitHub Dependabot"
+    needs:
+      - w7
+    status: done
+  - id: w9
+    summary: "Choose tool that minimizes false positives"
+    needs:
+      - w8
+    status: done
+  - id: w10
+    summary: "Create security ignore list for false positives"
+    needs:
+      - w9
+    status: done
+  - id: w11
+    summary: "Re-enable security job as blocking"
+    needs:
+      - w10
+      - w12
+      - w5
+    status: done
+  - id: w12
+    summary: "Add `make security-audit` for local testing"
+    needs:
+      - w9
+    status: done
+  - id: w13
+    summary: "Review current coverage threshold (64%)"
+    status: done
+  - id: w14
+    summary: "Add docstrings to undocumented public APIs"
+    needs:
+      - w13
+    status: done
+  - id: w15
+    summary: "Update threshold to achievable level"
+    needs:
+      - w13
+      - w14
+      - w16
+    status: done
+  - id: w16
+    summary: "Configure interrogate ignore patterns for internal modules"
+    needs:
+      - w13
+    status: done
+  - id: w17
+    summary: "Re-enable docstring-coverage as blocking"
+    needs:
+      - w15
+      - w11
+    status: done
+  - id: w18
+    summary: "Test validate_example_references.py locally"
+    status: done
+  - id: w19
+    summary: "Fix any broken example references"
+    needs:
+      - w18
+    status: done
+  - id: w20
+    summary: "Test check_example_syntax.py locally"
+    status: done
+  - id: w21
+    summary: "Fix any syntax errors in examples"
+    needs:
+      - w20
+    status: done
+  - id: w22
+    summary: "Re-enable example-validation as blocking"
+    needs:
+      - w19
+      - w21
+      - w17
+    status: done

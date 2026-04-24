@@ -143,10 +143,10 @@ approach: |
   same validated ordering abstractions and tests.
 
 anti_patterns:
-- "DO NOT modify dbgen binary output format — because TPC compliance requires unmodified dbgen output — sort as a post-processing
+- "DO NOT modify dbgen binary output format - because TPC compliance requires unmodified dbgen output - sort as a post-processing
   step only"
-- "DO NOT sort in-memory for SF>=10 — because lineitem at SF=10 is 6GB+ and will OOM — use PyArrow's chunked/streaming sort"
-- "DO NOT make sorting the default — because unsorted data is needed for baseline benchmarks — require explicit opt-in via
+- "DO NOT sort in-memory for SF>=10 - because lineitem at SF=10 is 6GB+ and will OOM - use PyArrow's chunked/streaming sort"
+- "DO NOT make sorting the default - because unsorted data is needed for baseline benchmarks - require explicit opt-in via
   --data-format or tuning config"
 
 verification:

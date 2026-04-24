@@ -76,7 +76,7 @@ must_preserve:
   - "Legitimate Delta/Iceberg directory entries tracked in manifest with is_directory must still validate and reuse"
   - "A directory recorded anywhere for a table across manifest formats must not be treated as untracked contamination"
   - "Existing test_directory_entry_validates_successfully and test_directory_entry_size_mismatch_detected still pass"
-  - "Cloud path handling unchanged — collision check gated on isinstance(output_dir, Path)"
+  - "Cloud path handling unchanged - collision check gated on isinstance(output_dir, Path)"
   - "V1 and V2 manifest validation both still work"
 
 approach: |
@@ -104,10 +104,10 @@ approach: |
   - If no usable file entries exist, raise a clear ValueError with --force datagen hint
 
 anti_patterns:
-  - "DO NOT add a full directory scan with os.listdir() — check only table-name collisions, because a broad scan requires fragile allowlists"
-  - "DO NOT add allowlist constants for known auxiliary files — they create maintenance burden for marginal value"
-  - "DO NOT warn-only for collisions — invalidate reuse, because warning still lets users hit the broken state"
-  - "DO NOT use get_table_files() alone to decide whether a colliding directory is tracked — it only reflects the selected/default entries"
+  - "DO NOT add a full directory scan with os.listdir() - check only table-name collisions, because a broad scan requires fragile allowlists"
+  - "DO NOT add allowlist constants for known auxiliary files - they create maintenance burden for marginal value"
+  - "DO NOT warn-only for collisions - invalidate reuse, because warning still lets users hit the broken state"
+  - "DO NOT use get_table_files() alone to decide whether a colliding directory is tracked - it only reflects the selected/default entries"
 
 scope_limit:
   only_modify:

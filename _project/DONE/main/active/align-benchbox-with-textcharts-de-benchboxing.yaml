@@ -6,20 +6,20 @@ status: Completed
 completed_date: "2026-03-09"
 description: |
   textcharts completed its full de-benchboxing initiative (5 change groups).
-  All changes are backward-compatible — old APIs still work but emit
+  All changes are backward-compatible - old APIs still work but emit
   DeprecationWarning. BenchBox should update call sites to use the new APIs.
 
   Audit findings (2026-03-09):
   - All 14+ constructor calls in ascii_runtime.py and exporters.py pass
-    title=, metric_label=, y_label= etc. explicitly — zero reliance on
+    title=, metric_label=, y_label= etc. explicitly - zero reliance on
     changed defaults. No output changes from Group 1.
   - 5 deprecated factory function calls in ascii_runtime.py need renaming.
   - 3 unused deprecated imports in test_ascii_charts.py need removal.
   - Compatibility shim (ascii/__init__.py) does `from textcharts import *`
     so new exports are automatically available.
-  - DEFAULT_MAX_QUERIES is not referenced in BenchBox — no action needed.
-  - lower_is_better defaults to True — matches BenchBox latency semantics.
-  - subject= parameter available but optional — could simplify title passing.
+  - DEFAULT_MAX_QUERIES is not referenced in BenchBox - no action needed.
+  - lower_is_better defaults to True - matches BenchBox latency semantics.
+  - subject= parameter available but optional - could simplify title passing.
 
   Supersedes: adapt-benchbox-to-textcharts-neutral-defaults (archived)
 
@@ -35,7 +35,7 @@ work:
   notes: |
     1. Update textcharts version constraint in pyproject.toml
     2. Run: `uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v`
-    3. All 15 golden tests should pass unchanged — BenchBox passes all labels
+    3. All 15 golden tests should pass unchanged - BenchBox passes all labels
        and titles explicitly, so the default changes in Group 1 are invisible.
     4. If any fail, inspect: the only legitimate failures would be from test
        fixtures that construct charts without explicit labels/titles.
@@ -43,8 +43,8 @@ work:
     5. Run full test suite: `uv run -- python -m pytest -q`
     6. Verify new parameter defaults match BenchBox semantics:
        - `lower_is_better: bool = True` on ASCIIComparisonBar, ASCIIDivergingBar,
-         SummaryStats — default True correct for latency (lower = better).
-       - `outlier_cap: float | None = None` on ASCIIChartOptions — None means
+         SummaryStats - default True correct for latency (lower = better).
+       - `outlier_cap: float | None = None` on ASCIIChartOptions - None means
          auto P95×2 capping, unchanged behavior.
        - Visual spot-check: comparison_bar and diverging_bar golden output
          shows correct green (improvement) / red (regression) colors.
@@ -80,9 +80,9 @@ work:
     Three deprecated factory functions are imported but never called in
     `tests/unit/visualization/ascii/test_ascii_charts.py`:
 
-    - Line 13: `from_bar_data` — unused
-    - Line 26: `from_normalized_results` — unused
-    - Line 31: `from_query_results` — unused
+    - Line 13: `from_bar_data` - unused
+    - Line 26: `from_normalized_results` - unused
+    - Line 31: `from_query_results` - unused
 
     Remove these dead imports. Run lint to confirm: `uv run ruff check tests/`
 
@@ -105,7 +105,7 @@ work:
     subject= would be cleaner. The benefit is avoiding title string duplication
     with the chart type name. The risk is titles that don't compose well with
     the generic default (e.g., subject="Performance" + "Bar Chart" = "Performance
-    Bar Chart" — fine, but subject="Phase Breakdown by Platform" + "Stacked
+    Bar Chart" - fine, but subject="Phase Breakdown by Platform" + "Stacked
     Breakdown" = nonsense).
 
     Decision criteria:
@@ -116,12 +116,12 @@ work:
     - Keep explicit title= for dynamic titles (f-strings with platform names)
 
     Done criteria: Adopt subject= if 5+ of the ~14 call sites compose cleanly.
-    If fewer than 5 compose well, skip — the consistency benefit is too small
+    If fewer than 5 compose well, skip - the consistency benefit is too small
     to justify a mixed approach (some subject=, some title=). Document the
     evaluation result either way in a commit message or code comment.
 
     Scope: ascii_runtime.py constructor calls only. Do NOT touch MCP dispatch
-    or exporters.py — those pass title= from external input and must remain
+    or exporters.py - those pass title= from external input and must remain
     explicit.
 
 - id: w6
@@ -130,8 +130,8 @@ work:
   status: done
   notes: |
     Final gate after w2 (factory renames) and w3 (dead import removal):
-    1. `uv run ruff check benchbox/core/visualization/ tests/unit/visualization/` — lint clean
-    2. `uv run -- python -W error::DeprecationWarning -m pytest tests/unit/visualization/ -q` — zero deprecation warnings
+    1. `uv run ruff check benchbox/core/visualization/ tests/unit/visualization/` - lint clean
+    2. `uv run -- python -W error::DeprecationWarning -m pytest tests/unit/visualization/ -q` - zero deprecation warnings
     Note: full suite and golden parity already verified in w1 and w2.
 
 verification:
@@ -165,14 +165,14 @@ scope_limit:
   - "benchbox/platforms/"
 
 must_preserve:
-- "All 15 golden snapshot tests pass unchanged — BenchBox passes explicit values everywhere"
+- "All 15 golden snapshot tests pass unchanged - BenchBox passes explicit values everywhere"
 - "BenchBox CLI and MCP chart output byte-identical to pre-migration"
 - "Zero DeprecationWarning from textcharts during normal BenchBox operation"
 - "Compatibility shim re-exports both old and new names for external callers"
 
 approach: |
   Low-risk mechanical migration. The audit confirms BenchBox passes all labels
-  and titles explicitly — no call site relies on changed defaults. The work is:
+  and titles explicitly - no call site relies on changed defaults. The work is:
   5 factory function renames, 3 dead import removals, 2 verifications, and an
   optional subject= adoption evaluation. Golden tests are the safety net.
 

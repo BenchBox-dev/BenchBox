@@ -1,5 +1,5 @@
 id: cloud-integration-test-infrastructure
-title: "Cloud Platform Integration Test Infrastructure — Deferred Live Tests"
+title: "Cloud Platform Integration Test Infrastructure - Deferred Live Tests"
 worktree: platform-expansion
 priority: Medium-High
 status: Completed
@@ -23,7 +23,7 @@ description: |
   - Automated multi-extension comparison pipeline
 
   MotherDuck adapter feature work (credential wizard, cloud upload, cache
-  control) has been split to motherduck-cloud-features.yaml — this TODO covers
+  control) has been split to motherduck-cloud-features.yaml - this TODO covers
   only test infrastructure and smoke tests.
 
 context_sections:
@@ -45,8 +45,8 @@ context_sections:
   "Existing Patterns": |
     The codebase already has live test infrastructure to follow:
     - Markers: live_integration, docker_integration, per-platform (live_starrocks, etc.)
-    - Skip helpers: tests/integration/platforms/conftest.py — skip_unless_docker_service(), get_env_or_skip()
-    - Cloud credential check: tests/e2e/utils.py — has_cloud_credentials()
+    - Skip helpers: tests/integration/platforms/conftest.py - skip_unless_docker_service(), get_env_or_skip()
+    - Cloud credential check: tests/e2e/utils.py - has_cloud_credentials()
     - Example: tests/integration/platforms/test_starrocks_live.py (pytestmark pattern)
     - Marker exclusion: make test-fast excludes live_integration via marker expression
 
@@ -55,7 +55,7 @@ metadata:
   - integration-tests
   - cloud
   - deferred-followup
-  estimated_effort: "Large — requires cloud account provisioning"
+  estimated_effort: "Large - requires cloud account provisioning"
   created_date: "2026-02-18"
   split_from_multiple:
   - firebolt-cloud-deployment
@@ -69,11 +69,11 @@ metadata:
 guardrails:
   verification:
     command: "uv run -- python -m pytest -m 'fast and not (slow or stress or resource_heavy or live_integration)' --tb=short -q"
-    expected: "All existing fast tests pass unchanged — new markers and conftest additions must not interfere"
+    expected: "All existing fast tests pass unchanged - new markers and conftest additions must not interfere"
   must_preserve:
   - "Existing pytest markers (fast, slow, stress, live_integration, docker_integration) and their exclusion expressions in Makefile and pytest.ini"
-  - "tests/integration/platforms/conftest.py — skip_unless_docker_service() and get_env_or_skip() helpers"
-  - "tests/e2e/utils.py — has_cloud_credentials() helper"
+  - "tests/integration/platforms/conftest.py - skip_unless_docker_service() and get_env_or_skip() helpers"
+  - "tests/e2e/utils.py - has_cloud_credentials() helper"
   - "make test-fast marker expression: 'fast and not (slow or stress or resource_heavy or live_integration)'"
   approach: |
     Follow the existing live test pattern established in test_starrocks_live.py:
@@ -84,22 +84,22 @@ guardrails:
     New per-platform markers (live_firebolt, live_starburst, etc.) should be
     registered in pyproject.toml [tool.pytest.ini_options] markers list.
   anti_patterns:
-  - "DO NOT add cloud credential checks to the root tests/conftest.py — use per-platform conftest or test-level skips — because global conftest pollution breaks offline test runs and slows xdist worker startup"
-  - "DO NOT create a new marker scheme — because live_integration already exists and is wired into Makefile/pytest.ini exclusions; adding a parallel 'cloud_integration' marker would fragment the skip logic"
-  - "DO NOT make live tests depend on specific data at specific scale factors — because cloud accounts may have varying data; use TPC-H SF=0.01 Q1 as the universal smoke query"
+  - "DO NOT add cloud credential checks to the root tests/conftest.py - use per-platform conftest or test-level skips - because global conftest pollution breaks offline test runs and slows xdist worker startup"
+  - "DO NOT create a new marker scheme - because live_integration already exists and is wired into Makefile/pytest.ini exclusions; adding a parallel 'cloud_integration' marker would fragment the skip logic"
+  - "DO NOT make live tests depend on specific data at specific scale factors - because cloud accounts may have varying data; use TPC-H SF=0.01 Q1 as the universal smoke query"
   scope_limit:
-  - "Only add test files and per-platform conftest fixtures — do not modify adapter implementation code"
+  - "Only add test files and per-platform conftest fixtures - do not modify adapter implementation code"
   - "Do not change existing Makefile marker expressions or pytest.ini addopts"
 
 work:
 - id: w0
-  summary: "Research — inventory cloud accounts, document provisioning steps, estimate costs"
+  summary: "Research - inventory cloud accounts, document provisioning steps, estimate costs"
   status: done
   notes: |
     Produce a provisioning checklist covering:
     1. Which accounts already exist (check for env vars / config files)
     2. Minimum viable setup per platform (free tier? trial? Docker alternative?)
-       - StarRocks: Docker Compose (free, local) — already has docker/starrocks/
+       - StarRocks: Docker Compose (free, local) - already has docker/starrocks/
        - pg_duckdb / pg_mooncake: Docker (free, local)
        - MotherDuck: free tier available (10 GB)
        - Firebolt: trial account required
@@ -123,7 +123,7 @@ work:
     connect → create table → load SF=0.01 → run TPC-H Q1 → validate row count.
 
 - id: w2
-  summary: "Firebolt Cloud live smoke tests — connect, create table, run TPC-H Q1, validate result"
+  summary: "Firebolt Cloud live smoke tests - connect, create table, run TPC-H Q1, validate result"
   needs: [w1]
   status: done
   notes: |
@@ -132,16 +132,16 @@ work:
     Env vars: FIREBOLT_HOST, FIREBOLT_USER, FIREBOLT_PASSWORD, FIREBOLT_DATABASE.
 
 - id: w3
-  summary: "StarRocks live smoke tests — connect, create table, run TPC-H Q1, validate result"
+  summary: "StarRocks live smoke tests - connect, create table, run TPC-H Q1, validate result"
   needs: [w1]
   status: done
   notes: |
-    No external blocker — Docker Compose setup already exists at
+    No external blocker - Docker Compose setup already exists at
     docker/starrocks/docker-compose.yml. Use skip_unless_docker_service()
     targeting localhost:19030.
 
 - id: w4
-  summary: "Starburst Galaxy live smoke tests — connect, create table, run TPC-H Q1, validate result"
+  summary: "Starburst Galaxy live smoke tests - connect, create table, run TPC-H Q1, validate result"
   needs: [w1]
   status: done
   notes: |
@@ -150,7 +150,7 @@ work:
     Env vars: STARBURST_HOST, STARBURST_USER, STARBURST_PASSWORD, STARBURST_CATALOG.
 
 - id: w5
-  summary: "MotherDuck live smoke tests — connect, create table, run TPC-H Q1, validate result"
+  summary: "MotherDuck live smoke tests - connect, create table, run TPC-H Q1, validate result"
   needs: [w1]
   status: done
   notes: |
@@ -158,7 +158,7 @@ work:
     Use get_env_or_skip("MOTHERDUCK_TOKEN", "MotherDuck").
 
 - id: w6
-  summary: "pg_duckdb MotherDuck mode integration tests — connect via MotherDuck, run TPC-H Q1"
+  summary: "pg_duckdb MotherDuck mode integration tests - connect via MotherDuck, run TPC-H Q1"
   needs: [w1]
   status: done
   notes: |
@@ -190,7 +190,7 @@ work:
     Tests replication lag measurement and benchmark consistency under WAL load.
 
 - id: w10
-  summary: "Docker-based PostgreSQL extension CI harness — Docker Compose for pg_duckdb, pg_mooncake, pg_analytics"
+  summary: "Docker-based PostgreSQL extension CI harness - Docker Compose for pg_duckdb, pg_mooncake, pg_analytics"
   needs: [w1]
   status: done
   notes: |
@@ -199,7 +199,7 @@ work:
     make test-docker-up-pg-extensions.
 
 - id: w11
-  summary: "Multi-extension comparison orchestration — run benchmarks across pg extensions sequentially"
+  summary: "Multi-extension comparison orchestration - run benchmarks across pg extensions sequentially"
   needs: [w6, w8, w10]
   status: done
   notes: |
@@ -207,7 +207,7 @@ work:
     pg_duckdb, pg_mooncake, and pg_analytics, collecting results per extension.
 
 - id: w12
-  summary: "Multi-extension comparison report generation — produce comparison tables from orchestrated results"
+  summary: "Multi-extension comparison report generation - produce comparison tables from orchestrated results"
   needs: [w11]
   status: done
   notes: |

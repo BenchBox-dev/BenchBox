@@ -8,14 +8,14 @@ category: Core Functionality
 description: |
   The ASCII charting module (benchbox/core/visualization/ascii/, ~2,976 lines across 11 files) is
   functionally complete with 11 chart types, but real-world usage reveals several UX issues that make
-  charts harder to read and interpret. These are cosmetic/readability issues, not functional bugs —
+  charts harder to read and interpret. These are cosmetic/readability issues, not functional bugs -
   all chart types render correctly and return valid strings.
 
   Issues identified from head_to_head and comparison template output with DataFusion SQL vs DataFrame:
 
   1. **Asymmetric series naming**: When comparing SQL vs DataFrame, one series is labeled
      "DataFusion" and the other "DataFusion (dataframe)". Both should carry their mode suffix
-     for symmetry — e.g., "DataFusion (sql)" vs "DataFusion (df)". Prefer abbreviated mode
+     for symmetry - e.g., "DataFusion (sql)" vs "DataFusion (df)". Prefer abbreviated mode
      labels: "df" not "dataframe", "sql" stays "sql".
 
   2. **Aggressive label truncation**: Platform names are truncated to as few as 8 characters
@@ -61,17 +61,17 @@ tasks:
       - description: "Add post-normalization pass in ResultPlotter.__init__() that detects same-platform/different-mode pairs
           and appends mode suffix to both"
         done: true
-      - description: "Abbreviate mode labels: 'dataframe' → 'df', 'sql' stays 'sql' — add MODE_ABBREVIATIONS dict"
+      - description: "Abbreviate mode labels: 'dataframe' → 'df', 'sql' stays 'sql' - add MODE_ABBREVIATIONS dict"
         done: true
       - description: "Ensure single-result case still shows bare platform name (no '(sql)' suffix when there's nothing to
           compare against)"
         done: true
-      - description: "Handle edge case where execution_mode is None or missing — default to 'sql' for disambiguation"
+      - description: "Handle edge case where execution_mode is None or missing - default to 'sql' for disambiguation"
         done: true
     - description: "Update _normalize_benchmark_result() with same logic"
       done: true
 
-  - title: "Phase 2: Label truncation — accommodate full names"
+  - title: "Phase 2: Label truncation - accommodate full names"
     description: |
       Remove hardcoded max-length caps on label display. Instead, calculate label width
       dynamically from actual content and shrink the data (bar/chart) area to compensate.
@@ -116,7 +116,7 @@ tasks:
         done: true
       - description: "Format as compact pipe-separated string, centered below title"
         done: true
-    - description: "Thread metadata through chart constructors — add optional metadata param to each chart class"
+    - description: "Thread metadata through chart constructors - add optional metadata param to each chart class"
       done: true
     - description: "Update _render_single_ascii_chart() in visualization.py to pass metadata from results to chart constructors"
       done: true
@@ -138,7 +138,7 @@ tasks:
   - title: "Phase 5: Axis labels"
     description: |
       Add descriptive axis title annotations to charts that have X and Y axes. These are
-      distinct from tick labels (which already exist) — they describe what the axis represents.
+      distinct from tick labels (which already exist) - they describe what the axis represents.
     items:
     - description: "Add _render_x_axis_label() and _render_y_axis_label() to ASCIIChartBase"
       done: true
@@ -147,7 +147,7 @@ tasks:
         done: true
       - description: "Y-axis label: rotated text along left edge, or compact label at top of y-axis"
         done: true
-    - description: "histogram.py: Add x_label='Query ID' and y_label is already used for title — add axis annotation"
+    - description: "histogram.py: Add x_label='Query ID' and y_label is already used for title - add axis annotation"
       done: true
     - description: "box_plot.py: Add x-axis label for the value scale"
       done: true
@@ -171,7 +171,7 @@ tasks:
         done: true
       - description: "Add color_scheme parameter to ASCIIHeatmap constructor ('diverging' or 'sequential')"
         done: true
-    - description: "Increase minimum cell width for column headers — ensure at least 12 chars for labels"
+    - description: "Increase minimum cell width for column headers - ensure at least 12 chars for labels"
       done: true
     - description: "Update scale legend text to show color meaning: 'blue=fast ... red=slow'"
       done: true
@@ -256,7 +256,7 @@ must_preserve:
 approach: |
   Work chart-by-chart, not feature-by-feature. Each phase is self-contained and testable.
 
-  Phase 1 (naming) modifies result_plotter.py only — add a _disambiguate_modes() method similar
+  Phase 1 (naming) modifies result_plotter.py only - add a _disambiguate_modes() method similar
   to existing _disambiguate_platforms(). Call it after _disambiguate_platforms() in __init__().
 
   Phase 2 (truncation) modifies individual chart files. Replace hardcoded caps with dynamic
@@ -267,18 +267,18 @@ approach: |
   Thread metadata as an optional dict through chart constructors. Modify _render_single_ascii_chart()
   in visualization.py to extract metadata from NormalizedResult and pass to chart.
 
-  Phases 4-7 are localized to individual chart files — follow existing patterns in each file.
+  Phases 4-7 are localized to individual chart files - follow existing patterns in each file.
 
 anti_patterns:
-- "DO NOT add metadata to the chart title string itself — because titles are already long and metadata should be visually
-  distinct — add a separate subtitle line instead"
-- "DO NOT wrap labels by splitting platform names mid-word — because 'DataFu\\nsion' is unreadable — only wrap at natural
+- "DO NOT add metadata to the chart title string itself - because titles are already long and metadata should be visually
+  distinct - add a separate subtitle line instead"
+- "DO NOT wrap labels by splitting platform names mid-word - because 'DataFu\\nsion' is unreadable - only wrap at natural
   boundaries like spaces or parentheses"
-- "DO NOT hardcode platform names or mode strings in the naming logic — because new platforms and modes are added regularly
-  — use generic detection of same-platform/different-mode pairs"
-- "DO NOT make the blue→red heatmap palette the ONLY option — because some users may prefer the sequential green→red palette
-  — add a color_scheme parameter defaulting to 'diverging'"
-- "DO NOT use statistical outlier detection that requires numpy — because BenchBox has zero numpy dependency for core — use
+- "DO NOT hardcode platform names or mode strings in the naming logic - because new platforms and modes are added regularly
+  - use generic detection of same-platform/different-mode pairs"
+- "DO NOT make the blue→red heatmap palette the ONLY option - because some users may prefer the sequential green→red palette
+  - add a color_scheme parameter defaulting to 'diverging'"
+- "DO NOT use statistical outlier detection that requires numpy - because BenchBox has zero numpy dependency for core - use
   simple IQR calculation with sorted() and len()"
 
 verification:
@@ -349,7 +349,7 @@ impact:
     and immediately interpretable.
   user_impact: |
     Users will see full platform names, symmetric series labels, run parameters, and clearer
-    visual distinction for outliers and heatmap values — all without needing to examine raw
+    visual distinction for outliers and heatmap values - all without needing to examine raw
     result files. Particularly impactful for SQL vs DataFrame comparisons and CI/CD log output.
   technical_debt: |
     Removes hardcoded magic numbers (8, 12, 20 char caps) in favor of dynamic sizing.
@@ -357,14 +357,14 @@ impact:
 
 context_sections:
   "Current Output Issues (from real DataFusion SF1 run)": |
-    1. Performance bar: "DataFusion" vs "DataFusion (datafr.." — asymmetric and truncated; should be "DataFusion (sql)" vs "DataFusion (df)"
-    2. Box plot: "DataFusion.." — truncated at 12 chars, no mode distinction
-    3. Comparison bar: "DataFu.." — truncated at 8 chars, unreadable
-    4. Heatmap: "DataF.." columns — severely truncated, green→red palette hard to read
+    1. Performance bar: "DataFusion" vs "DataFusion (datafr.." - asymmetric and truncated; should be "DataFusion (sql)" vs "DataFusion (df)"
+    2. Box plot: "DataFusion.." - truncated at 12 chars, no mode distinction
+    3. Comparison bar: "DataFu.." - truncated at 8 chars, unreadable
+    4. Heatmap: "DataF.." columns - severely truncated, green→red palette hard to read
     5. Histogram: No visual distinction between normal and outlier bars
     6. All charts: No scale factor, platform version, or tuning config displayed
     7. All charts with axes: No axis title labels (only tick values shown)
-    8. Summary box: "Geo Mean: 18.2ms → 61.3ms                              +236.7%" — huge blank gap between values and percentage
+    8. Summary box: "Geo Mean: 18.2ms → 61.3ms                              +236.7%" - huge blank gap between values and percentage
 
   "Architecture Notes": |
     - Series names originate in result_plotter.py:130-132 (_normalize_dict)

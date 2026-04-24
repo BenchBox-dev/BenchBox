@@ -42,27 +42,27 @@ description: 'Extend BenchBox''s DataFrame execution capability to all SQL-only 
   '
 category: Core Functionality
 must_preserve:
-- DataFrameQuery API contract in benchbox/core/dataframe/query.py — constructor signature
+- DataFrameQuery API contract in benchbox/core/dataframe/query.py - constructor signature
   (query_id, query_name, description, categories, pandas_impl, expression_impl, sql_equivalent,
   skip_platforms) and execute(ctx, family) method
-- DataFrameContext protocol in benchbox/core/dataframe/context.py — all 30+ methods
+- DataFrameContext protocol in benchbox/core/dataframe/context.py - all 30+ methods
   (get_table, col, lit, window_*, union_all, scalar, etc.) must remain unchanged
-- DataFrameContextImpl abstract base class in benchbox/core/dataframe/context.py —
+- DataFrameContextImpl abstract base class in benchbox/core/dataframe/context.py -
   Generic[DF] typing and abstract method signatures
-- TPC-H DataFrame query correctness — all 22 queries in benchbox/core/tpch/dataframe_queries.py
+- TPC-H DataFrame query correctness - all 22 queries in benchbox/core/tpch/dataframe_queries.py
   must continue to produce correct results
-- TPC-DS DataFrame query correctness — all 99 queries in benchbox/core/tpcds/dataframe_queries/queries.py
+- TPC-DS DataFrame query correctness - all 99 queries in benchbox/core/tpcds/dataframe_queries/queries.py
   must continue to produce correct results
-- QueryRegistry class interface in benchbox/core/dataframe/query.py — register(),
+- QueryRegistry class interface in benchbox/core/dataframe/query.py - register(),
   get(), list_queries(), filter_by_category() methods
-- Platform adapter compatibility — all 8 adapters in benchbox/platforms/dataframe/
+- Platform adapter compatibility - all 8 adapters in benchbox/platforms/dataframe/
   (polars_df, pandas_df, pyspark_df, datafusion_df, modin_df, cudf_df, dask_df) must
   work with new benchmark queries
-- 'benchmark_registry.py BENCHMARK_METADATA — existing entries must not be modified
+- 'benchmark_registry.py BENCHMARK_METADATA - existing entries must not be modified
   beyond adding supports_dataframe: True'
-- TPC-H parameter system — TPCH_DEFAULT_PARAMS, get_tpch_parameters(), set_parameter_overrides()
+- TPC-H parameter system - TPCH_DEFAULT_PARAMS, get_tpch_parameters(), set_parameter_overrides()
   in benchbox/core/tpch/dataframe_queries.py
-- TPC-DS parameter system — get_parameters() in benchbox/core/tpcds/dataframe_queries/parameters.py
+- TPC-DS parameter system - get_parameters() in benchbox/core/tpcds/dataframe_queries/parameters.py
 approach: 'Follow the established TPC-DS modular pattern (not the older TPC-H single-file
   pattern):
 
@@ -93,10 +93,10 @@ approach: 'Follow the established TPC-DS modular pattern (not the older TPC-H si
   structure
 
   3. Implement expression family first (ctx.col(), ctx.lit(), ctx.get_table() pattern)
-  — see q3_expression_impl in tpcds/queries.py
+  - see q3_expression_impl in tpcds/queries.py
 
   4. Implement pandas family second (string indexing, .merge(), .groupby() pattern)
-  — see q3_pandas_impl in tpcds/queries.py
+  - see q3_pandas_impl in tpcds/queries.py
 
   5. Register via QueryRegistry("{benchmark_id}") and wrap each pair in DataFrameQuery()
 
@@ -109,7 +109,7 @@ approach: 'Follow the established TPC-DS modular pattern (not the older TPC-H si
 
   Key pattern differences per benchmark:
 
-  - Single-table benchmarks (ClickBench, H2ODB): No joins, simpler — skip helpers.py
+  - Single-table benchmarks (ClickBench, H2ODB): No joins, simpler - skip helpers.py
 
   - Star-schema (SSB): Reuse TPC-H join patterns but with different key columns
 
@@ -121,22 +121,22 @@ approach: 'Follow the established TPC-DS modular pattern (not the older TPC-H si
 
   '
 anti_patterns:
-- DO NOT copy TPC-H query implementations into other benchmarks verbatim — because
-  each benchmark has different schema semantics, column names, and join patterns —
+- DO NOT copy TPC-H query implementations into other benchmarks verbatim - because
+  each benchmark has different schema semantics, column names, and join patterns -
   analyze the benchmark's SQL queries first and translate the logical operations
-- DO NOT add DataFrame queries without validating against SQL results — because silent
-  correctness bugs accumulate and are hard to find later — validate every query against
+- DO NOT add DataFrame queries without validating against SQL results - because silent
+  correctness bugs accumulate and are hard to find later - validate every query against
   SQL output at SF=0.01 before committing
 - DO NOT modify DataFrameQuery, DataFrameContext, or DataFrameContextImpl classes
-  — because that risks breaking existing TPC-H/TPC-DS implementations and all 8 platform
-  adapters — if new capabilities are needed, extend via subclass or helper functions
-- DO NOT modify existing TPC-H/TPC-DS dataframe_queries files — because those are
-  stable and tested — new benchmarks get their own isolated dataframe_queries/ directories
+  - because that risks breaking existing TPC-H/TPC-DS implementations and all 8 platform
+  adapters - if new capabilities are needed, extend via subclass or helper functions
+- DO NOT modify existing TPC-H/TPC-DS dataframe_queries files - because those are
+  stable and tested - new benchmarks get their own isolated dataframe_queries/ directories
 - DO NOT add benchmark-specific logic to platform adapters in benchbox/platforms/dataframe/
-  — because adapters must remain benchmark-agnostic — put benchmark-specific helpers
+  - because adapters must remain benchmark-agnostic - put benchmark-specific helpers
   in the benchmark's own dataframe_queries/helpers.py
-- DO NOT implement all 700+ queries in a single pass — because review quality degrades
-  with large changesets — implement one benchmark at a time with incremental commits
+- DO NOT implement all 700+ queries in a single pass - because review quality degrades
+  with large changesets - implement one benchmark at a time with incremental commits
   and validation
 verification:
 - description: Existing TPC-H DataFrame query tests still pass
@@ -403,7 +403,7 @@ work:
   needs:
   - w1
   status: done
-  notes: Not needed as separate module — helpers embedded per-benchmark where needed
+  notes: Not needed as separate module - helpers embedded per-benchmark where needed
 - id: w5
   summary: Create DataFrame query implementation template/generator
   status: done
@@ -445,7 +445,7 @@ work:
   summary: SSB DataFrame implementation (13 queries)
   status: done
 - id: w13
-  summary: 'SSB: Map star-schema join pattern — LINEORDER fact joins to DATE, CUSTOMER,
+  summary: 'SSB: Map star-schema join pattern - LINEORDER fact joins to DATE, CUSTOMER,
     SUPPLIER, PART dimensions via integer surrogate keys (lo_orderdate→d_datekey,
     lo_custkey→c_custkey)'
   needs:
@@ -473,12 +473,12 @@ work:
   status: done
 - id: w18
   summary: 'ClickBench: Implement single-table analytics on 108-column ''hits'' table
-    — no joins needed, focus on column selection and filtering'
+    - no joins needed, focus on column selection and filtering'
   needs:
   - w17
   status: done
 - id: w19
-  summary: 'ClickBench: Handle string-heavy operations — REGEX_REPLACE, LIKE patterns,
+  summary: 'ClickBench: Handle string-heavy operations - REGEX_REPLACE, LIKE patterns,
     URL parsing (Q6-Q12) in both families'
   needs:
   - w17
@@ -504,7 +504,7 @@ work:
   summary: NYC Taxi DataFrame implementation (25 queries)
   status: done
 - id: w24
-  summary: 'NYC Taxi: Implement LEFT JOIN pattern — trips fact table joins to taxi_zones
+  summary: 'NYC Taxi: Implement LEFT JOIN pattern - trips fact table joins to taxi_zones
     dimension for pickup/dropoff location lookups'
   needs:
   - w23
@@ -531,7 +531,7 @@ work:
   summary: TSBS DevOps DataFrame implementation (18 queries)
   status: done
 - id: w29
-  summary: 'TSBS: Implement time-series helpers — date_trunc bucketing (minute/hour),
+  summary: 'TSBS: Implement time-series helpers - date_trunc bucketing (minute/hour),
     per-hostname aggregation, composite (time, hostname) key handling'
   needs:
   - w28
@@ -558,7 +558,7 @@ work:
   - w32
   status: done
 - id: w34
-  summary: 'H2ODB: Handle PERCENTILE_CONT (Q9) — map to polars quantile/pandas quantile
+  summary: 'H2ODB: Handle PERCENTILE_CONT (Q9) - map to polars quantile/pandas quantile
     with WITHIN GROUP ORDER BY semantics'
   needs:
   - w32
@@ -586,7 +586,7 @@ work:
   summary: CoffeeShop DataFrame implementation (11 queries)
   status: done
 - id: w40
-  summary: 'CoffeeShop: Implement order analytics queries — revenue aggregations,
+  summary: 'CoffeeShop: Implement order analytics queries - revenue aggregations,
     product rankings, temporal patterns'
   needs:
   - w39
@@ -601,7 +601,7 @@ work:
   status: done
 - id: w43
   summary: 'TPC-H Skew: Evaluate direct reuse of TPC-H dataframe_queries.py implementations
-    — same query logic, different data distribution'
+    - same query logic, different data distribution'
   needs:
   - w42
   status: done
@@ -614,7 +614,7 @@ work:
   needs:
   - w42
   status: done
-  notes: Not needed — uses same TPC-H parameters. Skew is purely in data distribution.
+  notes: Not needed - uses same TPC-H parameters. Skew is purely in data distribution.
 - id: w45
   summary: 'TPC-H Skew: Validate all 22 queries produce correct results on skewed
     data (may expose join ordering issues)'
@@ -626,7 +626,7 @@ work:
   summary: DataVault DataFrame implementation (22 queries)
   status: done
 - id: w47
-  summary: 'DataVault: Implement Hub-Link-Satellite navigation — multi-table joins
+  summary: 'DataVault: Implement Hub-Link-Satellite navigation - multi-table joins
     through 21-table DV2.0 schema (7 Hubs + 6 Links + 8 Satellites)'
   needs:
   - w46
@@ -640,7 +640,7 @@ work:
   - w46
   status: done
 - id: w49
-  summary: 'DataVault: Validate all 22 queries — verify correct cardinality through
+  summary: 'DataVault: Validate all 22 queries - verify correct cardinality through
     many-to-many link table joins'
   needs:
   - w46
@@ -675,7 +675,7 @@ deferred:
 - summary: TPC-Havoc DataFrame implementation (220 queries)
   reason: 220 query variants exist to test SQL optimizer behavior (syntax rewriting,
     predicate pushdown, etc.). These test SQL engine internals, not logical query
-    semantics — DataFrame execution bypasses SQL parsing entirely. Minimal value for
+    semantics - DataFrame execution bypasses SQL parsing entirely. Minimal value for
     DataFrame benchmarking. Needs separate evaluation if desired.
 - summary: JoinOrder DataFrame implementation (113 queries)
   reason: 113 queries specifically designed to test SQL optimizer join ordering decisions.

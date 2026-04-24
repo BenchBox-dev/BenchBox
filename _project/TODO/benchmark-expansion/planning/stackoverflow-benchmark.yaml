@@ -162,9 +162,9 @@ must_preserve:
 - "Platform registry backward compatible"
 
 anti_patterns:
-- "DO NOT parse XML dumps at benchmark runtime — because XML parsing is 10-100x slower than Parquet reads — always pre-convert
+- "DO NOT parse XML dumps at benchmark runtime - because XML parsing is 10-100x slower than Parquet reads - always pre-convert
   to Parquet in the data generation phase"
-- "DO NOT require internet access for benchmark execution — because air-gapped environments exist — only the data acquisition
+- "DO NOT require internet access for benchmark execution - because air-gapped environments exist - only the data acquisition
   phase should download"
 
 verification:

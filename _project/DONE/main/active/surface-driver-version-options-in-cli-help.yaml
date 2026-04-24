@@ -21,7 +21,7 @@ description: |
     1. Move "Driver & Version Management" to appear near the top of --help-topic examples
        output (currently it appears after Validation, Plan Capture, Compression, Dry Run)
     2. Expand the section with a concrete example that addresses the "I installed X but
-       got Y" scenario — include a note that uv run syncs to uv.lock and why
+       got Y" scenario - include a note that uv run syncs to uv.lock and why
        --platform-option driver_version + driver_auto_install is the reliable path
     3. Add a one-line note to the --platform-option help string (run.py lines 485-493)
        pointing to `--help-topic examples` for the driver versioning pattern
@@ -65,18 +65,18 @@ impact:
 must_preserve:
 - "benchbox run --help output format and all existing option descriptions remain unchanged"
 - "All existing --help-topic sections remain present (reorder only, no removals)"
-- "help.py is not a code-logic file — no behavioral changes, only text content"
+- "help.py is not a code-logic file - no behavioral changes, only text content"
 
 approach: |
   All changes are in benchbox/cli/help.py (HELP_TOPICS dict) and the --platform-option
   help string in benchbox/cli/commands/run.py lines 485-493.
 
-  For help.py: the HELP_TOPICS dict is ordered — move the "Driver & Version Management"
+  For help.py: the HELP_TOPICS dict is ordered - move the "Driver & Version Management"
   key to appear before "Dry Run (Preview)" (currently line 265). Python dicts are
   insertion-ordered since 3.7, so the rendered order follows dict order.
 
   For the expanded example content, the new scenario to add:
-    "# uv run syncs your env to uv.lock — use driver_auto_install to reliably switch:"
+    "# uv run syncs your env to uv.lock - use driver_auto_install to reliably switch:"
     "benchbox run --platform duckdb --benchmark tpch \\"
     "  --platform-option driver_version=1.5.0 \\"
     "  --platform-option driver_auto_install=true"
@@ -84,9 +84,9 @@ approach: |
     "uv run --with \"duckdb==1.5.0\" benchbox run --platform duckdb --benchmark tpch"
 
 anti_patterns:
-- "DO NOT add behavioral logic to help.py — because it is a pure text/data file — keep all changes to string content only"
-- "DO NOT mention internal implementation details (uv.lock internals, sys.modules) in user-facing help — because it's jargon
-  — describe the observable behavior instead"
+- "DO NOT add behavioral logic to help.py - because it is a pure text/data file - keep all changes to string content only"
+- "DO NOT mention internal implementation details (uv.lock internals, sys.modules) in user-facing help - because it's jargon
+  - describe the observable behavior instead"
 
 verification:
 - description: "Driver & Version Management section appears near top of help-topic examples output"

@@ -14,46 +14,46 @@ description: |
 
   Groups to mark as ignored (by report rank):
 
-  G2  (60 lines): supports_operation/is_setup/sql — protocol operation support
+  G2  (60 lines): supports_operation/is_setup/sql - protocol operation support
       methods across ai_primitives, metadata_primitives, transaction_primitives,
       write_primitives dataframe_operations modules and datafusion_df/pyspark_df.
 
-  G5  (60 lines): to_dict/get_etl_config/get_performance_config — dataclass-to-dict
+  G5  (60 lines): to_dict/get_etl_config/get_performance_config - dataclass-to-dict
       conversion methods on distinct config/artifact classes. Acceptable boilerplate.
 
-  G6  (60 lines): q62_expression_impl/q99_expression_impl — TPC-DS Q62 and Q99
+  G6  (60 lines): q62_expression_impl/q99_expression_impl - TPC-DS Q62 and Q99
       are spec-mandated structurally similar delivery-time bucketing queries
       against different channels (web vs catalog).
 
-  G14 (55 lines): compress_file/decompress_file/open_for_read — protocol stubs
+  G14 (55 lines): compress_file/decompress_file/open_for_read - protocol stubs
       in context.py and protocols.py matching canonical impls in compression.py.
 
-  G17 (54 lines): window_dense_rank/window_rank/window_row_number —
+  G17 (54 lines): window_dense_rank/window_rank/window_row_number -
       Protocol/ABC abstract method stubs in core/dataframe/context.py.
 
-  G19 (54 lines): q38_expression_impl/q87_expression_impl — TPC-DS spec pair
+  G19 (54 lines): q38_expression_impl/q87_expression_impl - TPC-DS spec pair
       using INTERSECT/EXCEPT patterns with 3-channel sales data.
 
-  G21 (52 lines): union_sales_channels_pandas/union_returns_channels_pandas —
+  G21 (52 lines): union_sales_channels_pandas/union_returns_channels_pandas -
       domain-specific channel union operations in tpcds channel_helper.py.
 
-  G22 (52 lines): __init__ on facade classes (datavault.py, tpcds.py, tpch.py) —
+  G22 (52 lines): __init__ on facade classes (datavault.py, tpcds.py, tpch.py) -
       API surface conformance constructors.
 
-  G25 (51 lines): create_sample_test_results/get_extended_table_order — AST
+  G25 (51 lines): create_sample_test_results/get_extended_table_order - AST
       false positive; different purposes but similar nested dict/list structure.
 
-  G26 (50 lines): cast_date/cast_string/col — partially covered by existing rule;
+  G26 (50 lines): cast_date/cast_string/col - partially covered by existing rule;
       extend path_contains to include tpcdi/tools/file_parsers.py and
       core/tuning/ddl_generator.py.
 
-  G27 (50 lines): get_stream_info/get_table_info/get_table_tuning — thin
+  G27 (50 lines): get_stream_info/get_table_info/get_table_tuning - thin
       delegation methods on facade classes.
 
-  G29 (50 lines): _detect_format/col/get_row_count — extend existing rule to
+  G29 (50 lines): _detect_format/col/get_row_count - extend existing rule to
       add get_row_count for platform adapters; partially already covered.
 
-  G30 (49 lines): q62_pandas_impl/q99_pandas_impl — pandas implementations
+  G30 (49 lines): q62_pandas_impl/q99_pandas_impl - pandas implementations
       of the same TPC-DS Q62/Q99 spec pair.
 
   After adding rules, rebaseline: threshold = ceil(actual * 1.10).
@@ -95,7 +95,7 @@ work:
       datavault/tpcds/tpch). Added 6 new path-scoped rules (G2, G6/G19/G30, G14, G21, G25, G27).
       Note: G26 original approach assumed cast_date/cast_string at file_parsers.py and
       ddl_generator.py, but those files contain parse_file and supports_tuning_type respectively
-      (structural false positives — different abstract method stubs sharing same AST hash).
+      (structural false positives - different abstract method stubs sharing same AST hash).
       Fixed to target context.py where cast_date/cast_string actually live.
 
   - id: w2

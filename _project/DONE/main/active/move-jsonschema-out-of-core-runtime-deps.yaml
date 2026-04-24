@@ -8,7 +8,7 @@ category: Code Quality and Technical Debt
 description: |
   `jsonschema>=4.25.1` is declared on line 42 of `pyproject.toml` as a CORE
   runtime dep, but the only import site in the entire repo is
-  `_project/scripts/validate_todo.py:18` — internal TODO management
+  `_project/scripts/validate_todo.py:18` - internal TODO management
   tooling that is **not** packaged into the wheel.
 
   Two reasonable resolutions:
@@ -63,7 +63,7 @@ approach: |
   `validate_todo.py` workflow which is the sole consumer.
 
 anti_patterns:
-  - "DO NOT remove the dep entirely — because TODO tooling needs it — move to dev only"
+  - "DO NOT remove the dep entirely - because TODO tooling needs it - move to dev only"
 
 verification:
   - description: "jsonschema no longer in [project] dependencies but present in dep-group:dev"
@@ -91,7 +91,7 @@ metadata:
 
 impact:
   business_value: |
-    Honest dep boundary — declarations match where the code actually runs.
+    Honest dep boundary - declarations match where the code actually runs.
   user_impact: |
     End users no longer install jsonschema (and its small transitive set:
     attrs, referencing, rpds-py, jsonschema-specifications) when they have

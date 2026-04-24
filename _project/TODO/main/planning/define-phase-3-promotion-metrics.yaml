@@ -18,7 +18,7 @@ description: |
   to look.
 
   Without measurement and a forcing function, the Phase 3 promotion
-  decision will be made by whoever feels frustrated first — which is
+  decision will be made by whoever feels frustrated first - which is
   exactly the kind of ad-hoc engineering decision the strategy doc is
   trying to prevent. This item operationalizes the trigger: pick the
   metrics, build the cheapest possible dashboard, and put a review on
@@ -93,13 +93,13 @@ verification:
   expected_output: "exit 0, markdown output with one section per metric"
 
 must_preserve:
-- Strategy doc's deferral of Phase 3 — this TODO measures the trigger, doesn't pull it.
+- Strategy doc's deferral of Phase 3 - this TODO measures the trigger, doesn't pull it.
 - Existing Phase 3 planning TODOs (`design-results-ingest-storage-and-derived-read-model`, `integrate-benchbox-cli-submit-and-service-auth`, `operate-results-platform-security-observability-and-abuse-controls`) remain Not Started until a review explicitly promotes them.
 
 anti_patterns:
-- DO NOT start any Phase 3 implementation work as part of this TODO — because that defeats the deferral the strategy doc explicitly requires; this is measurement and decision plumbing only.
-- DO NOT pick metrics that can't be measured cheaply — because a dashboard nobody can build is the same as no dashboard; favor `gh` CLI queries and a flat notes file over building a metrics service.
-- DO NOT set the thresholds so low that they trip on noise — because false promotion of Phase 3 wastes the largest engineering investment in the project.
+- DO NOT start any Phase 3 implementation work as part of this TODO - because that defeats the deferral the strategy doc explicitly requires; this is measurement and decision plumbing only.
+- DO NOT pick metrics that can't be measured cheaply - because a dashboard nobody can build is the same as no dashboard; favor `gh` CLI queries and a flat notes file over building a metrics service.
+- DO NOT set the thresholds so low that they trip on noise - because false promotion of Phase 3 wastes the largest engineering investment in the project.
 
 scope_limit:
   only_modify:

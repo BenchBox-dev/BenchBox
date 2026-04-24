@@ -9,11 +9,11 @@ description: |
   migrated all 16 visualization chart types. However, two modules still contain custom
   ASCII rendering that predates textcharts and was not part of the original extraction scope:
 
-  1. **benchbox/monitoring/report.py** — `generate_ascii_chart()` + helpers render resource
+  1. **benchbox/monitoring/report.py** - `generate_ascii_chart()` + helpers render resource
      utilization time series (CPU, Memory, Disk I/O, Network) using a custom `*`-grid
      renderer (~80 lines). This maps directly to textcharts `LineChart`.
 
-  2. **benchbox/core/query_plans/visualization.py** — `QueryPlanVisualizer` renders operator
+  2. **benchbox/core/query_plans/visualization.py** - `QueryPlanVisualizer` renders operator
      trees using box-drawing characters (`└──`, `├──`, `│`). This is tree-structured
      domain visualization, NOT a chart type. textcharts has no tree renderer and adding
      one would be over-scoped. **Deferred.**
@@ -45,8 +45,8 @@ gap_analysis:
     solution: "Split `LineChart.render()` output via `.split('\\n')` to populate `chart_lines: list[str]`"
   - gap: "`height` parameter accepted by `generate_ascii_chart()` but textcharts auto-sizes by default"
     location: "benchbox/monitoring/report.py:78"
-    solution: "`ChartOptions` has `height: int | None` — pass it through. `ResourceChart.height` remains accurate."
-  - gap: "Tests assert `*` character presence and `time` axis label — textcharts uses different characters"
+    solution: "`ChartOptions` has `height: int | None` - pass it through. `ResourceChart.height` remains accurate."
+  - gap: "Tests assert `*` character presence and `time` axis label - textcharts uses different characters"
     location: "tests/unit/monitoring/test_monitoring_report.py:108-172"
     solution: "Update assertions to match textcharts LineChart output format (box-drawing chars, axis labels)"
 
@@ -78,7 +78,7 @@ work:
     - `from textcharts.base import ChartOptions`
 
     **B. Rewire `generate_ascii_chart()`** (report.py:75-121):
-    1. Handle empty series edge case (return "(no data)" chart — unchanged)
+    1. Handle empty series edge case (return "(no data)" chart - unchanged)
     2. Call `_series_to_line_chart()` for actual rendering
     3. Split rendered string via `.split('\n')` to populate `chart_lines: list[str]`
     4. Preserve `min_value` / `max_value` on the returned `ResourceChart`
@@ -101,7 +101,7 @@ work:
     - `test_single_value` (l.116): assert rendered output is non-empty instead of `*`
     - `test_increasing_series` (l.122): textcharts uses box-drawing chars, not `*`;
       assert chart contains data markers; remove `"time"` axis assertion
-    - `test_constant_series` (l.132): same — update char assertion
+    - `test_constant_series` (l.132): same - update char assertion
     - `test_with_title_and_unit` (l.139): title and unit assertions should still pass
       (textcharts renders both)
     - `test_chart_dimensions` (l.147): width/height on ResourceChart should still match
@@ -116,7 +116,7 @@ work:
     - `TestResourceReporterEdgeCases` (l.338-372): edge cases
     - `TestReportIntegration` (l.375-431): integration test
 
-    **Post-edit verification** — confirm rendered output is structurally valid:
+    **Post-edit verification** - confirm rendered output is structurally valid:
     ```python
     from benchbox.monitoring.report import generate_ascii_chart
     chart = generate_ascii_chart(
@@ -137,7 +137,7 @@ work:
     Now that monitoring uses textcharts, expose color/unicode options:
 
     1. Add optional params to `ResourceReporter.__init__()`:
-       - `use_color: bool = False` (default False — monitoring output often goes to log files)
+       - `use_color: bool = False` (default False - monitoring output often goes to log files)
        - `use_unicode: bool = True`
 
     2. Pass through to `ChartOptions` in the adapter function
@@ -192,7 +192,7 @@ files_affected:
 must_preserve:
 - "`generate_ascii_chart()` function signature and return type (ResourceChart)"
 - "`ResourceChart` dataclass public interface (render(), resource_type, width, height, min_value, max_value)"
-- "`ResourceReporter.generate_report()` behavior — charts dict keyed by ResourceType"
+- "`ResourceReporter.generate_report()` behavior - charts dict keyed by ResourceType"
 - "`ResourceReport.generate_text_report()` output structure (sections: SUMMARY, UTILIZATION, BOTTLENECK, CHARTS)"
 - "Empty series returns `(no data)` chart"
 
@@ -207,12 +207,12 @@ approach: |
   5. Add color/unicode passthrough as a follow-on enhancement
 
 anti_patterns:
-- "DO NOT change the `generate_ascii_chart()` return type — because `ResourceReporter` and
-  `ResourceReport` depend on `ResourceChart` — keep the adapter internal."
-- "DO NOT use `use_color=True` by default — because monitoring output often goes to log files
-  and CI output — default to False with opt-in."
-- "DO NOT attempt to convert query plan tree rendering — because textcharts has no tree
-  chart type and the operator tree is domain-specific DAG visualization — defer it."
+- "DO NOT change the `generate_ascii_chart()` return type - because `ResourceReporter` and
+  `ResourceReport` depend on `ResourceChart` - keep the adapter internal."
+- "DO NOT use `use_color=True` by default - because monitoring output often goes to log files
+  and CI output - default to False with opt-in."
+- "DO NOT attempt to convert query plan tree rendering - because textcharts has no tree
+  chart type and the operator tree is domain-specific DAG visualization - defer it."
 
 verification:
 - description: "Monitoring unit tests pass after conversion"
@@ -220,7 +220,7 @@ verification:
   expected_output: "All tests pass"
 - description: "No remaining custom chart rendering in report.py (no _build_chart_grid calls)"
   command: "rg '_build_chart_grid|_resample_to_width' benchbox/monitoring/report.py"
-  expected_output: "No matches — helper functions removed"
+  expected_output: "No matches - helper functions removed"
 - description: "textcharts import present in report.py"
   command: "rg 'from textcharts' benchbox/monitoring/report.py"
   expected_output: "At least one import from textcharts.line_chart"
@@ -232,7 +232,7 @@ verification:
   expected_output: "All tests pass"
 - description: "Rendered chart is structurally valid (has title, axes, data, reasonable size)"
   command: "uv run -- python -c \"from benchbox.monitoring.report import generate_ascii_chart; c = generate_ascii_chart([10,50,90], title='T', unit='%'); r = c.render(); assert 'T' in r and len(r) > 50, f'Bad render: {r[:100]}'\""
-  expected_output: "No assertion error — chart contains title and has substantial content"
+  expected_output: "No assertion error - chart contains title and has substantial content"
 
 scope_limit:
   only_modify:

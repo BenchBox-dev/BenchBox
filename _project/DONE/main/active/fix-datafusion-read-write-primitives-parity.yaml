@@ -29,11 +29,11 @@ description: |
 
 metadata:
   tags:
-  - datafusion
-  - read-primitives
-  - write-primitives
-  - parity
-  - concurrency
+    - datafusion
+    - read-primitives
+    - write-primitives
+    - parity
+    - concurrency
   estimated_effort: Medium
   created_date: "2026-02-11"
   last_updated: "2026-02-11T00:00:00"
@@ -52,12 +52,12 @@ impact:
     working directories.
 
 must_preserve:
-- "Base adapter reuse/recreate flow in `benchbox/platforms/base/adapter.py` remains the single source of truth for database
-  lifecycle decisions"
-- "Existing DuckDB/PostgreSQL/SQLite write-primitives setup behavior remains unchanged"
-- "Read-primitives catalog variant and skip_on semantics in `benchbox/core/read_primitives/catalog/loader.py` and `benchbox/core/read_primitives/queries.py`
-  remain backward compatible"
-- "DataFusion benchmark commands that already pass (for non-map read queries) continue to run without regression"
+  - "Base adapter reuse/recreate flow in `benchbox/platforms/base/adapter.py` remains the single source of truth for database
+    lifecycle decisions"
+  - "Existing DuckDB/PostgreSQL/SQLite write-primitives setup behavior remains unchanged"
+  - "Read-primitives catalog variant and skip_on semantics in `benchbox/core/read_primitives/catalog/loader.py` and `benchbox/core/read_primitives/queries.py`
+    remain backward compatible"
+  - "DataFusion benchmark commands that already pass (for non-map read queries) continue to run without regression"
 
 approach: |
   Follow existing shared-pattern boundaries:
@@ -81,103 +81,113 @@ approach: |
   (equivalent execution intent, not necessarily identical timings).
 
 anti_patterns:
-- "DO NOT hardcode `if platform == datafusion` branches at every write-primitives call site — because this duplicates connection
-  handling logic — centralize execution compatibility in one helper path"
-- "DO NOT solve map-query failures by globally skipping map category on DataFusion — because parity requires equivalent behavior
-  — add DataFusion variants with validated syntax"
-- "DO NOT bypass base adapter lifecycle with ad-hoc cleanup in benchmark code — because reuse and compatibility checks already
-  live in shared adapter flow — integrate minimal locking at the adapter boundary"
-- "DO NOT force `force_recreate=True` as a race workaround — because it destroys reuse effectiveness — serialize destructive
-  cleanup only when needed"
+  - "DO NOT hardcode `if platform == datafusion` branches at every write-primitives call site - because this duplicates connection
+    handling logic - centralize execution compatibility in one helper path"
+  - "DO NOT solve map-query failures by globally skipping map category on DataFusion - because parity requires equivalent behavior
+    - add DataFusion variants with validated syntax"
+  - "DO NOT bypass base adapter lifecycle with ad-hoc cleanup in benchmark code - because reuse and compatibility checks already
+    live in shared adapter flow - integrate minimal locking at the adapter boundary"
+  - "DO NOT force `force_recreate=True` as a race workaround - because it destroys reuse effectiveness - serialize destructive
+    cleanup only when needed"
 
 verification:
-- description: "Write-primitives setup check uses DataFusion-compatible SQL execution path and no longer false-negatives source
-    tables"
-  command: "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py -k \"table_exists or setup\" -v"
-  expected_output: "targeted write-primitives setup tests pass with no DataFusion API mismatch failures"
-- description: "Read-primitives map queries have valid DataFusion SQL variants and execute successfully"
-  command: "uv run -- python -m pytest tests/integration/test_read_primitives_datafusion.py -k \"map_construction or map_access
-    or map_keys_values\" -v"
-  expected_output: "map query integration tests pass on DataFusion"
-- description: "Concurrent DataFusion run setup no longer fails on working-dir cleanup races"
-  command: "uv run -- python -m pytest tests/integration/test_datafusion_adapter.py -k \"concurrent or working_dir or reuse\"\
-    \ -v"
-  expected_output: "no intermittent `Could not remove existing database` errors across repeated runs"
-- description: "End-to-end parity sanity for both primitive benchmarks on DataFusion SQL mode"
-  command: "uv run -- python -m benchbox run --platform datafusion --benchmark write_primitives --scale 1 --non-interactive
-    --phases power"
-  expected_output: "write-primitives runs queries instead of failing setup on missing source tables"
-- description: "End-to-end read-primitives map category runs on DataFusion without parser failure"
-  command: "uv run -- python -m benchbox run --platform datafusion --benchmark read_primitives --scale 1 --non-interactive
-    --queries map_construction,map_access,map_keys_values --phases power"
-  expected_output: "all three map queries execute or fail only for non-syntax reasons"
+  - description:
+      "Write-primitives setup check uses DataFusion-compatible SQL execution path and no longer false-negatives source
+      tables"
+    command: 'uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py -k "table_exists or setup" -v'
+    expected_output: "targeted write-primitives setup tests pass with no DataFusion API mismatch failures"
+  - description: "Read-primitives map queries have valid DataFusion SQL variants and execute successfully"
+    command:
+      'uv run -- python -m pytest tests/integration/test_read_primitives_datafusion.py -k "map_construction or map_access
+      or map_keys_values" -v'
+    expected_output: "map query integration tests pass on DataFusion"
+  - description: "Concurrent DataFusion run setup no longer fails on working-dir cleanup races"
+    command:
+      "uv run -- python -m pytest tests/integration/test_datafusion_adapter.py -k \"concurrent or working_dir or reuse\"\
+      \ -v"
+    expected_output: "no intermittent `Could not remove existing database` errors across repeated runs"
+  - description: "End-to-end parity sanity for both primitive benchmarks on DataFusion SQL mode"
+    command:
+      "uv run -- python -m benchbox run --platform datafusion --benchmark write_primitives --scale 1 --non-interactive
+      --phases power"
+    expected_output: "write-primitives runs queries instead of failing setup on missing source tables"
+  - description: "End-to-end read-primitives map category runs on DataFusion without parser failure"
+    command:
+      "uv run -- python -m benchbox run --platform datafusion --benchmark read_primitives --scale 1 --non-interactive
+      --queries map_construction,map_access,map_keys_values --phases power"
+    expected_output: "all three map queries execute or fail only for non-syntax reasons"
 
 scope_limit:
   only_modify:
-  - "benchbox/core/write_primitives/benchmark.py"
-  - "benchbox/core/connection.py"
-  - "benchbox/core/read_primitives/catalog/queries.yaml"
-  - "benchbox/platforms/datafusion.py"
-  - "tests/unit/benchmarks/test_write_primitives_core.py"
-  - "tests/unit/core/read_primitives/test_query_manager_variants.py"
-  - "tests/integration/test_read_primitives_datafusion.py"
-  - "tests/integration/test_datafusion_adapter.py"
+    - "benchbox/core/write_primitives/benchmark.py"
+    - "benchbox/core/connection.py"
+    - "benchbox/core/read_primitives/catalog/queries.yaml"
+    - "benchbox/platforms/datafusion.py"
+    - "tests/unit/benchmarks/test_write_primitives_core.py"
+    - "tests/unit/core/read_primitives/test_query_manager_variants.py"
+    - "tests/integration/test_read_primitives_datafusion.py"
+    - "tests/integration/test_datafusion_adapter.py"
   do_not_modify:
-  - "benchbox/core/runner/"
-  - "benchbox/cli/"
+    - "benchbox/core/runner/"
+    - "benchbox/cli/"
 
 files_affected:
   modified:
-  - "benchbox/core/write_primitives/benchmark.py"
-  - "benchbox/core/connection.py"
-  - "benchbox/core/read_primitives/catalog/queries.yaml"
-  - "benchbox/platforms/datafusion.py"
-  - "tests/unit/benchmarks/test_write_primitives_core.py"
-  - "tests/unit/core/read_primitives/test_query_manager_variants.py"
-  - "tests/integration/test_read_primitives_datafusion.py"
-  - "tests/integration/test_datafusion_adapter.py"
+    - "benchbox/core/write_primitives/benchmark.py"
+    - "benchbox/core/connection.py"
+    - "benchbox/core/read_primitives/catalog/queries.yaml"
+    - "benchbox/platforms/datafusion.py"
+    - "tests/unit/benchmarks/test_write_primitives_core.py"
+    - "tests/unit/core/read_primitives/test_query_manager_variants.py"
+    - "tests/integration/test_read_primitives_datafusion.py"
+    - "tests/integration/test_datafusion_adapter.py"
 
 work:
-- id: w1
-  summary: "Design and add a shared SQL execution compatibility helper that supports DB-API `execute()` and DataFusion `sql(...).collect()`
-    paths"
-  status: done
-- id: w2
-  summary: "Refactor write-primitives setup/table-existence checks to use the compatibility helper and verify source-table
-    detection on DataFusion"
-  needs: [w1]
-  status: done
-- id: w3
-  summary: "Research DataFusion map SQL syntax and implement dialect `variants` for map_construction/map_access/map_keys_values
-    in read-primitives catalog"
-  status: done
-- id: w4
-  summary: "Add/adjust read-primitives variant tests to assert DataFusion map variants are selected and executable"
-  needs: [w3]
-  status: done
-- id: w5
-  summary: "Implement minimal concurrency guard for DataFusion working-dir delete/recreate path while preserving base adapter
-    reuse semantics"
-  status: done
-- id: w6
-  summary: "Add regression tests for DataFusion cleanup race and reuse behavior under repeated/concurrent initialization"
-  needs: [w5]
-  status: done
-- id: w7
-  summary: "Run targeted unit/integration and command-level verification for read/write primitives parity, then document outcomes
-    in TODO item notes"
-  needs: [w2, w4, w6]
-  status: done
+  - id: w1
+    summary:
+      "Design and add a shared SQL execution compatibility helper that supports DB-API `execute()` and DataFusion `sql(...).collect()`
+      paths"
+    status: done
+  - id: w2
+    summary:
+      "Refactor write-primitives setup/table-existence checks to use the compatibility helper and verify source-table
+      detection on DataFusion"
+    needs: [w1]
+    status: done
+  - id: w3
+    summary:
+      "Research DataFusion map SQL syntax and implement dialect `variants` for map_construction/map_access/map_keys_values
+      in read-primitives catalog"
+    status: done
+  - id: w4
+    summary: "Add/adjust read-primitives variant tests to assert DataFusion map variants are selected and executable"
+    needs: [w3]
+    status: done
+  - id: w5
+    summary:
+      "Implement minimal concurrency guard for DataFusion working-dir delete/recreate path while preserving base adapter
+      reuse semantics"
+    status: done
+  - id: w6
+    summary: "Add regression tests for DataFusion cleanup race and reuse behavior under repeated/concurrent initialization"
+    needs: [w5]
+    status: done
+  - id: w7
+    summary:
+      "Run targeted unit/integration and command-level verification for read/write primitives parity, then document outcomes
+      in TODO item notes"
+    needs: [w2, w4, w6]
+    status: done
 
 success_metrics:
-- "DataFusion write_primitives no longer fails setup due to false missing-table detection"
-- "DataFusion executes map_construction/map_access/map_keys_values with valid SQL variants"
-- "Concurrent DataFusion runs against the same working dir do not fail cleanup with removal race errors"
-- "Database reuse remains effective when compatibility checks pass (no unconditional recreate workaround)"
+  - "DataFusion write_primitives no longer fails setup due to false missing-table detection"
+  - "DataFusion executes map_construction/map_access/map_keys_values with valid SQL variants"
+  - "Concurrent DataFusion runs against the same working dir do not fail cleanup with removal race errors"
+  - "Database reuse remains effective when compatibility checks pass (no unconditional recreate workaround)"
 
 open_questions:
-- "Which DataFusion map-constructor/accessor syntax is stable across supported DataFusion versions in BenchBox CI?"
-- "Should the SQL compatibility helper live in `benchbox/core/connection.py` or a dedicated shared utility module to avoid
-  broad import coupling?"
+  - "Which DataFusion map-constructor/accessor syntax is stable across supported DataFusion versions in BenchBox CI?"
+  - "Should the SQL compatibility helper live in `benchbox/core/connection.py` or a dedicated shared utility module to avoid
+    broad import coupling?"
 
 completed_date: "2026-02-11"

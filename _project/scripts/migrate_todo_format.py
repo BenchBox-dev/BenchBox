@@ -29,7 +29,7 @@ import yaml
 class TodoFormatMigrator:
     """Migrates TODO YAML files from legacy format to new integrated format."""
 
-    # Keys under `tasks` that are NOT phases — preserve as metadata
+    # Keys under `tasks` that are NOT phases - preserve as metadata
     NON_PHASE_KEYS = {"reference_patterns", "shared_fixtures"}
 
     # Maximum work units before flagging for review

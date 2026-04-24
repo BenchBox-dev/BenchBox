@@ -22,7 +22,7 @@ description: |
   `power_score` for TPC-H/TPC-DS and `geomean_ms` for everything else;
   both are shown in each row, but the primary sort is the canonical one.
 
-  Scope excludes computing power_score (the CLI already does this) — this
+  Scope excludes computing power_score (the CLI already does this) - this
   TODO only ensures the explorer surfaces and ranks by the right metric.
 
 deps:
@@ -75,26 +75,26 @@ files_affected:
   - "_project/analysis/benchbox-results-platform-strategy.md"
 
 must_preserve:
-- "CLI-computed power_score values — do not recompute in the pipeline; read from bundle metadata"
-- "Existing `geomean_ms` field on platform rows — remains present as secondary metric for all benchmarks"
-- "The 'Canonical Duration Metric' decision from 2026-04-14 — refines, does not overturn"
+- "CLI-computed power_score values - do not recompute in the pipeline; read from bundle metadata"
+- "Existing `geomean_ms` field on platform rows - remains present as secondary metric for all benchmarks"
+- "The 'Canonical Duration Metric' decision from 2026-04-14 - refines, does not overturn"
 
 approach: |
   The cleanest path is a single registry lookup in the pipeline.
   Pipeline reads summary.benchmark, looks up the metric config, attaches
   it to the emitted BenchmarkSummary. The frontend is purely declarative
-  from that point — no family logic in TypeScript.
+  from that point - no family logic in TypeScript.
 
   Registry entries are strings keyed on canonical benchmark family names
   (tpch, tpcds, star_schema, clickbench, nyctaxi, tsbs-devops, h2odb,
   datavault, ...). Unknown families fall back to geomean_ms asc.
 
 anti_patterns:
-- "DO NOT recompute power_score in the pipeline — because the CLI already emits it per-bundle — read the pre-computed value
+- "DO NOT recompute power_score in the pipeline - because the CLI already emits it per-bundle - read the pre-computed value
   and null if absent"
-- "DO NOT hard-code the benchmark → metric mapping in TypeScript — because it creates two sources of truth — serialize the
+- "DO NOT hard-code the benchmark → metric mapping in TypeScript - because it creates two sources of truth - serialize the
   choice into the summary artifact"
-- "DO NOT drop the secondary metric from the UI — because some users will want to cross-reference — show both, primary prominent,
+- "DO NOT drop the secondary metric from the UI - because some users will want to cross-reference - show both, primary prominent,
   secondary muted"
 
 scope_limit:

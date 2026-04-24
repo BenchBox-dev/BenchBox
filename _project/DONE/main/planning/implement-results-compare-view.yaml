@@ -11,7 +11,7 @@ deps:
   - build-static-pipeline-bundles-to-read-model
 description: |
   Build the dynamic comparison tool at `/results/compare?ids=id1,id2[,id3]`.
-  **This is the primary Phase 1 deliverable** — the feature that validates the
+  **This is the primary Phase 1 deliverable** - the feature that validates the
   core hypothesis ("people want to browse and compare public benchmark results")
   and differentiates the explorer from a file listing.
 
@@ -35,9 +35,9 @@ work:
   notes: |
     When the compare view loads with `?ids=id1,id2`:
     1. Fetch detail JSON for each result ID
-    2. Validate cohort compatibility (strict — block incompatible, don't warn):
-       - Same benchmark: required (hard-block if mismatched — show error, refuse to render)
-       - Same scale factor: required (hard-block if mismatched — show error, refuse to render)
+    2. Validate cohort compatibility (strict - block incompatible, don't warn):
+       - Same benchmark: required (hard-block if mismatched - show error, refuse to render)
+       - Same scale factor: required (hard-block if mismatched - show error, refuse to render)
        - Same query set: warn if different (e.g., subset vs full) but allow comparison
        - Different platform/config: expected and fine
     3. Build a merged query-level dataset: for each query ID, collect timings
@@ -123,19 +123,19 @@ impact:
     with a single page load and a shareable URL.
 
 must_preserve:
-- "Compare URLs must be stable and shareable — query params, not session state"
-- "Cohort validation must hard-block incompatible comparisons (different benchmark or scale factor) — never render them with a warning"
+- "Compare URLs must be stable and shareable - query params, not session state"
+- "Cohort validation must hard-block incompatible comparisons (different benchmark or scale factor) - never render them with a warning"
 
 approach: |
   Load detail JSONs for each compared result, merge on query ID, and render
   a table + chart. Use DuckDB-WASM for the merge query if convenient, or
-  do it in TypeScript for simpler results. Keep the comparison honest —
+  do it in TypeScript for simpler results. Keep the comparison honest -
   hard-block incompatible cohorts (different benchmark or scale factor), and
   warn about non-blocking configuration differences without hiding them.
 
 anti_patterns:
-- "DO NOT allow comparing results from different benchmarks or different scale factors — because cross-context comparison is meaningless and misleading — hard-block with an error, do not render the comparison"
-- "DO NOT compute a single 'score' that hides per-query variation — because aggregate scores obscure important per-query behavior — show query-level detail prominently"
+- "DO NOT allow comparing results from different benchmarks or different scale factors - because cross-context comparison is meaningless and misleading - hard-block with an error, do not render the comparison"
+- "DO NOT compute a single 'score' that hides per-query variation - because aggregate scores obscure important per-query behavior - show query-level detail prominently"
 
 verification:
 - description: "Vite build succeeds with compare view included"

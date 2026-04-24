@@ -106,11 +106,11 @@ approach: |
   mocks only.
 
 anti_patterns:
-- "DO NOT modify production code only to satisfy coverage targets — because this risks behavioral drift — add focused tests
+- "DO NOT modify production code only to satisfy coverage targets - because this risks behavioral drift - add focused tests
   for existing behavior"
-- "DO NOT write tests that require live databases or cloud credentials — because CI is offline for these integrations — mock
+- "DO NOT write tests that require live databases or cloud credentials - because CI is offline for these integrations - mock
   network/client layers"
-- "DO NOT assert entire generated SQL strings verbatim — because formatting churn creates brittle tests — assert key clauses,
+- "DO NOT assert entire generated SQL strings verbatim - because formatting churn creates brittle tests - assert key clauses,
   table refs, and parameter handling"
 
 verification:

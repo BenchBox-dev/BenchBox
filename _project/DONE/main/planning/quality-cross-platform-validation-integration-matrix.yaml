@@ -11,7 +11,7 @@ description: |
   That TODO delivered the comparator (benchbox/core/validation/cross_platform.py),
   its unit tests (tests/unit/core/test_cross_platform_validation.py), and
   the developer doc (docs/development/result-validation.md). What remains is
-  the live integration matrix and the nightly workflow — both require
+  the live integration matrix and the nightly workflow - both require
   platform credentials or heavier local infrastructure, so they were split
   off to preserve bounded review surface.
 
@@ -56,9 +56,9 @@ files_affected:
     - "docs/development/result-validation-triage.md"
 
 must_preserve:
-  - "Fast test lane duration unchanged — new tests are live_integration only"
-  - "No new required PR check — nightly-only signal; CI on PR stays as-is"
-  - "Comparator module (benchbox/core/validation/cross_platform.py) untouched by this TODO — it is already shipped"
+  - "Fast test lane duration unchanged - new tests are live_integration only"
+  - "No new required PR check - nightly-only signal; CI on PR stays as-is"
+  - "Comparator module (benchbox/core/validation/cross_platform.py) untouched by this TODO - it is already shipped"
 
 approach: |
   Use the existing Python comparator unchanged. Each integration test
@@ -73,10 +73,10 @@ approach: |
   once TPC-H is stable in nightly for at least one week.
 
 anti_patterns:
-  - "DO NOT run the suite on every PR — because cross-platform suites are expensive and flaky under cloud noise — nightly only"
-  - "DO NOT paper over a divergence with loose tolerance — because that defeats the purpose — every loosened Tolerance must cite a spec rule in the rationale field"
-  - "DO NOT hard-code credentials — because the first matrix is credential-free by design — snowflake/databricks join in a separate slice"
-  - "DO NOT edit the comparator module — because the unit suite pins its contract — file a new comparator TODO if behavior needs to change"
+  - "DO NOT run the suite on every PR - because cross-platform suites are expensive and flaky under cloud noise - nightly only"
+  - "DO NOT paper over a divergence with loose tolerance - because that defeats the purpose - every loosened Tolerance must cite a spec rule in the rationale field"
+  - "DO NOT hard-code credentials - because the first matrix is credential-free by design - snowflake/databricks join in a separate slice"
+  - "DO NOT edit the comparator module - because the unit suite pins its contract - file a new comparator TODO if behavior needs to change"
 
 verification:
   - description: "Integration suite passes locally on the no-credentials matrix"
@@ -85,7 +85,7 @@ verification:
   - description: "Nightly workflow file is valid"
     command: "uv run --with actionlint actionlint .github/workflows/cross-platform-validation.yml"
     expected_output: "(no errors)"
-  - description: "New integration test file carries no mark.fast markers — fast lane unaffected"
+  - description: "New integration test file carries no mark.fast markers - fast lane unaffected"
     command: "grep -c 'mark.fast' tests/integration/validation/test_cross_platform.py || echo 0"
     expected_output: "0"
 

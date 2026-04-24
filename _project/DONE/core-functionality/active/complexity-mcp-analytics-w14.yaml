@@ -26,7 +26,7 @@ work:
   summary: "Decompose register_all_resources: extract per-resource handler factories"
   status: done
   notes: |
-    benchbox/mcp/resources/registry.py:34 — nested function definitions for
+    benchbox/mcp/resources/registry.py:34 - nested function definitions for
     list_benchmarks, get_benchmark, list_platforms, get_platform each follow
     identical fetch → JSON structure pattern. Extract resource factories:
     - _make_list_resource(fetch_fn, formatter_fn) → Callable
@@ -37,7 +37,7 @@ work:
   summary: "Decompose _get_performance_trends_impl into load/filter/extract/aggregate phases"
   status: done
   notes: |
-    benchbox/mcp/tools/analytics.py:435 — phases:
+    benchbox/mcp/tools/analytics.py:435 - phases:
     - _load_result_files(result_dir, platform_filter) → list[RunResult]
     - _extract_metric(result, metric_name) → float | None
     - _compute_trends(grouped_runs, metric) → TrendResult
@@ -62,7 +62,7 @@ work:
   notes: |
     get_query_plan (analytics.py:101): extract _resolve_result_file(name) → Path,
       _extract_plan(result, query_id, format) → str
-    register_all_prompts (prompts/registry.py:20): similar to resources — extract
+    register_all_prompts (prompts/registry.py:20): similar to resources - extract
       _make_benchmark_prompt(template_fn) factory; repeated @mcp.prompt() patterns.
     _run_benchmark_impl (benchmark.py:239): extract _validate_and_build_config,
       _execute_and_format_result.
@@ -90,14 +90,14 @@ approach: |
   inner handler. This is the same pattern as existing MCP tools in discovery.py
   (already approved as ignore, but the factory approach is worth borrowing).
 
-  Analytics functions: three-phase pattern — load files, compute metric, format output.
+  Analytics functions: three-phase pattern - load files, compute metric, format output.
   Extract each phase. Avoid shared mutable state between phases.
 
 anti_patterns:
-- "DO NOT rename MCP tool/resource/prompt names — they're part of the public API"
+- "DO NOT rename MCP tool/resource/prompt names - they're part of the public API"
 - "DO NOT change the JSON response structure of any MCP tool or resource"
 - "DO NOT add async to sync functions or remove async from async functions"
-- "DO NOT merge analytics impl functions — keep them separate (each serves a different MCP tool)"
+- "DO NOT merge analytics impl functions - keep them separate (each serves a different MCP tool)"
 
 verification:
 - description: "Smoke tests pass"

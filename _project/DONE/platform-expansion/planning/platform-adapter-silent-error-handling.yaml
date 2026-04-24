@@ -13,7 +13,7 @@ description: |
      (e.g., lineitem in TPC-H), the benchmark proceeds to load data and execute queries
      against missing tables.
 
-  2. **QuestDB create_schema()** (PR #28): Same pattern — logs warning and skips failed
+  2. **QuestDB create_schema()** (PR #28): Same pattern - logs warning and skips failed
      DDL statements. Combined with the REFERENCES keyword filter that drops entire
      CREATE TABLE statements containing FK references, this can silently lose tables.
 
@@ -25,7 +25,7 @@ description: |
      failures (S3 bucket, extension creation) silently swallowed. Adapter proceeds without
      S3 storage configured.
 
-  5. **StarRocks _validate_data_integrity()** (PR #33): Mock detection anti-pattern —
+  5. **StarRocks _validate_data_integrity()** (PR #33): Mock detection anti-pattern -
      checks hasattr(connection, "_mock_name") to short-circuit validation. Test-aware
      logic in production code.
 
@@ -37,35 +37,35 @@ category: Platform Expansion
 
 work:
 - id: w1
-  summary: "Add failure counting to Doris create_schema() — warn if critical tables fail"
+  summary: "Add failure counting to Doris create_schema() - warn if critical tables fail"
   status: done
-  notes: "doris.py:329-335 — count failures, raise if >0 critical tables missing"
+  notes: "doris.py:329-335 - count failures, raise if >0 critical tables missing"
 
 - id: w2
-  summary: "Fix QuestDB REFERENCES filter — strip FK clauses instead of dropping entire statements"
+  summary: "Fix QuestDB REFERENCES filter - strip FK clauses instead of dropping entire statements"
   status: done
-  notes: "questdb.py:254 — use targeted regex to remove only FK constraint clauses"
+  notes: "questdb.py:254 - use targeted regex to remove only FK constraint clauses"
 
 - id: w3
   summary: "Add failure counting to QuestDB create_schema()"
   needs: [w2]
   status: done
-  notes: "questdb.py — same pattern as Doris fix"
+  notes: "questdb.py - same pattern as Doris fix"
 
 - id: w4
   summary: "Narrow pg_duckdb create_connection() exception handling"
   status: done
-  notes: "pg_duckdb.py:261-265 — catch specific exceptions or re-raise after logging"
+  notes: "pg_duckdb.py:261-265 - catch specific exceptions or re-raise after logging"
 
 - id: w5
   summary: "Narrow pg_mooncake create_connection() exception handling"
   status: done
-  notes: "pg_mooncake.py:171-175 — same pattern as pg_duckdb fix"
+  notes: "pg_mooncake.py:171-175 - same pattern as pg_duckdb fix"
 
 - id: w6
   summary: "Remove mock detection from StarRocks _validate_data_integrity()"
   status: done
-  notes: "starrocks/adapter.py:95 — fix test stubs to return proper data instead"
+  notes: "starrocks/adapter.py:95 - fix test stubs to return proper data instead"
 
 - id: w7
   summary: "Add tests for error handling improvements"
@@ -106,8 +106,8 @@ approach: |
   proper results from the validation query.
 
 anti_patterns:
-- "DO NOT use bare except — because it catches SystemExit and KeyboardInterrupt — catch specific exception types"
-- "DO NOT add test-awareness to production code — because it creates fragile coupling — fix tests instead"
+- "DO NOT use bare except - because it catches SystemExit and KeyboardInterrupt - catch specific exception types"
+- "DO NOT add test-awareness to production code - because it creates fragile coupling - fix tests instead"
 
 verification:
 - description: "All platform adapter tests pass"

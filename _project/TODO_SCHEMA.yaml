@@ -77,7 +77,7 @@ properties:
         properties:
           phases:
             type: array
-      - type: array  # Legacy format: direct list of phases
+      - type: array # Legacy format: direct list of phases
 
   # New flat work breakdown (replaces tasks.phases)
   work:
@@ -180,8 +180,8 @@ properties:
   impact:
     description: "Business value and user impact - supports string or object format"
     oneOf:
-      - type: string  # Simple string description
-      - type: object  # Structured impact assessment
+      - type: string # Simple string description
+      - type: object # Structured impact assessment
         properties:
           business_value:
             type: string
@@ -201,7 +201,7 @@ properties:
             type: array
           removed:
             type: array
-      - type: array  # Legacy format: list with change_type and paths
+      - type: array # Legacy format: list with change_type and paths
 
   # Implementation Guardrail Fields
   must_preserve:
@@ -219,16 +219,16 @@ properties:
 
   anti_patterns:
     type: array
-    description: "Explicit 'DO NOT do X — because Y — do Z instead' directives"
+    description: "Explicit 'DO NOT do X - because Y - do Z instead' directives"
     items:
       type: string
     examples:
-      - "DO NOT add a new base class — because adapter hierarchy is already 3 levels deep — extend the existing mixin instead"
+      - "DO NOT add a new base class - because adapter hierarchy is already 3 levels deep - extend the existing mixin instead"
 
   verification:
     description: "Concrete test steps with optional command and expected output"
     oneOf:
-      - type: array  # Structured format: list of verification steps
+      - type: array # Structured format: list of verification steps
         items:
           type: object
           properties:
@@ -240,7 +240,7 @@ properties:
               type: string
           required:
             - description
-      - type: object  # Legacy format: {commands: [strings]}
+      - type: object # Legacy format: {commands: [strings]}
         properties:
           commands:
             type: array
@@ -265,8 +265,8 @@ properties:
   context_sections:
     description: "Background context - supports object or array format"
     oneOf:
-      - type: object  # Key-value pairs
-      - type: array   # List with name and summary
+      - type: object # Key-value pairs
+      - type: array # List with name and summary
 
   technical_requirements:
     description: "Technical constraints - supports multiple formats"
@@ -284,8 +284,8 @@ properties:
   research_value:
     description: "Research or validation value - supports string or object"
     oneOf:
-      - type: string  # Simple description
-      - type: object  # Structured research plan
+      - type: string # Simple description
+      - type: object # Structured research plan
         properties:
           hypothesis:
             type: string

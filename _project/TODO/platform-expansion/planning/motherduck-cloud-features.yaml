@@ -1,5 +1,5 @@
 id: motherduck-cloud-features
-title: "MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control"
+title: "MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control"
 worktree: platform-expansion
 priority: High
 status: Not Started
@@ -9,7 +9,7 @@ description: |
   scoped in motherduck-platform-adapter (completed 2026-02-14) but deferred
   because they require a live MotherDuck account for development and testing.
 
-  These are adapter features, not test infrastructure — split from
+  These are adapter features, not test infrastructure - split from
   cloud-integration-test-infrastructure.yaml for clarity.
 
   1. Interactive credential setup wizard for MOTHERDUCK_TOKEN
@@ -18,7 +18,7 @@ description: |
 
 context_sections:
   "Background": |
-    The MotherDuck adapter was implemented with full offline functionality —
+    The MotherDuck adapter was implemented with full offline functionality -
     SQL dialect translation, config parsing, connection management. These three
     features require live API access and were deferred as a group.
 
@@ -29,10 +29,10 @@ context_sections:
 
 metadata:
   tags:
-  - motherduck
-  - cloud-features
-  - deferred-followup
-  estimated_effort: "Medium — requires MotherDuck free-tier account"
+    - motherduck
+    - cloud-features
+    - deferred-followup
+  estimated_effort: "Medium - requires MotherDuck free-tier account"
   created_date: "2026-03-28"
   split_from: cloud-integration-test-infrastructure
 
@@ -44,9 +44,9 @@ guardrails:
     command: "uv run -- python -m pytest tests/unit/platforms/test_motherduck_adapter.py -v --tb=short"
     expected: "All existing MotherDuck unit tests pass; new tests added for each feature"
   must_preserve:
-  - "Existing MotherDuck adapter connection and query execution paths"
-  - "Offline-mode functionality — adapter must continue to work without MOTHERDUCK_TOKEN for unit tests"
-  - "Platform config schema backwards compatibility"
+    - "Existing MotherDuck adapter connection and query execution paths"
+    - "Offline-mode functionality - adapter must continue to work without MOTHERDUCK_TOKEN for unit tests"
+    - "Platform config schema backwards compatibility"
   approach: |
     Follow the existing credential/config patterns in the MotherDuck adapter.
     The credential wizard should mirror the pattern used by other cloud platforms
@@ -54,40 +54,40 @@ guardrails:
     input. Cache control should use MotherDuck's SET statements or pragma if
     available, falling back to unique schema/table naming per run.
   anti_patterns:
-  - "DO NOT store credentials in config files or code — because MOTHERDUCK_TOKEN must come from env var or interactive prompt only, per project security conventions"
-  - "DO NOT add MotherDuck-specific imports at module top level — because the motherduck package may not be installed, and top-level imports break adapter discovery"
+    - "DO NOT store credentials in config files or code - because MOTHERDUCK_TOKEN must come from env var or interactive prompt only, per project security conventions"
+    - "DO NOT add MotherDuck-specific imports at module top level - because the motherduck package may not be installed, and top-level imports break adapter discovery"
   scope_limit:
-  - "Only modify MotherDuck adapter files and their tests"
-  - "Do not change the base adapter interface or shared platform code"
+    - "Only modify MotherDuck adapter files and their tests"
+    - "Do not change the base adapter interface or shared platform code"
 
 work:
-- id: w1
-  summary: "Credential setup wizard — interactive flow to configure MOTHERDUCK_TOKEN"
-  status: pending
-  notes: |
-    Interactive CLI flow: check env var → prompt for token → validate by
-    attempting connection → print success/failure. Should be invocable via
-    `benchbox setup motherduck` or similar.
-    Env var: MOTHERDUCK_TOKEN (already used by adapter for connection).
+  - id: w1
+    summary: "Credential setup wizard - interactive flow to configure MOTHERDUCK_TOKEN"
+    status: pending
+    notes: |
+      Interactive CLI flow: check env var → prompt for token → validate by
+      attempting connection → print success/failure. Should be invocable via
+      `benchbox setup motherduck` or similar.
+      Env var: MOTHERDUCK_TOKEN (already used by adapter for connection).
 
-- id: w2
-  summary: "Cloud storage upload path — upload data via MotherDuck's native mechanisms"
-  needs: [w1]
-  status: pending
-  notes: |
-    MotherDuck supports loading from URLs and cloud storage natively.
-    Implement upload_data() method that uses MotherDuck's COPY or
-    CREATE TABLE AS SELECT from staged files. Requires MOTHERDUCK_TOKEN.
+  - id: w2
+    summary: "Cloud storage upload path - upload data via MotherDuck's native mechanisms"
+    needs: [w1]
+    status: pending
+    notes: |
+      MotherDuck supports loading from URLs and cloud storage natively.
+      Implement upload_data() method that uses MotherDuck's COPY or
+      CREATE TABLE AS SELECT from staged files. Requires MOTHERDUCK_TOKEN.
 
-- id: w3
-  summary: "Result cache control — implement cache bypass for consistent benchmarking"
-  needs: [w1]
-  status: pending
-  notes: |
-    Research MotherDuck cache behavior and available control mechanisms.
-    Options to investigate:
-    - SET enable_result_caching = false (if available)
-    - PRAGMA statements
-    - Unique schema per run to avoid cache hits
-    - Query hints or comments that bust cache
-    Important for benchmark reproducibility — cached results skew timings.
+  - id: w3
+    summary: "Result cache control - implement cache bypass for consistent benchmarking"
+    needs: [w1]
+    status: pending
+    notes: |
+      Research MotherDuck cache behavior and available control mechanisms.
+      Options to investigate:
+      - SET enable_result_caching = false (if available)
+      - PRAGMA statements
+      - Unique schema per run to avoid cache hits
+      - Query hints or comments that bust cache
+      Important for benchmark reproducibility - cached results skew timings.

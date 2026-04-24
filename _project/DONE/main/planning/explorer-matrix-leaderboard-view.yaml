@@ -10,7 +10,7 @@ description: |
   surface per benchmark must be a Platform × Query matrix leaderboard,
   modelled on ClickBench but adapted to BenchBox's multi-dimensional data
   (trust tiers, tuning modes, phases). The current BenchmarkIndex.tsx
-  renders a sorted list — this TODO replaces it with the matrix.
+  renders a sorted list - this TODO replaces it with the matrix.
 
   The matrix is the product definition: arriving at /results/tpch/ should
   immediately answer "which engine wins, and by how much, on each query?"
@@ -23,17 +23,17 @@ description: |
     Platform      Trust    Power/Geomean  Cost   Q1    Q2   ... Q22
     ──────────────────────────────────────────────────────────────────
     DuckDB        maintainer   3184.9 / 11.5ms  $0    18ms  4ms  ... 6ms
-    Polars        maintainer   ——     / 8.2ms   $0    12ms  3ms  ... 4ms
+    Polars        maintainer   --     / 8.2ms   $0    12ms  3ms  ... 4ms
     DataFusion    community    2847.1 / 13.7ms  $0    22ms  6ms  ... 9ms
 
   Heat coloring rules (corrected from the original proposal):
 
   - Per-column normalization (each query independently).
-  - **Log scale**, not linear — SQLite at 892ms vs DuckDB at 11ms would
+  - **Log scale**, not linear - SQLite at 892ms vs DuckDB at 11ms would
     collapse the DuckDB/Polars/DataFusion gradation under linear.
   - Scale is **ratio-to-fastest-in-column** (ClickBench-style),
     not min-max.
-  - Null cells render "—" in muted gray with `aria-label="no data"`.
+  - Null cells render "-" in muted gray with `aria-label="no data"`.
 
   Row selection: checkboxes on each row feed the existing Compare page
   via URL-encoded IDs. See explorer-compare-url-short-ids for the ID
@@ -73,7 +73,7 @@ work:
   status: done
   notes: |
     Cases: (a) known timings produce stable color classes; (b) null
-    cells render '—'; (c) single-platform matrix degrades gracefully;
+    cells render '-'; (c) single-platform matrix degrades gracefully;
     (d) empty matrix shows empty state; (e) ratio calculation matches
     expected values for a 10x-range fixture.
 
@@ -103,7 +103,7 @@ work:
   status: done
   notes: |
     When only 1 platform has run a (benchmark, scale, phase) tuple,
-    hide heat coloring and show 'Only 1 result in this cohort — add
+    hide heat coloring and show 'Only 1 result in this cohort - add
     more with benchbox run ...'. When 0 query overlap across
     platforms, show 'No shared queries to compare'.
 
@@ -128,7 +128,7 @@ work:
     Replace both find() call-sites in Compare.tsx with this helper.
 
     This makes the matrix and the Compare page agree on what a query's
-    performance is — they will now both use the same canonical reduced
+    performance is - they will now both use the same canonical reduced
     value from the pipeline.
 
 files_affected:
@@ -143,10 +143,10 @@ files_affected:
   - "results-explorer/src/pages/Compare.tsx"
 
 must_preserve:
-- "Existing /results/:benchmark/ route — do not change URL pattern, only the rendered content"
+- "Existing /results/:benchmark/ route - do not change URL pattern, only the rendered content"
 - "BenchmarkIndex list view remains available via a toggle for mobile users"
-- "Existing manifest.json consumers — this TODO adds a new loader, does not remove the existing one"
-- "Compare page contract — selection emits URLs the Compare page already understands"
+- "Existing manifest.json consumers - this TODO adds a new loader, does not remove the existing one"
+- "Compare page contract - selection emits URLs the Compare page already understands"
 
 approach: |
   The heatmap is a single component with no internal state beyond
@@ -164,15 +164,15 @@ approach: |
   still render red but don't stretch the scale further.
 
 anti_patterns:
-- "DO NOT use linear min-max coloring — because linear compresses sub-2x gaps when a 80x outlier is present — use log10(ratio-to-fastest)
+- "DO NOT use linear min-max coloring - because linear compresses sub-2x gaps when a 80x outlier is present - use log10(ratio-to-fastest)
   with a 10x clamp"
-- "DO NOT default the ranking metric to geomean_ms for TPC-H/DS — because those benchmarks define power_score as the standard
-  metric — use the benchmark-aware choice from explorer-align-ranking-metric-with-tpc-standards"
-- "DO NOT hide community-tier rows by default — because hiding them defeats the trust model — render them with a visible tier
+- "DO NOT default the ranking metric to geomean_ms for TPC-H/DS - because those benchmarks define power_score as the standard
+  metric - use the benchmark-aware choice from explorer-align-ranking-metric-with-tpc-standards"
+- "DO NOT hide community-tier rows by default - because hiding them defeats the trust model - render them with a visible tier
   badge instead"
-- "DO NOT emit color via hard-coded hex — because dark mode and high-contrast accessibility settings need to override — use
+- "DO NOT emit color via hard-coded hex - because dark mode and high-contrast accessibility settings need to override - use
   CSS custom properties"
-- "DO NOT omit aria-label on heat cells — because colored cells alone are invisible to screen readers — always include numeric
+- "DO NOT omit aria-label on heat cells - because colored cells alone are invisible to screen readers - always include numeric
   + relative label"
 
 scope_limit:

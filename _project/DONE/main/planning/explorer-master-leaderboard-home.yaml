@@ -16,7 +16,7 @@ description: |
   (benchmark family, SF, phase, tuning, trust tier, date window), and
   URL-synced state so views are shareable.
 
-  The "Recent Results" list stays (or moves below the matrix) — the
+  The "Recent Results" list stays (or moves below the matrix) - the
   gap being filled is the lack of a cross-benchmark, cross-platform
   high-level view with absolute values. This is the first thing a
   user should see.
@@ -31,7 +31,7 @@ work:
     summary: "Extend MetaLeaderboard component with render-mode toggle (Times/Ranks/Speedup)"
     status: done
     notes: |
-      results-explorer/src/components/MetaLeaderboard.tsx — extend in
+      results-explorer/src/components/MetaLeaderboard.tsx - extend in
       place (per plan: data shape already carries what each mode needs
       after the pipeline widening). Modes:
         - Times: metric_value formatted via fmtGeomean (asc) / fmtScore (desc)
@@ -45,7 +45,7 @@ work:
     summary: "Widen MetaRank frontend type in types.ts"
     status: done
     notes: |
-      results-explorer/src/types.ts — add metric_value,
+      results-explorer/src/types.ts - add metric_value,
       speedup_vs_best, primary_metric, primary_order to MetaRank.
       All optional so the type survives older artifacts.
 
@@ -66,7 +66,7 @@ work:
     needs: [w3]
     status: done
     notes: |
-      results-explorer/src/pages/Home.tsx — make the matrix the
+      results-explorer/src/pages/Home.tsx - make the matrix the
       primary content surface. Do not wire cohort/row navigation yet
       (w6 handles that). Do not change the Recent Results position
       yet (w5 handles that). Scope: layout only.
@@ -94,7 +94,7 @@ work:
     needs: [w4]
     status: done
     notes: |
-      The new master matrix is structurally similar to QueryHeatmap —
+      The new master matrix is structurally similar to QueryHeatmap -
       reuse the same a11y scaffolding (role=grid, aria-rowindex/col,
       roving tabindex). Existing tests like
       QueryHeatmap.a11y should continue to pass; author a sibling
@@ -116,8 +116,8 @@ files_affected:
 
 must_preserve:
   - "Recent Results data surface remains accessible on Home (just demoted below the matrix)"
-  - "Existing MetaLeaderboard consumers (if any outside Home) continue to work — render-mode toggle defaults to current behavior (Ranks)"
-  - "colorForCell remains the single log-scale color source shared with QueryHeatmap — no duplicate palettes"
+  - "Existing MetaLeaderboard consumers (if any outside Home) continue to work - render-mode toggle defaults to current behavior (Ranks)"
+  - "colorForCell remains the single log-scale color source shared with QueryHeatmap - no duplicate palettes"
 
 approach: |
   The pipeline-widening item is the enabling dependency; this item
@@ -125,14 +125,14 @@ approach: |
   place rather than introducing a sibling MasterLeaderboard component
   (per plan) since the data shape already carries everything
   needed. Reuse chartMath.colorForCell and QueryHeatmap's a11y
-  pattern — no new primitives. Default render mode on first visit:
+  pattern - no new primitives. Default render mode on first visit:
   Times, so the user immediately sees absolute values (the missing
   surface this phase exists to restore).
 
 anti_patterns:
-  - "DO NOT fork MetaLeaderboard into a separate component — because the shapes are the same post-widening — extend in place"
-  - "DO NOT introduce a new color function — because colorForCell is the shared log-scale palette — call it"
-  - "DO NOT push filter state to a global store — because per-page useUrlState is sufficient — keep it local"
+  - "DO NOT fork MetaLeaderboard into a separate component - because the shapes are the same post-widening - extend in place"
+  - "DO NOT introduce a new color function - because colorForCell is the shared log-scale palette - call it"
+  - "DO NOT push filter state to a global store - because per-page useUrlState is sufficient - keep it local"
 
 verification:
   - description: "Explorer typecheck + Vitest suites green"
@@ -162,7 +162,7 @@ impact:
     toggle to speedup-vs-best for normalized comparisons, and every
     filter choice is in the URL so views are shareable.
   business_value: |
-    Closes the ClickBench-model gap called out in the ultraplan —
+    Closes the ClickBench-model gap called out in the ultraplan -
     the primary cross-benchmark entry point for prospects evaluating
     BenchBox against alternatives.
 

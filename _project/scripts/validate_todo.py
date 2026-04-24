@@ -101,9 +101,9 @@ class TodoValidator:
         """Check for deprecated fields and emit warnings."""
         warnings = []
         if "tasks" in data and "work" not in data:
-            warnings.append(f"DEPRECATED: '{file_path.name}' uses 'tasks' — migrate to 'work[]'")
+            warnings.append(f"DEPRECATED: '{file_path.name}' uses 'tasks' - migrate to 'work[]'")
         if "dependencies" in data and "deps" not in data:
-            warnings.append(f"DEPRECATED: '{file_path.name}' uses 'dependencies' — migrate to 'deps'")
+            warnings.append(f"DEPRECATED: '{file_path.name}' uses 'dependencies' - migrate to 'deps'")
         return warnings
 
     def validate_file(self, file_path: Path) -> Tuple[bool, List[str]]:

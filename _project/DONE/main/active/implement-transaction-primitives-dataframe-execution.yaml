@@ -10,7 +10,7 @@ description: |
   emitted phantom SUCCESS/0ms rows for all operations without calling the
   DataFrameTransactionOperationsManager. It now raises NotImplementedError.
 
-  This TODO implements the REAL execution path. The infrastructure is solid — a fully
+  This TODO implements the REAL execution path. The infrastructure is solid - a fully
   implemented DataFrameTransactionOperationsManager exists (1290 lines in
   dataframe_operations.py) with 12 operation types, per-platform capability profiles,
   and comprehensive unit tests at the operations-manager level. What's missing is
@@ -18,12 +18,12 @@ description: |
 
   There are TWO viable implementation patterns in the codebase:
 
-  Pattern A — SQL Parity (write_primitives): Spin up a temporary DuckDB, load data,
+  Pattern A - SQL Parity (write_primitives): Spin up a temporary DuckDB, load data,
   execute each operation through the SQL operation catalog. Ensures DataFrame-mode results
   are semantically identical to SQL-mode results.
   Reference: write_primitives/benchmark.py:1234-1345
 
-  Pattern B — Native DataFrame Execution (metadata_primitives): Call
+  Pattern B - Native DataFrame Execution (metadata_primitives): Call
   run_dataframe_benchmark() which uses the operations manager directly on real
   DataFrames/SparkSessions, producing results from actual platform execution.
   Reference: metadata_primitives/benchmark.py:1282-1342
@@ -39,11 +39,11 @@ description: |
     → get_dataframe_operations(platform_name, spark_session) → manager
     → set up Delta/Iceberg table → run operations in dependency order → collect results
 
-  IMPORTANT — Semantic equivalence, not operation-level parity:
+  IMPORTANT - Semantic equivalence, not operation-level parity:
   The SQL path runs 23 operations (BEGIN/COMMIT overhead, savepoints, isolation levels,
   mixed DML, advanced). The DataFrame path runs 12 operation types (atomic writes,
   rollback-to-version, time travel, concurrent writes, snapshot isolation). These are
-  NOT the same operations — they test equivalent ACID concepts through platform-native
+  NOT the same operations - they test equivalent ACID concepts through platform-native
   mechanisms. SQL uses BEGIN/COMMIT/ROLLBACK; Delta Lake uses atomic writes with RESTORE;
   Iceberg uses snapshot-based isolation. The mapping is conceptual:
     SQL commit overhead → atomic_insert/update/delete (implicit commit per write)
@@ -58,8 +58,8 @@ description: |
   - Transaction Primitives needs skip_dataframe_data_loading() → True because it
     manages its own table lifecycle (Delta/Iceberg tables, not Parquet files)
   - Only PySpark+Delta and PySpark+Iceberg support this benchmark in DataFrame mode
-  - Polars/Pandas have NO transaction support — must be rejected at supports_dataframe_mode()
-  - The benchmark registry currently shows supports_dataframe: False — must flip to True
+  - Polars/Pandas have NO transaction support - must be rejected at supports_dataframe_mode()
+  - The benchmark registry currently shows supports_dataframe: False - must flip to True
     only AFTER the implementation is verified functional
 
   Root cause analysis of prior failure (prevents recurrence):
@@ -67,7 +67,7 @@ description: |
   2. Tests only verified object instantiation, not execution behavior
   3. The TODO's own approach section said "follow write_primitives pattern" but the agent
      wrote an execute_dataframe_workload body that neither called get_dataframe_operations()
-     nor used the SQL parity approach — it just iterated the enum and returned fake rows
+     nor used the SQL parity approach - it just iterated the enum and returned fake rows
   4. No test called execute_dataframe_workload or verified non-zero execution times
 category: Core Functionality
 work:
@@ -94,7 +94,7 @@ work:
     2. Create initial Delta table from TPC-H source data:
        - For PySpark: write a DataFrame (from ctx.tables or generated test data) as
          Delta format to table_path
-       - The SQL path uses txn_orders (from TPC-H ORDERS) — use equivalent data
+       - The SQL path uses txn_orders (from TPC-H ORDERS) - use equivalent data
     3. After all operations complete, clean up the table directory
 
     --- CONCERN 2: Operation ordering and parameter sourcing ---
@@ -104,7 +104,7 @@ work:
     an explicit dispatch function or dict mapping each TransactionOperationType to a
     callable that provides the correct arguments:
 
-    Phase A — Write operations (create table state for later phases):
+    Phase A - Write operations (create table state for later phases):
       ATOMIC_INSERT: manager.execute_atomic_insert(table_path, test_dataframe)
         → test_dataframe: small DF with TPC-H-like rows (e.g., 10 order rows)
       ATOMIC_UPDATE: manager.execute_atomic_update(table_path, "o_orderkey > 8000000",
@@ -113,7 +113,7 @@ work:
       ATOMIC_MERGE: manager.execute_atomic_merge(table_path, merge_source_df,
         "target.o_orderkey = source.o_orderkey", when_matched={...}, when_not_matched={...})
 
-    Phase B — Version operations (depend on versions created in Phase A):
+    Phase B - Version operations (depend on versions created in Phase A):
       ROLLBACK_TO_VERSION: manager.execute_rollback_to_version(table_path, version=0)
         → version 0 exists because Phase A writes created versions 1+
       ROLLBACK_TO_TIMESTAMP: manager.execute_rollback_to_timestamp(table_path, timestamp)
@@ -121,7 +121,7 @@ work:
       TIME_TRAVEL_QUERY: manager.execute_time_travel_query(table_path, version=0)
       VERSION_COMPARE: manager.execute_version_compare(table_path, version1=0, version2=1)
 
-    Phase C — Concurrency/isolation operations:
+    Phase C - Concurrency/isolation operations:
       CONCURRENT_WRITE: manager.execute_concurrent_write(table_path, [df1, df2, df3])
         → provide 3 small DataFrames
       CONFLICT_RESOLUTION: manager.execute_conflict_resolution(table_path, test_df,
@@ -130,9 +130,9 @@ work:
       READ_YOUR_WRITES: manager.execute_read_your_writes(table_path, test_df)
 
     For each operation:
-    - Check manager.supports_operation(op_type) first — skip if unsupported
-    - Check query_filter — skip if not in filter
-    - Wrap in try/except — failed operations produce FAILED results, not exceptions
+    - Check manager.supports_operation(op_type) first - skip if unsupported
+    - Check query_filter - skip if not in filter
+    - Wrap in try/except - failed operations produce FAILED results, not exceptions
 
     --- CONCERN 3: Result type conversion ---
 
@@ -178,7 +178,7 @@ work:
   status: done
   notes: |
     Add a skip_dataframe_data_loading() → True method to TransactionPrimitivesBenchmark.
-    Transaction primitives creates its own Delta/Iceberg tables — the generic Parquet
+    Transaction primitives creates its own Delta/Iceberg tables - the generic Parquet
     loading path is wrong for this benchmark. Follow the write_primitives pattern
     (benchmark.py:1189-1191).
 
@@ -201,7 +201,7 @@ work:
     be inconsistent.
 
     This MUST happen AFTER w1, not before or simultaneously. The prior TODO flipped
-    the flag while the implementation was hollow — making the system advertise a
+    the flag while the implementation was hollow - making the system advertise a
     capability it couldn't deliver.
 
     Files: benchbox/core/benchmark_registry.py
@@ -223,7 +223,7 @@ work:
     1. Call execute_dataframe_workload() directly with a mock adapter/ctx that
        provides a real-enough SparkSession mock (or stub the operations manager)
     2. Assert that the returned result rows have execution_time_seconds > 0 for
-       SUCCESS operations — a zero-time SUCCESS is a test failure
+       SUCCESS operations - a zero-time SUCCESS is a test failure
     3. Assert that the operations manager's execute_*() methods were actually called
        (use unittest.mock to verify call counts)
     4. Assert that unsupported operations produce SKIPPED status, not SUCCESS
@@ -240,7 +240,7 @@ work:
     Test structure:
     - Mock the DataFrameTransactionOperationsManager to avoid needing real PySpark/Delta
     - Configure mock execute_* methods to return DataFrameTransactionResult with
-      realistic timing (duration_ms > 0) — import the result type and use its
+      realistic timing (duration_ms > 0) - import the result type and use its
       constructor or factory methods
     - Mock supports_operation() to control which operations are "supported"
     - Patch get_dataframe_operations() to return the mock manager
@@ -281,7 +281,7 @@ metadata:
 impact:
   business_value: |
     Enables transaction semantics benchmarking on lakehouse platforms (Delta Lake,
-    Iceberg) via PySpark DataFrames. Currently broken — the system either raises
+    Iceberg) via PySpark DataFrames. Currently broken - the system either raises
     NotImplementedError or (before the fix) emitted fabricated results.
   user_impact: |
     Users can run `benchbox run --platform pyspark-df --benchmark transaction_primitives`
@@ -295,12 +295,12 @@ files_affected:
   - tests/unit/core/transaction_primitives/test_dataframe_workload.py
 
 must_preserve:
-- TransactionPrimitivesBenchmark SQL execution path — all 23 SQL operations still work via OperationExecutor
+- TransactionPrimitivesBenchmark SQL execution path - all 23 SQL operations still work via OperationExecutor
 - TPC-H staging table schema (txn_orders, txn_lineitem, txn_customer) unchanged
-- Existing get_dataframe_operations() method at benchmark.py:1060 — it works correctly, use it
-- Existing test_dataframe_operations.py tests — they test the operations manager and remain valid
+- Existing get_dataframe_operations() method at benchmark.py:1060 - it works correctly, use it
+- Existing test_dataframe_operations.py tests - they test the operations manager and remain valid
 - execute_dataframe_workload signature must match adapter call site (ctx, adapter, benchmark_config, query_filter,
-  monitor, run_options) — keyword arguments, no underscore prefixes
+  monitor, run_options) - keyword arguments, no underscore prefixes
 
 approach: |
   Follow the metadata_primitives pattern for scaffolding (NOT write_primitives SQL
@@ -333,36 +333,36 @@ approach: |
   The SQL path runs 23 operations; the DataFrame path runs 12. These test equivalent
   ACID concepts through different mechanisms. Results are comparable at the category
   level (commit overhead, rollback, isolation), not at the individual operation level.
-  This is by design — lakehouse transactions are fundamentally different from SQL
+  This is by design - lakehouse transactions are fundamentally different from SQL
   BEGIN/COMMIT/ROLLBACK.
 
   The existing get_dataframe_operations() method (line 1060) validates the platform,
   creates the manager, and returns it. Use it as the entry point.
 
 anti_patterns:
-- DO NOT emit result rows without calling an operation method — because this is exactly the phantom-data defect from the
+- DO NOT emit result rows without calling an operation method - because this is exactly the phantom-data defect from the
   prior attempt. Every result row must come from a real manager.execute_*() call with measured timing.
-- DO NOT use a uniform getattr dispatch loop like getattr(manager, f"execute_{op.value}")() — because the 12 execute_*
+- DO NOT use a uniform getattr dispatch loop like getattr(manager, f"execute_{op.value}")() - because the 12 execute_*
   methods have heterogeneous signatures (2-5 params each, all different). execute_atomic_insert needs (table_path,
   dataframe), execute_atomic_update needs (table_path, condition, updates), execute_rollback_to_version needs
   (table_path, version). A uniform loop cannot provide correct arguments. Build an explicit dispatch map or
   per-operation helper.
-- DO NOT call rollback/time-travel operations before write operations — because rollback needs version numbers created
+- DO NOT call rollback/time-travel operations before write operations - because rollback needs version numbers created
   by prior writes, time_travel_query needs historical versions to exist, and version_compare needs two distinct
   versions. Operations must run in dependency order (writes first, then version ops, then concurrency/isolation ops).
-- DO NOT skip table setup/teardown — because every execute_* method requires a table_path pointing to a real
+- DO NOT skip table setup/teardown - because every execute_* method requires a table_path pointing to a real
   Delta/Iceberg table. The SQL path has staging tables created by setup(). The DataFrame path must create its own Delta
   table before operations and clean it up after.
-- DO NOT use the SQL parity pattern (DuckDB intermediary) — because transaction semantics are platform-specific (Delta
+- DO NOT use the SQL parity pattern (DuckDB intermediary) - because transaction semantics are platform-specific (Delta
   RESTORE, Iceberg snapshots). Routing through DuckDB tests DuckDB transactions, not the target platform's.
-- DO NOT rename keyword parameters with underscore prefixes (_monitor, _run_options) — because the adapter passes them
+- DO NOT rename keyword parameters with underscore prefixes (_monitor, _run_options) - because the adapter passes them
   as keyword arguments by name. Renaming breaks the call site with TypeError. Use # noqa: ARG002 if linter complains.
-- DO NOT flip supports_dataframe to True before execute_dataframe_workload is functional — because this is what the
+- DO NOT flip supports_dataframe to True before execute_dataframe_workload is functional - because this is what the
   prior attempt did, creating a system that advertised a broken capability.
-- DO NOT write tests that only verify object construction or config flags — because the prior attempt had 11 such tests
+- DO NOT write tests that only verify object construction or config flags - because the prior attempt had 11 such tests
   and none caught the hollow implementation. Every test must verify execution behavior (method calls, non-zero times,
   correct result format).
-- DO NOT assume 1:1 parity between SQL operations (23) and DataFrame operations (12) — because they test equivalent ACID
+- DO NOT assume 1:1 parity between SQL operations (23) and DataFrame operations (12) - because they test equivalent ACID
   concepts through different mechanisms. The SQL path tests BEGIN/COMMIT/ROLLBACK, savepoints, and isolation levels. The
   DataFrame path tests atomic writes, RESTORE, time travel, and snapshot isolation. Results are comparable at the
   category level, not the individual operation level.

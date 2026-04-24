@@ -11,7 +11,7 @@ description: |
   options. Users deploying with self-signed certs or strict TLS policies need
   these controls.
 
-  Deferred from platform-adapter-http-tls-support (completed, status anomaly —
+  Deferred from platform-adapter-http-tls-support (completed, status anomaly -
   all work done but marked "Not Started").
 
 context_sections:
@@ -23,56 +23,56 @@ context_sections:
 
 metadata:
   tags:
-  - tls
-  - security
-  - http
-  - deferred-followup
-  estimated_effort: "Small — 1 day"
+    - tls
+    - security
+    - http
+    - deferred-followup
+  estimated_effort: "Small - 1 day"
   created_date: "2026-02-18"
   split_from: platform-adapter-http-tls-support
 
 files_affected:
   modified:
-  - "benchbox/platforms/doris.py"
-  - "benchbox/platforms/starrocks/adapter.py"
-  - "benchbox/platforms/influxdb/client.py"
-  - "tests/unit/platforms/test_doris.py"
-  - "tests/unit/platforms/test_starrocks.py"
+    - "benchbox/platforms/doris.py"
+    - "benchbox/platforms/starrocks/adapter.py"
+    - "benchbox/platforms/influxdb/client.py"
+    - "tests/unit/platforms/test_doris.py"
+    - "tests/unit/platforms/test_starrocks.py"
 
 approach: |
   Follow the Trino adapter pattern (benchbox/platforms/trino.py:110-303):
     - Read verify_ssl (default True) and ssl_cert_path from config
     - Pass verify=ssl_cert_path if set, else verify=verify_ssl to each requests call
-  No shared HTTP mixin exists yet — add the TLS logic directly to each adapter's
+  No shared HTTP mixin exists yet - add the TLS logic directly to each adapter's
   upload method (doris.py _stream_load, starrocks/adapter.py, influxdb/client.py).
   Use lazy-imported `_requests` already present in doris.py; replicate that pattern
   in StarRocks and InfluxDB if not already there.
 
 anti_patterns:
-- "DO NOT set verify=False globally on a Session or module-level -- because it silently disables SSL for every subsequent request in the process -- instead pass verify= only to the specific PUT/POST upload call"
-- "DO NOT hardcode a default ca_cert_path -- because it breaks environments that don't have the cert file at that path -- instead only pass verify=ca_cert_path when ca_cert_path is explicitly set in config"
-- "DO NOT rename the option to ssl_cert_path -- because the Trino adapter already uses ca_cert_path as the config key -- keep naming consistent across adapters"
+  - "DO NOT set verify=False globally on a Session or module-level -- because it silently disables SSL for every subsequent request in the process -- instead pass verify= only to the specific PUT/POST upload call"
+  - "DO NOT hardcode a default ca_cert_path -- because it breaks environments that don't have the cert file at that path -- instead only pass verify=ca_cert_path when ca_cert_path is explicitly set in config"
+  - "DO NOT rename the option to ssl_cert_path -- because the Trino adapter already uses ca_cert_path as the config key -- keep naming consistent across adapters"
 
 must_preserve:
-- "Existing HTTP loading continues to work without any TLS config (backwards-compatible defaults)"
-- "All current platform adapter tests pass unchanged"
+  - "Existing HTTP loading continues to work without any TLS config (backwards-compatible defaults)"
+  - "All current platform adapter tests pass unchanged"
 
 work:
-- id: w1
-  summary: "Add verify_ssl and ca_cert_path TLS options to doris.py (_stream_load and _chunked_stream_load), starrocks/adapter.py, and influxdb/client.py — following trino.py:110-303 pattern"
-  status: done
+  - id: w1
+    summary: "Add verify_ssl and ca_cert_path TLS options to doris.py (_stream_load and _chunked_stream_load), starrocks/adapter.py, and influxdb/client.py - following trino.py:110-303 pattern"
+    status: done
 
-- id: w2
-  summary: "Wire options through Doris, StarRocks, and InfluxDB adapters"
-  needs: [w1]
-  status: done
+  - id: w2
+    summary: "Wire options through Doris, StarRocks, and InfluxDB adapters"
+    needs: [w1]
+    status: done
 
-- id: w3
-  summary: "Add unit tests for TLS options — verify cert path is passed through, verify_ssl=False disables validation"
-  needs: [w2]
-  status: done
+  - id: w3
+    summary: "Add unit tests for TLS options - verify cert path is passed through, verify_ssl=False disables validation"
+    needs: [w2]
+    status: done
 
 verification:
-- description: "Existing platform tests still pass"
-  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-  expected_output: "all tests pass, 0 failures"
+  - description: "Existing platform tests still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+    expected_output: "all tests pass, 0 failures"

@@ -87,11 +87,11 @@ must_preserve:
 - "ClickHouse adapter's PyMySQL usage unaffected by StarRocks's PyMySQL dependency"
 
 anti_patterns:
-- "DO NOT modify existing adapter files — because StarRocks is additive — create a new starrocks.py file"
-- "DO NOT use port 8030 for Stream Load — because StarRocks routes Stream Load to BE on port 8040, unlike Doris which routes
-  to FE on port 8030 — verify port in StarRocks documentation"
-- "DO NOT create a shared DorisStarRocksBase class — because the projects have diverged and coupling creates fragile inheritance
-  — implement independently"
+- "DO NOT modify existing adapter files - because StarRocks is additive - create a new starrocks.py file"
+- "DO NOT use port 8030 for Stream Load - because StarRocks routes Stream Load to BE on port 8040, unlike Doris which routes
+  to FE on port 8030 - verify port in StarRocks documentation"
+- "DO NOT create a shared DorisStarRocksBase class - because the projects have diverged and coupling creates fragile inheritance
+  - implement independently"
 
 verification:
 - description: "New adapter imports correctly"
@@ -232,5 +232,5 @@ work:
 deferred:
 - id: d1
   summary: "End-to-end TPC-H/TPC-DS validation on live StarRocks cluster (w13-w14)"
-  reason: "Requires running StarRocks FE+BE cluster — not available in local dev"
+  reason: "Requires running StarRocks FE+BE cluster - not available in local dev"
   revisit_when: "StarRocks Docker Compose harness available in CI"

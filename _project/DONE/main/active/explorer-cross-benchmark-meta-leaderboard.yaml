@@ -10,7 +10,7 @@ description: |
   The 2026-04-15 strategy review observed that BenchBox's multi-benchmark
   story is a real differentiator vs ClickBench but the current Home page
   does not lean into it. A cross-benchmark meta-leaderboard answers
-  "which engines consistently do well across benchmarks?" — a question
+  "which engines consistently do well across benchmarks?" - a question
   no single-benchmark site can answer.
 
   Approach: compute per-engine performance *rank* within each
@@ -76,9 +76,9 @@ files_affected:
   - "results-explorer/src/pages/Home.tsx"
 
 must_preserve:
-- "Home page remains navigable — the meta-leaderboard is additive, not replacing global nav"
+- "Home page remains navigable - the meta-leaderboard is additive, not replacing global nav"
 - "Recent Results section remains on the home page in a secondary position"
-- "No invented composite scores — only transparent rank aggregation"
+- "No invented composite scores - only transparent rank aggregation"
 
 approach: |
   The pipeline already iterates through every bundle once. After the
@@ -86,17 +86,17 @@ approach: |
   again to compute ranks: for each cohort, sort by the cohort's primary
   metric and assign 1-based ranks. Aggregate across cohorts per engine.
 
-  Frontend is a pure table render. No interactivity in the first cut —
+  Frontend is a pure table render. No interactivity in the first cut -
   clicking a cohort header navigates to the matrix leaderboard for that
   cohort.
 
 anti_patterns:
-- "DO NOT invent a weighted composite score — because any weighting is indefensible and masks the inputs — use simple rank
+- "DO NOT invent a weighted composite score - because any weighting is indefensible and masks the inputs - use simple rank
   aggregation with all inputs visible"
-- "DO NOT penalize platforms that didn't run a cohort — because missing data is not a loss — show N/A and exclude from that
+- "DO NOT penalize platforms that didn't run a cohort - because missing data is not a loss - show N/A and exclude from that
   platform's average"
-- "DO NOT include cohorts with only 1 platform — because rank is meaningless there — filter them out at pipeline time"
-- "DO NOT hide the methodology panel behind a 'why' link — because the whole point is transparency — show it inline below
+- "DO NOT include cohorts with only 1 platform - because rank is meaningless there - filter them out at pipeline time"
+- "DO NOT hide the methodology panel behind a 'why' link - because the whole point is transparency - show it inline below
   the table"
 
 scope_limit:

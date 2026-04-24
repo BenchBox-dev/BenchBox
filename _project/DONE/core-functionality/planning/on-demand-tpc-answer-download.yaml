@@ -86,9 +86,9 @@ must_preserve:
 - "sdist installations continue working without network access"
 
 anti_patterns:
-- "DO NOT make downloads mandatory — because corporate firewalls and air-gapped environments exist — always fall back to current
+- "DO NOT make downloads mandatory - because corporate firewalls and air-gapped environments exist - always fall back to current
   skip behavior when download fails"
-- "DO NOT store downloaded answers in the package directory — because it may be read-only — use a user-writable cache directory
+- "DO NOT store downloaded answers in the package directory - because it may be read-only - use a user-writable cache directory
   (XDG_CACHE_HOME or ~/.cache/benchbox/)"
 
 verification:

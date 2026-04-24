@@ -97,7 +97,7 @@ work:
     warehouse=14, web_site=26). 22/24 sf=1.0 row counts match BenchBox
     expectations exactly; store_returns and web_returns differ by <0.2% (well
     within the 5% tolerance). The `dbgen_version` table is absent from DuckDB
-    output — manifest expected_table_count (25) would need adjustment for any
+    output - manifest expected_table_count (25) would need adjustment for any
     non-dsdgen source.
 
     Critical finding for w2 (data contract): BenchBox's FIXED_TABLES set
@@ -126,7 +126,7 @@ work:
 
     Key decisions:
     - All 25 tables mandatory (no missing-table exceptions); min-1-row floor ensures this.
-    - "Fixed-size" table exemption does NOT apply at sf < 1.0 — fixed tables scale
+    - "Fixed-size" table exemption does NOT apply at sf < 1.0 - fixed tables scale
       proportionally with max(1, floor(sf1_baseline * sf)) like all other tables.
     - Same 5% validation tolerance applies at subscale; min-1 floor ensures expected_rows > 0.
     - New manifest field: compliance_class = "unofficial_subscale" for sf < 1.0 runs.
@@ -196,7 +196,7 @@ work:
       ResultBuilder.build().
     - benchbox/core/results/result_factory.py: Reads getattr(benchmark,
       "compliance_class", None) when constructing BenchmarkInfoInput.
-    - benchbox/base.py: Same — getattr(self, "compliance_class", None).
+    - benchbox/base.py: Same - getattr(self, "compliance_class", None).
     - benchbox/core/results/schema.py: _build_benchmark_section() now includes
       compliance_class key when non-None.
     - benchbox/core/results/loader.py: reconstruct_benchmark_results() reads
@@ -232,9 +232,9 @@ work:
 
     Changes:
     - benchbox/utils/data_validation.py: _scale_expectations() now differentiates
-      between TPC-H invariant-fixed tables (nation, region — always 25/5 regardless
+      between TPC-H invariant-fixed tables (nation, region - always 25/5 regardless
       of sf) and TPC-DS "official-fixed" tables (call_center, reason, ship_mode,
-      warehouse, income_band, web_site, store, time_dim — fixed at sf>=1.0 only;
+      warehouse, income_band, web_site, store, time_dim - fixed at sf>=1.0 only;
       at sf<1.0 scale proportionally with max(1, floor(sf1_baseline * sf))).
       Also switched from int() to max(1, int()) globally to enforce the min-1-row
       floor from the data contract.
@@ -256,10 +256,10 @@ work:
     - benchbox/core/publishing/bundle_publisher.py: Added "unofficial-research"
       to VALID_LABELS tuple.
     - benchbox/cli/commands/submit.py: Added compliance guardrail after loading
-      result — refuses submission if compliance_class is unofficial_nonstandard
+      result - refuses submission if compliance_class is unofficial_nonstandard
       or unofficial_subscale with a clear error message.
     - benchbox/cli/commands/publish.py: Added compliance check before publishing
-      — loads result JSON, refuses if unofficial and label != "unofficial-research".
+      - loads result JSON, refuses if unofficial and label != "unofficial-research".
       Imports load_result_file.
     - benchbox/cli/commands/report.py: Added --include-unofficial flag to `report import`.
       By default, unofficial TPC-DS results (compliance_class in unofficial classes)
@@ -283,7 +283,7 @@ work:
       to note that SF<1 requires --allow-unofficial-scale + patched dsdgen, with
       a reference to the patch TODO.
     - GEMINI.md: Updated constraints line to the same effect.
-    - AGENTS.md: Updated "Avoid" section to match — bundled binaries crash, patched
+    - AGENTS.md: Updated "Avoid" section to match - bundled binaries crash, patched
       binaries required, opt-in flag documented.
     - _sources/README.md: Updated "Important Constraints > TPC-DS Scale Factor"
       section to explain the bundled binary limitation, link to the probe doc, describe
@@ -297,7 +297,7 @@ work:
       + test_post_run_summary.py + test_visualization_tools.py: 124 passed
     - tests/e2e/test_error_handling.py: 31 passed
     - tests/unit/test_fractional_scale_factors.py: no tests collected (file exists,
-      no tests yet — not a regression)
+      no tests yet - not a regression)
 
 deferred:
 - summary: "Patch and redistribute upstream dsdgen binaries if Gate Zero shows native subscale generation is not viable"

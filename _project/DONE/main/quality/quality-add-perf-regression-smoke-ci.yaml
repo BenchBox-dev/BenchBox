@@ -34,7 +34,7 @@ work:
     status: done
 
   - id: w3
-    summary: "Add .github/workflows/perf-smoke.yml triggered on PR — runs the benchmark, calls `benchbox compare` against the checked-in baseline, uploads the result JSON/artifacts, sets PR check status"
+    summary: "Add .github/workflows/perf-smoke.yml triggered on PR - runs the benchmark, calls `benchbox compare` against the checked-in baseline, uploads the result JSON/artifacts, sets PR check status"
     needs: [w2]
     status: done
 
@@ -65,13 +65,13 @@ approach: |
   manually with a `--update-baseline` flag, commits the new JSON.
 
 anti_patterns:
-  - "DO NOT write a second comparison engine — because BenchBox already has `compare --fail-on-regression` — reuse the product path and add glue only around file selection if needed"
-  - "DO NOT block PR on flake — because cloud CI is noisy — provide skip-perf-smoke label and document when to use it"
-  - "DO NOT expand to multi-platform initially — because flakiness compounds — start with DuckDB only"
+  - "DO NOT write a second comparison engine - because BenchBox already has `compare --fail-on-regression` - reuse the product path and add glue only around file selection if needed"
+  - "DO NOT block PR on flake - because cloud CI is noisy - provide skip-perf-smoke label and document when to use it"
+  - "DO NOT expand to multi-platform initially - because flakiness compounds - start with DuckDB only"
 
 verification:
   - description: "Baseline file exists and validates"
-    command: "uv run -- python -c 'import json; json.load(open(\"_project/baselines/perf_smoke_duckdb_tpch_001.json\"))'"
+    command: 'uv run -- python -c ''import json; json.load(open("_project/baselines/perf_smoke_duckdb_tpch_001.json"))'''
     expected_output: "(no error)"
   - description: "BenchBox compare reports no regression when comparing the baseline file to itself"
     command: "uv run benchbox compare _project/baselines/perf_smoke_duckdb_tpch_001.json _project/baselines/perf_smoke_duckdb_tpch_001.json --fail-on-regression 10% --format json"

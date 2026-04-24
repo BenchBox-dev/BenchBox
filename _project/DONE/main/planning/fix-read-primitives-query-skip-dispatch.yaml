@@ -202,16 +202,16 @@ approach: |
   no SQL adapter test around the shared hook.
 
 anti_patterns:
-- "DO NOT fix the DataFusion SQL regression by special-casing DataFusion inside `PlatformAdapter._filter_queries()` — because
-  the ambiguous hook would still leak future DataFrame-only skips into SQL — split the hook by execution mode instead"
-- "DO NOT move the four DataFusion DataFrame skips into read-primitives catalog `skip_on` — because the SQL catalog has working
-  DataFusion variants — keep DataFrame-only skips in DataFrame dispatch"
-- "DO NOT keep Polars-only map blockers under `SKIP_FOR_EXPRESSION_FAMILY` — because that suppresses PySpark/DataFusion DataFrame
-  coverage — use a Polars-specific DataFrame skip bucket"
-- "DO NOT implement PySpark `element()` by returning a placeholder or Polars-like object — because Spark list transform/filter
-  semantics must be real expressions — either skip those queries or implement native Spark expressions with behavioral tests"
-- "DO NOT broaden skips to whole categories like `lambda` or `map` — because the benchmark needs per-query capability accounting
-  — skip only the concrete unsupported query IDs"
+- "DO NOT fix the DataFusion SQL regression by special-casing DataFusion inside `PlatformAdapter._filter_queries()` - because
+  the ambiguous hook would still leak future DataFrame-only skips into SQL - split the hook by execution mode instead"
+- "DO NOT move the four DataFusion DataFrame skips into read-primitives catalog `skip_on` - because the SQL catalog has working
+  DataFusion variants - keep DataFrame-only skips in DataFrame dispatch"
+- "DO NOT keep Polars-only map blockers under `SKIP_FOR_EXPRESSION_FAMILY` - because that suppresses PySpark/DataFusion DataFrame
+  coverage - use a Polars-specific DataFrame skip bucket"
+- "DO NOT implement PySpark `element()` by returning a placeholder or Polars-like object - because Spark list transform/filter
+  semantics must be real expressions - either skip those queries or implement native Spark expressions with behavioral tests"
+- "DO NOT broaden skips to whole categories like `lambda` or `map` - because the benchmark needs per-query capability accounting
+  - skip only the concrete unsupported query IDs"
 
 verification:
 - description: "Existing DataFrame mixin and read-primitives variant tests still pass"

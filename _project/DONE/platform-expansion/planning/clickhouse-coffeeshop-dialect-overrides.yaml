@@ -15,7 +15,7 @@ description: |
 
 work:
   - id: w1
-    summary: "Create ClickHouse override for SA4 — actual issue is nested window aggregate SUM(SUM()) OVER (), replaced with CROSS JOIN subquery. TODO description was incorrect about FILTER clause."
+    summary: "Create ClickHouse override for SA4 - actual issue is nested window aggregate SUM(SUM()) OVER (), replaced with CROSS JOIN subquery. TODO description was incorrect about FILTER clause."
     status: done
 
   - id: w2
@@ -33,12 +33,12 @@ files_affected:
     - "benchbox/core/coffeeshop/queries/clickhouse_sql/qtm1.sql"
 
 must_preserve:
-  - "Base coffeeshop QSA4/QTM1 queries unchanged — other platforms use standard FILTER and EXTRACT"
+  - "Base coffeeshop QSA4/QTM1 queries unchanged - other platforms use standard FILTER and EXTRACT"
   - "Override queries return identical column names and semantics"
 
 anti_patterns:
-  - "DO NOT modify base query files — because other platforms depend on standard SQL FILTER/EXTRACT — create clickhouse_sql/ overrides instead"
-  - "DO NOT use toHour() directly on TIME columns — because ClickHouse toHour() rejects bare TIME values — wrap in toDateTime() first"
+  - "DO NOT modify base query files - because other platforms depend on standard SQL FILTER/EXTRACT - create clickhouse_sql/ overrides instead"
+  - "DO NOT use toHour() directly on TIME columns - because ClickHouse toHour() rejects bare TIME values - wrap in toDateTime() first"
 
 approach: |
   Follow existing override pattern. For QSA4, mechanically replace

@@ -28,7 +28,7 @@ work:
   summary: "Decompose create_enhanced_benchmark_result into factory + normalizer helpers"
   status: done
   notes: |
-    benchbox/base.py:588 — Mix of result field extraction, fallback normalization,
+    benchbox/base.py:588 - Mix of result field extraction, fallback normalization,
     and dict manipulation. Extract:
     - _normalize_benchmark_id(raw) → str
     - _extract_query_results(raw_queries) → list[QueryResult]
@@ -39,7 +39,7 @@ work:
   summary: "Decompose _run_file_comparison into validate/load/compare/output helpers"
   status: done
   notes: |
-    benchbox/cli/commands/compare.py:1082 — four clear phases:
+    benchbox/cli/commands/compare.py:1082 - four clear phases:
     - _validate_comparison_inputs(file1, file2, opts) → or raise
     - _load_comparison_files(file1, file2) → (result1, result2)
     - _compute_comparison(r1, r2, opts) → ComparisonResult (delegate to existing)
@@ -50,7 +50,7 @@ work:
   summary: "Decompose run_dataframe_write_wizard into per-step handlers"
   status: done
   notes: |
-    benchbox/cli/tuning.py:694 — 4+ wizard steps follow identical pattern:
+    benchbox/cli/tuning.py:694 - 4+ wizard steps follow identical pattern:
       capability_check → user_prompt → config_update
     Extract _wizard_step(capability, prompt, config_key) → value or None.
     Each step becomes a single function call. Steps are independent.
@@ -60,7 +60,7 @@ work:
   needs: []
   status: done
   notes: |
-    benchbox/cli/tuning_resolver.py:162 — 4 sequential cases (notuning, auto, explicit path, tuned).
+    benchbox/cli/tuning_resolver.py:162 - 4 sequential cases (notuning, auto, explicit path, tuned).
     Each case is self-contained. Extract:
     - _resolve_notuning() → TuningConfig
     - _resolve_auto(platform, benchmark) → TuningConfig
@@ -113,7 +113,7 @@ approach: |
 
 anti_patterns:
 - "DO NOT change function signatures visible to callers (CLI commands, test fixtures)"
-- "DO NOT merge phases that have different error handling — keep their error paths distinct"
+- "DO NOT merge phases that have different error handling - keep their error paths distinct"
 - "DO NOT over-extract: aim for 3-5 helpers per function, not 10"
 - "DO NOT add logging or validation to the new helpers beyond what's in the original"
 

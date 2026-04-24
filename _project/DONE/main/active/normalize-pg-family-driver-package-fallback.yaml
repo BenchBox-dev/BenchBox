@@ -14,11 +14,11 @@ description: |
     - postgresql.py, timescaledb.py, pg_duckdb.py, pg_mooncake.py
       fall back to `"psycopg"` (bare distribution/import name).
     - cedardb.py:194 falls back to `"psycopg2-binary"` (psycopg2 pip extras
-      variant — leftover from pre-psycopg3 migration; the registry metadata
+      variant - leftover from pre-psycopg3 migration; the registry metadata
       at platform_registry.py:616 already advertises `"psycopg"`, so this
       fallback string is stale).
     - questdb.py:1415 falls back to `"psycopg[binary]"` (psycopg3 with pip
-      extras marker — the bracketed form is a pip-install requirement, not
+      extras marker - the bracketed form is a pip-install requirement, not
       an import name).
 
   In practice the fallback is rarely hit because PlatformRegistry.get_platform_info()

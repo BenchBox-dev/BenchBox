@@ -48,11 +48,11 @@ description: |
 
 metadata:
   tags:
-  - visualization
-  - ascii-charts
-  - cdf
-  - distribution
-  - latency
+    - visualization
+    - ascii-charts
+    - cdf
+    - distribution
+    - latency
   estimated_effort: Medium
   created_date: "2026-02-14"
 
@@ -68,17 +68,17 @@ impact:
 
 files_affected:
   added:
-  - benchbox/core/visualization/ascii/cdf_chart.py
+    - benchbox/core/visualization/ascii/cdf_chart.py
   modified:
-  - benchbox/core/visualization/ascii/__init__.py
-  - benchbox/core/visualization/exporters.py
-  - benchbox/core/visualization/templates.py
-  - tests/unit/visualization/ascii/test_ascii_charts.py
+    - benchbox/core/visualization/ascii/__init__.py
+    - benchbox/core/visualization/exporters.py
+    - benchbox/core/visualization/templates.py
+    - tests/unit/visualization/ascii/test_ascii_charts.py
 
 must_preserve:
-- "All 9 existing chart types continue to render identically"
-- "render_ascii_chart() in exporters.py handles all existing chart_type strings"
-- "ASCIILineChart behavior unchanged (CDF is a distribution chart, line chart is time-series)"
+  - "All 9 existing chart types continue to render identically"
+  - "render_ascii_chart() in exporters.py handles all existing chart_type strings"
+  - "ASCIILineChart behavior unchanged (CDF is a distribution chart, line chart is time-series)"
 
 approach: |
   Reuse the grid-based rendering pattern from benchbox/core/visualization/ascii/line_chart.py
@@ -95,56 +95,57 @@ approach: |
   Keep Y-axis fixed at 0-100% (no auto-scaling). X-axis scales to data range.
 
 anti_patterns:
-- "DO NOT reuse ASCIILineChart directly — because CDF has fixed 0-100% Y-axis and different data preparation (sorted cumulative)
-  — create a dedicated class that borrows rendering patterns"
-- "DO NOT add numpy/scipy dependency — because the visualization module has zero external deps — CDF computation is trivial
-  with sorted arrays"
+  - "DO NOT reuse ASCIILineChart directly - because CDF has fixed 0-100% Y-axis and different data preparation (sorted cumulative)
+    - create a dedicated class that borrows rendering patterns"
+  - "DO NOT add numpy/scipy dependency - because the visualization module has zero external deps - CDF computation is trivial
+    with sorted arrays"
 
 verification:
-- description: "New chart class renders without error"
-  command: "uv run -- python -c \"from benchbox.core.visualization.ascii.cdf_chart import ASCIICDFChart, CDFSeriesData; data
-    = [CDFSeriesData('DuckDB', [10, 20, 30, 50, 120]), CDFSeriesData('Polars', [15, 25, 45, 80, 310])]; chart = ASCIICDFChart(data=data);
-    print(chart.render())\""
-  expected_output: "Rendered chart with two CDF curves, Y-axis 0-100%"
-- description: "Existing chart tests still pass"
-  command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
-  expected_output: "all tests pass, 0 failures"
+  - description: "New chart class renders without error"
+    command:
+      'uv run -- python -c "from benchbox.core.visualization.ascii.cdf_chart import ASCIICDFChart, CDFSeriesData; data
+      = [CDFSeriesData(''DuckDB'', [10, 20, 30, 50, 120]), CDFSeriesData(''Polars'', [15, 25, 45, 80, 310])]; chart = ASCIICDFChart(data=data);
+      print(chart.render())"'
+    expected_output: "Rendered chart with two CDF curves, Y-axis 0-100%"
+  - description: "Existing chart tests still pass"
+    command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
+    expected_output: "all tests pass, 0 failures"
 
 scope_limit:
   only_modify:
-  - benchbox/core/visualization/ascii/
-  - benchbox/core/visualization/exporters.py
-  - benchbox/core/visualization/templates.py
-  - tests/unit/visualization/ascii/
+    - benchbox/core/visualization/ascii/
+    - benchbox/core/visualization/exporters.py
+    - benchbox/core/visualization/templates.py
+    - tests/unit/visualization/ascii/
 
 work:
-- id: w1
-  summary: "Create CDFSeriesData dataclass and ASCIICDFChart class with grid-based render()"
-  status: done
-- id: w2
-  summary: "Implement CDF computation (sort values, compute cumulative proportions) and grid plotting"
-  needs: [w1]
-  status: done
-- id: w3
-  summary: "Add optional percentile annotation lines (P50, P95, P99 vertical markers on X-axis)"
-  needs: [w2]
-  status: done
-- id: w4
-  summary: "Add from_query_results() factory for creating CDF from NormalizedResult data"
-  needs: [w1, w2]
-  status: done
-- id: w5
-  summary: "Register chart in __init__.py and add 'cdf_chart' case to render_ascii_chart() in exporters.py"
-  needs: [w1]
-  status: done
-- id: w6
-  summary: "Add unit tests (single series, multi-series, identical values, single value, large dataset)"
-  needs: [w1, w2]
-  status: done
-- id: w7
-  summary: "Add cdf_chart to flagship template in templates.py"
-  needs: [w5]
-  status: done
+  - id: w1
+    summary: "Create CDFSeriesData dataclass and ASCIICDFChart class with grid-based render()"
+    status: done
+  - id: w2
+    summary: "Implement CDF computation (sort values, compute cumulative proportions) and grid plotting"
+    needs: [w1]
+    status: done
+  - id: w3
+    summary: "Add optional percentile annotation lines (P50, P95, P99 vertical markers on X-axis)"
+    needs: [w2]
+    status: done
+  - id: w4
+    summary: "Add from_query_results() factory for creating CDF from NormalizedResult data"
+    needs: [w1, w2]
+    status: done
+  - id: w5
+    summary: "Register chart in __init__.py and add 'cdf_chart' case to render_ascii_chart() in exporters.py"
+    needs: [w1]
+    status: done
+  - id: w6
+    summary: "Add unit tests (single series, multi-series, identical values, single value, large dataset)"
+    needs: [w1, w2]
+    status: done
+  - id: w7
+    summary: "Add cdf_chart to flagship template in templates.py"
+    needs: [w5]
+    status: done
 
 deps:
   needs: []

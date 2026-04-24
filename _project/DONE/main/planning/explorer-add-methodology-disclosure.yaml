@@ -16,7 +16,7 @@ description: |
     - What hardware the result was produced on beyond OS/arch/CPU count
 
   This matters because BenchBox's differentiator over ClickBench is
-  "rich per-query detail — execution plans, tuning configurations,
+  "rich per-query detail - execution plans, tuning configurations,
   validation status". If a visitor can't interpret the numbers, that
   claim is hollow. The absence of methodology disclosure also makes it
   impossible to assess whether two results are meaningfully comparable.
@@ -69,12 +69,12 @@ files_affected:
     - "results-explorer/src/pages/Compare.tsx"
 
 must_preserve:
-  - "Existing ResultDetail layout above the disclosure panel — disclosure is additive"
-  - "Collapsed by default — visitors who don't care are not burdened"
+  - "Existing ResultDetail layout above the disclosure panel - disclosure is additive"
+  - "Collapsed by default - visitors who don't care are not burdened"
   - "Graceful rendering for bundles that lack execution_mode / tuning_mode (null-safe)"
 
 approach: |
-  Static disclosure — no new data fetching required. All the displayed
+  Static disclosure - no new data fetching required. All the displayed
   fields come from the detail result object already loaded by ResultDetail.
   The panel is a simple definition list rendered from props.
 
@@ -82,9 +82,9 @@ approach: |
   The label should be visible on first load so the panel is discoverable.
 
 anti_patterns:
-  - "DO NOT expand the panel by default — because most visitors just want the numbers — disclosure is for the methodologically curious"
-  - "DO NOT add interactive filtering or controls to the disclosure panel — because this is read-only provenance — action controls belong elsewhere"
-  - "DO NOT omit the metric definition — because 'Geomean query time' is not obvious to a first-time visitor — always include the definition"
+  - "DO NOT expand the panel by default - because most visitors just want the numbers - disclosure is for the methodologically curious"
+  - "DO NOT add interactive filtering or controls to the disclosure panel - because this is read-only provenance - action controls belong elsewhere"
+  - "DO NOT omit the metric definition - because 'Geomean query time' is not obvious to a first-time visitor - always include the definition"
 
 scope_limit:
   only_modify:

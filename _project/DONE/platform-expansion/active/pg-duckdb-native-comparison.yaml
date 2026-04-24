@@ -29,7 +29,7 @@ approach: |
      overhead percentage per query, geometric mean overhead, queries where
      pg_duckdb wins (if any)
 
-  The comparison infrastructure already exists and is mature — this is
+  The comparison infrastructure already exists and is mature - this is
   primarily an orchestration and formatting task. PlatformComparison
   validates same benchmark name and scale factor, computes per-query
   p50/p95/p99, and ranks via PlatformRanker with GEOMETRIC_MEAN strategy.
@@ -44,7 +44,7 @@ metadata:
   - comparison
   - analysis
   - deferred-followup
-  estimated_effort: "Small — 4-8 hours"
+  estimated_effort: "Small - 4-8 hours"
   created_date: "2026-02-21"
   split_from: pg-extension-advanced-benchmarking
 
@@ -58,13 +58,13 @@ scope_limit:
   - "tests/"
 
 must_preserve:
-- "PlatformComparison and PlatformRanker APIs unchanged — consume, don't modify"
+- "PlatformComparison and PlatformRanker APIs unchanged - consume, don't modify"
 - "Existing pg_duckdb and duckdb adapter behavior unmodified"
 
 anti_patterns:
-- "DO NOT reimplement comparison logic — because PlatformComparison already handles statistical tests, win/loss, and ranking
-  — use from_files() and compare()"
-- "DO NOT require live database connections for comparison — because users may want to compare pre-existing result files —
+- "DO NOT reimplement comparison logic - because PlatformComparison already handles statistical tests, win/loss, and ranking
+  - use from_files() and compare()"
+- "DO NOT require live database connections for comparison - because users may want to compare pre-existing result files -
   accept result file paths as input"
 
 verification:
@@ -81,6 +81,6 @@ work:
   status: done
 
 - id: w2
-  summary: "Add overhead-specific formatting — per-query overhead %, geometric mean overhead, winner annotations"
+  summary: "Add overhead-specific formatting - per-query overhead %, geometric mean overhead, winner annotations"
   needs: [w1]
   status: done

@@ -59,12 +59,12 @@ approach: |
   rather than depending on the leaked-into-core declaration.
 
 anti_patterns:
-  - "DO NOT add chdb to core deps to compensate — because that would defeat the optionality of ClickHouse — leave chdb in extras"
-  - "DO NOT remove chdb-core from extras as well — because chdb depends on it transitively, and uv tree would re-add it; the only goal is dropping the redundant *core* declaration"
+  - "DO NOT add chdb to core deps to compensate - because that would defeat the optionality of ClickHouse - leave chdb in extras"
+  - "DO NOT remove chdb-core from extras as well - because chdb depends on it transitively, and uv tree would re-add it; the only goal is dropping the redundant *core* declaration"
 
 verification:
   - description: "chdb-core no longer in [project] dependencies"
-    command: "uv run -- python -c \"import tomllib, pathlib; deps = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['dependencies']; assert not any('chdb-core' in d for d in deps), 'chdb-core still in core deps: ' + str([d for d in deps if 'chdb-core' in d]); print('OK: chdb-core removed from core')\""
+    command: 'uv run -- python -c "import tomllib, pathlib; deps = tomllib.loads(pathlib.Path(''pyproject.toml'').read_text())[''project''][''dependencies'']; assert not any(''chdb-core'' in d for d in deps), ''chdb-core still in core deps: '' + str([d for d in deps if ''chdb-core'' in d]); print(''OK: chdb-core removed from core'')"'
     expected_output: "OK: chdb-core removed from core"
   - description: "Fast suite passes"
     command: "uv run -- python -m pytest -m fast -q"

@@ -19,9 +19,9 @@ work:
   needs: []
   status: done
   notes: |
-    StackedPhase.tsx:27-30 — PHASE_COLORS uses inline hex literals
-    "#3b82f6", "#10b981", "#f59e0b", "#ef4444" — the same four
-    palette colors as PALETTE in chartTheme.ts — bypassing paletteColor().
+    StackedPhase.tsx:27-30 - PHASE_COLORS uses inline hex literals
+    "#3b82f6", "#10b981", "#f59e0b", "#ef4444" - the same four
+    palette colors as PALETTE in chartTheme.ts - bypassing paletteColor().
 
     Fix: export PHASE_COLORS from chartTheme.ts or replace inline
     literals with paletteColor(0..3).  chartTheme.ts already has the
@@ -38,7 +38,7 @@ work:
 
     Fix: either import HEAT_MIN_RATIO/HEAT_MAX_RATIO in chartMath.ts
     and use them in colorForCell, or remove the exports from chartTheme.ts.
-    The former is cleaner — makes colorForCell respect changes in one place.
+    The former is cleaner - makes colorForCell respect changes in one place.
 
 - id: w3
   summary: "Add dedicated useElementSize unit test"
@@ -76,7 +76,7 @@ work:
   needs: []
   status: done
   notes: |
-    BenchmarkIndex.tsx:325 — `summaryError.startsWith("No benchmark data
+    BenchmarkIndex.tsx:325 - `summaryError.startsWith("No benchmark data
     available")` is a string-prefix match on a user-visible message.
     If manifest.ts changes the message wording, the empty-state branch
     silently reverts to the amber error banner.

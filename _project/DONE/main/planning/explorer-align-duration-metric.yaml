@@ -25,44 +25,48 @@ description: |
 
 deps:
   needs:
-  - explorer-extend-manifest-and-pipeline
+    - explorer-extend-manifest-and-pipeline
 
 work:
-- id: w1
-  summary: "Update Compare.tsx: use geomean_ms as primary sort/compare axis. Keep total_duration_s as secondary column labeled
-    'Wall-clock total'."
-  status: done
+  - id: w1
+    summary:
+      "Update Compare.tsx: use geomean_ms as primary sort/compare axis. Keep total_duration_s as secondary column labeled
+      'Wall-clock total'."
+    status: done
 
-- id: w2
-  summary: "Update BenchmarkIndex.tsx and PlatformIndex.tsx browse tables: sort default by geomean_ms ascending. Relabel 'Duration'
-    column to 'Geomean (ms)' with a tooltip explaining the metric."
-  needs: [w1]
-  status: done
+  - id: w2
+    summary:
+      "Update BenchmarkIndex.tsx and PlatformIndex.tsx browse tables: sort default by geomean_ms ascending. Relabel 'Duration'
+      column to 'Geomean (ms)' with a tooltip explaining the metric."
+    needs: [w1]
+    status: done
 
-- id: w3
-  summary: "Update ResultDetail.tsx summary section: show geomean_ms as 'Geomean query time' prominently; move total_duration_s
-    to secondary metadata row with label 'Total wall-clock'."
-  needs: [w1]
-  status: done
+  - id: w3
+    summary:
+      "Update ResultDetail.tsx summary section: show geomean_ms as 'Geomean query time' prominently; move total_duration_s
+      to secondary metadata row with label 'Total wall-clock'."
+    needs: [w1]
+    status: done
 
-- id: w4
-  summary: "Add metric definition tooltip or footnote: 'Geometric mean of per-query execution times (measurement runs only).
-    Lower is faster. Comparable across runs with different query counts.'"
-  needs: [w2, w3]
-  status: done
+  - id: w4
+    summary:
+      "Add metric definition tooltip or footnote: 'Geometric mean of per-query execution times (measurement runs only).
+      Lower is faster. Comparable across runs with different query counts.'"
+    needs: [w2, w3]
+    status: done
 
 files_affected:
   modified:
-  - "results-explorer/src/pages/Compare.tsx"
-  - "results-explorer/src/pages/BenchmarkIndex.tsx"
-  - "results-explorer/src/pages/PlatformIndex.tsx"
-  - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
 
 must_preserve:
-- "total_duration_s remains visible — it is honest wall-clock data; just secondary"
-- "Existing URL/query-param format for compare view"
-- "All data loading logic — this is display/labeling changes only"
-- "Null-safety: if geomean_ms is null (e.g., old bundle), fall back to total_duration_s display with a 'N/A' geomean"
+  - "total_duration_s remains visible - it is honest wall-clock data; just secondary"
+  - "Existing URL/query-param format for compare view"
+  - "All data loading logic - this is display/labeling changes only"
+  - "Null-safety: if geomean_ms is null (e.g., old bundle), fall back to total_duration_s display with a 'N/A' geomean"
 
 approach: |
   The geomean_ms field will exist in the manifest after explorer-extend-manifest-
@@ -74,27 +78,27 @@ approach: |
   runs only). More comparable than wall-clock total when query counts differ."
 
 anti_patterns:
-- "DO NOT remove total_duration_s from the UI — because it is useful context — demote it, don't delete it"
-- "DO NOT recompute geomean in the browser — because it is precomputed in the manifest — read manifest.geomean_ms directly"
-- "DO NOT silently show geomean as 'Duration' — because that hides the metric choice from the reader — always label it"
+  - "DO NOT remove total_duration_s from the UI - because it is useful context - demote it, don't delete it"
+  - "DO NOT recompute geomean in the browser - because it is precomputed in the manifest - read manifest.geomean_ms directly"
+  - "DO NOT silently show geomean as 'Duration' - because that hides the metric choice from the reader - always label it"
 
 scope_limit:
   only_modify:
-  - "results-explorer/src/pages/"
+    - "results-explorer/src/pages/"
   do_not_modify:
-  - "benchbox/core/explorer_pipeline/ (pipeline changes are in the prerequisite TODO)"
-  - "results-explorer/src/components/ (no component changes needed)"
+    - "benchbox/core/explorer_pipeline/ (pipeline changes are in the prerequisite TODO)"
+    - "results-explorer/src/components/ (no component changes needed)"
 
 verification:
-- description: "Compare view sorts by geomean_ms"
-  command: "grep -n 'geomean_ms' results-explorer/src/pages/Compare.tsx"
-  expected_output: "at least one sort reference to geomean_ms"
-- description: "total_duration_s is still visible but labeled"
-  command: "grep -n 'Wall-clock\\|total_duration' results-explorer/src/pages/Compare.tsx"
-  expected_output: "present with descriptive label"
-- description: "TypeScript compiles cleanly"
-  command: "cd results-explorer && npm run typecheck"
-  expected_output: "(no errors)"
+  - description: "Compare view sorts by geomean_ms"
+    command: "grep -n 'geomean_ms' results-explorer/src/pages/Compare.tsx"
+    expected_output: "at least one sort reference to geomean_ms"
+  - description: "total_duration_s is still visible but labeled"
+    command: "grep -n 'Wall-clock\\|total_duration' results-explorer/src/pages/Compare.tsx"
+    expected_output: "present with descriptive label"
+  - description: "TypeScript compiles cleanly"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "(no errors)"
 
 metadata:
   tags: ["results", "explorer", "metrics", "geomean", "duration", "fidelity"]

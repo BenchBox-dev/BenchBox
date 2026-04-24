@@ -7,7 +7,7 @@ completed_date: "2026-02-21"
 category: Core Functionality
 description: |
   Following the complexity-check evaluation of the top-20 functions at CC=14,
-  five functions were classified as "required complexity" — their branching is
+  five functions were classified as "required complexity" - their branching is
   inherent to the problem domain and cannot be meaningfully reduced without
   adding indirection that hurts readability.
 
@@ -16,15 +16,15 @@ description: |
 
   Functions to exclude:
   1. benchbox/cli/commands/show_plan.py:show_plan (CC=14)
-     — Error handling (4 except branches) + 3-way format dispatch; irreducible for a CLI command
+     - Error handling (4 except branches) + 3-way format dispatch; irreducible for a CLI command
   2. benchbox/cli/commands/tuning_group.py:_display_config_settings_table (CC=14)
-     — Guard count proportional to number of config fields; no reducible structure
+     - Guard count proportional to number of config fields; no reducible structure
   3. benchbox/core/query_plans/parsers/base.py:_harmonize_operator_type (CC=14)
-     — 12-way keyword→enum mapping; branching count equals enum member count
+     - 12-way keyword→enum mapping; branching count equals enum member count
   4. benchbox/core/concurrency/analyzer.py:analyze_contention (CC=14)
-     — Mutually-exclusive classification decision tree; genuinely a classifier
+     - Mutually-exclusive classification decision tree; genuinely a classifier
   5. benchbox/core/metadata_primitives/complexity.py:__post_init__ (CC=14)
-     — N independent field validation guards; inherent to dataclass validation
+     - N independent field validation guards; inherent to dataclass validation
 
 work:
 - id: w1

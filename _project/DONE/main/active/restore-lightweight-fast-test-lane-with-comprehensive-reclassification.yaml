@@ -139,10 +139,10 @@ approach: |
   silently re-inflate the fast lane.
 
 anti_patterns:
-  - "DO NOT make `test-fast` single-process with `-n 0` — because that hides the classification regression instead of fixing it — keep parallel execution and reduce the lane size."
-  - "DO NOT treat `unit` as equivalent to `fast` — because many unit tests have heavy startup, subprocess, import, or data-generation costs — classify by observed behavior instead."
-  - "DO NOT rely on a small hand-maintained exception list alone — because new tests will keep drifting into `fast` — add a maintained inventory and validation guardrails."
-  - "DO NOT move expensive tests out of fast without preserving another routine lane that still covers them — because that creates hidden coverage gaps — keep them reachable through `medium`, `slow`, `stress`, or `resource_heavy` workflows."
+  - "DO NOT make `test-fast` single-process with `-n 0` - because that hides the classification regression instead of fixing it - keep parallel execution and reduce the lane size."
+  - "DO NOT treat `unit` as equivalent to `fast` - because many unit tests have heavy startup, subprocess, import, or data-generation costs - classify by observed behavior instead."
+  - "DO NOT rely on a small hand-maintained exception list alone - because new tests will keep drifting into `fast` - add a maintained inventory and validation guardrails."
+  - "DO NOT move expensive tests out of fast without preserving another routine lane that still covers them - because that creates hidden coverage gaps - keep them reachable through `medium`, `slow`, `stress`, or `resource_heavy` workflows."
 
 verification:
   - description: "Record current marker counts before edits"

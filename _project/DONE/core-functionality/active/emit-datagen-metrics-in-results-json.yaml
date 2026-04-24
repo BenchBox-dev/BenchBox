@@ -15,7 +15,7 @@ description: |
 
   1. duration_seconds kwarg silently dropped: runner.py captures datagen_duration
      and passes it to create_enhanced_benchmark_result(), but that method does
-     not declare duration_seconds as an explicit parameter — it lands in **kwargs
+     not declare duration_seconds as an explicit parameter - it lands in **kwargs
      and is never extracted. ResultBuilder._calculate_duration() then returns 0.0
      (no query times, no loading time). Fix: add set_total_duration() to builder
      and wire the param through.
@@ -64,11 +64,11 @@ work:
   status: done
 
 must_preserve:
-- "All existing callers of create_enhanced_benchmark_result() continue to work — duration_seconds was previously silently
+- "All existing callers of create_enhanced_benchmark_result() continue to work - duration_seconds was previously silently
   accepted via **kwargs; making it explicit must not break any call site"
 - "ResultBuilder._calculate_duration() fallback logic (start/end times, then query time sum) remains intact for non-datagen
   paths"
-- "Standard benchmark runs (load+power) report correct total_duration_ms and phase timings — no regression"
+- "Standard benchmark runs (load+power) report correct total_duration_ms and phase timings - no regression"
 - "_ensure_data_generated() return type (bool) and calling convention in runner.py unchanged"
 
 approach: |
@@ -90,7 +90,7 @@ approach: |
   For w4: add helper _read_datagen_stats_from_manifest(benchmark) near _ensure_data_generated().
   Use existing load_manifest() from benchbox.core.manifest.io. Handle both ManifestV1 (tables is
   dict[str, list[FileEntry]]) and ManifestV2 (tables is dict[str, TableFormats] with .formats dict).
-  Return {} on any failure — stats are non-critical. Merge returned dict into phase_data with **.
+  Return {} on any failure - stats are non-critical. Merge returned dict into phase_data with **.
 
   For w5: use pytest fixtures and mock benchmark objects with a temp manifest on disk.
   Parametrize over tpch/tpcds/ssb to confirm benchmark-agnostic behavior.

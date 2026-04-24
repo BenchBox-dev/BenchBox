@@ -21,9 +21,9 @@ description: |
 approach: |
   1. Create `benchbox/platforms/base/spark_execution_mixin.py` with a
      `SparkExecutionMixin` class containing:
-     - `_load_data_spark(self, benchmark, data_dir, connection)` — the shared
+     - `_load_data_spark(self, benchmark, data_dir, connection)` - the shared
        load logic using DataSourceResolver, format detection, chunk loading
-     - `_execute_query_spark(self, query, connection, **kwargs)` — the shared
+     - `_execute_query_spark(self, query, connection, **kwargs)` - the shared
        execution logic with dry-run, caching, validation, and error handling
   2. Have both LakeSail and Spark adapters inherit from the mixin
   3. Reduce each adapter's `load_data` and `execute_query` to thin wrappers
@@ -80,7 +80,7 @@ must_preserve:
   - "LakeSailAdapter.execute_query() and SparkAdapter.execute_query() return identical result dicts"
 
 anti_patterns:
-  - "DO NOT create a deep inheritance chain — because the adapter hierarchy is already 3+ levels — use a mixin that can be composed in"
+  - "DO NOT create a deep inheritance chain - because the adapter hierarchy is already 3+ levels - use a mixin that can be composed in"
 
 scope_limit:
   only_modify:

@@ -85,9 +85,9 @@ must_preserve:
 - "DuckDB adapter behavior unchanged when SiriusDB extension is not loaded"
 
 anti_patterns:
-- "DO NOT modify existing adapter files — because SiriusDB is additive — create a new siriusdb.py file"
-- "DO NOT require GPU for unit tests — because CI has no GPU hardware — mock GPU initialization and test CPU fallback path"
-- "DO NOT modify benchbox/platforms/duckdb.py — because SiriusDB extends DuckDB via extension loading — inherit from DuckDBAdapter
+- "DO NOT modify existing adapter files - because SiriusDB is additive - create a new siriusdb.py file"
+- "DO NOT require GPU for unit tests - because CI has no GPU hardware - mock GPU initialization and test CPU fallback path"
+- "DO NOT modify benchbox/platforms/duckdb.py - because SiriusDB extends DuckDB via extension loading - inherit from DuckDBAdapter
   and override only GPU-specific methods"
 
 verification:

@@ -50,7 +50,7 @@ work:
     2. Run full test suite: `uv run -- python -m pytest -q`
     3. Run golden snapshot tests specifically:
        `uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v`
-    4. If any golden tests fail, inspect output changes — they should only affect
+    4. If any golden tests fail, inspect output changes - they should only affect
        charts rendered WITHOUT explicit labels (i.e., test-only fixtures, not
        BenchBox production paths). Regenerate with `--update-golden` after review.
     5. Run BenchBox smoke test to confirm CLI output unchanged:
@@ -60,7 +60,7 @@ work:
   summary: "Migrate factory function calls to new generic names"
   needs: [w1]
   status: pending
-  blocked_by: "textcharts Group 4 not yet implemented — old names are still primary, no generic aliases exist"
+  blocked_by: "textcharts Group 4 not yet implemented - old names are still primary, no generic aliases exist"
   notes: |
     textcharts renamed benchmark-specific factory functions and deprecated the old
     names. BenchBox call sites in `ascii_runtime.py` need updating to silence
@@ -89,7 +89,7 @@ work:
   summary: "Update factory function parameter names (scatter cost→x, performance→y)"
   needs: [w2]
   status: pending
-  blocked_by: "textcharts Group 4 not yet implemented — from_points() does not exist yet"
+  blocked_by: "textcharts Group 4 not yet implemented - from_points() does not exist yet"
   notes: |
     The renamed `from_points()` in scatter_plot uses `x_label`/`y_label` instead
     of `cost_label`/`performance_label`. Check `_render_scatter` in ascii_runtime.py
@@ -108,7 +108,7 @@ work:
 
     BenchBox does NOT set value_formatter, so it defaults to None. When None AND
     metric_label is "ms" (BenchBox's default), the existing _format_time() is used
-    — behavior is identical.
+    - behavior is identical.
 
     Additionally, ASCIISummaryBox now routes _format_time() through _format_metric()
     dispatch. When metric_label != "ms", total_time and best/worst values use
@@ -124,7 +124,7 @@ work:
   summary: "Verify lower_is_better has no impact on existing behavior"
   needs: [w1]
   status: pending
-  blocked_by: "textcharts Group 3 not yet implemented — lower_is_better parameter does not exist yet"
+  blocked_by: "textcharts Group 3 not yet implemented - lower_is_better parameter does not exist yet"
   notes: |
     textcharts has NOT yet added `lower_is_better`. When it does, verify:
     - ComparisonBar.__init__() default True matches BenchBox latency semantics
@@ -136,7 +136,7 @@ work:
   summary: "Update compatibility shim re-exports if textcharts added new public names"
   needs: [w1, w2]
   status: pending
-  blocked_by: "textcharts Groups 1 and 4 not yet implemented — no new public names to re-export"
+  blocked_by: "textcharts Groups 1 and 4 not yet implemented - no new public names to re-export"
   notes: |
     The BenchBox compatibility shim in `benchbox/core/visualization/ascii/__init__.py`
     re-exports textcharts symbols. If textcharts added new public names (e.g.,

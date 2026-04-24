@@ -5,14 +5,14 @@ priority: Medium
 status: Completed
 category: Code Quality and Technical Debt
 description: |
-  Quality plan supplement — duplication workstream follow-up. Tracks
+  Quality plan supplement - duplication workstream follow-up. Tracks
   residual R-08 from
   `quality-consolidate-duplicate-code-clusters` (see
   docs/development/duplication-residuals.md).
 
   `transaction_primitives` and `write_primitives` ship near-identical
-  `Benchmark` and `Operations` base classes — operation registry,
-  dispatch, reporting scaffolding — but with type signatures parameterized
+  `Benchmark` and `Operations` base classes - operation registry,
+  dispatch, reporting scaffolding - but with type signatures parameterized
   over benchmark-specific result/operation types. Inventory measured the
   duplication at three clusters: 101, 93, and 71 lines (~265 lines total)
   across two 1300+ line files.
@@ -20,7 +20,7 @@ description: |
   The dedup TODO deliberately deferred this because:
     - Multi-day refactor (extraction needs generics over the
       result/operation type parameter, plus a shared registry contract)
-    - Touches benchmark execution path used by ACID tests — non-trivial
+    - Touches benchmark execution path used by ACID tests - non-trivial
       test surface
     - Per-cluster scope of the parent dedup TODO was capped at ≤4 hours
 
@@ -88,11 +88,11 @@ approach: |
   parent dedup TODO refused to touch this was bundle risk.
 
 anti_patterns:
-- "DO NOT collapse ResultT / OperationT into a single concrete type — because that loses type safety the existing classes
-  provide — keep generics"
-- "DO NOT migrate both families in one commit — because review needs to see each migration in isolation — one commit per family"
-- "DO NOT change benchmark semantics during extraction — because that's a separate concern — structural moves only"
-- "DO NOT extract methods that genuinely differ between the two families — because the diff exists for a reason — the survey
+- "DO NOT collapse ResultT / OperationT into a single concrete type - because that loses type safety the existing classes
+  provide - keep generics"
+- "DO NOT migrate both families in one commit - because review needs to see each migration in isolation - one commit per family"
+- "DO NOT change benchmark semantics during extraction - because that's a separate concern - structural moves only"
+- "DO NOT extract methods that genuinely differ between the two families - because the diff exists for a reason - the survey
   in w1 must classify each method as shared vs divergent"
 
 verification:

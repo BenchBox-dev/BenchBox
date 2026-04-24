@@ -85,10 +85,10 @@ approach: |
   as convenience aliases.
 
 anti_patterns:
-- "DO NOT use linear scaling for bar widths — because ratios can span 0.01x to 100x — use log2 scaling so 2x and 0.5x are
+- "DO NOT use linear scaling for bar widths - because ratios can span 0.01x to 100x - use log2 scaling so 2x and 0.5x are
   symmetric around the baseline"
-- "DO NOT modify ASCIIBarChart or ASCIIDivergingBar — because they serve different purposes (absolute values, pct change)
-  — implement as a new class"
+- "DO NOT modify ASCIIBarChart or ASCIIDivergingBar - because they serve different purposes (absolute values, pct change)
+  - implement as a new class"
 
 verification:
 - description: "New chart class renders without error"

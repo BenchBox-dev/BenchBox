@@ -111,11 +111,11 @@ approach: |
   Add result metadata so downstream analysis can segment runs by applied strategy.
 
 anti_patterns:
-- "DO NOT silently reinterpret existing Z-ORDER configs as liquid clustering — because it changes benchmark semantics — require
+- "DO NOT silently reinterpret existing Z-ORDER configs as liquid clustering - because it changes benchmark semantics - require
   explicit strategy selection"
-- "DO NOT implement Databricks-only behavior in platform-agnostic base classes without guards — because it risks cross-platform
-  regressions — keep logic adapter-scoped where possible"
-- "DO NOT ship strategy parsing without conflict validation — because mixed config states become non-reproducible — fail fast
+- "DO NOT implement Databricks-only behavior in platform-agnostic base classes without guards - because it risks cross-platform
+  regressions - keep logic adapter-scoped where possible"
+- "DO NOT ship strategy parsing without conflict validation - because mixed config states become non-reproducible - fail fast
   with clear remediation"
 
 verification:

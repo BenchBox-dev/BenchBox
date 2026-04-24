@@ -15,8 +15,8 @@ description: |
   to a data directory that the static build pipeline can consume.
 
   **Corpus strategy: depth over breadth.** The primary deliverable is a dynamic
-  comparison tool, so the corpus must have sufficient depth per benchmark — many
-  platforms at the same scale factor — rather than just hitting a raw bundle
+  comparison tool, so the corpus must have sufficient depth per benchmark - many
+  platforms at the same scale factor - rather than just hitting a raw bundle
   count. The target is: each included benchmark has ≥3 comparable platforms at
   the same scale factor, across most supported benchmarks and platforms at
   limited scale factors.
@@ -108,8 +108,8 @@ impact:
     explorer from depending on manually curated or stale data.
 
 must_preserve:
-- "Existing benchbox run and export workflows must not be modified — seed generation uses them as-is"
-- "Schema-v2 bundle format is the canonical artifact — no custom export shapes"
+- "Existing benchbox run and export workflows must not be modified - seed generation uses them as-is"
+- "Schema-v2 bundle format is the canonical artifact - no custom export shapes"
 
 approach: |
   Use `benchbox run` directly to generate all seed results. The seed workflow is
@@ -118,9 +118,9 @@ approach: |
   dynamic comparison tool has meaningful content at launch.
 
 anti_patterns:
-- "DO NOT include only synthetic or trivially small results — because the explorer must show realistic platform behavior — run actual benchmarks at SF 0.01+ with full query sets"
-- "DO NOT commit large bundles (>10MB each) directly to the main repo — because git history bloats permanently — use a data repo, LFS, or CI-generated artifacts if bundles are large"
-- "DO NOT generate the corpus manually and commit ad hoc — because the corpus must be reproducible and refreshable — build a CI workflow from the start"
+- "DO NOT include only synthetic or trivially small results - because the explorer must show realistic platform behavior - run actual benchmarks at SF 0.01+ with full query sets"
+- "DO NOT commit large bundles (>10MB each) directly to the main repo - because git history bloats permanently - use a data repo, LFS, or CI-generated artifacts if bundles are large"
+- "DO NOT generate the corpus manually and commit ad hoc - because the corpus must be reproducible and refreshable - build a CI workflow from the start"
 
 verification:
 - description: "All seed bundles pass schema validation and depth-per-benchmark criterion"

@@ -63,9 +63,9 @@ approach: |
   so `<3.0.0` is safe and gives runway.
 
 anti_patterns:
-  - "DO NOT pin to exact versions — because that breaks transitive resolution for users — upper bounds only"
-  - "DO NOT add bounds to every dep — because maintenance burden grows linearly — only the highest-risk 5-8"
-  - "DO NOT bump bounds reactively when CI breaks — because that's exactly the signal we wanted — investigate the breaking change first"
+  - "DO NOT pin to exact versions - because that breaks transitive resolution for users - upper bounds only"
+  - "DO NOT add bounds to every dep - because maintenance burden grows linearly - only the highest-risk 5-8"
+  - "DO NOT bump bounds reactively when CI breaks - because that's exactly the signal we wanted - investigate the breaking change first"
 
 verification:
   - description: "uv resolves lockfile cleanly"

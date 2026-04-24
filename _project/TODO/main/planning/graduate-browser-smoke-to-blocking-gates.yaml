@@ -17,7 +17,7 @@ description: |
   serializing workers. Gate is 10 consecutive green CI runs post-fix.
 
   Firefox: no known active flake. Gate is the same 10-consecutive-green
-  criterion applied independently — Firefox may be ready before WebKit
+  criterion applied independently - Firefox may be ready before WebKit
   if it is already passing consistently.
 
   Each browser is flipped independently; do not wait for both before
@@ -58,11 +58,11 @@ work:
 
 must_preserve:
   - "The Chromium blocking gate is unaffected by either change."
-  - "Each browser is assessed independently — do not block one promotion on the other."
+  - "Each browser is assessed independently - do not block one promotion on the other."
 
 anti_patterns:
-  - "DO NOT flip on a calendar or release schedule — because promoting before the run is stable will make the gate unreliable and erode trust in CI — gate strictly on the 10-consecutive-green criterion."
-  - "DO NOT flip both browsers in a single commit if their thresholds are reached at different times — because batching obscures which browser caused any subsequent regression — flip each in its own commit."
+  - "DO NOT flip on a calendar or release schedule - because promoting before the run is stable will make the gate unreliable and erode trust in CI - gate strictly on the 10-consecutive-green criterion."
+  - "DO NOT flip both browsers in a single commit if their thresholds are reached at different times - because batching obscures which browser caused any subsequent regression - flip each in its own commit."
 
 verification:
   - description: "Last 10 WebKit job conclusions are all success"
@@ -93,7 +93,7 @@ metadata:
 
 impact:
   business_value: |
-    Closes the cross-browser coverage story — Safari and Firefox
+    Closes the cross-browser coverage story - Safari and Firefox
     regressions become release-blocking, not advisory.
   technical_debt: |
     Removes two `continue-on-error` workarounds from the CI matrix.

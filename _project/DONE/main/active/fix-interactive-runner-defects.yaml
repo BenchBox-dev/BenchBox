@@ -15,10 +15,10 @@ description: |
   2. Query IDs collected as "Q37" format but adapter validates against bare "37" keys,
      causing a hard runtime failure after Spark finishes loading data.
   3. Scale factor recommendation returns 0.01 for benchmarks (e.g. TPC-DS) where the
-     minimum valid scale is 1.0 — recommendation is outside the available options list.
+     minimum valid scale is 1.0 - recommendation is outside the available options list.
   4. Tuning shown as "tuned" in the Configuration Preview and CLI command even when
      the user declined tuning configuration.
-  5. "Test Execution Type" selection (standard/power/…) is dead input — it has no effect
+  5. "Test Execution Type" selection (standard/power/…) is dead input - it has no effect
      on phase defaults and is overwritten by a subsequent re-derivation from phases.
 
 category: Bug Fix
@@ -60,7 +60,7 @@ work:
     In `benchbox/cli/benchmarks.py:761`, `_get_recommended_scale()` has:
       return max([s for s in scale_options if s <= 0.1], default=0.01)
     For benchmarks where min scale > 0.1 (e.g. TPC-DS: [1.0, 10.0, 100.0]), the
-    comprehension is empty and the hardcoded 0.01 is returned — a value not in the
+    comprehension is empty and the hardcoded 0.01 is returned - a value not in the
     available options list.
 
     Fix: replace the hardcoded default with scale_options[0]:
@@ -116,10 +116,10 @@ work:
 
     2. Add a proactive hint at the top of the phase prompt (before the numbered list)
        that clearly labels these as phase numbers, not query numbers:
-         "Enter phase numbers (1-6) or phase names — not query numbers."
+         "Enter phase numbers (1-6) or phase names - not query numbers."
          "Query subset selection comes in the next step."
 
-    No changes to parsing logic — the fallback-to-power behavior is correct; only
+    No changes to parsing logic - the fallback-to-power behavior is correct; only
     the messaging needs to be informative.
   files:
   - benchbox/cli/benchmarks.py
@@ -134,7 +134,7 @@ work:
     user input to Q-prefixed format (e.g. "Q37"). However, benchmark query dicts key
     queries by bare integers/strings ("1", "37"). `_apply_query_subset()` in
     `benchbox/platforms/base/adapter.py:3536-3539` checks `"Q37" in queries`, fails,
-    and raises a hard runtime error — after Spark has already spent time loading data.
+    and raises a hard runtime error - after Spark has already spent time loading data.
 
     Fix in `_apply_query_subset()` (the contract boundary): normalize the query_subset
     before validation by stripping any leading Q/q prefix when followed by digits:
@@ -161,7 +161,7 @@ work:
     re-derived from the phases selected in the immediately following `prompt_phases()`
     call (run.py lines 897-920), overwriting the user's choice.
 
-    Fix (Option A — remove the step):
+    Fix (Option A - remove the step):
     - Remove the execution type prompt from the wizard flow.
     - Remove the variable it populates (confirm it is only used in the re-derivation
       that follows phase selection).
@@ -205,10 +205,10 @@ approach: |
   exercise `_prompt_execution_type()` directly.
 
 anti_patterns:
-- "DO NOT change the normalization in prompt_query_subset() — fix it at the adapter boundary so all callers benefit"
-- "DO NOT add a 'Q' prefix everywhere else to match the prompt format — that couples all callers to one format"
-- "DO NOT add a noisy error message for the tuning decline case — it should just work silently with the correct state"
-- "DO NOT change scale_options lists in benchmark_registry.py — the fix is in the recommendation logic, not the options"
+- "DO NOT change the normalization in prompt_query_subset() - fix it at the adapter boundary so all callers benefit"
+- "DO NOT add a 'Q' prefix everywhere else to match the prompt format - that couples all callers to one format"
+- "DO NOT add a noisy error message for the tuning decline case - it should just work silently with the correct state"
+- "DO NOT change scale_options lists in benchmark_registry.py - the fix is in the recommendation logic, not the options"
 
 verification:
 - description: "Scale recommendation remains valid when the benchmark minimum scale is 1.0"

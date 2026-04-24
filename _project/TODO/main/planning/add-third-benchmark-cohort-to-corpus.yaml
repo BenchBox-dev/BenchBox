@@ -22,7 +22,7 @@ description: |
   same submit→PR→merge flow used for SF 0.1 expansion. The choice between
   TPC-DS and ClickBench is itself a decision (TPC-DS is more standard,
   ClickBench is a direct head-to-head with the comparison site we
-  differentiate against) — w1 makes that call explicitly.
+  differentiate against) - w1 makes that call explicitly.
 
 work:
 - id: w1
@@ -92,13 +92,13 @@ verification:
 
 must_preserve:
 - Existing TPC-H and SSB cohorts untouched.
-- "Cohort isolation per strategy doc — never compare across benchmark families."
+- "Cohort isolation per strategy doc - never compare across benchmark families."
 - Maintainer-run trust label on all generated bundles.
 
 anti_patterns:
-- DO NOT pick the benchmark by guessing — because the choice has strategic implications (head-to-head with ClickBench vs broader TPC family); document the trade-off explicitly in w1.
-- DO NOT use TPC-DS fractional scale factors below 1 — because they violate CLAUDE.md's hard rule and produce non-standard, non-comparable results.
-- DO NOT bundle this with the SF 0.1 expansion PR — because they answer different questions (depth-per-cohort vs benchmark-coverage) and reviewer attention shouldn't be split.
+- DO NOT pick the benchmark by guessing - because the choice has strategic implications (head-to-head with ClickBench vs broader TPC family); document the trade-off explicitly in w1.
+- DO NOT use TPC-DS fractional scale factors below 1 - because they violate CLAUDE.md's hard rule and produce non-standard, non-comparable results.
+- DO NOT bundle this with the SF 0.1 expansion PR - because they answer different questions (depth-per-cohort vs benchmark-coverage) and reviewer attention shouldn't be split.
 
 scope_limit:
   only_modify:

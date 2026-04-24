@@ -9,15 +9,15 @@ description: |
   Bug discovered on 2026-02-24: `driver_auto_install=true` silently fails when a
   corrupted isolated runtime exists on disk. The root cause is a two-layer failure:
 
-  Layer 1 — Discovery short-circuits auto-install:
-  In runtime_env.py lines 340–355, `discover_isolated_runtime()` runs before any
+  Layer 1 - Discovery short-circuits auto-install:
+  In runtime_env.py lines 340-355, `discover_isolated_runtime()` runs before any
   auto-install logic. If it finds a metadata match, it returns immediately and
   auto-install is never reached. A broken isolated runtime at
   `benchmark_runs/duckdb_version_envs/duckdb-1.2.2/` was discovered via
-  `importlib.metadata` (which only reads `.dist-info/METADATA` files — no actual
+  `importlib.metadata` (which only reads `.dist-info/METADATA` files - no actual
   module import), so the metadata check passed and the corrupted runtime was returned.
 
-  Layer 2 — Python ABI mismatch makes the runtime unusable:
+  Layer 2 - Python ABI mismatch makes the runtime unusable:
   The DuckDB 1.2.2 C extension was installed under Python 3.12
   (`duckdb.cpython-312-darwin.so`) but BenchBox was running under Python 3.10.
   Python 3.10 cannot load a 3.12 C extension, causing
@@ -39,7 +39,7 @@ context_sections:
     The `platform-driver-runtime-isolation` TODO (completed 2026-02-20) built the
     isolated runtime discovery and loading infrastructure. The discovery function
     (`discover_isolated_runtime`, runtime_env.py:122-159) was designed to be
-    lightweight — scanning `.dist-info/METADATA` without importing modules. This was
+    lightweight - scanning `.dist-info/METADATA` without importing modules. This was
     a reasonable design choice for speed, but it means corrupted or ABI-incompatible
     runtimes pass discovery and only fail at load time.
 
@@ -56,7 +56,7 @@ context_sections:
     The import validation in `load_driver_module()` catches the error but produces a
     confusing error message because the context of "why" is lost. The user sees a
     `ModuleNotFoundError` instead of "isolated runtime at X is incompatible with
-    Python Y — deleting and re-installing".
+    Python Y - deleting and re-installing".
 
     Key constraint: the fix must not make discovery slow for the common case (valid
     runtimes). A full import is expensive (~50-200ms for DuckDB). A lightweight
@@ -65,11 +65,11 @@ context_sections:
 
 metadata:
   tags:
-  - runtime-isolation
-  - driver-versioning
-  - correctness
-  - auto-install
-  - abi-compatibility
+    - runtime-isolation
+    - driver-versioning
+    - correctness
+    - auto-install
+    - abi-compatibility
   estimated_effort: "1-2 days"
   created_date: "2026-02-24"
 
@@ -89,75 +89,79 @@ impact:
 
 files_affected:
   modified:
-  - benchbox/utils/runtime_env.py
-  - tests/unit/utils/test_runtime_env.py
+    - benchbox/utils/runtime_env.py
+    - tests/unit/utils/test_runtime_env.py
   added: []
   removed: []
 
 work:
-- id: w1
-  summary: "Add _validate_runtime_importable() helper with lightweight ABI check on discovered isolated runtimes using extension
-    file suffix matching"
-  status: done
-  notes: |
-    Use importlib.machinery.EXTENSION_SUFFIXES to get valid suffixes for the running
-    interpreter (e.g., ['.cpython-310-darwin.so', '.abi3.so', '.so']).
-    Scan the package-specific subdirectory (site_packages / normalized_package) for
-    .so/.pyd files — not the entire site-packages tree. The normalized_package variable
-    is already in scope at the call site in discover_isolated_runtime(). For example,
-    for duckdb the scan target is site-packages/duckdb/, where the .so lives at
-    duckdb/duckdb.cpython-3XX-platform.so.
-    If extension files exist but none have a suffix in EXTENSION_SUFFIXES, return False.
-    If no extension files exist (pure Python package), return True.
-    Note: .abi3.so (stable ABI) extensions are cross-version compatible and are
-    correctly accepted because EXTENSION_SUFFIXES includes them.
+  - id: w1
+    summary:
+      "Add _validate_runtime_importable() helper with lightweight ABI check on discovered isolated runtimes using extension
+      file suffix matching"
+    status: done
+    notes: |
+      Use importlib.machinery.EXTENSION_SUFFIXES to get valid suffixes for the running
+      interpreter (e.g., ['.cpython-310-darwin.so', '.abi3.so', '.so']).
+      Scan the package-specific subdirectory (site_packages / normalized_package) for
+      .so/.pyd files - not the entire site-packages tree. The normalized_package variable
+      is already in scope at the call site in discover_isolated_runtime(). For example,
+      for duckdb the scan target is site-packages/duckdb/, where the .so lives at
+      duckdb/duckdb.cpython-3XX-platform.so.
+      If extension files exist but none have a suffix in EXTENSION_SUFFIXES, return False.
+      If no extension files exist (pure Python package), return True.
+      Note: .abi3.so (stable ABI) extensions are cross-version compatible and are
+      correctly accepted because EXTENSION_SUFFIXES includes them.
 
-- id: w2
-  summary: "Integrate validation into discover_isolated_runtime() — call _validate_runtime_importable() on each candidate
-    before returning it; log a warning and continue scanning on validation failure"
-  needs: [w1]
-  status: done
-  notes: |
-    In the loop at runtime_env.py:147-158, after version match is confirmed, call
-    the validator. On failure, log a warning like:
-    'Skipping isolated runtime at {site_packages}: ABI mismatch (found cpython-312,
-    need cpython-310). Delete this runtime or rebuild for current Python.'
-    Then `continue` to the next candidate instead of returning.
-    Use logging.getLogger(__name__).warning() consistent with existing patterns.
+  - id: w2
+    summary:
+      "Integrate validation into discover_isolated_runtime() - call _validate_runtime_importable() on each candidate
+      before returning it; log a warning and continue scanning on validation failure"
+    needs: [w1]
+    status: done
+    notes: |
+      In the loop at runtime_env.py:147-158, after version match is confirmed, call
+      the validator. On failure, log a warning like:
+      'Skipping isolated runtime at {site_packages}: ABI mismatch (found cpython-312,
+      need cpython-310). Delete this runtime or rebuild for current Python.'
+      Then `continue` to the next candidate instead of returning.
+      Use logging.getLogger(__name__).warning() consistent with existing patterns.
 
-- id: w3
-  summary: "Add unit tests for validation and skip-on-failure behavior, then run full verification suite to confirm zero regressions"
-  needs: [w2]
-  status: done
-  notes: |
-    Test cases:
-    1. Candidate with cpython-312 .so but running cpython-310 → skipped, returns None
-    2. Candidate with correct ABI .so → returned as valid
-    3. Candidate with no .so files (pure Python) → returned as valid
-    4. Candidate with .abi3.so (stable ABI) → returned as valid
-    5. Two candidates: first has wrong ABI, second is valid → second returned
-    6. Integration: ensure_driver_version() with corrupted isolated runtime falls
-       through to auto-install path when driver_auto_install=True
-    Use tmp_path fixtures and fake .so file creation (same pattern as existing
-    test_discover_isolated_runtime_finds_matching_version).
-    After tests pass, run full verification suite (see verification section).
+  - id: w3
+    summary: "Add unit tests for validation and skip-on-failure behavior, then run full verification suite to confirm zero regressions"
+    needs: [w2]
+    status: done
+    notes: |
+      Test cases:
+      1. Candidate with cpython-312 .so but running cpython-310 → skipped, returns None
+      2. Candidate with correct ABI .so → returned as valid
+      3. Candidate with no .so files (pure Python) → returned as valid
+      4. Candidate with .abi3.so (stable ABI) → returned as valid
+      5. Two candidates: first has wrong ABI, second is valid → second returned
+      6. Integration: ensure_driver_version() with corrupted isolated runtime falls
+         through to auto-install path when driver_auto_install=True
+      Use tmp_path fixtures and fake .so file creation (same pattern as existing
+      test_discover_isolated_runtime_finds_matching_version).
+      After tests pass, run full verification suite (see verification section).
 
 deferred:
-- summary: "Auto-delete or auto-rebuild corrupted isolated runtimes"
-  reason: "Destructive file operations on user's disk should require explicit opt-in. Warning + skip + fallthrough to auto-install
-    is the safe default. Can revisit with a --force-rebuild flag if users want automatic cleanup."
-- summary: "Validate RECORD file checksums for full integrity checking"
-  reason: "ABI mismatch is the dominant failure mode. Full integrity checking adds complexity for a less common scenario.
-    Can add later if needed."
+  - summary: "Auto-delete or auto-rebuild corrupted isolated runtimes"
+    reason:
+      "Destructive file operations on user's disk should require explicit opt-in. Warning + skip + fallthrough to auto-install
+      is the safe default. Can revisit with a --force-rebuild flag if users want automatic cleanup."
+  - summary: "Validate RECORD file checksums for full integrity checking"
+    reason:
+      "ABI mismatch is the dominant failure mode. Full integrity checking adds complexity for a less common scenario.
+      Can add later if needed."
 
 must_preserve:
-- "discover_isolated_runtime() returns immediately for valid runtimes with no measurable performance regression (< 5ms overhead
-  per candidate)"
-- "ensure_driver_version() auto-install path still works when no isolated runtime exists"
-- "load_driver_module() import validation and _module_is_from_runtime() check remain unchanged as a second safety layer"
-- "Default runs without explicit requested version continue working unchanged"
-- "Existing test_discover_isolated_runtime_finds_matching_version and test_ensure_driver_version_prefers_isolated_runtime
-  continue to pass"
+  - "discover_isolated_runtime() returns immediately for valid runtimes with no measurable performance regression (< 5ms overhead
+    per candidate)"
+  - "ensure_driver_version() auto-install path still works when no isolated runtime exists"
+  - "load_driver_module() import validation and _module_is_from_runtime() check remain unchanged as a second safety layer"
+  - "Default runs without explicit requested version continue working unchanged"
+  - "Existing test_discover_isolated_runtime_finds_matching_version and test_ensure_driver_version_prefers_isolated_runtime
+    continue to pass"
 
 approach: |
   Minimal-surface fix inside discover_isolated_runtime() in runtime_env.py.
@@ -180,46 +184,46 @@ approach: |
   suffixes for the running interpreter (e.g., ['.cpython-310-darwin.so', '.abi3.so', '.so']).
 
 anti_patterns:
-- "DO NOT do a full import in discover_isolated_runtime() for every candidate — because DuckDB import takes 50-200ms and discovery
-  may scan many candidates — use filename-based ABI check which costs < 1ms"
-- "DO NOT auto-delete corrupted runtimes — because users may have created them intentionally for a different Python version
-  — warn and skip instead"
-- "DO NOT change the load_driver_module() validation — because it serves as a second safety layer and its error messages are
-  already correct for post-resolution failures — this fix is specifically about pre-resolution validation in discovery"
-- "DO NOT add a separate 'validate' phase between discovery and auto-install — because the fix belongs inside discover_isolated_runtime()
-  itself — keep the ensure_driver_version() flow unchanged"
+  - "DO NOT do a full import in discover_isolated_runtime() for every candidate - because DuckDB import takes 50-200ms and discovery
+    may scan many candidates - use filename-based ABI check which costs < 1ms"
+  - "DO NOT auto-delete corrupted runtimes - because users may have created them intentionally for a different Python version
+    - warn and skip instead"
+  - "DO NOT change the load_driver_module() validation - because it serves as a second safety layer and its error messages are
+    already correct for post-resolution failures - this fix is specifically about pre-resolution validation in discovery"
+  - "DO NOT add a separate 'validate' phase between discovery and auto-install - because the fix belongs inside discover_isolated_runtime()
+    itself - keep the ensure_driver_version() flow unchanged"
 
 verification:
-- description: "Existing runtime_env unit tests pass unchanged"
-  command: "uv run -- python -m pytest tests/unit/utils/test_runtime_env.py -v --tb=short"
-  expected_output: "all existing tests pass, 0 failures"
-- description: "New ABI validation tests pass"
-  command: "uv run -- python -m pytest tests/unit/utils/test_runtime_env.py -k 'abi or importable or corrupted' -v --tb=short"
-  expected_output: "new tests pass covering ABI mismatch, valid runtime, pure-Python, and fallthrough scenarios"
-- description: "Platform contract tests unaffected"
-  command: "uv run -- python -m pytest tests/unit/platforms/test_platform_driver_runtime_contract.py -v --tb=short"
-  expected_output: "all contract tests pass, 0 failures"
-- description: "Integration isolation test still passes"
-  command: "uv run -- python -m pytest tests/integration/test_duckdb_version_isolation.py -v --tb=short"
-  expected_output: "test passes or skips gracefully if local envs not present"
+  - description: "Existing runtime_env unit tests pass unchanged"
+    command: "uv run -- python -m pytest tests/unit/utils/test_runtime_env.py -v --tb=short"
+    expected_output: "all existing tests pass, 0 failures"
+  - description: "New ABI validation tests pass"
+    command: "uv run -- python -m pytest tests/unit/utils/test_runtime_env.py -k 'abi or importable or corrupted' -v --tb=short"
+    expected_output: "new tests pass covering ABI mismatch, valid runtime, pure-Python, and fallthrough scenarios"
+  - description: "Platform contract tests unaffected"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_platform_driver_runtime_contract.py -v --tb=short"
+    expected_output: "all contract tests pass, 0 failures"
+  - description: "Integration isolation test still passes"
+    command: "uv run -- python -m pytest tests/integration/test_duckdb_version_isolation.py -v --tb=short"
+    expected_output: "test passes or skips gracefully if local envs not present"
 
 scope_limit:
   only_modify:
-  - benchbox/utils/runtime_env.py
-  - tests/unit/utils/test_runtime_env.py
+    - benchbox/utils/runtime_env.py
+    - tests/unit/utils/test_runtime_env.py
   do_not_modify:
-  - benchbox/platforms/duckdb.py
-  - benchbox/platforms/__init__.py
-  - benchbox/cli/database.py
-  - benchbox/cli/execution_pipeline.py
-  - benchbox/core/results/schema.py
-  - benchbox/platforms/base/adapter.py
+    - benchbox/platforms/duckdb.py
+    - benchbox/platforms/__init__.py
+    - benchbox/cli/database.py
+    - benchbox/cli/execution_pipeline.py
+    - benchbox/core/results/schema.py
+    - benchbox/platforms/base/adapter.py
 
 success_metrics:
-- "Corrupted isolated runtime with wrong Python ABI is skipped during discovery, allowing auto-install to proceed"
-- "Clear warning message logged when a candidate is skipped, including the path, found ABI tag, and expected ABI tag"
-- "No measurable performance regression for discovery of valid runtimes"
-- "All existing tests pass with zero modifications"
+  - "Corrupted isolated runtime with wrong Python ABI is skipped during discovery, allowing auto-install to proceed"
+  - "Clear warning message logged when a candidate is skipped, including the path, found ABI tag, and expected ABI tag"
+  - "No measurable performance regression for discovery of valid runtimes"
+  - "All existing tests pass with zero modifications"
 
 deps:
   needs: []

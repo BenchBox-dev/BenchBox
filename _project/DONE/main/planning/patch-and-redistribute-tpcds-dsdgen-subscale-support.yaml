@@ -105,7 +105,7 @@ work:
 
     All 16 SF×table combinations (sf=0.01, 0.1, 0.5, 1.0 × call_center, store, warehouse,
     web_site) exit 0 across all four platforms. SF=1.0 checksums match the pre-patch control
-    exactly. Cross-platform checksums are byte-identical — deterministic output confirmed.
+    exactly. Cross-platform checksums are byte-identical - deterministic output confirmed.
 
     Windows status: windows-arm64 and windows-x86_64 NOT rebuilt. No MinGW or Windows
     cross-compiler available on the darwin-arm64 build host. Upstream unpatched binaries

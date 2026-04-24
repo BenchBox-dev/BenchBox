@@ -17,7 +17,7 @@ description: |
   This assumption is unverified.  If QuestDB instead assigns synthetic column
   names (`col0`, `col1`, …) to headerless uploads and requires an explicit header
   to identify columns, every chunk after the first would land in the wrong columns
-  silently — the `/imp` response would still report N rows imported, masking the
+  silently - the `/imp` response would still report N rows imported, masking the
   corruption.
 
   The tpcds_obt benchmark is the only current user of this code path, but any
@@ -40,7 +40,7 @@ work:
 
     Sources: QuestDB 9.3.4 REST API reference, release notes, GitHub issues.
     Also check: `curl` test against a running QuestDB instance with a known
-    schema — send two chunks, first with header, second without, verify the
+    schema - send two chunks, first with header, second without, verify the
     second chunk's data lands in the correct columns by querying the table.
 
 - id: w2
@@ -49,7 +49,7 @@ work:
   status: done
   notes: |
     Add a test in `tests/integration/platforms/test_questdb_parquet_load.py`
-    (NOT fast-marked — requires a live QuestDB instance).
+    (NOT fast-marked - requires a live QuestDB instance).
 
     Test structure:
       1. Create a table with 3 columns: id INT, name VARCHAR, val DOUBLE
@@ -68,13 +68,13 @@ work:
   notes: |
     Two outcomes:
 
-    CASE A — column mapping is positional (assumption holds):
+    CASE A - column mapping is positional (assumption holds):
       Add a one-line comment in `_load_parquet_via_chunked_csv` (questdb.py:~880):
         # QuestDB /imp maps headerless chunks by position against existing schema
-        # (verified against QuestDB 9.3.4 — see integration test).
+        # (verified against QuestDB 9.3.4 - see integration test).
       No behaviour change needed.
 
-    CASE B — column mapping requires header on every chunk:
+    CASE B - column mapping requires header on every chunk:
       Change loop to always send `header=True`, but strip the header row from
       subsequent chunks before POSTing (or use `skiprows=1` in pandas `to_csv`
       equivalent).  The simplest safe fix: always include the header.
@@ -84,13 +84,13 @@ work:
 
 must_preserve:
 - "_load_parquet_via_chunked_csv: overwrite=false on every chunk (must not be changed to true)"
-- "_load_parquet_via_chunked_csv: create_schema always runs before load_data — table exists and is empty at load time"
+- "_load_parquet_via_chunked_csv: create_schema always runs before load_data - table exists and is empty at load time"
 - "All 6 TestLoadParquetViaChunkedCsv unit tests continue to pass after any code change"
 
 verification:
 - description: "Integration test: two-chunk headerless import produces correct column values"
   command: "uv run -- python -m pytest tests/integration/platforms/test_questdb_parquet_load.py -v"
-  expected_output: "All assertions pass — chunk 2 data in correct columns"
+  expected_output: "All assertions pass - chunk 2 data in correct columns"
 
 - description: "Unit tests: overwrite and header semantics unchanged"
   command: "uv run -- python -m pytest tests/unit/platforms/test_questdb_coverage.py::TestLoadParquetViaChunkedCsv -v"

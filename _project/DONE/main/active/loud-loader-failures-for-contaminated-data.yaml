@@ -18,7 +18,7 @@ description: |
   silently.
 
   This is the highest-value fix because it protects users regardless of the
-  contamination source — stale Iceberg dirs, bad paths, permissions, etc.
+  contamination source - stale Iceberg dirs, bad paths, permissions, etc.
 
 category: Core Functionality
 
@@ -77,7 +77,7 @@ approach: |
   - DataLoadingError is already defined in data_loading.py
 
 anti_patterns:
-  - "DO NOT return 0 silently for manifest-provided paths — raise errors instead, because silent failures cause cryptic downstream query failures"
+  - "DO NOT return 0 silently for manifest-provided paths - raise errors instead, because silent failures cause cryptic downstream query failures"
   - "DO NOT leave explicit single-file manifest or benchmark-table paths on the legacy warn+return-0 branch"
 
 scope_limit:

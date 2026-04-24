@@ -12,28 +12,28 @@ description: |
   storage and then COPY INTO native tables, discarding the staged format.
 
   Adding --table-mode gives explicit control over table creation strategy:
-    - native (default): current behavior — CREATE TABLE + INSERT/COPY INTO
+    - native (default): current behavior - CREATE TABLE + INSERT/COPY INTO
     - external: CREATE VIEW, CREATE EXTERNAL TABLE, or register external data source
       pointing to source files (local Parquet) or uploaded object storage paths
 
   External mode unlocks three capabilities:
-    1. True apples-to-apples cross-engine comparisons — all engines read the same files
+    1. True apples-to-apples cross-engine comparisons - all engines read the same files
     2. Faster iteration by skipping the materialization step
-    3. Benchmarking external table query performance — a real production data lake pattern
+    3. Benchmarking external table query performance - a real production data lake pattern
 
   For cloud platforms, data is still uploaded to object storage (S3, GCS, Azure Blob)
-  during the load phase — but instead of COPY INTO native tables, the engine creates
+  during the load phase - but instead of COPY INTO native tables, the engine creates
   external table references pointing at the uploaded Parquet files.
 
   Platform readiness:
 
     Already external:  DataFusion (CREATE EXTERNAL TABLE), Polars (scan_parquet)
     View-based:        DuckDB (CREATE VIEW over read_parquet), MotherDuck (inherits)
-    Cloud — trivial:   Athena (already external tables over S3 — skip CTAS step)
-    Cloud — moderate:  Snowflake (external stages), BigQuery (external tables over GCS),
+    Cloud - trivial:   Athena (already external tables over S3 - skip CTAS step)
+    Cloud - moderate:  Snowflake (external stages), BigQuery (external tables over GCS),
                        Redshift (Spectrum), Databricks (LOCATION-based tables),
                        ClickHouse Cloud (S3 engine), Azure Synapse (PolyBase)
-    Cloud — federated: Trino + Presto (Hive connector external tables)
+    Cloud - federated: Trino + Presto (Hive connector external tables)
     Unsupported:       SQLite, PostgreSQL (no external table mechanism)
 
   Error if external is requested on a platform that doesn't support it.
@@ -97,7 +97,7 @@ work:
     Parquet files in data_dir and execute:
       CREATE VIEW {table} AS SELECT * FROM read_parquet('{glob}')
     Return row counts via SELECT COUNT(*) FROM read_parquet(...).
-    MotherDuck inherits from DuckDB — verify it works without additional changes.
+    MotherDuck inherits from DuckDB - verify it works without additional changes.
     Also support Delta tables via DuckDB's delta extension read path.
     Files: benchbox/platforms/duckdb.py, benchbox/platforms/motherduck.py
 
@@ -106,9 +106,9 @@ work:
   needs: [w1]
   status: done
   notes: |
-    DataFusion already uses CREATE EXTERNAL TABLE / register_parquet() — set flag
+    DataFusion already uses CREATE EXTERNAL TABLE / register_parquet() - set flag
     and alias create_external_tables() to existing load path.
-    Polars already uses pl.scan_parquet() — same treatment.
+    Polars already uses pl.scan_parquet() - same treatment.
     Files: benchbox/platforms/datafusion.py, benchbox/platforms/polars_platform.py
 
   # -- Cloud platforms --
@@ -117,7 +117,7 @@ work:
   needs: [w1, w3]
   status: done
   notes: |
-    Athena already creates external tables over S3 — it's the native model.
+    Athena already creates external tables over S3 - it's the native model.
     Current load_data() uploads Parquet to S3 then runs CTAS to optimize/convert.
     External mode: upload to S3, create external table pointing at uploaded path,
     skip the CTAS conversion step. Data stays in uploaded Parquet format.
@@ -321,7 +321,7 @@ deferred:
 
 open_questions:
 - "How does --table-mode external interact with the generate phase on cloud platforms? Data still needs to reach object storage
-  — should external mode upload-but-skip-materialize automatically, or require a separate upload step?"
+  - should external mode upload-but-skip-materialize automatically, or require a separate upload step?"
 - "Should external be the default for Athena, since its tables are already external references to S3?"
 - "For Snowflake, should we use external stages (simpler) or Iceberg Tables (newer, potentially better query performance on
   Parquet)?"
@@ -343,7 +343,7 @@ impact:
     external tables over object stores are a real production data lake pattern.
     Eliminates data materialization time for development and testing workflows.
   user_impact: |
-    Users can benchmark external table query performance — a pattern used in
+    Users can benchmark external table query performance - a pattern used in
     production data lakes and lakehouses. The --table-mode flag gives explicit
     control over whether data is materialized into native tables or queried
     in-place. Faster iteration cycles for development and testing.
@@ -378,10 +378,10 @@ files_affected:
 
 must_preserve:
 - "DuckDBAdapter.load_data() continues to work unchanged when table_mode='native' (default)"
-- "DataFusion and Polars load paths remain unchanged — only adding capability flag"
+- "DataFusion and Polars load paths remain unchanged - only adding capability flag"
 - "All existing benchbox run invocations without --table-mode produce identical results"
 - "benchbox run --help output format and tier structure remain consistent"
-- "Cloud platform upload/staging infrastructure remains intact — external mode reuses it"
+- "Cloud platform upload/staging infrastructure remains intact - external mode reuses it"
 - "Athena, Snowflake, BigQuery, Redshift load_data() paths unchanged in native mode"
 - "Trino/Presto INSERT-based load path unchanged when staging_root is not configured"
 
@@ -393,7 +393,7 @@ approach: |
   file discovery logic from DataLoader for Parquet glob patterns and Delta detection.
 
   For cloud platforms: reuse each platform's existing upload/staging infrastructure.
-  The key change is what happens AFTER upload — instead of COPY INTO / CTAS into native
+  The key change is what happens AFTER upload - instead of COPY INTO / CTAS into native
   tables, create external table references pointing at the uploaded location. Each
   platform has its own external table DDL:
     - Snowflake: CREATE EXTERNAL TABLE ... WITH LOCATION = @stage/path
@@ -405,7 +405,7 @@ approach: |
     - Trino/Presto: CREATE TABLE ... WITH (external_location = '{path}')
     - Synapse:   CREATE EXTERNAL TABLE via PolyBase external data source
 
-  DataFusion and Polars already implement direct scanning — just declare the capability
+  DataFusion and Polars already implement direct scanning - just declare the capability
   flag and wire through. No behavioral changes needed.
 
   The runner.py routing change should be minimal: check the flag, validate the capability,
@@ -415,14 +415,14 @@ approach: |
   platform (w6 Athena, already external) -> remaining cloud platforms (w7-w13).
 
 anti_patterns:
-- "DO NOT modify existing load_data() paths — because native mode behavior must be preserved for all platforms — add a parallel
+- "DO NOT modify existing load_data() paths - because native mode behavior must be preserved for all platforms - add a parallel
   create_external_tables() method instead"
-- "DO NOT skip row count reporting — because downstream result validation depends on table_stats — use SELECT COUNT(*) or
+- "DO NOT skip row count reporting - because downstream result validation depends on table_stats - use SELECT COUNT(*) or
   metadata queries to get counts without materialization"
-- "DO NOT make external the default — because tuning, sorted ingestion, and CTAS optimization all require materialized tables
-  — keep native as default, external as opt-in"
-- "DO NOT bypass cloud upload for cloud platforms — because the engine needs data in object storage to create external tables
-  — reuse existing upload infrastructure, only skip the materialization step"
+- "DO NOT make external the default - because tuning, sorted ingestion, and CTAS optimization all require materialized tables
+  - keep native as default, external as opt-in"
+- "DO NOT bypass cloud upload for cloud platforms - because the engine needs data in object storage to create external tables
+  - reuse existing upload infrastructure, only skip the materialization step"
 
 verification:
 - description: "Existing fast tests still pass"

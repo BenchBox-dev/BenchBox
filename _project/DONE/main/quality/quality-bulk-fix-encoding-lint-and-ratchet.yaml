@@ -10,7 +10,7 @@ description: |
   them PLW1514 (open() without explicit encoding=). All are auto-fixable with
   --unsafe-fixes. Apply the bulk fix in reviewed chunks, then ratchet the gates
   so the gain is locked:
-    - PLW1514 stays selected (currently selected — make sure CI fails on regression)
+    - PLW1514 stays selected (currently selected - make sure CI fails on regression)
     - B904 (raise-from) added to ruff select as error
     - McCabe max-complexity lowered from 20 → 18, fix any new violations
 
@@ -19,7 +19,7 @@ description: |
 
 work:
   - id: w1
-    summary: "Run `uv run ruff check --fix --unsafe-fixes .` and review the diff in chunks (benchbox/, tests/, scripts/) — confirm encoding choices match file purpose (utf-8 for text, utf-8-sig only where needed)"
+    summary: "Run `uv run ruff check --fix --unsafe-fixes .` and review the diff in chunks (benchbox/, tests/, scripts/) - confirm encoding choices match file purpose (utf-8 for text, utf-8-sig only where needed)"
     status: done
 
   - id: w2
@@ -46,19 +46,19 @@ files_affected:
 
 must_preserve:
   - "All currently-passing tests continue to pass"
-  - "No behavior changes — encoding=\"utf-8\" is the safe default; only deviate where existing files document a different encoding"
+  - 'No behavior changes - encoding="utf-8" is the safe default; only deviate where existing files document a different encoding'
   - "Existing per-file ruff ignores remain in place"
 
 approach: |
   Run --unsafe-fixes once, then split the diff into directory-scoped commits for
   reviewability. The Python default encoding is platform-dependent (locale on
-  Linux, utf-8 on macOS, mbcs on Windows) — adding explicit utf-8 is strictly
+  Linux, utf-8 on macOS, mbcs on Windows) - adding explicit utf-8 is strictly
   safer. For the few files that intentionally write CSV/TSV with platform
   encoding, document and noqa per-line.
 
 anti_patterns:
-  - "DO NOT silence violations with broad `noqa` — because that defeats the gate — fix or per-line noqa with reason"
-  - "DO NOT bundle the ratchet config changes with the bulk fix — because it makes review impossible — separate commits per work unit"
+  - "DO NOT silence violations with broad `noqa` - because that defeats the gate - fix or per-line noqa with reason"
+  - "DO NOT bundle the ratchet config changes with the bulk fix - because it makes review impossible - separate commits per work unit"
 
 verification:
   - description: "Ruff is clean"

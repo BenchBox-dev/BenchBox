@@ -14,7 +14,7 @@ deps:
 description: |
   Maintainer testing of the Phase 2 submission flow proves the technology
   works. A first external contributor walking through the docs unaided
-  proves the *experience* works — different bar, different bugs. We need
+  proves the *experience* works - different bar, different bugs. We need
   one human who has not seen the code to attempt a real submission and
   report back where they got stuck.
 
@@ -44,7 +44,7 @@ work:
   status: pending
   notes: |
     Send the contributor:
-      1. The link to `docs/contributing-results.md` (and only that link —
+      1. The link to `docs/contributing-results.md` (and only that link -
          do not coach them through the steps).
       2. The repo URL.
       3. A one-paragraph "what we'd love feedback on" note (not a script;
@@ -102,14 +102,14 @@ verification:
   expected_output: "at least one merge commit referencing the contribution"
 
 must_preserve:
-- The contributor's autonomy — no real-time hand-holding during the dry-run.
-- Production review rigor — if the submission has defects, it is asked to be fixed, not silently merged.
-- Phase 2's trust-label distinction — community submissions retain `community-submission`, never silently promoted.
+- The contributor's autonomy - no real-time hand-holding during the dry-run.
+- Production review rigor - if the submission has defects, it is asked to be fixed, not silently merged.
+- Phase 2's trust-label distinction - community submissions retain `community-submission`, never silently promoted.
 
 anti_patterns:
-- DO NOT pre-coach the contributor through the docs — because that hides the friction this dry-run exists to surface.
-- DO NOT skip the external recruit and use another maintainer — because every maintainer already shares the curse of knowledge.
-- DO NOT bundle defect fixes into this TODO — because mixing observation with implementation muddies the retrospective; file separate TODOs and keep this one focused on the dry-run experience.
+- DO NOT pre-coach the contributor through the docs - because that hides the friction this dry-run exists to surface.
+- DO NOT skip the external recruit and use another maintainer - because every maintainer already shares the curse of knowledge.
+- DO NOT bundle defect fixes into this TODO - because mixing observation with implementation muddies the retrospective; file separate TODOs and keep this one focused on the dry-run experience.
 
 scope_limit:
   only_modify:

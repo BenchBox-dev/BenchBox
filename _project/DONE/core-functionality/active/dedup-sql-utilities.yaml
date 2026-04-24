@@ -18,7 +18,7 @@ description: |
   with identical regex and lambda replacements). Redshift has a minor variant
   (missing the IF NOT EXISTS group in its CREATE TABLE pattern).
 
-  This is a pure utility function with no platform-specific behavior — it just
+  This is a pure utility function with no platform-specific behavior - it just
   lowercases table names in SQL statements. It belongs in a shared module.
 
 approach: |

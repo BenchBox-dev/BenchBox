@@ -103,10 +103,10 @@ approach: |
   for non-default mode to avoid hidden configuration reuse.
 
 anti_patterns:
-- "DO NOT override a user-provided --table-mode with interactive prompt output — because explicit CLI intent must win — skip
+- "DO NOT override a user-provided --table-mode with interactive prompt output - because explicit CLI intent must win - skip
   prompting when table_mode came from CLI"
-- "DO NOT leak interactive-only prompt behavior into --non-interactive paths — because CI workflows rely on deterministic
-  flag-only behavior — keep prompt logic gated by TTY interactive flow"
+- "DO NOT leak interactive-only prompt behavior into --non-interactive paths - because CI workflows rely on deterministic
+  flag-only behavior - keep prompt logic gated by TTY interactive flow"
 
 verification:
 - description: "Interactive dryrun command and preview include table mode and remain stable"

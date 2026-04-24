@@ -9,7 +9,7 @@ description: |
   Internal TODO/release tooling under `_project/scripts/` is the structural
   reason `jsonschema` lives in `[project] dependencies` and `ruamel-yaml`
   lives in `[dependency-groups] dev`. These packages are not part of the
-  shipped wheel — `_project/` is excluded from packaging.
+  shipped wheel - `_project/` is excluded from packaging.
 
   Audited tooling-only imports today:
     - `_project/scripts/validate_todo.py` → `jsonschema`
@@ -70,7 +70,7 @@ deferred:
 files_affected:
   added:
     - "_project/scripts/pyproject.toml"
-    - "_project/scripts/README.md"  # if not already present
+    - "_project/scripts/README.md" # if not already present
   modified:
     - "pyproject.toml"
     - "uv.lock"
@@ -86,7 +86,7 @@ must_preserve:
 approach: |
   Make the wheel/tooling boundary structural. After this TODO, contributors
   installing benchbox in dev mode no longer pick up `jsonschema` or
-  `ruamel-yaml` transitively — those live in the isolated tooling env and
+  `ruamel-yaml` transitively - those live in the isolated tooling env and
   are only resolved when a TODO/release script is actually invoked.
 
   Pattern reference: `uv` supports per-directory pyproject.toml resolution
@@ -94,16 +94,16 @@ approach: |
   that wraps `uv run --project $(dirname "$0") "$@"`.
 
 anti_patterns:
-  - "DO NOT silently drop the deps from main pyproject without first creating the isolated env — because contributors invoking the scripts will get ImportError — set up the new env first, verify, then remove"
-  - "DO NOT pin to floating versions in `_project/scripts/pyproject.toml` — because internal tooling regressions are hard to debug — pin to current uv.lock versions"
-  - "DO NOT modify the scripts themselves — because behavior change is out of scope — only the invocation environment"
+  - "DO NOT silently drop the deps from main pyproject without first creating the isolated env - because contributors invoking the scripts will get ImportError - set up the new env first, verify, then remove"
+  - "DO NOT pin to floating versions in `_project/scripts/pyproject.toml` - because internal tooling regressions are hard to debug - pin to current uv.lock versions"
+  - "DO NOT modify the scripts themselves - because behavior change is out of scope - only the invocation environment"
 
 verification:
   - description: "jsonschema and ruamel-yaml absent from main pyproject"
-    command: "uv run -- python -c \"import pathlib; t = pathlib.Path('pyproject.toml').read_text(); assert 'jsonschema' not in t, 'jsonschema still in main manifest'; assert 'ruamel-yaml' not in t and 'ruamel.yaml' not in t, 'ruamel-yaml still in main manifest'; print('OK: tooling deps removed from main manifest')\""
+    command: 'uv run -- python -c "import pathlib; t = pathlib.Path(''pyproject.toml'').read_text(); assert ''jsonschema'' not in t, ''jsonschema still in main manifest''; assert ''ruamel-yaml'' not in t and ''ruamel.yaml'' not in t, ''ruamel-yaml still in main manifest''; print(''OK: tooling deps removed from main manifest'')"'
     expected_output: "OK: tooling deps removed from main manifest"
   - description: "Isolated env exists and resolves"
-    command: "uv run -- python -c \"import pathlib; assert pathlib.Path('_project/scripts/pyproject.toml').exists(), 'isolated env pyproject missing'; print('OK: isolated env present')\""
+    command: 'uv run -- python -c "import pathlib; assert pathlib.Path(''_project/scripts/pyproject.toml'').exists(), ''isolated env pyproject missing''; print(''OK: isolated env present'')"'
     expected_output: "OK: isolated env present"
   - description: "Tooling still functions"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py list --status 'Not Started' 2>&1 | head -5"
@@ -121,14 +121,14 @@ scope_limit:
     - "CLAUDE.md"
     - "AGENTS.md"
   do_not_modify:
-    - "_project/scripts/*.py"  # behavior change is out of scope
+    - "_project/scripts/*.py" # behavior change is out of scope
     - "benchbox/"
     - "tests/"
-    - ".github/workflows/"  # CI integration handled by Phase 4 TODO
+    - ".github/workflows/" # CI integration handled by Phase 4 TODO
 
 deps:
   needs:
-    - "move-jsonschema-out-of-core-runtime-deps"  # Phase 0 must land first
+    - "move-jsonschema-out-of-core-runtime-deps" # Phase 0 must land first
 
 metadata:
   tags: ["maintenance", "supply-chain", "deps", "tooling", "audit-followup"]

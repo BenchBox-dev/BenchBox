@@ -9,13 +9,13 @@ description: |
   test (tests/integration/test_local_platform_benchmark_matrix.py) and in e2e tests
   to fix a failing test suite (commit 8c0ddcb46, 2026-03-27):
 
-  1. dask-df/tpcds — Dask fails on complex TPC-DS expressions (isin and others).
+  1. dask-df/tpcds - Dask fails on complex TPC-DS expressions (isin and others).
      Related: test_dataframe_platforms.py::TestDaskDataFrameE2E::test_tpch_full_execution
      is also xfail for the same isin issue on TPC-H. Both point to the same root
      cause: Dask's lazy evaluation doesn't support the isin() expression form that
      the BenchBox DataFrame query translator emits.
 
-  2. pyspark-df/tpcds — PySpark TPC-DS at SF=1.0 fails in CI without full JVM/Spark
+  2. pyspark-df/tpcds - PySpark TPC-DS at SF=1.0 fails in CI without full JVM/Spark
      setup. This is an environment constraint, not a query translation bug. Likely
      fixable by improving the availability check or guard condition rather than
      fixing PySpark itself.
@@ -33,14 +33,14 @@ metadata:
     - dask-df
     - pyspark-df
     - tpcds
-  estimated_effort: "Medium — dask isin fix may require query translator change; pyspark is likely a guard improvement"
+  estimated_effort: "Medium - dask isin fix may require query translator change; pyspark is likely a guard improvement"
   created_date: "2026-03-27"
   related_commits:
-    - "8c0ddcb46 — introduced the xfail markers being tracked here"
+    - "8c0ddcb46 - introduced the xfail markers being tracked here"
 
 work:
   - id: w1
-    summary: "Diagnose dask-df isin failure — identify which TPC-DS queries trigger it and what expression form Dask rejects"
+    summary: "Diagnose dask-df isin failure - identify which TPC-DS queries trigger it and what expression form Dask rejects"
     status: done
     notes: |
       Run: uv run -- python -m pytest tests/e2e/test_dataframe_platforms.py::TestDaskDataFrameE2E -k "tpch" -n 0 -v --runxfail
@@ -69,7 +69,7 @@ work:
       - tests/e2e/test_dataframe_platforms.py (TestDaskDataFrameE2E::test_tpch_full_execution marker)
 
   - id: w4
-    summary: "Diagnose pyspark-df/tpcds CI failure — determine if it's an is_dataframe_available gap or missing JVM guard"
+    summary: "Diagnose pyspark-df/tpcds CI failure - determine if it's an is_dataframe_available gap or missing JVM guard"
     status: done
     notes: |
       Check whether is_dataframe_available("pyspark-df") already returns False in the
@@ -83,7 +83,7 @@ work:
     status: done
     notes: |
       If is_dataframe_available already handles this: the xfail in matrix test is
-      unreachable — remove it and add a comment to the guard instead.
+      unreachable - remove it and add a comment to the guard instead.
       If PySpark imports succeed but execution fails: tighten the availability check
       to detect missing Spark session/JVM before the test runs.
       Resolution criteria: pyspark-df/tpcds either skips via is_dataframe_available
@@ -95,7 +95,7 @@ must_preserve:
   - "All non-dask, non-pyspark DataFrame platform matrix tests continue to pass"
 
 approach: |
-  Start with diagnosis (w1, w4 can run in parallel — they're independent platforms).
+  Start with diagnosis (w1, w4 can run in parallel - they're independent platforms).
   For dask-df, focus on the query translator in benchbox/platforms/dataframe/ rather
   than test-side workarounds.
   For pyspark-df, prefer tightening the availability guard over adding more xfail

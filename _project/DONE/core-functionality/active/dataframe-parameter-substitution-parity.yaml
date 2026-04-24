@@ -18,15 +18,15 @@ description: |
   3. Multi-stream throughput tests in DataFrame mode repeat identical parameters across
      streams instead of varying them per the TPC specification.
 
-  The ordering permutation logic is already correct — both SQL and DataFrame modes use
+  The ordering permutation logic is already correct - both SQL and DataFrame modes use
   TPCHStreams.PERMUTATION_MATRIX and TPCDSPermutationGenerator respectively. The gap
   is purely in parameter substitution.
 
   IMPORTANT: The two benchmarks have different parameter access patterns:
-  - TPC-DS: All 99 queries call get_parameters(query_id) from parameters.py — a single
+  - TPC-DS: All 99 queries call get_parameters(query_id) from parameters.py - a single
     centralized choke point. Minimum fix: modify get_parameters() to accept overrides.
   - TPC-H: All 22 queries INLINE parameter values directly (e.g., cutoff_date = date(1998, 9, 2)).
-    The TPCH_PARAMS dict at module top is dead documentation — never referenced by any
+    The TPCH_PARAMS dict at module top is dead documentation - never referenced by any
     query function. Minimum fix: create a get_tpch_parameters(query_id) function, then
     refactor each query to call it instead of using inline literals.
 
@@ -52,7 +52,7 @@ tasks:
       - summary: "Identify which parameters vary per seed in each of the 22 TPC-H queries (dates, segments, regions, nations,
           quantities, discounts, etc.) by running qgen with 2-3 different seeds and diffing output"
         done: true
-      - summary: "Write extraction functions using regex anchored to SQL keywords — one per query or per parameter pattern"
+      - summary: "Write extraction functions using regex anchored to SQL keywords - one per query or per parameter pattern"
         done: true
       - summary: "Validate extracted parameters against the current inline values in dataframe_queries.py for the default
           seed"
@@ -78,15 +78,15 @@ tasks:
       - summary: "Move the existing inline parameter values from each query function into a proper TPCH_DEFAULT_PARAMS dict
           keyed by query_id (consolidating the dead TPCH_PARAMS dict)"
         done: true
-      - summary: "Implement get_tpch_parameters(query_id, overrides=None) — returns overrides[query_id] if present, else TPCH_DEFAULT_PARAMS[query_id]"
+      - summary: "Implement get_tpch_parameters(query_id, overrides=None) - returns overrides[query_id] if present, else TPCH_DEFAULT_PARAMS[query_id]"
         done: true
     - summary: "Extend existing get_parameters(query_id) in tpcds/parameters.py to accept an optional overrides dict"
       done: true
       subtasks:
-      - summary: "Add overrides parameter: get_parameters(query_id, overrides=None) — returns TPCDSParameters from overrides
+      - summary: "Add overrides parameter: get_parameters(query_id, overrides=None) - returns TPCDSParameters from overrides
           if present, else from TPCDS_DEFAULT_PARAMS"
         done: true
-      - summary: "Verify zero TPC-DS query functions need modification — they all call get_parameters(N) which continues to
+      - summary: "Verify zero TPC-DS query functions need modification - they all call get_parameters(N) which continues to
           work unchanged"
         done: true
 
@@ -117,9 +117,9 @@ tasks:
       - summary: "When seed is provided: call extractor to produce params, set as module-level or thread-local overrides before
           query execution"
         done: true
-      - summary: "When seed is None (default): do nothing — static defaults used automatically (backward compatible)"
+      - summary: "When seed is None (default): do nothing - static defaults used automatically (backward compatible)"
         done: true
-    - summary: "Choose minimal injection mechanism — prefer module-level override dict that get_tpch_parameters()/get_parameters()
+    - summary: "Choose minimal injection mechanism - prefer module-level override dict that get_tpch_parameters()/get_parameters()
         check, avoiding DataFrameContext Protocol changes"
       done: true
 
@@ -138,7 +138,7 @@ tasks:
     - summary: "Run existing test suite to confirm zero regressions"
       done: true
 
-  - phase: "Phase 6: Address review findings — incomplete parameterization and test gaps"
+  - phase: "Phase 6: Address review findings - incomplete parameterization and test gaps"
     done: true
     items:
     - summary: "Fix TPC-H Q7/Q8 hardcoded date parameters to use get_tpch_parameters() (4 functions)"
@@ -193,7 +193,7 @@ metadata:
 impact:
   business_value: |
     Without parameter parity, SQL vs DataFrame benchmark comparisons are scientifically
-    invalid — the two modes execute different query workloads. This blocks any credible
+    invalid - the two modes execute different query workloads. This blocks any credible
     published performance comparison between SQL platforms and DataFrame libraries.
     Multi-stream throughput tests in DataFrame mode are also meaningless since every
     stream runs identical parameters instead of the specification-required variations.
@@ -218,23 +218,23 @@ files_affected:
 must_preserve:
 - "All 22 TPC-H query functions produce identical results when no overrides are set (static defaults match current inline
   values exactly)"
-- "All 99 TPC-DS query functions continue to call get_parameters(N) with no signature change — overrides parameter is optional
+- "All 99 TPC-DS query functions continue to call get_parameters(N) with no signature change - overrides parameter is optional
   with default None"
-- "TPCHStreams.PERMUTATION_MATRIX ordering logic is unchanged — permutations are already correct"
-- "TPCDSPermutationGenerator ordering logic is unchanged — permutations are already correct"
+- "TPCHStreams.PERMUTATION_MATRIX ordering logic is unchanged - permutations are already correct"
+- "TPCDSPermutationGenerator ordering logic is unchanged - permutations are already correct"
 - "qgen/dsqgen binary invocation patterns in QGenBinary and DSQGenBinary remain untouched"
 - "DataFrameContext Protocol and all 5 implementations unchanged: DataFrameContext (Protocol), DataFrameContextImpl (ABC),
   PolarsDataFrameContext, ExpressionFamilyContext, PandasFamilyContext"
 - "The params = get_parameters(N) call pattern in all TPC-DS query functions continues to work without modification"
 - "Existing DataFrame benchmark results at default seed remain reproducible"
-- "Q7/Q8 dates are spec-fixed at 1995-01-01 to 1996-12-31 regardless of seed — Phase 6 parameterizes them for architectural
+- "Q7/Q8 dates are spec-fixed at 1995-01-01 to 1996-12-31 regardless of seed - Phase 6 parameterizes them for architectural
   consistency but the default values MUST remain these exact dates"
 
 approach: |
-  MINIMUM-CHANGE STRATEGY — inject parameters through centralized parameter functions,
+  MINIMUM-CHANGE STRATEGY - inject parameters through centralized parameter functions,
   not through DataFrameContext Protocol changes.
 
-  Key insight: TPC-DS already has a single choke point — every query calls
+  Key insight: TPC-DS already has a single choke point - every query calls
   get_parameters(query_id) from parameters.py. Adding an optional `overrides` parameter
   to this function is the minimum fix for all 99 TPC-DS queries: zero query function
   modifications needed.
@@ -257,27 +257,27 @@ approach: |
 
   Phase 6 approach: Fix the 3 identified gaps with minimal scope:
   - Q7/Q8: Add start_date/end_date to TPCH_DEFAULT_PARAMS, update 4 functions to read from params
-  - Q96: This is the sole TPC-DS query that bypasses get_parameters() — add the call to both impls
+  - Q96: This is the sole TPC-DS query that bypasses get_parameters() - add the call to both impls
   - Tests: Add integration-level tests that verify query functions actually consume overrides
 
 anti_patterns:
-- "DO NOT reimplement qgen/dsqgen parameter generation algorithms in Python — because these algorithms are complex, version-specific,
-  and maintained by the TPC — extract from binary output instead"
-- "DO NOT remove the static default parameter values — because they serve as documentation and fallback when binaries are
-  unavailable — keep them as defaults"
-- "DO NOT modify the permutation/ordering logic — because ordering is already correct for both TPC-H and TPC-DS in DataFrame
-  mode — this TODO is parameter-only"
-- "DO NOT parse dsqgen output by positional character offset — because SQL formatting may vary by dialect flag — use regex
+- "DO NOT reimplement qgen/dsqgen parameter generation algorithms in Python - because these algorithms are complex, version-specific,
+  and maintained by the TPC - extract from binary output instead"
+- "DO NOT remove the static default parameter values - because they serve as documentation and fallback when binaries are
+  unavailable - keep them as defaults"
+- "DO NOT modify the permutation/ordering logic - because ordering is already correct for both TPC-H and TPC-DS in DataFrame
+  mode - this TODO is parameter-only"
+- "DO NOT parse dsqgen output by positional character offset - because SQL formatting may vary by dialect flag - use regex
   patterns anchored to SQL keywords instead"
-- "DO NOT change the DataFrameContext Protocol or any of its 5 implementations — because that forces changes to PolarsDataFrameContext,
-  ExpressionFamilyContext, PandasFamilyContext, and all platform adapters — use module-level override dicts instead"
-- "DO NOT change the function signature of expression_impl/pandas_impl callables — because every query registration binds
-  Callable[[DataFrameContext], Any] and changing this signature requires updating 200+ registrations — inject params through
+- "DO NOT change the DataFrameContext Protocol or any of its 5 implementations - because that forces changes to PolarsDataFrameContext,
+  ExpressionFamilyContext, PandasFamilyContext, and all platform adapters - use module-level override dicts instead"
+- "DO NOT change the function signature of expression_impl/pandas_impl callables - because every query registration binds
+  Callable[[DataFrameContext], Any] and changing this signature requires updating 200+ registrations - inject params through
   the parameter functions instead"
-- "DO NOT build a full SQL parser for parameter extraction — because regex on well-known TPC query templates is sufficient
-  and far simpler — keep extraction targeted to known parameter slots"
-- "DO NOT change Q7/Q8 default date values from 1995-01-01/1996-12-31 — because these are TPC-H spec-fixed values that do
-  not vary with seed — parameterize for consistency but preserve exact defaults"
+- "DO NOT build a full SQL parser for parameter extraction - because regex on well-known TPC query templates is sufficient
+  and far simpler - keep extraction targeted to known parameter slots"
+- "DO NOT change Q7/Q8 default date values from 1995-01-01/1996-12-31 - because these are TPC-H spec-fixed values that do
+  not vary with seed - parameterize for consistency but preserve exact defaults"
 
 verification:
 - description: "TPC-H DataFrame parameters match qgen output for seed=1 SF=1"
@@ -337,22 +337,22 @@ context_sections:
 
     DataFrame Parameter Path:
       TPC-H: Parameters INLINED directly in each of the 44 query functions (22 expression + 22 pandas).
-             The TPCH_PARAMS dict at module top is dead code — never referenced by any query function.
-             Example: q1_expression_impl() has `cutoff_date = date(1998, 9, 2)` — not `TPCH_PARAMS["q1_date"]`.
+             The TPCH_PARAMS dict at module top is dead code - never referenced by any query function.
+             Example: q1_expression_impl() has `cutoff_date = date(1998, 9, 2)` - not `TPCH_PARAMS["q1_date"]`.
       TPC-DS: All query functions call get_parameters(query_id) from parameters.py, which returns
              values from the TPCDS_DEFAULT_PARAMS dict. This is a centralized choke point.
 
     Ordering/Permutation Path (ALREADY CORRECT for both modes):
-      TPC-H: TPCHStreams.PERMUTATION_MATRIX[stream_id % 41] — used by both SQL and DataFrame
-      TPC-DS: TPCDSPermutationGenerator(seed=42+stream_id) — used by both SQL and DataFrame
+      TPC-H: TPCHStreams.PERMUTATION_MATRIX[stream_id % 41] - used by both SQL and DataFrame
+      TPC-DS: TPCDSPermutationGenerator(seed=42+stream_id) - used by both SQL and DataFrame
 
   "Choke Point Analysis": |
-    TPC-DS (EASY — 1 function change):
+    TPC-DS (EASY - 1 function change):
       All 99 queries → get_parameters(query_id) → TPCDS_DEFAULT_PARAMS
       Fix: Add `overrides` param to get_parameters(). Zero query functions modified.
-      EXCEPTION: Q96 bypasses get_parameters() entirely — uses hardcoded literals.
+      EXCEPTION: Q96 bypasses get_parameters() entirely - uses hardcoded literals.
 
-    TPC-H (HARDER — 44 function refactors):
+    TPC-H (HARDER - 44 function refactors):
       All 22 expression_impl and 22 pandas_impl functions inline their parameters.
       Fix: Create get_tpch_parameters(query_id), consolidate inline values into a dict,
       refactor 44 functions to call the centralized function.
@@ -361,7 +361,7 @@ context_sections:
   "Post-Implementation Review Findings (2026-02-06)": |
     REVIEW SCORE: 12/15 (Good)
 
-    BUG #1 — TPC-H Q7/Q8 Hardcoded Dates (4 functions affected):
+    BUG #1 - TPC-H Q7/Q8 Hardcoded Dates (4 functions affected):
       q7_expression_impl line 426-427, q7_pandas_impl line 1341-1342,
       q8_expression_impl line 475-476, q8_pandas_impl line 1403-1404.
       All four call get_tpch_parameters() but then hardcode start_date=date(1995,1,1)
@@ -370,23 +370,23 @@ context_sections:
       parameter extractor _q7()/_q8() don't extract dates either. Architecturally
       inconsistent but functionally correct for current behavior.
 
-    BUG #2 — TPC-DS Q96 Bypasses get_parameters():
+    BUG #2 - TPC-DS Q96 Bypasses get_parameters():
       q96_expression_impl (queries.py:431) and q96_pandas_impl (queries.py:463)
       use hardcoded literals (t_hour==8, t_minute>=30, hd_dep_count==0, etc.)
       instead of calling get_parameters(96). Parameters ARE defined in
       TPCDS_DEFAULT_PARAMS[96] = {"hours": [(8, 9)]} but never consumed.
       This is the only TPC-DS query that bypasses the choke point.
 
-    GAP #3 — No integration-level tests:
+    GAP #3 - No integration-level tests:
       Tests verify get_tpch_parameters() and get_parameters() return correct values,
       but no test verifies that actual query implementations consume overridden values.
       A test that sets overrides and runs a query function would have caught Bugs #1-2.
 
-    STYLE — Misplaced import:
+    STYLE - Misplaced import:
       parameter_extractor.py line 83: `from datetime import timedelta` inside _q1().
       Should be at module top.
 
-    DESIGN NOTE — Module-level mutable state:
+    DESIGN NOTE - Module-level mutable state:
       Both _parameter_overrides globals are not thread-safe. Acceptable for single-process
       benchmark runs. Worth documenting if multi-threading is ever considered.
 

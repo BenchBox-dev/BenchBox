@@ -16,7 +16,7 @@ description: |
   PlatformIndex, Compare, Home) already reads the canonical median from
   `DetailResult.display_timings[]`.
 
-  This item fixes that drift. The raw samples do not disappear — they
+  This item fixes that drift. The raw samples do not disappear - they
   move behind an "Individual samples" expander so audit is still
   possible without polluting the default view.
 
@@ -25,7 +25,7 @@ work:
   summary: "Switch default query table + QueryTimingChart to display_timings[]"
   status: done
   notes: |
-    ResultDetail.tsx lines 63, 111, 288 — swap `detail.queries` for
+    ResultDetail.tsx lines 63, 111, 288 - swap `detail.queries` for
     `detail.display_timings`. Row shape becomes
     `{query_id, display_ms, sample_count}`. Sort key changes from
     `duration_ms` → `display_ms`. Drop the Status column (no per-run
@@ -41,7 +41,7 @@ work:
     Below the main table, add a `<details>` / expander that, when
     opened, renders the existing raw `detail.queries[]` table
     (per-sample rows with iter/stream/status). Keep the current
-    columns and sort behavior so nothing is lost — only demoted from
+    columns and sort behavior so nothing is lost - only demoted from
     default to drill-down.
 
 - id: w3
@@ -71,12 +71,12 @@ approach: |
   used by every aggregate page (see getDisplayMs() and
   BenchmarkIndex/PlatformIndex/Compare call sites). This item is a
   straight data-source swap at ResultDetail.tsx lines 63/111/288 plus a
-  new drill-down section — not a new abstraction.
+  new drill-down section - not a new abstraction.
 
 anti_patterns:
-- "DO NOT drop the raw queries[] rendering — because per-sample data is needed for audit/debugging — move it behind a <details>
+- "DO NOT drop the raw queries[] rendering - because per-sample data is needed for audit/debugging - move it behind a <details>
   expander instead"
-- "DO NOT introduce a new aggregation helper — because display_timings[] is already the precomputed median — just read it"
+- "DO NOT introduce a new aggregation helper - because display_timings[] is already the precomputed median - just read it"
 
 verification:
 - description: "Explorer typecheck + Vitest suites stay green"

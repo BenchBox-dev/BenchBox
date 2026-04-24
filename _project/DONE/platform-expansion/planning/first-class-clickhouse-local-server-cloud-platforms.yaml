@@ -25,9 +25,9 @@ description: |
 
   The new public naming contract must be three first-class platform identifiers:
 
-  - `clickhouse-local` — chDB embedded/in-process ClickHouse
-  - `clickhouse-server` — Docker-backed or self-hosted remote ClickHouse via `clickhouse-driver`
-  - `clickhouse-cloud` — managed ClickHouse Cloud via `clickhouse-connect`
+  - `clickhouse-local` - chDB embedded/in-process ClickHouse
+  - `clickhouse-server` - Docker-backed or self-hosted remote ClickHouse via `clickhouse-driver`
+  - `clickhouse-cloud` - managed ClickHouse Cloud via `clickhouse-connect`
 
   Under this contract, bare `clickhouse` is no longer the canonical server-facing
   name. If it remains temporarily accepted, it must be a compatibility alias with
@@ -283,18 +283,18 @@ approach: |
      Docker benchmark coverage for `clickhouse-server`.
 
 anti_patterns:
-- "DO NOT keep bare `clickhouse` as the canonical server platform name — because that preserves the current ambiguity between
-  chDB and real server ClickHouse — make `clickhouse-server` the documented primary selector and keep bare `clickhouse` only
+- "DO NOT keep bare `clickhouse` as the canonical server platform name - because that preserves the current ambiguity between
+  chDB and real server ClickHouse - make `clickhouse-server` the documented primary selector and keep bare `clickhouse` only
   as an explicit compatibility alias if needed"
 - "DO NOT continue exposing one public adapter boundary that branches internally between chDB and clickhouse-driver without
-  fixing the connection contract — because the two clients expose materially different APIs — use platform-specific wrappers
+  fixing the connection contract - because the two clients expose materially different APIs - use platform-specific wrappers
   over shared internals"
-- "DO NOT call the Docker/server path 'covered' with only `SELECT 1` or simple DDL smoke tests — because that misses schema/load/query/metadata
-  regressions — require at least one real benchmark slice on `clickhouse-server`"
-- "DO NOT update docs and CLI names without aligning packaging, install commands, and dependency checks — because users will
-  keep installing the wrong driver for the named platform — migrate those surfaces in the same change set"
+- "DO NOT call the Docker/server path 'covered' with only `SELECT 1` or simple DDL smoke tests - because that misses schema/load/query/metadata
+  regressions - require at least one real benchmark slice on `clickhouse-server`"
+- "DO NOT update docs and CLI names without aligning packaging, install commands, and dependency checks - because users will
+  keep installing the wrong driver for the named platform - migrate those surfaces in the same change set"
 - "DO NOT let `clickhouse-local` and `clickhouse-server` diverge in SQL semantics or benchmark tuning by copy-pasting logic
-  — because the split is about platform identity and runtime contract, not benchmark behavior — keep shared ClickHouse internals
+  - because the split is about platform identity and runtime contract, not benchmark behavior - keep shared ClickHouse internals
   centralized"
 
 verification:

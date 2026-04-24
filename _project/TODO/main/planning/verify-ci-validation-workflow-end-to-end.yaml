@@ -108,9 +108,9 @@ must_preserve:
 - All test PRs are CLOSED, never merged, so the corpus stays clean.
 
 anti_patterns:
-- DO NOT modify the validation workflow or validator script during this task — because the goal is to observe real behavior, not patch around it; file follow-up TODOs for any fixes needed.
-- DO NOT push test bundles to `main` or `published-results` directly — because that pollutes the curated corpus; PRs only, and close without merging.
-- DO NOT use `--no-verify` or skip the CI step locally to "shortcut" the test — because the entire point is to exercise the GitHub Actions runner, not the local validator.
+- DO NOT modify the validation workflow or validator script during this task - because the goal is to observe real behavior, not patch around it; file follow-up TODOs for any fixes needed.
+- DO NOT push test bundles to `main` or `published-results` directly - because that pollutes the curated corpus; PRs only, and close without merging.
+- DO NOT use `--no-verify` or skip the CI step locally to "shortcut" the test - because the entire point is to exercise the GitHub Actions runner, not the local validator.
 
 scope_limit:
   only_modify:

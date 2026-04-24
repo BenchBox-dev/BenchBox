@@ -44,16 +44,16 @@ must_preserve:
 
 approach: |
   The ETL transformations are mostly pure functions that transform DataFrames
-  or dictionaries — ideal for unit testing. Create test fixtures with small
+  or dictionaries - ideal for unit testing. Create test fixtures with small
   sample data (5-10 rows) that exercise the transform logic. For SCD processor,
   test Type 1 and Type 2 SCD operations with before/after state assertions.
   For batch.py, mock the database connection and test orchestration logic.
 
 anti_patterns:
-- "DO NOT test with real TPC-DI data files — because they require the dsqgen binary and are 100MB+ at SF=1, making tests slow
-  and environment-dependent — create minimal synthetic fixtures (5-10 rows)"
-- "DO NOT require dsqgen binary — because it is platform-specific, not available in CI, and segfaults on fractional scale
-  factors — mock data generation calls"
+- "DO NOT test with real TPC-DI data files - because they require the dsqgen binary and are 100MB+ at SF=1, making tests slow
+  and environment-dependent - create minimal synthetic fixtures (5-10 rows)"
+- "DO NOT require dsqgen binary - because it is platform-specific, not available in CI, and segfaults on fractional scale
+  factors - mock data generation calls"
 
 verification:
 - description: "TPC-DI unit tests pass"

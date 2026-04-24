@@ -11,9 +11,9 @@ description: |
   appear in shipped or tested source but have no `pyproject.toml`
   declaration:
 
-  1. `PIL` (Pillow) — image processing in visualization image tests.
-  2. `ansi2html` — terminal output → HTML conversion (likely tooling-only).
-  3. AI-primitives ML stack — `sentence_transformers`, `spacy`, `textblob`,
+  1. `PIL` (Pillow) - image processing in visualization image tests.
+  2. `ansi2html` - terminal output → HTML conversion (likely tooling-only).
+  3. AI-primitives ML stack - `sentence_transformers`, `spacy`, `textblob`,
      `torch`, used by `benchbox/core/ai_primitives/`. All are guarded
      behind `try/except ImportError`, but should still be declared in an
      explicit extras group so users who want AI-primitives can install
@@ -64,7 +64,7 @@ must_preserve:
   - "Existing guarded-import patterns in `benchbox/core/ai_primitives/` continue to work without the optional deps installed"
   - "Visualization image tests continue to work where PIL is currently relied on"
   - "Fast suite green"
-  - "No new unconditional `import PIL`/`import torch`/etc — declarations only, not new imports"
+  - "No new unconditional `import PIL`/`import torch`/etc - declarations only, not new imports"
 
 approach: |
   Inventory-first. For each undeclared import, check the actual code path
@@ -77,8 +77,8 @@ approach: |
   the loop.
 
 anti_patterns:
-  - "DO NOT add deps to core just to make undeclared imports satisfied — because that bloats the minimal install — use extras groups"
-  - "DO NOT remove the guarded-import pattern in AI-primitives — because the whole point is they remain optional — declarations only"
+  - "DO NOT add deps to core just to make undeclared imports satisfied - because that bloats the minimal install - use extras groups"
+  - "DO NOT remove the guarded-import pattern in AI-primitives - because the whole point is they remain optional - declarations only"
 
 verification:
   - description: "Used-but-undeclared section in inventory updated to reflect new state"

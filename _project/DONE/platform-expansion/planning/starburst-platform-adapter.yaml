@@ -78,10 +78,10 @@ must_preserve:
 - "Existing Trino adapter unchanged"
 
 anti_patterns:
-- "DO NOT modify existing adapter files — because Starburst is additive — create a new starburst.py file"
-- "DO NOT duplicate Trino query logic — because Starburst IS Trino with managed features — inherit and only override authentication
+- "DO NOT modify existing adapter files - because Starburst is additive - create a new starburst.py file"
+- "DO NOT duplicate Trino query logic - because Starburst IS Trino with managed features - inherit and only override authentication
   and catalog handling"
-- "DO NOT add trino-python-client as a new dependency — because it is already an existing dependency — reuse the existing
+- "DO NOT add trino-python-client as a new dependency - because it is already an existing dependency - reuse the existing
   installation"
 
 verification:
@@ -204,5 +204,5 @@ work:
 deferred:
 - id: d1
   summary: "Live integration tests with Starburst Galaxy (w22-w24)"
-  reason: "Requires Starburst Galaxy account and running cluster — not available in local dev"
+  reason: "Requires Starburst Galaxy account and running cluster - not available in local dev"
   revisit_when: "Starburst Galaxy account provisioned for CI testing"

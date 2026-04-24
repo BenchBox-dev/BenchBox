@@ -94,10 +94,10 @@ must_preserve:
 - "ClickHouse adapter's PyMySQL usage unaffected by Doris's PyMySQL dependency"
 
 anti_patterns:
-- "DO NOT modify existing adapter files — because Doris is additive — create a new doris.py file"
-- "DO NOT create a shared DorisStarRocksBase class — because the projects have diverged and coupling creates fragile inheritance
-  — implement independently"
-- "DO NOT conflict with ClickHouse's PyMySQL usage — because both platforms use PyMySQL on different ports — ensure connection
+- "DO NOT modify existing adapter files - because Doris is additive - create a new doris.py file"
+- "DO NOT create a shared DorisStarRocksBase class - because the projects have diverged and coupling creates fragile inheritance
+  - implement independently"
+- "DO NOT conflict with ClickHouse's PyMySQL usage - because both platforms use PyMySQL on different ports - ensure connection
   configuration is fully isolated"
 
 verification:

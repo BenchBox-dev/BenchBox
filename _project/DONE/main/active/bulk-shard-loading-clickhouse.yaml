@@ -57,7 +57,7 @@ work:
     4. Execute and return COUNT delta (before/after) as for DuckDB.
 
     The ClickHouse file() function requires an explicit column schema string for
-    CSV — derive it from DESCRIBE TABLE {table} (or equivalent).
+    CSV - derive it from DESCRIBE TABLE {table} (or equivalent).
     Dry-run: capture SQL then return len(file_paths)*1000.
 
 - id: w3
@@ -70,11 +70,11 @@ work:
     single COPY / INSERT for all shards, add a confirming test and close this unit.
     If the cloud path still issues one INSERT per shard (using s3() or url()),
     implement load_table_bulk() analogously to w2 using s3() glob patterns.
-    DO NOT scope-creep into refactoring the full cloud upload pipeline —
+    DO NOT scope-creep into refactoring the full cloud upload pipeline -
     only add/override load_table_bulk() in the cloud adapter class.
 
 - id: w4
-  summary: "Unit tests for ClickHouseNativeHandler.load_table_bulk() — glob SQL, row count, fallback, dry-run"
+  summary: "Unit tests for ClickHouseNativeHandler.load_table_bulk() - glob SQL, row count, fallback, dry-run"
   needs: [w2]
   status: done
   notes: |
@@ -89,11 +89,11 @@ deferred:
   reason: "CSV via file() is sufficient for current benchmarks; Native format has different escaping requirements"
 - summary: "Bulk loading for PostgreSQL COPY FROM PROGRAM or COPY FROM STDIN multi-file"
   reason: "PostgreSQL COPY is fundamentally single-file per statement; would require UNION ALL construction or a PL/pgSQL
-    wrapper — different scope"
+    wrapper - different scope"
 - summary: "Bulk S3/GCS loading for ClickHouse Cloud adapter using s3() glob patterns"
   reason: "Cloud adapter (_load_data_via_s3, _load_data_via_gcs) has its own per-file upload+insert loop that bypasses DataLoader
     and ClickHouseNativeHandler entirely. Bulk loading requires restructuring the upload pipeline (upload all first, then
-    single INSERT with s3() glob) — a larger refactor tracked separately."
+    single INSERT with s3() glob) - a larger refactor tracked separately."
 
 metadata:
   tags:
@@ -162,12 +162,12 @@ approach: |
      shards in bulk; if so, just add tests.
 
 anti_patterns:
-- "DO NOT concatenate shard CSV files on disk — because that requires temp storage and file I/O — use the glob pattern in
+- "DO NOT concatenate shard CSV files on disk - because that requires temp storage and file I/O - use the glob pattern in
   SQL instead"
-- "DO NOT hardcode the glob separator as '.' — because shard naming conventions may differ (e.g., _N vs .N) — derive the common
+- "DO NOT hardcode the glob separator as '.' - because shard naming conventions may differ (e.g., _N vs .N) - derive the common
   prefix programmatically from the actual file names"
-- "DO NOT skip the fallback to per-file loop — because shards may legitimately be in different dirs for re-loaded manifests
-  — the fallback ensures correctness in all cases"
+- "DO NOT skip the fallback to per-file loop - because shards may legitimately be in different dirs for re-loaded manifests
+  - the fallback ensures correctness in all cases"
 
 verification:
 - description: "ClickHouse handler unit tests pass"

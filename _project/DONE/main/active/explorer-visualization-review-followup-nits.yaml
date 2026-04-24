@@ -59,7 +59,7 @@ work:
   summary: "Apply NO_DATA_ERROR_PREFIX informational empty state to ranks view in BenchmarkIndex.tsx"
   status: done
   notes: |
-    BenchmarkIndex.tsx:350 — ranks view error block should mirror matrix view:
+    BenchmarkIndex.tsx:350 - ranks view error block should mirror matrix view:
       summaryError.startsWith(NO_DATA_ERROR_PREFIX) ? (informational empty state)
         : (amber banner)
     Add a test case covering the ranks view error path.
@@ -76,7 +76,7 @@ work:
   summary: "Optimize O(n×m) query lookup in build_comparison_artifact (transformer.py:757)"
   status: done
   notes: |
-    transformer.py:754-760 — inner loop scans d.display_timings linearly per query.
+    transformer.py:754-760 - inner loop scans d.display_timings linearly per query.
     Fix: build a per-detail lookup dict before the outer loop:
       timing_maps = [{dt.query_id: dt for dt in d.display_timings} for d in details]
     Then: timing = timing_maps[i].get(qid)
@@ -87,7 +87,7 @@ work:
   status: done
   notes: |
     test_comparison_artifact.py has no test for the progressive case: same driver_version
-    but different execution_mode — confirming cascade continues to execution_mode.
+    but different execution_mode - confirming cascade continues to execution_mode.
     Add:
       def test_driver_version_stops_cascade_before_execution_mode():
           d1 = _make_detail("r1", ..., driver_version="1.2.0", execution_mode="sql")
@@ -109,7 +109,7 @@ work:
   summary: "Replace hardcoded #6366f1 legend color in PercentileLadder.tsx with theme-derived neutral"
   status: done
   notes: |
-    PercentileLadder.tsx:86 — legend swatches use hardcoded fill="#6366f1" (Tailwind indigo-500).
+    PercentileLadder.tsx:86 - legend swatches use hardcoded fill="#6366f1" (Tailwind indigo-500).
     The legend shows opacity levels (P99→P50), not platform identity.
     Change to fill="#6b7280" (Tailwind gray-500) or export a LEGEND_COLOR from chartTheme.ts.
 
@@ -117,7 +117,7 @@ work:
   summary: "Harden chartRegistry meta-test to catch forward drift (new Python chart types)"
   status: done
   notes: |
-    chartRegistry.meta.test.ts hardcodes CANONICAL_IDS — adding chart type #17 to
+    chartRegistry.meta.test.ts hardcodes CANONICAL_IDS - adding chart type #17 to
     chart_types.py won't fail the test until CANONICAL_IDS is also manually updated.
     Fix: emit chart_ids.json during make parity-fixtures; meta-test loads that file.
     Alternatively, add a Python smoke test asserting len(ALL_CHART_TYPES) == 16.
@@ -126,7 +126,7 @@ work:
   summary: "Rename NewCharts.test.tsx to charts.smoke.test.tsx"
   status: done
   notes: |
-    results-explorer/src/components/__tests__/NewCharts.test.tsx — "New" is misleading
+    results-explorer/src/components/__tests__/NewCharts.test.tsx - "New" is misleading
     once these are established components. Rename to charts.smoke.test.tsx.
     No test content changes.
 
@@ -139,7 +139,7 @@ work:
     cost_scatter, sparkline_table.
     These charts render pipeline-emitted fields directly (no TS math), so the fixtures
     would verify field→rendering mapping rather than numeric equivalence.
-    Low urgency — smoke tests already cover rendering crashes.
+    Low urgency - smoke tests already cover rendering crashes.
 
 - id: w14
   summary: "Update docs/visualization-parity.md fixture table with 4 new fixtures"
@@ -151,15 +151,15 @@ work:
       - cdf_ecdf.json         → computeECDFPoints → transformer.py _compute_ecdf
       - rank_table.json       → computeRankTable  → transformer.py _compute_ranks
       - percentile_ladder.json → computePercentile → transformer.py _compute_percentile
-    No code change — docs-only.
+    No code change - docs-only.
 
 - id: w15
   summary: "Add explanatory comment for comparison_artifact.json exclusion in Makefile parity-check"
   status: done
   notes: |
-    Makefile:597 — `--exclude='comparison_artifact.json'` has no comment.
+    Makefile:597 - `--exclude='comparison_artifact.json'` has no comment.
     Add:
-      # comparison_artifact.json is excluded — it requires real result bundles
+      # comparison_artifact.json is excluded - it requires real result bundles
       # to generate and is verified by the comparisonArtifact.parity.test.tsx suite instead
 
 - id: w16
@@ -169,7 +169,7 @@ work:
     _build_meta_leaderboard assigns ordinal ranks (enumerate → i+1) without tie detection.
     Two platforms with equal metric values get consecutive ranks (1, 2) instead of equal (1, 1).
     Fix: after sorting, scan for equal metric values and assign equal ranks.
-    computeRankTable() in chartMath.ts already handles ties — Python should match.
+    computeRankTable() in chartMath.ts already handles ties - Python should match.
 
 - id: w17
   summary: "Add unit tests for _build_meta_leaderboard (pipeline.py:165-256)"
@@ -192,14 +192,14 @@ work:
     Add to results-explorer/src/components/__tests__/:
       - Empty platforms → renders null
       - One cohort, two platforms → correct rank cells ("1/2", "2/2")
-      - Platform with N/A → shows "—" cell
+      - Platform with N/A → shows "-" cell
       - avg_rank with 1 decimal place
 
 - id: w19
   summary: "Add scale_factor and phase query params to cohort hrefs in meta-leaderboard (pipeline.py:232)"
   status: done
   notes: |
-    pipeline.py:232 — cohort href is `/results/{benchmark}/` — navigates to the
+    pipeline.py:232 - cohort href is `/results/{benchmark}/` - navigates to the
     benchmark index without specifying (SF, phase). If BenchmarkIndex defaults to a
     different SF, users see a different cohort than intended.
     Change to: f"/results/{benchmark}/?sf={sf}&phase={phase}"
@@ -246,15 +246,15 @@ files_affected:
   - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
 
 must_preserve:
-- "StackedPhase.tsx visual output — phase colors must remain identical hex values"
+- "StackedPhase.tsx visual output - phase colors must remain identical hex values"
 - "All existing Vitest tests pass"
-- "build_comparison_artifact output unchanged — only internal data structure optimization"
-- "PercentileLadder visual output — only legend swatch color changes"
+- "build_comparison_artifact output unchanged - only internal data structure optimization"
+- "PercentileLadder visual output - only legend swatch color changes"
 
 verification:
 - description: "No inline PHASE_COLORS in StackedPhase.tsx"
   command: "grep -n 'PHASE_COLORS\\s*=' results-explorer/src/components/StackedPhase.tsx"
-  expected_output: "zero matches — PHASE_COLORS imported from chartTheme"
+  expected_output: "zero matches - PHASE_COLORS imported from chartTheme"
 - description: "chartTheme exports PHASE_COLORS"
   command: "grep -n 'export.*PHASE_COLORS' results-explorer/src/lib/chartTheme.ts"
   expected_output: "one match"

@@ -580,7 +580,7 @@ class TodoCLI:
                     print(f"    {uid:5s}  {summary}")
                 print()
         else:
-            # Legacy tasks.phases format — graceful fallback
+            # Legacy tasks.phases format - graceful fallback
             tasks = data.get("tasks", {})
             if isinstance(tasks, dict) and "phases" in tasks:
                 phases = tasks["phases"]
@@ -598,7 +598,7 @@ class TodoCLI:
                         item_icon = "[done]" if item_done else "[    ]"
                         print(f"    {item_icon}  {item.get('summary', '?')}")
                 print()
-                print("  (Legacy tasks.phases format — run migration to convert to work[])")
+                print("  (Legacy tasks.phases format - run migration to convert to work[])")
                 print()
             else:
                 print("  No work breakdown found.\n")

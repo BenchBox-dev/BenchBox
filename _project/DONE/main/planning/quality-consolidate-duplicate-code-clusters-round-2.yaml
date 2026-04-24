@@ -14,7 +14,7 @@ description: |
   and eliminates a common C901 contributor (the try/except-per-metadata-call
   shape and long if/elif commitment-plan ladders).
 
-  Dependency note: w1 and w5 are independent and lowest-risk — start there.
+  Dependency note: w1 and w5 are independent and lowest-risk - start there.
   w2 touches interactive code paths and should be done after w1 (same
   adapters). w3 and w4 are independent of the rest.
 
@@ -43,7 +43,7 @@ description: |
               athena C901 refactor surfaced (commit 3288e108f).
 
   3. Catalog-loader shape (TPC-H vs TPC-DS)
-     Files: benchbox/core/tpch/* and benchbox/core/tpcds/* —
+     Files: benchbox/core/tpch/* and benchbox/core/tpcds/* -
             _load_*_schema / _load_*_catalog pairs
      Pattern: Same file-open → parse → validate → index shape, only
               benchmark-specific field names differ.
@@ -68,7 +68,7 @@ description: |
      Pattern: Long if plan == "x": ...; elif plan == "y": ... chains
               mapping commitment/edition strings to pricing model fields.
      Proposed fix: Module-level PRICING_PLAN_MAP: dict[str, tuple[
-              pricing_model, edition]] + single .get() lookup — mirrors
+              pricing_model, edition]] + single .get() lookup - mirrors
               bigquery _determine_bigquery_pricing pattern.
      Impact: Removes ~30-50 lines per adapter; also removes a common
               C901 contributor.
@@ -84,9 +84,9 @@ work:
     notes: "Audited per-adapter try/except blocks. Exception handlers vary significantly: different exception types (ImportError/AttributeError vs broad Exception), multi-key mutations, cursor cleanup, conditional None guards. A bare _safe_metadata_collect(fn) would be lossy. Anti-pattern rule: not worthwhile with less than 3 identical call sites. Skipping."
 
   - id: w5
-    summary: "Convert pricing/commitment if-elif ladders in databricks + redshift to dict-dispatch tables (bigquery already done — use _determine_bigquery_pricing as reference). Own commit per adapter."
+    summary: "Convert pricing/commitment if-elif ladders in databricks + redshift to dict-dispatch tables (bigquery already done - use _determine_bigquery_pricing as reference). Own commit per adapter."
     status: done
-    notes: "Audited databricks/adapter.py and redshift.py — no pricing/commitment if-elif ladders exist. Only bigquery had this pattern; it was resolved in commit 07cea9852. w5 is complete by virtue of there being nothing to do."
+    notes: "Audited databricks/adapter.py and redshift.py - no pricing/commitment if-elif ladders exist. Only bigquery had this pattern; it was resolved in commit 07cea9852. w5 is complete by virtue of there being nothing to do."
 
   - id: w2
     summary: "Extract credential_setup_flow scaffolding in platforms/credentials/_flow.py; migrate athena + bigquery + one Azure/GCP to prove the pattern. Keep per-platform field schemas and validators local."
@@ -97,12 +97,12 @@ work:
   - id: w3
     summary: "Parameterize catalog loaders; collapse TPC-H / TPC-DS _load_*_schema pairs into a single load_catalog(path, spec) function with per-benchmark spec objects."
     status: done
-    notes: "Audited benchbox/core/tpch/schema.py and benchbox/core/tpcds/schema/tables.py — structurally different, no shared _load_*_schema/_load_*_catalog pattern exists. The write_primitives and ai_primitives catalog loaders do share a _load_catalog_payload() shape, but core/primitives/catalog/loader.py already provides a parameterized shared loader for that family. Skipping."
+    notes: "Audited benchbox/core/tpch/schema.py and benchbox/core/tpcds/schema/tables.py - structurally different, no shared _load_*_schema/_load_*_catalog pattern exists. The write_primitives and ai_primitives catalog loaders do share a _load_catalog_payload() shape, but core/primitives/catalog/loader.py already provides a parameterized shared loader for that family. Skipping."
 
   - id: w4
     summary: "Define ServiceLimitCollector protocol in aws_cost_limits; migrate EC2/S3/Redshift/Athena collectors to conform. Per-service code becomes normalized-record callables."
     status: done
-    notes: "No aws_cost_limits.py file exists in the codebase. The AWS platform adapters (athena_spark, emr_serverless, glue) each set billing_model as a static string — no collect/describe/aggregate loop to unify. Skipping."
+    notes: "No aws_cost_limits.py file exists in the codebase. The AWS platform adapters (athena_spark, emr_serverless, glue) each set billing_model as a static string - no collect/describe/aggregate loop to unify. Skipping."
 
 files_affected:
   # NOTE: _platform_info_utils.py and credentials/_flow.py were planned but not created.
@@ -132,9 +132,9 @@ must_preserve:
 
 approach: |
   Each cluster gets its own commit (or small commit series). Start with
-  w1 and w5 — lowest-risk, highest-density wins.
+  w1 and w5 - lowest-risk, highest-density wins.
 
-  w1 (_safe_metadata_collect): a trivial wrapper — the risk is only that
+  w1 (_safe_metadata_collect): a trivial wrapper - the risk is only that
   some call sites catch a *specific* exception today. Audit each try
   block before migrating; preserve specificity where it exists.
 
@@ -155,10 +155,10 @@ approach: |
   simpler services.
 
 anti_patterns:
-  - "DO NOT introduce a shared helper without at least 3 call sites — because two-site dedupe is premature abstraction — keep duplicated code if only 2 adapters use it"
-  - "DO NOT change behavior during extraction — because this is structural dedup — if a call site differs, preserve the difference via a helper parameter"
-  - "DO NOT bundle w1 + w2 + w3 into one commit — because review needs to be bounded — one commit per work unit minimum"
-  - "DO NOT collapse _safe_metadata_collect blocks that catch specific exceptions — because the specificity is intentional — preserve per-call exception filters"
+  - "DO NOT introduce a shared helper without at least 3 call sites - because two-site dedupe is premature abstraction - keep duplicated code if only 2 adapters use it"
+  - "DO NOT change behavior during extraction - because this is structural dedup - if a call site differs, preserve the difference via a helper parameter"
+  - "DO NOT bundle w1 + w2 + w3 into one commit - because review needs to be bounded - one commit per work unit minimum"
+  - "DO NOT collapse _safe_metadata_collect blocks that catch specific exceptions - because the specificity is intentional - preserve per-call exception filters"
 
 scope_limit:
   only_modify:

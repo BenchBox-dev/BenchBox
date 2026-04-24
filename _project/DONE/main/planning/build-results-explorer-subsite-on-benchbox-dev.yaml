@@ -15,13 +15,13 @@ description: |
   public read models.
 
   **Phase assignment:** This is the Phase 1 core deliverable. It does NOT depend
-  on the hosted governance model or full ingest architecture — Phase 1 uses a
+  on the hosted governance model or full ingest architecture - Phase 1 uses a
   static build pipeline (canonical bundles → JSON manifests + DuckDB snapshot)
   deployed to GitHub Pages. The governance and ingest TODOs were removed as
   blockers because Phase 1 is entirely maintainer-curated with no hosted services.
 
   This TODO is a **tracking umbrella** for the Phase 1 implementation. It does
-  not contain implementation work itself — it mirrors the milestone state of the
+  not contain implementation work itself - it mirrors the milestone state of the
   results-explorer cluster. Mark each work unit done when the corresponding
   cluster item(s) are completed. Mark this item Completed when w3 is done.
 
@@ -98,7 +98,7 @@ verification:
   expected_output: "0"
 
 files_affected:
-  note: "Tracking umbrella — no files are modified by this item directly. See constituent TODOs for per-item file scope."
+  note: "Tracking umbrella - no files are modified by this item directly. See constituent TODOs for per-item file scope."
 
 scope_limit:
-  note: "Tracking umbrella — scope is enforced by constituent implementation TODOs, not here."
+  note: "Tracking umbrella - scope is enforced by constituent implementation TODOs, not here."

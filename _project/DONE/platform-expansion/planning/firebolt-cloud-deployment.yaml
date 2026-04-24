@@ -82,11 +82,11 @@ must_preserve:
 - "firebolt:core backward compatibility maintained with both firebolt_mode and deployment_mode config keys"
 
 anti_patterns:
-- "DO NOT remove firebolt_mode config support — because existing users have configs with it — support both firebolt_mode and
+- "DO NOT remove firebolt_mode config support - because existing users have configs with it - support both firebolt_mode and
   deployment_mode with deprecation warning"
-- "DO NOT break existing Firebolt Core Docker mode — because it is the default development mode — ensure firebolt:core continues
+- "DO NOT break existing Firebolt Core Docker mode - because it is the default development mode - ensure firebolt:core continues
   to work without cloud credentials"
-- "DO NOT require cloud credentials for core mode — because core mode runs locally via Docker — gate cloud auth behind deployment
+- "DO NOT require cloud credentials for core mode - because core mode runs locally via Docker - gate cloud auth behind deployment
   mode checks"
 
 verification:

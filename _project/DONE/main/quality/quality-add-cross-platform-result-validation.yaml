@@ -6,7 +6,7 @@ status: Completed
 completed_date: "2026-04-12"
 category: Testing and Quality Assurance
 description: |
-  Quality plan Phase 2b — anchor of the measurement-integrity workstream.
+  Quality plan Phase 2b - anchor of the measurement-integrity workstream.
   BenchBox's product is trustworthy benchmark results, but the audit found no
   centralized correctness validation comparing query results across platforms.
   Today, divergent results between (say) DuckDB and ClickHouse on the same
@@ -29,7 +29,7 @@ description: |
 
 work:
   - id: w1
-    summary: "Design tolerance model: per-benchmark spec (TPC-H §2.6.3 ordering, decimal precision, NULL rules) — document in module docstring"
+    summary: "Design tolerance model: per-benchmark spec (TPC-H §2.6.3 ordering, decimal precision, NULL rules) - document in module docstring"
     status: done
 
   - id: w2
@@ -41,7 +41,7 @@ work:
     summary: "Wire into pytest integration tests over (benchmark, platform) pairs at SF=0.01; keep the first matrix local/no-credentials"
     needs: [w2]
     status: deferred
-    note: "Split to follow-up quality-cross-platform-validation-integration-matrix — live matrix + nightly workflow bundled there to keep this TODO's review surface bounded."
+    note: "Split to follow-up quality-cross-platform-validation-integration-matrix - live matrix + nightly workflow bundled there to keep this TODO's review surface bounded."
 
   - id: w4
     summary: "Add nightly GitHub Actions workflow .github/workflows/cross-platform-validation.yml running the cross-platform pytest suite and publishing structured diff artifacts on failure"
@@ -84,9 +84,9 @@ approach: |
   front.
 
 anti_patterns:
-  - "DO NOT hide divergences with loose tolerances — because that defeats the purpose — every loosened tolerance must cite a spec rule"
-  - "DO NOT run on every PR — because cross-platform suites are expensive and flaky in cloud — nightly only"
-  - "DO NOT invent a new top-level CLI in the first slice — because command design will distract from correctness semantics — stabilize the comparator in pytest first"
+  - "DO NOT hide divergences with loose tolerances - because that defeats the purpose - every loosened tolerance must cite a spec rule"
+  - "DO NOT run on every PR - because cross-platform suites are expensive and flaky in cloud - nightly only"
+  - "DO NOT invent a new top-level CLI in the first slice - because command design will distract from correctness semantics - stabilize the comparator in pytest first"
 
 verification:
   - description: "Cross-platform comparator unit tests pass"

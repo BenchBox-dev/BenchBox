@@ -16,7 +16,7 @@ description: |
 
   Chosen approach: `fcntl.flock(LOCK_EX | LOCK_NB)` on `~/.benchbox/test.lock`.
   The OS auto-releases the lock when the holder process dies (no stale lock cleanup
-  needed). No new dependencies — `fcntl` is stdlib on macOS/Linux.
+  needed). No new dependencies - `fcntl` is stdlib on macOS/Linux.
 
 context_sections:
   "Background": |
@@ -31,16 +31,16 @@ context_sections:
   "Design Decisions": |
     - Lock file: ~/.benchbox/test.lock (user-local; ~/.benchbox/ already exists)
     - fcntl.flock chosen over os.open(O_CREAT|O_EXCL) because flock auto-releases
-      on process death — no PID tracking, no age-based stale detection needed
+      on process death - no PID tracking, no age-based stale detection needed
     - Lock is NOT acquired when: in an xdist worker subprocess (hasattr config
       'workerinput'), numprocesses == 0 (single-threaded), or env var
       BENCHBOX_SKIP_TEST_LOCK=1 is set
-    - Hook: pytest_configure (not pytest_sessionstart — numprocesses is on the
+    - Hook: pytest_configure (not pytest_sessionstart - numprocesses is on the
       config.option namespace after CLI option parsing, before configure hooks)
     - CI is unaffected: CI containers get fresh environments with no contention
 
   "Reference Implementation": |
-    Existing pattern to reference (but not copy — uses PID-file approach which
+    Existing pattern to reference (but not copy - uses PID-file approach which
     we intentionally avoid):
       benchbox/core/primitives/generator_base.py (datagen locking via O_CREAT|O_EXCL)
 
@@ -59,24 +59,24 @@ verification:
   expected_output: "tests pass (OS auto-released flock on kill)"
 
 must_preserve:
-- "xdist workers: hasattr(config, 'workerinput') check must prevent workers from competing for the lock — only the controller
+- "xdist workers: hasattr(config, 'workerinput') check must prevent workers from competing for the lock - only the controller
   process acquires it"
 - "CI pipelines: lock is user-local (~/.benchbox/test.lock); CI containers with fresh filesystems must never see a pre-existing
   lock"
 - "Single-threaded runs: numprocesses == 0 or None must bypass the lock entirely"
 - "Crash recovery: after kill -9 on a running test session, the next invocation must succeed without any manual cleanup (OS
   auto-releases flock on exit)"
-- "All 13,000+ fast-marked tests continue to pass after the hooks are added — confirm with `make test-fast` reporting 13052
+- "All 13,000+ fast-marked tests continue to pass after the hooks are added - confirm with `make test-fast` reporting 13052
   passed"
 
 anti_patterns:
-- "DO NOT use portalocker or filelock packages — they add dependencies; fcntl is stdlib and sufficient for macOS/Linux"
-- "DO NOT use pytest_sessionstart hook — use pytest_configure instead. Reason: numprocesses is readable from config.option
+- "DO NOT use portalocker or filelock packages - they add dependencies; fcntl is stdlib and sufficient for macOS/Linux"
+- "DO NOT use pytest_sessionstart hook - use pytest_configure instead. Reason: numprocesses is readable from config.option
   at configure time (post CLI parse, pre session); sessionstart is too late and the lock would not block workers from being
   spawned"
-- "DO NOT store lock metadata in _test_lock_fd write until after flock succeeds — ftruncate/write must happen only after exclusive
+- "DO NOT store lock metadata in _test_lock_fd write until after flock succeeds - ftruncate/write must happen only after exclusive
   lock is confirmed"
-- "DO NOT add lock logic to production benchbox source — scope is tests/ and Makefile only"
+- "DO NOT add lock logic to production benchbox source - scope is tests/ and Makefile only"
 
 scope_limit:
   only_modify:
@@ -113,7 +113,7 @@ metadata:
   - developer-experience
   - concurrency
   - xdist
-  estimated_effort: "Small — ~70 lines in conftest.py + 4 lines in Makefile"
+  estimated_effort: "Small - ~70 lines in conftest.py + 4 lines in Makefile"
   created_date: "2026-02-23"
   source_plan: "proud-snuggling-flamingo.md"
 

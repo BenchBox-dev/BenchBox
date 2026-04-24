@@ -60,7 +60,7 @@ def _print_aggregate(reports: list[IntegrityReport]) -> None:
     warn_count = sum(1 for r in reports if r.overall_status.value == "WARN")
     fail_count = sum(1 for r in reports if r.overall_status.value == "FAIL")
     print("=" * 60)
-    print(f"Aggregate: {total} files — {pass_count} PASS, {warn_count} WARN, {fail_count} FAIL")
+    print(f"Aggregate: {total} files - {pass_count} PASS, {warn_count} WARN, {fail_count} FAIL")
     print("=" * 60)
 
 

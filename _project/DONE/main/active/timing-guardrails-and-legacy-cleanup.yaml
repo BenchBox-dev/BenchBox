@@ -16,19 +16,19 @@ description: |
 
 deps:
   needs:
-  - timing-runtime-wide-monotonic-migration
+    - timing-runtime-wide-monotonic-migration
 
 metadata:
   owners:
-  - joe
+    - joe
   tags:
-  - timing
-  - guardrails
-  - cleanup
-  - lint
+    - timing
+    - guardrails
+    - cleanup
+    - lint
   estimated_effort: 2-3 days
-  created_date: '2026-02-12'
-  completed_date: '2026-02-12'
+  created_date: "2026-02-12"
+  completed_date: "2026-02-12"
 
 impact:
   business_value: |
@@ -40,16 +40,16 @@ impact:
 
 files_affected:
   modified:
-  - benchbox/core/results/query_normalizer.py
-  - benchbox/core/results/schema.py
-  - benchbox/core/results/exporter.py
-  - scripts/
-  - docs/
+    - benchbox/core/results/query_normalizer.py
+    - benchbox/core/results/schema.py
+    - benchbox/core/results/exporter.py
+    - scripts/
+    - docs/
 
 must_preserve:
-- "Result loading/export for historical artifacts remains operational via explicit conversion boundaries"
-- "Developer workflows remain fast and non-interactive friendly"
-- "Existing CLI summaries and benchmark report formats remain unchanged"
+  - "Result loading/export for historical artifacts remains operational via explicit conversion boundaries"
+  - "Developer workflows remain fast and non-interactive friendly"
+  - "Existing CLI summaries and benchmark report formats remain unchanged"
 
 approach: |
   Remove stale compatibility branches that were kept during migration, then add
@@ -60,59 +60,59 @@ approach: |
   of allowed vs forbidden clock usage.
 
 anti_patterns:
-- "DO NOT remove compatibility without validating historical artifact loading paths — because existing result files still
-  need conversion support at boundaries"
-- "DO NOT add overly broad lint rules that block legitimate datetime usage — because event timestamps are valid wall-clock
-  uses — scope rules to elapsed/timeout patterns"
-- "DO NOT leave timing rules undocumented — because enforcement without guidance causes repeated violations — update contributor
-  docs with concrete examples"
+  - "DO NOT remove compatibility without validating historical artifact loading paths - because existing result files still
+    need conversion support at boundaries"
+  - "DO NOT add overly broad lint rules that block legitimate datetime usage - because event timestamps are valid wall-clock
+    uses - scope rules to elapsed/timeout patterns"
+  - "DO NOT leave timing rules undocumented - because enforcement without guidance causes repeated violations - update contributor
+    docs with concrete examples"
 
 verification:
-- description: "Timing guardrail check passes"
-  command: "uv run -- python -m pytest tests/unit/core/results/ -k 'timing or normalizer or schema' -q"
-  expected_output: "Guardrail tests pass"
-- description: "Historical result normalization tests still pass"
-  command: "uv run -- python -m pytest tests/unit/core/results/ -k 'loader or normalizer or exporter' -q"
-  expected_output: "Selected tests pass"
-- description: "Project quality gate remains green"
-  command: "make ci-test"
-  expected_output: "CI test suite passes"
+  - description: "Timing guardrail check passes"
+    command: "uv run -- python -m pytest tests/unit/core/results/ -k 'timing or normalizer or schema' -q"
+    expected_output: "Guardrail tests pass"
+  - description: "Historical result normalization tests still pass"
+    command: "uv run -- python -m pytest tests/unit/core/results/ -k 'loader or normalizer or exporter' -q"
+    expected_output: "Selected tests pass"
+  - description: "Project quality gate remains green"
+    command: "make ci-test"
+    expected_output: "CI test suite passes"
 
 scope_limit:
   only_modify:
-  - benchbox/core/results/query_normalizer.py
-  - benchbox/core/results/schema.py
-  - benchbox/core/results/exporter.py
-  - scripts/validate_todo_indexes.py
-  - docs/AGENTS.md
-  - tests/unit/core/results/test_query_normalizer.py
-  - tests/unit/core/results/test_normalizer.py
-  - tests/unit/core/results/test_loader.py
+    - benchbox/core/results/query_normalizer.py
+    - benchbox/core/results/schema.py
+    - benchbox/core/results/exporter.py
+    - scripts/validate_todo_indexes.py
+    - docs/AGENTS.md
+    - tests/unit/core/results/test_query_normalizer.py
+    - tests/unit/core/results/test_normalizer.py
+    - tests/unit/core/results/test_loader.py
   do_not_modify:
-  - benchbox/platforms/
-  - benchbox/core/tpcdi/
+    - benchbox/platforms/
+    - benchbox/core/tpcdi/
 
 success_metrics:
-- "Legacy runtime timing compatibility branches removed where no longer needed"
-- "Automated checks detect reintroduction of wall-clock elapsed arithmetic in runtime code"
-- "Timing methodology documented in contributor-facing docs"
+  - "Legacy runtime timing compatibility branches removed where no longer needed"
+  - "Automated checks detect reintroduction of wall-clock elapsed arithmetic in runtime code"
+  - "Timing methodology documented in contributor-facing docs"
 
 work:
-- id: w1
-  summary: "Remove obsolete compatibility branches for legacy runtime timing key handling"
-  status: done
-- id: w2
-  summary: "Add timing guardrail checker and tests for prohibited elapsed timing patterns"
-  status: done
-- id: w3
-  summary: "Document canonical timing methodology and examples in project docs"
-  needs:
-  - w2
-  status: done
-- id: w4
-  summary: "Run regression tests for results loading/export and overall CI quality gates"
-  needs:
-  - w1
-  - w2
-  - w3
-  status: done
+  - id: w1
+    summary: "Remove obsolete compatibility branches for legacy runtime timing key handling"
+    status: done
+  - id: w2
+    summary: "Add timing guardrail checker and tests for prohibited elapsed timing patterns"
+    status: done
+  - id: w3
+    summary: "Document canonical timing methodology and examples in project docs"
+    needs:
+      - w2
+    status: done
+  - id: w4
+    summary: "Run regression tests for results loading/export and overall CI quality gates"
+    needs:
+      - w1
+      - w2
+      - w3
+    status: done

@@ -1,5 +1,5 @@
 id: runtime-module-refactor-batch-two
-title: Runtime Module Refactor – Batch Two
+title: Runtime Module Refactor - Batch Two
 worktree: runtime-ops
 category: Code Quality and Technical Debt
 priority: Low
@@ -8,18 +8,18 @@ description: Finalize the runtime refactor initiative by documenting sequencing 
   and aligning tests/coverage expectations with the modular structure now in place.
 impact: Preserves the gains from the previous refactors and gives contributors clear guardrails for future changes.
 tasks:
-- phase: Iteration Planning
-  done: true
-  items:
-  - summary: '"Record per-module sequencing/dependency notes in `_project/runtime_ops_refactor_notes.md`"'
-  - summary: Document success metrics (LOC thresholds, coverage targets) alongside existing guardrails
-- phase: Quality Controls
-  done: true
-  items:
-  - summary: Add automated coverage check enforcing documented targets for CLI, TPC-DS, TPC-DI, ClickHouse, and
-      validation modules
-  - summary: Update runtime architecture docs with the mapping between modules and their corresponding test suites
-  - summary: Ensure guidance references existing module size guardrails and smoke-test expectations
+  - phase: Iteration Planning
+    done: true
+    items:
+      - summary: '"Record per-module sequencing/dependency notes in `_project/runtime_ops_refactor_notes.md`"'
+      - summary: Document success metrics (LOC thresholds, coverage targets) alongside existing guardrails
+  - phase: Quality Controls
+    done: true
+    items:
+      - summary: Add automated coverage check enforcing documented targets for CLI, TPC-DS, TPC-DI, ClickHouse, and
+          validation modules
+      - summary: Update runtime architecture docs with the mapping between modules and their corresponding test suites
+      - summary: Ensure guidance references existing module size guardrails and smoke-test expectations
 
 completed_date: "2026-01-07"
 completion_summary: |

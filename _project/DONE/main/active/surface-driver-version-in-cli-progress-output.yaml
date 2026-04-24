@@ -13,7 +13,7 @@ description: |
   uv pip install, then ran benchbox without specifying --platform-option driver_version=X.
   uv run silently reverted the package to the uv.lock-pinned 1.4.3 before Python started.
   The result JSON correctly reported 1.4.3, but the user only discovered the discrepancy
-  by reading the result file — never from the CLI output.
+  by reading the result file - never from the CLI output.
 
   The fix is to emit driver version after config resolution, either by:
     a) Moving the "Running ..." line to after database_config is created (line 1402 in
@@ -32,35 +32,38 @@ description: |
 category: Core Functionality
 
 work:
-- id: w1
-  summary: "Move 'Running...' print line to after database_config creation in commands/run.py (line ~1402) and include driver
-    version from database_config.driver_version_actual or driver_version_resolved"
-  status: done
+  - id: w1
+    summary:
+      "Move 'Running...' print line to after database_config creation in commands/run.py (line ~1402) and include driver
+      version from database_config.driver_version_actual or driver_version_resolved"
+    status: done
 
-- id: w2
-  summary: "Handle the no-driver-package case (e.g., SQLite) gracefully — omit driver clause when driver_package is None or
-    version is unknown"
-  needs: [w1]
-  status: done
+  - id: w2
+    summary:
+      "Handle the no-driver-package case (e.g., SQLite) gracefully - omit driver clause when driver_package is None or
+      version is unknown"
+    needs: [w1]
+    status: done
 
-- id: w3
-  summary: "Add unit/snapshot test verifying the new output format for both driver-present and driver-absent cases"
-  needs: [w1]
-  status: done
+  - id: w3
+    summary: "Add unit/snapshot test verifying the new output format for both driver-present and driver-absent cases"
+    needs: [w1]
+    status: done
 
-- id: w4
-  summary: "Check the interactive mode code path (around line 1924 in commands/run.py where platform_type is resolved) and
-    apply the same driver version display pattern if applicable"
-  needs: [w1]
-  status: done
+  - id: w4
+    summary:
+      "Check the interactive mode code path (around line 1924 in commands/run.py where platform_type is resolved) and
+      apply the same driver version display pattern if applicable"
+    needs: [w1]
+    status: done
 
 metadata:
   created_date: "2026-02-23"
   estimated_effort: "Small (< 2 hours)"
   tags:
-  - ux
-  - cli
-  - driver-versioning
+    - ux
+    - cli
+    - driver-versioning
 
 impact:
   user_impact: |
@@ -69,10 +72,10 @@ impact:
     manually installed dev/pre-release version).
 
 must_preserve:
-- "The 'Running ...' line still appears before benchmark execution begins (not after)"
-- "Non-interactive/--non-interactive mode continues to work correctly"
-- "The output format for platforms without a driver package (SQLite) is not broken"
-- "benchbox run --dry-run output is not affected"
+  - "The 'Running ...' line still appears before benchmark execution begins (not after)"
+  - "Non-interactive/--non-interactive mode continues to work correctly"
+  - "The output format for platforms without a driver package (SQLite) is not broken"
+  - "benchbox run --dry-run output is not affected"
 
 approach: |
   In benchbox/cli/commands/run.py, the "Running ..." line is at line 1369 (direct execution
@@ -85,26 +88,27 @@ approach: |
   Use driver_version_actual if set, fall back to driver_version_resolved, fall back to
   omitting the driver clause entirely. Do not show "None" or "unknown".
 
-  The interactive mode (not direct execution) uses a different code path — check if the
+  The interactive mode (not direct execution) uses a different code path - check if the
   same pattern applies there (around line 1924 where platform_type is resolved).
 
 anti_patterns:
-- "DO NOT emit the version before database_config creation — because it won't be resolved yet — move the print line to after
-  line 1406"
-- "DO NOT show 'driver: None' or 'driver: unknown' — because it's noise — omit the driver clause when version is not available"
-- "DO NOT change the --dry-run output path — because it has different semantics — scope only to direct execution path"
+  - "DO NOT emit the version before database_config creation - because it won't be resolved yet - move the print line to after
+    line 1406"
+  - "DO NOT show 'driver: None' or 'driver: unknown' - because it's noise - omit the driver clause when version is not available"
+  - "DO NOT change the --dry-run output path - because it has different semantics - scope only to direct execution path"
 
 verification:
-- description: "Output line includes driver version for DuckDB run"
-  command: "uv run benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power --non-interactive 2>&1 | grep
-    'Running tpch'"
-  expected_output: "Running tpch on duckdb at scale 0.01 [driver 1.4.3] (or similar with actual version)"
-- description: "Existing fast unit tests still pass"
-  command: "uv run -- python -m pytest -m fast -q"
-  expected_output: "All tests pass with 0 failures"
+  - description: "Output line includes driver version for DuckDB run"
+    command:
+      "uv run benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power --non-interactive 2>&1 | grep
+      'Running tpch'"
+    expected_output: "Running tpch on duckdb at scale 0.01 [driver 1.4.3] (or similar with actual version)"
+  - description: "Existing fast unit tests still pass"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "All tests pass with 0 failures"
 
 scope_limit:
   only_modify:
-  - "benchbox/cli/commands/run.py"
-  - "tests/unit/cli/"
+    - "benchbox/cli/commands/run.py"
+    - "tests/unit/cli/"
 completed_date: "2026-02-23"

@@ -12,7 +12,7 @@ description: |
 
   Run every quarter:
     1. `uv run -- python scripts/check_dependency_bounds.py --report-only`
-       — single source of truth for bounds health (same script the release
+       - single source of truth for bounds health (same script the release
        gate uses; see quality-gate-dependency-bounds-in-release-automation).
     2. `uv lock --upgrade --dry-run` to see what would resolve without caps.
     3. For each capped dep flagged ceiling-minus-one: check the upstream
@@ -24,7 +24,7 @@ description: |
 
 work:
   - id: w1
-    summary: "Run `uv run -- python scripts/check_dependency_bounds.py --report-only` and `uv lock --upgrade --dry-run` — capture what the release gate will see and what would move without caps"
+    summary: "Run `uv run -- python scripts/check_dependency_bounds.py --report-only` and `uv lock --upgrade --dry-run` - capture what the release gate will see and what would move without caps"
     status: pending
   - id: w2
     summary: "For each capped dep flagged ceiling-minus-one, check upstream changelog for breaking changes in the next major"

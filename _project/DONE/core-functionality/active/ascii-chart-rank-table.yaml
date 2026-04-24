@@ -43,11 +43,11 @@ description: |
 
 metadata:
   tags:
-  - visualization
-  - ascii-charts
-  - ranking
-  - leaderboard
-  - competitive
+    - visualization
+    - ascii-charts
+    - ranking
+    - leaderboard
+    - competitive
   estimated_effort: Medium
   created_date: "2026-02-14"
 
@@ -63,17 +63,17 @@ impact:
 
 files_affected:
   added:
-  - benchbox/core/visualization/ascii/rank_table.py
+    - benchbox/core/visualization/ascii/rank_table.py
   modified:
-  - benchbox/core/visualization/ascii/__init__.py
-  - benchbox/core/visualization/exporters.py
-  - benchbox/core/visualization/templates.py
-  - tests/unit/visualization/ascii/test_ascii_charts.py
+    - benchbox/core/visualization/ascii/__init__.py
+    - benchbox/core/visualization/exporters.py
+    - benchbox/core/visualization/templates.py
+    - tests/unit/visualization/ascii/test_ascii_charts.py
 
 must_preserve:
-- "All 9 existing chart types continue to render identically"
-- "render_ascii_chart() in exporters.py handles all existing chart_type strings"
-- "ASCIIHeatmap behavior unchanged (heatmap shows absolute values, rank table shows ordinal positions)"
+  - "All 9 existing chart types continue to render identically"
+  - "render_ascii_chart() in exporters.py handles all existing chart_type strings"
+  - "ASCIIHeatmap behavior unchanged (heatmap shows absolute values, rank table shows ordinal positions)"
 
 approach: |
   Build as a table renderer (similar approach to ASCIIHeatmap) with ranking logic:
@@ -93,55 +93,56 @@ approach: |
   ASCIIQueryHistogram._natural_sort_key().
 
 anti_patterns:
-- "DO NOT modify ASCIIHeatmap — because the heatmap shows absolute values with intensity encoding, while the rank table shows
-  ordinal positions — implement as a new class that can accept the same input data"
-- "DO NOT use floating-point rank display — because ranks are ordinal — show '1st', '2nd', '3rd' text, not '1.0', '2.0'"
+  - "DO NOT modify ASCIIHeatmap - because the heatmap shows absolute values with intensity encoding, while the rank table shows
+    ordinal positions - implement as a new class that can accept the same input data"
+  - "DO NOT use floating-point rank display - because ranks are ordinal - show '1st', '2nd', '3rd' text, not '1.0', '2.0'"
 
 verification:
-- description: "New chart class renders without error"
-  command: "uv run -- python -c \"from benchbox.core.visualization.ascii.rank_table import ASCIIRankTable, RankTableData;
-    data = RankTableData(['Q1','Q2'], ['DuckDB','Polars'], {('DuckDB','Q1'): 10, ('Polars','Q1'): 20, ('DuckDB','Q2'): 30,
-    ('Polars','Q2'): 15}); chart = ASCIIRankTable(data=data); print(chart.render())\""
-  expected_output: "Rendered table with rank positions and win/loss tally"
-- description: "Existing chart tests still pass"
-  command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
-  expected_output: "all tests pass, 0 failures"
+  - description: "New chart class renders without error"
+    command:
+      'uv run -- python -c "from benchbox.core.visualization.ascii.rank_table import ASCIIRankTable, RankTableData;
+      data = RankTableData([''Q1'',''Q2''], [''DuckDB'',''Polars''], {(''DuckDB'',''Q1''): 10, (''Polars'',''Q1''): 20, (''DuckDB'',''Q2''): 30,
+      (''Polars'',''Q2''): 15}); chart = ASCIIRankTable(data=data); print(chart.render())"'
+    expected_output: "Rendered table with rank positions and win/loss tally"
+  - description: "Existing chart tests still pass"
+    command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -v"
+    expected_output: "all tests pass, 0 failures"
 
 scope_limit:
   only_modify:
-  - benchbox/core/visualization/ascii/
-  - benchbox/core/visualization/exporters.py
-  - benchbox/core/visualization/templates.py
-  - tests/unit/visualization/ascii/
+    - benchbox/core/visualization/ascii/
+    - benchbox/core/visualization/exporters.py
+    - benchbox/core/visualization/templates.py
+    - tests/unit/visualization/ascii/
 
 work:
-- id: w1
-  summary: "Create RankTableData dataclass and ASCIIRankTable class with render()"
-  status: done
-- id: w2
-  summary: "Implement per-query ranking with tie handling (1st, 1st, 3rd) and color coding"
-  needs: [w1]
-  status: done
-- id: w3
-  summary: "Implement footer with win tallies and geometric mean rank computation"
-  needs: [w2]
-  status: done
-- id: w4
-  summary: "Add from_heatmap_data() factory that accepts the same matrix format as ASCIIHeatmap"
-  needs: [w1]
-  status: done
-- id: w5
-  summary: "Register chart in __init__.py and add 'rank_table' case to render_ascii_chart() in exporters.py"
-  needs: [w1]
-  status: done
-- id: w6
-  summary: "Add unit tests (ties, single platform, many platforms, auto-split for many queries)"
-  needs: [w1, w2, w3]
-  status: done
-- id: w7
-  summary: "Add rank_table to head_to_head and flagship templates in templates.py"
-  needs: [w5]
-  status: done
+  - id: w1
+    summary: "Create RankTableData dataclass and ASCIIRankTable class with render()"
+    status: done
+  - id: w2
+    summary: "Implement per-query ranking with tie handling (1st, 1st, 3rd) and color coding"
+    needs: [w1]
+    status: done
+  - id: w3
+    summary: "Implement footer with win tallies and geometric mean rank computation"
+    needs: [w2]
+    status: done
+  - id: w4
+    summary: "Add from_heatmap_data() factory that accepts the same matrix format as ASCIIHeatmap"
+    needs: [w1]
+    status: done
+  - id: w5
+    summary: "Register chart in __init__.py and add 'rank_table' case to render_ascii_chart() in exporters.py"
+    needs: [w1]
+    status: done
+  - id: w6
+    summary: "Add unit tests (ties, single platform, many platforms, auto-split for many queries)"
+    needs: [w1, w2, w3]
+    status: done
+  - id: w7
+    summary: "Add rank_table to head_to_head and flagship templates in templates.py"
+    needs: [w5]
+    status: done
 
 deps:
   needs: []

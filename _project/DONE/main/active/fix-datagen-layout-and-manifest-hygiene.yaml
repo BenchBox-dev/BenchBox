@@ -22,11 +22,11 @@ description: |
 
 metadata:
   tags:
-  - datagen
-  - manifests
-  - dataframe-cache
-  - pathing
-  - hygiene
+    - datagen
+    - manifests
+    - dataframe-cache
+    - pathing
+    - hygiene
   estimated_effort: Large
   created_date: "2026-02-13"
   last_updated: "2026-02-13T12:00:00"
@@ -44,9 +44,9 @@ impact:
     and enforces manifest-to-filesystem convergence.
 
 must_preserve:
-- "Existing benchmark run semantics for data generation and loading remain functional across supported platforms"
-- "Current dual-manifest model remains intact: _datagen_manifest.json for SQL data and _manifest.json for DataFrame cache"
-- "Existing database filename conventions (including tuning suffixes) remain unchanged"
+  - "Existing benchmark run semantics for data generation and loading remain functional across supported platforms"
+  - "Current dual-manifest model remains intact: _datagen_manifest.json for SQL data and _manifest.json for DataFrame cache"
+  - "Existing database filename conventions (including tuning suffixes) remain unchanged"
 
 approach: |
   Implement in bounded phases with tests after each phase.
@@ -72,88 +72,89 @@ approach: |
   and optionally prune untracked stale files in dry-run/apply modes.
 
 anti_patterns:
-- "DO NOT collapse SQL datagen and DataFrame cache manifest formats into one schema — because they serve different lifecycle
-  contracts — preserve both and enforce local consistency"
-- "DO NOT delete all sidecar/tool files unconditionally after generation — because some flows may depend on them for reuse/debug
-  — prune only conflicts or explicit maintenance targets"
-- "DO NOT rename existing database filenames or tuning suffixes — because downstream tooling expects current naming — change
-  only parent directory routing"
-- "DO NOT perform broad recursive deletion based only on extension patterns — because this risks data loss — prune from manifest/table-aware
-  allowlists"
+  - "DO NOT collapse SQL datagen and DataFrame cache manifest formats into one schema - because they serve different lifecycle
+    contracts - preserve both and enforce local consistency"
+  - "DO NOT delete all sidecar/tool files unconditionally after generation - because some flows may depend on them for reuse/debug
+    - prune only conflicts or explicit maintenance targets"
+  - "DO NOT rename existing database filenames or tuning suffixes - because downstream tooling expects current naming - change
+    only parent directory routing"
+  - "DO NOT perform broad recursive deletion based only on extension patterns - because this risks data loss - prune from manifest/table-aware
+    allowlists"
 
 verification:
-- description: "Fast suite remains green"
-  command: "uv run -- python -m pytest -m fast -q"
-  expected_output: "all selected tests pass"
-- description: "Updated modules pass targeted unit coverage"
-  command: "uv run -- python -m pytest tests/unit/core/dataframe/test_data_loader.py tests/unit/platforms/test_duckdb.py tests/unit/platforms/test_datafusion.py
-    tests/unit/core/tpcds -v --tb=short"
-  expected_output: "targeted tests pass, 0 failures"
-- description: "Ruff checks pass"
-  command: "uv run ruff check ."
-  expected_output: "no lint errors"
-- description: "Dry-run migration reports expected DB moves and stale candidates without writing"
-  command: "uv run -- python scripts/migrate_datagen_layout.py --dry-run"
-  expected_output: "summary includes candidate database moves from datagen to databases"
+  - description: "Fast suite remains green"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all selected tests pass"
+  - description: "Updated modules pass targeted unit coverage"
+    command:
+      "uv run -- python -m pytest tests/unit/core/dataframe/test_data_loader.py tests/unit/platforms/test_duckdb.py tests/unit/platforms/test_datafusion.py
+      tests/unit/core/tpcds -v --tb=short"
+    expected_output: "targeted tests pass, 0 failures"
+  - description: "Ruff checks pass"
+    command: "uv run ruff check ."
+    expected_output: "no lint errors"
+  - description: "Dry-run migration reports expected DB moves and stale candidates without writing"
+    command: "uv run -- python scripts/migrate_datagen_layout.py --dry-run"
+    expected_output: "summary includes candidate database moves from datagen to databases"
 
 files_affected:
   modified:
-  - "benchbox/base.py"
-  - "benchbox/utils/path_utils.py"
-  - "benchbox/core/config_utils.py"
-  - "benchbox/platforms/duckdb.py"
-  - "benchbox/platforms/sqlite.py"
-  - "benchbox/platforms/datafusion.py"
-  - "benchbox/core/tpcds/generator/manager.py"
-  - "benchbox/core/tpcds/generator/filesystem.py"
-  - "benchbox/core/tpch/generator.py"
-  - "benchbox/core/dataframe/data_loader.py"
-  - "benchbox/core/datavault/etl/transformer.py"
-  - "benchbox/utils/datagen_manifest.py"
+    - "benchbox/base.py"
+    - "benchbox/utils/path_utils.py"
+    - "benchbox/core/config_utils.py"
+    - "benchbox/platforms/duckdb.py"
+    - "benchbox/platforms/sqlite.py"
+    - "benchbox/platforms/datafusion.py"
+    - "benchbox/core/tpcds/generator/manager.py"
+    - "benchbox/core/tpcds/generator/filesystem.py"
+    - "benchbox/core/tpch/generator.py"
+    - "benchbox/core/dataframe/data_loader.py"
+    - "benchbox/core/datavault/etl/transformer.py"
+    - "benchbox/utils/datagen_manifest.py"
   added:
-  - "scripts/migrate_datagen_layout.py"
-  - "tests/unit/utils/test_path_utils.py"
-  - "tests/unit/core/dataframe/test_data_loader_cache_hygiene.py"
-  - "tests/unit/core/datavault/test_manifest_paths.py"
+    - "scripts/migrate_datagen_layout.py"
+    - "tests/unit/utils/test_path_utils.py"
+    - "tests/unit/core/dataframe/test_data_loader_cache_hygiene.py"
+    - "tests/unit/core/datavault/test_manifest_paths.py"
 
 scope_limit:
   do_not_modify:
-  - "benchbox/core/results/"
-  - "benchbox/cli/help.py"
+    - "benchbox/core/results/"
+    - "benchbox/cli/help.py"
 
 success_metrics:
-- "Benchmark class names with trailing 'Benchmark' resolve to canonical IDs (no clickbenchbenchmark/tpchavocbenchmark output
-  dirs)"
-- "New DuckDB/SQLite/DataFusion DB artifacts are created under benchmark_runs/databases"
-- "Regeneration no longer leaves conflicting raw+compressed/sharded table variants in-place for tracked tables"
-- "DataFrame cache leaf directories contain only _manifest.json and tracked files after conversion"
-- "Data Vault manifest entries resolve to valid paths under output_dir"
+  - "Benchmark class names with trailing 'Benchmark' resolve to canonical IDs (no clickbenchbenchmark/tpchavocbenchmark output
+    dirs)"
+  - "New DuckDB/SQLite/DataFusion DB artifacts are created under benchmark_runs/databases"
+  - "Regeneration no longer leaves conflicting raw+compressed/sharded table variants in-place for tracked tables"
+  - "DataFrame cache leaf directories contain only _manifest.json and tracked files after conversion"
+  - "Data Vault manifest entries resolve to valid paths under output_dir"
 
 work:
-- id: w1
-  summary: "Fix BaseBenchmark benchmark-name normalization fallback and add regression tests"
-  status: done
-- id: w2
-  summary: "Add databases path helper and reroute DuckDB/SQLite/DataFusion + config DB artifact paths"
-  needs: [w1]
-  status: done
-- id: w3
-  summary: "Implement table-aware stale artifact pruning for regeneration in TPC data generators"
-  needs: [w2]
-  status: done
-- id: w4
-  summary: "Harden DataFrame cache conversion with schema/table filtering and leaf-manifest pruning"
-  needs: [w2]
-  status: done
-- id: w5
-  summary: "Fix Data Vault manifest path normalization and add validation tests"
-  needs: [w3]
-  status: done
-- id: w6
-  summary: "Add one-time migration utility (dry-run/apply) for DB relocation and stale-file cleanup reporting"
-  needs: [w4, w5]
-  status: done
-- id: w7
-  summary: "Run verification suite, update indexes, and finalize TODO integration"
-  needs: [w6]
-  status: done
+  - id: w1
+    summary: "Fix BaseBenchmark benchmark-name normalization fallback and add regression tests"
+    status: done
+  - id: w2
+    summary: "Add databases path helper and reroute DuckDB/SQLite/DataFusion + config DB artifact paths"
+    needs: [w1]
+    status: done
+  - id: w3
+    summary: "Implement table-aware stale artifact pruning for regeneration in TPC data generators"
+    needs: [w2]
+    status: done
+  - id: w4
+    summary: "Harden DataFrame cache conversion with schema/table filtering and leaf-manifest pruning"
+    needs: [w2]
+    status: done
+  - id: w5
+    summary: "Fix Data Vault manifest path normalization and add validation tests"
+    needs: [w3]
+    status: done
+  - id: w6
+    summary: "Add one-time migration utility (dry-run/apply) for DB relocation and stale-file cleanup reporting"
+    needs: [w4, w5]
+    status: done
+  - id: w7
+    summary: "Run verification suite, update indexes, and finalize TODO integration"
+    needs: [w6]
+    status: done

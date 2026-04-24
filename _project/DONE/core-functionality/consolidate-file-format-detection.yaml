@@ -145,9 +145,9 @@ must_preserve:
 - is_tpc_format() API and return values unchanged
 - All existing platform tests continue to pass
 anti_patterns:
-- DO NOT create a generic format detector class — because simple predicate functions match the existing codebase pattern —
+- DO NOT create a generic format detector class - because simple predicate functions match the existing codebase pattern -
   follow the is_tpc_format() function style
-- DO NOT change function signatures — because callers depend on the current API — only change the internal implementation
+- DO NOT change function signatures - because callers depend on the current API - only change the internal implementation
 verification:
 - description: All fast tests pass after refactoring
   command: uv run -- python -m pytest -m fast --tb=short -q

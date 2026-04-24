@@ -121,11 +121,11 @@ must_preserve:
 - "All existing CLI functionality continues working (just under new parameter names)"
 
 anti_patterns:
-- "DO NOT add backward compatibility aliases — because we are in Alpha status — just rename directly"
-- "DO NOT rename the `benchbox convert` subcommand — because verbs are appropriate for subcommand names — only rename the
+- "DO NOT add backward compatibility aliases - because we are in Alpha status - just rename directly"
+- "DO NOT rename the `benchbox convert` subcommand - because verbs are appropriate for subcommand names - only rename the
   --convert parameter on `benchbox run`"
-- "DO NOT rename data_format variables in unrelated modules (TPC-DI, InfluxDB, DataFusion) — because those refer to different
-  concepts — only rename the CLI parameter and its direct usage path"
+- "DO NOT rename data_format variables in unrelated modules (TPC-DI, InfluxDB, DataFusion) - because those refer to different
+  concepts - only rename the CLI parameter and its direct usage path"
 
 verification:
 - description: "Ruff format passes"

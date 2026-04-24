@@ -7,7 +7,7 @@ completed_date: "2026-04-12"
 category: Project Lifecycle Management
 description: |
   Quality plan Phase 4f/4g. AGENTS.md is referenced as the canonical contributor
-  & agent guide but is only 98 lines — too thin to actually be canonical.
+  & agent guide but is only 98 lines - too thin to actually be canonical.
   Promote frequently-needed patterns from /docs/development/ into AGENTS.md
   so contributors and AI agents have one source of truth.
 
@@ -38,7 +38,7 @@ files_affected:
     - "tests/README.md"
 
 must_preserve:
-  - "AGENTS.md remains a quick reference, not a 1000-line tome — target ≤ 300 lines"
+  - "AGENTS.md remains a quick reference, not a 1000-line tome - target ≤ 300 lines"
   - "Existing /docs/development/ structure unchanged"
   - "Test runtime/behavior unchanged (this is doc-only)"
 
@@ -48,13 +48,13 @@ approach: |
   link to the deep-dive in /docs/development/.
 
   For tests/README.md, treat it as onboarding doc for "I want to write a
-  new test in BenchBox" — explain the marker system, the lock, the macOS
+  new test in BenchBox" - explain the marker system, the lock, the macOS
   quirk, and where to put fast vs slow tests.
 
 anti_patterns:
-  - "DO NOT duplicate content from /docs/development/ into AGENTS.md — because the two will drift out of sync — summarize in 2-5 sentences and link"
-  - "DO NOT let AGENTS.md exceed 300 lines — because it stops being a quick reference — move depth to /docs/development/"
-  - "DO NOT document the macOS conftest branch by paraphrasing the code — because rewrites rot — quote the exact lines (109-122) and explain why"
+  - "DO NOT duplicate content from /docs/development/ into AGENTS.md - because the two will drift out of sync - summarize in 2-5 sentences and link"
+  - "DO NOT let AGENTS.md exceed 300 lines - because it stops being a quick reference - move depth to /docs/development/"
+  - "DO NOT document the macOS conftest branch by paraphrasing the code - because rewrites rot - quote the exact lines (109-122) and explain why"
 
 verification:
   - description: "AGENTS.md is well-formed markdown"

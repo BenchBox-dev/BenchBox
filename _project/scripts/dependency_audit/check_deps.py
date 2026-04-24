@@ -3,7 +3,7 @@
 Fails (exit 1) when:
   (a) A declared package has zero import sites AND is not in either allowlist.
   (b) [Future] An imported top-level module is undeclared and not in the
-      guarded-optional allowlist. (Not yet enabled — Phase 5.)
+      guarded-optional allowlist. (Not yet enabled - Phase 5.)
 
 Usage:
     uv run -- python _project/scripts/dependency_audit/check_deps.py
@@ -44,7 +44,7 @@ _ROOT = _HERE.parents[2]  # BenchBox repo root
 PLUGIN_CLI_ALLOWLIST = _HERE / "plugin_cli_allowlist.yaml"
 GUARDED_OPTIONAL_ALLOWLIST = _HERE / "guarded_optional_allowlist.yaml"
 
-# Scan targets: main source + test dirs (does NOT include _project/scripts/ —
+# Scan targets: main source + test dirs (does NOT include _project/scripts/ -
 # tooling-only imports belong in the isolated env, not the main manifest).
 SCAN_PATHS = ["benchbox", "scripts", "tests", "docs/conf.py", "docs/_static"]
 
@@ -247,7 +247,7 @@ def run_check(root: pathlib.Path, verbose: bool = False) -> int:
           f"{allowed_count} allowlisted, {len(violations)} violations")
 
     if violations:
-        print("\nVIOLATIONS — declared packages with zero import sites (not allowlisted):")
+        print("\nVIOLATIONS - declared packages with zero import sites (not allowlisted):")
         for v in violations:
             print(f"  - {v}")
         print(

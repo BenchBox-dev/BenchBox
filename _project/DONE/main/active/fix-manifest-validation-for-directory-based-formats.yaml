@@ -14,13 +14,13 @@ description: |
   store a single directory path in the manifest entry (e.g., "lineitem/") with
   size_bytes computed as a recursive file sum via rglob("*"). But validation calls
   fp.stat().st_size on that directory path, which returns the inode size (~96 bytes
-  on macOS/Linux) — never matching the stored recursive sum.
+  on macOS/Linux) - never matching the stored recursive sum.
 
   This was masked when vortex (a regular file format) was at format_preference[0].
   The format_preference ordering fix (commit d643ccaca) moved delta to position 0,
   exposing the latent inconsistency.
 
-  DESIGN ANALYSIS — Should we store individual files instead of directories?
+  DESIGN ANALYSIS - Should we store individual files instead of directories?
   No. Delta/Iceberg/DuckLake tables are loaded as directories (e.g.,
   `deltatable('path/to/lineitem/')`), not by listing individual parquet files.
   The directory path IS the correct entry for downstream loaders. Storing individual
@@ -34,11 +34,11 @@ description: |
   entry type. This future-proofs for any new directory-based formats.
 
   AFFECTED VALIDATION SITES (confirmed by code reading):
-  1. runner.py:1175-1177 — _validate_manifest_if_present()
-  2. data_validation.py:498 — table expectation validation
-  3. data_validation.py:530 — unknown benchmark file validation
+  1. runner.py:1175-1177 - _validate_manifest_if_present()
+  2. data_validation.py:498 - table expectation validation
+  3. data_validation.py:530 - unknown benchmark file validation
 
-  AFFECTED FORMATS: delta, iceberg, ducklake, partitioned parquet — all use
+  AFFECTED FORMATS: delta, iceberg, ducklake, partitioned parquet - all use
   rglob("*") for size at write time but get stat().st_size at read time.
 
 metadata:
@@ -55,7 +55,7 @@ impact:
   business_value: |
     Every Delta/Iceberg/DuckLake benchmark run wastes ~10s at SF=1 (and proportionally
     more at larger scale factors) regenerating data that hasn't changed. This is a
-    correctness issue — the reuse path is broken for all directory-based formats.
+    correctness issue - the reuse path is broken for all directory-based formats.
 
 work:
 - id: w1
@@ -97,7 +97,7 @@ work:
     Add optional `is_directory: bool = False` to ConvertedFileEntry in
     benchbox/core/manifest/models.py. Update _manifest_v2_to_dict() in
     benchbox/core/manifest/io.py to serialize this field (only when True,
-    to avoid bloating existing manifests). This is forward-looking — validation
+    to avoid bloating existing manifests). This is forward-looking - validation
     can optionally use this hint instead of probing the filesystem. Existing
     manifests without the field default to False (file behavior).
 
@@ -117,12 +117,12 @@ work:
   status: done
   notes: |
     Add tests to tests/unit/core/test_runner_manifest_reuse.py:
-    1. test_directory_entry_validates_successfully — create a manifest with a
+    1. test_directory_entry_validates_successfully - create a manifest with a
        directory entry, populate it with files whose total size matches size_bytes,
        verify validation returns (True, manifest, True)
-    2. test_directory_entry_size_mismatch_detected — same but add/remove a file
+    2. test_directory_entry_size_mismatch_detected - same but add/remove a file
        so recursive sum differs, verify validation catches it
-    3. test_file_entry_still_works — existing file-based validation unchanged
+    3. test_file_entry_still_works - existing file-based validation unchanged
 
     Add parallel tests to tests/unit/utils/test_manifest_validation.py for the
     data_validation.py fix.
@@ -147,7 +147,7 @@ work:
     End-to-end test that:
     1. Generates TPC-H data at SF=0.01
     2. Converts to Delta format
-    3. Runs again — verify data is reused (no "Manifest validation failed" warning)
+    3. Runs again - verify data is reused (no "Manifest validation failed" warning)
     4. Verify benchmark completes without regeneration
     If an integration test fixture for delta conversion already exists in
     tests/integration/test_open_table_formats.py, extend it rather than creating
@@ -158,7 +158,7 @@ deferred:
   reason: |
     For very large scale factors, rglob("*") during validation could be slow.
     Could cache file count + total size in manifest, or use a checksum.
-    Not needed now — validation runs once per benchmark invocation.
+    Not needed now - validation runs once per benchmark invocation.
 - summary: "Backfill is_directory flag into existing manifests"
   reason: |
     Old manifests won't have is_directory. The helper probes the filesystem
@@ -168,7 +168,7 @@ deferred:
 must_preserve:
 - "_validate_manifest_if_present() returns the same 3-tuple contract: (is_valid, manifest_dict_or_none, manifest_found)"
 - "File-based format validation (parquet, vortex, tbl) continues to use exact stat().st_size comparison"
-- "get_table_files() API and return format unchanged — all 6 callers unaffected"
+- "get_table_files() API and return format unchanged - all 6 callers unaffected"
 - "ConversionResult.output_files continues to accept both file and directory Path objects"
 - "ManifestV2 serialization remains backward-compatible (is_directory defaults to False)"
 - "data_validation.py size checks for regular files remain exact (not relaxed)"
@@ -190,12 +190,12 @@ approach: |
     ducklake_converter.py:218
 
 anti_patterns:
-- "DO NOT store individual parquet files from inside delta/iceberg directories — because downstream loaders need the table
+- "DO NOT store individual parquet files from inside delta/iceberg directories - because downstream loaders need the table
   directory path, not individual data files"
-- "DO NOT skip size validation for directories entirely — because that would silently accept corrupted/incomplete data; use
+- "DO NOT skip size validation for directories entirely - because that would silently accept corrupted/incomplete data; use
   recursive sum instead"
-- "DO NOT change the get_table_files() return format — because 6 callers depend on the current dict-list structure"
-- "DO NOT use os.path.getsize on directories — because it returns inode size just like stat().st_size; must use rglob"
+- "DO NOT change the get_table_files() return format - because 6 callers depend on the current dict-list structure"
+- "DO NOT use os.path.getsize on directories - because it returns inode size just like stat().st_size; must use rglob"
 
 scope_limit:
   only_modify:

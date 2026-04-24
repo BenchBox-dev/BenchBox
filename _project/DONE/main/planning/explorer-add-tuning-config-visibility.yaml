@@ -18,7 +18,7 @@ description: |
     2. Loads and displays the tuning config summary from the .tuning.json
        sidecar (if present) on the detail page
     3. Enables the Compare view to show a tuning-mode label per result so
-       cross-tuning comparisons are legible (not blocked — just labeled)
+       cross-tuning comparisons are legible (not blocked - just labeled)
 
   Prerequisite: explorer-extend-manifest-and-pipeline must land first
   (tuning_mode and tuning_hash must be in the manifest).
@@ -57,8 +57,8 @@ files_affected:
 
 must_preserve:
   - "Existing compare view behavior when tuning is the same across both results (no regression)"
-  - "Results without a .tuning.json sidecar render cleanly — tuning panel shows 'No tuning config recorded' not an error"
-  - "TrustBadge layout unchanged — TuningBadge is a separate element"
+  - "Results without a .tuning.json sidecar render cleanly - tuning panel shows 'No tuning config recorded' not an error"
+  - "TrustBadge layout unchanged - TuningBadge is a separate element"
 
 approach: |
   Tuning mode label is simple: read tuning_mode from manifest, render a
@@ -67,18 +67,18 @@ approach: |
 
   Tuning config panel on detail page: lazy-fetch the .tuning.json sidecar
   URL (already derivable from bundle_path convention). Render as a
-  collapsible key-value table. Only fetch on expand — not on page load.
+  collapsible key-value table. Only fetch on expand - not on page load.
 
   Cross-tuning comparison: the strategy doc says tuning_mode is a
   comparability-breaking dimension that should warn, not hard-block. The
   warning must be visually prominent (yellow banner) but must not prevent
-  the comparison from rendering — a user may intentionally compare tuned
+  the comparison from rendering - a user may intentionally compare tuned
   vs notuning to see the delta.
 
 anti_patterns:
-  - "DO NOT hard-block cross-tuning comparisons — because intentional tuned vs notuning comparisons are valid and valuable — warn visibly but allow"
-  - "DO NOT fetch the .tuning.json sidecar eagerly — because most visitors won't expand the panel — lazy-fetch on expand only"
-  - "DO NOT show tuning_hash to end users — because it is an internal grouping key — show tuning_mode and tuning summary instead"
+  - "DO NOT hard-block cross-tuning comparisons - because intentional tuned vs notuning comparisons are valid and valuable - warn visibly but allow"
+  - "DO NOT fetch the .tuning.json sidecar eagerly - because most visitors won't expand the panel - lazy-fetch on expand only"
+  - "DO NOT show tuning_hash to end users - because it is an internal grouping key - show tuning_mode and tuning summary instead"
 
 scope_limit:
   only_modify:

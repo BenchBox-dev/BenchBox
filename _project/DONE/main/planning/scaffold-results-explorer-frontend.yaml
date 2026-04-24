@@ -7,7 +7,7 @@ completed_date: "2026-04-03"
 category: Core Functionality
 deps:
   needs:
-  - define-results-platform-product-and-launch-strategy
+    - define-results-platform-product-and-launch-strategy
 description: |
   Set up the frontend project for the results explorer at `benchbox.dev/results/`.
   The explorer is a standalone static app built with Vite and TypeScript that
@@ -20,7 +20,7 @@ description: |
   Technology stack:
   - Build: Vite 6+
   - Language: TypeScript (strict mode)
-  - Framework: Preact (lightweight) or vanilla TS — decide in w1
+  - Framework: Preact (lightweight) or vanilla TS - decide in w1
   - Analytics: DuckDB-WASM (@duckdb/duckdb-wasm)
   - Styling: Tailwind CSS or minimal custom CSS
   - Routing: File-based real paths (not hash routing) for stable share URLs
@@ -30,7 +30,7 @@ description: |
   landing page, docs, and blog.
 
   **Dependency note:** `resolve-results-explorer-brand-ownership` is NOT a
-  blocker for scaffolding — implementation proceeds with BenchBox placement as
+  blocker for scaffolding - implementation proceeds with BenchBox placement as
   the working default. Brand must be resolved before launch (tracked in
   `launch-results-explorer-acceptance-and-seed`).
 
@@ -43,96 +43,96 @@ description: |
   the strategy is complete.
 
 work:
-- id: w1
-  summary: "Choose component model and initialize Vite project"
-  status: done
-  notes: |
-    Decide: Preact (JSX component model, ~3KB) vs vanilla TypeScript (no framework).
-    Recommendation: start with Preact — the component model helps for interactive
-    views (compare, filters) without the weight of React.
+  - id: w1
+    summary: "Choose component model and initialize Vite project"
+    status: done
+    notes: |
+      Decide: Preact (JSX component model, ~3KB) vs vanilla TypeScript (no framework).
+      Recommendation: start with Preact - the component model helps for interactive
+      views (compare, filters) without the weight of React.
 
-    Initialize the project at `results-explorer/` (or `site/results/`):
-    - `npm create vite@latest results-explorer -- --template preact-ts`
-    - Configure `vite.config.ts` with `base: '/results/'` for GitHub Pages subpath
-    - Add TypeScript strict mode
-    - Add `.gitignore` for node_modules, dist/
+      Initialize the project at `results-explorer/` (or `site/results/`):
+      - `npm create vite@latest results-explorer -- --template preact-ts`
+      - Configure `vite.config.ts` with `base: '/results/'` for GitHub Pages subpath
+      - Add TypeScript strict mode
+      - Add `.gitignore` for node_modules, dist/
 
-- id: w2
-  summary: "Integrate DuckDB-WASM and build the data access layer"
-  needs: [w1]
-  status: done
-  notes: |
-    Install `@duckdb/duckdb-wasm` and create a data access module that:
-    1. Initializes DuckDB-WASM on first use (lazy loading)
-    2. Fetches and registers `results.duckdb` from the static data directory
-    3. Exposes typed query functions:
-       - `getManifest()` — fetch and parse `manifest.json`
-       - `queryResults(filters)` — SQL query against DuckDB for filtered results
-       - `queryQueries(resultId)` — get query timings for a specific result
-       - `compareResults(ids[])` — get side-by-side query data for comparison
-    4. Handles loading states and errors gracefully
+  - id: w2
+    summary: "Integrate DuckDB-WASM and build the data access layer"
+    needs: [w1]
+    status: done
+    notes: |
+      Install `@duckdb/duckdb-wasm` and create a data access module that:
+      1. Initializes DuckDB-WASM on first use (lazy loading)
+      2. Fetches and registers `results.duckdb` from the static data directory
+      3. Exposes typed query functions:
+         - `getManifest()` - fetch and parse `manifest.json`
+         - `queryResults(filters)` - SQL query against DuckDB for filtered results
+         - `queryQueries(resultId)` - get query timings for a specific result
+         - `compareResults(ids[])` - get side-by-side query data for comparison
+      4. Handles loading states and errors gracefully
 
-    DuckDB-WASM WASM files should be served from the same origin (copy to
-    `public/` or configure CDN). Test that the .duckdb file loads correctly
-    in Chrome, Firefox, and Safari.
+      DuckDB-WASM WASM files should be served from the same origin (copy to
+      `public/` or configure CDN). Test that the .duckdb file loads correctly
+      in Chrome, Firefox, and Safari.
 
-- id: w3
-  summary: "Build shared layout shell with navigation, header, and footer"
-  needs: [w1]
-  status: done
-  notes: |
-    Create the shared layout that wraps all explorer pages:
-    - Header with BenchBox logo/name and nav links (Home, Docs, Blog, Results)
-    - Results-specific sub-navigation (Browse by Benchmark, Browse by Platform)
-    - Footer consistent with the rest of benchbox.dev
-    - Responsive layout (desktop + tablet + mobile)
+  - id: w3
+    summary: "Build shared layout shell with navigation, header, and footer"
+    needs: [w1]
+    status: done
+    notes: |
+      Create the shared layout that wraps all explorer pages:
+      - Header with BenchBox logo/name and nav links (Home, Docs, Blog, Results)
+      - Results-specific sub-navigation (Browse by Benchmark, Browse by Platform)
+      - Footer consistent with the rest of benchbox.dev
+      - Responsive layout (desktop + tablet + mobile)
 
-    The header should match the existing benchbox.dev site navigation so the
-    explorer feels integrated, not like a separate app. Read the existing
-    landing page header for visual consistency.
+      The header should match the existing benchbox.dev site navigation so the
+      explorer feels integrated, not like a separate app. Read the existing
+      landing page header for visual consistency.
 
-- id: w4
-  summary: "Configure routing for real URL paths"
-  needs: [w1]
-  status: done
-  notes: |
-    Set up routing that produces real URL paths (not hash-based):
-    - `/results/` — home
-    - `/results/tpch/` — benchmark index
-    - `/results/duckdb/` — platform index
-    - `/results/r/{result_id}` — result detail
-    - `/results/compare?ids=id1,id2` — compare view
+  - id: w4
+    summary: "Configure routing for real URL paths"
+    needs: [w1]
+    status: done
+    notes: |
+      Set up routing that produces real URL paths (not hash-based):
+      - `/results/` - home
+      - `/results/tpch/` - benchmark index
+      - `/results/duckdb/` - platform index
+      - `/results/r/{result_id}` - result detail
+      - `/results/compare?ids=id1,id2` - compare view
 
-    For GitHub Pages (no server-side routing), use one of:
-    a) Pre-render all known routes at build time (preferred — enables SEO)
-    b) 404.html fallback that handles client-side routing
-    c) Both: pre-render known routes + fallback for dynamic paths
+      For GitHub Pages (no server-side routing), use one of:
+      a) Pre-render all known routes at build time (preferred - enables SEO)
+      b) 404.html fallback that handles client-side routing
+      c) Both: pre-render known routes + fallback for dynamic paths
 
-    Recommendation: pre-render browse and detail pages at build time using
-    manifest.json. Compare view uses query params and client-side rendering.
+      Recommendation: pre-render browse and detail pages at build time using
+      manifest.json. Compare view uses query params and client-side rendering.
 
-- id: w5
-  summary: "Add build scripts and verify Vite output"
-  needs: [w2, w3, w4]
-  status: done
-  notes: |
-    Configure the full build pipeline:
-    1. `npm run build` produces optimized output in `dist/`
-    2. Verify `base: '/results/'` produces correct asset paths
-    3. Verify DuckDB-WASM files are included in the output
-    4. Verify static data files (manifest.json, details/, results.duckdb) are
-       copied to `dist/data/`
-    5. Test locally with `npx serve dist` that all routes work
-    6. Document build prerequisites in a README
+  - id: w5
+    summary: "Add build scripts and verify Vite output"
+    needs: [w2, w3, w4]
+    status: done
+    notes: |
+      Configure the full build pipeline:
+      1. `npm run build` produces optimized output in `dist/`
+      2. Verify `base: '/results/'` produces correct asset paths
+      3. Verify DuckDB-WASM files are included in the output
+      4. Verify static data files (manifest.json, details/, results.duckdb) are
+         copied to `dist/data/`
+      5. Test locally with `npx serve dist` that all routes work
+      6. Document build prerequisites in a README
 
 metadata:
   tags:
-  - results
-  - explorer
-  - phase-1
-  - frontend
-  - vite
-  - duckdb-wasm
+    - results
+    - explorer
+    - phase-1
+    - frontend
+    - vite
+    - duckdb-wasm
   estimated_effort: "Medium"
   created_date: "2026-03-29"
   completed_date: "2026-04-03"
@@ -148,33 +148,33 @@ impact:
     Establishes clean frontend architecture before page-specific code accumulates.
 
 must_preserve:
-- "The existing benchbox.dev landing page, docs, and blog must continue to build and deploy independently"
-- "Explorer URLs must be real paths (not hash-based) for stable sharing and SEO"
+  - "The existing benchbox.dev landing page, docs, and blog must continue to build and deploy independently"
+  - "Explorer URLs must be real paths (not hash-based) for stable sharing and SEO"
 
 approach: |
   Follow the CloudSpecs reference architecture: Vite build + DuckDB-WASM for
-  browser-side analytics. Keep the framework minimal — Preact or vanilla TS.
+  browser-side analytics. Keep the framework minimal - Preact or vanilla TS.
   Pre-render known routes at build time for SEO; use client-side routing only
   for dynamic views (compare).
 
 anti_patterns:
-- "DO NOT use hash-based routing (#/results/tpch) — because benchmark result URLs must be stable and shareable — use real paths with GitHub Pages 404 fallback"
-- "DO NOT bundle DuckDB-WASM inline — because the WASM binary is large (~4MB) — load it lazily on first analytics interaction"
-- "DO NOT couple the explorer build to the Sphinx docs build — because they have different toolchains and lifecycles — build independently and assemble in CI"
+  - "DO NOT use hash-based routing (#/results/tpch) - because benchmark result URLs must be stable and shareable - use real paths with GitHub Pages 404 fallback"
+  - "DO NOT bundle DuckDB-WASM inline - because the WASM binary is large (~4MB) - load it lazily on first analytics interaction"
+  - "DO NOT couple the explorer build to the Sphinx docs build - because they have different toolchains and lifecycles - build independently and assemble in CI"
 
 verification:
-- description: "Vite build succeeds and produces correct output"
-  command: "cd results-explorer && npm run build && ls dist/"
-  expected_output: "index.html, assets/, data/"
-- description: "DuckDB-WASM loads and queries work in local preview"
-  command: "cd results-explorer && npx serve dist -l 3000 &"
-  expected_output: "Server running, explorer pages accessible at localhost:3000/results/"
+  - description: "Vite build succeeds and produces correct output"
+    command: "cd results-explorer && npm run build && ls dist/"
+    expected_output: "index.html, assets/, data/"
+  - description: "DuckDB-WASM loads and queries work in local preview"
+    command: "cd results-explorer && npx serve dist -l 3000 &"
+    expected_output: "Server running, explorer pages accessible at localhost:3000/results/"
 
 scope_limit:
   only_modify:
-  - "results-explorer/"
+    - "results-explorer/"
   do_not_modify:
-  - "benchbox/"
-  - "docs/"
-  - "landing/"
-  - ".github/workflows/"
+    - "benchbox/"
+    - "docs/"
+    - "landing/"
+    - ".github/workflows/"

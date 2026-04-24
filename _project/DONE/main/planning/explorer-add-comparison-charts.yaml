@@ -13,12 +13,12 @@ description: |
   important gap for the "dynamic comparison tool" claim is the absence
   of charts that make per-query performance deltas legible at a glance:
 
-    1. Normalized speedup chart (log scale, baseline-relative) — answers
+    1. Normalized speedup chart (log scale, baseline-relative) - answers
        "how much faster/slower is platform B vs platform A per query?"
        The current grouped bar chart doesn't normalize, so a 1ms vs 2ms
        delta looks the same as a 100ms vs 200ms delta.
 
-    2. Diverging bar chart (per-query improvement/regression) — answers
+    2. Diverging bar chart (per-query improvement/regression) - answers
        "which queries got faster and which got slower?" A positive/negative
        bar per query makes regressions immediately obvious. The CLI's
        `diverging_bar` chart type is the primary tool for this.
@@ -27,7 +27,7 @@ description: |
   support the compare view's core UX claim.
 
   A phase breakdown (stacked load vs query time) and percentile ladder
-  are valuable but deferred — they require phase timing fields that are
+  are valuable but deferred - they require phase timing fields that are
   not yet in the manifest.
 
 deps:
@@ -73,14 +73,14 @@ files_affected:
     - "results-explorer/src/pages/Compare.tsx"
 
 must_preserve:
-  - "Existing grouped bar chart — it is the default for 3+ result comparisons and remains accessible via the chart selector"
-  - "Compare view URL format — chart selection is UI state, not URL state (no new query params needed)"
+  - "Existing grouped bar chart - it is the default for 3+ result comparisons and remains accessible via the chart selector"
+  - "Compare view URL format - chart selection is UI state, not URL state (no new query params needed)"
   - "Null-safety: if geomean_ms is missing, disable normalized speedup with a clear message"
 
 approach: |
   Both charts are inline SVG components (consistent with existing
   QueryTimingChart pattern). No external charting library needed for
-  these two chart types — the math is simple and SVG gives full control
+  these two chart types - the math is simple and SVG gives full control
   over log scale rendering.
 
   Log scale: manually compute SVG x-positions from log2(speedup).
@@ -91,9 +91,9 @@ approach: |
   faster, M queries slower, median delta: ±X%".
 
 anti_patterns:
-  - "DO NOT pull in a charting library (D3, Chart.js, Recharts) — because bundle size and dependency overhead aren't justified for 2 chart types — inline SVG is sufficient"
-  - "DO NOT use linear scale for the speedup chart — because OLAP deltas span orders of magnitude — log scale is required for legibility"
-  - "DO NOT default to the slowest result as baseline — because speedup is conventionally measured relative to the alternative, not the worst option — default to fastest"
+  - "DO NOT pull in a charting library (D3, Chart.js, Recharts) - because bundle size and dependency overhead aren't justified for 2 chart types - inline SVG is sufficient"
+  - "DO NOT use linear scale for the speedup chart - because OLAP deltas span orders of magnitude - log scale is required for legibility"
+  - "DO NOT default to the slowest result as baseline - because speedup is conventionally measured relative to the alternative, not the worst option - default to fastest"
 
 scope_limit:
   only_modify:

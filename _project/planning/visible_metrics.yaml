@@ -32,7 +32,7 @@ originating_todo: explorer-canonical-browser-duckdb-read-model
 metrics:
 
   # ---------------------------------------------------------------------------
-  # results table — base table, one row per result bundle
+  # results table - base table, one row per result bundle
   # ---------------------------------------------------------------------------
 
   - table: results
@@ -108,7 +108,7 @@ metrics:
     tolerance: 1.0e-9
     display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
     notes: >
-      Geometric mean of per-query display_ms medians — the canonical comparison metric.
+      Geometric mean of per-query display_ms medians - the canonical comparison metric.
       Differs from geomean_ms (which uses all raw samples); display_geomean_ms uses
       one median-of-passing-measurement-runs value per query.
 
@@ -193,13 +193,13 @@ metrics:
   - table: results
     column: has_plans
     kind: raw_copy
-    source_field: "derived from bundle — True when a .plans.json sidecar exists"
+    source_field: "derived from bundle - True when a .plans.json sidecar exists"
     display_surfaces: [result_detail]
 
   - table: results
     column: has_tuning
     kind: raw_copy
-    source_field: "derived from bundle — True when config.tuning_mode is set"
+    source_field: "derived from bundle - True when config.tuning_mode is set"
     display_surfaces: [result_detail]
 
   - table: results
@@ -211,7 +211,7 @@ metrics:
     notes: "Constructed as {bundle_url_prefix}/{result_id}.json"
 
   # ---------------------------------------------------------------------------
-  # query_display_timings table — one row per (result_id, query_id)
+  # query_display_timings table - one row per (result_id, query_id)
   # ---------------------------------------------------------------------------
 
   - table: query_display_timings
@@ -233,7 +233,7 @@ metrics:
     notes: "Number of passing measurement runs that contributed to display_ms"
 
   # ---------------------------------------------------------------------------
-  # query_executions table — one row per individual query run
+  # query_executions table - one row per individual query run
   # ---------------------------------------------------------------------------
 
   - table: query_executions
@@ -267,7 +267,7 @@ metrics:
     display_surfaces: [result_detail]
 
   # ---------------------------------------------------------------------------
-  # benchmark_matrix_cells table — Platform × Query display_ms per cohort
+  # benchmark_matrix_cells table - Platform × Query display_ms per cohort
   # ---------------------------------------------------------------------------
 
   - table: benchmark_matrix_cells
@@ -282,7 +282,7 @@ metrics:
       (benchmark, scale_factor, phase) instead of joining across all results.
 
   # ---------------------------------------------------------------------------
-  # benchmark_rankings table — per-(benchmark, scale, phase, result_id) ranking
+  # benchmark_rankings table - per-(benchmark, scale, phase, result_id) ranking
   # ---------------------------------------------------------------------------
 
   - table: benchmark_rankings
@@ -335,7 +335,7 @@ metrics:
     canonical_ref: "benchbox.core.explorer_pipeline.compare_math.speedup_vs_best"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index, compare]
-    notes: "∈ (0, 1] — best row in cohort = 1.0, worse rows < 1.0; direction-aware on primary_metric"
+    notes: "∈ (0, 1] - best row in cohort = 1.0, worse rows < 1.0; direction-aware on primary_metric"
 
   - table: benchmark_rankings
     column: speedup_vs_slowest_in_cohort
@@ -343,10 +343,10 @@ metrics:
     canonical_ref: "benchbox.core.explorer_pipeline.compare_math.speedup_vs_slowest"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index, compare]
-    notes: "≥ 1.0 — slowest row in cohort = 1.0, better rows > 1.0; direction-aware on primary_metric"
+    notes: "≥ 1.0 - slowest row in cohort = 1.0, better rows > 1.0; direction-aware on primary_metric"
 
   # ---------------------------------------------------------------------------
-  # cohort_metadata table — meta-leaderboard cohort + per-variant ranks
+  # cohort_metadata table - meta-leaderboard cohort + per-variant ranks
   #
   # PRIMARY KEY is (cohort_key, result_id): one row PER PUBLISHABLE VARIANT,
   # not per platform. Same platform may appear more than once per cohort when
@@ -406,7 +406,7 @@ metrics:
     notes: "Enables Home to surface cross-trust-level comparisons on the cohort panel without a secondary query"
 
   # ---------------------------------------------------------------------------
-  # meta_leaderboard table — pre-computed cross-cohort platform summary
+  # meta_leaderboard table - pre-computed cross-cohort platform summary
   # ---------------------------------------------------------------------------
 
   - table: meta_leaderboard
@@ -429,7 +429,7 @@ metrics:
     notes: "Count of cohorts in which this platform has a non-null rank"
 
   # ---------------------------------------------------------------------------
-  # short_ids table — short_id -> result_id mapping
+  # short_ids table - short_id -> result_id mapping
   # ---------------------------------------------------------------------------
 
   - table: short_ids

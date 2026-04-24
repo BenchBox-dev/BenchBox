@@ -24,10 +24,10 @@ description: |
 
 metadata:
   tags:
-  - testing
-  - coverage
-  - ci
-  - enforcement
+    - testing
+    - coverage
+    - ci
+    - enforcement
   estimated_effort: Small
   created_date: "2026-02-07"
   last_updated: "2026-02-18T16:20:00"
@@ -41,8 +41,8 @@ impact:
     by high-coverage modules compensating for low-coverage ones.
 
 must_preserve:
-- "ci-test Makefile target continues to run pytest with existing flags and pass"
-- "Existing passing CI jobs remain passing with no increase in runtime >20%"
+  - "ci-test Makefile target continues to run pytest with existing flags and pass"
+  - "Existing passing CI jobs remain passing with no increase in runtime >20%"
 
 approach: |
   Write a standalone Python script (no external dependencies beyond stdlib)
@@ -52,65 +52,65 @@ approach: |
   any package is below threshold. Make threshold configurable via CLI arg.
 
 anti_patterns:
-- "DO NOT add external dependencies to the coverage script — because it runs in CI where install time matters — use only stdlib
-  (xml.etree, pathlib, argparse)"
-- "DO NOT make the script fail on missing coverage.xml — because not all CI runs generate it — exit 0 with a warning if the
-  file is absent"
+  - "DO NOT add external dependencies to the coverage script - because it runs in CI where install time matters - use only stdlib
+    (xml.etree, pathlib, argparse)"
+  - "DO NOT make the script fail on missing coverage.xml - because not all CI runs generate it - exit 0 with a warning if the
+    file is absent"
 
 verification:
-- description: "Script correctly identifies modules below threshold"
-  command: "uv run -- python scripts/check_module_coverage.py --coverage-xml coverage.xml --threshold 50 --exclude-module benchbox/data --exclude-module benchbox/examples"
-  expected_output: "table of per-module coverage with pass/fail indicators"
-- description: "Script exits non-zero when modules fail"
-  command: "uv run -- python scripts/check_module_coverage.py --coverage-xml coverage.xml --threshold 99 --exclude-module benchbox/data --exclude-module benchbox/examples; echo $?"
-  expected_output: "exit code 1 (since no module is at 99%)"
+  - description: "Script correctly identifies modules below threshold"
+    command: "uv run -- python scripts/check_module_coverage.py --coverage-xml coverage.xml --threshold 50 --exclude-module benchbox/data --exclude-module benchbox/examples"
+    expected_output: "table of per-module coverage with pass/fail indicators"
+  - description: "Script exits non-zero when modules fail"
+    command: "uv run -- python scripts/check_module_coverage.py --coverage-xml coverage.xml --threshold 99 --exclude-module benchbox/data --exclude-module benchbox/examples; echo $?"
+    expected_output: "exit code 1 (since no module is at 99%)"
 
 files_affected:
   added:
-  - "scripts/check_module_coverage.py"
-  - "tests/unit/test_check_module_coverage.py"
+    - "scripts/check_module_coverage.py"
+    - "tests/unit/test_check_module_coverage.py"
   modified:
-  - "Makefile"
-  - ".github/workflows/test.yml"
+    - "Makefile"
+    - ".github/workflows/test.yml"
 
 scope_limit:
   do_not_modify:
-  - "benchbox/"
+    - "benchbox/"
 deps:
   needs:
-  - coverage-core-benchmarks
-  - coverage-core-tpcdi
-  - coverage-cli-modules
-  - coverage-platforms
-  - coverage-core-utilities
+    - coverage-core-benchmarks
+    - coverage-core-tpcdi
+    - coverage-cli-modules
+    - coverage-platforms
+    - coverage-core-utilities
 work:
-- id: w1
-  summary: "Write scripts/check_module_coverage.py that parses coverage.xml"
-  status: done
-- id: w2
-  summary: "Parse coverage.xml, group by benchbox/* top-level package"
-  needs:
-  - w1
-  status: done
-- id: w3
-  summary: "Report per-package coverage with pass/fail against 50% threshold"
-  needs:
-  - w1
-  status: done
-- id: w4
-  summary: "Exit non-zero if any package fails"
-  needs:
-  - w1
-  status: done
-- id: w5
-  summary: "Add tests for the coverage check script itself"
-  status: done
-- id: w6
-  summary: "Add check_module_coverage.py to Makefile as coverage-check target"
-  status: done
-- id: w7
-  summary: "Add to ci-test target in Makefile after pytest coverage run"
-  status: done
-- id: w8
-  summary: "Update GitHub Actions workflow to run the check"
-  status: done
+  - id: w1
+    summary: "Write scripts/check_module_coverage.py that parses coverage.xml"
+    status: done
+  - id: w2
+    summary: "Parse coverage.xml, group by benchbox/* top-level package"
+    needs:
+      - w1
+    status: done
+  - id: w3
+    summary: "Report per-package coverage with pass/fail against 50% threshold"
+    needs:
+      - w1
+    status: done
+  - id: w4
+    summary: "Exit non-zero if any package fails"
+    needs:
+      - w1
+    status: done
+  - id: w5
+    summary: "Add tests for the coverage check script itself"
+    status: done
+  - id: w6
+    summary: "Add check_module_coverage.py to Makefile as coverage-check target"
+    status: done
+  - id: w7
+    summary: "Add to ci-test target in Makefile after pytest coverage run"
+    status: done
+  - id: w8
+    summary: "Update GitHub Actions workflow to run the check"
+    status: done

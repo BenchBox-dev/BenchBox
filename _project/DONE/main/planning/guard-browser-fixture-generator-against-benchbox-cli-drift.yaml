@@ -54,7 +54,7 @@ work:
 
 must_preserve:
   - "`benchbox explorer build` continues to work for all current callers (the fixture generator and any doc snippets)."
-  - "The fixture generator remains a single-entry `node scripts/generate-browser-fixtures.mjs` command — no new required env vars."
+  - "The fixture generator remains a single-entry `node scripts/generate-browser-fixtures.mjs` command - no new required env vars."
   - "The browser suite remains the source of truth for user-visible coverage; this TODO only adds an early warning, not replacement coverage."
 
 approach: |
@@ -64,8 +64,8 @@ approach: |
   (more commands, richer output), revisit.
 
 anti_patterns:
-  - "DO NOT replace the subprocess call with an in-process Python→JS bridge — because subprocess-based coupling is the only thing keeping the fixture generator deployable without a Node↔Python runtime — keep the shell-out and add the version check alongside it."
-  - "DO NOT swallow the mismatch as a warning — because the whole point is to fail fast so the real root cause surfaces in CI — exit non-zero on mismatch."
+  - "DO NOT replace the subprocess call with an in-process Python→JS bridge - because subprocess-based coupling is the only thing keeping the fixture generator deployable without a Node↔Python runtime - keep the shell-out and add the version check alongside it."
+  - "DO NOT swallow the mismatch as a warning - because the whole point is to fail fast so the real root cause surfaces in CI - exit non-zero on mismatch."
 
 verification:
   - description: "The TODO item itself validates cleanly"
@@ -107,7 +107,7 @@ impact:
     contributor time and makes the browser suite look flaky when the
     real fault is on the Python side.
   user_impact: |
-    None directly — this is infrastructure-side resilience.
+    None directly - this is infrastructure-side resilience.
   technical_debt: |
     Makes the implicit contract between `benchbox explorer build` and
     the fixture generator explicit and testable.

@@ -68,7 +68,7 @@ must_preserve:
 - "from_config round-trip: config dict → adapter.parquet_chunk_rows"
 
 anti_patterns:
-- "DO NOT add parquet_chunk_rows to the CLI --platform-option help text for other platforms — because this is QuestDB-specific,
+- "DO NOT add parquet_chunk_rows to the CLI --platform-option help text for other platforms - because this is QuestDB-specific,
   scoped to questdb.py only"
 
 verification:

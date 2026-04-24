@@ -51,18 +51,18 @@ work:
       vendored directory to drift from the lockfile.
 
 must_preserve:
-  - "`registerFileURL('results.duckdb', ...)` and `ATTACH ... AS bench (READ_ONLY)` continue to work unchanged — this TODO only moves bundle loading, not file registration."
+  - "`registerFileURL('results.duckdb', ...)` and `ATTACH ... AS bench (READ_ONLY)` continue to work unchanged - this TODO only moves bundle loading, not file registration."
   - "Cross-origin isolation (COEP/COOP) still enables SharedArrayBuffer in the browser."
   - "The Chromium blocking gate keeps passing throughout the change."
 
 approach: |
   Keep the change focused on bundle loading. Do not touch the DuckDB
-  attach logic, the fixture generator, or the range-read test server —
+  attach logic, the fixture generator, or the range-read test server -
   those are separate concerns owned by other TODOs.
 
 anti_patterns:
-  - "DO NOT commit the WASM binaries into `results-explorer/public/vendor/duckdb-wasm/` without a desync guard — because `npm install` can silently drift the runtime version away from the shipped WASM bytes — wire in the version check in the same PR that vendors the bundle."
-  - "DO NOT remove the jsDelivr fallback without confirming the vendored path handles the MVP / EH / COI worker variants the way `selectBundle` does — because picking the wrong variant silently degrades performance or breaks threading — exercise `selectBundle` against the vendored descriptor first, then drop jsDelivr only if every platform target still resolves to a local file."
+  - "DO NOT commit the WASM binaries into `results-explorer/public/vendor/duckdb-wasm/` without a desync guard - because `npm install` can silently drift the runtime version away from the shipped WASM bytes - wire in the version check in the same PR that vendors the bundle."
+  - "DO NOT remove the jsDelivr fallback without confirming the vendored path handles the MVP / EH / COI worker variants the way `selectBundle` does - because picking the wrong variant silently degrades performance or breaks threading - exercise `selectBundle` against the vendored descriptor first, then drop jsDelivr only if every platform target still resolves to a local file."
 
 verification:
   - description: "The TODO item itself validates cleanly"

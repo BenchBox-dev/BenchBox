@@ -45,11 +45,11 @@ approach: |
   executed.
 
 anti_patterns:
-- "DO NOT move deltalake/pyiceberg into core runtime dependencies — because BenchBox core should remain minimal — install
+- "DO NOT move deltalake/pyiceberg into core runtime dependencies - because BenchBox core should remain minimal - install
   them in CI via dev group or table-formats extras"
-- "DO NOT remove skip guards from tests — because local environments may intentionally lack optional deps — use marker-scoped
+- "DO NOT remove skip guards from tests - because local environments may intentionally lack optional deps - use marker-scoped
   CI execution to guarantee coverage"
-- "DO NOT bundle this into unrelated CI jobs — because failures become harder to diagnose — keep a dedicated table-format
+- "DO NOT bundle this into unrelated CI jobs - because failures become harder to diagnose - keep a dedicated table-format
   integration job"
 
 verification:

@@ -119,7 +119,7 @@ must_preserve:
 - "All seed corpus results must be accessible and renderable in the explorer"
 
 approach: |
-  Systematic verification of all launch criteria. No shortcuts — test every
+  Systematic verification of all launch criteria. No shortcuts - test every
   page, every browser, every deployment path. Fix issues found during acceptance
   before marking launch complete.
 
@@ -139,9 +139,9 @@ verification:
 - description: "Explorer component test suite passes"
   command: "cd results-explorer && npm run typecheck && npm run build"
   expected_output: "Typecheck and build both pass"
-- description: "Cross-browser acceptance — manual"
+- description: "Cross-browser acceptance - manual"
   command: "echo 'Manual: verify Chrome, Firefox, Safari per w2 checklist'"
-  expected_output: "Manual verification — all browsers pass"
+  expected_output: "Manual verification - all browsers pass"
 
 scope_limit:
   only_modify:

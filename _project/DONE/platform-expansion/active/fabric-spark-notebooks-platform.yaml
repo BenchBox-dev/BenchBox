@@ -103,11 +103,11 @@ must_preserve:
 - "fabric_warehouse.py public interface unchanged"
 
 anti_patterns:
-- "DO NOT modify fabric_warehouse.py's public interface — because it's in production use — extract shared code to a new internal
+- "DO NOT modify fabric_warehouse.py's public interface - because it's in production use - extract shared code to a new internal
   module if needed"
-- "DO NOT create a local SparkSession — because Fabric Spark only runs remotely via Livy API — all Spark code must be submitted
+- "DO NOT create a local SparkSession - because Fabric Spark only runs remotely via Livy API - all Spark code must be submitted
   as string via POST /sessions/{id}/statements"
-- "DO NOT duplicate OneLake upload logic — because fabric_warehouse.py already implements it — extract shared OneLake logic
+- "DO NOT duplicate OneLake upload logic - because fabric_warehouse.py already implements it - extract shared OneLake logic
   to a common internal module"
 
 verification:

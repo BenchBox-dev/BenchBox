@@ -71,7 +71,7 @@ must_preserve:
 approach: |
   Minimal-surface-area change in strict dependency order:
 
-  1) Change the DEFAULT_CACHE_DIR constant — this is the one-line core fix.
+  1) Change the DEFAULT_CACHE_DIR constant - this is the one-line core fix.
   2) Update DataCache docstring to reflect the new default.
   3) Add a path helper to path_utils.py for consistency with existing helpers.
   4) Wire BENCHBOX_CACHE_DIR through DataFrameRunOptions.cache_dir in runner.py
@@ -85,14 +85,14 @@ approach: |
   8) Full verification: fast suite, smoke run, confirm output appears locally.
 
 anti_patterns:
-- "DO NOT move SQL paths to a global location — because the current CWD-relative SQL default is correct and predictable
-  — the fix is bringing DataFrame in line with SQL, not the reverse"
-- "DO NOT remove or disable caching — because DataFrame format conversions (CSV->Parquet etc.) are expensive
-  — only the default location changes, caching behavior is preserved"
-- "DO NOT auto-migrate existing ~/.benchbox/dataframe-data/ — because users may have multiple projects sharing that cache
-  — migration is deferred and should be opt-in if ever implemented"
-- "DO NOT change the internal cache directory structure (benchmark/sf_N/format/) — because this is an implementation detail
-  that works correctly — only the root prefix changes"
+- "DO NOT move SQL paths to a global location - because the current CWD-relative SQL default is correct and predictable
+  - the fix is bringing DataFrame in line with SQL, not the reverse"
+- "DO NOT remove or disable caching - because DataFrame format conversions (CSV->Parquet etc.) are expensive
+  - only the default location changes, caching behavior is preserved"
+- "DO NOT auto-migrate existing ~/.benchbox/dataframe-data/ - because users may have multiple projects sharing that cache
+  - migration is deferred and should be opt-in if ever implemented"
+- "DO NOT change the internal cache directory structure (benchmark/sf_N/format/) - because this is an implementation detail
+  that works correctly - only the root prefix changes"
 
 verification:
 - description: "TODO schema validation passes for this new item"
@@ -188,7 +188,7 @@ work:
   needs:
   - w1
   status: done
-  notes: "No test changes needed — existing tests use explicit cache_dir or mocks, none assert the old ~/.benchbox default"
+  notes: "No test changes needed - existing tests use explicit cache_dir or mocks, none assert the old ~/.benchbox default"
 - id: w7
   summary: "Add test_storage_location_parity.py asserting SQL and DataFrame defaults share benchmark_runs/ root"
   needs:

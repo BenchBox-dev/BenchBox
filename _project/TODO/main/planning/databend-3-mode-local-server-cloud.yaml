@@ -6,8 +6,8 @@ status: Not Started
 category: Platform Expansion
 
 description: |
-  Databend currently supports two implicit modes — remote self-hosted (Docker +
-  MinIO) and Databend Cloud — but they aren't modelled as distinct deployment
+  Databend currently supports two implicit modes - remote self-hosted (Docker +
+  MinIO) and Databend Cloud - but they aren't modelled as distinct deployment
   modes. This TODO adds a ClickHouse-style 3-mode architecture:
 
     standalone  Native macOS binary, local disk storage, no Docker or object
@@ -39,7 +39,7 @@ description: |
     - supports storage_type = "disk" (no MinIO) for development/testing
     - DSN format unchanged: databend+http://user:pass@localhost:8000/db
     - adapter.py create_connection(), create_schema(), load_data() all survive
-      unchanged — they already use the DSN, no mode-specific logic needed
+      unchanged - they already use the DSN, no mode-specific logic needed
     - deployment_mode.py, process_manager.py, config_generator.py are all new
       files (none exist today); pattern follows clickhouse/deployment_mode.py
     - Raft data dir, ports 9191 (meta gRPC), 8000 (query HTTP), 3307 (MySQL)
@@ -60,7 +60,7 @@ work:
            for arm64 and x86_64.
         2. Confirm the standalone deployment model: does it require both
            databend-meta and databend-query, or is there a single "standalone"
-           binary that bundles both? (Check the latest docs/releases carefully —
+           binary that bundles both? (Check the latest docs/releases carefully -
            some versions ship databend-standalone or an all-in-one binary.)
         3. Confirm whether storage_type = "disk" is still supported in the
            current release and what the exact TOML config key is.
@@ -68,7 +68,7 @@ work:
            has changed since the prior research (adapter.py, __init__.py,
            docker-compose.yml).
         5. Update this TODO's KNOWN UNKNOWNS section with your findings. If any
-           finding materially changes the implementation plan, update w3–w8
+           finding materially changes the implementation plan, update w3-w8
            accordingly before proceeding.
 
       KNOWN UNKNOWNS (to be resolved in w1):
@@ -87,7 +87,7 @@ work:
     status: pending
     notes: |
       This is a go/no-go gate. If Databend standalone cannot complete TPC-H Q1
-      reliably, the remaining work items (w3–w8) should be parked and this TODO
+      reliably, the remaining work items (w3-w8) should be parked and this TODO
       updated with the blocker. Do not write implementation code until w2 passes.
 
       Steps:
@@ -161,7 +161,7 @@ work:
         - Import resolve_databend_deployment_mode from deployment_mode
         - In __init__: resolve deployment_mode early, store as self.deployment_mode
         - Add _setup_standalone_mode(config): reads database_path, configures
-          local ports, invokes process_manager to prepare (but not start —
+          local ports, invokes process_manager to prepare (but not start -
           start happens in create_connection or a lifecycle hook)
         - create_connection() dispatch: standalone → start process, build DSN to
           localhost; server/cloud → existing behavior unchanged
@@ -232,7 +232,7 @@ work:
         - examples/getting_started/local/databend_standalone_tpch.py (new)
 
 must_preserve:
-  - "Existing 'databend' platform behavior (server/Docker mode) is completely unchanged — default deployment_mode must remain 'server'"
+  - "Existing 'databend' platform behavior (server/Docker mode) is completely unchanged - default deployment_mode must remain 'server'"
   - "Databend Cloud credential flow (DATABEND_HOST, DATABEND_USER, DATABEND_PASSWORD, DATABEND_SSL env vars) continues to work for existing users"
   - "Docker docker-compose.yml for databend is not modified or removed"
   - "All existing databend unit tests continue to pass after deployment_mode changes"
@@ -242,12 +242,12 @@ approach: |
     - deployment_mode.py for normalization/resolution (clickhouse/deployment_mode.py)
     - Thin first-class adapters that force their mode (clickhouse_local.py)
     - Mode-specific setup methods inside the base adapter (clickhouse/setup.py)
-    - No eager process startup — start the standalone binary only inside
+    - No eager process startup - start the standalone binary only inside
       create_connection(), not in __init__
   Unlike ClickHouse local mode (chDB, in-process), standalone requires external
   process lifecycle via process_manager.py. Treat this as the most complex part:
   write it defensively with timeouts, port conflict detection, and clean failure
-  modes. Do not attempt to make process management "clever" — sequential start
+  modes. Do not attempt to make process management "clever" - sequential start
   with polling is correct and sufficient.
 
 anti_patterns:
@@ -265,10 +265,10 @@ verification:
     command: "uv run -- python -m pytest tests/unit/platforms/test_databend_deployment_mode.py -q"
     expected_output: "All tests pass with 0 failures"
   - description: "databend-standalone platform is registered and listed"
-    command: "uv run -- python -c \"from benchbox.platforms import get_platform_adapter; a = get_platform_adapter('databend-standalone'); print(a.deployment_mode)\""
+    command: 'uv run -- python -c "from benchbox.platforms import get_platform_adapter; a = get_platform_adapter(''databend-standalone''); print(a.deployment_mode)"'
     expected_output: "standalone"
   - description: "databend-cloud platform is registered and listed"
-    command: "uv run -- python -c \"from benchbox.platforms import get_platform_adapter; a = get_platform_adapter('databend-cloud'); print(a.deployment_mode)\""
+    command: 'uv run -- python -c "from benchbox.platforms import get_platform_adapter; a = get_platform_adapter(''databend-cloud''); print(a.deployment_mode)"'
     expected_output: "cloud"
   - description: "TPC-H Q1 via standalone mode completes correctly (requires w2 environment)"
     command: "uv run -- python -m pytest tests/integration/platforms/test_databend_smoke.py::test_standalone_mode -q"

@@ -69,14 +69,14 @@ approach: |
   serialization/deserialization does not silently truncate to integer values.
 
 anti_patterns:
-- "DO NOT keep emitting both execution_time and execution_time_seconds from runtime producers — because it preserves ambiguity
-  — emit only canonical key"
-- "DO NOT change external file schemas abruptly without conversion paths — because export/load compatibility matters — convert
+- "DO NOT keep emitting both execution_time and execution_time_seconds from runtime producers - because it preserves ambiguity
+  - emit only canonical key"
+- "DO NOT change external file schemas abruptly without conversion paths - because export/load compatibility matters - convert
   in normalizer/export layers"
-- "DO NOT change query business logic while touching timing keys — because this item is contract-focused — isolate refactor
+- "DO NOT change query business logic while touching timing keys - because this item is contract-focused - isolate refactor
   to timing output and consumption"
-- "DO NOT allow integer coercion/truncation for execution_time_seconds — because sub-second precision is required for benchmark
-  fidelity — enforce float validation in schema boundaries"
+- "DO NOT allow integer coercion/truncation for execution_time_seconds - because sub-second precision is required for benchmark
+  fidelity - enforce float validation in schema boundaries"
 
 verification:
 - description: "DataFrame query execution tests validate canonical timing key output"

@@ -26,19 +26,19 @@ category: Architecture & Refactoring
 
 metadata:
   tags:
-  - architecture
-  - database-adapters
-  - managed-databases
-  - refactoring
+    - architecture
+    - database-adapters
+    - managed-databases
+    - refactoring
   estimated_effort: "Small"
   created_date: "2026-04-14"
   source_review: "Review findings on commit dbc84af27"
   related_commits:
-  - dbc84af27
+    - dbc84af27
 
 impact:
   user_impact: |
-    None — this is internal refactoring. Behavior is already correct after
+    None - this is internal refactoring. Behavior is already correct after
     dbc84af27; this eliminates duplication.
   maintainer_impact: |
     Reduces duplication between QuestDB and InfluxDB adapters. Makes it

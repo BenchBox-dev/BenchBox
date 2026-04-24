@@ -22,7 +22,7 @@ description: |
 
   Note: Several render() functions are already approved as required-complexity ignores
   (line_chart, box_plot, scatter_plot, bar_chart, rank_table, cdf_chart). The functions
-  listed above are NOT in that list — their complexity is reducible.
+  listed above are NOT in that list - their complexity is reducible.
 
 category: "Core Functionality"
 
@@ -86,7 +86,7 @@ metadata:
   tags: ["complexity", "refactor", "visualization", "ascii"]
 
 must_preserve:
-- "All chart output must be pixel-for-pixel identical — test with known data fixtures"
+- "All chart output must be pixel-for-pixel identical - test with known data fixtures"
 - "render() method signatures unchanged (callers pass same arguments)"
 - "Color codes and ANSI escape sequences must be identical"
 - "Column width calculations must produce the same values"
@@ -96,16 +96,16 @@ approach: |
   functions if they don't use self. Keep render() as the public entry point that
   orchestrates helpers in order.
 
-  Reference existing decomposed charts: ascii/line_chart.py is well-structured —
+  Reference existing decomposed charts: ascii/line_chart.py is well-structured -
   note how it organizes helpers as private methods. Follow that pattern.
 
   Test approach: capture render() output before and after and compare with assertEqual.
 
 anti_patterns:
 - "DO NOT change the public render() signature"
-- "DO NOT create a base class or mixin for shared helpers — module-level functions are fine"
+- "DO NOT create a base class or mixin for shared helpers - module-level functions are fine"
 - "DO NOT extract so many small helpers that reading render() requires jumping between 10 methods"
-- "DO NOT optimize the rendering logic while refactoring — behavior first, optimization later"
+- "DO NOT optimize the rendering logic while refactoring - behavior first, optimization later"
 
 verification:
 - description: "Smoke tests pass"

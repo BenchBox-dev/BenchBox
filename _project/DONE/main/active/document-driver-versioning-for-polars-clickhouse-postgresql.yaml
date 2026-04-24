@@ -68,7 +68,7 @@ metadata:
 impact:
   user_impact: |
     Users of Polars, ClickHouse Cloud, and PostgreSQL platforms will find version
-    management guidance directly in their platform's documentation — not just in DuckDB's.
+    management guidance directly in their platform's documentation - not just in DuckDB's.
     Reduces confusion when uv.lock silently reverts a manually-installed version.
 
 files_affected:
@@ -79,9 +79,9 @@ files_affected:
   - "docs/usage/driver-version-management.md"
 
 must_preserve:
-- "Existing content in all four docs files is not removed or restructured — only append new sections"
+- "Existing content in all four docs files is not removed or restructured - only append new sections"
 - "The {ref}`driver-version-management` cross-reference format matches what is used in duckdb.md"
-- "driver-version-management.md remains the single authoritative guide — platform docs link to it, not duplicate it"
+- "driver-version-management.md remains the single authoritative guide - platform docs link to it, not duplicate it"
 
 approach: |
   For each platform doc, locate the "Platform Options" or "Configuration" section and
@@ -103,13 +103,13 @@ approach: |
   clickhouse-connect 0.10.0, psycopg2-binary 2.9.11).
 
   For driver-version-management.md, add one example per platform to the
-  "Pattern 1: driver_auto_install" block — a brief comment line + the benchbox run
+  "Pattern 1: driver_auto_install" block - a brief comment line + the benchbox run
   command is sufficient (no new sections needed).
 
 anti_patterns:
-- "DO NOT duplicate the full driver-version-management guide content in each platform doc — because it will go stale — add
+- "DO NOT duplicate the full driver-version-management guide content in each platform doc - because it will go stale - add
   only a short example + link"
-- "DO NOT add version numbers that don't match the current optional-extra floors — because it will confuse users — use the
+- "DO NOT add version numbers that don't match the current optional-extra floors - because it will confuse users - use the
   same versions as pyproject.toml optional extras"
 
 verification:

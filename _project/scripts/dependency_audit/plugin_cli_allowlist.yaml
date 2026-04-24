@@ -9,7 +9,7 @@
 # Reference the relevant config surface where this tool is activated.
 
 # --------------------------------------------------------------------------
-# pytest plugins — activated via pytest.ini / pyproject.toml [tool.pytest],
+# pytest plugins - activated via pytest.ini / pyproject.toml [tool.pytest],
 # not via import statements in test files (pytest auto-discovers them).
 # --------------------------------------------------------------------------
 pytest:
@@ -28,7 +28,7 @@ pytest-timeout:
   reason: "Timeout plugin; loaded via pytest marks/config. Not imported."
 
 # --------------------------------------------------------------------------
-# Linting and type-checking CLI tools — invoked as shell commands.
+# Linting and type-checking CLI tools - invoked as shell commands.
 # --------------------------------------------------------------------------
 ruff:
   reason: "Linter/formatter CLI; invoked as `uv run ruff check/format`. Not imported."
@@ -46,7 +46,7 @@ codespell:
   reason: "Spell checker CLI; invoked as `codespell`. Not imported."
 
 # --------------------------------------------------------------------------
-# Sphinx and documentation build plugins — activated via docs/conf.py
+# Sphinx and documentation build plugins - activated via docs/conf.py
 # extensions list or as theme packages.
 # --------------------------------------------------------------------------
 furo:

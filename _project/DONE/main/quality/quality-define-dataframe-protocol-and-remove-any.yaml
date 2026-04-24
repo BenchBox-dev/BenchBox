@@ -7,7 +7,7 @@ completed_date: "2026-04-13"
 completion_note: |
   Foundation slice delivered:
     - benchbox/platforms/dataframe/protocol.py: LazyFrameLike Protocol
-      (runtime_checkable). Intentionally minimal — only the surface that
+      (runtime_checkable). Intentionally minimal - only the surface that
       is genuinely common across Polars, PySpark, DataFusion, Pandas,
       PyArrow. Module docstring explains why a larger Protocol would
       lie about backend convergence.
@@ -31,7 +31,7 @@ description: |
   directives cluster in the same area.
 
   Define a DataFrameProtocol capturing the common surface across Polars,
-  Pandas, PyArrow, Modin, Dask, cudf — operations actually used by BenchBox
+  Pandas, PyArrow, Modin, Dask, cudf - operations actually used by BenchBox
   (read_parquet, filter, group_by/agg, join, collect, schema, len). Replace
   Any annotations with the protocol where dispatch is generic, and with
   concrete library types where dispatch is library-specific.
@@ -52,7 +52,7 @@ work:
     status: done
 
   - id: w4
-    summary: "Run `uv run ty check benchbox/platforms/dataframe/` — fix any newly-surfaced errors (these are real bugs the prior Any was hiding)"
+    summary: "Run `uv run ty check benchbox/platforms/dataframe/` - fix any newly-surfaced errors (these are real bugs the prior Any was hiding)"
     needs: [w3]
     status: done
 
@@ -69,12 +69,12 @@ files_affected:
     - "tests/unit/platforms/dataframe/test_protocol_conformance.py"
 
 must_preserve:
-  - "Runtime behavior of unified_frame.py unchanged — this is type annotations only (plus protocol definition)"
+  - "Runtime behavior of unified_frame.py unchanged - this is type annotations only (plus protocol definition)"
   - "All dataframe-platform tests pass on Polars, Pandas, PyArrow at minimum"
   - "Lazy-loading semantics for optional dataframe backends preserved"
 
 approach: |
-  Use typing.Protocol (PEP 544) for structural typing — no inheritance changes
+  Use typing.Protocol (PEP 544) for structural typing - no inheritance changes
   to existing dataframe libraries. Mark with @runtime_checkable so the
   conformance test can use isinstance().
 
@@ -86,9 +86,9 @@ approach: |
   The goal is not zero Any; it is meaningful Any.
 
 anti_patterns:
-  - "DO NOT inherit from a base class — because dataframe libraries don't share one and we can't modify them — use Protocol"
-  - "DO NOT add runtime type checks at every call site — because that's slow and noisy — type-check at boundaries only"
-  - "DO NOT touch unified_frame.py runtime behavior — because that's a separate concern — annotations only"
+  - "DO NOT inherit from a base class - because dataframe libraries don't share one and we can't modify them - use Protocol"
+  - "DO NOT add runtime type checks at every call site - because that's slow and noisy - type-check at boundaries only"
+  - "DO NOT touch unified_frame.py runtime behavior - because that's a separate concern - annotations only"
 
 verification:
   - description: "Type checker shows no new errors on dataframe layer vs pre-refactor baseline captured in w1"

@@ -30,229 +30,230 @@ deps:
   needs: []
 
 work:
-- id: w1
-  summary: "Profile fast suite to identify tests falsely marked fast, and fix markers"
-  status: done
-  needs: []
-  description: |
-    The "fast" suite (13,350 tests, marker `pytest.mark.fast`) takes 25+ minutes
-    single-threaded. For a "fast" suite, this should be under 5 minutes.
+  - id: w1
+    summary: "Profile fast suite to identify tests falsely marked fast, and fix markers"
+    status: done
+    needs: []
+    description: |
+      The "fast" suite (13,350 tests, marker `pytest.mark.fast`) takes 25+ minutes
+      single-threaded. For a "fast" suite, this should be under 5 minutes.
 
-    Steps:
-    1. Run with duration reporting:
-       `uv run -- python -m pytest tests/unit -m fast --durations=50 -n 0 -q 2>&1`
-    2. Identify tests taking >1s each — these are not "fast"
-    3. For each slow test, determine root cause:
-       - Subprocess spawning → re-mark as `medium` or `slow`
-       - Real binary invocation → re-mark as `integration`
-       - Unnecessary sleep → fix (see w3)
-       - Heavy computation → optimize or re-mark
-    4. Re-mark incorrectly-tagged tests with appropriate markers
-    5. Verify fast suite now runs in <5 minutes single-threaded
+      Steps:
+      1. Run with duration reporting:
+         `uv run -- python -m pytest tests/unit -m fast --durations=50 -n 0 -q 2>&1`
+      2. Identify tests taking >1s each - these are not "fast"
+      3. For each slow test, determine root cause:
+         - Subprocess spawning → re-mark as `medium` or `slow`
+         - Real binary invocation → re-mark as `integration`
+         - Unnecessary sleep → fix (see w3)
+         - Heavy computation → optimize or re-mark
+      4. Re-mark incorrectly-tagged tests with appropriate markers
+      5. Verify fast suite now runs in <5 minutes single-threaded
 
-    Known candidates from audit:
-    - tests/unit/cli/test_cli_power_throughput.py (subprocess, marked slow but may
-      have fast-marked tests that call it)
-    - tests/unit/core/tpcds/test_tpcds_stdout_datagen.py (TPC binary invocation)
-    - tests/unit/core/tpch/test_tpch_stdout_datagen.py (TPC binary invocation)
+      Known candidates from audit:
+      - tests/unit/cli/test_cli_power_throughput.py (subprocess, marked slow but may
+        have fast-marked tests that call it)
+      - tests/unit/core/tpcds/test_tpcds_stdout_datagen.py (TPC binary invocation)
+      - tests/unit/core/tpch/test_tpch_stdout_datagen.py (TPC binary invocation)
 
-- id: w2
-  summary: "Strengthen assertions in the 5 worst is-not-None-heavy test files"
-  status: done
-  needs: []
-  description: |
-    Five files account for 152 trivial `is not None` assertions. For each file,
-    replace weak assertions with value-checking assertions where the function's
-    return type is known.
+  - id: w2
+    summary: "Strengthen assertions in the 5 worst is-not-None-heavy test files"
+    status: done
+    needs: []
+    description: |
+      Five files account for 152 trivial `is not None` assertions. For each file,
+      replace weak assertions with value-checking assertions where the function's
+      return type is known.
 
-    Target files (by is-not-None count):
-    1. tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py (35)
-    2. tests/unit/platforms/dataframe/test_pyspark_df.py (33)
-    3. tests/unit/core/cost/test_cloud_platform_costs.py (30)
-    4. tests/unit/core/tpch/test_dataframe_queries.py (27)
-    5. tests/unit/core/aiml_functions/test_aiml_functions_queries.py (27)
+      Target files (by is-not-None count):
+      1. tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py (35)
+      2. tests/unit/platforms/dataframe/test_pyspark_df.py (33)
+      3. tests/unit/core/cost/test_cloud_platform_costs.py (30)
+      4. tests/unit/core/tpch/test_dataframe_queries.py (27)
+      5. tests/unit/core/aiml_functions/test_aiml_functions_queries.py (27)
 
-    For each file:
-    a. Read the function under test to understand its return type
-    b. Replace `assert X is not None` with specific assertions:
-       - If returns DataFrame: assert column names, row count, or sample values
-       - If returns dict: assert expected keys and value types
-       - If returns numeric: assert range or exact value
-    c. Run the test to confirm it still passes
-    d. If the function genuinely can return None as valid behavior, keep the
-       assertion but add a comment explaining why
+      For each file:
+      a. Read the function under test to understand its return type
+      b. Replace `assert X is not None` with specific assertions:
+         - If returns DataFrame: assert column names, row count, or sample values
+         - If returns dict: assert expected keys and value types
+         - If returns numeric: assert range or exact value
+      c. Run the test to confirm it still passes
+      d. If the function genuinely can return None as valid behavior, keep the
+         assertion but add a comment explaining why
 
-    Do NOT change test structure — only strengthen assertions within existing
-    test methods.
+      Do NOT change test structure - only strengthen assertions within existing
+      test methods.
 
-- id: w3
-  summary: "Remove 9 avoidable time.sleep calls from test_tpc_compliance.py"
-  status: done
-  needs: []
-  description: |
-    tests/unit/test_tpc_compliance.py has 9 time.sleep calls simulating query
-    execution timing. These are avoidable — the tests can use mock timing
-    or deterministic time values instead.
+  - id: w3
+    summary: "Remove 9 avoidable time.sleep calls from test_tpc_compliance.py"
+    status: done
+    needs: []
+    description: |
+      tests/unit/test_tpc_compliance.py has 9 time.sleep calls simulating query
+      execution timing. These are avoidable - the tests can use mock timing
+      or deterministic time values instead.
 
-    Replace each `time.sleep(X)` with either:
-    - A monkeypatch of `time.perf_counter` returning deterministic values, or
-    - Direct assignment of execution_time values to result dicts
+      Replace each `time.sleep(X)` with either:
+      - A monkeypatch of `time.perf_counter` returning deterministic values, or
+      - Direct assignment of execution_time values to result dicts
 
-    This removes ~0.45s of unnecessary wait per test run, but more importantly
-    eliminates flaky timing-dependent assertions.
+      This removes ~0.45s of unnecessary wait per test run, but more importantly
+      eliminates flaky timing-dependent assertions.
 
-- id: w4
-  summary: "Replace hollow isinstance assertions in 4 files with behavioral checks"
-  status: done
-  needs: [w2]
-  description: |
-    Four files have 79 hollow isinstance assertions that test guaranteed return
-    types (e.g., `assert isinstance(sql, str)` when the function signature
-    guarantees str). Replace with assertions that verify behavior.
+  - id: w4
+    summary: "Replace hollow isinstance assertions in 4 files with behavioral checks"
+    status: done
+    needs: [w2]
+    description: |
+      Four files have 79 hollow isinstance assertions that test guaranteed return
+      types (e.g., `assert isinstance(sql, str)` when the function signature
+      guarantees str). Replace with assertions that verify behavior.
 
-    Target files (by isinstance count, hollow only):
-    1. tests/validation/test_parameter_compliance.py (27) — all check
-       `isinstance(sql, str)` for query functions that always return str.
-       Replace with: `assert "SELECT" in sql.upper() or "WITH" in sql.upper()`
-    2. tests/unit/tpch/test_api_compatibility.py (26) — all check
-       `isinstance(manager, TPCHQueries)` or `isinstance(sql, str)`.
-       Replace manager checks with method existence; sql checks with content.
-    3. tests/integration/tpch/test_tpch_benchmark.py (26) — all check
-       `isinstance(sql, str)` or `isinstance(queries, dict)`.
-       Replace with key/content assertions.
-    4. tests/unit/test_tpcds_enhanced.py (16) — checks `isinstance(dir, Path)`
-       and `isinstance(result, dict)`.
-       Replace with path property checks and dict key assertions.
+      Target files (by isinstance count, hollow only):
+      1. tests/validation/test_parameter_compliance.py (27) - all check
+         `isinstance(sql, str)` for query functions that always return str.
+         Replace with: `assert "SELECT" in sql.upper() or "WITH" in sql.upper()`
+      2. tests/unit/tpch/test_api_compatibility.py (26) - all check
+         `isinstance(manager, TPCHQueries)` or `isinstance(sql, str)`.
+         Replace manager checks with method existence; sql checks with content.
+      3. tests/integration/tpch/test_tpch_benchmark.py (26) - all check
+         `isinstance(sql, str)` or `isinstance(queries, dict)`.
+         Replace with key/content assertions.
+      4. tests/unit/test_tpcds_enhanced.py (16) - checks `isinstance(dir, Path)`
+         and `isinstance(result, dict)`.
+         Replace with path property checks and dict key assertions.
 
-    SKIP files where isinstance is meaningful (type contracts):
-    - test_unified_frame_coverage.py (82) — expression wrapper type is API contract
-    - test_polars_df.py (19) — pl.Expr type required for chaining
-    - test_tpcds_core.py (20) — C binary wrapper validation
-    - test_unified_pandas_frame.py (17) — wrapper factory pattern
-    - test_protocols.py (17) — protocol compliance testing
+      SKIP files where isinstance is meaningful (type contracts):
+      - test_unified_frame_coverage.py (82) - expression wrapper type is API contract
+      - test_polars_df.py (19) - pl.Expr type required for chaining
+      - test_tpcds_core.py (20) - C binary wrapper validation
+      - test_unified_pandas_frame.py (17) - wrapper factory pattern
+      - test_protocols.py (17) - protocol compliance testing
 
-    Depends on w2 because both modify assertion patterns and the implementer
-    should apply lessons learned from the is-not-None strengthening first.
+      Depends on w2 because both modify assertion patterns and the implementer
+      should apply lessons learned from the is-not-None strengthening first.
 
-- id: w5
-  summary: "Consolidate 5 thin platform test files into their main adapter test files"
-  status: done
-  needs: [w1]
-  description: |
-    Five platform test files are too thin (<200 lines each) to justify standalone
-    status. Merge their tests into the corresponding main adapter test file.
+  - id: w5
+    summary: "Consolidate 5 thin platform test files into their main adapter test files"
+    status: done
+    needs: [w1]
+    description: |
+      Five platform test files are too thin (<200 lines each) to justify standalone
+      status. Merge their tests into the corresponding main adapter test file.
 
-    Consolidation plan:
-    1. tests/unit/platforms/test_clickhouse_metadata_coverage.py (87 lines, 5 tests)
-       → merge into test_clickhouse_adapter.py
-       Reason: 5 basic metadata mixin tests, not a distinct feature
+      Consolidation plan:
+      1. tests/unit/platforms/test_clickhouse_metadata_coverage.py (87 lines, 5 tests)
+         → merge into test_clickhouse_adapter.py
+         Reason: 5 basic metadata mixin tests, not a distinct feature
 
-    2. tests/unit/platforms/test_bigquery_case_normalization.py (200 lines, 10 tests)
-       → merge into test_bigquery_adapter.py
-       Reason: tests single adapter method (_normalize_table_names_case)
+      2. tests/unit/platforms/test_bigquery_case_normalization.py (200 lines, 10 tests)
+         → merge into test_bigquery_adapter.py
+         Reason: tests single adapter method (_normalize_table_names_case)
 
-    3. tests/unit/platforms/test_bigquery_staging_root.py (119 lines, 7 tests)
-       → merge into test_bigquery_adapter.py
-       Reason: tests one config parsing scenario (gs://bucket/path)
+      3. tests/unit/platforms/test_bigquery_staging_root.py (119 lines, 7 tests)
+         → merge into test_bigquery_adapter.py
+         Reason: tests one config parsing scenario (gs://bucket/path)
 
-    4. tests/unit/platforms/databricks/test_databricks_copy_into.py (134 lines, 2 tests)
-       → merge into test_databricks_adapter.py
-       Reason: only 2 tests for COPY INTO, too thin for standalone
+      4. tests/unit/platforms/databricks/test_databricks_copy_into.py (134 lines, 2 tests)
+         → merge into test_databricks_adapter.py
+         Reason: only 2 tests for COPY INTO, too thin for standalone
 
-    5. tests/unit/platforms/test_timescaledb_coverage.py (72 lines, 3 tests)
-       → merge into test_timescaledb_adapter.py
-       Reason: 3 error-handling tests, minimal scope
+      5. tests/unit/platforms/test_timescaledb_coverage.py (72 lines, 3 tests)
+         → merge into test_timescaledb_adapter.py
+         Reason: 3 error-handling tests, minimal scope
 
-    For each merge:
-    a. Copy test class(es) into the target file
-    b. Update imports (add any missing from the source)
-    c. Preserve pytest markers from the source file
-    d. Run the target file's tests to verify
-    e. Delete the source file
+      For each merge:
+      a. Copy test class(es) into the target file
+      b. Update imports (add any missing from the source)
+      c. Preserve pytest markers from the source file
+      d. Run the target file's tests to verify
+      e. Delete the source file
 
-    Files explicitly NOT consolidated (serve distinct purposes):
-    - DuckDB: 4 files (plan capture, real connection, sorted loading — all distinct)
-    - DataFusion: 3 files (query transformer, real connection — separate modules)
-    - ClickHouse cloud/local: separate deployment modes
-    - Databricks liquid clustering: substantial feature (226 lines, 5 tests)
+      Files explicitly NOT consolidated (serve distinct purposes):
+      - DuckDB: 4 files (plan capture, real connection, sorted loading - all distinct)
+      - DataFusion: 3 files (query transformer, real connection - separate modules)
+      - ClickHouse cloud/local: separate deployment modes
+      - Databricks liquid clustering: substantial feature (226 lines, 5 tests)
 
-    Total: delete 5 files (612 lines), no net test loss.
+      Total: delete 5 files (612 lines), no net test loss.
 
-    Depends on w1 because marker reclassification may affect which tests run
-    together, and we want stable markers before moving tests between files.
+      Depends on w1 because marker reclassification may affect which tests run
+      together, and we want stable markers before moving tests between files.
 
-- id: w6
-  summary: "Replace MagicMock with real connections in test_platform_adapters_coverage_wave_remaining.py and test_dataframe_runner.py"
-  status: done
-  needs: [w2]
-  description: |
-    The top 2 MagicMock-heavy files where real alternatives exist:
+  - id: w6
+    summary: "Replace MagicMock with real connections in test_platform_adapters_coverage_wave_remaining.py and test_dataframe_runner.py"
+    status: done
+    needs: [w2]
+    description: |
+      The top 2 MagicMock-heavy files where real alternatives exist:
 
-    1. tests/unit/platforms/test_platform_adapters_coverage_wave_remaining.py
-       (75 MagicMock instances, 1,246 lines, 107 tests)
-       - TestDuckLakeMaintenanceOperations: replace with real DuckDB :memory:
-       - TestBenchmarkTablesSource: replace with real in-memory tables
-       - TestInfluxDBConnection: reduce mocks for protocol/utility tests
-       - KEEP mocks for cloud modules (BigQuery, Redshift, Athena, Fabric)
-       - Estimated reduction: 20-30 MagicMock instances
+      1. tests/unit/platforms/test_platform_adapters_coverage_wave_remaining.py
+         (75 MagicMock instances, 1,246 lines, 107 tests)
+         - TestDuckLakeMaintenanceOperations: replace with real DuckDB :memory:
+         - TestBenchmarkTablesSource: replace with real in-memory tables
+         - TestInfluxDBConnection: reduce mocks for protocol/utility tests
+         - KEEP mocks for cloud modules (BigQuery, Redshift, Athena, Fabric)
+         - Estimated reduction: 20-30 MagicMock instances
 
-    2. tests/unit/core/runner/test_dataframe_runner.py
-       (49 MagicMock instances, 530 lines)
-       - Audit each test: categorize as (a) platform behavior or (b) orchestration
-       - For (a): replace with real DuckDB/SQLite/DataFusion fixtures
-       - For (b): keep mocked (orchestration logic legitimately needs mocks)
-       - Estimated reduction: 15-25 MagicMock instances
+      2. tests/unit/core/runner/test_dataframe_runner.py
+         (49 MagicMock instances, 530 lines)
+         - Audit each test: categorize as (a) platform behavior or (b) orchestration
+         - For (a): replace with real DuckDB/SQLite/DataFusion fixtures
+         - For (b): keep mocked (orchestration logic legitimately needs mocks)
+         - Estimated reduction: 15-25 MagicMock instances
 
-    Use existing real-connection test files as templates:
-    - test_duckdb_real_connection.py (real :memory: DuckDB)
-    - test_sqlite_real_connection.py (real :memory: SQLite)
-    - test_datafusion_real_connection.py (real SessionContext)
+      Use existing real-connection test files as templates:
+      - test_duckdb_real_connection.py (real :memory: DuckDB)
+      - test_sqlite_real_connection.py (real :memory: SQLite)
+      - test_datafusion_real_connection.py (real SessionContext)
 
-    SKIP all cloud-only platform test files (Snowflake, BigQuery, Databricks,
-    Onehouse, Dataproc, Firebolt, Fabric, LakeSail) — mocking is the only
-    option for these.
+      SKIP all cloud-only platform test files (Snowflake, BigQuery, Databricks,
+      Onehouse, Dataproc, Firebolt, Fabric, LakeSail) - mocking is the only
+      option for these.
 
-    Depends on w2 because assertion strengthening should happen first so the
-    implementer sees which tests already have strong assertions vs weak ones.
+      Depends on w2 because assertion strengthening should happen first so the
+      implementer sees which tests already have strong assertions vs weak ones.
 
-- id: w7
-  summary: "Split root conftest.py into domain-specific conftest files"
-  status: done
-  needs: [w1]
-  description: |
-    tests/conftest.py is 746 lines combining:
-    - Parallel test locking (benchbox_test_lock fixture + session hooks)
-    - Timeout management (pytest_collection_modifyitems)
-    - Marker-based classification (fast/medium/slow/integration logic)
-    - 70+ fixture definitions across unrelated domains
-    - Custom hooks (pytest_runtest_protocol, etc.)
+  - id: w7
+    summary: "Split root conftest.py into domain-specific conftest files"
+    status: done
+    needs: [w1]
+    description: |
+      tests/conftest.py is 746 lines combining:
+      - Parallel test locking (benchbox_test_lock fixture + session hooks)
+      - Timeout management (pytest_collection_modifyitems)
+      - Marker-based classification (fast/medium/slow/integration logic)
+      - 70+ fixture definitions across unrelated domains
+      - Custom hooks (pytest_runtest_protocol, etc.)
 
-    Split into:
-    - tests/conftest.py — keep only: session-scoped hooks (locking, timeout,
-      markers) and truly shared fixtures (tmp dirs, common helpers)
-    - tests/unit/conftest.py — unit-test-specific fixtures
-    - tests/unit/platforms/conftest.py — platform adapter fixtures (if any
-      are currently in root)
-    - tests/unit/core/conftest.py — core module fixtures (if any)
+      Split into:
+      - tests/conftest.py - keep only: session-scoped hooks (locking, timeout,
+        markers) and truly shared fixtures (tmp dirs, common helpers)
+      - tests/unit/conftest.py - unit-test-specific fixtures
+      - tests/unit/platforms/conftest.py - platform adapter fixtures (if any
+        are currently in root)
+      - tests/unit/core/conftest.py - core module fixtures (if any)
 
-    Target: root conftest.py under 200 lines.
+      Target: root conftest.py under 200 lines.
 
-    Depends on w1 because marker reclassification may change the
-    pytest_collection_modifyitems logic.
+      Depends on w1 because marker reclassification may change the
+      pytest_collection_modifyitems logic.
 
 deferred:
-- summary: "Reduce MagicMock in remaining 319 files (~1,460 instances after w6)"
-  reason: "Mostly cloud-only platforms where mocking is unavoidable. Address opportunistically when those adapters are modified
-    for other work."
-- summary: "Strengthen isinstance in meaningful-but-weak files (test_system_info.py mixed assertions)"
-  reason: "Only ~23 assertions in mixed category. Diminishing returns after w4 handles the 79 clearly hollow ones."
+  - summary: "Reduce MagicMock in remaining 319 files (~1,460 instances after w6)"
+    reason:
+      "Mostly cloud-only platforms where mocking is unavoidable. Address opportunistically when those adapters are modified
+      for other work."
+  - summary: "Strengthen isinstance in meaningful-but-weak files (test_system_info.py mixed assertions)"
+    reason: "Only ~23 assertions in mixed category. Diminishing returns after w4 handles the 79 clearly hollow ones."
 
 metadata:
   tags:
-  - testing
-  - quality
-  - performance
-  - developer-experience
+    - testing
+    - quality
+    - performance
+    - developer-experience
   estimated_effort: "Large (2-3 weeks)"
   created_date: "2026-03-06"
   last_updated: "2026-03-06"
@@ -260,39 +261,40 @@ metadata:
 verification:
   command: |
     echo "--- fast suite timing ---" && timeout 600 uv run -- python -m pytest tests/unit -m fast --durations=5 -n 0 -q 2>&1 | tail -10 && echo "--- is-not-None count in top 5 ---" && grep -c 'is not None' tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py tests/unit/platforms/dataframe/test_pyspark_df.py tests/unit/core/cost/test_cloud_platform_costs.py tests/unit/core/tpch/test_dataframe_queries.py tests/unit/core/aiml_functions/test_aiml_functions_queries.py 2>&1 && echo "--- sleeps in tpc_compliance ---" && grep -c 'time.sleep' tests/unit/test_tpc_compliance.py && echo "--- conftest size ---" && wc -l tests/conftest.py && echo "--- hollow isinstance (4 files) ---" && grep -c 'assert isinstance' tests/validation/test_parameter_compliance.py tests/unit/tpch/test_api_compatibility.py tests/integration/tpch/test_tpch_benchmark.py tests/unit/test_tpcds_enhanced.py 2>&1 && echo "--- thin files deleted ---" && ls tests/unit/platforms/test_clickhouse_metadata_coverage.py tests/unit/platforms/test_bigquery_case_normalization.py tests/unit/platforms/test_bigquery_staging_root.py tests/unit/platforms/test_timescaledb_coverage.py 2>&1 && echo "--- MagicMock in top 2 ---" && grep -c 'MagicMock' tests/unit/platforms/test_platform_adapters_coverage_wave_remaining.py tests/unit/core/runner/test_dataframe_runner.py 2>&1
-  expected: "Fast suite <10min; is-not-None counts reduced >50%; 0 sleeps in tpc_compliance; conftest <200 lines; hollow isinstance
+  expected:
+    "Fast suite <10min; is-not-None counts reduced >50%; 0 sleeps in tpc_compliance; conftest <200 lines; hollow isinstance
     reduced >50%; thin files not found (deleted); MagicMock counts reduced by 35-55"
 
 must_preserve:
-- "All existing tests must continue to pass — marker changes only affect which suite they run in"
-- "tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py must be kept (has real Polars execution)"
-- "Root conftest parallel locking behavior must be preserved across the split"
-- "CI fast suite (make test-fast) must still work with updated markers"
-- "Meaningful isinstance assertions must be kept — only replace hollow ones where the type is guaranteed by the function signature"
-- "Cloud platform test files must keep MagicMock — no real connection alternative exists for Snowflake, BigQuery, Databricks,
-  etc."
-- "Consolidated tests must preserve all test methods — merge means zero test loss"
+  - "All existing tests must continue to pass - marker changes only affect which suite they run in"
+  - "tests/unit/core/test_dataframe_queries_coverage_wave_remaining.py must be kept (has real Polars execution)"
+  - "Root conftest parallel locking behavior must be preserved across the split"
+  - "CI fast suite (make test-fast) must still work with updated markers"
+  - "Meaningful isinstance assertions must be kept - only replace hollow ones where the type is guaranteed by the function signature"
+  - "Cloud platform test files must keep MagicMock - no real connection alternative exists for Snowflake, BigQuery, Databricks,
+    etc."
+  - "Consolidated tests must preserve all test methods - merge means zero test loss"
 
 anti_patterns:
-- "DO NOT delete test files without merging their tests first — because every test file in scope has real value — move tests
-  to the target file, then delete the source"
-- "DO NOT add new MagicMock usage — because the suite already has 1,605 instances and mock density is a known problem — use
-  real objects or monkeypatch"
-- "DO NOT move fixtures without verifying scope — because conftest.py fixtures are auto-discovered by pytest scope and moving
-  them changes availability — run affected tests after each fixture move"
-- "DO NOT replace meaningful isinstance assertions — because expression wrapper types (UnifiedExpr, pl.Expr) and C binary
-  wrapper types are API contracts — only replace where the return type is guaranteed by the function signature"
-- "DO NOT attempt MagicMock reduction in cloud-only platform tests — because Snowflake/BigQuery/Databricks/etc. have no local
-  alternative — mocking is the correct approach for those"
+  - "DO NOT delete test files without merging their tests first - because every test file in scope has real value - move tests
+    to the target file, then delete the source"
+  - "DO NOT add new MagicMock usage - because the suite already has 1,605 instances and mock density is a known problem - use
+    real objects or monkeypatch"
+  - "DO NOT move fixtures without verifying scope - because conftest.py fixtures are auto-discovered by pytest scope and moving
+    them changes availability - run affected tests after each fixture move"
+  - "DO NOT replace meaningful isinstance assertions - because expression wrapper types (UnifiedExpr, pl.Expr) and C binary
+    wrapper types are API contracts - only replace where the return type is guaranteed by the function signature"
+  - "DO NOT attempt MagicMock reduction in cloud-only platform tests - because Snowflake/BigQuery/Databricks/etc. have no local
+    alternative - mocking is the correct approach for those"
 
 scope_limit:
   include:
-  - "tests/ directory (markers, assertions, conftest, sleep removal, file consolidation)"
-  - "pyproject.toml (marker definitions only)"
+    - "tests/ directory (markers, assertions, conftest, sleep removal, file consolidation)"
+    - "pyproject.toml (marker definitions only)"
   exclude:
-  - "benchbox/ source code (no production changes)"
-  - "tests/integration/ (modify only test_tpch_benchmark.py isinstance assertions in w4)"
-  - "tests/e2e/ (do not modify)"
+    - "benchbox/ source code (no production changes)"
+    - "tests/integration/ (modify only test_tpch_benchmark.py isinstance assertions in w4)"
+    - "tests/e2e/ (do not modify)"
 
 impact:
   business_value: |
@@ -309,18 +311,18 @@ impact:
 
 files_affected:
   modified:
-  - "tests/conftest.py (split into smaller files)"
-  - "tests/unit/test_tpc_compliance.py (remove sleeps)"
-  - "5 test files with is-not-None assertion strengthening (w2)"
-  - "4 test files with isinstance assertion replacement (w4)"
-  - "4 adapter test files receiving merged tests (w5)"
-  - "2 test files with MagicMock reduction (w6)"
-  - "Multiple test files with marker corrections (w1)"
+    - "tests/conftest.py (split into smaller files)"
+    - "tests/unit/test_tpc_compliance.py (remove sleeps)"
+    - "5 test files with is-not-None assertion strengthening (w2)"
+    - "4 test files with isinstance assertion replacement (w4)"
+    - "4 adapter test files receiving merged tests (w5)"
+    - "2 test files with MagicMock reduction (w6)"
+    - "Multiple test files with marker corrections (w1)"
   added:
-  - "tests/unit/conftest.py (extracted fixtures)"
+    - "tests/unit/conftest.py (extracted fixtures)"
   deleted:
-  - "tests/unit/platforms/test_clickhouse_metadata_coverage.py (merged into test_clickhouse_adapter.py)"
-  - "tests/unit/platforms/test_bigquery_case_normalization.py (merged into test_bigquery_adapter.py)"
-  - "tests/unit/platforms/test_bigquery_staging_root.py (merged into test_bigquery_adapter.py)"
-  - "tests/unit/platforms/databricks/test_databricks_copy_into.py (merged into test_databricks_adapter.py)"
-  - "tests/unit/platforms/test_timescaledb_coverage.py (merged into test_timescaledb_adapter.py)"
+    - "tests/unit/platforms/test_clickhouse_metadata_coverage.py (merged into test_clickhouse_adapter.py)"
+    - "tests/unit/platforms/test_bigquery_case_normalization.py (merged into test_bigquery_adapter.py)"
+    - "tests/unit/platforms/test_bigquery_staging_root.py (merged into test_bigquery_adapter.py)"
+    - "tests/unit/platforms/databricks/test_databricks_copy_into.py (merged into test_databricks_adapter.py)"
+    - "tests/unit/platforms/test_timescaledb_coverage.py (merged into test_timescaledb_adapter.py)"

@@ -27,47 +27,47 @@ work:
       - load_ai_catalog (CC=29): per-field YAML validation with distinct rules per field
       - load_write_primitives_catalog (CC=25): per-field YAML validation (same pattern)
       - _extract_operator_info (CC=23): query plan parser dispatching on operator type
-      - _validate_manifest_if_present (CC=23): multi-layer manifest validation — recently
+      - _validate_manifest_if_present (CC=23): multi-layer manifest validation - recently
         expanded for contamination detection; extraction would scatter tightly coupled
         validation logic across helpers without reducing real complexity
 
   - id: w2
-    summary: "Refactor render_ascii_chart (CC=43) — replace elif chain with chart-type registry"
+    summary: "Refactor render_ascii_chart (CC=43) - replace elif chain with chart-type registry"
     status: done
     note: |
       Extracted 15 chart-type builder functions and a _CHART_BUILDERS dict registry.
       Main function reduced to a single dict lookup. CC 43→3.
 
   - id: w3
-    summary: "Refactor _build_duckdb_external_scan_expression (CC=23) — extract per-format handlers"
+    summary: "Refactor _build_duckdb_external_scan_expression (CC=23) - extract per-format handlers"
     status: done
     note: |
       Extracted 5 per-format handlers (_try_delta_scan, _try_iceberg_scan,
       _try_vortex_scan, _try_parquet_scan, _try_text_scan). CC 23→5.
 
   - id: w4
-    summary: "Refactor display_interactive_preview (CC=22) — data-driven table row construction"
+    summary: "Refactor display_interactive_preview (CC=22) - data-driven table row construction"
     status: done
     note: |
       Replaced 15+ if-present-add-row guards with data-driven tuple list.
       Extracted _format_compression_str and _resolve_cli_table_format helpers. CC 22→8.
 
   - id: w5
-    summary: "Refactor validate_column_types (CC=22) — extract per-tuning-type validators"
+    summary: "Refactor validate_column_types (CC=22) - extract per-tuning-type validators"
     status: done
     note: |
-      Already refactored in prior change — delegates to 4 private validators.
+      Already refactored in prior change - delegates to 4 private validators.
       CC is below threshold.
 
   - id: w6
-    summary: "Refactor apply_driver_metadata (CC=21) — consolidate repeated getattr/setattr chains"
+    summary: "Refactor apply_driver_metadata (CC=21) - consolidate repeated getattr/setattr chains"
     status: done
     note: |
-      Already refactored in prior change — delegates to 4 private helpers.
+      Already refactored in prior change - delegates to 4 private helpers.
       CC is below threshold.
 
   - id: w7
-    summary: "Refactor _load_file_based_data (CC=18) — extract sharded loading to helper method"
+    summary: "Refactor _load_file_based_data (CC=18) - extract sharded loading to helper method"
     status: done
     note: |
       Extracted _load_sharded_table() and _log_table_loaded() from
@@ -85,7 +85,7 @@ verification:
     expected_output: "All checks passed"
 
 must_preserve:
-  - "All refactored functions must produce identical behavior — no semantic changes"
+  - "All refactored functions must produce identical behavior - no semantic changes"
   - "Existing tests must continue to pass without modification"
   - "exclude_functions entries must include CC score and rationale comment"
 
@@ -99,12 +99,12 @@ approach: |
   3. Run focused tests + lint after each extraction
   4. Verify CC reduced via: uv run -- python scripts/check_complexity.py 2>&1 | grep function_name
 
-  w7: Optional cleanup — only if w2-w6 are done and fast suite is green.
+  w7: Optional cleanup - only if w2-w6 are done and fast suite is green.
 
 anti_patterns:
-  - "DO NOT change public API signatures — because these are all internal functions and callers should not need updating"
-  - "DO NOT add new abstractions (base classes, protocols) — because extraction alone achieves the CC target without introducing coupling between unrelated modules"
-  - "DO NOT move code to new files — because the helpers share private state with the parent function and moving them would require exposing internal details"
+  - "DO NOT change public API signatures - because these are all internal functions and callers should not need updating"
+  - "DO NOT add new abstractions (base classes, protocols) - because extraction alone achieves the CC target without introducing coupling between unrelated modules"
+  - "DO NOT move code to new files - because the helpers share private state with the parent function and moving them would require exposing internal details"
 
 scope_limit:
   only_modify:

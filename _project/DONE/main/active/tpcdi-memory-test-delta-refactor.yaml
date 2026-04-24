@@ -12,7 +12,7 @@ description: |
     assert metrics["peak_memory_mb"] <= max_memory_mb
 
   This was raised from 600 MB to 2000 MB base in commit 8c0ddcb46 because observed
-  absolute RSS at SF 0.01 was 1943 MB — xdist workers, loaded modules, and pandas
+  absolute RSS at SF 0.01 was 1943 MB - xdist workers, loaded modules, and pandas
   internals dominate the measurement, not the benchmark itself.
 
   The problem: absolute RSS is immune to memory leaks. A 300 MB regression at SF 0.01
@@ -36,10 +36,10 @@ metadata:
     - tpcdi
     - memory
     - regression-detection
-  estimated_effort: "Small — validation method change + one calibration run to pick threshold"
+  estimated_effort: "Small - validation method change + one calibration run to pick threshold"
   created_date: "2026-03-27"
   related_commits:
-    - "8c0ddcb46 — raised absolute RSS threshold 600→2000 MB, which is what this TODO fixes"
+    - "8c0ddcb46 - raised absolute RSS threshold 600→2000 MB, which is what this TODO fixes"
 
 work:
   - id: w1
@@ -73,11 +73,11 @@ must_preserve:
   - "memory_growth_mb key continues to exist in performance_results dict (used by _save_performance_baseline)"
   - "peak_memory_mb key remains in performance_results (other methods may reference it)"
   - "All four scale factors (0.01, 0.1, 0.5, 1.0) continue to be tested"
-  - "No changes to data collection logic in test_multi_scale_factor_performance_analysis — only _validate_performance_thresholds changes"
+  - "No changes to data collection logic in test_multi_scale_factor_performance_analysis - only _validate_performance_thresholds changes"
 
 approach: |
   The change is entirely in _validate_performance_thresholds. The data collection loop
-  already captures start_memory and peak_memory and computes the delta — no changes
+  already captures start_memory and peak_memory and computes the delta - no changes
   needed there. Only the assertion and the threshold formula change.
 
   Calibrate threshold conservatively: observed_max_growth * 2 rounded up to nearest
@@ -85,7 +85,7 @@ approach: |
   machines with aggressive GC.
 
 anti_patterns:
-  - "DO NOT remove peak_memory_mb from performance_results — because _save_performance_baseline may use it and callers outside this method may depend on it — only change the assertion"
+  - "DO NOT remove peak_memory_mb from performance_results - because _save_performance_baseline may use it and callers outside this method may depend on it - only change the assertion"
   - "DO NOT pick a threshold without a calibration run first -- because guessing will either re-create the loose-threshold problem or cause spurious CI failures -- always observe before asserting"
   - "DO NOT merge the calibration print into production code -- because debug prints in test output are noise -- remove the temporary print before committing w2"
 

@@ -41,7 +41,7 @@ impact:
     Architecture docs are the primary onboarding reference. Inaccuracy here
     increases support burden and slows contributor ramp-up.
   regression_risk: |
-    Zero — documentation-only changes.
+    Zero - documentation-only changes.
 
 work:
 - id: w1
@@ -75,11 +75,11 @@ work:
     Ensure no references to non-existent APIs.
   approach: |
     Key classes to document:
-    - BenchmarkExecutor (benchbox.cli.execution) — high-level orchestrator
-    - PowerRunExecutor (benchbox.utils.execution_manager) — concurrent query execution
-    - ExpressionFamilyAdapter (benchbox.platforms.dataframe.expression_family) — Polars/PySpark/DataFusion
-    - PandasFamilyAdapter (benchbox.platforms.dataframe.pandas_family) — Pandas/Modin/cuDF/Vaex/Dask
-    - DataFrameProfiler (benchbox.core.dataframe.profiling) — profiling/memory tracking
+    - BenchmarkExecutor (benchbox.cli.execution) - high-level orchestrator
+    - PowerRunExecutor (benchbox.utils.execution_manager) - concurrent query execution
+    - ExpressionFamilyAdapter (benchbox.platforms.dataframe.expression_family) - Polars/PySpark/DataFusion
+    - PandasFamilyAdapter (benchbox.platforms.dataframe.pandas_family) - Pandas/Modin/cuDF/Vaex/Dask
+    - DataFrameProfiler (benchbox.core.dataframe.profiling) - profiling/memory tracking
   files:
   - docs/design/architecture.md
 

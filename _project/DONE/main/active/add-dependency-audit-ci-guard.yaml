@@ -9,8 +9,8 @@ description: |
   The `audit-imported-dependencies-for-elimination` audit was driven by
   two methodology scripts currently parked under `_project/scratch/`
   (gitignored):
-    - `parse_deps.py` — tomllib-based dep enumeration from pyproject.toml
-    - `scan_imports.py` — AST walker over benchbox/, scripts/, tests/,
+    - `parse_deps.py` - tomllib-based dep enumeration from pyproject.toml
+    - `scan_imports.py` - AST walker over benchbox/, scripts/, tests/,
       docs/conf.py, docs/_static/
 
   Without a check, the audit's "70 KEEP, 6 FLAG-*" snapshot decays. New
@@ -43,9 +43,9 @@ work:
     status: done
     notes: |
       Files:
-        - `plugin_cli_allowlist.yaml` — pytest-*, ruff, ty, tox, mutmut,
+        - `plugin_cli_allowlist.yaml` - pytest-*, ruff, ty, tox, mutmut,
           codespell, sphinx-*, furo, pygments, etc.
-        - `guarded_optional_allowlist.yaml` — cudf, cupy, cuml,
+        - `guarded_optional_allowlist.yaml` - cudf, cupy, cuml,
           sentence_transformers, torch, spacy, textblob, pysail, dask_sql,
           flightsql, influxdb3.
 
@@ -55,7 +55,7 @@ work:
     status: done
 
   - id: w5
-    summary: "Wire `make audit-deps` into the existing CI lint job (`.github/workflows/`). Should run alongside `make lint` and `make typecheck` — pure Python AST, fast."
+    summary: "Wire `make audit-deps` into the existing CI lint job (`.github/workflows/`). Should run alongside `make lint` and `make typecheck` - pure Python AST, fast."
     needs: [w4]
     status: done
 
@@ -73,7 +73,7 @@ deferred:
   - summary: "Auto-PR new findings (e.g. open a TODO when a new unused dep is detected)"
     reason: "Out of scope for the initial guard; the failing CI check is sufficient signal."
   - summary: "Extend the scan to detect over-pinned version bounds"
-    reason: "Different problem domain — covered by `review-dependency-upper-bounds-quarterly`."
+    reason: "Different problem domain - covered by `review-dependency-upper-bounds-quarterly`."
 
 files_affected:
   added:
@@ -87,12 +87,12 @@ files_affected:
     - "Makefile"
     - ".github/workflows/<lint job>.yml"
     - "docs/development/dependency-inventory.md"
-    - ".gitignore"  # un-ignore the moved scripts if needed
+    - ".gitignore" # un-ignore the moved scripts if needed
 
 must_preserve:
   - "Existing `make lint` / `make typecheck` / `make test-fast` targets unchanged"
   - "CI runtime impact <30s for the new check (it's pure AST, no installs)"
-  - "Allowlists explicitly mirror the documented exemptions in `dependency-inventory.md` — no silent drift"
+  - "Allowlists explicitly mirror the documented exemptions in `dependency-inventory.md` - no silent drift"
   - "Check fails closed: any unexpected new dep or undeclared import causes CI red"
 
 approach: |
@@ -106,9 +106,9 @@ approach: |
   that justifies it.
 
 anti_patterns:
-  - "DO NOT make the check warning-only — because warnings get ignored in CI noise — fail the build"
-  - "DO NOT bake the allowlists into the script source — because future audits need to update them without code review of the scanner — keep them as data files"
-  - "DO NOT extend the scope to version-bound checking — because that's a different problem domain — keep this TODO focused on declared/imported parity"
+  - "DO NOT make the check warning-only - because warnings get ignored in CI noise - fail the build"
+  - "DO NOT bake the allowlists into the script source - because future audits need to update them without code review of the scanner - keep them as data files"
+  - "DO NOT extend the scope to version-bound checking - because that's a different problem domain - keep this TODO focused on declared/imported parity"
 
 verification:
   - description: "make audit-deps target exists"
@@ -132,7 +132,7 @@ scope_limit:
     - "docs/development/dependency-inventory.md"
     - ".gitignore"
   do_not_modify:
-    - "pyproject.toml"   # this TODO adds a check, not a fix
+    - "pyproject.toml" # this TODO adds a check, not a fix
     - "uv.lock"
     - "benchbox/"
     - "tests/"

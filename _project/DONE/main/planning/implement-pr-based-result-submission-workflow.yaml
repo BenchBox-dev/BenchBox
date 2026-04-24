@@ -19,7 +19,7 @@ description: |
   Maintainers review and merge. Merge triggers a rebuild of derived read
   models and redeployment of the explorer.
 
-  This model uses GitHub as the auth, moderation, and audit layer — zero
+  This model uses GitHub as the auth, moderation, and audit layer - zero
   hosted services required. It scales to ~100s of submissions/month before
   maintainer review becomes a bottleneck.
 
@@ -121,17 +121,17 @@ impact:
 
 must_preserve:
 - "Phase 1 explorer continues to work for maintainer-curated results"
-- "The canonical schema-v2 bundle remains the submission artifact — no alternative format"
+- "The canonical schema-v2 bundle remains the submission artifact - no alternative format"
 - "Existing benchbox run/export workflows are not modified"
 
 approach: |
   Build on the Phase 1 foundation. The static build pipeline already transforms
-  bundles into read models — Phase 2 just adds more bundles from community PRs.
+  bundles into read models - Phase 2 just adds more bundles from community PRs.
   The `benchbox submit` command is a thin packaging layer, not a new code path.
 
 anti_patterns:
-- "DO NOT build a hosted API for Phase 2 — because PR-based submission is sufficient until volume demands it — avoid premature infrastructure"
-- "DO NOT auto-merge community submissions without maintainer review — because unreviewed results degrade trust — require human approval"
+- "DO NOT build a hosted API for Phase 2 - because PR-based submission is sufficient until volume demands it - avoid premature infrastructure"
+- "DO NOT auto-merge community submissions without maintainer review - because unreviewed results degrade trust - require human approval"
 
 verification:
 - description: "benchbox submit --output packages a valid submission bundle"

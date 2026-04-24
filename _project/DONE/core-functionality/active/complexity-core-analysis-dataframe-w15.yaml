@@ -9,18 +9,18 @@ description: |
   Five core functions at CC=14 have clear decomposition opportunities.
 
   Target functions:
-  1. validate (comparison.py:196) — extract _detect_outliers() and _validate_query_overlap()
-  2. _rank_by_composite (ranking.py:361) — extract _compute_raw_scores() and _normalize_scores()
-  3. _run_sql_query (benchmark_suite.py:1081) — extract _run_on_duckdb() and _run_on_sqlite()
+  1. validate (comparison.py:196) - extract _detect_outliers() and _validate_query_overlap()
+  2. _rank_by_composite (ranking.py:361) - extract _compute_raw_scores() and _normalize_scores()
+  3. _run_sql_query (benchmark_suite.py:1081) - extract _run_on_duckdb() and _run_on_sqlite()
      (most clear-cut: two 90%-identical platform branches)
-  4. convert_csv_to_parquet (data_loader.py:255) — extract _build_write_kwargs() and _resolve_arrow_types()
-  5. execute_dry_run (dryrun.py:110) — extract _resolve_execution_mode() and _init_platform_adapter()
+  4. convert_csv_to_parquet (data_loader.py:255) - extract _build_write_kwargs() and _resolve_arrow_types()
+  5. execute_dry_run (dryrun.py:110) - extract _resolve_execution_mode() and _init_platform_adapter()
 
 work:
 - id: w1
   summary: "Extract _run_on_duckdb() and _run_on_sqlite() from _run_sql_query in benchmark_suite.py"
   status: done
-  notes: "Most impactful — near-duplicate platform branches are the primary code smell"
+  notes: "Most impactful - near-duplicate platform branches are the primary code smell"
 
 - id: w2
   summary: "Extract _compute_raw_scores() and _normalize_scores() from _rank_by_composite in ranking.py"
@@ -52,14 +52,14 @@ must_preserve:
 
 approach: |
   Follow complexity batches 3-7 pattern. For _run_sql_query, the DuckDB and SQLite
-  branches are nearly identical — factor out shared logic (load tables loop, warmup loop,
+  branches are nearly identical - factor out shared logic (load tables loop, warmup loop,
   benchmark loop with row count capture) into a common pattern or extract per-platform
   helpers that share a _time_query_iterations() utility.
 
 anti_patterns:
-- "DO NOT create an ABC or strategy pattern for the DuckDB/SQLite dispatch — because only 2 platforms exist — simple if/else
+- "DO NOT create an ABC or strategy pattern for the DuckDB/SQLite dispatch - because only 2 platforms exist - simple if/else
   with extracted helpers is sufficient"
-- "DO NOT change the scoring formula in _rank_by_composite — because results must remain comparable with prior runs — only
+- "DO NOT change the scoring formula in _rank_by_composite - because results must remain comparable with prior runs - only
   restructure the code"
 
 verification:

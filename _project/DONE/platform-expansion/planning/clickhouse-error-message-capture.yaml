@@ -15,7 +15,7 @@ description: |
 
 work:
   - id: w1
-    summary: "Find the ClickHouse adapter's query execution error handler — locate where exceptions are caught but messages discarded"
+    summary: "Find the ClickHouse adapter's query execution error handler - locate where exceptions are caught but messages discarded"
     status: done
 
   - id: w2
@@ -37,8 +37,8 @@ must_preserve:
   - "Successful queries unaffected"
 
 anti_patterns:
-  - "DO NOT catch exceptions without storing str(e) in the result error field — because swallowed errors force manual re-runs for diagnosis — always capture the message"
-  - "DO NOT change query execution flow or retry logic — because this is a diagnostics-only fix — only add error message capture to existing except blocks"
+  - "DO NOT catch exceptions without storing str(e) in the result error field - because swallowed errors force manual re-runs for diagnosis - always capture the message"
+  - "DO NOT change query execution flow or retry logic - because this is a diagnostics-only fix - only add error message capture to existing except blocks"
 
 approach: |
   Search the ClickHouse adapter for try/except blocks in query execution methods.

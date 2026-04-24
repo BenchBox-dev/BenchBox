@@ -30,7 +30,7 @@ description: |
       varying only by column names and cardinality.
 
   G3  (55 lines): classify_error / date_add / date_sub across 6 files.
-      AST false positive — these are different functions with different return
+      AST false positive - these are different functions with different return
       types and semantics (error classification vs datetime arithmetic) that
       happen to share the facade/delegation AST shape.
 
@@ -53,7 +53,7 @@ description: |
 
   G8  (48 lines): generate_data / get_all_aliases / get_benchmark_info across
       platform_registry.py, datavault.py, nyctaxi.py, tpch_skew.py, tsbs_devops.py.
-      Facade API conformance methods — same pattern as __init__ facades already
+      Facade API conformance methods - same pattern as __init__ facades already
       ignored in wave-2.
 
   G9  (48 lines): get_queries_by_category in tpcdi/query_analytics.py,
@@ -75,7 +75,7 @@ description: |
       docstring + attribute assignment. Different classes, different attributes.
 
   G22 (44 lines): calculate_official_metrics / execute_operation / get across
-      5 files. AST false positive — three different function names with different
+      5 files. AST false positive - three different function names with different
       purposes that share the delegation/accessor AST shape.
 
   G27 (43 lines): q26_expression_impl / q7_expression_impl in
@@ -209,12 +209,12 @@ must_preserve:
 - "make duplicate-check still passes in CI"
 
 anti_patterns:
-- "DO NOT add overly broad function name ignores — because broad ignores mask future real duplicates that should be consolidated,
-  defeating the purpose of the checker — always scope with path_contains"
-- "DO NOT duplicate existing rules — because multiple rules matching the same function create maintenance burden when paths
-  change and make it unclear which rule is authoritative — extend existing rules by adding function names or paths"
-- "DO NOT ignore groups that are genuine consolidation candidates — because the wave-3 consolidation TODOs (sql-platform-adapters,
-  core-and-dataframe) target groups where extraction will reduce real maintenance cost — check the companion TODOs before
+- "DO NOT add overly broad function name ignores - because broad ignores mask future real duplicates that should be consolidated,
+  defeating the purpose of the checker - always scope with path_contains"
+- "DO NOT duplicate existing rules - because multiple rules matching the same function create maintenance burden when paths
+  change and make it unclear which rule is authoritative - extend existing rules by adding function names or paths"
+- "DO NOT ignore groups that are genuine consolidation candidates - because the wave-3 consolidation TODOs (sql-platform-adapters,
+  core-and-dataframe) target groups where extraction will reduce real maintenance cost - check the companion TODOs before
   classifying a group as ignore"
 
 metadata:

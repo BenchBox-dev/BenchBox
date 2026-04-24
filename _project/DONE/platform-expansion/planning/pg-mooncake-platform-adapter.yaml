@@ -25,7 +25,7 @@ description: |
   Key benchmarking scenarios:
   - pg_mooncake columnstore vs PostgreSQL heap tables (same queries)
   - pg_mooncake vs native DuckDB (columnar vs columnar)
-  - pg_mooncake vs ClickHouse (ClickBench comparison — pg_mooncake is top 10)
+  - pg_mooncake vs ClickHouse (ClickBench comparison - pg_mooncake is top 10)
   - pg_mooncake with object storage backend (S3/GCS) vs local disk
 
 context_sections:
@@ -51,7 +51,7 @@ context_sections:
     Limitations:
     - Not all PostgreSQL features supported on columnstore tables
     - Converting existing heap tables requires CREATE + COPY workflow
-    - Active development — some data types may not be supported yet
+    - Active development - some data types may not be supported yet
 
   "Technical Context": |
     pg_mooncake connects via standard PostgreSQL wire protocol (psycopg2).
@@ -71,7 +71,7 @@ context_sections:
     - Configure mooncake-specific GUC parameters
     - Handle limitations gracefully (unsupported data types, features)
 
-    IMPORTANT: pg_mooncake bundles its own pg_duckdb fork — it conflicts with
+    IMPORTANT: pg_mooncake bundles its own pg_duckdb fork - it conflicts with
     the standalone pg_duckdb extension. Cannot coexist in the same instance.
     This means separate PostgreSQL instances for pg_duckdb vs pg_mooncake benchmarks.
 
@@ -115,15 +115,15 @@ technical_requirements:
   - "PostgreSQL 15+ with pg_mooncake extension installed"
   constraints:
   - "Requires pg_mooncake extension pre-installed on PostgreSQL server"
-  - "Conflicts with standalone pg_duckdb — cannot coexist in same instance"
+  - "Conflicts with standalone pg_duckdb - cannot coexist in same instance"
   - "Not all PostgreSQL data types supported on columnstore tables"
   - "Object storage mode requires S3/GCS credentials"
   compatibility: |
-    PostgreSQL 15-18 with pg_mooncake. Standard psycopg2 driver — no
+    PostgreSQL 15-18 with pg_mooncake. Standard psycopg2 driver - no
     additional Python dependencies. Object storage backend is optional.
 
 must_preserve:
-- "PostgreSQLAdapter.load_data() COPY pipeline unchanged — pg_mooncake inherits it but COPY targets columnstore tables"
+- "PostgreSQLAdapter.load_data() COPY pipeline unchanged - pg_mooncake inherits it but COPY targets columnstore tables"
 - "PostgreSQLAdapter.execute_query() return format unchanged"
 - "All existing PostgreSQL adapter tests pass: uv run -- python -m pytest tests/unit/platforms/test_postgresql_adapter.py
   -v"
@@ -136,9 +136,9 @@ approach: |
   1. Create PgMooncakeAdapter(PostgreSQLAdapter) in benchbox/platforms/pg_mooncake.py
   2. Override create_connection() to verify pg_mooncake extension is installed
   3. Override create_schema() to modify DDL: add "USING columnstore" to
-     CREATE TABLE statements. This is the critical difference — tables must use
+     CREATE TABLE statements. This is the critical difference - tables must use
      the columnstore access method for pg_mooncake to activate.
-  4. Inherit load_data() from PostgreSQLAdapter — COPY works on columnstore
+  4. Inherit load_data() from PostgreSQLAdapter - COPY works on columnstore
      tables but internally creates Parquet files
   5. Override configure_for_benchmark() for pg_mooncake-specific GUCs
   6. Register in platform_registry.py with metadata (category: "olap-columnstore",
@@ -155,14 +155,14 @@ approach: |
   - CLI flags: --mooncake-storage=local|s3 --mooncake-bucket=<url>
 
 anti_patterns:
-- "DO NOT modify the PostgreSQL adapter's create_schema() — because pg_mooncake needs USING columnstore only for its own tables
-  — override in the pg_mooncake adapter class"
-- "DO NOT try to ALTER existing heap tables to columnstore in-place — because pg_mooncake requires CREATE TABLE ... USING
-  columnstore — create tables with columnstore from the start"
-- "DO NOT silently fall back to heap tables on unsupported types — because this would produce misleading benchmark results
-  — raise a clear error listing which columns have unsupported types"
-- "DO NOT bundle or install pg_mooncake via the adapter — because extension installation requires server admin privileges
-  and Docker setup — only verify it exists and raise a clear error if missing"
+- "DO NOT modify the PostgreSQL adapter's create_schema() - because pg_mooncake needs USING columnstore only for its own tables
+  - override in the pg_mooncake adapter class"
+- "DO NOT try to ALTER existing heap tables to columnstore in-place - because pg_mooncake requires CREATE TABLE ... USING
+  columnstore - create tables with columnstore from the start"
+- "DO NOT silently fall back to heap tables on unsupported types - because this would produce misleading benchmark results
+  - raise a clear error listing which columns have unsupported types"
+- "DO NOT bundle or install pg_mooncake via the adapter - because extension installation requires server admin privileges
+  and Docker setup - only verify it exists and raise a clear error if missing"
 
 verification:
 - description: "pg_mooncake adapter module imports without error"
@@ -217,7 +217,7 @@ work:
     data types"
   needs: [w2]
   status: done
-  notes: "This is the critical differentiator — all tables must use columnstore access method"
+  notes: "This is the critical differentiator - all tables must use columnstore access method"
 
 - id: w4
   summary: "Implement configure_for_benchmark() override for pg_mooncake-specific OLAP optimizations"
@@ -228,7 +228,7 @@ work:
   summary: "Add object storage configuration support (mooncake.default_bucket GUC, S3/GCS credential handling via env vars)"
   needs: [w2]
   status: done
-  notes: "Optional feature — local disk is default; S3 requires MOONCAKE_S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY"
+  notes: "Optional feature - local disk is default; S3 requires MOONCAKE_S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY"
 
 - id: w6
   summary: "Register pg-mooncake in platform_registry.py with metadata (display_name, category, libraries, storage_modes:
@@ -267,13 +267,13 @@ work:
 
 deferred:
 - summary: "pg_moonlink WAL-based replication for real-time analytics benchmarking"
-  reason: "Requires specific PostgreSQL WAL configuration — advanced use case for later"
+  reason: "Requires specific PostgreSQL WAL configuration - advanced use case for later"
 - summary: "Object storage (S3/GCS) integration testing"
-  reason: "Requires cloud storage credentials — handle in live-platform-test workflow"
+  reason: "Requires cloud storage credentials - handle in live-platform-test workflow"
 - summary: "Data type compatibility matrix documentation"
-  reason: "pg_mooncake is actively evolving — type support changes frequently"
+  reason: "pg_mooncake is actively evolving - type support changes frequently"
 - summary: "Heap-to-columnstore migration benchmarking (measuring conversion overhead)"
-  reason: "Specialized benchmark scenario — handle as a separate benchmark type"
+  reason: "Specialized benchmark scenario - handle as a separate benchmark type"
 
 open_questions:
 - "Should we provide a Docker Compose file for easy pg_mooncake setup since the recommended path is Docker?"

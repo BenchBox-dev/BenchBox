@@ -74,16 +74,16 @@ approach: |
   implemented render paths and tests.
 
 anti_patterns:
-- "DO NOT add new chart names directly in multiple modules — because duplicated registries drift — define one canonical source
+- "DO NOT add new chart names directly in multiple modules - because duplicated registries drift - define one canonical source
   and import it"
-- "DO NOT silently skip unsupported template chart types — because users cannot trust template output completeness — emit
+- "DO NOT silently skip unsupported template chart types - because users cannot trust template output completeness - emit
   explicit skip reasons and test them"
-- "DO NOT widen comparison charts to arbitrary N-way semantics without design — because current logic is pairwise and order-sensitive
-  — enforce two-run expectations or provide explicit selection"
-- "DO NOT render heatmap cells with mixed-width fill/value layouts — because scanability collapses across rows — enforce fixed
+- "DO NOT widen comparison charts to arbitrary N-way semantics without design - because current logic is pairwise and order-sensitive
+  - enforce two-run expectations or provide explicit selection"
+- "DO NOT render heatmap cells with mixed-width fill/value layouts - because scanability collapses across rows - enforce fixed
   cell width and right-aligned numerals"
-- "DO NOT prepend decorative series glyphs to box-plot labels when glyphs are not used in the plot body — because they waste
-  label width and add noise — use plain series names"
+- "DO NOT prepend decorative series glyphs to box-plot labels when glyphs are not used in the plot body - because they waste
+  label width and add noise - use plain series names"
 
 verification:
 - description: "Visualization unit tests pass for ASCII charts and no-color rendering"

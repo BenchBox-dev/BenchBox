@@ -25,7 +25,7 @@ description: |
      tests/conftest.py, running BEFORE the deselection slice so all collected items
      (including those about to be deselected by -m filters) are inspected. Starts in
      warning mode, promoted to error mode once all violations are remediated.
-  2. Remediation of all 43 existing violations — each test gets a single correct
+  2. Remediation of all 43 existing violations - each test gets a single correct
      speed marker based on what it actually does.
 
   This makes the pytest_collection_modifyitems exclusion hook (added in
@@ -43,7 +43,7 @@ metadata:
 
 impact:
   user_impact: |
-    None — test infrastructure only. No production behavior or API changes.
+    None - test infrastructure only. No production behavior or API changes.
   maintainer_impact: |
     Future tests with conflicting markers fail collection immediately with a
     clear error message listing the offending tests and the violated rule.
@@ -71,7 +71,7 @@ work:
       deselection slice. This guarantees all violations are visible even when a -m
       filter (e.g. -m fast) would later remove the conflicting tests from session.items.
 
-      Do NOT add a second pytest_collection_modifyitems function — Python would
+      Do NOT add a second pytest_collection_modifyitems function - Python would
       silently override the first. Extend the existing one.
 
       Insert at the top of the existing hook body:
@@ -243,7 +243,7 @@ work:
         - test_delta_sorted_output_writes_readable_delta_table
         - test_iceberg_sorted_output_writes_iceberg_layout
 
-      These tests write Delta/Iceberg table layouts — clearly resource-heavy I/O.
+      These tests write Delta/Iceberg table layouts - clearly resource-heavy I/O.
       Remove @fast. Read the test body: seconds → @medium, minutes → @slow.
       Keep @resource_heavy in all cases.
     files:
@@ -288,7 +288,7 @@ work:
 
       Because conflict detection fires inside pytest_collection_modifyitems,
       --collect-only is sufficient to trigger it. Do NOT pipe to tail or any
-      other command — the exit code must come directly from pytest for CI to
+      other command - the exit code must come directly from pytest for CI to
       catch failures reliably.
 
       Wire into CI: add lint-markers to the existing lint job (or a new
@@ -300,27 +300,27 @@ work:
       - .github/workflows/lint.yml  # or whichever workflow runs lint
 
 must_preserve:
-  - "make test-fast and uv run -- python -m pytest -m fast -q collect identical node ID sets (not just equal counts) — enforced by existing collection hook in d84c897a8"
-  - "make test-slow, make test-stress, make test-all still collect their expected sets — hook must not block explicit marker opt-in"
+  - "make test-fast and uv run -- python -m pytest -m fast -q collect identical node ID sets (not just equal counts) - enforced by existing collection hook in d84c897a8"
+  - "make test-slow, make test-stress, make test-all still collect their expected sets - hook must not block explicit marker opt-in"
   - "BENCHBOX_SKIP_MARKER_CHECK=1 suppresses validation errors after w14 promotion (escape hatch preserved); during w1-w13 migration, BENCHBOX_ENFORCE_MARKER_CHECK=1 opts into early error mode"
-  - "No test logic changes — only marker annotations modified"
+  - "No test logic changes - only marker annotations modified"
 
 approach: |
   Work units are sequenced: extend the existing pytest_collection_modifyitems hook
   in warning mode first (w1), placing conflict detection BEFORE the deselection
   slice so all 43 violations are visible regardless of -m filter. CI stays green
-  while violations are fixed (w2-w13 can run in any order or in parallel — one
+  while violations are fixed (w2-w13 can run in any order or in parallel - one
   file per commit). Promote to error mode (w14) only after all violations are
   gone, confirmed by pytest --collect-only returning zero marker-conflict warnings.
   Finally add the make target (w15) to give pre-commit a fast entry point.
 
 anti_patterns:
-  - "DO NOT add new markers to tests without first checking for speed-lane conflicts — because the hook catches it at collection time but a failing CI run wastes 10+ minutes before you see the error; check locally with --collect-only first"
-  - "DO NOT resolve conflicts by removing resource_heavy or live_integration from tests that genuinely need those markers — those exist to route tests to the right runner; remove the speed-lane marker instead"
-  - "DO NOT use BENCHBOX_SKIP_MARKER_CHECK=1 in CI — it defeats the entire purpose"
-  - "DO NOT change test logic while fixing markers — because this is a metadata-only cleanup and any logic change risks introducing regressions that get blamed on the marker fix, making it harder to revert cleanly"
-  - "DO NOT add a second pytest_collection_modifyitems function to conftest.py — Python silently overrides the first; extend the existing hook body instead"
-  - "DO NOT pipe the lint-markers pytest invocation into tail or any filter — the exit code must come from pytest directly, otherwise CI wiring silently passes on failure"
+  - "DO NOT add new markers to tests without first checking for speed-lane conflicts - because the hook catches it at collection time but a failing CI run wastes 10+ minutes before you see the error; check locally with --collect-only first"
+  - "DO NOT resolve conflicts by removing resource_heavy or live_integration from tests that genuinely need those markers - those exist to route tests to the right runner; remove the speed-lane marker instead"
+  - "DO NOT use BENCHBOX_SKIP_MARKER_CHECK=1 in CI - it defeats the entire purpose"
+  - "DO NOT change test logic while fixing markers - because this is a metadata-only cleanup and any logic change risks introducing regressions that get blamed on the marker fix, making it harder to revert cleanly"
+  - "DO NOT add a second pytest_collection_modifyitems function to conftest.py - Python silently overrides the first; extend the existing hook body instead"
+  - "DO NOT pipe the lint-markers pytest invocation into tail or any filter - the exit code must come from pytest directly, otherwise CI wiring silently passes on failure"
 
 verification:
   - description: "No fast+slow conflicts after w2-w6"
@@ -362,5 +362,5 @@ scope_limit:
   do_not_touch:
     - "Production source code (benchbox/ package)"
     - "pytest.ini addopts (do not change the default -m expression)"
-    - "The pytest_collection_modifyitems exclusion hook logic added in d84c897a8 — extend it, do not replace it"
+    - "The pytest_collection_modifyitems exclusion hook logic added in d84c897a8 - extend it, do not replace it"
     - "Any test files not listed above"

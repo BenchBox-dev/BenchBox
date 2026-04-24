@@ -16,7 +16,7 @@ description: |
   3. Measure conversion time, storage size before/after, and query performance
      delta on the same workload pre- and post-conversion
 
-  No existing migration benchmarking infrastructure exists in BenchBox —
+  No existing migration benchmarking infrastructure exists in BenchBox -
   this is net-new capability.
 
   Split from pg-extension-advanced-benchmarking (originally deferred from
@@ -37,7 +37,7 @@ approach: |
      PlatformComparison.from_files() can compare heap vs columnstore runs
 
   Reference: PgMooncakeAdapter.create_schema() already adds USING columnstore
-  to DDL. The migration benchmark needs the inverse — load WITHOUT columnstore
+  to DDL. The migration benchmark needs the inverse - load WITHOUT columnstore
   first, then convert.
 
 metadata:
@@ -47,7 +47,7 @@ metadata:
   - benchmarking
   - migration
   - deferred-followup
-  estimated_effort: "Medium — 1-2 days"
+  estimated_effort: "Medium - 1-2 days"
   created_date: "2026-02-21"
   split_from: pg-extension-advanced-benchmarking
 
@@ -64,12 +64,12 @@ scope_limit:
 must_preserve:
 - "PgMooncakeAdapter.create_schema() default behavior (USING columnstore on all tables)"
 - "Existing benchmark phase execution unaffected"
-- "BenchmarkResults schema compatibility — output must load via PlatformComparison.from_files()"
+- "BenchmarkResults schema compatibility - output must load via PlatformComparison.from_files()"
 
 anti_patterns:
-- "DO NOT modify the default create_schema path — because existing benchmarks expect columnstore by default — add a separate
+- "DO NOT modify the default create_schema path - because existing benchmarks expect columnstore by default - add a separate
   code path or parameter for heap-first loading"
-- "DO NOT invent a custom results format — because the comparison infrastructure expects BenchmarkResults v2.0 JSON — emit
+- "DO NOT invent a custom results format - because the comparison infrastructure expects BenchmarkResults v2.0 JSON - emit
   standard result files"
 
 verification:

@@ -1,5 +1,5 @@
 id: clickhouse-join-memory-tuning
-title: "Fix ClickHouse JOIN memory limit — restore max_bytes_in_join to 50% and verify grace_hash"
+title: "Fix ClickHouse JOIN memory limit - restore max_bytes_in_join to 50% and verify grace_hash"
 worktree: platform-expansion
 category: Platform Expansion
 priority: High
@@ -9,7 +9,7 @@ description: |
   "Limit for JOIN exceeded, max bytes: 2.00 GiB, current bytes: 2.72 GiB"
 
   Root cause: benchbox/platforms/clickhouse/tuning.py ~line 91 sets max_bytes_in_join
-  to 25% of max_memory_usage. With a 2 GB default, that's 512 MB — too low for Q5's
+  to 25% of max_memory_usage. With a 2 GB default, that's 512 MB - too low for Q5's
   multi-table join at SF1 which needs 2.72 GB.
 
   Additionally, join_algorithm should be set to "grace_hash" (~line 105) which spills
@@ -24,7 +24,7 @@ work:
   status: done
 
 - id: w2
-  summary: "Verify join_algorithm = 'grace_hash' is being applied — check for overrides in adapter or session settings"
+  summary: "Verify join_algorithm = 'grace_hash' is being applied - check for overrides in adapter or session settings"
   status: done
 
 - id: w3
@@ -42,10 +42,10 @@ must_preserve:
 - "grace_hash join algorithm setting is not overridden by adapter session defaults"
 
 anti_patterns:
-- "DO NOT lower max_bytes_in_join below 0.5 × max_memory_usage — because SF1 Q5 multi-table join needs 2.72 GiB and 25% cap
-  caused OOM — keep at 50% minimum"
-- "DO NOT remove grace_hash join_algorithm — because grace_hash spills to disk and is the safety net when memory limits are
-  hit — verify it takes effect"
+- "DO NOT lower max_bytes_in_join below 0.5 × max_memory_usage - because SF1 Q5 multi-table join needs 2.72 GiB and 25% cap
+  caused OOM - keep at 50% minimum"
+- "DO NOT remove grace_hash join_algorithm - because grace_hash spills to disk and is the safety net when memory limits are
+  hit - verify it takes effect"
 
 approach: |
   Simple parameter change in tuning.py. Check the max_bytes_in_join calculation

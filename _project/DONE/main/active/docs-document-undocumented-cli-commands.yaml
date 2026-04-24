@@ -18,7 +18,7 @@ description: |
   - benchbox plan-history (benchbox/cli/commands/plan_history.py)
   - benchbox show-plan (benchbox/cli/commands/show_plan.py)
   - benchbox setup (benchbox/cli/commands/setup.py)
-  - benchbox run-official (benchbox/cli/commands/run_official.py — hidden)
+  - benchbox run-official (benchbox/cli/commands/run_official.py - hidden)
 
   Undocumented `benchbox run` flags:
   --table-mode, --table-format, --presort, --sorted-ingestion-mode,
@@ -48,7 +48,7 @@ impact:
   maintainer_impact: |
     Undocumented features generate support questions and inconsistent usage.
   regression_risk: |
-    Zero — documentation-only changes.
+    Zero - documentation-only changes.
 
 work:
 - id: w1

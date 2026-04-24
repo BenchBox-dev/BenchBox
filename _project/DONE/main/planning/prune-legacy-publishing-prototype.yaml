@@ -83,7 +83,7 @@ must_preserve:
 - "test_publish_store.py and test_publish_cli.py must remain and pass"
 
 anti_patterns:
-- "DO NOT remove files piecemeal without verifying zero consumers first — because hidden imports cause runtime ImportError — scan the full tree before deleting"
+- "DO NOT remove files piecemeal without verifying zero consumers first - because hidden imports cause runtime ImportError - scan the full tree before deleting"
 
 scope_limit:
   only_modify:

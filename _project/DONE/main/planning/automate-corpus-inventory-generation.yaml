@@ -50,7 +50,7 @@ work:
 
     Flags:
       - `--check` → exit 1 if generated content differs from on-disk file
-        (no write, deterministic — no `generated_at`)
+        (no write, deterministic - no `generated_at`)
       - `--write` → overwrite `corpus-inventory.json`
     Default: `--write`.
 
@@ -82,7 +82,7 @@ work:
       `uv run python scripts/generate_corpus_inventory.py --check`
     A failing check posts a PR comment instructing the contributor to run
     `uv run python scripts/generate_corpus_inventory.py --write` locally
-    and amend the PR. Keep the message friendly — most contributors will
+    and amend the PR. Keep the message friendly - most contributors will
     not have read the contributor guide before this point.
 
 - id: w4
@@ -138,14 +138,14 @@ verification:
   expected_output: "no diff (modulo generated_at if not stripped)"
 
 must_preserve:
-- The schema-v2 bundle format and the trust-label sidecar contract — generator reads, never mutates.
-- Existing pipeline at `benchbox/core/explorer_pipeline/` — it builds its own manifest; the inventory is a separate, lighter index.
+- The schema-v2 bundle format and the trust-label sidecar contract - generator reads, never mutates.
+- Existing pipeline at `benchbox/core/explorer_pipeline/` - it builds its own manifest; the inventory is a separate, lighter index.
 - Existing fields/shape consumed by any downstream tool referencing `corpus-inventory.json`. Audit consumers in w5 before changing the shape.
 
 anti_patterns:
-- DO NOT parse the submission-manifest.json contents for trust resolution — because the established contract (PR #53) is presence-only; only check `is_file()`. Hash verification belongs to the CI validator.
-- DO NOT include `generated_at` in `--check` mode — because timestamp drift would defeat the purpose; the deterministic comparison must be byte-stable.
-- DO NOT auto-regenerate during the pipeline build — because PRs need to fail loudly with "run the script" guidance, not silently regenerate and hide drift.
+- DO NOT parse the submission-manifest.json contents for trust resolution - because the established contract (PR #53) is presence-only; only check `is_file()`. Hash verification belongs to the CI validator.
+- DO NOT include `generated_at` in `--check` mode - because timestamp drift would defeat the purpose; the deterministic comparison must be byte-stable.
+- DO NOT auto-regenerate during the pipeline build - because PRs need to fail loudly with "run the script" guidance, not silently regenerate and hide drift.
 
 scope_limit:
   only_modify:

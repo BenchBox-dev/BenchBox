@@ -79,16 +79,16 @@ approach: |
   4) Add targeted tests for each failure mode and parity behavior before broader test runs.
 
 anti_patterns:
-- "DO NOT move override state into DataFrameContext or query function signatures — because this would fan out changes across
-  all adapters and query registrations — keep injection through existing parameter accessors"
-- "DO NOT clear overrides only on success paths — because runner exceptions and early returns are common enough to leak global
-  state — enforce cleanup in `finally`"
-- "DO NOT treat one extracted TPC-DS override map as valid for all streams — because stream_id influences dsqgen substitution
-  choices — derive/apply by current stream context"
-- "DO NOT introduce a full SQL parser for extraction — because query templates are known and pattern extraction is sufficient
-  and faster — extend targeted regex/pattern logic instead"
-- "DO NOT silently claim full parity coverage if unsupported parameter keys remain — because this creates false confidence
-  — explicitly track and document supported/uncovered key sets"
+- "DO NOT move override state into DataFrameContext or query function signatures - because this would fan out changes across
+  all adapters and query registrations - keep injection through existing parameter accessors"
+- "DO NOT clear overrides only on success paths - because runner exceptions and early returns are common enough to leak global
+  state - enforce cleanup in `finally`"
+- "DO NOT treat one extracted TPC-DS override map as valid for all streams - because stream_id influences dsqgen substitution
+  choices - derive/apply by current stream context"
+- "DO NOT introduce a full SQL parser for extraction - because query templates are known and pattern extraction is sufficient
+  and faster - extend targeted regex/pattern logic instead"
+- "DO NOT silently claim full parity coverage if unsupported parameter keys remain - because this creates false confidence
+  - explicitly track and document supported/uncovered key sets"
 
 verification:
 - description: "TODO schema validation passes for this new item"

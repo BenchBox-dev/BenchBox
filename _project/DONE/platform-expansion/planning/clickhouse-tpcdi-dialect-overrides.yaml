@@ -23,19 +23,19 @@ description: |
 
 work:
   - id: w1
-    summary: "Create ClickHouse overrides for AQ7, AQ8, AQ10 — replace JULIANDAY/DATE('now') with dateDiff/today()"
+    summary: "Create ClickHouse overrides for AQ7, AQ8, AQ10 - replace JULIANDAY/DATE('now') with dateDiff/today()"
     status: done
 
   - id: w2
-    summary: "Create ClickHouse override for AQ5 — rewrite NULLIF inside aggregates to if() expressions"
+    summary: "Create ClickHouse override for AQ5 - rewrite NULLIF inside aggregates to if() expressions"
     status: done
 
   - id: w3
-    summary: "Create ClickHouse override for AQ6 — replace SUM(SUM()) OVER () with CROSS JOIN total"
+    summary: "Create ClickHouse override for AQ6 - replace SUM(SUM()) OVER () with CROSS JOIN total"
     status: done
 
   - id: w4
-    summary: "Investigate and create ClickHouse overrides for EQ3, EQ7 — VALUES and double-nested COUNT"
+    summary: "Investigate and create ClickHouse overrides for EQ3, EQ7 - VALUES and double-nested COUNT"
     status: done
 
   - id: w5
@@ -50,13 +50,13 @@ files_affected:
     - "tests/unit/core/tpcdi/test_tpcdi_clickhouse_overrides.py"
 
 must_preserve:
-  - "Base query_analytics.py queries unchanged — other platforms use standard SQL JULIANDAY/NULLIF/FILTER syntax"
+  - "Base query_analytics.py queries unchanged - other platforms use standard SQL JULIANDAY/NULLIF/FILTER syntax"
   - "Override queries return identical column names, types, and row semantics"
 
 anti_patterns:
-  - "DO NOT modify the base query_analytics.py queries — because other platforms use them correctly — create ClickHouse overrides instead"
-  - "DO NOT use JULIANDAY() in ClickHouse overrides — because it is a SQLite-only function — use dateDiff('day', ...) instead"
-  - "DO NOT apply JULIANDAY→dateDiff before SQLGlot translation — because SQLGlot reorders dateDiff() arguments — apply after SQLGlot"
+  - "DO NOT modify the base query_analytics.py queries - because other platforms use them correctly - create ClickHouse overrides instead"
+  - "DO NOT use JULIANDAY() in ClickHouse overrides - because it is a SQLite-only function - use dateDiff('day', ...) instead"
+  - "DO NOT apply JULIANDAY→dateDiff before SQLGlot translation - because SQLGlot reorders dateDiff() arguments - apply after SQLGlot"
 
 verification:
   - description: "ClickHouse TPC-DI overrides load and use native syntax"

@@ -15,7 +15,7 @@ description: |
   different optimizer components.
 
   For DataFrame execution, the concept translates differently: instead of varying SQL
-  syntax, DataFrame variants vary the API call sequence — different join orders,
+  syntax, DataFrame variants vary the API call sequence - different join orders,
   different aggregation strategies (pre-filter vs post-filter), lazy vs eager
   evaluation patterns, and different window function formulations. The goal shifts
   from "stress the SQL optimizer" to "measure how different DataFrame API patterns
@@ -25,7 +25,7 @@ description: |
   in both expression and pandas families. TPC-Havoc DataFrame extends these with
   alternative implementations that use structurally different DataFrame API patterns.
 
-  This is architecturally unique — no other benchmark has the variant concept in
+  This is architecturally unique - no other benchmark has the variant concept in
   DataFrame mode. Requires designing a new variant registration pattern for
   DataFrameQuery objects.
 
@@ -70,7 +70,7 @@ work:
     Create benchbox/core/tpchavoc/dataframe_queries/ directory with per-query modules
     (q01.py, q02.py, q03.py). For each query, create 10 expression_impl variants.
 
-    Q1 (Pricing Summary — filter + groupby + aggregation):
+    Q1 (Pricing Summary - filter + groupby + aggregation):
     - v1: Baseline (import from tpch dataframe Q1)
     - v2: Pre-compute aggregation columns before groupby
     - v3: Window functions instead of groupby (partition + distinct)
@@ -94,11 +94,11 @@ work:
   notes: |
     Continue with q04.py, q05.py, q06.py.
 
-    Q4 (Order Priority Checking — EXISTS subquery):
+    Q4 (Order Priority Checking - EXISTS subquery):
     - Variant axes: semi-join vs filter-join, pre-filter lineitem dates vs post-filter
-    Q5 (Local Supplier Volume — 6-table join + groupby):
+    Q5 (Local Supplier Volume - 6-table join + groupby):
     - Variant axes: join order (6 permutations), pre-filter nation/region before join
-    Q6 (Forecasting Revenue Change — single-table filter + sum):
+    Q6 (Forecasting Revenue Change - single-table filter + sum):
     - Variant axes: filter order, compound vs chained filters, pre-select columns
 
 - id: w4
@@ -123,13 +123,13 @@ work:
   notes: |
     q11.py through q14.py. Mix of subquery-heavy and aggregation-heavy queries.
 
-    Q11 (Important Stock Identification — HAVING with subquery):
+    Q11 (Important Stock Identification - HAVING with subquery):
     - Variant axes: subquery as intermediate DF vs inline, threshold pre-compute
-    Q12 (Shipping Modes and Order Priority — CASE + groupby):
+    Q12 (Shipping Modes and Order Priority - CASE + groupby):
     - Variant axes: CASE as .when() chain vs boolean masks, filter-first vs agg-first
-    Q13 (Customer Distribution — LEFT JOIN + groupby + groupby):
+    Q13 (Customer Distribution - LEFT JOIN + groupby + groupby):
     - Variant axes: two-stage vs single-stage aggregation, NOT LIKE as anti-join
-    Q14 (Promotion Effect — CASE inside SUM):
+    Q14 (Promotion Effect - CASE inside SUM):
     - Variant axes: conditional sum vs filter+sum+join, pre-filter parts
 
 - id: w6
@@ -139,13 +139,13 @@ work:
   notes: |
     q15.py through q18.py. Complex subquery patterns.
 
-    Q15 (Top Supplier — subquery for max revenue):
+    Q15 (Top Supplier - subquery for max revenue):
     - Variant axes: intermediate DF vs chained, top-1 vs filter-to-max
-    Q16 (Parts/Supplier Count — DISTINCT, NOT IN):
+    Q16 (Parts/Supplier Count - DISTINCT, NOT IN):
     - Variant axes: anti-join vs ~isin(), distinct before vs after join
-    Q17 (Small Quantity Order Revenue — correlated subquery):
+    Q17 (Small Quantity Order Revenue - correlated subquery):
     - Variant axes: join-with-avg vs window function, filter timing
-    Q18 (Large Volume Customer — HAVING):
+    Q18 (Large Volume Customer - HAVING):
     - Variant axes: filter-after-groupby vs pre-aggregate, join order
 
 - id: w7
@@ -155,13 +155,13 @@ work:
   notes: |
     q19.py through q22.py. Most complex query patterns.
 
-    Q19 (Discounted Revenue — compound OR conditions):
+    Q19 (Discounted Revenue - compound OR conditions):
     - Variant axes: union of filtered sets vs single complex filter, per-brand subframes
-    Q20 (Potential Part Promotion — multi-level subquery):
+    Q20 (Potential Part Promotion - multi-level subquery):
     - Variant axes: join chain vs nested intermediates, semi-join vs filter
-    Q21 (Suppliers Who Kept Orders Waiting — EXISTS/NOT EXISTS):
+    Q21 (Suppliers Who Kept Orders Waiting - EXISTS/NOT EXISTS):
     - Variant axes: semi-join + anti-join vs boolean masks, join order for 4 tables
-    Q22 (Global Sales Opportunity — nested subqueries):
+    Q22 (Global Sales Opportunity - nested subqueries):
     - Variant axes: intermediate DFs vs chained, avg pre-compute vs inline
 
 - id: w8
@@ -221,7 +221,7 @@ deferred:
 - summary: "Automated variant equivalence testing across all 22 queries at SF=0.01"
   reason: "Full equivalence testing is expensive (220 queries x 2 families). Start with Q1-Q3 equivalence in unit tests, defer
     comprehensive testing to integration suite."
-- summary: "Variant performance analysis tooling — identify which DataFrame patterns are fastest per platform"
+- summary: "Variant performance analysis tooling - identify which DataFrame patterns are fastest per platform"
   reason: "Analysis tooling is follow-up work after the implementations exist and have been benchmarked."
 - summary: "Replace Q16-Q22 result-replay variants with deeper hand-written structural rewrites"
   reason: "The first complete registry covers Q16-Q22 with canonical execution plus final projection/order replay to preserve
@@ -242,7 +242,7 @@ metadata:
 
 impact:
   business_value: |
-    Unique benchmark capability — no other tool measures how DataFrame API patterns
+    Unique benchmark capability - no other tool measures how DataFrame API patterns
     affect performance for semantically equivalent operations. Valuable for DataFrame
     library developers optimizing their engines and for users choosing between API
     patterns.
@@ -265,9 +265,9 @@ files_affected:
   - benchbox/core/benchmark_registry.py
 
 must_preserve:
-- "TPCHavocBenchmark SQL variant generation unchanged — all 220 SQL variants still work via VariantGenerator/StaticSQLVariant"
+- "TPCHavocBenchmark SQL variant generation unchanged - all 220 SQL variants still work via VariantGenerator/StaticSQLVariant"
 - "ResultValidator variant equivalence checking still works for SQL mode"
-- "TPCHBenchmark base class DataFrame queries (tpch/dataframe_queries.py) are NOT modified — TPC-Havoc imports them as baselines"
+- "TPCHBenchmark base class DataFrame queries (tpch/dataframe_queries.py) are NOT modified - TPC-Havoc imports them as baselines"
 - "benchbox run --platform duckdb --benchmark tpchavoc still runs SQL variants"
 
 approach: |
@@ -281,7 +281,7 @@ approach: |
   IDs like "Q1v1", "Q1v2", etc. The benchmark's get_dataframe_queries() returns
   this registry.
 
-  Design the variant categories based on actual TPC-H query structure — not all
+  Design the variant categories based on actual TPC-H query structure - not all
   variant types apply to all queries (e.g., join-reorder only applies to multi-join
   queries). Document which variant strategies apply to which queries in
   DATAFRAME_VARIANTS.md.
@@ -294,14 +294,14 @@ implementation_order: |
   (220 variants) and architecturally unique (variant concept). Implement after
   df-support-flightdata and df-support-joinorder establish the QueryRegistry pattern,
   since TPC-Havoc extends it with the variant registration design. All 5 TODOs modify
-  benchmark_registry.py — sequential implementation avoids merge conflicts.
+  benchmark_registry.py - sequential implementation avoids merge conflicts.
 
 anti_patterns:
-- "DO NOT modify tpch/dataframe_queries.py — because TPC-Havoc extends TPC-H, not modifies it — import base implementations
+- "DO NOT modify tpch/dataframe_queries.py - because TPC-Havoc extends TPC-H, not modifies it - import base implementations
   and build variants on top"
-- "DO NOT create variants that produce different results — because semantic equivalence is the core property — every variant
+- "DO NOT create variants that produce different results - because semantic equivalence is the core property - every variant
   must produce identical output for the same input data and parameters"
-- "DO NOT create trivial variants (e.g., just renaming aliases) — because the point is structural diversity — each variant
+- "DO NOT create trivial variants (e.g., just renaming aliases) - because the point is structural diversity - each variant
   must use a genuinely different execution strategy"
 
 verification:

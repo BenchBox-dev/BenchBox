@@ -17,7 +17,7 @@ description: |
   independently instantiates a DuckDB-WASM worker; WebKit serializes WASM
   compilation differently from Chromium/Firefox and stalls past the 10 s
   `expect` timeout when multiple pages compete for init. Moving DuckDB-WASM
-  to same-origin bundled assets did NOT retire the flake — the race is WASM
+  to same-origin bundled assets did NOT retire the flake - the race is WASM
   init contention, not CDN latency.
 
   Fix applied (w2): `--workers=1` added to the `test:e2e:webkit` npm script
@@ -41,7 +41,7 @@ work:
       passes (nav link renders) but page-specific headings time out within 10 s.
       Root cause: concurrent DuckDB-WASM worker startup stalls in WebKit when
       multiple pages initialize simultaneously. Same-origin bundled assets did NOT
-      retire the flake — race is WASM init contention, not CDN latency.
+      retire the flake - race is WASM init contention, not CDN latency.
 
   - id: w2
     summary: "Pick a remediation and prototype it against the WebKit smoke run"
@@ -64,19 +64,19 @@ work:
 must_preserve:
   - "The Chromium blocking gate continues to run the full suite without regression."
   - "Firefox @smoke continues to pass cleanly."
-  - "No production-code seam is introduced for failure injection — the
+  - "No production-code seam is introduced for failure injection - the
     original architecture decision stands."
 
 approach: |
   Start from the trace, not from guesswork. The suite already captures
-  traces on failure — the first step is to confirm whether the failing
+  traces on failure - the first step is to confirm whether the failing
   step is a WASM download, an `ATTACH`, or a navigation. Pick the
   remediation that addresses that specific step.
 
 anti_patterns:
-  - "DO NOT paper over the flake with retries — because this hides the underlying WebKit-specific issue and ships silent instability to maintainers — identify and fix the root cause."
-  - "DO NOT drop WebKit from the matrix — because Safari/WebKit rendering is a real user surface — graduate it once stable, don't remove it."
-  - "DO NOT flip `continue-on-error: true` off on a calendar / release schedule — because promoting WebKit before the flake is actually fixed will regress main — gate the flip on the 10-consecutive-green criterion in w3 and nothing else."
+  - "DO NOT paper over the flake with retries - because this hides the underlying WebKit-specific issue and ships silent instability to maintainers - identify and fix the root cause."
+  - "DO NOT drop WebKit from the matrix - because Safari/WebKit rendering is a real user surface - graduate it once stable, don't remove it."
+  - "DO NOT flip `continue-on-error: true` off on a calendar / release schedule - because promoting WebKit before the flake is actually fixed will regress main - gate the flip on the 10-consecutive-green criterion in w3 and nothing else."
 
 verification:
   - description: "The TODO item itself validates cleanly"

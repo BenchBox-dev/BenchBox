@@ -25,7 +25,7 @@ description: |
 
   2) The query workbench's column picker shouldn't hardcode the
      column list. `DuckDBSnapshotBuilder._COLUMNS` is already
-     authoritative — emit it as `results_schema.json` next to
+     authoritative - emit it as `results_schema.json` next to
      `results.duckdb` so the frontend can consume it directly.
 
 work:
@@ -46,7 +46,7 @@ work:
       - primary_metric: str (e.g. "geomean_ms", "power_score")
       - primary_order: "asc" | "desc"
     Pull primary_metric/primary_order from get_ranking_config(benchmark)
-    — pipeline.py line 142 already calls this for the summary build,
+    - pipeline.py line 142 already calls this for the summary build,
     reuse the result.
 
 - id: w2
@@ -62,7 +62,7 @@ work:
   summary: "Emit results_schema.json next to results.duckdb"
   status: done
   notes: |
-    benchbox/core/explorer_pipeline/duckdb_builder.py — after the
+    benchbox/core/explorer_pipeline/duckdb_builder.py - after the
     DuckDB file is written, serialize _COLUMNS (name + type) as
     results_schema.json in the same output directory. No schema
     change; just persisting the already-authoritative column list
@@ -97,8 +97,8 @@ files_affected:
   - "results_schema.json (emitted artifact, not checked in)"
 
 must_preserve:
-- "Existing frontend consumers that read only {rank, total} from MetaRank continue to work — extra keys are additive"
-- "DuckDB snapshot output (results.duckdb) byte-for-byte identical — this item only adds a sidecar"
+- "Existing frontend consumers that read only {rank, total} from MetaRank continue to work - extra keys are additive"
+- "DuckDB snapshot output (results.duckdb) byte-for-byte identical - this item only adds a sidecar"
 - "primary_metric / primary_order values match get_ranking_config() for every registered benchmark family"
 
 approach: |
@@ -114,11 +114,11 @@ approach: |
   Both forms make the cohort best = 1.0, which is what the UI renders.
 
 anti_patterns:
-- "DO NOT remove {rank, total} — because existing frontends depend on them — only add fields"
-- "DO NOT hardcode latency-vs-throughput logic — because RankingConfig.primary_order already encodes the direction — read
+- "DO NOT remove {rank, total} - because existing frontends depend on them - only add fields"
+- "DO NOT hardcode latency-vs-throughput logic - because RankingConfig.primary_order already encodes the direction - read
   it"
-- "DO NOT recompute best per cohort in a second pass — because the cohort iteration at pipeline.py:217 already has all values
-  — fold speedup into that loop"
+- "DO NOT recompute best per cohort in a second pass - because the cohort iteration at pipeline.py:217 already has all values
+  - fold speedup into that loop"
 
 verification:
 - description: "Explorer pipeline unit tests green"

@@ -11,17 +11,17 @@ completed_date: "2026-02-27"
 category: Core Functionality
 description: |
   Code review (2026-02-27) found that the current get_query_plan() uses EXPLAIN (FORMAT JSON)
-  without ANALYZE, capturing ESTIMATED plans only — timing and cardinality fields are absent
+  without ANALYZE, capturing ESTIMATED plans only - timing and cardinality fields are absent
   in stored plans. Switching to EXPLAIN ANALYZE (FORMAT JSON) by default will capture actual
   per-operator execution statistics while keeping the existing JSON schema intact.
 
   Decision: EXPLAIN ANALYZE is the new default for capture_plans=True.
   PRAGMA enable_profiling was rejected (different JSON schema, version-dependent inline
-  reading, not thread-safe in file mode) — see context_sections for full rationale.
+  reading, not thread-safe in file mode) - see context_sections for full rationale.
 
   Schema compatibility: EXPLAIN ANALYZE (FORMAT JSON) produces the same field names as
   EXPLAIN (FORMAT JSON): name / timing / cardinality / extra_info / children.
-  The DuckDBQueryPlanParser already handles timing+cardinality when present — proven by
+  The DuckDBQueryPlanParser already handles timing+cardinality when present - proven by
   the DUCKDB_1_0_JSON_WITH_TIMING fixture (tests/fixtures/duckdb_plans_by_version.py:177).
   The core get_query_plan() change is one word: EXPLAIN → EXPLAIN ANALYZE.
 
@@ -30,7 +30,7 @@ description: |
   An opt-out config key (analyze_plans: false) must be available for users who want
   structural-only plan capture without the execution overhead.
 
-  Note: plan fingerprinting is unaffected — it already excludes timing/cardinality by
+  Note: plan fingerprinting is unaffected - it already excludes timing/cardinality by
   design (structural comparison only).
 
   Reference: /Users/joe/.claude/plans/temporal-kindling-tarjan.md
@@ -48,7 +48,7 @@ metadata:
 impact:
   business_value: |
     Plan capture runs will include actual per-operator timing and cardinality data,
-    enabling real operator-level performance analysis. No schema changes required —
+    enabling real operator-level performance analysis. No schema changes required -
     the parser already handles these fields. Fingerprints and structural comparisons
     are unaffected.
   user_impact: |
@@ -67,34 +67,34 @@ context_sections:
     Full analysis in /Users/joe/.claude/plans/temporal-kindling-tarjan.md.
     Summary:
     - PRAGMA JSON schema uses operator_type/operator_timing/operator_cardinality (not
-      name/timing/cardinality) — requires full parser rewrite
+      name/timing/cardinality) - requires full parser rewrite
     - Inline reading needs conn.query_profiling_output() (DuckDB ≥ 1.0 Python API)
     - File-based output (PRAGMA profiling_output) is not thread-safe for concurrent queries
-    - BenchBox fingerprinting excludes timing/cardinality anyway — PRAGMA overhead not justified
+    - BenchBox fingerprinting excludes timing/cardinality anyway - PRAGMA overhead not justified
 
   "Why EXPLAIN ANALYZE is safe as default": |
     EXPLAIN ANALYZE (FORMAT JSON) produces the SAME JSON structure as EXPLAIN (FORMAT JSON):
       {"name": "HASH_JOIN", "timing": 0.042, "cardinality": 15000, "extra_info": "...", "children": [...]}
     DuckDBQueryPlanParser already handles timing+cardinality when present.
     Fixture DUCKDB_1_0_JSON_WITH_TIMING (tests/fixtures/duckdb_plans_by_version.py:177) proves this.
-    Fingerprint computation in compute_plan_fingerprint() already excludes timing/cardinality —
+    Fingerprint computation in compute_plan_fingerprint() already excludes timing/cardinality -
     no fingerprint behavior change.
 
 must_preserve:
 - "Plan fingerprinting MUST NOT include timing/cardinality (QueryPlanDAG.compute_plan_fingerprint excludes these by design
-  — structural comparison only)"
+  - structural comparison only)"
 - "Opt-out path MUST remain available: analyze_plans: false in config (or equivalent) restores EXPLAIN without ANALYZE for
   users who need minimal overhead"
 - "Parser behavior for plans without timing fields MUST continue working unchanged (backwards compatibility with stored plans
   from before this change)"
 
 anti_patterns:
-- "DO NOT switch to PRAGMA enable_profiling — because it uses a different JSON schema (operator_type vs name) requiring full
-  parser rewrite — EXPLAIN ANALYZE is sufficient and schema-compatible"
-- "DO NOT remove the analyze_plans opt-out — because concurrent throughput benchmarks and CI speed runs need lightweight structural-only
-  plan capture — always keep the escape hatch"
-- "DO NOT change the fingerprinting algorithm to include timing — because fingerprints are used for plan-change detection
-  across runs, and timing varies between identical plans — keep timing out of fingerprints"
+- "DO NOT switch to PRAGMA enable_profiling - because it uses a different JSON schema (operator_type vs name) requiring full
+  parser rewrite - EXPLAIN ANALYZE is sufficient and schema-compatible"
+- "DO NOT remove the analyze_plans opt-out - because concurrent throughput benchmarks and CI speed runs need lightweight structural-only
+  plan capture - always keep the escape hatch"
+- "DO NOT change the fingerprinting algorithm to include timing - because fingerprints are used for plan-change detection
+  across runs, and timing varies between identical plans - keep timing out of fingerprints"
 
 scope_limit:
   description: "Changes must be confined to plan capture path only"
@@ -106,7 +106,7 @@ scope_limit:
   - tests/unit/core/query_plans/parsers/test_duckdb_parser.py
 
 verification:
-- description: "EXPLAIN ANALYZE (FORMAT JSON) populates timing fields — confirms schema compatibility"
+- description: "EXPLAIN ANALYZE (FORMAT JSON) populates timing fields - confirms schema compatibility"
   command: "uv run -- python -c \"import duckdb, json; con = duckdb.connect(); con.execute('CREATE TABLE t AS SELECT range
     AS id FROM range(1000)'); rows = con.execute('EXPLAIN ANALYZE (FORMAT JSON) SELECT count(*) FROM t').fetchall(); plan
     = json.loads(rows[0][1]); print('timing present:', 'timing' in json.dumps(plan))\""

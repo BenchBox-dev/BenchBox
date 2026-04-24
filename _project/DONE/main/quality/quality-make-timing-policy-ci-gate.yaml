@@ -36,7 +36,7 @@ description: |
 
 work:
   - id: w1
-    summary: "Run `_project/scripts/timing_audit.py --report` and triage all 154 time.time() sites — categorize as: (a) event timestamp [keep], (b) execution timing [migrate to mono_time], (c) audit log [keep]"
+    summary: "Run `_project/scripts/timing_audit.py --report` and triage all 154 time.time() sites - categorize as: (a) event timestamp [keep], (b) execution timing [migrate to mono_time], (c) audit log [keep]"
     status: done
 
   - id: w2
@@ -50,7 +50,7 @@ work:
     status: done
 
   - id: w4
-    summary: "Add a CI step in .github/workflows/lint.yml running `uv run -- python _project/scripts/timing_policy_check.py --strict` — fail on unlisted wall-clock"
+    summary: "Add a CI step in .github/workflows/lint.yml running `uv run -- python _project/scripts/timing_policy_check.py --strict` - fail on unlisted wall-clock"
     needs: [w2]
     status: done
 
@@ -81,8 +81,8 @@ approach: |
   group rather than per-line.
 
 anti_patterns:
-  - "DO NOT add a blanket allowlist entry for whole directories — because that hides drift — be specific or migrate"
-  - "DO NOT change the clock module API — because callers rely on mono_time() name — extend, don't rename"
+  - "DO NOT add a blanket allowlist entry for whole directories - because that hides drift - be specific or migrate"
+  - "DO NOT change the clock module API - because callers rely on mono_time() name - extend, don't rename"
 
 verification:
   - description: "Timing policy check passes"

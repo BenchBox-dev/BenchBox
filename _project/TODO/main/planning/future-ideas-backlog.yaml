@@ -1,5 +1,5 @@
 id: future-ideas-backlog
-title: "Future Ideas Backlog — Specialized Benchmarks and Infrastructure"
+title: "Future Ideas Backlog - Specialized Benchmarks and Infrastructure"
 worktree: main
 priority: Low
 status: Not Started
@@ -13,7 +13,7 @@ description: |
   When any item below is ready for implementation, create a dedicated TODO
   file with full tasks, phases, guardrails, and files_affected.
 
-  Note: Geospatial benchmark support was removed from this backlog —
+  Note: Geospatial benchmark support was removed from this backlog -
   it is tracked by the dedicated TODO:
   TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
 
@@ -34,7 +34,7 @@ impact:
     Each needs research to validate demand and feasibility before investment.
 work:
 - id: w1
-  summary: "Graph Query Benchmark Support — Neo4j, Neptune"
+  summary: "Graph Query Benchmark Support - Neo4j, Neptune"
   status: pending
 - id: w2
   summary: "Research LDBC Social Network Benchmark (industry standard)"
@@ -52,7 +52,7 @@ work:
   - w1
   status: pending
 - id: w5
-  summary: "Interactive Benchmark Explorer — Web UI"
+  summary: "Interactive Benchmark Explorer - Web UI"
   status: pending
 - id: w6
   summary: "Define target users and use cases (why CLI + charts aren't sufficient)"
@@ -70,7 +70,7 @@ work:
   - w5
   status: pending
 - id: w9
-  summary: "Streaming Benchmark Support — Kafka, Flink, Spark Streaming"
+  summary: "Streaming Benchmark Support - Kafka, Flink, Spark Streaming"
   status: pending
 - id: w10
   summary: "Research Nexmark benchmark (streaming standard)"

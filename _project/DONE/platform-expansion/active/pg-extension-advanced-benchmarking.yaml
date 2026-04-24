@@ -34,33 +34,33 @@ context_sections:
 
 metadata:
   tags:
-  - pg-extensions
-  - pg-mooncake
-  - pg-duckdb
-  - benchmarking
-  - deferred-followup
-  estimated_effort: "Small — 1-2 days"
+    - pg-extensions
+    - pg-mooncake
+    - pg-duckdb
+    - benchmarking
+    - deferred-followup
+  estimated_effort: "Small - 1-2 days"
   created_date: "2026-02-18"
   split_from_multiple:
-  - pg-mooncake-platform-adapter
-  - pg-duckdb-platform-adapter
+    - pg-mooncake-platform-adapter
+    - pg-duckdb-platform-adapter
 
 files_affected:
   modified:
-  - "benchbox/platforms/pg_mooncake.py"
-  - "benchbox/platforms/pg_duckdb.py"
+    - "benchbox/platforms/pg_mooncake.py"
+    - "benchbox/platforms/pg_duckdb.py"
 
 verification:
-- description: "Existing pg_mooncake tests still pass after any changes"
-  command: "uv run -- python -m pytest tests/unit/platforms/test_pg_mooncake_adapter.py -x -q"
-  expected_output: "all tests pass, 0 failures"
-- description: "Existing pg_duckdb tests still pass after any changes"
-  command: "uv run -- python -m pytest tests/unit/platforms/test_pg_duckdb_adapter.py -x -q"
-  expected_output: "all tests pass, 0 failures"
+  - description: "Existing pg_mooncake tests still pass after any changes"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_pg_mooncake_adapter.py -x -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Existing pg_duckdb tests still pass after any changes"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_pg_duckdb_adapter.py -x -q"
+    expected_output: "all tests pass, 0 failures"
 
 must_preserve:
-- "pg_mooncake adapter: existing query execution, connection management, and TPC-H/TPC-DS run paths"
-- "pg_duckdb adapter: existing query execution and schema load paths"
+  - "pg_mooncake adapter: existing query execution, connection management, and TPC-H/TPC-DS run paths"
+  - "pg_duckdb adapter: existing query execution and schema load paths"
 
 approach: |
   - For w1: emit the compatibility matrix as a YAML file at
@@ -71,7 +71,7 @@ approach: |
     (alongside existing SetupPhase fields). In pg_mooncake.py, add a run_migration_phase()
     method that executes ALTER TABLE ... SET ACCESS METHOD columnar, records wall time
     and storage delta, and returns a MigrationPhase instance or None. The runner skips
-    this phase when not configured — use the NOT_RUN stub pattern (status="not_run",
+    this phase when not configured - use the NOT_RUN stub pattern (status="not_run",
     duration_ms=0) already present in benchbox/core/runner/runner.py (LifecyclePhases).
     Update _build_phases_block() in schema.py to conditionally include the migration
     phase using the "Omit Empty" principle.
@@ -80,41 +80,41 @@ approach: |
     In pg_duckdb.py, add an optional run_native_comparison() method triggered by a
     --platform-option compare_native=true flag. Serialize via a new top-level
     "comparisons" key in schema.py using the "Omit Empty" pattern (omit if None).
-    Do NOT add --compare-native as a top-level CLI flag — use the existing
+    Do NOT add --compare-native as a top-level CLI flag - use the existing
     --platform-option K=V mechanism already in benchbox run.
 
 anti_patterns:
-- "DO NOT modify pg_mooncake or pg_duckdb connection/auth code — these are read-only
-   enhancements; touching connection paths risks breaking live adapters with no
-   benefit"
-- "DO NOT hardcode type lists for w1 — pull from pg_mooncake release notes or a
-   live information_schema query, so the matrix stays accurate across versions"
+  - "DO NOT modify pg_mooncake or pg_duckdb connection/auth code - these are read-only
+    enhancements; touching connection paths risks breaking live adapters with no
+    benefit"
+  - "DO NOT hardcode type lists for w1 - pull from pg_mooncake release notes or a
+    live information_schema query, so the matrix stays accurate across versions"
 
 scope_limit:
   only_modify:
-  - "benchbox/platforms/pg_mooncake.py"
-  - "benchbox/platforms/pg_mooncake_type_compat.yaml"
-  - "benchbox/platforms/pg_duckdb.py"
-  - "benchbox/core/results/models.py"
-  - "benchbox/core/results/schema.py"
-  - "tests/unit/platforms/test_pg_mooncake_adapter.py"
-  - "tests/unit/platforms/test_pg_duckdb_adapter.py"
+    - "benchbox/platforms/pg_mooncake.py"
+    - "benchbox/platforms/pg_mooncake_type_compat.yaml"
+    - "benchbox/platforms/pg_duckdb.py"
+    - "benchbox/core/results/models.py"
+    - "benchbox/core/results/schema.py"
+    - "tests/unit/platforms/test_pg_mooncake_adapter.py"
+    - "tests/unit/platforms/test_pg_duckdb_adapter.py"
 
 work:
-- id: w1
-  summary: "Write pg_mooncake type compatibility matrix to pg_mooncake_type_compat.yaml
-    — enumerate supported column types for the pinned version from release notes"
-  status: done
-  needs: []
+  - id: w1
+    summary: "Write pg_mooncake type compatibility matrix to pg_mooncake_type_compat.yaml
+      - enumerate supported column types for the pinned version from release notes"
+    status: done
+    needs: []
 
-- id: w2
-  summary: "Add optional migration phase to pg_mooncake adapter — ALTER TABLE heap→columnar,
-    record wall time and storage delta, emit as a phase result in the result bundle"
-  status: done
-  needs: []
+  - id: w2
+    summary: "Add optional migration phase to pg_mooncake adapter - ALTER TABLE heap→columnar,
+      record wall time and storage delta, emit as a phase result in the result bundle"
+    status: done
+    needs: []
 
-- id: w3
-  summary: "Add pg_duckdb vs native DuckDB comparison output — run identical TPC-H queries
-    on both platforms, write per-query timing delta JSON into the result bundle"
-  status: done
-  needs: []
+  - id: w3
+    summary: "Add pg_duckdb vs native DuckDB comparison output - run identical TPC-H queries
+      on both platforms, write per-query timing delta JSON into the result bundle"
+    status: done
+    needs: []

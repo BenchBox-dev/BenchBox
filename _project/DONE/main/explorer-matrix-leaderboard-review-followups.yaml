@@ -17,7 +17,7 @@ work:
   needs: []
   status: done
   notes: |
-    Compare.tsx:196-198 — grouped bar chart uses `?? 0` for null display_ms
+    Compare.tsx:196-198 - grouped bar chart uses `?? 0` for null display_ms
     values (queries where all runs failed).  Zero-height bars correctly
     disappear visually, but the intent is non-obvious: a reader might wonder
     if 0 misrepresents failed queries as "fastest."
@@ -31,7 +31,7 @@ work:
   needs: []
   status: done
   notes: |
-    QueryHeatmap.tsx:74 — filter `v > 0` silently excludes timing=0ms
+    QueryHeatmap.tsx:74 - filter `v > 0` silently excludes timing=0ms
     (physically impossible but could occur with rounding artifacts).
 
     Fix: add a comment:
@@ -42,7 +42,7 @@ work:
   needs: []
   status: done
   notes: |
-    manifest.ts:79-80 — HTML detection uses `contentType.includes("text/html")`.
+    manifest.ts:79-80 - HTML detection uses `contentType.includes("text/html")`.
     If a real 5xx error page uses `application/json` content-type, the gzip
     DecompressionStream would throw with a cryptic "DecompressionStream error"
     rather than a meaningful HTTP error.
@@ -56,7 +56,7 @@ work:
   needs: []
   status: done
   notes: |
-    QueryHeatmap.tsx:272 — lightnessForCell is called unconditionally even
+    QueryHeatmap.tsx:272 - lightnessForCell is called unconditionally even
     when suppressHeat=true (single-platform view).  The result is immediately
     discarded.  This is a negligible waste but could confuse a reader.
 
@@ -70,8 +70,8 @@ files_affected:
   - "results-explorer/src/lib/manifest.ts"
 
 must_preserve:
-- "Compare.tsx grouped chart rendering — only adding a comment in w1"
-- "QueryHeatmap heat coloring behavior — only adding a comment in w2 and guarding an unused call in w4"
+- "Compare.tsx grouped chart rendering - only adding a comment in w1"
+- "QueryHeatmap heat coloring behavior - only adding a comment in w2 and guarding an unused call in w4"
 
 verification:
 - description: "Full test suite green"

@@ -25,71 +25,71 @@ description: |
 category: "Core Functionality"
 
 work:
-- id: w1
-  summary: "Replace _update_role_map and _table_from_prefix with dict constants"
-  status: done
-  notes: |
-    Both are in query_conversion.py. _table_from_prefix has ~15-way if/elif → dict.
-    _update_role_map maps table names → role prefixes → dict constant TABLE_TO_ROLE_PREFIX.
-    The role inference calls after the lookup can stay; only the lookup changes.
+  - id: w1
+    summary: "Replace _update_role_map and _table_from_prefix with dict constants"
+    status: done
+    notes: |
+      Both are in query_conversion.py. _table_from_prefix has ~15-way if/elif → dict.
+      _update_role_map maps table names → role prefixes → dict constant TABLE_TO_ROLE_PREFIX.
+      The role inference calls after the lookup can stay; only the lookup changes.
 
-- id: w2
-  summary: "Replace _map_to_maintenance_operation_type with dict mapping"
-  status: done
-  notes: |
-    benchbox/core/tpcds/maintenance_test.py - maps (operation, table) tuples to
-    MaintenanceOperationType. Simple dict: OPERATION_TABLE_TO_TYPE = {("INSERT", "t"): ...}
+  - id: w2
+    summary: "Replace _map_to_maintenance_operation_type with dict mapping"
+    status: done
+    notes: |
+      benchbox/core/tpcds/maintenance_test.py - maps (operation, table) tuples to
+      MaintenanceOperationType. Simple dict: OPERATION_TABLE_TO_TYPE = {("INSERT", "t"): ...}
 
-- id: w3
-  summary: "Replace _handle_cli_error isinstance chain with dispatch dict"
-  needs: []
-  status: done
-  notes: |
-    benchbox/cli/exceptions.py — 6+ isinstance() checks mapping error types to
-    help methods. Dict: ERROR_HANDLERS = {PlatformNotFoundError: ..., ...}
+  - id: w3
+    summary: "Replace _handle_cli_error isinstance chain with dispatch dict"
+    needs: []
+    status: done
+    notes: |
+      benchbox/cli/exceptions.py - 6+ isinstance() checks mapping error types to
+      help methods. Dict: ERROR_HANDLERS = {PlatformNotFoundError: ..., ...}
 
-- id: w4
-  summary: "Replace _is_example_line multi-pattern checks with compiled regex list"
-  needs: []
-  status: done
-  notes: |
-    benchbox/release/content_validation.py — multiple if-checks for different
-    example patterns. Compile all patterns into EXAMPLE_PATTERNS = [re.compile(...), ...]
-    and use any(p.match(line) for p in EXAMPLE_PATTERNS).
+  - id: w4
+    summary: "Replace _is_example_line multi-pattern checks with compiled regex list"
+    needs: []
+    status: done
+    notes: |
+      benchbox/release/content_validation.py - multiple if-checks for different
+      example patterns. Compile all patterns into EXAMPLE_PATTERNS = [re.compile(...), ...]
+      and use any(p.match(line) for p in EXAMPLE_PATTERNS).
 
-- id: w5
-  summary: "Replace _get_optimizations_suffix and _find_objects_with_prefix with dicts"
-  needs: []
-  status: done
-  notes: |
-    _get_optimizations_suffix (database_naming.py): dict mapping (platform, opts) → suffix.
-    _find_objects_with_prefix (metadata_primitives/generator.py): SQL template dict keyed
-    by (object_type, dialect).
+  - id: w5
+    summary: "Replace _get_optimizations_suffix and _find_objects_with_prefix with dicts"
+    needs: []
+    status: done
+    notes: |
+      _get_optimizations_suffix (database_naming.py): dict mapping (platform, opts) → suffix.
+      _find_objects_with_prefix (metadata_primitives/generator.py): SQL template dict keyed
+      by (object_type, dialect).
 
-- id: w6
-  summary: "Simplify composite_params.py:parse query/key dispatch with dict mapper"
-  needs: []
-  status: done
-  notes: |
-    benchbox/cli/composite_params.py — key dispatch for sample/first/queries uses
-    if/elif; replace with TYPE_CONVERTERS = {"sample": float, "first": int, ...}.
-    Query special-case parsing (edge case) stays inline but extract to helper.
+  - id: w6
+    summary: "Simplify composite_params.py:parse query/key dispatch with dict mapper"
+    needs: []
+    status: done
+    notes: |
+      benchbox/cli/composite_params.py - key dispatch for sample/first/queries uses
+      if/elif; replace with TYPE_CONVERTERS = {"sample": float, "first": int, ...}.
+      Query special-case parsing (edge case) stays inline but extract to helper.
 
-- id: w7
-  summary: "Run smoke tests and complexity check; verify all 8 functions below warn threshold"
-  needs: [w1, w2, w3, w4, w5, w6]
-  status: done
+  - id: w7
+    summary: "Run smoke tests and complexity check; verify all 8 functions below warn threshold"
+    needs: [w1, w2, w3, w4, w5, w6]
+    status: done
 
 metadata:
   estimated_effort: "1 day"
   tags: ["complexity", "refactor", "dict-dispatch"]
 
 must_preserve:
-- "_update_role_map: role map output must be identical for all TPC-DS OBT queries"
-- "_table_from_prefix: column prefix → table mapping must be 100% accurate (drives OBT SQL)"
-- "_map_to_maintenance_operation_type: mapping must be exact (drives TPC-DS maintenance spec)"
-- "_handle_cli_error: all existing error types must still trigger the same help output"
-- "parse: CLI parameter parsing output must be byte-for-byte identical for all current inputs"
+  - "_update_role_map: role map output must be identical for all TPC-DS OBT queries"
+  - "_table_from_prefix: column prefix → table mapping must be 100% accurate (drives OBT SQL)"
+  - "_map_to_maintenance_operation_type: mapping must be exact (drives TPC-DS maintenance spec)"
+  - "_handle_cli_error: all existing error types must still trigger the same help output"
+  - "parse: CLI parameter parsing output must be byte-for-byte identical for all current inputs"
 
 approach: |
   Pattern: identify the if/elif chain, extract the mapping as a module-level dict constant
@@ -97,28 +97,28 @@ approach: |
   Raise the same exception on KeyError that the original raised on else/fallthrough.
 
   Reference: benchbox/core/tpcds_obt/query_conversion.py already uses this pattern in
-  other functions (_post_process dispatch) — follow that style.
+  other functions (_post_process dispatch) - follow that style.
 
 anti_patterns:
-- "DO NOT change function signatures or return types"
-- "DO NOT merge separate dict constants into a single mega-dict — one dict per function"
-- "DO NOT use lambdas in dict values when the original used inline expressions; keep readable"
-- "DO NOT refactor surrounding functions beyond the target chain"
+  - "DO NOT change function signatures or return types"
+  - "DO NOT merge separate dict constants into a single mega-dict - one dict per function"
+  - "DO NOT use lambdas in dict values when the original used inline expressions; keep readable"
+  - "DO NOT refactor surrounding functions beyond the target chain"
 
 verification:
-- description: "Smoke tests pass"
-  command: "uv run -- python -m pytest -m fast -q"
-  expected_output: "all tests pass, 0 failures"
-- description: "All 8 target functions drop below warn threshold"
-  command: "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(query_conversion|maintenance_test|exceptions|content_validation|database_naming|generator|composite_params)'"
-  expected_output: "No WARN entries for the 8 target functions"
+  - description: "Smoke tests pass"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "All 8 target functions drop below warn threshold"
+    command: "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(query_conversion|maintenance_test|exceptions|content_validation|database_naming|generator|composite_params)'"
+    expected_output: "No WARN entries for the 8 target functions"
 
 scope_limit:
   only_modify:
-  - "benchbox/core/tpcds_obt/query_conversion.py"
-  - "benchbox/core/tpcds/maintenance_test.py"
-  - "benchbox/cli/exceptions.py"
-  - "benchbox/release/content_validation.py"
-  - "benchbox/utils/database_naming.py"
-  - "benchbox/core/metadata_primitives/generator.py"
-  - "benchbox/cli/composite_params.py"
+    - "benchbox/core/tpcds_obt/query_conversion.py"
+    - "benchbox/core/tpcds/maintenance_test.py"
+    - "benchbox/cli/exceptions.py"
+    - "benchbox/release/content_validation.py"
+    - "benchbox/utils/database_naming.py"
+    - "benchbox/core/metadata_primitives/generator.py"
+    - "benchbox/cli/composite_params.py"

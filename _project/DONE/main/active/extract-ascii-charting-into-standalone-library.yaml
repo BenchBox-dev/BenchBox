@@ -13,8 +13,8 @@ description: |
   breaking existing BenchBox workflows.
 
   Key architecture decisions:
-  - Library name: `textcharts` — generic, memorable, no BenchBox branding
-  - Dispatch layer (`ascii_runtime.py`): stays in BenchBox — it contains
+  - Library name: `textcharts` - generic, memorable, no BenchBox branding
+  - Dispatch layer (`ascii_runtime.py`): stays in BenchBox - it contains
     domain-specific NormalizedResult→chart data conversion
   - Naming: standalone drops `ASCII` prefix (e.g. `BarChart` not `ASCIIBarChart`);
     BenchBox shims re-export with `ASCII*` aliases for compatibility
@@ -78,7 +78,7 @@ work:
     This establishes the canonical public surface for the package.
 
 - id: w18
-  summary: "Decouple format_scale_factor — the only benchbox import inside ascii/"
+  summary: "Decouple format_scale_factor - the only benchbox import inside ascii/"
   needs: [w1]
   status: done
   notes: |
@@ -194,7 +194,7 @@ work:
     - All data models unchanged: BarData, HistogramBar, BoxPlotSeries, etc.
     - Utilities: TerminalColors, TerminalCapabilities, ColorMode,
       detect_terminal_capabilities
-    - No dispatch/render() function — standalone users construct chart objects directly.
+    - No dispatch/render() function - standalone users construct chart objects directly.
 
 - id: w4
   summary: "Copy and port base runtime primitives (options, colors, terminal capabilities, shared helpers)"
@@ -411,10 +411,10 @@ must_preserve:
 approach: |
   Three-phase extraction strategy with clear gates between phases.
 
-  Phase A — Internal API Separation (in-tree, no new package):
+  Phase A - Internal API Separation (in-tree, no new package):
   1. Expand ascii/__init__.py to export all data models and factory functions (w1)
   2. Decouple the single `format_scale_factor` import via optional Callable on
-     ASCIIChartOptions — the only benchbox import inside ascii/ (w18)
+     ASCIIChartOptions - the only benchbox import inside ascii/ (w18)
   3. Create ascii_api.py facade module as single import point for external callers (w16)
   4. Migrate all external callers (CLI, MCP, exporters, post_run_summary,
      chart_generator) to import from ascii_api only (w16)
@@ -422,33 +422,33 @@ approach: |
   6. Create golden-output snapshot tests for all 15 chart types BEFORE extraction (w19)
   Gate: zero direct ascii submodule imports outside visualization package.
 
-  Phase B — Standalone Package Extraction:
+  Phase B - Standalone Package Extraction:
   7. Scaffold textcharts package in packages/textcharts/ with src layout (w3)
   8. Define public API: drop ASCII prefix, add ChartOptions alias (w13)
   9. Copy code, rewrite internal imports, add custom palette support (w4-w6)
   10. Replace BenchBox ascii/ with compatibility shim re-exporting from textcharts (w7)
   11. Add textcharts as BenchBox path dependency (w8)
-  12. Verify golden-output parity — must be byte-identical (w9-w10)
+  12. Verify golden-output parity - must be byte-identical (w9-w10)
   Gate: full test suite passes, zero benchbox imports in textcharts.
 
-  Phase C — Packaging and Release:
+  Phase C - Packaging and Release:
   13. Complete packaging MVP with README, chart gallery, py.typed (w15)
   14. Publish to PyPI and switch BenchBox to versioned dependency (w11)
   15. Deprecate compatibility shims after one stable release cycle (w12)
 
 anti_patterns:
-- "DO NOT move BenchBox result normalization models into the standalone library — because they encode domain semantics and
-  compatibility obligations — keep them in BenchBox adapters."
-- "DO NOT perform a big-bang directory move without shims — because this will break imports across CLI/MCP/tests — introduce
+- "DO NOT move BenchBox result normalization models into the standalone library - because they encode domain semantics and
+  compatibility obligations - keep them in BenchBox adapters."
+- "DO NOT perform a big-bang directory move without shims - because this will break imports across CLI/MCP/tests - introduce
   delegation shims first."
-- "DO NOT change chart IDs or user-facing option names during extraction — because downstream tools depend on them — preserve
+- "DO NOT change chart IDs or user-facing option names during extraction - because downstream tools depend on them - preserve
   contracts until a separately versioned deprecation plan exists."
-- "DO NOT optimize output formatting during initial extraction — because it masks migration regressions — prioritize strict
+- "DO NOT optimize output formatting during initial extraction - because it masks migration regressions - prioritize strict
   parity first, then incremental improvements."
-- "DO NOT import `benchbox.*` modules inside the standalone package — because that breaks encapsulation and reusability —
+- "DO NOT import `benchbox.*` modules inside the standalone package - because that breaks encapsulation and reusability -
   use typed adapter DTOs at the BenchBox boundary."
-- "DO NOT start standalone package extraction before internal API-separation gates pass — because unresolved internal coupling
-  will leak BenchBox implementation details into the library boundary — complete in-tree facade migration first."
+- "DO NOT start standalone package extraction before internal API-separation gates pass - because unresolved internal coupling
+  will leak BenchBox implementation details into the library boundary - complete in-tree facade migration first."
 
 verification:
   # --- Phase A gates ---
@@ -474,7 +474,7 @@ verification:
   phase: A
 - description: "Pre-extraction gate: external callers use facade only"
   command: "rg -n \"benchbox\\.core\\.visualization\\.ascii\" benchbox | rg -v \"^benchbox/core/visualization/(ascii/|ascii_runtime|ascii_api|exporters|post_run_summary|chart_generator)\""
-  expected_output: "No matches — all external callers migrated to ascii_api facade"
+  expected_output: "No matches - all external callers migrated to ascii_api facade"
   phase: A
 - description: "Golden output snapshots created for all 15 chart types"
   command: "uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -q"
@@ -542,11 +542,11 @@ success_metrics:
 
 resolved_questions:
 - question: "What should the public distribution and import name be?"
-  answer: "`textcharts` (PyPI: textcharts, import: textcharts) — generic, memorable, no BenchBox branding"
+  answer: "`textcharts` (PyPI: textcharts, import: textcharts) - generic, memorable, no BenchBox branding"
 - question: "Should the first release guarantee exact text output stability or only semantic stability?"
-  answer: "Exact text parity — golden snapshot tests enforce byte-identical output before and after extraction"
+  answer: "Exact text parity - golden snapshot tests enforce byte-identical output before and after extraction"
 - question: "Should compatibility shims remain for one major BenchBox release or two?"
-  answer: "One stable release cycle — add deprecation warnings after first release, plan removal for next major"
+  answer: "One stable release cycle - add deprecation warnings after first release, plan removal for next major"
 - question: "Should the dispatch layer (ascii_runtime.py) move into the standalone library?"
-  answer: "No — it contains BenchBox-specific NormalizedResult→chart data conversion. Standalone users construct chart objects
+  answer: "No - it contains BenchBox-specific NormalizedResult→chart data conversion. Standalone users construct chart objects
     directly."

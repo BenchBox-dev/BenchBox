@@ -63,7 +63,7 @@ items:
   - design-results-ingest-storage-and-derived-read-model
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
-  title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
+  title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
   worktree: platform-expansion
   category: Platform Expansion
   priority: High
@@ -72,7 +72,7 @@ items:
   - motherduck
   - cloud-features
   - deferred-followup
-  estimated_effort: Medium — requires MotherDuck free-tier account
+  estimated_effort: Medium - requires MotherDuck free-tier account
   work_total: 3
   work_done: 0
   work_ready: 1
@@ -120,7 +120,7 @@ items:
   - jit
   - mpi
   - deferred-followup
-  estimated_effort: Medium — 2-3 days
+  estimated_effort: Medium - 2-3 days
   work_total: 3
   work_done: 0
   work_ready: 1
@@ -144,7 +144,7 @@ items:
   work_ready: 17
 - id: future-ideas-backlog
   file: TODO/main/planning/future-ideas-backlog.yaml
-  title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
+  title: Future Ideas Backlog - Specialized Benchmarks and Infrastructure
   worktree: main
   category: Supporting Infrastructure
   priority: Low
@@ -366,7 +366,7 @@ items:
   - gluten
   - native-execution
   - accelerated-spark
-  estimated_effort: Large — ~6-8 engineering days including jar provisioning, two deployment modes, multi-arch Docker image
+  estimated_effort: Large - ~6-8 engineering days including jar provisioning, two deployment modes, multi-arch Docker image
     + compose, CI strategy, and docs
   work_total: 21
   work_done: 0

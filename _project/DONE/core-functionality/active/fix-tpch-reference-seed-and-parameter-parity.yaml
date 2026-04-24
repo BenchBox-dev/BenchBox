@@ -135,12 +135,12 @@ approach: |
   rather than hardcoded, but that can be a follow-up.
 
 anti_patterns:
-- "DO NOT change TPCH_PARAMS values without verifying against qgen output — because the parameters are interdependent and
-  arbitrary changes will produce wrong row counts — regenerate from qgen instead"
-- "DO NOT remove the reference_seed concept entirely — because exact validation against answer files requires a specific seed
-  — keep it available but don't make it the default"
-- "DO NOT add seed parameter threading to DataFrame query functions — because that would require reimplementing qgen's parameter
-  substitution in Python — keep DataFrame params as a static dict derived from qgen output"
+- "DO NOT change TPCH_PARAMS values without verifying against qgen output - because the parameters are interdependent and
+  arbitrary changes will produce wrong row counts - regenerate from qgen instead"
+- "DO NOT remove the reference_seed concept entirely - because exact validation against answer files requires a specific seed
+  - keep it available but don't make it the default"
+- "DO NOT add seed parameter threading to DataFrame query functions - because that would require reimplementing qgen's parameter
+  substitution in Python - keep DataFrame params as a static dict derived from qgen output"
 
 verification:
 - description: "Reference seed constant matches its comment"

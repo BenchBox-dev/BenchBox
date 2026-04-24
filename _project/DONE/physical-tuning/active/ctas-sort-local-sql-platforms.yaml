@@ -1,4 +1,4 @@
-# CTAS Sort — Local SQL Platform Implementations
+# CTAS Sort - Local SQL Platform Implementations
 #
 # Location: _project/TODO/physical-tuning/planning/ctas-sort-local-sql-platforms.yaml
 
@@ -78,7 +78,7 @@ work:
       DROP TABLE {t};
       ALTER TABLE {t}_ctas_sort RENAME TO {t};
       COMMIT;
-    Verify: does this preserve indexes/constraints created by schema setup? Likely not —
+    Verify: does this preserve indexes/constraints created by schema setup? Likely not -
     the DROP removes the table and its constraints. The base class apply_ctas_sort runs
     after data load but the schema (CREATE TABLE + indexes) was applied earlier in the
     run. Determine whether constraints must be re-applied or if COPY-based loading makes
@@ -95,7 +95,7 @@ work:
     Alternatively, wrap all statements in a DO $$ ... $$ block if the connection supports it.
 
 - id: w5
-  summary: "Research StarRocks CTAS sort — does post-load CTAS physically reorder data?"
+  summary: "Research StarRocks CTAS sort - does post-load CTAS physically reorder data?"
   status: done
   notes: |
     StarRocks uses a Duplicate Key / Sort Key model defined at table creation.
@@ -123,7 +123,7 @@ work:
     SQLite CTAS sort requires DROP + RENAME which loses indexes/constraints, same as PG.
     Given SQLite is a dev/testing platform (not production performance target), the cost
     likely outweighs the benefit. Decision: return None with log_debug(
-    "SQLite CTAS sort skipped — physical sort not beneficial for testing platform").
+    "SQLite CTAS sort skipped - physical sort not beneficial for testing platform").
     Document the decision in code comments so future maintainers understand it was deliberate.
 
 - id: w8
@@ -189,23 +189,23 @@ must_preserve:
 - "All existing DataFusion, PostgreSQL, StarRocks, SQLite unit tests pass"
 
 approach: |
-  Work research units (w1, w3, w5, w7) first in parallel — they are read-only and independent.
+  Work research units (w1, w3, w5, w7) first in parallel - they are read-only and independent.
   Then implement based on findings (w2, w4, w6 depend on their research units).
   For PostgreSQL, if the multi-statement list[str] return type is needed, extend apply_ctas_sort
   in the base class to handle it before implementing the PostgreSQL override.
 
   For DataFusion, check the existing _load_table_parquet() and _load_table_csv() methods to
-  understand how the table is registered — CTAS sort requires the table to exist as a
+  understand how the table is registered - CTAS sort requires the table to exist as a
   named relation that can be self-joined in SELECT * FROM {table_name}.
 
 anti_patterns:
-- "DO NOT assume DataFusion CTAS behavior matches DuckDB without verification — because DataFusion's table registration model
-  (external tables vs in-memory) differs — verify that SELECT * FROM {table_name} is valid post-load before generating CTAS
+- "DO NOT assume DataFusion CTAS behavior matches DuckDB without verification - because DataFusion's table registration model
+  (external tables vs in-memory) differs - verify that SELECT * FROM {table_name} is valid post-load before generating CTAS
   SQL"
-- "DO NOT execute DROP TABLE without a preceding BEGIN transaction in PostgreSQL — because a crash between DROP and RENAME
-  would leave the table destroyed — always wrap in a BEGIN/COMMIT block"
-- "DO NOT skip the research work units (w1, w3, w5) to save time — because incorrect CTAS assumptions could silently produce
-  unsorted data or corrupt the table — confirm physical sort behavior before coding"
+- "DO NOT execute DROP TABLE without a preceding BEGIN transaction in PostgreSQL - because a crash between DROP and RENAME
+  would leave the table destroyed - always wrap in a BEGIN/COMMIT block"
+- "DO NOT skip the research work units (w1, w3, w5) to save time - because incorrect CTAS assumptions could silently produce
+  unsorted data or corrupt the table - confirm physical sort behavior before coding"
 
 verification:
 - description: "Local SQL platform unit tests pass"

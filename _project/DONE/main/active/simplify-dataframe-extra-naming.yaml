@@ -7,16 +7,16 @@ completed_date: "2026-02-15"
 description: |
   The `dataframe-` prefix on pyproject.toml extras (e.g., `dataframe-dask` instead of `dask`)
   creates a poor UX: users must know the prefix convention to install optional dependencies.
-  Running `uv sync --extra dask` fails with a confusing error — the correct incantation is
+  Running `uv sync --extra dask` fails with a confusing error - the correct incantation is
   `uv sync --extra dataframe-dask`.
 
   Investigation found the prefix serves no real purpose for any of the 7 DataFrame platforms:
   - **5 platforms** (polars, pandas, dask, modin, cudf) have no SQL-mode counterpart at all.
   - **DataFusion** has `datafusion` (SQL+pyarrow) and `dataframe-datafusion` (DataFrame only).
-    The only difference is pyarrow — a lightweight transitive dep that both modes benefit from.
+    The only difference is pyarrow - a lightweight transitive dep that both modes benefit from.
     Merge into one `datafusion` extra including pyarrow.
   - **PySpark/Spark** has `spark` (pyspark>=4.0.1) and `dataframe-pyspark` (pyspark>=3.5.0).
-    The >=4.0.1 floor on `spark` is unjustified — every other pyspark reference in pyproject.toml
+    The >=4.0.1 floor on `spark` is unjustified - every other pyspark reference in pyproject.toml
     uses >=3.5.0 (cloud-spark groups, dataframe-all, test deps). The Spark SQL adapter uses
     standard SparkSession APIs available since 3.x. Align to pyspark>=3.5.0 for both.
 
@@ -26,126 +26,126 @@ description: |
 category: "Developer Experience"
 
 work:
-- id: w1
-  summary: "Add plain-name extra aliases in pyproject.toml for 5 non-conflicting DataFrame platforms"
-  status: done
-  notes: |
-    Add these new extras that forward to existing dataframe- extras:
-      dask = ["dask[distributed]>=2024.1.0", "pandas>=2.0.0"]
-      modin = ["modin[ray]>=0.32.0", "pandas>=2.0.0"]
-      pandas = ["pandas>=2.0.0"]
-      polars = ["polars>=1.35.2"]
-      cudf = []   # placeholder — same as dataframe-cudf
-    Keep `dataframe-*` variants as-is for backward compatibility.
-    Verify: `uv sync --extra dask --dry-run` resolves without errors.
-    Commit: pyproject.toml only.
+  - id: w1
+    summary: "Add plain-name extra aliases in pyproject.toml for 5 non-conflicting DataFrame platforms"
+    status: done
+    notes: |
+      Add these new extras that forward to existing dataframe- extras:
+        dask = ["dask[distributed]>=2024.1.0", "pandas>=2.0.0"]
+        modin = ["modin[ray]>=0.32.0", "pandas>=2.0.0"]
+        pandas = ["pandas>=2.0.0"]
+        polars = ["polars>=1.35.2"]
+        cudf = []   # placeholder - same as dataframe-cudf
+      Keep `dataframe-*` variants as-is for backward compatibility.
+      Verify: `uv sync --extra dask --dry-run` resolves without errors.
+      Commit: pyproject.toml only.
 
-- id: w2
-  summary: "Merge DataFusion into single `datafusion` extra with pyarrow"
-  needs: [w1]
-  status: done
-  notes: |
-    Current state:
-      datafusion = ["datafusion>=50.1.0", "pyarrow>=10.0.0"]     # SQL mode
-      dataframe-datafusion = ["datafusion>=50.1.0"]                # DataFrame mode
-    Action: make `dataframe-datafusion` an alias pointing to the full `datafusion` deps:
-      dataframe-datafusion = ["datafusion>=50.1.0", "pyarrow>=10.0.0"]
-    pyarrow is lightweight (~30MB) and useful in both modes. One extra, one dep list.
-    Update PLATFORM_TO_EXTRA: "datafusion-df" → "datafusion".
-    Verify: `uv sync --extra datafusion --dry-run` resolves correctly.
-    Commit: pyproject.toml only.
+  - id: w2
+    summary: "Merge DataFusion into single `datafusion` extra with pyarrow"
+    needs: [w1]
+    status: done
+    notes: |
+      Current state:
+        datafusion = ["datafusion>=50.1.0", "pyarrow>=10.0.0"]     # SQL mode
+        dataframe-datafusion = ["datafusion>=50.1.0"]                # DataFrame mode
+      Action: make `dataframe-datafusion` an alias pointing to the full `datafusion` deps:
+        dataframe-datafusion = ["datafusion>=50.1.0", "pyarrow>=10.0.0"]
+      pyarrow is lightweight (~30MB) and useful in both modes. One extra, one dep list.
+      Update PLATFORM_TO_EXTRA: "datafusion-df" → "datafusion".
+      Verify: `uv sync --extra datafusion --dry-run` resolves correctly.
+      Commit: pyproject.toml only.
 
-- id: w3
-  summary: "Align PySpark to single version floor and add `pyspark` plain-name alias"
-  needs: [w1]
-  status: done
-  notes: |
-    Current state:
-      spark = ["pyspark>=4.0.1"]                                   # SQL mode
-      dataframe-pyspark = ["pyspark>=3.5.0"]                       # DataFrame mode
-    Action:
-      1. Lower `spark` extra to pyspark>=3.5.0 (matches every other pyspark ref in pyproject.toml).
-      2. Add plain-name alias: `pyspark = ["pyspark>=3.5.0"]`
-      3. Make `dataframe-pyspark` an alias: `dataframe-pyspark = ["pyspark>=3.5.0"]`
-    All three names (`spark`, `pyspark`, `dataframe-pyspark`) install pyspark>=3.5.0.
-    Update PLATFORM_TO_EXTRA: "pyspark-df" → "pyspark".
-    Verify: `uv sync --extra spark --extra pyspark --dry-run` resolves correctly.
-    Commit: pyproject.toml only.
+  - id: w3
+    summary: "Align PySpark to single version floor and add `pyspark` plain-name alias"
+    needs: [w1]
+    status: done
+    notes: |
+      Current state:
+        spark = ["pyspark>=4.0.1"]                                   # SQL mode
+        dataframe-pyspark = ["pyspark>=3.5.0"]                       # DataFrame mode
+      Action:
+        1. Lower `spark` extra to pyspark>=3.5.0 (matches every other pyspark ref in pyproject.toml).
+        2. Add plain-name alias: `pyspark = ["pyspark>=3.5.0"]`
+        3. Make `dataframe-pyspark` an alias: `dataframe-pyspark = ["pyspark>=3.5.0"]`
+      All three names (`spark`, `pyspark`, `dataframe-pyspark`) install pyspark>=3.5.0.
+      Update PLATFORM_TO_EXTRA: "pyspark-df" → "pyspark".
+      Verify: `uv sync --extra spark --extra pyspark --dry-run` resolves correctly.
+      Commit: pyproject.toml only.
 
-- id: w4
-  summary: "Update PLATFORM_TO_EXTRA and DEPENDENCY_GROUPS in dependencies.py"
-  needs: [w1, w2, w3]
-  status: done
-  notes: |
-    File: benchbox/utils/dependencies.py
-    Changes:
-      - PLATFORM_TO_EXTRA: update DataFrame platform entries to use plain names
-        (e.g., "polars-df" → "polars", "pandas-df" → "pandas", "datafusion-df" → "datafusion",
-         "pyspark-df" → "pyspark", "dask-df" → "dask", "modin-df" → "modin", "cudf-df" → "cudf")
-      - DATAFRAME_DEPENDENCY_GROUPS: update install_command strings to use plain names
-        (e.g., "uv add benchbox --extra polars" not "--extra dataframe-polars")
-      - DEPENDENCY_GROUPS: update any entries referencing dataframe- extras to plain names
-    Verify: `uv run -- python -c "from benchbox.utils.dependencies import PLATFORM_TO_EXTRA; print(PLATFORM_TO_EXTRA)"` shows plain names.
-    Commit: benchbox/utils/dependencies.py only.
+  - id: w4
+    summary: "Update PLATFORM_TO_EXTRA and DEPENDENCY_GROUPS in dependencies.py"
+    needs: [w1, w2, w3]
+    status: done
+    notes: |
+      File: benchbox/utils/dependencies.py
+      Changes:
+        - PLATFORM_TO_EXTRA: update DataFrame platform entries to use plain names
+          (e.g., "polars-df" → "polars", "pandas-df" → "pandas", "datafusion-df" → "datafusion",
+           "pyspark-df" → "pyspark", "dask-df" → "dask", "modin-df" → "modin", "cudf-df" → "cudf")
+        - DATAFRAME_DEPENDENCY_GROUPS: update install_command strings to use plain names
+          (e.g., "uv add benchbox --extra polars" not "--extra dataframe-polars")
+        - DEPENDENCY_GROUPS: update any entries referencing dataframe- extras to plain names
+      Verify: `uv run -- python -c "from benchbox.utils.dependencies import PLATFORM_TO_EXTRA; print(PLATFORM_TO_EXTRA)"` shows plain names.
+      Commit: benchbox/utils/dependencies.py only.
 
-- id: w5
-  summary: "Update error messages and install suggestions in platform_checker and __init__"
-  needs: [w4]
-  status: done
-  notes: |
-    Files:
-      - benchbox/platforms/dataframe/platform_checker.py: extra_name params, get_installation_suggestion()
-      - benchbox/platforms/__init__.py: get_dataframe_requirements() messages
-    Change all user-facing strings from "dataframe-X" to plain "X" names.
-    Example: "uv add benchbox --extra polars" not "uv add benchbox --extra dataframe-polars".
-    Verify: `uv run -- python -c "from benchbox.platforms.dataframe.platform_checker import get_installation_suggestion; print(get_installation_suggestion('polars'))"` shows plain name.
-    Commit: both files together.
+  - id: w5
+    summary: "Update error messages and install suggestions in platform_checker and __init__"
+    needs: [w4]
+    status: done
+    notes: |
+      Files:
+        - benchbox/platforms/dataframe/platform_checker.py: extra_name params, get_installation_suggestion()
+        - benchbox/platforms/__init__.py: get_dataframe_requirements() messages
+      Change all user-facing strings from "dataframe-X" to plain "X" names.
+      Example: "uv add benchbox --extra polars" not "uv add benchbox --extra dataframe-polars".
+      Verify: `uv run -- python -c "from benchbox.platforms.dataframe.platform_checker import get_installation_suggestion; print(get_installation_suggestion('polars'))"` shows plain name.
+      Commit: both files together.
 
-- id: w6
-  summary: "Update tests to use plain extra names"
-  needs: [w4, w5]
-  status: done
-  notes: |
-    Files:
-      - tests/unit/platforms/test_dataframe_factory.py: update "dataframe-pandas" etc. assertions
-      - tests/unit/platforms/dataframe/test_platform_checker.py: update install suggestion assertions
-      - tests/unit/utils/test_dependencies.py: update group structure and naming assertions
-    Add parametrized tests verifying both plain and dataframe- names map to correct packages.
-    Verify: `uv run -- python -m pytest tests/unit/platforms/test_dataframe_factory.py tests/unit/platforms/dataframe/test_platform_checker.py tests/unit/utils/test_dependencies.py -v`
-    Commit: all three test files together.
+  - id: w6
+    summary: "Update tests to use plain extra names"
+    needs: [w4, w5]
+    status: done
+    notes: |
+      Files:
+        - tests/unit/platforms/test_dataframe_factory.py: update "dataframe-pandas" etc. assertions
+        - tests/unit/platforms/dataframe/test_platform_checker.py: update install suggestion assertions
+        - tests/unit/utils/test_dependencies.py: update group structure and naming assertions
+      Add parametrized tests verifying both plain and dataframe- names map to correct packages.
+      Verify: `uv run -- python -m pytest tests/unit/platforms/test_dataframe_factory.py tests/unit/platforms/dataframe/test_platform_checker.py tests/unit/utils/test_dependencies.py -v`
+      Commit: all three test files together.
 
-- id: w7
-  summary: "Update documentation to use plain extra names"
-  needs: [w4, w5]
-  status: done
-  notes: |
-    Files:
-      - docs/platforms/quick-reference.md
-      - docs/platforms/comparison-matrix.md
-      - docs/tutorials/dataframe-quickstart.md
-      - docs/platforms/dataframe.md
-      - Individual platform docs (polars.md, pandas-dataframe.md, etc.)
-      - CLAUDE.md CLI quick reference (if applicable)
-    Use plain names in all install examples. Mention dataframe- as legacy alias once in
-    docs/platforms/dataframe.md only.
-    Verify: `rg "dataframe-polars|dataframe-pandas|dataframe-dask|dataframe-modin|dataframe-pyspark|dataframe-datafusion" docs/` returns only the legacy-alias note.
-    Commit: all docs files together.
+  - id: w7
+    summary: "Update documentation to use plain extra names"
+    needs: [w4, w5]
+    status: done
+    notes: |
+      Files:
+        - docs/platforms/quick-reference.md
+        - docs/platforms/comparison-matrix.md
+        - docs/tutorials/dataframe-quickstart.md
+        - docs/platforms/dataframe.md
+        - Individual platform docs (polars.md, pandas-dataframe.md, etc.)
+        - CLAUDE.md CLI quick reference (if applicable)
+      Use plain names in all install examples. Mention dataframe- as legacy alias once in
+      docs/platforms/dataframe.md only.
+      Verify: `rg "dataframe-polars|dataframe-pandas|dataframe-dask|dataframe-modin|dataframe-pyspark|dataframe-datafusion" docs/` returns only the legacy-alias note.
+      Commit: all docs files together.
 
 metadata:
   tags:
-  - "developer-experience"
-  - "naming-convention"
-  - "pyproject-extras"
+    - "developer-experience"
+    - "naming-convention"
+    - "pyproject-extras"
   estimated_effort: "Medium"
   created_date: "2026-02-15"
 
 must_preserve:
-- "All existing `dataframe-*` extra names continue to resolve — verify: `uv sync --extra dataframe-dask --extra dataframe-pandas
-  --dry-run` succeeds."
-- "Platform adapters resolve correctly with plain names — verify: `uv run -- python -c \"from benchbox.platforms import get_adapter;
-  get_adapter('polars-df')\"` succeeds."
-- "`uv sync --extra all` and `uv sync --extra cloud` continue to work unchanged."
-- "No change to runtime behavior — this is purely an installation/naming change."
+  - "All existing `dataframe-*` extra names continue to resolve - verify: `uv sync --extra dataframe-dask --extra dataframe-pandas
+    --dry-run` succeeds."
+  - 'Platform adapters resolve correctly with plain names - verify: `uv run -- python -c "from benchbox.platforms import get_adapter;
+    get_adapter(''polars-df'')"` succeeds.'
+  - "`uv sync --extra all` and `uv sync --extra cloud` continue to work unchanged."
+  - "No change to runtime behavior - this is purely an installation/naming change."
 
 approach: |
   Add plain-name extras as ALIASES first (w1), keeping all dataframe- names functional.
@@ -153,46 +153,47 @@ approach: |
   internal references to prefer plain names (w4-w7). Every intermediate state is valid:
   the dataframe- names never break, they just become the less-preferred spelling.
   Convenience groups (dataframe-pandas-family, dataframe-expression-family, dataframe-all)
-  are kept as-is — they are rarely typed by users and "dataframe-all" is semantically clear.
+  are kept as-is - they are rarely typed by users and "dataframe-all" is semantically clear.
 
 anti_patterns:
-- "DO NOT remove dataframe- extras from pyproject.toml — because downstream users/scripts may reference them — keep as aliases
-  indefinitely."
-- "DO NOT batch all pyproject.toml changes into one commit — because a typo in extras can break all installs — commit w1,
-  w2, w3 separately with dry-run verification."
+  - "DO NOT remove dataframe- extras from pyproject.toml - because downstream users/scripts may reference them - keep as aliases
+    indefinitely."
+  - "DO NOT batch all pyproject.toml changes into one commit - because a typo in extras can break all installs - commit w1,
+    w2, w3 separately with dry-run verification."
 
 verification:
-- description: "Plain-name extras resolve for all 7 DataFrame platforms"
-  command: "uv sync --extra dask --extra pandas --extra modin --extra polars --extra pyspark --extra datafusion --dry-run"
-  expected_output: "Resolution succeeds without errors"
-- description: "Existing dataframe- extras still resolve"
-  command: "uv sync --extra dataframe-dask --extra dataframe-pandas --extra dataframe-pyspark --extra dataframe-datafusion
-    --dry-run"
-  expected_output: "Resolution succeeds without errors"
-- description: "Spark SQL extra uses aligned version"
-  command: "uv run -- python -c \"import tomllib; d=tomllib.load(open('pyproject.toml','rb')); print(d['project']['optional-dependencies']['spark'])\""
-  expected_output: "['pyspark>=3.5.0']"
-- description: "Tests pass after naming changes"
-  command: "make test-fast"
-  expected_output: "All tests pass, no new failures"
+  - description: "Plain-name extras resolve for all 7 DataFrame platforms"
+    command: "uv sync --extra dask --extra pandas --extra modin --extra polars --extra pyspark --extra datafusion --dry-run"
+    expected_output: "Resolution succeeds without errors"
+  - description: "Existing dataframe- extras still resolve"
+    command:
+      "uv sync --extra dataframe-dask --extra dataframe-pandas --extra dataframe-pyspark --extra dataframe-datafusion
+      --dry-run"
+    expected_output: "Resolution succeeds without errors"
+  - description: "Spark SQL extra uses aligned version"
+    command: 'uv run -- python -c "import tomllib; d=tomllib.load(open(''pyproject.toml'',''rb'')); print(d[''project''][''optional-dependencies''][''spark''])"'
+    expected_output: "['pyspark>=3.5.0']"
+  - description: "Tests pass after naming changes"
+    command: "make test-fast"
+    expected_output: "All tests pass, no new failures"
 
 scope_limit:
   only_modify:
-  - "pyproject.toml"
-  - "benchbox/utils/dependencies.py"
-  - "benchbox/platforms/dataframe/platform_checker.py"
-  - "benchbox/platforms/__init__.py"
-  - "tests/unit/platforms/test_dataframe_factory.py"
-  - "tests/unit/platforms/dataframe/test_platform_checker.py"
-  - "tests/unit/utils/test_dependencies.py"
-  - "docs/platforms/"
-  - "docs/tutorials/dataframe-quickstart.md"
-  - "CLAUDE.md"
-  - "_project/TODO/"
+    - "pyproject.toml"
+    - "benchbox/utils/dependencies.py"
+    - "benchbox/platforms/dataframe/platform_checker.py"
+    - "benchbox/platforms/__init__.py"
+    - "tests/unit/platforms/test_dataframe_factory.py"
+    - "tests/unit/platforms/dataframe/test_platform_checker.py"
+    - "tests/unit/utils/test_dependencies.py"
+    - "docs/platforms/"
+    - "docs/tutorials/dataframe-quickstart.md"
+    - "CLAUDE.md"
+    - "_project/TODO/"
   do_not_modify:
-  - "benchbox/core/"
-  - "benchbox/cli/"
-  - "_binaries/"
-  - "benchmark_runs/"
+    - "benchbox/core/"
+    - "benchbox/cli/"
+    - "_binaries/"
+    - "benchmark_runs/"
 
 open_questions: []

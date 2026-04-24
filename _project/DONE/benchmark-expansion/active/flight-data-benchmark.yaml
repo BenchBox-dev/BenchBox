@@ -191,9 +191,9 @@ must_preserve:
 - "Platform registry backward compatible"
 
 anti_patterns:
-- "DO NOT hardcode BTS download URLs — because BTS periodically changes endpoints — use configuration-driven URL templates"
-- "DO NOT download real flight data in unit tests — because files are large and BTS rate-limits — use synthetic test fixtures"
-- "DO NOT embed full airport/airline datasets inline in code — because reference data changes over time — use downloadable CSV files with version pinning"
+- "DO NOT hardcode BTS download URLs - because BTS periodically changes endpoints - use configuration-driven URL templates"
+- "DO NOT download real flight data in unit tests - because files are large and BTS rate-limits - use synthetic test fixtures"
+- "DO NOT embed full airport/airline datasets inline in code - because reference data changes over time - use downloadable CSV files with version pinning"
 
 verification:
 - description: "Flight data benchmark module imports"

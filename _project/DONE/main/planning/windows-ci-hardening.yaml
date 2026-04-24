@@ -16,7 +16,7 @@ description: |
     data corruption on Windows where default is cp1252)
   - 3 os.access(path, os.X_OK) checks that are no-ops on Windows
   - Integration tests (integration-smoke, test-package, pyspark) run
-    Ubuntu-only — test-package uses bash-isms (source activate)
+    Ubuntu-only - test-package uses bash-isms (source activate)
   - Only Python 3.12 tested on Windows; 3.10 has different encoding defaults
   - No static analysis catches Windows anti-patterns pre-merge
 
@@ -30,7 +30,7 @@ metadata:
   - release-quality
   estimated_effort: "Medium"
   created_date: "2026-04-02"
-  source_review: "Windows CI hardening conversation — codebase audit"
+  source_review: "Windows CI hardening conversation - codebase audit"
 
 impact:
   user_impact: |
@@ -72,7 +72,7 @@ work:
   needs: []
   description: |
     Add PLW1514 (unspecified-encoding) to the ruff select list in
-    pyproject.toml. Fix existing violations — primarily ~6 instances in
+    pyproject.toml. Fix existing violations - primarily ~6 instances in
     core/dryrun.py where open() is called without encoding="utf-8".
     On Windows the default encoding is the system ANSI codepage (cp1252),
     not UTF-8, so missing encoding= causes silent data corruption.
@@ -100,7 +100,7 @@ work:
   needs: []
   description: |
     The test-package job uses `source test-venv/bin/activate` and bare
-    `python` — both bash-isms that fail on Windows. Replace with `uv run`
+    `python` - both bash-isms that fail on Windows. Replace with `uv run`
     invocations that work on all platforms. Consider adding windows-latest
     to the job matrix to verify package installation on Windows.
   files:
@@ -113,7 +113,7 @@ work:
   description: |
     Add windows-latest to the integration-smoke job matrix. These ~46
     tests exercise data generation, file I/O, and subprocess orchestration
-    — all areas where Windows path/encoding bugs surface. Requires w3
+    - all areas where Windows path/encoding bugs surface. Requires w3
     patterns to be established first.
   files:
   - .github/workflows/test.yml
@@ -142,7 +142,7 @@ work:
   description: |
     Fix issues surfaced by the new static checks:
     - Replace os.X_OK checks with platform-aware logic (check .exe
-      extension on Windows, X_OK on Unix) — 3 instances in TPC generators
+      extension on Windows, X_OK on Unix) - 3 instances in TPC generators
       and tpc_compilation.py
     - Add encoding="utf-8" to any remaining open() calls missed by w1
     - Guard any unguarded Unix-only signal usage
@@ -189,14 +189,14 @@ must_preserve:
 
 approach: |
   Start with zero-effort wins (ruff rule, matrix entry) before building
-  new tooling. Each work unit is independently shippable — no need to
+  new tooling. Each work unit is independently shippable - no need to
   batch. Follow the existing CI structure in .github/workflows/test.yml.
 
 anti_patterns:
-- "DO NOT add Windows-only workarounds with sys.platform checks scattered through business logic — centralize platform abstractions
+- "DO NOT add Windows-only workarounds with sys.platform checks scattered through business logic - centralize platform abstractions
   in utils/"
-- "DO NOT make integration tests conditional on platform — fix the tests to be cross-platform instead"
-- "DO NOT use continue-on-error: true for Windows jobs — that hides failures instead of catching them"
+- "DO NOT make integration tests conditional on platform - fix the tests to be cross-platform instead"
+- "DO NOT use continue-on-error: true for Windows jobs - that hides failures instead of catching them"
 
 verification:
 - description: "Ruff catches open() calls without encoding"

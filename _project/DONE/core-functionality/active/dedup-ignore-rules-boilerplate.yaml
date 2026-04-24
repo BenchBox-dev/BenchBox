@@ -8,7 +8,7 @@ category: Core Functionality
 description: |
   The `make duplicate-check-verbose` report identifies 396 duplicate function groups
   totaling 12,666 duplicated lines. Analysis of the top 30 groups reveals that 17 are
-  intentional boilerplate — interface-conforming stubs, protocol/ABC declarations,
+  intentional boilerplate - interface-conforming stubs, protocol/ABC declarations,
   platform adapter wrappers, and TPC-DS spec-mandated query patterns.
 
   These groups should be suppressed via ignore_rules in pyproject.toml
@@ -61,7 +61,7 @@ approach: |
 
 work:
 - id: w1
-  summary: "Add ignore rules for Protocol/ABC abstract stubs (G8,G9,G11,G22) — ~412 lines"
+  summary: "Add ignore rules for Protocol/ABC abstract stubs (G8,G9,G11,G22) - ~412 lines"
   status: done
   notes: |
     Functions: cast_date, cast_string, col, filter, limit, scalar_to_df,
@@ -72,7 +72,7 @@ work:
     benchbox/platforms/base/
 
 - id: w2
-  summary: "Add ignore rules for platform adapter wrappers (G3,G10,G14) — ~366 lines"
+  summary: "Add ignore rules for platform adapter wrappers (G3,G10,G14) - ~366 lines"
   status: done
   notes: |
     Functions: _detect_format, col, from_pandas, lit, get_dataframe_operations,
@@ -81,7 +81,7 @@ work:
     benchbox/platforms/databricks/, benchbox/platforms/snowflake.py, etc.
 
 - id: w3
-  summary: "Add ignore rules for benchmark facade/delegation methods (G2,G5,G16) — ~410 lines"
+  summary: "Add ignore rules for benchmark facade/delegation methods (G2,G5,G16) - ~410 lines"
   status: done
   notes: |
     Functions: get_queries_by_category, get_query_info, get_operations_by_category,
@@ -91,7 +91,7 @@ work:
     benchbox/*.py (top-level modules)
 
 - id: w4
-  summary: "Add ignore rules for TPC-DS/TPC-DI domain patterns (G1,G6,G7,G26,G28) — ~741 lines"
+  summary: "Add ignore rules for TPC-DS/TPC-DI domain patterns (G1,G6,G7,G26,G28) - ~741 lines"
   status: done
   notes: |
     Functions: _fact_map, _role_aliases, _income_band_aliases, _load_base_queries,
@@ -102,7 +102,7 @@ work:
     benchbox/core/tpcdi/query_*.py, benchbox/core/tpcds/dataframe_queries/
 
 - id: w5
-  summary: "Add ignore rules for multi-backend dispatch methods (G18,G20) — ~175 lines"
+  summary: "Add ignore rules for multi-backend dispatch methods (G18,G20) - ~175 lines"
   status: done
   notes: |
     Functions: first, floor, last, abs_, round_, ceil, sqrt, log, quantile,
@@ -123,7 +123,7 @@ verification:
 - description: "Duplicate check still passes with lowered threshold"
   command: "make duplicate-check"
   expected_output: "PASS: N duplicated lines within threshold of M"
-- description: "No false negatives — consolidation targets still appear in report"
+- description: "No false negatives - consolidation targets still appear in report"
   command: "make duplicate-check-verbose --top-n 10"
   expected_output: "Report still shows consolidation candidates (Groups 4,12,13,17,19,21,23-25,27,29,30)"
 
@@ -136,9 +136,9 @@ must_preserve:
 - "make duplicate-check exit code behavior unchanged"
 
 anti_patterns:
-- "DO NOT use ignore_function_names (global) for functions that should only be ignored in specific paths — because it would
-  suppress genuine duplicates elsewhere — use ignore_rules with path_contains instead"
-- "DO NOT set threshold to exact current count — because normal development causes small fluctuations — set it ~10% above
+- "DO NOT use ignore_function_names (global) for functions that should only be ignored in specific paths - because it would
+  suppress genuine duplicates elsewhere - use ignore_rules with path_contains instead"
+- "DO NOT set threshold to exact current count - because normal development causes small fluctuations - set it ~10% above
   baseline"
 
 metadata:

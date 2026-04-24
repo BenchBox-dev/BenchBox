@@ -49,19 +49,19 @@ approach: |
   symbol, line range, current responsibility, proposed module, caller risk.
 
 anti_patterns:
-  - "DO NOT start moving code in this TODO — because that would bypass the safety-gated refactor item — keep this slice read-only"
-  - "DO NOT group methods by 'roughly same size' — because that creates arbitrary modules — cluster by responsibility and call graph"
+  - "DO NOT start moving code in this TODO - because that would bypass the safety-gated refactor item - keep this slice read-only"
+  - "DO NOT group methods by 'roughly same size' - because that creates arbitrary modules - cluster by responsibility and call graph"
 
 verification:
   - description: "Refactor map enumerates every public symbol in adapter.py"
-    command: "uv run -- python -c 'import ast, pathlib; src = pathlib.Path(\"benchbox/platforms/base/adapter.py\").read_text(); tree = ast.parse(src); symbols = [n.name for n in ast.walk(tree) if isinstance(n, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and not n.name.startswith(\"_\")]; doc = pathlib.Path(\"docs/development/adapter-refactor-map.md\").read_text(); missing = [s for s in symbols if s not in doc]; print(\"MISSING:\", missing) if missing else print(\"OK: all\", len(symbols), \"public symbols mapped\")'"
+    command: 'uv run -- python -c ''import ast, pathlib; src = pathlib.Path("benchbox/platforms/base/adapter.py").read_text(); tree = ast.parse(src); symbols = [n.name for n in ast.walk(tree) if isinstance(n, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and not n.name.startswith("_")]; doc = pathlib.Path("docs/development/adapter-refactor-map.md").read_text(); missing = [s for s in symbols if s not in doc]; print("MISSING:", missing) if missing else print("OK: all", len(symbols), "public symbols mapped")'''
     expected_output: "OK: all N public symbols mapped"
   - description: "Map references every proposed target module"
-    command: "rg -n \"connection|execution|data_loading|result_capture|dialect_translation|tuning\" docs/development/adapter-refactor-map.md"
+    command: 'rg -n "connection|execution|data_loading|result_capture|dialect_translation|tuning" docs/development/adapter-refactor-map.md'
     expected_output: "all six module names present"
   - description: "adapter.py is unchanged (this TODO is read-only)"
     command: "git diff --stat benchbox/platforms/base/adapter.py"
-    expected_output: "(empty — no changes)"
+    expected_output: "(empty - no changes)"
 
 metadata:
   tags: ["quality-plan", "phase-2", "phase-3-prep", "refactor-map"]

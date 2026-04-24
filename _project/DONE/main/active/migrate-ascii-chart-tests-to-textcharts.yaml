@@ -149,8 +149,8 @@ work:
     ```
 
     Final verification:
-    1. BenchBox: `uv run -- python -m pytest tests/unit/visualization/ascii/ -q` — all pass
-    2. textcharts: `cd ~/Developer/textcharts && uv run -- python -m pytest -q` — all pass
+    1. BenchBox: `uv run -- python -m pytest tests/unit/visualization/ascii/ -q` - all pass
+    2. textcharts: `cd ~/Developer/textcharts && uv run -- python -m pytest -q` - all pass
     3. Line count: BenchBox test file should be ~800 lines (down from ~4,500)
 
 - id: w4
@@ -185,7 +185,7 @@ must_preserve:
 - "BenchBox integration tests (ResultPlotter, ascii_runtime, exporters, templates, chart suggestions) remain in BenchBox"
 - "textcharts tests import from `textcharts.*` directly, not through BenchBox shims"
 - "BenchBox golden output snapshot tests continue to pass"
-- "No test coverage gaps — every test moved to textcharts must pass there"
+- "No test coverage gaps - every test moved to textcharts must pass there"
 
 approach: |
   Incremental migration: move tests class-by-class, verify at each step.
@@ -197,13 +197,13 @@ approach: |
   classes that need splitting.
 
 anti_patterns:
-- "DO NOT delete tests from BenchBox before verifying they pass in textcharts — because
-  a failed migration would leave both repos without coverage — always verify first."
+- "DO NOT delete tests from BenchBox before verifying they pass in textcharts - because
+  a failed migration would leave both repos without coverage - always verify first."
 - "DO NOT move tests that import BenchBox-specific fixtures (make_normalized_result) or
-  modules (ascii_runtime, exporters, templates) — because these test integration logic
-  that belongs in BenchBox — review each class carefully."
-- "DO NOT batch-move all tests in one commit — because a single broken import rewrite
-  would fail the entire migration — commit in logical groups (core types, edge cases,
+  modules (ascii_runtime, exporters, templates) - because these test integration logic
+  that belongs in BenchBox - review each class carefully."
+- "DO NOT batch-move all tests in one commit - because a single broken import rewrite
+  would fail the entire migration - commit in logical groups (core types, edge cases,
   advanced charts, splits)."
 
 scope_limit:

@@ -89,9 +89,9 @@ approach: |
   lower-priority columns with "..." indicator.
 
 anti_patterns:
-- "DO NOT use full-width bar charts per cell — because the value of this chart is compactness — use 1-4 character sparkline
+- "DO NOT use full-width bar charts per cell - because the value of this chart is compactness - use 1-4 character sparkline
   bars only"
-- "DO NOT hardcode metric columns — because different benchmarks expose different metrics — accept a flexible list of SparklineColumn
+- "DO NOT hardcode metric columns - because different benchmarks expose different metrics - accept a flexible list of SparklineColumn
   instances"
 
 verification:

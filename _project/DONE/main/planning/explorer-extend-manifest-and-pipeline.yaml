@@ -18,18 +18,18 @@ description: |
   depend on these fields reaching the manifest and DuckDB schema first.
 
   Target manifest additions (all sourced from existing bundle fields):
-    - geomean_ms          — exp(mean(ln(query_ms))) across measurement queries
-    - execution_mode      — "sql" | "dataframe" from config.mode
-    - tuning_mode         — "tuned" | "notuning" | "auto" from config.tuning_mode
-    - tuning_hash         — stable short hash of tuning config for grouping
-    - platform_version    — platform.version (distinct from driver_version)
-    - test_type           — "power" | "throughput" from phases
-    - validation_status   — summary.validation.status
-    - cost_usd            — cost.total_usd (null if absent)
+    - geomean_ms          - exp(mean(ln(query_ms))) across measurement queries
+    - execution_mode      - "sql" | "dataframe" from config.mode
+    - tuning_mode         - "tuned" | "notuning" | "auto" from config.tuning_mode
+    - tuning_hash         - stable short hash of tuning config for grouping
+    - platform_version    - platform.version (distinct from driver_version)
+    - test_type           - "power" | "throughput" from phases
+    - validation_status   - summary.validation.status
+    - cost_usd            - cost.total_usd (null if absent)
 
   Target query record additions:
-    - run_type            — "warmup" | "measurement" per query timing entry
-    - iter, stream        — iteration and stream IDs
+    - run_type            - "warmup" | "measurement" per query timing entry
+    - iter, stream        - iteration and stream IDs
 
 deps:
   needs: []
@@ -60,7 +60,7 @@ work:
     status: pending
 
   - id: w6
-    summary: "Update TypeScript types.ts in results-explorer to match extended ManifestResult and DetailResult shapes. No UI changes — just type alignment."
+    summary: "Update TypeScript types.ts in results-explorer to match extended ManifestResult and DetailResult shapes. No UI changes - just type alignment."
     needs: [w5]
     status: pending
 
@@ -80,9 +80,9 @@ files_affected:
     - "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
 
 must_preserve:
-  - "Existing manifest field names and types — add fields, never rename or remove"
-  - "Existing DuckDB column names — extend schema with new columns only"
-  - "Null-safety for older bundles that predate any new field — missing → null, not error"
+  - "Existing manifest field names and types - add fields, never rename or remove"
+  - "Existing DuckDB column names - extend schema with new columns only"
+  - "Null-safety for older bundles that predate any new field - missing → null, not error"
   - "Explorer pages render correctly for bundles that have no tuning config, no cost data, or no run_type on queries"
 
 approach: |
@@ -95,17 +95,17 @@ approach: |
 
   tuning_hash: short SHA256 prefix of the serialized tuning config dict (or
   tuning mode string if no detail is available). Purpose is grouping, not
-  cryptographic identity — 8 hex chars is enough.
+  cryptographic identity - 8 hex chars is enough.
 
   test_type: infer from which phases are present in the bundle. If
   phases.power_test is populated → "power"; if phases.throughput_test → "throughput";
   if both → "power" (primary). If neither, leave null.
 
 anti_patterns:
-  - "DO NOT add UI changes in this TODO — because this is a pipeline/data-model change only — UI consumption comes in follow-up TODOs"
-  - "DO NOT error on missing fields — because older bundles predate many fields — null-safe extraction throughout"
-  - "DO NOT recompute geomean_ms in every browser query — because it should be precomputed — add it to the manifest at build time"
-  - "DO NOT change the tuning_hash algorithm without updating all callers — because it is used for grouping across results — stability matters more than hash quality"
+  - "DO NOT add UI changes in this TODO - because this is a pipeline/data-model change only - UI consumption comes in follow-up TODOs"
+  - "DO NOT error on missing fields - because older bundles predate many fields - null-safe extraction throughout"
+  - "DO NOT recompute geomean_ms in every browser query - because it should be precomputed - add it to the manifest at build time"
+  - "DO NOT change the tuning_hash algorithm without updating all callers - because it is used for grouping across results - stability matters more than hash quality"
 
 scope_limit:
   only_modify:

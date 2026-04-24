@@ -69,10 +69,10 @@ approach: |
   precision/resolution assumptions.
 
 anti_patterns:
-- "DO NOT blindly replace every time.time() usage — because some are valid event timestamps — classify before migrating"
-- "DO NOT encode allowlist as tribal knowledge — because policy will regress — persist machine-readable allowlist in-repo"
-- "DO NOT weaken checks by broad path exemptions — because that hides regressions — use narrow, justified allowlist entries"
-- "DO NOT alter unrelated business logic while touching timing calls — because this is a governance migration — isolate timing-only
+- "DO NOT blindly replace every time.time() usage - because some are valid event timestamps - classify before migrating"
+- "DO NOT encode allowlist as tribal knowledge - because policy will regress - persist machine-readable allowlist in-repo"
+- "DO NOT weaken checks by broad path exemptions - because that hides regressions - use narrow, justified allowlist entries"
+- "DO NOT alter unrelated business logic while touching timing calls - because this is a governance migration - isolate timing-only
   diffs"
 
 verification:

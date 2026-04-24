@@ -1,5 +1,5 @@
 id: migrate-textcharts-api-breaking-changes
-title: "Migrate BenchBox imports to textcharts new API — rename ASCII*-prefixed classes to unprefixed names"
+title: "Migrate BenchBox imports to textcharts new API - rename ASCII*-prefixed classes to unprefixed names"
 worktree: main
 priority: High
 status: Completed
@@ -7,7 +7,7 @@ completed_date: "2026-03-10"
 description: |
   The textcharts library has removed all backward-compatibility stubs:
   - 17 ASCII*-prefixed class names removed (e.g. ASCIIBarChart -> BarChart)
-  - 13 deprecated factory functions removed (not used in BenchBox — no action)
+  - 13 deprecated factory functions removed (not used in BenchBox - no action)
   - 2 deprecated re-export aliases removed from __init__.py
 
   BenchBox imports textcharts via wildcard shims in
@@ -16,7 +16,7 @@ description: |
   annotations, instantiations, isinstance checks, and string literals.
   These will raise ImportError or test failures when textcharts is upgraded.
 
-  This is a mechanical find-and-replace — no behavioral changes, no
+  This is a mechanical find-and-replace - no behavioral changes, no
   constructor signature changes, byte-identical rendering output.
 
   Scope: 6 source files (~66 references) + 4 test files (~133 references).
@@ -43,7 +43,7 @@ files_affected:
 
 work:
 - id: w1
-  summary: "Rename ASCII*-prefixed classes in 6 source files — ascii_runtime.py, exporters.py, post_run_summary.py, chart_generator.py, visualize.py, mcp/visualization.py"
+  summary: "Rename ASCII*-prefixed classes in 6 source files - ascii_runtime.py, exporters.py, post_run_summary.py, chart_generator.py, visualize.py, mcp/visualization.py"
   status: done
   notes: |
     Class rename map (only the names actually used in BenchBox source):
@@ -66,24 +66,24 @@ work:
 
     Update imports, instantiations, type annotations, and docstring
     references. Preserve all string literals that refer to "ASCII" as a
-    rendering mode concept (e.g. "ASCII charts", "ascii_api") — only
+    rendering mode concept (e.g. "ASCII charts", "ascii_api") - only
     rename class name references.
 
 - id: w2
-  summary: "Rename ASCII*-prefixed classes in 4 test files and run full verification — test_ascii_golden_output.py, test_nocolor_rendering.py, test_ascii_charts.py, test_post_run_summary.py"
+  summary: "Rename ASCII*-prefixed classes in 4 test files and run full verification - test_ascii_golden_output.py, test_nocolor_rendering.py, test_ascii_charts.py, test_post_run_summary.py"
   status: done
   notes: |
     Same rename map as w1. These test files import from
-    benchbox.core.visualization.ascii.* submodules. Independent of w1 —
+    benchbox.core.visualization.ascii.* submodules. Independent of w1 -
     the shim modules export whatever textcharts exports (wildcard imports),
     so both work units fix consumer-side references and can run in parallel.
 
-    test_ascii_charts.py has monkey-patching of runtime.ASCIIBarChart —
+    test_ascii_charts.py has monkey-patching of runtime.ASCIIBarChart -
     update to runtime.BarChart.
 
     test_post_run_summary.py:266 has a mock path string
     "benchbox.core.visualization.post_run_summary.ASCIISummaryBox.render"
-    — update to SummaryBox. Lines 659/677 have docstring references.
+    - update to SummaryBox. Lines 659/677 have docstring references.
 
     After all renames, run the verification commands from the verification
     section to confirm no remaining old references and golden snapshots
@@ -100,15 +100,15 @@ approach: |
   Mechanical find-and-replace per the rename map. Each file: update import
   lines first, then update all usages in function bodies. The
   benchbox/core/visualization/ascii/*.py shim modules use wildcard imports
-  from textcharts and need no changes — they auto-adapt.
+  from textcharts and need no changes - they auto-adapt.
 
   Process each source file independently. Run lint after each file to catch
   import errors immediately. Commit per work unit.
 
 anti_patterns:
-- "DO NOT rename string literals like 'ASCII charts' or 'ascii_api' — only rename class name references like ASCIIBarChart — because these are descriptive terms, not code symbols"
-- "DO NOT change constructor signatures or add/remove parameters — because the API is identical, only names changed"
-- "DO NOT modify the ascii/*.py shim modules — because wildcard imports auto-adapt to the new names"
+- "DO NOT rename string literals like 'ASCII charts' or 'ascii_api' - only rename class name references like ASCIIBarChart - because these are descriptive terms, not code symbols"
+- "DO NOT change constructor signatures or add/remove parameters - because the API is identical, only names changed"
+- "DO NOT modify the ascii/*.py shim modules - because wildcard imports auto-adapt to the new names"
 
 verification:
 - description: "All visualization tests pass"
@@ -137,7 +137,7 @@ scope_limit:
   - "tests/unit/visualization/ascii/test_ascii_charts.py"
   - "tests/unit/core/visualization/test_post_run_summary.py"
   exclude:
-  - "benchbox/core/visualization/ascii/*.py (shim modules — wildcard imports auto-adapt)"
+  - "benchbox/core/visualization/ascii/*.py (shim modules - wildcard imports auto-adapt)"
   - "textcharts library itself (upstream, not our code)"
   - "Any behavioral changes, constructor signatures, or rendering logic"
 

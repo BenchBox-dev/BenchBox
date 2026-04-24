@@ -17,24 +17,24 @@ description: |
 
   ### Query plan comparison gaps (comparison.py)
   1. _OPERATOR_COMPARATORS missing Limit (limit_count, offset_count) and
-     Project (projection_expressions) comparators — first-class LogicalOperator
+     Project (projection_expressions) comparators - first-class LogicalOperator
      fields silently ignored during plan comparison
   2. Aggregate comparator only checks aggregation_functions, ignores group_by_keys
   3. Set difference output in _compare_set_diff is non-deterministic (list(set - set))
-     — affects snapshot test stability
+     - affects snapshot test stability
 
   ### Visualization null safety (visualization.py)
   4. _format_physical_properties calls phys.properties.get() without guarding
-     against phys.properties being None — AttributeError when show_physical=True
+     against phys.properties being None - AttributeError when show_physical=True
      and PhysicalOperator has properties=None
 
   ### Exception chain loss (primitives/catalog/loader.py)
   5. raise error_class(...) without `from exc` in expected_rows_affected
-     int() parsing — loses original TypeError/ValueError context
+     int() parsing - loses original TypeError/ValueError context
 
   ### Analysis edge cases (ranking.py)
   6. _normalize_scores produces NaN when float("inf") is present in raw scores
-     (platform with no query times) — NaN propagates into composite rankings
+     (platform with no query times) - NaN propagates into composite rankings
 
   ### CLI truthiness (benchmarks.py)
   7. spec.default truthiness check on choices branch (line ~1414): falsy defaults
@@ -44,12 +44,12 @@ description: |
 
   ### Timing domain mismatch (maintenance_test.py)
   8. _execute_maintenance_operation uses mono_time() for start but time.time()
-     for end — operation.duration is cross-domain nonsense. Should use
+     for end - operation.duration is cross-domain nonsense. Should use
      mono_time()/elapsed_seconds() consistently.
 
   ### Stub function naming (runner.py)
   9. _execute_single_stream only parses stream file comment headers, never
-     executes SQL — function name and result dict (success=True,
+     executes SQL - function name and result dict (success=True,
      queries_successful=N) are misleading
 
   ### Docstring gaps
@@ -115,17 +115,17 @@ must_preserve:
 - "_prompt_single_option honors falsy defaults (0, False, '') when spec.default is not None"
 
 approach: |
-  Work through each item independently — they are isolated fixes in separate modules.
+  Work through each item independently - they are isolated fixes in separate modules.
   For the query plan comparators (w1-w3), add unit tests that exercise the new
   comparisons. For the timing fix (w8), use elapsed_seconds(start_time) pattern
   already established in _finalize_maintenance_result. For the NaN fix (w6),
   replace inf with a large finite value before normalization.
 
 anti_patterns:
-- "DO NOT change the _OPERATOR_COMPARATORS dispatch pattern — because it was just introduced and is the right structure —
+- "DO NOT change the _OPERATOR_COMPARATORS dispatch pattern - because it was just introduced and is the right structure -
   only add new entries"
-- "DO NOT change public function signatures — because callers depend on them — only fix internal behavior"
-- "DO NOT use time.time() for duration measurement — because it is affected by NTP adjustments and clock skew — use mono_time()/elapsed_seconds()
+- "DO NOT change public function signatures - because callers depend on them - only fix internal behavior"
+- "DO NOT use time.time() for duration measurement - because it is affected by NTP adjustments and clock skew - use mono_time()/elapsed_seconds()
   consistently"
 
 verification:

@@ -24,7 +24,7 @@ priorities:
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
-      title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
+      title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
       category: Platform Expansion
       status: Not Started
     - id: external-contributor-submission-dry-run
@@ -113,7 +113,7 @@ priorities:
       status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
-      title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
+      title: Future Ideas Backlog - Specialized Benchmarks and Infrastructure
       category: Supporting Infrastructure
       status: Not Started
     - id: geospatial-primitives-benchmark

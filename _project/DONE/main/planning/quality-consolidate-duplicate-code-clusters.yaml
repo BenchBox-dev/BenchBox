@@ -6,7 +6,7 @@ status: Completed
 completed_date: "2026-04-12"
 category: Code Quality and Technical Debt
 description: |
-  Quality plan supplement — duplication workstream. pylint
+  Quality plan supplement - duplication workstream. pylint
   `duplicate-code --min-similarity-lines=8` finds ~368 duplicate blocks in
   benchbox/core/ and ~188 in benchbox/platforms/. Even at 15-line similarity,
   100 blocks remain in platforms alone. Duplication across 73 adapters is
@@ -22,7 +22,7 @@ description: |
       apply_table_tunings dispatch pattern, ~20 lines)
 
   Extract shared helpers where the duplication is genuine (same intent,
-  same behavior). Reject DRY where platforms diverge in meaningful ways —
+  same behavior). Reject DRY where platforms diverge in meaningful ways -
   the goal is fewer accidental copies, not forced abstraction.
 
   Should run BEFORE quality-refactor-adapter-base-into-cohesive-modules so
@@ -71,7 +71,7 @@ work:
   notes: "Consolidated 11 clusters: platforms.base.models re-export from core.results.models; dataframe._result_helpers (4
     sites); _spark_helpers.get_spark_query_plan (2 sites); file_format.validate_tbl_compression_consistency (2 sites); core.schema_primitives.BaseSchemaTable
     (3 sites: tpch/tpcds/datavault); azure._livy_mixin.LivyStatementMixin (2 sites: fabric/synapse Spark); presto_trino_utils
-    helpers — escape_insert_value/is_date_value/normalize_existing_files, load_file_batches, resolve_data_files (2 sites each).
+    helpers - escape_insert_value/is_date_value/normalize_existing_files, load_file_batches, resolve_data_files (2 sites each).
     Full consolidation log + deferral rationales in docs/development/duplication-residuals.md."
 
 - id: w6
@@ -109,7 +109,7 @@ files_affected:
   - "tests/unit/platforms/gcp/test_gcs_path.py"
 
 must_preserve:
-- "Runtime behavior of every affected adapter unchanged — this is structural consolidation, not behavior change"
+- "Runtime behavior of every affected adapter unchanged - this is structural consolidation, not behavior change"
 - "Platform-specific variants remain distinct where they genuinely differ (e.g., Fabric vs Synapse token scopes)"
 - "Lazy-loading and optional-dependency semantics preserved (helpers don't force-import SDKs at module load)"
 - "All platform tests pass after every slice"
@@ -127,18 +127,18 @@ approach: |
        platform tests.
 
   For the apply_platform_optimizations cluster, coordinate with
-  quality-map-adapter-base-refactor-scope — if the adapter base is about
+  quality-map-adapter-base-refactor-scope - if the adapter base is about
   to grow a tuning module, that is the right destination. Do not extract
   to a third location.
 
 anti_patterns:
-- "DO NOT extract an abstraction that collapses meaningful platform differences — because false DRY hurts more than duplication
-  — leave distinct implementations distinct"
-- "DO NOT create cross-package utility modules for platform-specific helpers — because it hides coupling — keep helpers close
+- "DO NOT extract an abstraction that collapses meaningful platform differences - because false DRY hurts more than duplication
+  - leave distinct implementations distinct"
+- "DO NOT create cross-package utility modules for platform-specific helpers - because it hides coupling - keep helpers close
   to their platform"
-- "DO NOT chase the metric — because hitting a duplicate-block count by splitting helpers into micro-functions is worse than
-  the duplication — only consolidate real duplication"
-- "DO NOT promote R0801 to error in this TODO — because the baseline is noisy — warn-only initially, promote in a follow-up"
+- "DO NOT chase the metric - because hitting a duplicate-block count by splitting helpers into micro-functions is worse than
+  the duplication - only consolidate real duplication"
+- "DO NOT promote R0801 to error in this TODO - because the baseline is noisy - warn-only initially, promote in a follow-up"
 
 scope_limit:
   only_modify:

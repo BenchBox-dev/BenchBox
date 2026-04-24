@@ -8,7 +8,7 @@ completed_note: "Contract document exists at _project/analysis/hosted-results-co
 category: Core Functionality
 deps:
   needs:
-  - define-results-platform-product-and-launch-strategy
+    - define-results-platform-product-and-launch-strategy
 description: |
   A hosted results platform is not just an upload endpoint. BenchBox needs a
   durable contract for what a hosted result is, how it relates to the canonical
@@ -27,58 +27,58 @@ description: |
   without a full governance model.
 
 work:
-- id: w1
-  summary: "Define hosted result identity, immutable bundle contract, and ingest status model"
-  status: done
-  notes: |
-    Separate three distinct identifiers: (1) bundle hash — content-addressable,
-    immutable; (2) submission ID — generated on ingest, survives re-upload;
-    (3) public result ID — stable permalink, may be minted after curation.
-    Define allowed ingest status transitions: pending → validated → published,
-    plus rejected and withdrawn. Output: identity-model.md draft.
+  - id: w1
+    summary: "Define hosted result identity, immutable bundle contract, and ingest status model"
+    status: done
+    notes: |
+      Separate three distinct identifiers: (1) bundle hash - content-addressable,
+      immutable; (2) submission ID - generated on ingest, survives re-upload;
+      (3) public result ID - stable permalink, may be minted after curation.
+      Define allowed ingest status transitions: pending → validated → published,
+      plus rejected and withdrawn. Output: identity-model.md draft.
 
-- id: w2
-  summary: "Define visibility states and trust labels for hosted results"
-  needs: [w1]
-  status: done
-  notes: |
-    Cover private, unlisted, public self-reported, public curated, and public
-    verified states or an explicitly revised equivalent.
+  - id: w2
+    summary: "Define visibility states and trust labels for hosted results"
+    needs: [w1]
+    status: done
+    notes: |
+      Cover private, unlisted, public self-reported, public curated, and public
+      verified states or an explicitly revised equivalent.
 
-- id: w3
-  summary: "Define cohort and ranking eligibility rules for comparison and leaderboards"
-  needs: [w2]
-  status: done
-  notes: |
-    Prevent incompatible runs from being mixed into misleading comparisons.
+  - id: w3
+    summary: "Define cohort and ranking eligibility rules for comparison and leaderboards"
+    needs: [w2]
+    status: done
+    notes: |
+      Prevent incompatible runs from being mixed into misleading comparisons.
 
-- id: w4
-  summary: "Define privacy, redaction, retention, and data-removal policy"
-  needs: [w2]
-  status: done
-  notes: |
-    Decide what system metadata may be public, redactable, or removable after submission.
+  - id: w4
+    summary: "Define privacy, redaction, retention, and data-removal policy"
+    needs: [w2]
+    status: done
+    notes: |
+      Decide what system metadata may be public, redactable, or removable after submission.
 
-- id: w5
-  summary: "Document the contract for CLI, API, and frontend consumers"
-  needs: [w3, w4]
-  status: done
-  notes: |
-    Produce a single hosted-results-contract.md that specifies:
-    - What fields the submission endpoint accepts and returns
-    - Which visibility states and trust labels the explorer must render
-    - Which cohort fields must match for a compare view to be valid
-    - What privacy/redaction/removal operations are supported
-    This doc is the authoritative input for design-results-ingest (Phase 3
-    API design) and the explorer frontend trust-label implementation.
+  - id: w5
+    summary: "Document the contract for CLI, API, and frontend consumers"
+    needs: [w3, w4]
+    status: done
+    notes: |
+      Produce a single hosted-results-contract.md that specifies:
+      - What fields the submission endpoint accepts and returns
+      - Which visibility states and trust labels the explorer must render
+      - Which cohort fields must match for a compare view to be valid
+      - What privacy/redaction/removal operations are supported
+      This doc is the authoritative input for design-results-ingest (Phase 3
+      API design) and the explorer frontend trust-label implementation.
 
 metadata:
   tags:
-  - results
-  - governance
-  - ranking
-  - trust
-  - privacy
+    - results
+    - governance
+    - ranking
+    - trust
+    - privacy
   estimated_effort: "Large"
   created_date: "2026-03-29"
 
@@ -94,8 +94,8 @@ impact:
     reinvented independently by different implementation tracks.
 
 must_preserve:
-- "Canonical BenchBox result bundles remain downloadable and distinguishable from any derived hosted metadata"
-- "BenchBox does not imply TPC certification or equivalent official standing for ordinary hosted submissions"
+  - "Canonical BenchBox result bundles remain downloadable and distinguishable from any derived hosted metadata"
+  - "BenchBox does not imply TPC certification or equivalent official standing for ordinary hosted submissions"
 
 approach: |
   Treat the canonical schema-v2 bundle as input, not as the full hosted public
@@ -103,15 +103,15 @@ approach: |
   it without mutating the raw bundle format into a service-shaped payload.
 
 anti_patterns:
-- "DO NOT treat every public upload as equally trustworthy -- because self-reported and curated results carry different weight -- make trust labels explicit in the contract"
-- "DO NOT allow ranking before compatibility cohorts are defined -- because mixed cohorts create false leaderboards -- define comparison eligibility first"
+  - "DO NOT treat every public upload as equally trustworthy -- because self-reported and curated results carry different weight -- make trust labels explicit in the contract"
+  - "DO NOT allow ranking before compatibility cohorts are defined -- because mixed cohorts create false leaderboards -- define comparison eligibility first"
 
 files_affected:
   modified:
-  - "_project/analysis/benchbox-results-platform-strategy.md"
-  - "_project/TODO/main/planning/"
+    - "_project/analysis/benchbox-results-platform-strategy.md"
+    - "_project/TODO/main/planning/"
 
 scope_limit:
   only_modify:
-  - "_project/analysis/"
-  - "_project/TODO/"
+    - "_project/analysis/"
+    - "_project/TODO/"

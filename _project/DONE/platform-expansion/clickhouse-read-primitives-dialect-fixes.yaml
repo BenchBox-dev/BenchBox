@@ -1,5 +1,5 @@
 id: clickhouse-read-primitives-dialect-fixes
-title: "Fix ClickHouse read_primitives failures — dialect overrides, expected_failures, and error capture"
+title: "Fix ClickHouse read_primitives failures - dialect overrides, expected_failures, and error capture"
 worktree: platform-expansion
 category: Platform Expansion
 priority: Medium-High
@@ -42,17 +42,17 @@ work:
     status: done
 
   - id: w5
-    summary: "Fix window function syntax failures: timeseries_trend_analysis, window_moving_frame, window_multiple_orderings — adjust frame specs and ORDER BY for ClickHouse"
+    summary: "Fix window function syntax failures: timeseries_trend_analysis, window_moving_frame, window_multiple_orderings - adjust frame specs and ORDER BY for ClickHouse"
     needs: [w1, w2, w3]
     status: done
 
   - id: w6
-    summary: "Fix QUALIFY clause failures: qualify_cume_dist — rewrite as subquery with WHERE on window result"
+    summary: "Fix QUALIFY clause failures: qualify_cume_dist - rewrite as subquery with WHERE on window result"
     needs: [w1, w2, w3]
     status: done
 
   - id: w7
-    summary: "Fix statistical function failures: statistical_correlation — investigate CORR() syntax differences"
+    summary: "Fix statistical function failures: statistical_correlation - investigate CORR() syntax differences"
     needs: [w1, w2, w3]
     status: done
 
@@ -79,8 +79,8 @@ resolution_notes: |
   ReadPrimitivesQueryManager.has_variant and routing variants through
   get_queries() without re-translation.
 
-  With the foundation fix, these variants — several already present in the
-  catalog — now survive to the adapter: any_value_simple/_with_filter (any()),
+  With the foundation fix, these variants - several already present in the
+  catalog - now survive to the adapter: any_value_simple/_with_filter (any()),
   array_length (length()), intrinsic_appx_median/statistical_percentiles
   (quantile()), statistical_correlation (corr/covarPop/covarSamp),
   timeseries_trend_analysis (toStartOfMonth + manual slope),
@@ -95,26 +95,26 @@ resolution_notes: |
   so it was not converted into skip_on or an expected failure marker.
 
   Fulltext queries were not marked expected_failure because working
-  LIKE-based ClickHouse variants already exist — the anti_pattern guidance
+  LIKE-based ClickHouse variants already exist - the anti_pattern guidance
   prefers dialect overrides over skipping when the query is fixable.
 
   Error-capture work deferred to clickhouse-error-message-capture TODO.
 
 must_preserve:
-  - "Base read_primitives query files unchanged — other platforms use standard SQL"
+  - "Base read_primitives query files unchanged - other platforms use standard SQL"
   - "Override queries return identical column names, types, and row semantics"
   - "Existing ClickHouse read_primitives results for passing queries unaffected"
 
 anti_patterns:
-  - "DO NOT modify base query files — because other platforms depend on standard SQL — create clickhouse_sql/ overrides instead"
-  - "DO NOT mark fixable queries as expected_failure — because dialect overrides are preferred over skipping"
-  - "DO NOT use skip_on for runtime-only timeout risk — reserve skip_on for queries that are genuinely unsupported on that dialect"
+  - "DO NOT modify base query files - because other platforms depend on standard SQL - create clickhouse_sql/ overrides instead"
+  - "DO NOT mark fixable queries as expected_failure - because dialect overrides are preferred over skipping"
+  - "DO NOT use skip_on for runtime-only timeout risk - reserve skip_on for queries that are genuinely unsupported on that dialect"
 
 scope_limit:
   include:
     - "benchbox/core/read_primitives/queries/"
   exclude:
-    - "benchbox/platforms/clickhouse/adapter.py — error capture tracked in clickhouse-error-message-capture"
+    - "benchbox/platforms/clickhouse/adapter.py - error capture tracked in clickhouse-error-message-capture"
 
 approach: |
   Categorize each of the 22 failing queries into: fixable (dialect override),

@@ -47,7 +47,7 @@ impact:
     No new packages, no dependency changes. A few re-exports are added to
     a public API surface.
   regression_risk: |
-    Low. This is adding re-exports and updating import paths — no behavior
+    Low. This is adding re-exports and updating import paths - no behavior
     change.
 
 justification: |
@@ -100,8 +100,8 @@ approach: |
   compatibility shims, no distribution split.
 
 anti_patterns:
-- "DO NOT split MCP into a separate distribution at this stage — APIs are not stable (v0.1.5, alpha)"
-- "DO NOT add backwards-compatibility shims for the old internal import paths — MCP is the only consumer"
+- "DO NOT split MCP into a separate distribution at this stage - APIs are not stable (v0.1.5, alpha)"
+- "DO NOT add backwards-compatibility shims for the old internal import paths - MCP is the only consumer"
 - "DO NOT change MCP schemas or prompt contracts as part of this work"
 
 verification:

@@ -6,7 +6,7 @@ status: Completed
 completed_date: "2026-04-13"
 category: Code Quality and Technical Debt
 description: |
-  Quality plan Phase 3. benchbox/platforms/base/adapter.py is 5,158 lines —
+  Quality plan Phase 3. benchbox/platforms/base/adapter.py is 5,158 lines -
   the single largest non-generated file in the repo and the foundation
   underlying all 73 adapter implementations. Its size makes review,
   navigation, and safe modification difficult; bugs here have maximum
@@ -22,13 +22,13 @@ description: |
   code-moving work remains blocked on the safety nets.
 
   Proposed split:
-    base/adapter.py          (Protocol/ABC only — ~400 lines)
-    base/connection.py       (Connection lifecycle, retries — ~600 lines)
-    base/execution.py        (Query execution, timing wrap — ~800 lines)
-    base/data_loading.py     (Native + external table modes — ~900 lines)
-    base/result_capture.py   (Status, errors, plans — ~600 lines)
-    base/dialect_translation.py (sqlglot integration — ~700 lines)
-    base/tuning.py           (Tuning hook resolution — ~500 lines)
+    base/adapter.py          (Protocol/ABC only - ~400 lines)
+    base/connection.py       (Connection lifecycle, retries - ~600 lines)
+    base/execution.py        (Query execution, timing wrap - ~800 lines)
+    base/data_loading.py     (Native + external table modes - ~900 lines)
+    base/result_capture.py   (Status, errors, plans - ~600 lines)
+    base/dialect_translation.py (sqlglot integration - ~700 lines)
+    base/tuning.py           (Tuning hook resolution - ~500 lines)
 
 deps:
   needs:
@@ -38,55 +38,55 @@ deps:
 
 work:
 - id: w1
-  summary: "SLICE 1 — Extract dialect_translation.py (dialect/translate_sql/get_tpc_base_dialect). Smallest cluster per refactor
+  summary: "SLICE 1 - Extract dialect_translation.py (dialect/translate_sql/get_tpc_base_dialect). Smallest cluster per refactor
     map §4. Re-export from adapter.py. Run full fast suite."
   status: done
 
 - id: w2
-  summary: "SLICE 2a — Extract sorted_ingestion.py (sorted-ingestion capability/resolve/metadata + CTAS-sort helpers + state)."
+  summary: "SLICE 2a - Extract sorted_ingestion.py (sorted-ingestion capability/resolve/metadata + CTAS-sort helpers + state)."
   needs: [w1]
   status: done
 
 - id: w3
-  summary: "SLICE 2b — Extract tuning_config.py (effective config, validate_tuning_*, apply_unified_tuning, configure_for_benchmark)."
+  summary: "SLICE 2b - Extract tuning_config.py (effective config, validate_tuning_*, apply_unified_tuning, configure_for_benchmark)."
   needs: [w2]
   status: done
 
 - id: w4
-  summary: "SLICE 2c — Consolidate per-table tuning hooks into tuning.py (apply_table_tunings, supports_tuning_type, generate_tuning_clause)."
+  summary: "SLICE 2c - Consolidate per-table tuning hooks into tuning.py (apply_table_tunings, supports_tuning_type, generate_tuning_clause)."
   needs: [w3]
   status: done
 
 - id: w5
-  summary: "SLICE 3a — Extract connection_lifecycle.py (test_connection, validate/require_dependencies, get_connection_from_pool,
+  summary: "SLICE 3a - Extract connection_lifecycle.py (test_connection, validate/require_dependencies, get_connection_from_pool,
     drop_database, handle_existing_database, check_database_exists*)."
   needs: [w4]
   status: done
 
 - id: w10
-  summary: "SLICE 3b — Extract connection_wrappers.py (DriverIsolationCapability, check_isolation_capability, PlatformAdapterConnection,
+  summary: "SLICE 3b - Extract connection_wrappers.py (DriverIsolationCapability, check_isolation_capability, PlatformAdapterConnection,
     _NoCloseProxy). Re-export from adapter.py."
   needs: [w5]
   status: done
 
 - id: w6
-  summary: "SLICE 4 — Extract data_loading.py (create_schema, load_data, external tables, _create_enhanced_* phase helpers)."
+  summary: "SLICE 4 - Extract data_loading.py (create_schema, load_data, external tables, _create_enhanced_* phase helpers)."
   needs: [w5]
   status: done
 
 - id: w7
-  summary: "SLICE 5 — Extract result_capture.py (plan capture, validate_loaded_data/row_counts, _collect_resource_utilization)."
+  summary: "SLICE 5 - Extract result_capture.py (plan capture, validate_loaded_data/row_counts, _collect_resource_utilization)."
   needs: [w6]
   status: done
 
 - id: w8
-  summary: "SLICE 6 — Extract execution.py (execute_query, power/throughput/maintenance drivers; keep run_enhanced_benchmark
+  summary: "SLICE 6 - Extract execution.py (execute_query, power/throughput/maintenance drivers; keep run_enhanced_benchmark
     on facade)."
   needs: [w7]
   status: done
 
 - id: w9
-  summary: "Final cleanup — adapter.py contains only facade + re-exports. Verify ≤600 lines. Update docs/development/adapter-refactor-map.md."
+  summary: "Final cleanup - adapter.py contains only facade + re-exports. Verify ≤600 lines. Update docs/development/adapter-refactor-map.md."
   needs: [w8]
   status: done
 
@@ -123,11 +123,11 @@ approach: |
   only if absolutely required, which it shouldn't be given re-exports).
 
 anti_patterns:
-- "DO NOT rename any public symbol — because 73 adapters depend on them — preserve names exactly even if they're imperfect"
-- "DO NOT collapse multiple slices into one commit — because review and rollback need slice-level granularity — one commit
+- "DO NOT rename any public symbol - because 73 adapters depend on them - preserve names exactly even if they're imperfect"
+- "DO NOT collapse multiple slices into one commit - because review and rollback need slice-level granularity - one commit
   per slice"
-- "DO NOT modify adapter implementation files — because that's a different refactor — limit scope to base/"
-- "DO NOT extract while adapters or tests are in flight on other branches — because merge conflicts will be brutal — coordinate
+- "DO NOT modify adapter implementation files - because that's a different refactor - limit scope to base/"
+- "DO NOT extract while adapters or tests are in flight on other branches - because merge conflicts will be brutal - coordinate
   timing"
 
 scope_limit:

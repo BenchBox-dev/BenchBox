@@ -33,21 +33,21 @@ category: "<Core Functionality|Platform Expansion|Testing and Quality Assurance|
 # Use 'needs' to express ordering; readiness is computed by CLI.
 work:
   - id: w1
-    summary: "<First work unit — no dependencies>"
+    summary: "<First work unit - no dependencies>"
     status: pending
 
   - id: w2
-    summary: "<Second work unit — depends on w1>"
+    summary: "<Second work unit - depends on w1>"
     needs: [w1]
     status: pending
 
   - id: w3
-    summary: "<Third work unit — depends on w1>"
+    summary: "<Third work unit - depends on w1>"
     needs: [w1]
     status: pending
 
   - id: w4
-    summary: "<Fourth work unit — depends on w2 and w3>"
+    summary: "<Fourth work unit - depends on w2 and w3>"
     needs: [w2, w3]
     status: pending
     notes: "<Optional implementation notes>"
@@ -88,11 +88,11 @@ files_affected:
     - "<path/to/deleted/file.py>"
 
 # ============================================================================
-# IMPLEMENTATION GUARDRAILS (optional — constrain AI agent behavior)
+# IMPLEMENTATION GUARDRAILS (optional - constrain AI agent behavior)
 # ============================================================================
 
 # Existing behaviors that must NOT break. Name specific files, functions,
-# classes, or observable behaviors — not vague "don't break things".
+# classes, or observable behaviors - not vague "don't break things".
 # Different from success_metrics (project-level outcomes); this is about
 # preserving what already works during implementation.
 must_preserve:
@@ -108,11 +108,11 @@ approach: |
   benchbox/utils/compression.py rather than adding new decompression logic.
   Start with the SQL path, then extend to DataFrame adapters.>
 
-# Explicit mistakes to avoid. Format: "DO NOT X — because Y — do Z instead".
+# Explicit mistakes to avoid. Format: "DO NOT X - because Y - do Z instead".
 # Drawn from past implementation friction or known footguns in this area.
 anti_patterns:
-  - "<e.g., DO NOT add a new ABC — because the adapter hierarchy is already 3 levels deep — extend the existing PlatformMixin instead>"
-  - "<e.g., DO NOT shell out to tpc-h binary at runtime — because it segfaults on fractional SF — use pre-generated data from _binaries/>"
+  - "<e.g., DO NOT add a new ABC - because the adapter hierarchy is already 3 levels deep - extend the existing PlatformMixin instead>"
+  - "<e.g., DO NOT shell out to tpc-h binary at runtime - because it segfaults on fractional SF - use pre-generated data from _binaries/>"
 
 # Concrete verification steps. Each step has a description and optional
 # command + expected_output so the agent can't misinterpret results.

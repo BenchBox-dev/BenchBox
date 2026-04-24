@@ -23,87 +23,87 @@ description: |
 category: "Core Functionality"
 
 work:
-- id: w1
-  summary: "Decompose _generate_local: separate artifact-check, generation, compress, validate"
-  status: done
-  notes: |
-    benchbox/core/tpcds/generator/manager.py:220 — phases:
-    1. Availability check + smart regeneration decision (lines ~226-254)
-    2. Stale artifact cleanup (lines ~265-267)
-    3. Sample data vs native generation (lines ~269-291)
-    4. Compression (lines ~294-300)
-    5. Validation + manifest (lines ~310-313)
-    Extract each as a private method. Top-level orchestrates with early returns.
+  - id: w1
+    summary: "Decompose _generate_local: separate artifact-check, generation, compress, validate"
+    status: done
+    notes: |
+      benchbox/core/tpcds/generator/manager.py:220 - phases:
+      1. Availability check + smart regeneration decision (lines ~226-254)
+      2. Stale artifact cleanup (lines ~265-267)
+      3. Sample data vs native generation (lines ~269-291)
+      4. Compression (lines ~294-300)
+      5. Validation + manifest (lines ~310-313)
+      Extract each as a private method. Top-level orchestrates with early returns.
 
-- id: w2
-  summary: "Decompose ducklake convert(): extract validation, setup, schema, transfer, cleanup"
-  status: done
-  notes: |
-    benchbox/utils/format_converters/ducklake_converter.py:49 — clean pipeline:
-    - _validate_conversion_inputs(src, dst) → or raise
-    - _setup_duckdb_connection(path, config) → conn
-    - _create_schema_and_tables(conn, src_schema) → None
-    - _transfer_rows(conn, src, progress_cb) → int
-    Progress callback plumbing can use a context manager or be passed explicitly.
+  - id: w2
+    summary: "Decompose ducklake convert(): extract validation, setup, schema, transfer, cleanup"
+    status: done
+    notes: |
+      benchbox/utils/format_converters/ducklake_converter.py:49 - clean pipeline:
+      - _validate_conversion_inputs(src, dst) → or raise
+      - _setup_duckdb_connection(path, config) → conn
+      - _create_schema_and_tables(conn, src_schema) → None
+      - _transfer_rows(conn, src, progress_cb) → int
+      Progress callback plumbing can use a context manager or be passed explicitly.
 
-- id: w3
-  summary: "Decompose _generate_special_test_files: data-driven file variant generation"
-  status: done
-  notes: |
-    benchbox/core/primitives/generator_base.py:908 — 4+ CSV file variants (errors, nulls,
-    quoted fields, PSV) with repetitive patterns. Create FILE_VARIANTS config list:
-    FILE_VARIANTS = [{"name": "errors", "transform": inject_errors_fn, ...}, ...]
-    Replace per-variant blocks with loop: for v in FILE_VARIANTS: _generate_variant(v).
+  - id: w3
+    summary: "Decompose _generate_special_test_files: data-driven file variant generation"
+    status: done
+    notes: |
+      benchbox/core/primitives/generator_base.py:908 - 4+ CSV file variants (errors, nulls,
+      quoted fields, PSV) with repetitive patterns. Create FILE_VARIANTS config list:
+      FILE_VARIANTS = [{"name": "errors", "transform": inject_errors_fn, ...}, ...]
+      Replace per-variant blocks with loop: for v in FILE_VARIANTS: _generate_variant(v).
 
-- id: w4
-  summary: "Decompose _finalize_generation: extract file-detection strategy loop"
-  needs: []
-  status: done
-  notes: |
-    benchbox/core/tpch/generator.py:964 — per-table: 4 file detection strategies tried in
-    sequence (compressed, single file, chunks, alternate paths). Extract:
-    - _detect_generated_file(table, output_dir) → Path | None (tries strategies in order)
-    Main loop becomes: for table in tables: path = _detect_generated_file(...); if not path: handle_miss()
+  - id: w4
+    summary: "Decompose _finalize_generation: extract file-detection strategy loop"
+    needs: []
+    status: done
+    notes: |
+      benchbox/core/tpch/generator.py:964 - per-table: 4 file detection strategies tried in
+      sequence (compressed, single file, chunks, alternate paths). Extract:
+      - _detect_generated_file(table, output_dir) → Path | None (tries strategies in order)
+      Main loop becomes: for table in tables: path = _detect_generated_file(...); if not path: handle_miss()
 
-- id: w5
-  summary: "Simplify _generate_single_table_chunk_streaming chunk I/O loop"
-  needs: []
-  status: done
-  notes: |
-    benchbox/core/tpcds/generator/streaming.py:210 — streaming subprocess with chunk loop.
-    Extract:
-    - _open_compressed_writer(path, compression) → context manager
-    - _stream_chunks(proc, writer, chunk_size) → int (returns row count)
-    Main function: setup → stream_chunks() → post-process checks.
+  - id: w5
+    summary: "Simplify _generate_single_table_chunk_streaming chunk I/O loop"
+    needs: []
+    status: done
+    notes: |
+      benchbox/core/tpcds/generator/streaming.py:210 - streaming subprocess with chunk loop.
+      Extract:
+      - _open_compressed_writer(path, compression) → context manager
+      - _stream_chunks(proc, writer, chunk_size) → int (returns row count)
+      Main function: setup → stream_chunks() → post-process checks.
 
-- id: w6
-  summary: "Decompose load_data_to_database (tpcdi) and platform load_data functions"
-  needs: []
-  status: done
-  notes: |
-    tpcdi/benchmark.py:load_data_to_database (17):
-    - Extract _create_tables(conn, schema) and _load_table_file(conn, table, path, batch_size).
-    databend/adapter.py:load_data (17):
-    - Extract _convert_row_batch(rows, types) → list[tuple] and _flush_batch(conn, table, batch).
-    influxdb/adapter.py:load_data (17):
-    - Extract TSBS_TABLE_CONFIG = {"cpu": {...}, "disk": {...}, ...} as module constant.
-    - Extract _map_tsbs_fields(row, table_config) → dict.
+  - id: w6
+    summary: "Decompose load_data_to_database (tpcdi) and platform load_data functions"
+    needs: []
+    status: done
+    notes: |
+      tpcdi/benchmark.py:load_data_to_database (17):
+      - Extract _create_tables(conn, schema) and _load_table_file(conn, table, path, batch_size).
+      databend/adapter.py:load_data (17):
+      - Extract _convert_row_batch(rows, types) → list[tuple] and _flush_batch(conn, table, batch).
+      influxdb/adapter.py:load_data (17):
+      - Extract TSBS_TABLE_CONFIG = {"cpu": {...}, "disk": {...}, ...} as module constant.
+      - Extract _map_tsbs_fields(row, table_config) → dict.
 
-- id: w7
-  summary: "Run smoke tests and complexity check; verify all 8 functions below warn threshold"
-  needs: [w1, w2, w3, w4, w5, w6]
-  status: done
+  - id: w7
+    summary: "Run smoke tests and complexity check; verify all 8 functions below warn threshold"
+    needs: [w1, w2, w3, w4, w5, w6]
+    status: done
 
 metadata:
   estimated_effort: "1-2 days"
   tags: ["complexity", "refactor", "generators", "data-loading"]
 
 must_preserve:
-- "_generate_local: all output artifacts (files, compression, manifest) must be identical"
-- "convert (ducklake): row count and schema must match source exactly"
-- "_generate_special_test_files: all CSV variants must have identical content to before"
-- "_finalize_generation: generated file paths must resolve identically for all scale factors"
-- "load_data_to_database: all rows must load with identical column types and values"
+  - "_generate_local: all output artifacts (files, compression, manifest) must be identical"
+  - "convert (ducklake): row count and schema must match source exactly"
+  - "_generate_special_test_files: all CSV variants must have identical content to before"
+  - "_finalize_generation: generated file paths must resolve identically for all scale factors"
+  - "load_data_to_database: all rows must load with identical column types and values"
 
 approach: |
   For generators: use private methods on the same class; keep artifact paths as instance state.
@@ -111,29 +111,29 @@ approach: |
   For the streaming chunk loop: use a generator function to yield chunks, making the loop body simpler.
 
 anti_patterns:
-- "DO NOT change TPC generation outputs — any diff in generated data breaks benchmark reproducibility"
-- "DO NOT add retry logic or new error handling in the extracted helpers"
-- "DO NOT change the compression format or level when extracting compression helpers"
-- "DO NOT add logging in extracted helpers beyond what's in the original code"
+  - "DO NOT change TPC generation outputs - any diff in generated data breaks benchmark reproducibility"
+  - "DO NOT add retry logic or new error handling in the extracted helpers"
+  - "DO NOT change the compression format or level when extracting compression helpers"
+  - "DO NOT add logging in extracted helpers beyond what's in the original code"
 
 verification:
-- description: "Smoke tests pass"
-  command: "uv run -- python -m pytest -m fast -q"
-  expected_output: "all tests pass, 0 failures"
-- description: "Generator unit tests pass"
-  command: "uv run -- python -m pytest tests/ -k 'generator or gen or tpcds or tpch' -q"
-  expected_output: "all tests pass, 0 failures"
-- description: "Target functions below warn threshold"
-  command: "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(_generate_local|ducklake|special_test_files|finalize_generation|chunk_streaming|load_data_to_database|databend.*load|influxdb.*load)'"
-  expected_output: "No WARN entries for the 8 target functions"
+  - description: "Smoke tests pass"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Generator unit tests pass"
+    command: "uv run -- python -m pytest tests/ -k 'generator or gen or tpcds or tpch' -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Target functions below warn threshold"
+    command: "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(_generate_local|ducklake|special_test_files|finalize_generation|chunk_streaming|load_data_to_database|databend.*load|influxdb.*load)'"
+    expected_output: "No WARN entries for the 8 target functions"
 
 scope_limit:
   only_modify:
-  - "benchbox/core/tpcds/generator/manager.py"
-  - "benchbox/utils/format_converters/ducklake_converter.py"
-  - "benchbox/core/primitives/generator_base.py"
-  - "benchbox/core/tpch/generator.py"
-  - "benchbox/core/tpcds/generator/streaming.py"
-  - "benchbox/core/tpcdi/benchmark.py"
-  - "benchbox/platforms/databend/adapter.py"
-  - "benchbox/platforms/influxdb/adapter.py"
+    - "benchbox/core/tpcds/generator/manager.py"
+    - "benchbox/utils/format_converters/ducklake_converter.py"
+    - "benchbox/core/primitives/generator_base.py"
+    - "benchbox/core/tpch/generator.py"
+    - "benchbox/core/tpcds/generator/streaming.py"
+    - "benchbox/core/tpcdi/benchmark.py"
+    - "benchbox/platforms/databend/adapter.py"
+    - "benchbox/platforms/influxdb/adapter.py"

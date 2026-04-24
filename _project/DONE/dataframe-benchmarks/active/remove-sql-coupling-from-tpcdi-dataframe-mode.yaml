@@ -17,7 +17,7 @@ description: |
   transforms return DataFrames directly.
 
   SQLConnectionProvider and get_sql_connection() are removed entirely from the
-  DataFrame subsystem since the concept is architecturally wrong — DataFrame adapters
+  DataFrame subsystem since the concept is architecturally wrong - DataFrame adapters
   should never be asked for SQL connections.
 
 category: "Core Functionality"
@@ -91,7 +91,7 @@ tasks:
       done: false
     - summary: "Rewire _execute_etl_stage_queries() (benchmark.py:736) to accept backend instead of connection"
       done: false
-    - summary: "Delete _resolve_platform_connection() (benchmark.py:721) — dead code"
+    - summary: "Delete _resolve_platform_connection() (benchmark.py:721) - dead code"
       done: false
 
   - phase: "Phase 4: Remove SQLConnectionProvider entirely"
@@ -193,7 +193,7 @@ approach: |
   DataFrame backend's write layer. Follow the WritePrimitivesBenchmark pattern
   (write_primitives/benchmark.py:1196-1287) for capability-driven DataFrame execution.
 
-  Extract SQL logic from benchmark.py into SQLETLBackend — this is a move, not a rewrite.
+  Extract SQL logic from benchmark.py into SQLETLBackend - this is a move, not a rewrite.
   The _load_warehouse_data(), validate_etl_results(), and SCD processor SQL methods become
   methods on SQLETLBackend. The existing run_etl_pipeline() becomes the shared orchestrator
   that accepts a backend parameter instead of a connection.
@@ -202,14 +202,14 @@ approach: |
   cleanup. Run tests after each phase.
 
 anti_patterns:
-- "DO NOT create a new write abstraction — because DataFrameMaintenanceOperations already provides insert_rows/update_rows/merge_rows
-  with per-platform implementations — delegate to it"
-- "DO NOT keep staging CSV files as an intermediate format — because the Transform phase already produces pandas DataFrames
-  internally and writing/reading CSVs is wasteful double I/O — return DataFrames directly"
-- "DO NOT leave SQLConnectionProvider in benchbox/core/dataframe/ — because the DataFrame subsystem should never expose SQL
-  concepts — remove it entirely"
-- "DO NOT modify the SQL path behavior — because run_etl_benchmark and run_full_benchmark must continue working identically
-  — only extract their logic into SQLETLBackend"
+- "DO NOT create a new write abstraction - because DataFrameMaintenanceOperations already provides insert_rows/update_rows/merge_rows
+  with per-platform implementations - delegate to it"
+- "DO NOT keep staging CSV files as an intermediate format - because the Transform phase already produces pandas DataFrames
+  internally and writing/reading CSVs is wasteful double I/O - return DataFrames directly"
+- "DO NOT leave SQLConnectionProvider in benchbox/core/dataframe/ - because the DataFrame subsystem should never expose SQL
+  concepts - remove it entirely"
+- "DO NOT modify the SQL path behavior - because run_etl_benchmark and run_full_benchmark must continue working identically
+  - only extract their logic into SQLETLBackend"
 
 verification:
 - description: "All TPC-DI unit tests pass"
@@ -261,7 +261,7 @@ context_sections:
   "Predecessor": |
     The completed TODO "Unify TPC-DI SQL/DataFrame Execution Contract" (b79b3889)
     unified the SQL and DataFrame paths through a shared _execute_etl_stage_queries()
-    method but introduced SQLConnectionProvider — requiring DataFrame adapters to
+    method but introduced SQLConnectionProvider - requiring DataFrame adapters to
     expose SQL connections. This was identified as a fundamental architectural defect
     in review: DataFrame mode should never touch SQL.
 

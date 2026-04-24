@@ -16,7 +16,7 @@ description: |
   fast filter + pivot over a canonical result set.
 
   The pipeline already emits `results.duckdb`, and `src/db.ts` already
-  initialises DuckDB-WASM in the frontend — no consumer exists yet.
+  initialises DuckDB-WASM in the frontend - no consumer exists yet.
   This item is the consumer.
 
   Depends on explorer-pipeline-meta-leaderboard-widening for the
@@ -28,7 +28,7 @@ work:
     summary: "Add /results/query route in App.tsx"
     status: done
     notes: |
-      results-explorer/src/App.tsx — register
+      results-explorer/src/App.tsx - register
       `<Query path="/results/query" />` BEFORE the benchmark-wildcard
       route so it isn't captured by /results/:benchmark.
 
@@ -39,7 +39,7 @@ work:
       New file: results-explorer/src/lib/queryFilters.ts. Given a
       FilterState object, produce a safe SQL string (or prepared
       statement args) against `bench.results`. All user-provided
-      values parameterised — never string-concatenated. This module
+      values parameterised - never string-concatenated. This module
       is also what the SQL textarea's "build from current facets"
       button emits.
 
@@ -61,7 +61,7 @@ work:
     status: done
     notes: |
       Center column. One row per bundle from bench.results. Column
-      picker reads results_schema.json (emitted by the pipeline —
+      picker reads results_schema.json (emitted by the pipeline -
       see explorer-pipeline-meta-leaderboard-widening w3) so the
       frontend never hardcodes _COLUMNS. Default visible columns:
       benchmark, platform, SF, date, power_score, geomean_ms,
@@ -75,7 +75,7 @@ work:
     notes: |
       Button: "Download CSV". Exports the currently-filtered set
       (not the full table). Uses the DuckDB-WASM Blob path already
-      scaffolded in db.ts — no new deps.
+      scaffolded in db.ts - no new deps.
 
   - id: w6
     summary: "Advanced mode: plain <textarea> SQL editor, read-only enforced by ATTACH READ_ONLY"
@@ -83,7 +83,7 @@ work:
     status: done
     notes: |
       Collapsed <details> under the table. Plain textarea (no
-      CodeMirror — parity with `benchbox results --sql`, no new
+      CodeMirror - parity with `benchbox results --sql`, no new
       deps). Runs via `queryRows<T>()` (db.ts line 78). Read-only
       guarantee comes from DuckDB's existing
       `ATTACH ... (READ_ONLY)` at db.ts:57.
@@ -112,26 +112,26 @@ files_affected:
     - "results-explorer/src/lib/queryFilters.ts"
 
 must_preserve:
-  - "Existing routes remain reachable — /results/query must be registered before /results/:benchmark so it isn't shadowed"
-  - "src/db.ts initialises DuckDB-WASM with ATTACH READ_ONLY — do not weaken this; SQL textarea relies on it for safety"
-  - "queryRows<T>() helper at db.ts:78 continues to be the sole query entry point from this page — no parallel DuckDB client"
+  - "Existing routes remain reachable - /results/query must be registered before /results/:benchmark so it isn't shadowed"
+  - "src/db.ts initialises DuckDB-WASM with ATTACH READ_ONLY - do not weaken this; SQL textarea relies on it for safety"
+  - "queryRows<T>() helper at db.ts:78 continues to be the sole query entry point from this page - no parallel DuckDB client"
 
 approach: |
-  Land as a single consumer of the already-scaffolded db.ts — no
+  Land as a single consumer of the already-scaffolded db.ts - no
   refactor of db.ts itself. Note the out-of-date docstring reference
   to "bench.manifest" in db.ts; the actual attached name from
   duckdb_builder.py is `bench.results` (benign to leave for now, but
   worth a drive-by comment fix). Facet counts via a single GROUP BY
-  probe per load keeps the cold-start snappy — do not push counts to
+  probe per load keeps the cold-start snappy - do not push counts to
   server-side aggregation. All user input in the SQL path is
   untrusted: use parameterised queries for the filter→SQL path, and
   rely on READ_ONLY for the textarea path.
 
 anti_patterns:
-  - "DO NOT introduce CodeMirror or a SQL syntax highlighter — because scope says 'parity with benchbox results --sql, no new deps' — plain textarea is sufficient"
-  - "DO NOT string-concat filter values into SQL — because DuckDB-WASM supports parameters — parameterise every user value"
-  - "DO NOT duplicate _COLUMNS on the frontend — because results_schema.json is emitted by the pipeline specifically to avoid this — fetch it at load"
-  - "DO NOT register the /results/query route AFTER /results/:benchmark — because the wildcard will capture it — register it first"
+  - "DO NOT introduce CodeMirror or a SQL syntax highlighter - because scope says 'parity with benchbox results --sql, no new deps' - plain textarea is sufficient"
+  - "DO NOT string-concat filter values into SQL - because DuckDB-WASM supports parameters - parameterise every user value"
+  - "DO NOT duplicate _COLUMNS on the frontend - because results_schema.json is emitted by the pipeline specifically to avoid this - fetch it at load"
+  - "DO NOT register the /results/query route AFTER /results/:benchmark - because the wildcard will capture it - register it first"
 
 verification:
   - description: "Explorer typecheck + Vitest green (including Query.test.tsx)"
@@ -157,7 +157,7 @@ impact:
     Users can slice the full result corpus by platform, benchmark,
     SF, date, trust tier, etc. with counted facets, export filtered
     CSVs, and run arbitrary SELECT queries against results.duckdb
-    without downloading anything — parity with what a local
+    without downloading anything - parity with what a local
     `benchbox results --sql` session offers.
   business_value: |
     The query workbench is the CloudSpecs-style analysis surface

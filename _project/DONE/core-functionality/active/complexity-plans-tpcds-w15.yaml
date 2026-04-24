@@ -9,12 +9,12 @@ description: |
   Six core functions at CC=14 in query plans and TPC-DS modules can be decomposed.
 
   Target functions:
-  1. _compare_operator_properties (comparison.py:288) — replace if/elif dispatch with registry dict
-  2. _format_operator_properties (visualization.py:297) — extract _format_truncated_list() helper
-  3. load_operations_catalog (primitives/catalog/loader.py:24) — extract _parse_operation_entry()
-  4. run_streams (tpcds/benchmark/runner.py:687) — extract sequential stream runner, share with concurrent
-  5. run (tpcds/maintenance_test.py:131) — split loop from finalization logic
-  6. run_official_benchmark (tpcds/official_benchmark.py:97) — extract _extract_metric() helper
+  1. _compare_operator_properties (comparison.py:288) - replace if/elif dispatch with registry dict
+  2. _format_operator_properties (visualization.py:297) - extract _format_truncated_list() helper
+  3. load_operations_catalog (primitives/catalog/loader.py:24) - extract _parse_operation_entry()
+  4. run_streams (tpcds/benchmark/runner.py:687) - extract sequential stream runner, share with concurrent
+  5. run (tpcds/maintenance_test.py:131) - split loop from finalization logic
+  6. run_official_benchmark (tpcds/official_benchmark.py:97) - extract _extract_metric() helper
 
 work:
 - id: w1
@@ -59,12 +59,12 @@ approach: |
   mapping operator type strings to small comparison functions. For _format_operator_properties,
   the _format_truncated_list(label, items, max_display=3) helper eliminates the repeated
   truncation pattern. For run_streams, the key insight is that the sequential loop body
-  and the concurrent StreamExecutor._run_single_stream do the same thing — factor into one.
+  and the concurrent StreamExecutor._run_single_stream do the same thing - factor into one.
 
 anti_patterns:
-- "DO NOT change TPC-DS spec-mandated behavior in run_streams or maintenance_test — because TPC compliance depends on exact
-  execution semantics — only restructure the code"
-- "DO NOT create new files for extracted helpers — because these are small private functions — keep them in the same module"
+- "DO NOT change TPC-DS spec-mandated behavior in run_streams or maintenance_test - because TPC compliance depends on exact
+  execution semantics - only restructure the code"
+- "DO NOT create new files for extracted helpers - because these are small private functions - keep them in the same module"
 
 verification:
 - description: "Query plan tests pass"

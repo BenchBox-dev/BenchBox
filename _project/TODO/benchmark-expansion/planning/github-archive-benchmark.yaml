@@ -213,9 +213,9 @@ must_preserve:
 - "BaseBenchmark interface contract unchanged"
 
 anti_patterns:
-- "DO NOT implement pre-2015 Timeline API format — because the schema is incompatible with post-2015 and adds complexity with
-  no benefit — document as out-of-scope"
-- "DO NOT download from gharchive.org in unit tests — because the service rate-limits and files are 50MB+ per hour — use synthetic
+- "DO NOT implement pre-2015 Timeline API format - because the schema is incompatible with post-2015 and adds complexity with
+  no benefit - document as out-of-scope"
+- "DO NOT download from gharchive.org in unit tests - because the service rate-limits and files are 50MB+ per hour - use synthetic
   test fixtures"
 
 verification:

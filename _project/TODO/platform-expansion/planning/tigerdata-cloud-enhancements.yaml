@@ -62,7 +62,7 @@ must_preserve:
 
 work:
 - id: w1
-  summary: "Add connection pooling mode selection (direct, session pool, transaction pool) — TigerData offers three connection modes on different ports"
+  summary: "Add connection pooling mode selection (direct, session pool, transaction pool) - TigerData offers three connection modes on different ports"
   status: pending
   notes: |
     TigerData provides three connection endpoints per service:

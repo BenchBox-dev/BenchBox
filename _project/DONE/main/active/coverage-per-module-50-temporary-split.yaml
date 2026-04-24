@@ -16,12 +16,12 @@ description: |
 
   Implementation sequence (8 phases):
     1. Add active-scope per-file coverage checker and Makefile workflow.
-    2. Quick wins — modules at 43-49% needing 2-4 tests each (~21 files).
-    3. Medium effort — tuning, credentials, TPC runners, platform adapters (~20 files).
-    4. High effort — large modules requiring 5-10 tests each (~11 files).
-    5. CLI coverage — zero-coverage through near-50% CLI modules (~20 files).
+    2. Quick wins - modules at 43-49% needing 2-4 tests each (~21 files).
+    3. Medium effort - tuning, credentials, TPC runners, platform adapters (~20 files).
+    4. High effort - large modules requiring 5-10 tests each (~11 files).
+    5. CLI coverage - zero-coverage through near-50% CLI modules (~20 files).
     6. Active TPC-DI modules under 50% (not deferred).
-    7. Final sweep — fill any remaining gaps found after verification.
+    7. Final sweep - fill any remaining gaps found after verification.
     8. Enforce the gate in local CI workflow and keep deferred-module tracking.
 
   Total: ~87 new test files, ~405 test functions.
@@ -112,49 +112,49 @@ description: |
 
 metadata:
   tags:
-  - testing
-  - coverage
-  - core
-  - cli
-  - tpcdi
-  - platforms
-  - tuning
-  - ci
+    - testing
+    - coverage
+    - core
+    - cli
+    - tpcdi
+    - platforms
+    - tuning
+    - ci
   estimated_effort: Large
   created_date: "2026-02-08"
   last_updated: "2026-02-09T10:20:00"
   completed_date: "2026-02-09"
 
   related:
-  - coverage-cli-modules
-  - coverage-core-benchmarks
-  - coverage-core-tpcdi
-  - coverage-platforms
-  - coverage-ci-enforcement
+    - coverage-cli-modules
+    - coverage-core-benchmarks
+    - coverage-core-tpcdi
+    - coverage-platforms
+    - coverage-ci-enforcement
   dependency_note: |
     This TODO supersedes the related coverage TODOs above by providing a
     consolidated, per-file implementation plan. The related TODOs remain as
     reference for category-specific context and anti-patterns but should not
-    be implemented independently — use this TODO as the single execution plan.
+    be implemented independently - use this TODO as the single execution plan.
   reference_patterns:
-  - pattern: "Platform adapter stubs"
-    reference: "tests/unit/platforms/test_azure_synapse_adapter.py"
-  - pattern: "Credential mocking"
-    reference: "tests/unit/platforms/credentials/test_snowflake_defaults.py"
-  - pattern: "Tuning DDL generators"
-    reference: "tests/unit/core/tuning/generators/test_snowflake_ddl.py"
-  - pattern: "CLI commands"
-    reference: "tests/unit/cli/test_compare_command.py"
-  - pattern: "DataFrame adapters"
-    reference: "tests/unit/platforms/dataframe/test_polars_df.py"
+    - pattern: "Platform adapter stubs"
+      reference: "tests/unit/platforms/test_azure_synapse_adapter.py"
+    - pattern: "Credential mocking"
+      reference: "tests/unit/platforms/credentials/test_snowflake_defaults.py"
+    - pattern: "Tuning DDL generators"
+      reference: "tests/unit/core/tuning/generators/test_snowflake_ddl.py"
+    - pattern: "CLI commands"
+      reference: "tests/unit/cli/test_compare_command.py"
+    - pattern: "DataFrame adapters"
+      reference: "tests/unit/platforms/dataframe/test_polars_df.py"
 
   shared_fixtures:
-  - "temp_dir"
-  - "duckdb_memory_db"
-  - "cli_runner"
-  - "cli_benchmark_mocks"
-  - "mock_platform_dependency_checks (autouse)"
-  - "mock_environment_variables"
+    - "temp_dir"
+    - "duckdb_memory_db"
+    - "cli_runner"
+    - "cli_benchmark_mocks"
+    - "mock_platform_dependency_checks (autouse)"
+    - "mock_environment_variables"
 
   migration_review_required: true
 impact:
@@ -169,10 +169,10 @@ impact:
     covered by existing related TODOs.
 
 must_preserve:
-- "Existing fast/unit test suite remains green with no live platform dependency"
-- "Current CLI command behavior and argument contracts remain unchanged"
-- "TPC-DI SQL/DataFrame ETL parity behavior verified by existing parity tests"
-- "Existing overall --cov-fail-under workflow remains available during migration"
+  - "Existing fast/unit test suite remains green with no live platform dependency"
+  - "Current CLI command behavior and argument contracts remain unchanged"
+  - "TPC-DI SQL/DataFrame ETL parity behavior verified by existing parity tests"
+  - "Existing overall --cov-fail-under workflow remains available during migration"
 
 approach: |
   Follow existing test patterns in tests/unit/{cli,core,tpcdi,platforms} and
@@ -191,611 +191,637 @@ approach: |
   before proceeding to the next phase.
 
 anti_patterns:
-- "DO NOT add integration tests that require cloud credentials or external services — because CI must run offline — use deterministic
-  mocks/fakes"
-- "DO NOT raise coverage by weakening assertions — because it masks regressions — assert observable behavior and error-path
-  contracts"
-- "DO NOT silently defer additional modules beyond the approved list — because scope creep undermines the gate — add any new
-  deferment as explicit TODO update"
-- "DO NOT import heavy cloud SDKs at module level in test files — because they add 2-5s import overhead and may not be installed
-  — use unittest.mock.patch or lazy imports"
-- "DO NOT test auto-generated SQL strings character-by-character — because SQL formatting changes would cause false failures
-  — test query structure, table references, and parameters instead"
+  - "DO NOT add integration tests that require cloud credentials or external services - because CI must run offline - use deterministic
+    mocks/fakes"
+  - "DO NOT raise coverage by weakening assertions - because it masks regressions - assert observable behavior and error-path
+    contracts"
+  - "DO NOT silently defer additional modules beyond the approved list - because scope creep undermines the gate - add any new
+    deferment as explicit TODO update"
+  - "DO NOT import heavy cloud SDKs at module level in test files - because they add 2-5s import overhead and may not be installed
+    - use unittest.mock.patch or lazy imports"
+  - "DO NOT test auto-generated SQL strings character-by-character - because SQL formatting changes would cause false failures
+    - test query structure, table references, and parameters instead"
 
 verification:
-- description: "Active-scope per-file checker reports and fails correctly"
-  command: "uv run -- python scripts/check_per_file_coverage.py --min 50 --coverage-json coverage.json"
-  expected_output: "No active-scope module below 50%, exit code 0"
-- description: "Fast coverage workflow remains green at project floor"
-  command: "make ci-test"
-  expected_output: "pytest fast suite passes and coverage gate remains >=50%"
-- description: "Targeted coverage wave tests pass"
-  command: "uv run -- python -m pytest tests/unit -m fast --tb=short"
-  expected_output: "all selected fast unit tests pass, 0 failures"
-- description: "Per-phase verification"
-  command: "uv run -- python -m pytest tests -p pytest_cov --cov=benchbox --cov-report=term-missing:skip-covered -n auto -m
-    'not slow and not stress and not live_integration' --tb=short -q --benchmark-disable"
-  expected_output: "no benchbox/ module below 50% in output"
+  - description: "Active-scope per-file checker reports and fails correctly"
+    command: "uv run -- python scripts/check_per_file_coverage.py --min 50 --coverage-json coverage.json"
+    expected_output: "No active-scope module below 50%, exit code 0"
+  - description: "Fast coverage workflow remains green at project floor"
+    command: "make ci-test"
+    expected_output: "pytest fast suite passes and coverage gate remains >=50%"
+  - description: "Targeted coverage wave tests pass"
+    command: "uv run -- python -m pytest tests/unit -m fast --tb=short"
+    expected_output: "all selected fast unit tests pass, 0 failures"
+  - description: "Per-phase verification"
+    command:
+      "uv run -- python -m pytest tests -p pytest_cov --cov=benchbox --cov-report=term-missing:skip-covered -n auto -m
+      'not slow and not stress and not live_integration' --tb=short -q --benchmark-disable"
+    expected_output: "no benchbox/ module below 50% in output"
 
 success_metrics:
-- "Every active-scope benchbox/*.py module reaches >=50% coverage"
-- "Deferred-module list remains explicit and documented with re-entry criteria"
-- "Coverage-per-file workflow is reproducible in local CI path"
-- "~87 new test files with ~405 test functions, all @pytest.mark.fast"
+  - "Every active-scope benchbox/*.py module reaches >=50% coverage"
+  - "Deferred-module list remains explicit and documented with re-entry criteria"
+  - "Coverage-per-file workflow is reproducible in local CI path"
+  - "~87 new test files with ~405 test functions, all @pytest.mark.fast"
 
 files_affected:
   added:
-  - "scripts/check_per_file_coverage.py"
-    # Phase 2: Quick wins (21 files)
-  - "tests/unit/core/visualization/test_visualization_exceptions.py"
-  - "tests/unit/core/tpcds/schema/test_tpcds_schema_registry.py"
-  - "tests/unit/platforms/dataframe/test_dataframe_init.py"
-  - "tests/unit/utils/test_verbosity_coverage.py"
-  - "tests/unit/core/visualization/test_visualization_exporters.py"
-  - "tests/unit/examples/test_dryrun_utils.py"
-  - "tests/unit/core/tsbs_devops/test_tsbs_benchmark_coverage.py"
-  - "tests/unit/platforms/test_clickhouse_cloud_coverage.py"
-  - "tests/unit/platforms/test_azure_synapse_coverage.py"
-  - "tests/unit/platforms/gcp/test_dataproc_serverless_coverage.py"
-  - "tests/unit/platforms/test_timescaledb_coverage.py"
-  - "tests/unit/platforms/aws/test_athena_spark_coverage.py"
-  - "tests/unit/platforms/azure/test_synapse_spark_coverage.py"
-  - "tests/unit/platforms/gcp/test_dataproc_coverage.py"
-  - "tests/unit/core/tpcds/test_tpcds_maintenance_coverage.py"
-  - "tests/unit/core/tpcds/generator/test_streaming_coverage.py"
-  - "tests/unit/platforms/dataframe/test_pyspark_maintenance_coverage.py"
-  - "tests/unit/core/tpch_skew/test_tpch_skew_benchmark_coverage.py"
-  - "tests/unit/platforms/test_cudf_coverage.py"
-  - "tests/unit/mcp/test_mcp_init_coverage.py"
-  - "tests/unit/utils/format_converters/test_vortex_converter_coverage.py"
-    # Phase 3: Medium effort (20 files)
-  - "tests/unit/core/tuning/test_tuning_validation.py"
-  - "tests/unit/core/tuning/test_tuning_metadata.py"
-  - "tests/unit/core/tuning/generators/test_azure_synapse_ddl.py"
-  - "tests/unit/core/tuning/generators/test_clickhouse_ddl.py"
-  - "tests/unit/core/tuning/generators/test_firebolt_ddl.py"
-  - "tests/unit/platforms/credentials/test_snowflake_coverage.py"
-  - "tests/unit/platforms/credentials/test_bigquery_coverage.py"
-  - "tests/unit/platforms/credentials/test_databricks_credentials_coverage.py"
-  - "tests/unit/core/tpcds/benchmark/test_tpcds_runner_coverage.py"
-  - "tests/unit/core/tpcds/test_throughput_test_coverage.py"
-  - "tests/unit/core/tpch/test_official_benchmark_coverage.py"
-  - "tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py"
-  - "tests/unit/platforms/test_motherduck_coverage.py"
-  - "tests/unit/platforms/test_influxdb_adapter_coverage.py"
-  - "tests/unit/platforms/test_clickhouse_metadata_coverage.py"
-  - "tests/unit/platforms/aws/test_emr_serverless_coverage.py"
-  - "tests/unit/platforms/dataframe/test_iceberg_maintenance_coverage.py"
-  - "tests/unit/platforms/dataframe/test_expression_family_coverage.py"
-  - "tests/unit/platforms/dataframe/test_modin_df_coverage.py"
-  - "tests/unit/platforms/credentials/test_redshift_coverage.py"
-    # Phase 4: High effort (11 files)
-  - "tests/unit/platforms/dataframe/test_unified_frame_coverage.py"
-  - "tests/unit/core/tpch/test_dataframe_queries_coverage.py"
-  - "tests/unit/core/transaction_primitives/test_generator_coverage.py"
-  - "tests/unit/core/tpch/test_parameter_extractor_coverage.py"
-  - "tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py"
-  - "tests/unit/core/tpch_skew/test_skew_generator_coverage.py"
-  - "tests/unit/core/tpcds/test_parameter_extractor_coverage.py"
-  - "tests/unit/core/tsbs_devops/test_tsbs_df_queries_coverage.py"
-  - "tests/unit/platforms/dataframe/test_cudf_df_coverage.py"
-  - "tests/unit/platforms/dataframe/test_dask_df_coverage.py"
-  - "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py"
-    # Phase 5: CLI (20 files)
-  - "tests/unit/cli/test_tuning_wizard.py"
-  - "tests/unit/cli/test_onboarding_coverage.py"
-  - "tests/unit/cli/commands/test_compare_plans_coverage.py"
-  - "tests/unit/cli/commands/test_compare_dataframes_coverage.py"
-  - "tests/unit/cli/commands/test_df_tuning_coverage.py"
-  - "tests/unit/cli/commands/test_export_coverage.py"
-  - "tests/unit/cli/test_preferences_coverage.py"
-  - "tests/unit/cli/commands/test_plan_history_coverage.py"
-  - "tests/unit/cli/commands/test_datagen_coverage.py"
-  - "tests/unit/cli/commands/test_show_plan_coverage.py"
-  - "tests/unit/cli/commands/test_compare_coverage.py"
-  - "tests/unit/cli/commands/test_shell_coverage.py"
-  - "tests/unit/cli/commands/test_run_official_coverage.py"
-  - "tests/unit/cli/test_system_coverage.py"
-  - "tests/unit/cli/test_composite_params_coverage.py"
-  - "tests/unit/cli/test_config_coverage.py"
-  - "tests/unit/cli/test_output_coverage.py"
-  - "tests/unit/cli/commands/test_tuning_group_coverage.py"
-  - "tests/unit/cli/commands/test_tuning_cmd_coverage.py"
-  - "tests/unit/cli/presentation/test_system_presentation_coverage.py"
-    # Phase 6: TPC-DI (handled by related TODO, file names TBD)
+    - "scripts/check_per_file_coverage.py"
+      # Phase 2: Quick wins (21 files)
+    - "tests/unit/core/visualization/test_visualization_exceptions.py"
+    - "tests/unit/core/tpcds/schema/test_tpcds_schema_registry.py"
+    - "tests/unit/platforms/dataframe/test_dataframe_init.py"
+    - "tests/unit/utils/test_verbosity_coverage.py"
+    - "tests/unit/core/visualization/test_visualization_exporters.py"
+    - "tests/unit/examples/test_dryrun_utils.py"
+    - "tests/unit/core/tsbs_devops/test_tsbs_benchmark_coverage.py"
+    - "tests/unit/platforms/test_clickhouse_cloud_coverage.py"
+    - "tests/unit/platforms/test_azure_synapse_coverage.py"
+    - "tests/unit/platforms/gcp/test_dataproc_serverless_coverage.py"
+    - "tests/unit/platforms/test_timescaledb_coverage.py"
+    - "tests/unit/platforms/aws/test_athena_spark_coverage.py"
+    - "tests/unit/platforms/azure/test_synapse_spark_coverage.py"
+    - "tests/unit/platforms/gcp/test_dataproc_coverage.py"
+    - "tests/unit/core/tpcds/test_tpcds_maintenance_coverage.py"
+    - "tests/unit/core/tpcds/generator/test_streaming_coverage.py"
+    - "tests/unit/platforms/dataframe/test_pyspark_maintenance_coverage.py"
+    - "tests/unit/core/tpch_skew/test_tpch_skew_benchmark_coverage.py"
+    - "tests/unit/platforms/test_cudf_coverage.py"
+    - "tests/unit/mcp/test_mcp_init_coverage.py"
+    - "tests/unit/utils/format_converters/test_vortex_converter_coverage.py"
+      # Phase 3: Medium effort (20 files)
+    - "tests/unit/core/tuning/test_tuning_validation.py"
+    - "tests/unit/core/tuning/test_tuning_metadata.py"
+    - "tests/unit/core/tuning/generators/test_azure_synapse_ddl.py"
+    - "tests/unit/core/tuning/generators/test_clickhouse_ddl.py"
+    - "tests/unit/core/tuning/generators/test_firebolt_ddl.py"
+    - "tests/unit/platforms/credentials/test_snowflake_coverage.py"
+    - "tests/unit/platforms/credentials/test_bigquery_coverage.py"
+    - "tests/unit/platforms/credentials/test_databricks_credentials_coverage.py"
+    - "tests/unit/core/tpcds/benchmark/test_tpcds_runner_coverage.py"
+    - "tests/unit/core/tpcds/test_throughput_test_coverage.py"
+    - "tests/unit/core/tpch/test_official_benchmark_coverage.py"
+    - "tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py"
+    - "tests/unit/platforms/test_motherduck_coverage.py"
+    - "tests/unit/platforms/test_influxdb_adapter_coverage.py"
+    - "tests/unit/platforms/test_clickhouse_metadata_coverage.py"
+    - "tests/unit/platforms/aws/test_emr_serverless_coverage.py"
+    - "tests/unit/platforms/dataframe/test_iceberg_maintenance_coverage.py"
+    - "tests/unit/platforms/dataframe/test_expression_family_coverage.py"
+    - "tests/unit/platforms/dataframe/test_modin_df_coverage.py"
+    - "tests/unit/platforms/credentials/test_redshift_coverage.py"
+      # Phase 4: High effort (11 files)
+    - "tests/unit/platforms/dataframe/test_unified_frame_coverage.py"
+    - "tests/unit/core/tpch/test_dataframe_queries_coverage.py"
+    - "tests/unit/core/transaction_primitives/test_generator_coverage.py"
+    - "tests/unit/core/tpch/test_parameter_extractor_coverage.py"
+    - "tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py"
+    - "tests/unit/core/tpch_skew/test_skew_generator_coverage.py"
+    - "tests/unit/core/tpcds/test_parameter_extractor_coverage.py"
+    - "tests/unit/core/tsbs_devops/test_tsbs_df_queries_coverage.py"
+    - "tests/unit/platforms/dataframe/test_cudf_df_coverage.py"
+    - "tests/unit/platforms/dataframe/test_dask_df_coverage.py"
+    - "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py"
+      # Phase 5: CLI (20 files)
+    - "tests/unit/cli/test_tuning_wizard.py"
+    - "tests/unit/cli/test_onboarding_coverage.py"
+    - "tests/unit/cli/commands/test_compare_plans_coverage.py"
+    - "tests/unit/cli/commands/test_compare_dataframes_coverage.py"
+    - "tests/unit/cli/commands/test_df_tuning_coverage.py"
+    - "tests/unit/cli/commands/test_export_coverage.py"
+    - "tests/unit/cli/test_preferences_coverage.py"
+    - "tests/unit/cli/commands/test_plan_history_coverage.py"
+    - "tests/unit/cli/commands/test_datagen_coverage.py"
+    - "tests/unit/cli/commands/test_show_plan_coverage.py"
+    - "tests/unit/cli/commands/test_compare_coverage.py"
+    - "tests/unit/cli/commands/test_shell_coverage.py"
+    - "tests/unit/cli/commands/test_run_official_coverage.py"
+    - "tests/unit/cli/test_system_coverage.py"
+    - "tests/unit/cli/test_composite_params_coverage.py"
+    - "tests/unit/cli/test_config_coverage.py"
+    - "tests/unit/cli/test_output_coverage.py"
+    - "tests/unit/cli/commands/test_tuning_group_coverage.py"
+    - "tests/unit/cli/commands/test_tuning_cmd_coverage.py"
+    - "tests/unit/cli/presentation/test_system_presentation_coverage.py"
+      # Phase 6: TPC-DI (handled by related TODO, file names TBD)
   modified:
-  - "Makefile"
-  - "pyproject.toml"
-  - "_project/TODO/_indexes/master.yaml"
-  - "_project/TODO/_indexes/by-category.yaml"
-  - "_project/TODO/_indexes/by-priority.yaml"
-  - "_project/TODO/_indexes/by-status.yaml"
+    - "Makefile"
+    - "pyproject.toml"
+    - "_project/TODO/_indexes/master.yaml"
+    - "_project/TODO/_indexes/by-category.yaml"
+    - "_project/TODO/_indexes/by-priority.yaml"
+    - "_project/TODO/_indexes/by-status.yaml"
 
 scope_limit:
   only_modify:
-  - "tests/unit/"
-  - "scripts/"
-  - "Makefile"
-  - "pyproject.toml"
-  - "_project/TODO/"
+    - "tests/unit/"
+    - "scripts/"
+    - "Makefile"
+    - "pyproject.toml"
+    - "_project/TODO/"
   do_not_modify:
-  - "benchbox/"
+    - "benchbox/"
 work:
-- id: w1
-  summary: "Add scripts/check_per_file_coverage.py for coverage.json-based active-scope checks"
-  status: done
-- id: w2
-  summary: "Fail when any active-scope benchbox/*.py file is below 50%"
-  needs:
-  - w1
-  status: done
-- id: w3
-  summary: "Report sorted failing files with percentage and statement count"
-  needs:
-  - w1
-  status: done
-- id: w4
-  summary: "Support deferred list and configurable threshold via CLI flags"
-  needs:
-  - w1
-  status: done
-- id: w5
-  summary: "Add make coverage-per-file target and document usage"
-  status: done
-- id: w6
-  summary: "Update pyproject coverage omit/deferred notes for temporary split"
-  status: done
-- id: w7
-  summary: "Batch 2A: Trivial small modules (3 files, ~8 tests)"
-  status: done
-- id: w8
-  summary: "tests/unit/core/visualization/test_visualization_exceptions.py → core/visualization/exceptions.py (33% → 50%,
-    ~3 tests)"
-  needs:
-  - w7
-  status: done
-- id: w9
-  summary: "tests/unit/core/tpcds/schema/test_tpcds_schema_registry.py → core/tpcds/schema/registry.py (27% → 50%, ~3 tests)"
-  needs:
-  - w7
-  status: done
-- id: w10
-  summary: "tests/unit/platforms/dataframe/test_dataframe_init.py → platforms/dataframe/__init__.py (46% → 50%, ~2 tests)"
-  needs:
-  - w7
-  status: done
-- id: w11
-  summary: "Batch 2B: Utils/core near-50% (5 files, ~15 tests)"
-  status: done
-- id: w12
-  summary: "tests/unit/utils/test_verbosity_coverage.py → utils/verbosity.py (49% → 50%, ~3 tests)"
-  needs:
-  - w11
-  status: done
-- id: w13
-  summary: "tests/unit/core/visualization/test_visualization_exporters.py → core/visualization/exporters.py (44% → 50%, ~4
-    tests)"
-  needs:
-  - w11
-  status: done
-- id: w14
-  summary: "tests/unit/examples/test_dryrun_utils.py → examples/dryrun_utils.py (47% → 50%, ~2 tests)"
-  needs:
-  - w11
-  status: done
-- id: w15
-  summary: "tests/unit/core/tsbs_devops/test_tsbs_benchmark_coverage.py → core/tsbs_devops/benchmark.py (43% → 50%, ~4 tests)"
-  needs:
-  - w11
-  status: done
-- id: w16
-  summary: "tests/unit/platforms/test_clickhouse_cloud_coverage.py → platforms/clickhouse_cloud.py (46% → 50%, ~2 tests)"
-  needs:
-  - w11
-  status: done
-- id: w17
-  summary: "Batch 2C: Platform adapters near-50% (6 files, ~16 tests)"
-  status: done
-- id: w18
-  summary: "tests/unit/platforms/test_azure_synapse_coverage.py → platforms/azure_synapse.py (49% → 50%, ~3 tests)"
-  needs:
-  - w17
-  status: done
-- id: w19
-  summary: "tests/unit/platforms/gcp/test_dataproc_serverless_coverage.py → platforms/gcp/dataproc_serverless_adapter.py (49%
-    → 50%, ~2 tests)"
-  needs:
-  - w17
-  status: done
-- id: w20
-  summary: "tests/unit/platforms/test_timescaledb_coverage.py → platforms/timescaledb.py (48% → 50%, ~2 tests)"
-  needs:
-  - w17
-  status: done
-- id: w21
-  summary: "tests/unit/platforms/aws/test_athena_spark_coverage.py → platforms/aws/athena_spark_adapter.py (45% → 50%, ~3
-    tests)"
-  needs:
-  - w17
-  status: done
-- id: w22
-  summary: "tests/unit/platforms/azure/test_synapse_spark_coverage.py → platforms/azure/synapse_spark_adapter.py (44% → 50%,
-    ~3 tests)"
-  needs:
-  - w17
-  status: done
-- id: w23
-  summary: "tests/unit/platforms/gcp/test_dataproc_coverage.py → platforms/gcp/dataproc_adapter.py (43% → 50%, ~3 tests)"
-  needs:
-  - w17
-  status: done
-- id: w24
-  summary: "Batch 2D: Core benchmark modules near-50% (5 files, ~18 tests)"
-  status: done
-- id: w25
-  summary: "tests/unit/core/tpcds/test_tpcds_maintenance_coverage.py → core/tpcds/maintenance_test.py (48% → 50%, ~3 tests)"
-  needs:
-  - w24
-  status: done
-- id: w26
-  summary: "tests/unit/core/tpcds/generator/test_streaming_coverage.py → core/tpcds/generator/streaming.py (45% → 50%, ~4
-    tests)"
-  needs:
-  - w24
-  status: done
-- id: w27
-  summary: "tests/unit/platforms/dataframe/test_pyspark_maintenance_coverage.py → platforms/dataframe/pyspark_maintenance.py
-    (44% → 50%, ~3 tests)"
-  needs:
-  - w24
-  status: done
-- id: w28
-  summary: "tests/unit/core/tpch_skew/test_tpch_skew_benchmark_coverage.py → core/tpch_skew/benchmark.py (39% → 50%, ~4 tests)"
-  needs:
-  - w24
-  status: done
-- id: w29
-  summary: "tests/unit/platforms/test_cudf_coverage.py → platforms/cudf.py (42% → 50%, ~4 tests)"
-  needs:
-  - w24
-  status: done
-- id: w30
-  summary: "Batch 2E: MCP and misc (2 files, ~6 tests)"
-  status: done
-- id: w31
-  summary: "tests/unit/mcp/test_mcp_init_coverage.py → mcp/__init__.py (31% → 50%, ~3 tests)"
-  needs:
-  - w30
-  status: done
-- id: w32
-  summary: "tests/unit/utils/format_converters/test_vortex_converter_coverage.py → utils/format_converters/vortex_converter.py
-    (14% → 50%, ~3 tests)"
-  needs:
-  - w30
-  status: done
-- id: w33
-  summary: "Batch 3A: Tuning subsystem (5 files, ~32 tests)"
-  status: done
-- id: w34
-  summary: "tests/unit/core/tuning/test_tuning_validation.py → core/tuning/validation.py (13% → 50%, ~10 tests)"
-  needs:
-  - w33
-  status: done
-- id: w35
-  summary: "tests/unit/core/tuning/test_tuning_metadata.py → core/tuning/metadata.py (13% → 50%, ~10 tests)"
-  needs:
-  - w33
-  status: done
-- id: w36
-  summary: "tests/unit/core/tuning/generators/test_azure_synapse_ddl.py → core/tuning/generators/azure_synapse.py (24% → 50%,
-    ~4 tests)"
-  needs:
-  - w33
-  status: done
-- id: w37
-  summary: "tests/unit/core/tuning/generators/test_clickhouse_ddl.py → core/tuning/generators/clickhouse.py (22% → 50%, ~4
-    tests)"
-  needs:
-  - w33
-  status: done
-- id: w38
-  summary: "tests/unit/core/tuning/generators/test_firebolt_ddl.py → core/tuning/generators/firebolt.py (19% → 50%, ~4 tests)"
-  needs:
-  - w33
-  status: done
-- id: w39
-  summary: "Batch 3B: Credentials (3 files, ~21 tests)"
-  status: done
-- id: w40
-  summary: "tests/unit/platforms/credentials/test_snowflake_coverage.py → platforms/credentials/snowflake.py (32% → 50%, ~6
-    tests)"
-  needs:
-  - w39
-  status: done
-- id: w41
-  summary: "tests/unit/platforms/credentials/test_bigquery_coverage.py → platforms/credentials/bigquery.py (29% → 50%, ~6
-    tests)"
-  needs:
-  - w39
-  status: done
-- id: w42
-  summary: "tests/unit/platforms/credentials/test_databricks_credentials_coverage.py → platforms/databricks/credentials.py
-    (28% → 50%, ~6 tests)"
-  needs:
-  - w39
-  status: done
-- id: w43
-  summary: "Batch 3C: TPC benchmark runners (4 files, ~22 tests)"
-  status: done
-- id: w44
-  summary: "tests/unit/core/tpcds/benchmark/test_tpcds_runner_coverage.py → core/tpcds/benchmark/runner.py (34% → 50%, ~7
-    tests)"
-  needs:
-  - w43
-  status: done
-- id: w45
-  summary: "tests/unit/core/tpcds/test_throughput_test_coverage.py → core/tpcds/throughput_test.py (32% → 50%, ~5 tests)"
-  needs:
-  - w43
-  status: done
-- id: w46
-  summary: "tests/unit/core/tpch/test_official_benchmark_coverage.py → core/tpch/official_benchmark.py (32% → 50%, ~4 tests)"
-  needs:
-  - w43
-  status: done
-- id: w47
-  summary: "tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py → core/transaction_primitives/dataframe_operations.py
-    (38% → 50%, ~6 tests)"
-  needs:
-  - w43
-  status: done
-- id: w48
-  summary: "Batch 3D: Platform adapters (5 files, ~24 tests)"
-  status: done
-- id: w49
-  summary: "tests/unit/platforms/test_motherduck_coverage.py → platforms/motherduck.py (32% → 50%, ~5 tests)"
-  needs:
-  - w48
-  status: done
-- id: w50
-  summary: "tests/unit/platforms/test_influxdb_adapter_coverage.py → platforms/influxdb/adapter.py (31% → 50%, ~5 tests)"
-  needs:
-  - w48
-  status: done
-- id: w51
-  summary: "tests/unit/platforms/test_clickhouse_metadata_coverage.py → platforms/clickhouse/metadata.py (31% → 50%, ~4 tests)"
-  needs:
-  - w48
-  status: done
-- id: w52
-  summary: "tests/unit/platforms/aws/test_emr_serverless_coverage.py → platforms/aws/emr_serverless_adapter.py (38% → 50%,
-    ~5 tests)"
-  needs:
-  - w48
-  status: done
-- id: w53
-  summary: "tests/unit/platforms/dataframe/test_iceberg_maintenance_coverage.py → platforms/dataframe/iceberg_maintenance.py
-    (38% → 50%, ~5 tests)"
-  needs:
-  - w48
-  status: done
-- id: w54
-  summary: "Batch 3E: DataFrame adapters and remaining credentials (3 files, ~20 tests)"
-  status: done
-- id: w55
-  summary: "tests/unit/platforms/dataframe/test_expression_family_coverage.py → platforms/dataframe/expression_family.py (35%
-    → 50%, ~6 tests)"
-  needs:
-  - w54
-  status: done
-- id: w56
-  summary: "tests/unit/platforms/dataframe/test_modin_df_coverage.py → platforms/dataframe/modin_df.py (27% → 50%, ~5 tests)"
-  needs:
-  - w54
-  status: done
-- id: w57
-  summary: "tests/unit/platforms/credentials/test_redshift_coverage.py → platforms/credentials/redshift.py (24% → 50%, ~9
-    tests)"
-  needs:
-  - w54
-  status: done
-- id: w58
-  summary: "Batch 4A: Largest core modules (5 files, ~40 tests)"
-  status: done
-- id: w59
-  summary: "tests/unit/platforms/dataframe/test_unified_frame_coverage.py → platforms/dataframe/unified_frame.py (35% → 50%,
-    ~10 tests)"
-  needs:
-  - w58
-  status: done
-- id: w60
-  summary: "tests/unit/core/tpch/test_dataframe_queries_coverage.py → core/tpch/dataframe_queries.py (12% → 50%, ~10 tests)"
-  needs:
-  - w58
-  status: done
-- id: w61
-  summary: "tests/unit/core/transaction_primitives/test_generator_coverage.py → core/transaction_primitives/generator.py (11%
-    → 50%, ~8 tests)"
-  needs:
-  - w58
-  status: done
-- id: w62
-  summary: "tests/unit/core/tpch/test_parameter_extractor_coverage.py → core/tpch/parameter_extractor.py (22% → 50%, ~6 tests)"
-  needs:
-  - w58
-  status: done
-- id: w63
-  summary: "tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py → core/tpchavoc/validation.py (14% → 50%, ~6 tests)"
-  needs:
-  - w58
-  status: done
-- id: w64
-  summary: "Batch 4B: More large modules (6 files, ~35 tests)"
-  status: done
-- id: w65
-  summary: "tests/unit/core/tpch_skew/test_skew_generator_coverage.py → core/tpch_skew/generator.py (17% → 50%, ~7 tests)"
-  needs:
-  - w64
-  status: done
-- id: w66
-  summary: "tests/unit/core/tpcds/test_parameter_extractor_coverage.py → core/tpcds/parameter_extractor.py (15% → 50%, ~4
-    tests)"
-  needs:
-  - w64
-  status: done
-- id: w67
-  summary: "tests/unit/core/tsbs_devops/test_tsbs_df_queries_coverage.py → core/tsbs_devops/dataframe_queries/queries.py (19%
-    → 50%, ~7 tests)"
-  needs:
-  - w64
-  status: done
-- id: w68
-  summary: "tests/unit/platforms/dataframe/test_cudf_df_coverage.py → platforms/dataframe/cudf_df.py (24% → 50%, ~5 tests)"
-  needs:
-  - w64
-  status: done
-- id: w69
-  summary: "tests/unit/platforms/dataframe/test_dask_df_coverage.py → platforms/dataframe/dask_df.py (20% → 50%, ~6 tests)"
-  needs:
-  - w64
-  status: done
-- id: w70
-  summary: "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py → platforms/databricks/dataframe_adapter.py
-    (18% → 50%, ~6 tests)"
-  needs:
-  - w64
-  status: done
-- id: w71
-  summary: "Batch 5A: Zero-coverage CLI modules (2 files, ~12 tests)"
-  status: done
-- id: w72
-  summary: "tests/unit/cli/test_tuning_wizard.py → cli/tuning.py (0% → 50%, ~6 tests)"
-  needs:
-  - w71
-  status: done
-- id: w73
-  summary: "tests/unit/cli/test_onboarding_coverage.py → cli/onboarding.py (0% → 50%, ~6 tests)"
-  needs:
-  - w71
-  status: done
-- id: w74
-  summary: "Batch 5B: Low-coverage CLI commands (6 files, ~32 tests)"
-  status: done
-- id: w75
-  summary: "tests/unit/cli/commands/test_compare_plans_coverage.py → cli/commands/compare_plans.py (8% → 50%, ~5 tests)"
-  needs:
-  - w74
-  status: done
-- id: w76
-  summary: "tests/unit/cli/commands/test_compare_dataframes_coverage.py → cli/commands/compare_dataframes.py (9% → 50%, ~5
-    tests)"
-  needs:
-  - w74
-  status: done
-- id: w77
-  summary: "tests/unit/cli/commands/test_df_tuning_coverage.py → cli/commands/df_tuning.py (11% → 50%, ~5 tests)"
-  needs:
-  - w74
-  status: done
-- id: w78
-  summary: "tests/unit/cli/commands/test_export_coverage.py → cli/commands/export.py (13% → 50%, ~5 tests)"
-  needs:
-  - w74
-  status: done
-- id: w79
-  summary: "tests/unit/cli/test_preferences_coverage.py → cli/preferences.py (15% → 50%, ~7 tests)"
-  needs:
-  - w74
-  status: done
-- id: w80
-  summary: "tests/unit/cli/commands/test_plan_history_coverage.py → cli/commands/plan_history.py (19% → 50%, ~5 tests)"
-  needs:
-  - w74
-  status: done
-- id: w81
-  summary: "Batch 5C: Medium-coverage CLI (7 files, ~33 tests)"
-  status: done
-- id: w82
-  summary: "tests/unit/cli/commands/test_datagen_coverage.py → cli/commands/datagen.py (22% → 50%, ~5 tests)"
-  needs:
-  - w81
-  status: done
-- id: w83
-  summary: "tests/unit/cli/commands/test_show_plan_coverage.py → cli/commands/show_plan.py (24% → 50%, ~4 tests)"
-  needs:
-  - w81
-  status: done
-- id: w84
-  summary: "tests/unit/cli/commands/test_compare_coverage.py → cli/commands/compare.py (28% → 50%, ~5 tests)"
-  needs:
-  - w81
-  status: done
-- id: w85
-  summary: "tests/unit/cli/commands/test_shell_coverage.py → cli/commands/shell.py (30% → 50%, ~5 tests)"
-  needs:
-  - w81
-  status: done
-- id: w86
-  summary: "tests/unit/cli/commands/test_run_official_coverage.py → cli/commands/run_official.py (33% → 50%, ~5 tests)"
-  needs:
-  - w81
-  status: done
-- id: w87
-  summary: "tests/unit/cli/test_system_coverage.py → cli/system.py (36% → 50%, ~4 tests)"
-  needs:
-  - w81
-  status: done
-- id: w88
-  summary: "tests/unit/cli/test_composite_params_coverage.py → cli/composite_params.py (39% → 50%, ~5 tests)"
-  needs:
-  - w81
-  status: done
-- id: w89
-  summary: "Batch 5D: Near-50% CLI modules (5 files, ~21 tests)"
-  status: done
-- id: w90
-  summary: "tests/unit/cli/test_config_coverage.py → cli/config.py (41% → 50%, ~5 tests)"
-  needs:
-  - w89
-  status: done
-- id: w91
-  summary: "tests/unit/cli/test_output_coverage.py → cli/output.py (43% → 50%, ~5 tests)"
-  needs:
-  - w89
-  status: done
-- id: w92
-  summary: "tests/unit/cli/commands/test_tuning_group_coverage.py → cli/commands/tuning_group.py (40% → 50%, ~4 tests)"
-  needs:
-  - w89
-  status: done
-- id: w93
-  summary: "tests/unit/cli/commands/test_tuning_cmd_coverage.py → cli/commands/tuning.py (46% → 50%, ~2 tests)"
-  needs:
-  - w89
-  status: done
-- id: w94
-  summary: "tests/unit/cli/presentation/test_system_presentation_coverage.py → cli/presentation/system.py (6% → 50%, ~5 tests)"
-  needs:
-  - w89
-  status: done
-- id: w95
-  summary: "Raise non-deferred TPC-DI modules under 50%: benchmark/generator/queries/loader/schema/validation/metrics/config/etl.py/etl/validation.py"
-  status: done
-- id: w96
-  summary: "Keep ETL tests unit-heavy with mocked pipeline and deterministic fixtures"
-  status: done
-- id: w97
-  summary: "Re-run full coverage report and identify any modules still below 50%"
-  status: done
-- id: w98
-  summary: "Add targeted tests for remaining gaps discovered after phases 2-6"
-  status: done
-- id: w99
-  summary: "Enable failing mode for coverage-per-file in local CI/test workflow"
-  status: done
-- id: w100
-  summary: "Record before/after failing-module snapshots per wave"
-  status: done
-- id: w101
-  summary: "Confirm no active-scope module remains below 50%"
-  status: done
+  - id: w1
+    summary: "Add scripts/check_per_file_coverage.py for coverage.json-based active-scope checks"
+    status: done
+  - id: w2
+    summary: "Fail when any active-scope benchbox/*.py file is below 50%"
+    needs:
+      - w1
+    status: done
+  - id: w3
+    summary: "Report sorted failing files with percentage and statement count"
+    needs:
+      - w1
+    status: done
+  - id: w4
+    summary: "Support deferred list and configurable threshold via CLI flags"
+    needs:
+      - w1
+    status: done
+  - id: w5
+    summary: "Add make coverage-per-file target and document usage"
+    status: done
+  - id: w6
+    summary: "Update pyproject coverage omit/deferred notes for temporary split"
+    status: done
+  - id: w7
+    summary: "Batch 2A: Trivial small modules (3 files, ~8 tests)"
+    status: done
+  - id: w8
+    summary:
+      "tests/unit/core/visualization/test_visualization_exceptions.py → core/visualization/exceptions.py (33% → 50%,
+      ~3 tests)"
+    needs:
+      - w7
+    status: done
+  - id: w9
+    summary: "tests/unit/core/tpcds/schema/test_tpcds_schema_registry.py → core/tpcds/schema/registry.py (27% → 50%, ~3 tests)"
+    needs:
+      - w7
+    status: done
+  - id: w10
+    summary: "tests/unit/platforms/dataframe/test_dataframe_init.py → platforms/dataframe/__init__.py (46% → 50%, ~2 tests)"
+    needs:
+      - w7
+    status: done
+  - id: w11
+    summary: "Batch 2B: Utils/core near-50% (5 files, ~15 tests)"
+    status: done
+  - id: w12
+    summary: "tests/unit/utils/test_verbosity_coverage.py → utils/verbosity.py (49% → 50%, ~3 tests)"
+    needs:
+      - w11
+    status: done
+  - id: w13
+    summary:
+      "tests/unit/core/visualization/test_visualization_exporters.py → core/visualization/exporters.py (44% → 50%, ~4
+      tests)"
+    needs:
+      - w11
+    status: done
+  - id: w14
+    summary: "tests/unit/examples/test_dryrun_utils.py → examples/dryrun_utils.py (47% → 50%, ~2 tests)"
+    needs:
+      - w11
+    status: done
+  - id: w15
+    summary: "tests/unit/core/tsbs_devops/test_tsbs_benchmark_coverage.py → core/tsbs_devops/benchmark.py (43% → 50%, ~4 tests)"
+    needs:
+      - w11
+    status: done
+  - id: w16
+    summary: "tests/unit/platforms/test_clickhouse_cloud_coverage.py → platforms/clickhouse_cloud.py (46% → 50%, ~2 tests)"
+    needs:
+      - w11
+    status: done
+  - id: w17
+    summary: "Batch 2C: Platform adapters near-50% (6 files, ~16 tests)"
+    status: done
+  - id: w18
+    summary: "tests/unit/platforms/test_azure_synapse_coverage.py → platforms/azure_synapse.py (49% → 50%, ~3 tests)"
+    needs:
+      - w17
+    status: done
+  - id: w19
+    summary:
+      "tests/unit/platforms/gcp/test_dataproc_serverless_coverage.py → platforms/gcp/dataproc_serverless_adapter.py (49%
+      → 50%, ~2 tests)"
+    needs:
+      - w17
+    status: done
+  - id: w20
+    summary: "tests/unit/platforms/test_timescaledb_coverage.py → platforms/timescaledb.py (48% → 50%, ~2 tests)"
+    needs:
+      - w17
+    status: done
+  - id: w21
+    summary:
+      "tests/unit/platforms/aws/test_athena_spark_coverage.py → platforms/aws/athena_spark_adapter.py (45% → 50%, ~3
+      tests)"
+    needs:
+      - w17
+    status: done
+  - id: w22
+    summary:
+      "tests/unit/platforms/azure/test_synapse_spark_coverage.py → platforms/azure/synapse_spark_adapter.py (44% → 50%,
+      ~3 tests)"
+    needs:
+      - w17
+    status: done
+  - id: w23
+    summary: "tests/unit/platforms/gcp/test_dataproc_coverage.py → platforms/gcp/dataproc_adapter.py (43% → 50%, ~3 tests)"
+    needs:
+      - w17
+    status: done
+  - id: w24
+    summary: "Batch 2D: Core benchmark modules near-50% (5 files, ~18 tests)"
+    status: done
+  - id: w25
+    summary: "tests/unit/core/tpcds/test_tpcds_maintenance_coverage.py → core/tpcds/maintenance_test.py (48% → 50%, ~3 tests)"
+    needs:
+      - w24
+    status: done
+  - id: w26
+    summary:
+      "tests/unit/core/tpcds/generator/test_streaming_coverage.py → core/tpcds/generator/streaming.py (45% → 50%, ~4
+      tests)"
+    needs:
+      - w24
+    status: done
+  - id: w27
+    summary:
+      "tests/unit/platforms/dataframe/test_pyspark_maintenance_coverage.py → platforms/dataframe/pyspark_maintenance.py
+      (44% → 50%, ~3 tests)"
+    needs:
+      - w24
+    status: done
+  - id: w28
+    summary: "tests/unit/core/tpch_skew/test_tpch_skew_benchmark_coverage.py → core/tpch_skew/benchmark.py (39% → 50%, ~4 tests)"
+    needs:
+      - w24
+    status: done
+  - id: w29
+    summary: "tests/unit/platforms/test_cudf_coverage.py → platforms/cudf.py (42% → 50%, ~4 tests)"
+    needs:
+      - w24
+    status: done
+  - id: w30
+    summary: "Batch 2E: MCP and misc (2 files, ~6 tests)"
+    status: done
+  - id: w31
+    summary: "tests/unit/mcp/test_mcp_init_coverage.py → mcp/__init__.py (31% → 50%, ~3 tests)"
+    needs:
+      - w30
+    status: done
+  - id: w32
+    summary:
+      "tests/unit/utils/format_converters/test_vortex_converter_coverage.py → utils/format_converters/vortex_converter.py
+      (14% → 50%, ~3 tests)"
+    needs:
+      - w30
+    status: done
+  - id: w33
+    summary: "Batch 3A: Tuning subsystem (5 files, ~32 tests)"
+    status: done
+  - id: w34
+    summary: "tests/unit/core/tuning/test_tuning_validation.py → core/tuning/validation.py (13% → 50%, ~10 tests)"
+    needs:
+      - w33
+    status: done
+  - id: w35
+    summary: "tests/unit/core/tuning/test_tuning_metadata.py → core/tuning/metadata.py (13% → 50%, ~10 tests)"
+    needs:
+      - w33
+    status: done
+  - id: w36
+    summary:
+      "tests/unit/core/tuning/generators/test_azure_synapse_ddl.py → core/tuning/generators/azure_synapse.py (24% → 50%,
+      ~4 tests)"
+    needs:
+      - w33
+    status: done
+  - id: w37
+    summary:
+      "tests/unit/core/tuning/generators/test_clickhouse_ddl.py → core/tuning/generators/clickhouse.py (22% → 50%, ~4
+      tests)"
+    needs:
+      - w33
+    status: done
+  - id: w38
+    summary: "tests/unit/core/tuning/generators/test_firebolt_ddl.py → core/tuning/generators/firebolt.py (19% → 50%, ~4 tests)"
+    needs:
+      - w33
+    status: done
+  - id: w39
+    summary: "Batch 3B: Credentials (3 files, ~21 tests)"
+    status: done
+  - id: w40
+    summary:
+      "tests/unit/platforms/credentials/test_snowflake_coverage.py → platforms/credentials/snowflake.py (32% → 50%, ~6
+      tests)"
+    needs:
+      - w39
+    status: done
+  - id: w41
+    summary:
+      "tests/unit/platforms/credentials/test_bigquery_coverage.py → platforms/credentials/bigquery.py (29% → 50%, ~6
+      tests)"
+    needs:
+      - w39
+    status: done
+  - id: w42
+    summary:
+      "tests/unit/platforms/credentials/test_databricks_credentials_coverage.py → platforms/databricks/credentials.py
+      (28% → 50%, ~6 tests)"
+    needs:
+      - w39
+    status: done
+  - id: w43
+    summary: "Batch 3C: TPC benchmark runners (4 files, ~22 tests)"
+    status: done
+  - id: w44
+    summary:
+      "tests/unit/core/tpcds/benchmark/test_tpcds_runner_coverage.py → core/tpcds/benchmark/runner.py (34% → 50%, ~7
+      tests)"
+    needs:
+      - w43
+    status: done
+  - id: w45
+    summary: "tests/unit/core/tpcds/test_throughput_test_coverage.py → core/tpcds/throughput_test.py (32% → 50%, ~5 tests)"
+    needs:
+      - w43
+    status: done
+  - id: w46
+    summary: "tests/unit/core/tpch/test_official_benchmark_coverage.py → core/tpch/official_benchmark.py (32% → 50%, ~4 tests)"
+    needs:
+      - w43
+    status: done
+  - id: w47
+    summary:
+      "tests/unit/core/transaction_primitives/test_dataframe_ops_coverage.py → core/transaction_primitives/dataframe_operations.py
+      (38% → 50%, ~6 tests)"
+    needs:
+      - w43
+    status: done
+  - id: w48
+    summary: "Batch 3D: Platform adapters (5 files, ~24 tests)"
+    status: done
+  - id: w49
+    summary: "tests/unit/platforms/test_motherduck_coverage.py → platforms/motherduck.py (32% → 50%, ~5 tests)"
+    needs:
+      - w48
+    status: done
+  - id: w50
+    summary: "tests/unit/platforms/test_influxdb_adapter_coverage.py → platforms/influxdb/adapter.py (31% → 50%, ~5 tests)"
+    needs:
+      - w48
+    status: done
+  - id: w51
+    summary: "tests/unit/platforms/test_clickhouse_metadata_coverage.py → platforms/clickhouse/metadata.py (31% → 50%, ~4 tests)"
+    needs:
+      - w48
+    status: done
+  - id: w52
+    summary:
+      "tests/unit/platforms/aws/test_emr_serverless_coverage.py → platforms/aws/emr_serverless_adapter.py (38% → 50%,
+      ~5 tests)"
+    needs:
+      - w48
+    status: done
+  - id: w53
+    summary:
+      "tests/unit/platforms/dataframe/test_iceberg_maintenance_coverage.py → platforms/dataframe/iceberg_maintenance.py
+      (38% → 50%, ~5 tests)"
+    needs:
+      - w48
+    status: done
+  - id: w54
+    summary: "Batch 3E: DataFrame adapters and remaining credentials (3 files, ~20 tests)"
+    status: done
+  - id: w55
+    summary:
+      "tests/unit/platforms/dataframe/test_expression_family_coverage.py → platforms/dataframe/expression_family.py (35%
+      → 50%, ~6 tests)"
+    needs:
+      - w54
+    status: done
+  - id: w56
+    summary: "tests/unit/platforms/dataframe/test_modin_df_coverage.py → platforms/dataframe/modin_df.py (27% → 50%, ~5 tests)"
+    needs:
+      - w54
+    status: done
+  - id: w57
+    summary:
+      "tests/unit/platforms/credentials/test_redshift_coverage.py → platforms/credentials/redshift.py (24% → 50%, ~9
+      tests)"
+    needs:
+      - w54
+    status: done
+  - id: w58
+    summary: "Batch 4A: Largest core modules (5 files, ~40 tests)"
+    status: done
+  - id: w59
+    summary:
+      "tests/unit/platforms/dataframe/test_unified_frame_coverage.py → platforms/dataframe/unified_frame.py (35% → 50%,
+      ~10 tests)"
+    needs:
+      - w58
+    status: done
+  - id: w60
+    summary: "tests/unit/core/tpch/test_dataframe_queries_coverage.py → core/tpch/dataframe_queries.py (12% → 50%, ~10 tests)"
+    needs:
+      - w58
+    status: done
+  - id: w61
+    summary:
+      "tests/unit/core/transaction_primitives/test_generator_coverage.py → core/transaction_primitives/generator.py (11%
+      → 50%, ~8 tests)"
+    needs:
+      - w58
+    status: done
+  - id: w62
+    summary: "tests/unit/core/tpch/test_parameter_extractor_coverage.py → core/tpch/parameter_extractor.py (22% → 50%, ~6 tests)"
+    needs:
+      - w58
+    status: done
+  - id: w63
+    summary: "tests/unit/core/tpchavoc/test_tpchavoc_validation_coverage.py → core/tpchavoc/validation.py (14% → 50%, ~6 tests)"
+    needs:
+      - w58
+    status: done
+  - id: w64
+    summary: "Batch 4B: More large modules (6 files, ~35 tests)"
+    status: done
+  - id: w65
+    summary: "tests/unit/core/tpch_skew/test_skew_generator_coverage.py → core/tpch_skew/generator.py (17% → 50%, ~7 tests)"
+    needs:
+      - w64
+    status: done
+  - id: w66
+    summary:
+      "tests/unit/core/tpcds/test_parameter_extractor_coverage.py → core/tpcds/parameter_extractor.py (15% → 50%, ~4
+      tests)"
+    needs:
+      - w64
+    status: done
+  - id: w67
+    summary:
+      "tests/unit/core/tsbs_devops/test_tsbs_df_queries_coverage.py → core/tsbs_devops/dataframe_queries/queries.py (19%
+      → 50%, ~7 tests)"
+    needs:
+      - w64
+    status: done
+  - id: w68
+    summary: "tests/unit/platforms/dataframe/test_cudf_df_coverage.py → platforms/dataframe/cudf_df.py (24% → 50%, ~5 tests)"
+    needs:
+      - w64
+    status: done
+  - id: w69
+    summary: "tests/unit/platforms/dataframe/test_dask_df_coverage.py → platforms/dataframe/dask_df.py (20% → 50%, ~6 tests)"
+    needs:
+      - w64
+    status: done
+  - id: w70
+    summary:
+      "tests/unit/platforms/databricks/test_databricks_df_adapter_coverage.py → platforms/databricks/dataframe_adapter.py
+      (18% → 50%, ~6 tests)"
+    needs:
+      - w64
+    status: done
+  - id: w71
+    summary: "Batch 5A: Zero-coverage CLI modules (2 files, ~12 tests)"
+    status: done
+  - id: w72
+    summary: "tests/unit/cli/test_tuning_wizard.py → cli/tuning.py (0% → 50%, ~6 tests)"
+    needs:
+      - w71
+    status: done
+  - id: w73
+    summary: "tests/unit/cli/test_onboarding_coverage.py → cli/onboarding.py (0% → 50%, ~6 tests)"
+    needs:
+      - w71
+    status: done
+  - id: w74
+    summary: "Batch 5B: Low-coverage CLI commands (6 files, ~32 tests)"
+    status: done
+  - id: w75
+    summary: "tests/unit/cli/commands/test_compare_plans_coverage.py → cli/commands/compare_plans.py (8% → 50%, ~5 tests)"
+    needs:
+      - w74
+    status: done
+  - id: w76
+    summary:
+      "tests/unit/cli/commands/test_compare_dataframes_coverage.py → cli/commands/compare_dataframes.py (9% → 50%, ~5
+      tests)"
+    needs:
+      - w74
+    status: done
+  - id: w77
+    summary: "tests/unit/cli/commands/test_df_tuning_coverage.py → cli/commands/df_tuning.py (11% → 50%, ~5 tests)"
+    needs:
+      - w74
+    status: done
+  - id: w78
+    summary: "tests/unit/cli/commands/test_export_coverage.py → cli/commands/export.py (13% → 50%, ~5 tests)"
+    needs:
+      - w74
+    status: done
+  - id: w79
+    summary: "tests/unit/cli/test_preferences_coverage.py → cli/preferences.py (15% → 50%, ~7 tests)"
+    needs:
+      - w74
+    status: done
+  - id: w80
+    summary: "tests/unit/cli/commands/test_plan_history_coverage.py → cli/commands/plan_history.py (19% → 50%, ~5 tests)"
+    needs:
+      - w74
+    status: done
+  - id: w81
+    summary: "Batch 5C: Medium-coverage CLI (7 files, ~33 tests)"
+    status: done
+  - id: w82
+    summary: "tests/unit/cli/commands/test_datagen_coverage.py → cli/commands/datagen.py (22% → 50%, ~5 tests)"
+    needs:
+      - w81
+    status: done
+  - id: w83
+    summary: "tests/unit/cli/commands/test_show_plan_coverage.py → cli/commands/show_plan.py (24% → 50%, ~4 tests)"
+    needs:
+      - w81
+    status: done
+  - id: w84
+    summary: "tests/unit/cli/commands/test_compare_coverage.py → cli/commands/compare.py (28% → 50%, ~5 tests)"
+    needs:
+      - w81
+    status: done
+  - id: w85
+    summary: "tests/unit/cli/commands/test_shell_coverage.py → cli/commands/shell.py (30% → 50%, ~5 tests)"
+    needs:
+      - w81
+    status: done
+  - id: w86
+    summary: "tests/unit/cli/commands/test_run_official_coverage.py → cli/commands/run_official.py (33% → 50%, ~5 tests)"
+    needs:
+      - w81
+    status: done
+  - id: w87
+    summary: "tests/unit/cli/test_system_coverage.py → cli/system.py (36% → 50%, ~4 tests)"
+    needs:
+      - w81
+    status: done
+  - id: w88
+    summary: "tests/unit/cli/test_composite_params_coverage.py → cli/composite_params.py (39% → 50%, ~5 tests)"
+    needs:
+      - w81
+    status: done
+  - id: w89
+    summary: "Batch 5D: Near-50% CLI modules (5 files, ~21 tests)"
+    status: done
+  - id: w90
+    summary: "tests/unit/cli/test_config_coverage.py → cli/config.py (41% → 50%, ~5 tests)"
+    needs:
+      - w89
+    status: done
+  - id: w91
+    summary: "tests/unit/cli/test_output_coverage.py → cli/output.py (43% → 50%, ~5 tests)"
+    needs:
+      - w89
+    status: done
+  - id: w92
+    summary: "tests/unit/cli/commands/test_tuning_group_coverage.py → cli/commands/tuning_group.py (40% → 50%, ~4 tests)"
+    needs:
+      - w89
+    status: done
+  - id: w93
+    summary: "tests/unit/cli/commands/test_tuning_cmd_coverage.py → cli/commands/tuning.py (46% → 50%, ~2 tests)"
+    needs:
+      - w89
+    status: done
+  - id: w94
+    summary: "tests/unit/cli/presentation/test_system_presentation_coverage.py → cli/presentation/system.py (6% → 50%, ~5 tests)"
+    needs:
+      - w89
+    status: done
+  - id: w95
+    summary: "Raise non-deferred TPC-DI modules under 50%: benchmark/generator/queries/loader/schema/validation/metrics/config/etl.py/etl/validation.py"
+    status: done
+  - id: w96
+    summary: "Keep ETL tests unit-heavy with mocked pipeline and deterministic fixtures"
+    status: done
+  - id: w97
+    summary: "Re-run full coverage report and identify any modules still below 50%"
+    status: done
+  - id: w98
+    summary: "Add targeted tests for remaining gaps discovered after phases 2-6"
+    status: done
+  - id: w99
+    summary: "Enable failing mode for coverage-per-file in local CI/test workflow"
+    status: done
+  - id: w100
+    summary: "Record before/after failing-module snapshots per wave"
+    status: done
+  - id: w101
+    summary: "Confirm no active-scope module remains below 50%"
+    status: done

@@ -109,8 +109,8 @@ approach: |
   private patch.
 
 anti_patterns:
-  - "DO NOT monkey-patch `BROWSER_RUNTIME._globalFileInfo` from the page — because it lives inside the DuckDB-WASM worker and crosses a private API boundary — solve the problem via a supported configuration surface instead."
-  - "DO NOT move the explorer off DuckDB-WASM's HTTP attach to regain range reads — because the canonical browser read model depends on it — fix the range-read path rather than replacing it."
+  - "DO NOT monkey-patch `BROWSER_RUNTIME._globalFileInfo` from the page - because it lives inside the DuckDB-WASM worker and crosses a private API boundary - solve the problem via a supported configuration surface instead."
+  - "DO NOT move the explorer off DuckDB-WASM's HTTP attach to regain range reads - because the canonical browser read model depends on it - fix the range-read path rather than replacing it."
 
 verification:
   - description: "The TODO item itself validates cleanly"
@@ -144,7 +144,7 @@ metadata:
 impact:
   business_value: |
     Closes the RG-2 range-read gate so the explorer's cold-load
-    bandwidth scales with query size, not database size — a prerequisite
+    bandwidth scales with query size, not database size - a prerequisite
     for the hosted results platform's public rollout at larger corpora.
   user_impact: |
     Faster first-meaningful-paint on cold loads once the corpus grows

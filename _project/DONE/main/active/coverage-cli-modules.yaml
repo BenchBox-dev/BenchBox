@@ -11,14 +11,14 @@ description: |
 
   Current coverage breakdown:
     - cli/commands/compare.py: 30.2% (623 missing)
-    - cli/commands/run.py: 49.8% (516 missing) — nearly there
+    - cli/commands/run.py: 49.8% (516 missing) - nearly there
     - cli/commands/shell.py: 30.0% (301 missing)
     - cli/commands/compare_plans.py: 11.6% (229 missing)
     - cli/commands/compare_dataframes.py: 12.7% (200 missing)
     - cli/tuning.py: 0.0% (397 missing)
-    - cli/config.py: 47.6% (267 missing) — nearly there
+    - cli/config.py: 47.6% (267 missing) - nearly there
     - cli/onboarding.py: 0.0% (192 missing)
-    - cli/output.py: 49.0% (177 missing) — nearly there
+    - cli/output.py: 49.0% (177 missing) - nearly there
     - cli/exceptions.py: 36.9% (178 missing)
     - cli/preferences.py: 19.2% (126 missing)
     - cli/composite_params.py: 46.4% (120 missing)
@@ -59,9 +59,9 @@ approach: |
   user input and filesystem operations.
 
 anti_patterns:
-- "DO NOT launch actual benchmark runs in CLI tests — because benchmark runs take 30+ seconds and require platform credentials
-  — mock the runner with unittest.mock.patch"
-- "DO NOT test by parsing CLI stdout strings — because stdout format changes would cause false failures — test return values,
+- "DO NOT launch actual benchmark runs in CLI tests - because benchmark runs take 30+ seconds and require platform credentials
+  - mock the runner with unittest.mock.patch"
+- "DO NOT test by parsing CLI stdout strings - because stdout format changes would cause false failures - test return values,
   exit codes, and side effects instead"
 
 verification:

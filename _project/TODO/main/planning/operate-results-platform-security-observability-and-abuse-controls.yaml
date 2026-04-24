@@ -131,7 +131,7 @@ anti_patterns:
 - "DO NOT rely on UI badges alone for trust and visibility enforcement -- because storage and API mistakes can leak data -- enforce policy at the service boundary"
 
 verification:
-  # These are done-state checks — run them after work completes, not before.
+  # These are done-state checks - run them after work completes, not before.
   # The output files are created by this TODO's work units.
 - description: "Threat model document committed with STRIDE coverage (run after w2)"
   command: "grep -c 'Spoofing\\|Tampering\\|Repudiation\\|Information\\|Denial\\|Elevation' _project/analysis/threat-model.md"

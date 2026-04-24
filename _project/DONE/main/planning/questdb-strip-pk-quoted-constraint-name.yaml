@@ -55,7 +55,7 @@ work:
 
 must_preserve:
 - "All five existing TestCreateSchemaBranches PK stripping tests continue to pass"
-- "_strip_fk_constraints is unchanged — only _strip_pk_constraints regex is modified"
+- "_strip_fk_constraints is unchanged - only _strip_pk_constraints regex is modified"
 
 verification:
 - description: "All PK stripping tests pass including new quoted-name test"

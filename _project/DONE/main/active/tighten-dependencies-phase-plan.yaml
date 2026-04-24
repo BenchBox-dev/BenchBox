@@ -32,7 +32,7 @@ description: |
 
 work:
   - id: w1
-    summary: "Phase 0 — execute the 5 ready follow-ups in order: sphinx-dev-deps → lxml → jsonschema → chdb-core → declare-undeclared. One PR each."
+    summary: "Phase 0 - execute the 5 ready follow-ups in order: sphinx-dev-deps → lxml → jsonschema → chdb-core → declare-undeclared. One PR each."
     status: done
     notes: |
       Order: clean-up-unused-sphinx-dev-deps → drop-lxml-dev-dep-or-port-test-to-stdlib →
@@ -40,22 +40,22 @@ work:
       declare-undeclared-runtime-imports.
 
   - id: w2
-    summary: "Phase 1 — fold into Phase 0's `declare-undeclared-runtime-imports` TODO (covers `pillow`, `ansi2html`, AI-primitives extras). No separate child TODO needed."
+    summary: "Phase 1 - fold into Phase 0's `declare-undeclared-runtime-imports` TODO (covers `pillow`, `ansi2html`, AI-primitives extras). No separate child TODO needed."
     status: done
     needs: [w1]
 
   - id: w3
-    summary: "Phase 2 — execute child TODO `extract-project-scripts-to-isolated-env` to give internal TODO/release tooling its own pyproject.toml so jsonschema/ruamel-yaml leave the main manifest entirely."
+    summary: "Phase 2 - execute child TODO `extract-project-scripts-to-isolated-env` to give internal TODO/release tooling its own pyproject.toml so jsonschema/ruamel-yaml leave the main manifest entirely."
     status: done
     needs: [w1]
 
   - id: w4
-    summary: "Phase 4 — execute child TODO `add-dependency-audit-ci-guard` to promote the audit's AST scripts into a `make audit-deps` check wired into CI."
+    summary: "Phase 4 - execute child TODO `add-dependency-audit-ci-guard` to promote the audit's AST scripts into a `make audit-deps` check wired into CI."
     status: done
     needs: [w1, w3]
 
   - id: w5
-    summary: "Phase 3 (deferred to v0.3.0) — deprecate plain-name extras (pandas/polars/modin/dask/pyspark/cudf) and the `databricks-connect` alias. Tracked in release plan, not as a near-term TODO."
+    summary: "Phase 3 (deferred to v0.3.0) - deprecate plain-name extras (pandas/polars/modin/dask/pyspark/cudf) and the `databricks-connect` alias. Tracked in release plan, not as a near-term TODO."
     status: pending
     notes: |
       Cut order:
@@ -65,7 +65,7 @@ work:
 
 deferred:
   - summary: "Migration off psycopg2-binary to psycopg3"
-    reason: "Driver modernization — out of scope for an *elimination* audit. File separately when product is ready."
+    reason: "Driver modernization - out of scope for an *elimination* audit. File separately when product is ready."
   - summary: "Removing `requests` declarations from extras:cloud-spark* / extras:questdb"
     reason: "Audit finding F4 documented these as intentional belt-and-suspenders; removal would silently break minimal Azure/QuestDB installs."
   - summary: "Splitting pyarrow between core and dataframe extras"
@@ -88,9 +88,9 @@ approach: |
   boundary.
 
 anti_patterns:
-  - "DO NOT bundle multiple phases into one PR — because reviewer surface and rollback granularity both suffer — keep one TODO per PR"
-  - "DO NOT execute Phase 3 outside a v0.3.0 milestone — because plain-name extras may be pinned in user installs in the wild — needs deprecation window"
-  - "DO NOT chase the remaining 70 KEEP entries looking for hidden fat — because the audit already verified each has a real owner — focus structural effort on Phase 2 and Phase 4"
+  - "DO NOT bundle multiple phases into one PR - because reviewer surface and rollback granularity both suffer - keep one TODO per PR"
+  - "DO NOT execute Phase 3 outside a v0.3.0 milestone - because plain-name extras may be pinned in user installs in the wild - needs deprecation window"
+  - "DO NOT chase the remaining 70 KEEP entries looking for hidden fat - because the audit already verified each has a real owner - focus structural effort on Phase 2 and Phase 4"
 
 verification:
   - description: "All Phase 0 child TODOs exist in planning/ or completed in DONE/"

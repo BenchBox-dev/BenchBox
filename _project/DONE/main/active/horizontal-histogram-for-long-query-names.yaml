@@ -26,17 +26,17 @@ description: |
     - read_primitives (124 queries, names like "aggregation_groupby_large")
     - transaction_primitives
     - metadata_primitives
-    - joinorder (names like "1a", "2b" — short, so vertical is fine)
-    - h2odb (names like "groupby_q1" — borderline)
+    - joinorder (names like "1a", "2b" - short, so vertical is fine)
+    - h2odb (names like "groupby_q1" - borderline)
 
   Unaffected benchmarks (short numeric IDs):
     - tpch (Q1-Q22), tpcds (Q1-Q99), ssb (Q1-Q13), clickbench (Q1-Q43)
 
 metadata:
   tags:
-  - visualization
-  - ascii-charts
-  - ux
+    - visualization
+    - ascii-charts
+    - ux
   estimated_effort: Small
   created_date: "2026-02-10"
   last_updated: "2026-02-10"
@@ -46,13 +46,13 @@ impact:
     Primitives benchmarks are a key differentiator for BenchBox. Unreadable
     post-run output undermines usability and makes results hard to share.
   technical_debt: |
-    None — ASCIIBarChart already exists; this wires it into the post-run path.
+    None - ASCIIBarChart already exists; this wires it into the post-run path.
 
 must_preserve:
-- "Existing vertical histogram rendering for TPC-H/TPC-DS/SSB/ClickBench is unchanged"
-- "generate_post_run_summary() return type (PostRunSummary) is unchanged"
-- "ASCIIBarChart and ASCIIQueryHistogram classes are not modified"
-- "All existing post-run summary tests continue to pass"
+  - "Existing vertical histogram rendering for TPC-H/TPC-DS/SSB/ClickBench is unchanged"
+  - "generate_post_run_summary() return type (PostRunSummary) is unchanged"
+  - "ASCIIBarChart and ASCIIQueryHistogram classes are not modified"
+  - "All existing post-run summary tests continue to pass"
 
 approach: |
   1. In generate_post_run_summary(), after building the query_display_ids,
@@ -68,46 +68,46 @@ approach: |
   Key files:
     - benchbox/core/visualization/post_run_summary.py (chart selection logic)
     - benchbox/core/visualization/ascii/bar_chart.py (ASCIIBarChart, BarData)
-    - benchbox/core/visualization/ascii/histogram.py (ASCIIQueryHistogram — read only)
+    - benchbox/core/visualization/ascii/histogram.py (ASCIIQueryHistogram - read only)
 
 anti_patterns:
-- "DO NOT modify ASCIIQueryHistogram or ASCIIBarChart internals — because these are shared rendering components used elsewhere
-  — add the selection logic in generate_post_run_summary() only"
-- "DO NOT use query count as the sole heuristic — because TPC-DS has 99 queries with short names — use query name length as
-  the primary signal"
+  - "DO NOT modify ASCIIQueryHistogram or ASCIIBarChart internals - because these are shared rendering components used elsewhere
+    - add the selection logic in generate_post_run_summary() only"
+  - "DO NOT use query count as the sole heuristic - because TPC-DS has 99 queries with short names - use query name length as
+    the primary signal"
 
 verification:
-- description: "Existing post-run summary tests pass"
-  command: "uv run -- python -m pytest tests/unit/core/visualization/test_post_run_summary.py -v --tb=short"
-  expected_output: "all tests pass, 0 failures"
-- description: "New tests for horizontal bar chart selection"
-  command: "uv run -- python -m pytest tests/unit/core/visualization/ -k 'horizontal or long_query' -v --tb=short"
-  expected_output: "new tests pass showing horizontal chart for long query names"
+  - description: "Existing post-run summary tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/visualization/test_post_run_summary.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "New tests for horizontal bar chart selection"
+    command: "uv run -- python -m pytest tests/unit/core/visualization/ -k 'horizontal or long_query' -v --tb=short"
+    expected_output: "new tests pass showing horizontal chart for long query names"
 
 success_metrics:
-- "Benchmarks with long query names render horizontal bar charts with readable labels"
-- "Benchmarks with short numeric IDs continue to render vertical histograms"
-- "PostRunSummary.query_histogram is always a non-empty string for successful runs"
+  - "Benchmarks with long query names render horizontal bar charts with readable labels"
+  - "Benchmarks with short numeric IDs continue to render vertical histograms"
+  - "PostRunSummary.query_histogram is always a non-empty string for successful runs"
 
 files_affected:
   modified:
-  - "benchbox/core/visualization/post_run_summary.py"
-  - "tests/unit/core/visualization/test_post_run_summary.py"
+    - "benchbox/core/visualization/post_run_summary.py"
+    - "tests/unit/core/visualization/test_post_run_summary.py"
 
 scope_limit:
   only_modify:
-  - "benchbox/core/visualization/post_run_summary.py"
-  - "tests/unit/core/visualization/"
+    - "benchbox/core/visualization/post_run_summary.py"
+    - "tests/unit/core/visualization/"
   do_not_modify:
-  - "benchbox/core/visualization/ascii/histogram.py"
-  - "benchbox/core/visualization/ascii/bar_chart.py"
-  - "benchbox/cli/"
+    - "benchbox/core/visualization/ascii/histogram.py"
+    - "benchbox/core/visualization/ascii/bar_chart.py"
+    - "benchbox/cli/"
 
 work:
-- id: w1
-  summary: "Add chart type selection logic in generate_post_run_summary() based on median query name length"
-  status: done
-- id: w2
-  summary: "Add tests for horizontal bar chart selection with long and short query names"
-  status: done
-  needs: [w1]
+  - id: w1
+    summary: "Add chart type selection logic in generate_post_run_summary() based on median query name length"
+    status: done
+  - id: w2
+    summary: "Add tests for horizontal bar chart selection with long and short query names"
+    status: done
+    needs: [w1]

@@ -7,10 +7,10 @@ completed_date: "2026-04-03"
 category: Core Functionality
 deps:
   needs:
-  - scaffold-results-explorer-frontend
+    - scaffold-results-explorer-frontend
 description: |
   Build the result detail page at `/results/r/{result_id}`. This is the
-  canonical public page for a single benchmark result — the page users share,
+  canonical public page for a single benchmark result - the page users share,
   link to, and bookmark. It shows full metadata, per-query timing breakdown,
   validation status, environment info, and a download link to the raw bundle.
 
@@ -18,84 +18,84 @@ description: |
   the corpus gets a stable, pre-rendered detail page.
 
 work:
-- id: w1
-  summary: "Implement the result detail page layout and metadata display"
-  status: done
-  notes: |
-    The detail page for `/results/r/{result_id}` shows:
+  - id: w1
+    summary: "Implement the result detail page layout and metadata display"
+    status: done
+    notes: |
+      The detail page for `/results/r/{result_id}` shows:
 
-    Header section:
-    - Benchmark name + platform name (large, prominent)
-    - Scale factor, date, total duration
-    - Trust badge: "Maintainer Run" (Phase 1 only has this label)
-    - "Download Raw Bundle" button linking to the canonical schema-v2 JSON
+      Header section:
+      - Benchmark name + platform name (large, prominent)
+      - Scale factor, date, total duration
+      - Trust badge: "Maintainer Run" (Phase 1 only has this label)
+      - "Download Raw Bundle" button linking to the canonical schema-v2 JSON
 
-    Metadata panel:
-    - Environment: OS, arch, CPU count, memory
-    - Configuration: compression, tuning mode, validation mode, phases run
-    - Query summary: N passed, N failed, total queries
+      Metadata panel:
+      - Environment: OS, arch, CPU count, memory
+      - Configuration: compression, tuning mode, validation mode, phases run
+      - Query summary: N passed, N failed, total queries
 
-    Data source: per-result detail JSON from `details/{result_id}.json`
+      Data source: per-result detail JSON from `details/{result_id}.json`
 
-- id: w2
-  summary: "Implement the query timing table and visualization"
-  needs: [w1]
-  status: done
-  notes: |
-    Show per-query results in a sortable table:
-    | Query | Time (ms) | Rows | Status |
-    |-------|-----------|------|--------|
-    | Q1    | 45.2      | 4    | passed |
-    | Q2    | 12.1      | 460  | passed |
-    ...
+  - id: w2
+    summary: "Implement the query timing table and visualization"
+    needs: [w1]
+    status: done
+    notes: |
+      Show per-query results in a sortable table:
+      | Query | Time (ms) | Rows | Status |
+      |-------|-----------|------|--------|
+      | Q1    | 45.2      | 4    | passed |
+      | Q2    | 12.1      | 460  | passed |
+      ...
 
-    Add a simple bar chart showing query times (horizontal bars, sorted by
-    query ID or by duration). This can be a lightweight SVG/Canvas chart —
-    no need for a charting library. The chart gives visual context that the
-    table alone doesn't provide.
+      Add a simple bar chart showing query times (horizontal bars, sorted by
+      query ID or by duration). This can be a lightweight SVG/Canvas chart -
+      no need for a charting library. The chart gives visual context that the
+      table alone doesn't provide.
 
-    Highlight failed queries in red. Show validation details if available.
+      Highlight failed queries in red. Show validation details if available.
 
-- id: w3
-  summary: "Add companion file display (query plans, tuning config)"
-  needs: [w1]
-  status: done
-  notes: |
-    If the result has companion files (.plans.json, .tuning.json):
-    - Show a "Query Plans" expandable section with plan text per query
-    - Show a "Tuning Configuration" section with applied tuning clauses
-    - Link to companion file downloads
+  - id: w3
+    summary: "Add companion file display (query plans, tuning config)"
+    needs: [w1]
+    status: done
+    notes: |
+      If the result has companion files (.plans.json, .tuning.json):
+      - Show a "Query Plans" expandable section with plan text per query
+      - Show a "Tuning Configuration" section with applied tuning clauses
+      - Link to companion file downloads
 
-    If companions are not available, hide the sections cleanly.
+      If companions are not available, hide the sections cleanly.
 
-- id: w4
-  summary: "Add compare action and navigation context"
-  needs: [w1]
-  status: done
-  notes: |
-    - "Compare with another result" button that navigates to compare view
-      with this result pre-selected
-    - Breadcrumb: Results > TPC-H > DuckDB > This Result
-    - "Other results for this benchmark" and "Other results on this platform"
-      quick links (from manifest data)
+  - id: w4
+    summary: "Add compare action and navigation context"
+    needs: [w1]
+    status: done
+    notes: |
+      - "Compare with another result" button that navigates to compare view
+        with this result pre-selected
+      - Breadcrumb: Results > TPC-H > DuckDB > This Result
+      - "Other results for this benchmark" and "Other results on this platform"
+        quick links (from manifest data)
 
-- id: w5
-  summary: "Pre-render detail pages at build time"
-  needs: [w1, w2]
-  status: done
-  notes: |
-    During Vite build, read manifest.json and generate static HTML for every
-    result: `/results/r/{result_id}/index.html`. Each page includes the full
-    metadata and query table in the HTML (no JS required for basic content).
-    JavaScript enhances with sorting, charts, and companion file display.
+  - id: w5
+    summary: "Pre-render detail pages at build time"
+    needs: [w1, w2]
+    status: done
+    notes: |
+      During Vite build, read manifest.json and generate static HTML for every
+      result: `/results/r/{result_id}/index.html`. Each page includes the full
+      metadata and query table in the HTML (no JS required for basic content).
+      JavaScript enhances with sorting, charts, and companion file display.
 
 metadata:
   tags:
-  - results
-  - explorer
-  - phase-1
-  - frontend
-  - detail-page
+    - results
+    - explorer
+    - phase-1
+    - frontend
+    - detail-page
   estimated_effort: "Medium"
   created_date: "2026-03-29"
   completed_date: "2026-04-03"
@@ -110,32 +110,32 @@ impact:
     actionable data (query timings, environment, download link).
 
 must_preserve:
-- "Every detail page must link to the raw canonical schema-v2 bundle for download"
-- "Pre-rendered HTML must show full metadata and query table without JavaScript"
+  - "Every detail page must link to the raw canonical schema-v2 bundle for download"
+  - "Pre-rendered HTML must show full metadata and query table without JavaScript"
 
 approach: |
   Render from per-result detail JSON files. Pre-render at build time for SEO
   and fast loading. Enhance with JS for sorting, charts, and companion files.
-  Keep the page layout clean and scannable — metadata at top, query table
+  Keep the page layout clean and scannable - metadata at top, query table
   prominent, companion data expandable.
 
 anti_patterns:
-- "DO NOT compute aggregate statistics on the detail page that aren't in the source data — because the detail page shows one result truthfully — aggregation belongs in compare/browse views"
-- "DO NOT require JavaScript to see basic result data — because pre-rendered HTML is better for SEO and sharing — JS enhances, it doesn't gate"
+  - "DO NOT compute aggregate statistics on the detail page that aren't in the source data - because the detail page shows one result truthfully - aggregation belongs in compare/browse views"
+  - "DO NOT require JavaScript to see basic result data - because pre-rendered HTML is better for SEO and sharing - JS enhances, it doesn't gate"
 
 verification:
-- description: "Vite build succeeds and detail pages are pre-rendered"
-  command: "cd results-explorer && npm run build && ls dist/r/*/index.html | wc -l"
-  expected_output: "≥30 (matching seed corpus size)"
-- description: "Pre-rendered detail pages contain query table without JavaScript"
-  command: "cd results-explorer && grep -c '<td>' dist/r/$(ls dist/r/ | head -1)/index.html"
-  expected_output: "≥22 (one row per query minimum)"
-- description: "Detail page component tests pass"
-  command: "cd results-explorer && npm run typecheck && npm run build"
-  expected_output: "Typecheck and build both pass"
+  - description: "Vite build succeeds and detail pages are pre-rendered"
+    command: "cd results-explorer && npm run build && ls dist/r/*/index.html | wc -l"
+    expected_output: "≥30 (matching seed corpus size)"
+  - description: "Pre-rendered detail pages contain query table without JavaScript"
+    command: "cd results-explorer && grep -c '<td>' dist/r/$(ls dist/r/ | head -1)/index.html"
+    expected_output: "≥22 (one row per query minimum)"
+  - description: "Detail page component tests pass"
+    command: "cd results-explorer && npm run typecheck && npm run build"
+    expected_output: "Typecheck and build both pass"
 
 scope_limit:
   only_modify:
-  - "results-explorer/src/"
+    - "results-explorer/src/"
   do_not_modify:
-  - "benchbox/"
+    - "benchbox/"

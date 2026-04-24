@@ -21,52 +21,53 @@ description: |
 
 deps:
   needs:
-  - clickhouse-error-message-capture
+    - clickhouse-error-message-capture
 
 work:
-- id: w1
-  summary: "Audit redshift.py three bare-except sites; convert to typed exceptions + str(exception) in result.error_message"
-  status: done
+  - id: w1
+    summary: "Audit redshift.py three bare-except sites; convert to typed exceptions + str(exception) in result.error_message"
+    status: done
 
-- id: w2
-  summary: "Apply same pattern to firebolt.py"
-  needs: [w1]
-  status: done
+  - id: w2
+    summary: "Apply same pattern to firebolt.py"
+    needs: [w1]
+    status: done
 
-- id: w3
-  summary: "Apply same pattern to experimental/gpu/metrics.py and capabilities.py"
-  needs: [w1]
-  status: done
+  - id: w3
+    summary: "Apply same pattern to experimental/gpu/metrics.py and capabilities.py"
+    needs: [w1]
+    status: done
 
-- id: w4
-  summary: "Apply same pattern to experimental/concurrency/pool_tester.py"
-  needs: [w1]
-  status: done
+  - id: w4
+    summary: "Apply same pattern to experimental/concurrency/pool_tester.py"
+    needs: [w1]
+    status: done
 
-- id: w5
-  summary: "Add unit tests per adapter asserting error messages reach result objects (mirror the ClickHouse test added in
-    clickhouse-error-message-capture)"
-  needs: [w2, w3, w4]
-  status: done
+  - id: w5
+    summary:
+      "Add unit tests per adapter asserting error messages reach result objects (mirror the ClickHouse test added in
+      clickhouse-error-message-capture)"
+    needs: [w2, w3, w4]
+    status: done
 
 files_affected:
   modified:
-  - "benchbox/platforms/redshift.py"
-  - "benchbox/platforms/firebolt.py"
-  - "benchbox/experimental/gpu/metrics.py"
-  - "benchbox/experimental/gpu/capabilities.py"
-  - "benchbox/experimental/concurrency/pool_tester.py"
-  - "tests/unit/core/concurrency/test_pool_tester.py"
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/firebolt.py"
+    - "benchbox/experimental/gpu/metrics.py"
+    - "benchbox/experimental/gpu/capabilities.py"
+    - "benchbox/experimental/concurrency/pool_tester.py"
+    - "tests/unit/core/concurrency/test_pool_tester.py"
   added:
-  - "tests/unit/platforms/test_redshift_error_capture.py"
-  - "tests/unit/platforms/test_firebolt_error_capture.py"
-  - "tests/unit/experimental/gpu/test_metrics_error_capture.py"
-  - "tests/unit/experimental/gpu/test_capabilities_error_capture.py"
+    - "tests/unit/platforms/test_redshift_error_capture.py"
+    - "tests/unit/platforms/test_firebolt_error_capture.py"
+    - "tests/unit/experimental/gpu/test_metrics_error_capture.py"
+    - "tests/unit/experimental/gpu/test_capabilities_error_capture.py"
 
 must_preserve:
-- "Successful query path unchanged on each adapter"
-- "Existing retry/backoff logic in redshift.py untouched"
-- "Experimental adapters' opt-in behavior (off by default) unchanged"
+  - "Successful query path unchanged on each adapter"
+  - "Existing retry/backoff logic in redshift.py untouched"
+  - "Experimental adapters' opt-in behavior (off by default) unchanged"
 
 approach: |
   Mirror the ClickHouse pattern from the just-completed
@@ -84,18 +85,19 @@ approach: |
   so CI does not require CUDA, NVML, or a real GPU.
 
 anti_patterns:
-- "DO NOT change retry semantics — because that's a separate concern with its own risks — only touch error capture"
-- "DO NOT add new exception classes — because the existing core/errors hierarchy is sufficient — reuse what's there"
-- "DO NOT require a real GPU in unit tests — because CI won't provide one — mock the failure paths instead"
+  - "DO NOT change retry semantics - because that's a separate concern with its own risks - only touch error capture"
+  - "DO NOT add new exception classes - because the existing core/errors hierarchy is sufficient - reuse what's there"
+  - "DO NOT require a real GPU in unit tests - because CI won't provide one - mock the failure paths instead"
 
 verification:
-- description: "All platform tests pass"
-  command: "uv run -- python -m pytest tests/unit/platforms/ -q"
-  expected_output: "all tests pass"
-- description: "New platform, concurrency, and GPU error-capture tests pass"
-  command: "uv run -- python -m pytest tests/unit/platforms/test_redshift_error_capture.py tests/unit/platforms/test_firebolt_error_capture.py
-    tests/unit/core/concurrency/test_pool_tester.py tests/unit/experimental/gpu/ -v"
-  expected_output: "all tests pass"
+  - description: "All platform tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -q"
+    expected_output: "all tests pass"
+  - description: "New platform, concurrency, and GPU error-capture tests pass"
+    command:
+      "uv run -- python -m pytest tests/unit/platforms/test_redshift_error_capture.py tests/unit/platforms/test_firebolt_error_capture.py
+      tests/unit/core/concurrency/test_pool_tester.py tests/unit/experimental/gpu/ -v"
+    expected_output: "all tests pass"
 
 metadata:
   tags: ["quality-plan", "phase-1", "error-handling", "cloud-adapters"]

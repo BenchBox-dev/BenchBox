@@ -71,7 +71,7 @@ scope_limit:
 
 must_preserve:
   - "Table name list includes all 24 TPC-DS tables"
-  - "generator/manager.py copy includes 'dbgen_version' (25th entry) — handle separately"
+  - "generator/manager.py copy includes 'dbgen_version' (25th entry) - handle separately"
 
 metadata:
   tags:

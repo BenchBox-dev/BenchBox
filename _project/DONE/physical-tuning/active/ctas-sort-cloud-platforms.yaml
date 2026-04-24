@@ -1,4 +1,4 @@
-# CTAS Sort — Cloud Data Warehouse Platform Implementations
+# CTAS Sort - Cloud Data Warehouse Platform Implementations
 #
 # Location: _project/TODO/physical-tuning/planning/ctas-sort-cloud-platforms.yaml
 
@@ -19,7 +19,7 @@ description: |
   Snowflake
     Snowflake already applies SORT configuration via clustering keys in apply_unified_tuning().
     A post-load CTAS (CREATE OR REPLACE TABLE t AS SELECT * FROM t ORDER BY col) will
-    re-materialize data sorted but without Automatic Clustering — this may be counterproductive.
+    re-materialize data sorted but without Automatic Clustering - this may be counterproductive.
     Research whether post-load CTAS sort is beneficial in addition to or instead of clustering.
     If clustering already covers the use case, _build_ctas_sort_sql should return None and the
     sort should remain in apply_unified_tuning() / apply_table_tunings().
@@ -49,12 +49,12 @@ description: |
     ClickHouse table ORDER BY is defined immutably at CREATE TABLE time (ENGINE = MergeTree
     ORDER BY col). Post-load CTAS sort is not applicable. Return None from
     _build_ctas_sort_sql and document. The correct path is to include ORDER BY in CREATE
-    TABLE DDL generation — this may require a separate tuning TODO for ClickHouse DDL.
+    TABLE DDL generation - this may require a separate tuning TODO for ClickHouse DDL.
 
   Athena
     Athena (Presto/Trino-based) queries S3 directly. CTAS (CREATE TABLE ... AS SELECT ...
     ORDER BY) writes new Parquet files to S3. This IS meaningful for query performance if
-    the output is partitioned or sorted — but Athena's distributed nature means ORDER BY in
+    the output is partitioned or sorted - but Athena's distributed nature means ORDER BY in
     CTAS only produces local file ordering, not global ordering across the dataset. Research
     whether this provides zone-map-equivalent benefits for Athena queries.
 
@@ -117,9 +117,9 @@ work:
   status: done
   notes: |
     Redshift options:
-    - VACUUM SORT ONLY table_name — re-sorts in-place using the table's defined SORT KEY.
+    - VACUUM SORT ONLY table_name - re-sorts in-place using the table's defined SORT KEY.
       Requires SORT KEY to be defined in CREATE TABLE. No DROP/RENAME needed.
-    - CTAS+DROP+RENAME — loses SORT KEY definition and distribution style.
+    - CTAS+DROP+RENAME - loses SORT KEY definition and distribution style.
     If VACUUM SORT ONLY is viable: implement _build_ctas_sort_sql to return
       "VACUUM SORT ONLY {table_name};" (unconventional use of the hook, but works).
     If not viable: return None and document.
@@ -148,7 +148,7 @@ work:
   summary: "Research Azure Synapse CTAS ORDER BY effectiveness with hash/round-robin distribution"
   status: done
   notes: |
-    Synapse columnar store uses columnstore indexes for compression and pushdown — physical
+    Synapse columnar store uses columnstore indexes for compression and pushdown - physical
     row order within a distribution affects rowgroup quality. CTAS ORDER BY may improve
     rowgroup delta store promotion. Verify against Synapse docs.
 
@@ -234,7 +234,7 @@ must_preserve:
 - "Platforms returning None from _build_ctas_sort_sql produce no SQL execution side effects"
 
 approach: |
-  Research units (w1, w3, w5, w7, w9) can all run in parallel — they are read-only.
+  Research units (w1, w3, w5, w7, w9) can all run in parallel - they are read-only.
   Implementation follows research findings. Where the answer is "unsupported / return None",
   the implementation is 5-10 lines (override + docstring); prioritize getting the documentation
   right over speed.
@@ -243,19 +243,19 @@ approach: |
   ctas-sort-dataloader-connectivity. If gaps are discovered, capture them as a follow-up TODO
   instead of modifying base adapter code in this item.
 
-  Do not attempt live platform tests — unit tests with mocked connections are sufficient
+  Do not attempt live platform tests - unit tests with mocked connections are sufficient
   for verifying SQL generation. The verification commands use only unit tests.
 
 anti_patterns:
-- "DO NOT implement CTAS sort for Snowflake on top of existing clustering — because Snowflake's Automatic Clustering already
-  handles physical data ordering and a CTAS would recreate the table without the clustering metadata — if research confirms
+- "DO NOT implement CTAS sort for Snowflake on top of existing clustering - because Snowflake's Automatic Clustering already
+  handles physical data ordering and a CTAS would recreate the table without the clustering metadata - if research confirms
   CTAS adds no value, return None"
-- "DO NOT use CTAS for Databricks/Delta Lake — because CTAS creates an unmanaged table losing Delta transactional metadata
-  — the correct mechanism is OPTIMIZE ZORDER BY"
-- "DO NOT implement BigQuery CTAS sort — because BigQuery does not preserve row order and the sorted output would revert to
-  arbitrary order on subsequent DML — use CLUSTER BY"
-- "DO NOT skip research units to save time — because incorrect assumptions for cloud warehouses could produce silently incorrect
-  benchmark data — validate physical sort behavior before coding any SQL"
+- "DO NOT use CTAS for Databricks/Delta Lake - because CTAS creates an unmanaged table losing Delta transactional metadata
+  - the correct mechanism is OPTIMIZE ZORDER BY"
+- "DO NOT implement BigQuery CTAS sort - because BigQuery does not preserve row order and the sorted output would revert to
+  arbitrary order on subsequent DML - use CLUSTER BY"
+- "DO NOT skip research units to save time - because incorrect assumptions for cloud warehouses could produce silently incorrect
+  benchmark data - validate physical sort behavior before coding any SQL"
 
 verification:
 - description: "Cloud platform CTAS sort unit tests pass (no live credentials needed)"

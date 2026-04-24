@@ -10,7 +10,7 @@ description: |
   The strategy doc (§ Trust, Visibility, and Ranking) lists the dimensions
   on which two results are comparability-breaking. Phase 1 enforces
   hard-blocks on benchmark and scale factor mismatch. Execution mode and
-  tuning mode are also comparability-breaking — a SQL vs DataFrame
+  tuning mode are also comparability-breaking - a SQL vs DataFrame
   comparison or a tuned vs notuning comparison can look like a platform
   performance difference when it is actually a configuration difference.
 
@@ -23,7 +23,7 @@ description: |
     - The two results differ on tuning_mode (tuned vs notuning)
     - The two results use different query subsets (full vs partial)
 
-  Warnings are prominent (banner at top of compare view) but not blocking —
+  Warnings are prominent (banner at top of compare view) but not blocking -
   intentional cross-tuning comparisons are valuable.
 
 deps:
@@ -61,8 +61,8 @@ files_affected:
     - "results-explorer/src/components/ComparabilityBanner.tsx"
 
 must_preserve:
-  - "Existing hard-block on benchmark mismatch and scale-factor mismatch — these remain blocking"
-  - "Cross-tuning and cross-mode comparisons are allowed (not blocked) — warning is advisory, not preventive"
+  - "Existing hard-block on benchmark mismatch and scale-factor mismatch - these remain blocking"
+  - "Cross-tuning and cross-mode comparisons are allowed (not blocked) - warning is advisory, not preventive"
   - "Compare view still renders when warnings are present"
 
 approach: |
@@ -71,13 +71,13 @@ approach: |
   banner above the chart area.
 
   Warning text should explain the implication, not just state the fact.
-  "Execution mode differs: sql vs dataframe" is insufficient — add
+  "Execution mode differs: sql vs dataframe" is insufficient - add
   "results may not reflect platform SQL performance differences".
 
 anti_patterns:
-  - "DO NOT hard-block on execution_mode or tuning_mode mismatch — because intentional cross-mode comparisons are valid analytical use cases — warn and allow"
-  - "DO NOT show warnings for equal values — because that would be noise — only warn when the dimension actually differs"
-  - "DO NOT conflate warnings with trust labels — because comparability is about methodology, trust is about provenance — separate concerns, separate UI elements"
+  - "DO NOT hard-block on execution_mode or tuning_mode mismatch - because intentional cross-mode comparisons are valid analytical use cases - warn and allow"
+  - "DO NOT show warnings for equal values - because that would be noise - only warn when the dimension actually differs"
+  - "DO NOT conflate warnings with trust labels - because comparability is about methodology, trust is about provenance - separate concerns, separate UI elements"
 
 scope_limit:
   only_modify:

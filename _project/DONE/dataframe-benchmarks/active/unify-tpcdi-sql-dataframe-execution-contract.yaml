@@ -3,8 +3,8 @@ title: Unify TPC-DI SQL/DataFrame Execution Contract and ETL Path
 worktree: dataframe-benchmarks
 priority: Critical
 status: Completed
-completed_date: '2026-02-07'
-description: 'TPC-DI currently exposes separate execution paths for SQL and DataFrame modes,
+completed_date: "2026-02-07"
+description: "TPC-DI currently exposes separate execution paths for SQL and DataFrame modes,
 
   and DataFrame mode discovers platform SQL connections via attribute sniffing.
 
@@ -22,121 +22,121 @@ description: 'TPC-DI currently exposes separate execution paths for SQL and Data
 
   Scope focuses on runtime correctness and contract clarity for TPC-DI.
 
-  '
+  "
 category: Core Functionality
 tasks:
   phases:
-  - phase: 'Phase 1: Contract Design and Baseline'
-    done: true
-    items:
-    - summary: Define explicit SQL connection-provider contract for DataFrame execution
+    - phase: "Phase 1: Contract Design and Baseline"
       done: true
-      subtasks:
-      - summary: Add protocol/interface in core dataframe abstractions for SQL-capable connection access
-        done: true
-      - summary: Document required adapter behavior and failure semantics when connection is unavailable
-        done: true
-    - summary: Map current TPC-DI SQL and DataFrame execution flow divergence
+      items:
+        - summary: Define explicit SQL connection-provider contract for DataFrame execution
+          done: true
+          subtasks:
+            - summary: Add protocol/interface in core dataframe abstractions for SQL-capable connection access
+              done: true
+            - summary: Document required adapter behavior and failure semantics when connection is unavailable
+              done: true
+        - summary: Map current TPC-DI SQL and DataFrame execution flow divergence
+          done: true
+          subtasks:
+            - summary: Trace call graph for run_full_benchmark/run_etl_benchmark vs execute_dataframe_workload
+              done: true
+            - summary: Identify reusable ETL orchestration boundary and canonical result mapping layer
+              done: true
+    - phase: "Phase 2: Shared ETL Orchestration Implementation"
       done: true
-      subtasks:
-      - summary: Trace call graph for run_full_benchmark/run_etl_benchmark vs execute_dataframe_workload
-        done: true
-      - summary: Identify reusable ETL orchestration boundary and canonical result mapping layer
-        done: true
-  - phase: 'Phase 2: Shared ETL Orchestration Implementation'
-    done: true
-    items:
-    - summary: Refactor TPC-DI execution to a single shared ETL orchestration path
+      items:
+        - summary: Refactor TPC-DI execution to a single shared ETL orchestration path
+          done: true
+          subtasks:
+            - summary: Implement one canonical ETL executor used by both SQL and DataFrame entry points
+              done: true
+            - summary: Ensure stage ordering, batch processing, validation hooks, and failure handling are identical across modes
+              done: true
+            - summary: Keep mode-specific output shaping as thin adapters around shared execution results
+              done: true
+        - summary: Replace attribute sniffing with explicit contract usage in DataFrame path
+          done: true
+          subtasks:
+            - summary: Use connection-provider protocol instead of hasattr(adapter, 'connection') / ctx.sql_connection checks
+              done: true
+            - summary: Emit deterministic, user-actionable errors for missing/invalid connection providers
+              done: true
+        - summary: Remove misleading parameter discard in execute_dataframe_workload
+          done: true
+          subtasks:
+            - summary: Delete `_ = (ctx, monitor, run_options)` and align usage/docs with actual behavior
+              done: true
+            - summary: Either wire monitor/run_options into execution hooks or explicitly mark reserved parameters in docstring
+              done: true
+    - phase: "Phase 3: Verification and Regression Defense"
       done: true
-      subtasks:
-      - summary: Implement one canonical ETL executor used by both SQL and DataFrame entry points
-        done: true
-      - summary: Ensure stage ordering, batch processing, validation hooks, and failure handling are identical across modes
-        done: true
-      - summary: Keep mode-specific output shaping as thin adapters around shared execution results
-        done: true
-    - summary: Replace attribute sniffing with explicit contract usage in DataFrame path
-      done: true
-      subtasks:
-      - summary: Use connection-provider protocol instead of hasattr(adapter, 'connection') / ctx.sql_connection checks
-        done: true
-      - summary: Emit deterministic, user-actionable errors for missing/invalid connection providers
-        done: true
-    - summary: Remove misleading parameter discard in execute_dataframe_workload
-      done: true
-      subtasks:
-      - summary: Delete `_ = (ctx, monitor, run_options)` and align usage/docs with actual behavior
-        done: true
-      - summary: Either wire monitor/run_options into execution hooks or explicitly mark reserved parameters in docstring
-        done: true
-  - phase: 'Phase 3: Verification and Regression Defense'
-    done: true
-    items:
-    - summary: Add parity tests proving SQL/DataFrame consistency
-      done: true
-      subtasks:
-      - summary: Add tests asserting shared stage outputs (status, ordering, metrics fields) for SQL and DataFrame entry points
-        done: true
-      - summary: Add failure-path parity tests (missing connection, stage exception, validation failure)
-        done: true
-    - summary: Add contract tests for adapter connection-provider protocol
-      done: true
-      subtasks:
-      - summary: Verify compliant adapters pass and non-compliant adapters fail with explicit errors
-        done: true
-      - summary: Cover at least one expression-family and one pandas-family adapter behavior
-        done: true
-    - summary: Run targeted and broad quality gates
-      done: true
-      subtasks:
-      - summary: Run TPC-DI unit suite and DataFrame adapter interaction tests
-        done: true
-      - summary: Run lint and typecheck to confirm contract and API consistency
-        done: true
+      items:
+        - summary: Add parity tests proving SQL/DataFrame consistency
+          done: true
+          subtasks:
+            - summary: Add tests asserting shared stage outputs (status, ordering, metrics fields) for SQL and DataFrame entry points
+              done: true
+            - summary: Add failure-path parity tests (missing connection, stage exception, validation failure)
+              done: true
+        - summary: Add contract tests for adapter connection-provider protocol
+          done: true
+          subtasks:
+            - summary: Verify compliant adapters pass and non-compliant adapters fail with explicit errors
+              done: true
+            - summary: Cover at least one expression-family and one pandas-family adapter behavior
+              done: true
+        - summary: Run targeted and broad quality gates
+          done: true
+          subtasks:
+            - summary: Run TPC-DI unit suite and DataFrame adapter interaction tests
+              done: true
+            - summary: Run lint and typecheck to confirm contract and API consistency
+              done: true
 metadata:
   owners:
-  - joe
+    - joe
   tags:
-  - tpcdi
-  - dataframe
-  - sql-parity
-  - execution-contract
+    - tpcdi
+    - dataframe
+    - sql-parity
+    - execution-contract
   estimated_effort: Large
-  created_date: '2026-02-07'
-  last_updated: '2026-02-07T00:00:00'
+  created_date: "2026-02-07"
+  last_updated: "2026-02-07T00:00:00"
 impact:
-  business_value: 'Prevents silent correctness drift between SQL and DataFrame TPC-DI results,
+  business_value: "Prevents silent correctness drift between SQL and DataFrame TPC-DI results,
 
     improving trust in benchmark outcomes and reducing regression/debug costs.
 
-    '
-  user_impact: 'Users get deterministic behavior from TPC-DI regardless of execution mode,
+    "
+  user_impact: "Users get deterministic behavior from TPC-DI regardless of execution mode,
 
     with clearer errors when a platform cannot provide required capabilities.
 
-    '
-  technical_debt: 'Consolidates duplicated orchestration logic and replaces ad-hoc connection
+    "
+  technical_debt: "Consolidates duplicated orchestration logic and replaces ad-hoc connection
 
     discovery with an explicit, testable contract.
 
-    '
+    "
 files_affected:
   modified:
-  - benchbox/core/tpcdi/benchmark.py
-  - benchbox/core/tpcdi/etl/pipeline.py
-  - benchbox/core/dataframe/context.py
-  - benchbox/platforms/dataframe/benchmark_mixin.py
-  - tests/unit/core/tpcdi/test_tpcdi_dataframe_workload.py
-  - tests/unit/core/tpcdi/test_tpcdi_pipeline.py
-  - tests/unit/core/runner/test_dataframe_runner.py
+    - benchbox/core/tpcdi/benchmark.py
+    - benchbox/core/tpcdi/etl/pipeline.py
+    - benchbox/core/dataframe/context.py
+    - benchbox/platforms/dataframe/benchmark_mixin.py
+    - tests/unit/core/tpcdi/test_tpcdi_dataframe_workload.py
+    - tests/unit/core/tpcdi/test_tpcdi_pipeline.py
+    - tests/unit/core/runner/test_dataframe_runner.py
   added:
-  - tests/unit/core/tpcdi/test_tpcdi_sql_dataframe_parity.py
-  - tests/unit/platforms/dataframe/test_connection_provider_contract.py
+    - tests/unit/core/tpcdi/test_tpcdi_sql_dataframe_parity.py
+    - tests/unit/platforms/dataframe/test_connection_provider_contract.py
 must_preserve:
-- TPC-DI transactional capability gating (transactions + incremental + SCD2) remains enforced before ETL stage execution
-- Existing TPC-DI benchmark metrics export structure remains backward-compatible for existing result consumers
-- DataFrame benchmark mixin query filtering semantics remain unchanged for non-TPC-DI benchmarks
-approach: 'Establish a canonical TPC-DI ETL executor boundary first, then route both
+  - TPC-DI transactional capability gating (transactions + incremental + SCD2) remains enforced before ETL stage execution
+  - Existing TPC-DI benchmark metrics export structure remains backward-compatible for existing result consumers
+  - DataFrame benchmark mixin query filtering semantics remain unchanged for non-TPC-DI benchmarks
+approach: "Establish a canonical TPC-DI ETL executor boundary first, then route both
 
   SQL and DataFrame entry points through it. Keep mode-specific behavior limited
 
@@ -151,49 +151,50 @@ approach: 'Establish a canonical TPC-DI ETL executor boundary first, then route 
 
   under controlled fixtures.
 
-  '
+  "
 anti_patterns:
-- DO NOT keep separate ETL orchestration logic for SQL and DataFrame paths — because drift is the root issue — route both
-  through one shared executor
-- DO NOT use hasattr/getattr sniffing for connection discovery — because adapter behavior is implicit and brittle — enforce
-  a typed provider contract
-- DO NOT encode mode-specific semantics in shared ETL internals — because this recreates divergence — isolate mode differences
-  to thin adapters
+  - DO NOT keep separate ETL orchestration logic for SQL and DataFrame paths - because drift is the root issue - route both
+    through one shared executor
+  - DO NOT use hasattr/getattr sniffing for connection discovery - because adapter behavior is implicit and brittle - enforce
+    a typed provider contract
+  - DO NOT encode mode-specific semantics in shared ETL internals - because this recreates divergence - isolate mode differences
+    to thin adapters
 verification:
-- description: TPC-DI DataFrame workload tests pass with contract-based connection resolution
-  command: uv run -- python -m pytest tests/unit/core/tpcdi/test_tpcdi_dataframe_workload.py -q
-  expected_output: all tests pass
-- description: TPC-DI SQL/DataFrame parity tests pass
-  command: uv run -- python -m pytest tests/unit/core/tpcdi/test_tpcdi_sql_dataframe_parity.py -q
-  expected_output: all tests pass
-- description: Connection-provider contract tests pass
-  command: uv run -- python -m pytest tests/unit/platforms/dataframe/test_connection_provider_contract.py -q
-  expected_output: all tests pass
-- description: Lint and typecheck are clean for touched files
-  command: make lint && make typecheck-uv
-  expected_output: lint passes; no new type diagnostics in changed files
+  - description: TPC-DI DataFrame workload tests pass with contract-based connection resolution
+    command: uv run -- python -m pytest tests/unit/core/tpcdi/test_tpcdi_dataframe_workload.py -q
+    expected_output: all tests pass
+  - description: TPC-DI SQL/DataFrame parity tests pass
+    command: uv run -- python -m pytest tests/unit/core/tpcdi/test_tpcdi_sql_dataframe_parity.py -q
+    expected_output: all tests pass
+  - description: Connection-provider contract tests pass
+    command: uv run -- python -m pytest tests/unit/platforms/dataframe/test_connection_provider_contract.py -q
+    expected_output: all tests pass
+  - description: Lint and typecheck are clean for touched files
+    command: make lint && make typecheck-uv
+    expected_output: lint passes; no new type diagnostics in changed files
 scope_limit:
   only_modify:
-  - benchbox/core/tpcdi/
-  - benchbox/core/dataframe/
-  - benchbox/platforms/dataframe/
-  - tests/unit/core/tpcdi/
-  - tests/unit/platforms/dataframe/
+    - benchbox/core/tpcdi/
+    - benchbox/core/dataframe/
+    - benchbox/platforms/dataframe/
+    - tests/unit/core/tpcdi/
+    - tests/unit/platforms/dataframe/
   do_not_modify:
-  - benchbox/core/tpch/
-  - benchbox/core/tpcds/
-  - benchbox/cli/
+    - benchbox/core/tpch/
+    - benchbox/core/tpcds/
+    - benchbox/cli/
 success_metrics:
-- SQL and DataFrame TPC-DI entry points execute through one shared ETL orchestration implementation
-- No direct adapter/context attribute sniffing remains in TPC-DI DataFrame connection resolution
-- Stage-level outputs (status, timing key fields, record counters) are parity-validated between SQL and DataFrame modes
-- No misleading unused-parameter discard remains in execute_dataframe_workload()
+  - SQL and DataFrame TPC-DI entry points execute through one shared ETL orchestration implementation
+  - No direct adapter/context attribute sniffing remains in TPC-DI DataFrame connection resolution
+  - Stage-level outputs (status, timing key fields, record counters) are parity-validated between SQL and DataFrame modes
+  - No misleading unused-parameter discard remains in execute_dataframe_workload()
 open_questions:
-- Should DataFrame mode surface ETL result envelopes identical to SQL mode or retain query-style wrappers for benchmark runner
-  compatibility?
-- Which adapter/context layer is the right long-term owner of SQL connection provider responsibilities?
+  - Should DataFrame mode surface ETL result envelopes identical to SQL mode or retain query-style wrappers for benchmark runner
+    compatibility?
+  - Which adapter/context layer is the right long-term owner of SQL connection provider responsibilities?
 sections:
-  Implementation Summary: "Completed unification of TPC-DI SQL/DataFrame execution contracts and ETL\norchestration behavior.\n\
+  Implementation Summary:
+    "Completed unification of TPC-DI SQL/DataFrame execution contracts and ETL\norchestration behavior.\n\
     \nDelivered:\n- Explicit `SQLConnectionProvider` contract in DataFrame core abstractions.\n- Shared ETL stage executor\
     \ reuse between SQL (`run_etl_benchmark`) and\n  DataFrame (`execute_dataframe_workload`) entry points.\n- Deterministic\
     \ connection-resolution errors based on explicit contract\n  rather than attribute sniffing.\n- Added SQL/DataFrame parity\

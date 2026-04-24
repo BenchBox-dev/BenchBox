@@ -98,16 +98,16 @@ approach: |
   visualization tests.
 
 anti_patterns:
-- "DO NOT switch MCP/CLI no-color flows back to ANSI color dependence — because those paths must remain readable without ANSI
-  — use structural glyph/layout improvements instead"
-- "DO NOT encode outlier state as query-only in grouped mode — because it marks non-outlier peer bars incorrectly — track
+- "DO NOT switch MCP/CLI no-color flows back to ANSI color dependence - because those paths must remain readable without ANSI
+  - use structural glyph/layout improvements instead"
+- "DO NOT encode outlier state as query-only in grouped mode - because it marks non-outlier peer bars incorrectly - track
   outliers at platform+query bar identity"
-- "DO NOT relax tests to accept mismatched legend-vs-bar semantics — because that hides a readability regression — assert
+- "DO NOT relax tests to accept mismatched legend-vs-bar semantics - because that hides a readability regression - assert
   glyph correspondence explicitly"
-- "DO NOT pad summary-box rows using raw percentage text length — because no-color mode appends structural arrows (↑/↓) —
+- "DO NOT pad summary-box rows using raw percentage text length - because no-color mode appends structural arrows (↑/↓) -
   compute visible width from rendered text"
-- "DO NOT hide comparison percentages in two-column summary mode — because users lose the key regression/improvement signal
-  — include both absolute and percent deltas"
+- "DO NOT hide comparison percentages in two-column summary mode - because users lose the key regression/improvement signal
+  - include both absolute and percent deltas"
 
 verification:
 - description: "Targeted ASCII visualization tests pass for histogram/box/heatmap behavior"

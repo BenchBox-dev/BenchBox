@@ -67,11 +67,11 @@ context_sections:
 
 metadata:
   tags:
-  - platform-adapter
-  - postgresql-extension
-  - pg-duckdb
-  - olap
-  - duckdb
+    - platform-adapter
+    - postgresql-extension
+    - pg-duckdb
+    - olap
+    - duckdb
   estimated_effort: "3-4 days"
   created_date: "2026-02-14"
 
@@ -88,33 +88,33 @@ impact:
 
 files_affected:
   added:
-  - "benchbox/platforms/pg_duckdb.py"
-  - "benchbox/core/tuning/generators/pg_duckdb.py"
-  - "tests/unit/platforms/test_pg_duckdb_adapter.py"
-  - "docs/platforms/pg_duckdb.md"
+    - "benchbox/platforms/pg_duckdb.py"
+    - "benchbox/core/tuning/generators/pg_duckdb.py"
+    - "tests/unit/platforms/test_pg_duckdb_adapter.py"
+    - "docs/platforms/pg_duckdb.md"
   modified:
-  - "benchbox/core/platform_registry.py"
-  - "benchbox/platforms/__init__.py"
+    - "benchbox/core/platform_registry.py"
+    - "benchbox/platforms/__init__.py"
 
 technical_requirements:
   dependencies:
-  - "psycopg2-binary>=2.9.0 (existing, shared with PostgreSQL adapter)"
-  - "PostgreSQL 14+ with pg_duckdb extension installed"
+    - "psycopg2-binary>=2.9.0 (existing, shared with PostgreSQL adapter)"
+    - "PostgreSQL 14+ with pg_duckdb extension installed"
   constraints:
-  - "Requires pg_duckdb extension pre-installed on PostgreSQL server"
-  - "Conflicts with pg_mooncake — cannot coexist in same instance"
-  - "MotherDuck mode requires MOTHERDUCK_TOKEN environment variable"
-  - "Thread count tuning requires superuser or pg_duckdb role"
+    - "Requires pg_duckdb extension pre-installed on PostgreSQL server"
+    - "Conflicts with pg_mooncake - cannot coexist in same instance"
+    - "MotherDuck mode requires MOTHERDUCK_TOKEN environment variable"
+    - "Thread count tuning requires superuser or pg_duckdb role"
   compatibility: |
-    PostgreSQL 14-18 with pg_duckdb 1.0+. Standard psycopg2 driver — no
+    PostgreSQL 14-18 with pg_duckdb 1.0+. Standard psycopg2 driver - no
     additional Python dependencies. MotherDuck integration is optional.
 
 must_preserve:
-- "PostgreSQLAdapter.load_data() COPY pipeline unchanged — pg_duckdb inherits it directly"
-- "PostgreSQLAdapter.execute_query() return format unchanged — pg_duckdb only overrides configuration"
-- "All existing PostgreSQL adapter tests pass: uv run -- python -m pytest tests/unit/platforms/test_postgresql_adapter.py
-  -v"
-- "Platform registry autodiscovery for all existing platforms unaffected"
+  - "PostgreSQLAdapter.load_data() COPY pipeline unchanged - pg_duckdb inherits it directly"
+  - "PostgreSQLAdapter.execute_query() return format unchanged - pg_duckdb only overrides configuration"
+  - "All existing PostgreSQL adapter tests pass: uv run -- python -m pytest tests/unit/platforms/test_postgresql_adapter.py
+    -v"
+  - "Platform registry autodiscovery for all existing platforms unaffected"
 
 approach: |
   Follow the TimescaleDB pattern (benchbox/platforms/timescaledb.py) which extends
@@ -130,124 +130,132 @@ approach: |
   6. Add CLI config builder in __init__.py following TimescaleDB pattern
 
   For the DDL generator (benchbox/core/tuning/generators/pg_duckdb.py), extend
-  PostgreSQLDDLGenerator. pg_duckdb works with standard PostgreSQL DDL — the
+  PostgreSQLDDLGenerator. pg_duckdb works with standard PostgreSQL DDL - the
   generator mainly needs to handle index recommendations (pg_duckdb benefits
   less from B-tree indexes since it bypasses them for analytical scans).
 
 anti_patterns:
-- "DO NOT add a new SQL dialect for pg_duckdb — because pg_duckdb uses standard PostgreSQL SQL parsed by DuckDB internally
-  — reuse POSTGRES_DIALECT from the PostgreSQL adapter"
-- "DO NOT require pg_duckdb for the PostgreSQL adapter — because they are separate platforms — pg_duckdb adapter is its own
-  class that happens to inherit from PostgreSQLAdapter"
-- "DO NOT try to install pg_duckdb via CREATE EXTENSION in production — because extension installation requires server admin
-  privileges — only verify it exists and raise a clear error if missing"
-- "DO NOT add data lake query support in the initial implementation — because it requires S3/GCS credentials and Parquet file
-  management — defer to a separate work item"
+  - "DO NOT add a new SQL dialect for pg_duckdb - because pg_duckdb uses standard PostgreSQL SQL parsed by DuckDB internally
+    - reuse POSTGRES_DIALECT from the PostgreSQL adapter"
+  - "DO NOT require pg_duckdb for the PostgreSQL adapter - because they are separate platforms - pg_duckdb adapter is its own
+    class that happens to inherit from PostgreSQLAdapter"
+  - "DO NOT try to install pg_duckdb via CREATE EXTENSION in production - because extension installation requires server admin
+    privileges - only verify it exists and raise a clear error if missing"
+  - "DO NOT add data lake query support in the initial implementation - because it requires S3/GCS credentials and Parquet file
+    management - defer to a separate work item"
 
 verification:
-- description: "pg_duckdb adapter module imports without error"
-  command: "uv run -- python -c \"from benchbox.platforms.pg_duckdb import PgDuckDBAdapter; print('import OK')\""
-  expected_output: "import OK"
-- description: "All existing platform tests still pass"
-  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-  expected_output: "all tests pass, 0 failures"
-- description: "pg_duckdb unit tests pass"
-  command: "uv run -- python -m pytest tests/unit/platforms/test_pg_duckdb_adapter.py -v --tb=short"
-  expected_output: "all tests pass, 0 failures"
-- description: "Platform registry lists pg-duckdb"
-  command: "uv run -- python -c \"from benchbox.core.platform_registry import PlatformRegistry; print('pg-duckdb' in PlatformRegistry.list_platforms())\""
-  expected_output: "True"
+  - description: "pg_duckdb adapter module imports without error"
+    command: 'uv run -- python -c "from benchbox.platforms.pg_duckdb import PgDuckDBAdapter; print(''import OK'')"'
+    expected_output: "import OK"
+  - description: "All existing platform tests still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "pg_duckdb unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_pg_duckdb_adapter.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Platform registry lists pg-duckdb"
+    command: 'uv run -- python -c "from benchbox.core.platform_registry import PlatformRegistry; print(''pg-duckdb'' in PlatformRegistry.list_platforms())"'
+    expected_output: "True"
 
 scope_limit:
   only_modify:
-  - "benchbox/platforms/pg_duckdb.py"
-  - "benchbox/platforms/__init__.py"
-  - "benchbox/core/platform_registry.py"
-  - "benchbox/core/tuning/generators/pg_duckdb.py"
-  - "tests/unit/platforms/test_pg_duckdb_adapter.py"
-  - "docs/platforms/pg_duckdb.md"
+    - "benchbox/platforms/pg_duckdb.py"
+    - "benchbox/platforms/__init__.py"
+    - "benchbox/core/platform_registry.py"
+    - "benchbox/core/tuning/generators/pg_duckdb.py"
+    - "tests/unit/platforms/test_pg_duckdb_adapter.py"
+    - "docs/platforms/pg_duckdb.md"
   do_not_modify:
-  - "benchbox/platforms/postgresql.py"
-  - "benchbox/platforms/duckdb.py"
-  - "benchbox/platforms/timescaledb.py"
-  - "benchbox/core/runner.py"
+    - "benchbox/platforms/postgresql.py"
+    - "benchbox/platforms/duckdb.py"
+    - "benchbox/platforms/timescaledb.py"
+    - "benchbox/core/runner.py"
 
 deps:
   needs: []
 
 success_metrics:
-- "benchbox run --platform pg-duckdb --benchmark tpch --scale 0.01 --dry-run succeeds"
-- "Unit tests cover adapter creation, extension verification, GUC configuration, and MotherDuck mode"
-- "Platform appears in benchbox run --help with correct description"
+  - "benchbox run --platform pg-duckdb --benchmark tpch --scale 0.01 --dry-run succeeds"
+  - "Unit tests cover adapter creation, extension verification, GUC configuration, and MotherDuck mode"
+  - "Platform appears in benchbox run --help with correct description"
 
 work:
-- id: w1
-  summary: "Create PgDuckDBAdapter class extending PostgreSQLAdapter with platform_name, get_target_dialect, and basic class
-    structure"
-  status: done
+  - id: w1
+    summary:
+      "Create PgDuckDBAdapter class extending PostgreSQLAdapter with platform_name, get_target_dialect, and basic class
+      structure"
+    status: done
 
-- id: w2
-  summary: "Implement create_connection() override to verify pg_duckdb extension is installed and set default GUC parameters
-    (duckdb.force_execution, threads)"
-  needs: [w1]
-  status: done
+  - id: w2
+    summary:
+      "Implement create_connection() override to verify pg_duckdb extension is installed and set default GUC parameters
+      (duckdb.force_execution, threads)"
+    needs: [w1]
+    status: done
 
-- id: w3
-  summary: "Implement configure_for_benchmark() override to set pg_duckdb-specific OLAP optimizations (force_execution=true,
-    thread tuning per benchmark type)"
-  needs: [w2]
-  status: done
+  - id: w3
+    summary:
+      "Implement configure_for_benchmark() override to set pg_duckdb-specific OLAP optimizations (force_execution=true,
+      thread tuning per benchmark type)"
+    needs: [w2]
+    status: done
 
-- id: w4
-  summary: "Add MotherDuck deployment mode with token-based authentication (MOTHERDUCK_TOKEN env var, duckdb.motherduck_token
-    GUC)"
-  needs: [w2]
-  status: done
-  notes: "Follow TimescaleDB cloud deployment pattern for deployment mode handling"
+  - id: w4
+    summary:
+      "Add MotherDuck deployment mode with token-based authentication (MOTHERDUCK_TOKEN env var, duckdb.motherduck_token
+      GUC)"
+    needs: [w2]
+    status: done
+    notes: "Follow TimescaleDB cloud deployment pattern for deployment mode handling"
 
-- id: w5
-  summary: "Register pg-duckdb in platform_registry.py with metadata (display_name, category, libraries, deployment_modes:
-    self-hosted + motherduck)"
-  needs: [w1]
-  status: done
+  - id: w5
+    summary:
+      "Register pg-duckdb in platform_registry.py with metadata (display_name, category, libraries, deployment_modes:
+      self-hosted + motherduck)"
+    needs: [w1]
+    status: done
 
-- id: w6
-  summary: "Add CLI config builder and hook registration in platforms/__init__.py with pg-duckdb-specific arguments (--pgduckdb-force-execution,
-    --pgduckdb-threads)"
-  needs: [w5]
-  status: done
+  - id: w6
+    summary:
+      "Add CLI config builder and hook registration in platforms/__init__.py with pg-duckdb-specific arguments (--pgduckdb-force-execution,
+      --pgduckdb-threads)"
+    needs: [w5]
+    status: done
 
-- id: w7
-  summary: "Create PgDuckDBDDLGenerator extending PostgreSQLDDLGenerator with pg_duckdb-aware index recommendations"
-  needs: [w1]
-  status: done
+  - id: w7
+    summary: "Create PgDuckDBDDLGenerator extending PostgreSQLDDLGenerator with pg_duckdb-aware index recommendations"
+    needs: [w1]
+    status: done
 
-- id: w8
-  summary: "Write unit tests: adapter creation, extension verification mock, GUC parameter setting, MotherDuck mode configuration,
-    error handling for missing extension"
-  needs: [w3, w4]
-  status: done
+  - id: w8
+    summary:
+      "Write unit tests: adapter creation, extension verification mock, GUC parameter setting, MotherDuck mode configuration,
+      error handling for missing extension"
+    needs: [w3, w4]
+    status: done
 
-- id: w9
-  summary: "Write platform registration tests and CLI integration tests"
-  needs: [w5, w6]
-  status: done
+  - id: w9
+    summary: "Write platform registration tests and CLI integration tests"
+    needs: [w5, w6]
+    status: done
 
-- id: w10
-  summary: "Write platform documentation (docs/platforms/pg_duckdb.md) covering setup, usage, deployment modes, and comparison
-    with native DuckDB"
-  needs: [w3, w4]
-  status: done
+  - id: w10
+    summary:
+      "Write platform documentation (docs/platforms/pg_duckdb.md) covering setup, usage, deployment modes, and comparison
+      with native DuckDB"
+    needs: [w3, w4]
+    status: done
 
 deferred:
-- summary: "Data lake query support (S3 Parquet/Iceberg reads via pg_duckdb)"
-  reason: "Requires cloud storage credentials and Parquet file management — separate feature"
-- summary: "MotherDuck cloud deployment integration testing"
-  reason: "Requires active MotherDuck account — handle in live-platform-test workflow"
-- summary: "pg_duckdb vs native DuckDB automated comparison reports"
-  reason: "Requires comparison framework — handle after both adapters are stable"
+  - summary: "Data lake query support (S3 Parquet/Iceberg reads via pg_duckdb)"
+    reason: "Requires cloud storage credentials and Parquet file management - separate feature"
+  - summary: "MotherDuck cloud deployment integration testing"
+    reason: "Requires active MotherDuck account - handle in live-platform-test workflow"
+  - summary: "pg_duckdb vs native DuckDB automated comparison reports"
+    reason: "Requires comparison framework - handle after both adapters are stable"
 
 open_questions:
-- "Should pg_duckdb automatically disable PostgreSQL indexes during benchmarking since DuckDB bypasses them?"
-- "How should we handle pg_duckdb version detection (v1.0 vs v1.1 feature differences)?"
-- "Should MotherDuck mode be a separate platform name (pg-duckdb:motherduck) or a CLI flag?"
+  - "Should pg_duckdb automatically disable PostgreSQL indexes during benchmarking since DuckDB bypasses them?"
+  - "How should we handle pg_duckdb version detection (v1.0 vs v1.1 feature differences)?"
+  - "Should MotherDuck mode be a separate platform name (pg-duckdb:motherduck) or a CLI flag?"

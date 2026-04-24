@@ -6,7 +6,7 @@ status: Not Started
 category: Platform Expansion
 description: |
   The Bodo DataFrame adapter currently uses Pandas-compatible I/O only.
-  @bodo.jit is Bodo's core value proposition — auto-parallelization of Pandas
+  @bodo.jit is Bodo's core value proposition - auto-parallelization of Pandas
   code via JIT compilation. MPI multi-node execution is the next tier.
 
   Deferred from bodo-dataframe-platform (completed 2026-02-09). The initial
@@ -38,7 +38,7 @@ metadata:
   - jit
   - mpi
   - deferred-followup
-  estimated_effort: "Medium — 2-3 days"
+  estimated_effort: "Medium - 2-3 days"
   created_date: "2026-02-18"
   split_from: bodo-dataframe-platform
 
@@ -48,11 +48,11 @@ open_questions:
 
 work:
 - id: w1
-  summary: "Verify Bodo adapter exists or recreate from DONE item — establish Pandas-compatible baseline"
+  summary: "Verify Bodo adapter exists or recreate from DONE item - establish Pandas-compatible baseline"
   status: pending
 
 - id: w2
-  summary: "Add @bodo.jit compilation mode — decorate query functions, handle warmup, implement compilation caching"
+  summary: "Add @bodo.jit compilation mode - decorate query functions, handle warmup, implement compilation caching"
   needs: [w1]
   status: pending
   notes: |
@@ -60,7 +60,7 @@ work:
     overhead on first run; subsequent runs use cached compilation.
 
 - id: w3
-  summary: "Add MPI multi-node distributed execution support — mpiexec launch, hostfile config, data partitioning"
+  summary: "Add MPI multi-node distributed execution support - mpiexec launch, hostfile config, data partitioning"
   needs: [w2]
   status: pending
   notes: |

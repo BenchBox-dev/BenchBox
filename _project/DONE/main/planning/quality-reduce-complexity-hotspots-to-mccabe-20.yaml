@@ -6,11 +6,11 @@ status: Completed
 completed_date: "2026-04-14"
 category: Code Quality and Technical Debt
 description: |
-  Quality plan supplement — complexity workstream. The ratchet target is
+  Quality plan supplement - complexity workstream. The ratchet target is
   McCabe **18** (aligning with `quality-bulk-fix-encoding-lint-and-ratchet`).
   As of 2026-04-13, 7 C901 violations remain above threshold 18 after an
   ongoing refactor campaign brought the count down from 44+. The worst
-  remaining offender — `cli/commands/run.py::run` at McCabe 285 — is an
+  remaining offender - `cli/commands/run.py::run` at McCabe 285 - is an
   unmanaged dispatcher that must be split into phase/option/result helpers.
 
   Bring every function under 18, then add C901 to the permanent ruff `select`
@@ -45,7 +45,7 @@ work:
     status: done
 
   - id: w4
-    summary: "CI gate is already covered by existing `uv run ruff check .` in lint.yml — no separate step needed since C901 is now in active select."
+    summary: "CI gate is already covered by existing `uv run ruff check .` in lint.yml - no separate step needed since C901 is now in active select."
     needs: [w3]
     status: done
 
@@ -61,14 +61,14 @@ files_affected:
     - "benchbox/core/tpcds/power_test.py"
     - "benchbox/platforms/dataframe/unified_frame.py"
     - "benchbox/core/tpcds_obt/query_conversion.py"
-    - "(various — 38 additional modules)"
+    - "(various - 38 additional modules)"
     - ".github/workflows/lint.yml"
 
 must_preserve:
-  - "Runtime behavior of every refactored function — this is structural extraction, not behavior change"
+  - "Runtime behavior of every refactored function - this is structural extraction, not behavior change"
   - "Public CLI surface of `benchbox run` unchanged (same options, same exit codes, same help text)"
   - "All existing tests pass after every slice (≥21,000 tests)"
-  - "No new `# noqa: C901` suppressions — refactor, don't silence (exception: generated code or vendored shims with inline rationale)"
+  - "No new `# noqa: C901` suppressions - refactor, don't silence (exception: generated code or vendored shims with inline rationale)"
 
 approach: |
   Extract-method is the primary tool. For each hotspot:
@@ -85,14 +85,14 @@ approach: |
   maintenance), by platform-option parsing, and by result finalization; the
   click decorator surface stays on the outer `run` shell.
 
-  Prefer small, reviewable PRs — one commit per hotspot at minimum. Do not
+  Prefer small, reviewable PRs - one commit per hotspot at minimum. Do not
   bundle refactors across modules.
 
 anti_patterns:
-  - "DO NOT add `# noqa: C901` to silence violations — because that defeats the gate — extract helpers instead"
-  - "DO NOT change public API surface during extraction — because callers depend on it — keep helpers private"
-  - "DO NOT bundle multiple hotspot refactors into one commit — because review needs to be bounded — one commit per function"
-  - "DO NOT introduce new abstractions just to hit the number — because YAGNI — extract only cohesive helpers that tell a story"
+  - "DO NOT add `# noqa: C901` to silence violations - because that defeats the gate - extract helpers instead"
+  - "DO NOT change public API surface during extraction - because callers depend on it - keep helpers private"
+  - "DO NOT bundle multiple hotspot refactors into one commit - because review needs to be bounded - one commit per function"
+  - "DO NOT introduce new abstractions just to hit the number - because YAGNI - extract only cohesive helpers that tell a story"
 
 scope_limit:
   only_modify:
@@ -114,7 +114,7 @@ verification:
     command: "uv run benchbox run --help | sha256sum"
     expected_output: "matches pre-refactor hash captured at start of w1"
   - description: "pyproject.toml gates C901 permanently"
-    command: "uv run -- python -c \"import tomllib; cfg = tomllib.load(open('pyproject.toml','rb')); assert 'C901' in cfg['tool']['ruff']['lint']['select']\""
+    command: 'uv run -- python -c "import tomllib; cfg = tomllib.load(open(''pyproject.toml'',''rb'')); assert ''C901'' in cfg[''tool''][''ruff''][''lint''][''select'']"'
     expected_output: "(no error)"
 
 metadata:

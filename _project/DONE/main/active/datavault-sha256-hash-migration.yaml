@@ -8,17 +8,17 @@ category: Core Functionality
 description: |
   The DataVault benchmark's hash key columns are defined as VARCHAR(32), sized for
   MD5's 32-char hex output. MD5 has known collision vulnerabilities that make it
-  unsuitable for Data Vault 2.0 in any production-representative benchmark — the
+  unsuitable for Data Vault 2.0 in any production-representative benchmark - the
   whole point of DV2.0 hash keys is collision-free surrogate identity.
 
   A root-cause analysis revealed a five-layer inconsistency across the codebase:
 
-    1. BenchmarkOptionSpec (benchmark.py:485) declares choices=("md5", "sha256") —
+    1. BenchmarkOptionSpec (benchmark.py:485) declares choices=("md5", "sha256") -
        the CLI accepts sha256 and the docs advertise it.
     2. SUPPORTED_HASH_ALGORITHMS = ("md5",) (benchmark.py:56) immediately rejects
        sha256 at construction time with ValueError.
     3. HashAlgorithm = Literal["md5"] (hash_functions.py:16) narrows the type to
-       match the runtime — the unreachable sha1/sha256 branches were cleaned up in
+       match the runtime - the unreachable sha1/sha256 branches were cleaned up in
        fc6509c35 along with the [:32] truncation; sha256 must now be added back cleanly.
     4. (Resolved by fc6509c35) The sha256 branch truncated to [:32], destroying
        half the entropy. That branch is gone; the function now raises ValueError for
@@ -43,18 +43,18 @@ work:
     to:
       choices=("md5",)
 
-    Also update docs/reference/cli/run.md — the hash_algorithm row currently says
+    Also update docs/reference/cli/run.md - the hash_algorithm row currently says
     "md5, sha256"; change it to "md5" with a note that sha256 support is planned.
 
     This eliminates the user-visible false promise without any behavioral change.
-    The validator at line 89 already rejects sha256 — this makes the CLI agree.
+    The validator at line 89 already rejects sha256 - this makes the CLI agree.
 
     Verification: `benchbox run --benchmark datavault --benchmark-option hash_algorithm=sha256`
     must now fail at CLI validation (choices check) rather than silently passing
     the CLI and failing inside the constructor.
 
 - id: w2
-  summary: "Audit every source of truth for the algorithm allowlist — document the single-source design"
+  summary: "Audit every source of truth for the algorithm allowlist - document the single-source design"
   needs: [w1]
   status: done
   notes: |
@@ -83,13 +83,13 @@ work:
     In benchbox/core/datavault/schema.py, change:
       HASHKEY = "VARCHAR(32)"  # MD5 hash keys are always 32 hex characters
     to:
-      HASHKEY = "VARCHAR(64)"  # Hash key columns — 32 chars for MD5, 40 for SHA-1, 64 for SHA-256
+      HASHKEY = "VARCHAR(64)"  # Hash key columns - 32 chars for MD5, 40 for SHA-1, 64 for SHA-256
 
     Verify that HASHKEY is the single definition driving all hub/link/satellite DDL.
     Grep for any other hard-coded VARCHAR(32) references tied to hash columns and
     update those too. Do not change non-hash columns.
 
-    The wider column is backward-compatible for existing MD5 data — VARCHAR(64)
+    The wider column is backward-compatible for existing MD5 data - VARCHAR(64)
     stores 32-char strings without truncation or padding.
 
     Run datavault schema generation smoke test to confirm DDL output reflects the
@@ -102,11 +102,11 @@ work:
   notes: |
     Exact changes in order:
 
-    1. hash_functions.py:16 — widen type:
+    1. hash_functions.py:16 - widen type:
          HashAlgorithm = Literal["md5", "sha256"]
        SHA-1 stays excluded: it's neither collision-safe nor schema-compatible (40 chars).
 
-    2. hash_functions.py:43-45 — add sha256 branch before the raise:
+    2. hash_functions.py:43-45 - add sha256 branch before the raise:
          (The old truncated [:32] sha256 branch was removed in fc6509c35;
           the function body is now just md5 + raise ValueError.)
          Add:
@@ -114,13 +114,13 @@ work:
                return hashlib.sha256(key_string.encode("utf-8")).hexdigest()
          The 64-char output fits VARCHAR(64).
 
-    3. benchmark.py:56 — widen the allowlist:
+    3. benchmark.py:56 - widen the allowlist:
          SUPPORTED_HASH_ALGORITHMS = ("md5", "sha256")
 
-    4. benchmark.py:485 — restore sha256 in CLI choices:
+    4. benchmark.py:485 - restore sha256 in CLI choices:
          choices=("md5", "sha256")
 
-    5. transformer.py:136-137 — replace the hard-coded check with a reference:
+    5. transformer.py:136-137 - replace the hard-coded check with a reference:
          from benchbox.core.datavault.benchmark import DataVaultBenchmark
          if hash_algorithm not in DataVaultBenchmark.SUPPORTED_HASH_ALGORITHMS:
              raise ValueError(...)
@@ -138,7 +138,7 @@ work:
     In tests/unit/core/datavault/test_datavault_benchmark.py:
       - test_sha256_algorithm_rejected → test_sha256_algorithm_accepted: construct
         DataVaultBenchmark(hash_algorithm="sha256") and assert no exception.
-      - test_sha1_algorithm_rejected: keep — SHA-1 must still be rejected.
+      - test_sha1_algorithm_rejected: keep - SHA-1 must still be rejected.
       - Add test_sha256_produces_64char_key: call generate_hash_key(1, algorithm="sha256")
         and assert len(result) == 64.
 
@@ -158,15 +158,15 @@ work:
   status: done
   notes: |
     Locations to update:
-      - docs/reference/cli/run.md: hash_algorithm row — restore "md5, sha256"
+      - docs/reference/cli/run.md: hash_algorithm row - restore "md5, sha256"
         (already changed to "md5" in w1; re-add sha256 now that it works).
       - benchmark.py:55 comment: "currently only MD5 due to VARCHAR(32) schema
-        constraints" — update to reflect VARCHAR(64) and sha256 support.
+        constraints" - update to reflect VARCHAR(64) and sha256 support.
       - benchmark.py:51, 78: docstring mentions "only 'md5' currently supported"
-        — update to list both md5 and sha256.
-      - transformer.py:126: docstring "(only 'md5' supported)" — update.
+        - update to list both md5 and sha256.
+      - transformer.py:126: docstring "(only 'md5' supported)" - update.
       - hash_functions.py:28-29: generate_hash_key docstring says "32-character
-        hex string" — update to describe md5 (32 chars) and sha256 (64 chars).
+        hex string" - update to describe md5 (32 chars) and sha256 (64 chars).
       - hash_functions.py: verify Returns docstring is accurate post-w4.
 
     Grep for "only.*md5" and "VARCHAR(32)" across the datavault package to catch
@@ -198,12 +198,12 @@ impact:
     authoritative source; all other layers are derived or validated against it.
 
 must_preserve:
-- "MD5 remains the default — hash_algorithm defaults to 'md5' in all constructors and CLI options"
-- "SHA-1 stays unsupported — 40-char output doesn't align with either VARCHAR(32) or VARCHAR(64), and SHA-1 is cryptographically
+- "MD5 remains the default - hash_algorithm defaults to 'md5' in all constructors and CLI options"
+- "SHA-1 stays unsupported - 40-char output doesn't align with either VARCHAR(32) or VARCHAR(64), and SHA-1 is cryptographically
   weaker than SHA-256"
-- "generate_hash_key_sql() remains MD5-only — DuckDB's md5() SQL function is the only hash SQL available without custom extensions;
+- "generate_hash_key_sql() remains MD5-only - DuckDB's md5() SQL function is the only hash SQL available without custom extensions;
   that restriction stands"
-- "Existing VARCHAR(32) test fixtures remain valid — stored MD5 hashes are still 32 chars and fit in VARCHAR(64) without truncation"
+- "Existing VARCHAR(32) test fixtures remain valid - stored MD5 hashes are still 32 chars and fit in VARCHAR(64) without truncation"
 
 approach: |
   Execute as two gate-checked phases: w1 (stop the false promise) before any

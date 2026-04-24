@@ -59,16 +59,16 @@ approach: |
   mock all SDK clients (boto3, google-cloud, snowflake-connector). For
   credential modules, test env var parsing, config file loading, and
   validation logic. For DataFrame adapters, use small in-memory DataFrames.
-  unified_frame.py is the largest file — focus on the public API methods
+  unified_frame.py is the largest file - focus on the public API methods
   and expression translation.
 
 anti_patterns:
-- "DO NOT require cloud credentials for unit tests — because CI has no cloud access and tests must be runnable offline — mock
+- "DO NOT require cloud credentials for unit tests - because CI has no cloud access and tests must be runnable offline - mock
   all SDK clients (boto3, google-cloud, snowflake-connector)"
-- "DO NOT import heavy cloud SDKs at module level in test files — because they add 2-5s import overhead and may not be installed
-  — use unittest.mock.patch or lazy imports"
-- "DO NOT test platform-specific SQL dialect generation — because dialect translation is covered by separate dialect tests
-  — test adapter configuration, connection logic, and error handling instead"
+- "DO NOT import heavy cloud SDKs at module level in test files - because they add 2-5s import overhead and may not be installed
+  - use unittest.mock.patch or lazy imports"
+- "DO NOT test platform-specific SQL dialect generation - because dialect translation is covered by separate dialect tests
+  - test adapter configuration, connection logic, and error handling instead"
 
 verification:
 - description: "All platform tests pass"

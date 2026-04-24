@@ -152,12 +152,12 @@ approach: |
   canonical path share logic, extract canonical behavior first, then remove branching.
 
 anti_patterns:
-- "DO NOT keep aliases with deprecation warnings — because this prolongs surface-area and maintenance cost — remove symbols
+- "DO NOT keep aliases with deprecation warnings - because this prolongs surface-area and maintenance cost - remove symbols
   outright in alpha."
-- "DO NOT batch unverified removals across unrelated subsystems — because regression root-cause becomes opaque — validate
+- "DO NOT batch unverified removals across unrelated subsystems - because regression root-cause becomes opaque - validate
   each wave before proceeding."
-- "DO NOT update only docs or only tests without deleting code branches — because stale compatibility paths will remain executable
-  — delete implementation first then align tests/docs."
+- "DO NOT update only docs or only tests without deleting code branches - because stale compatibility paths will remain executable
+  - delete implementation first then align tests/docs."
 
 verification:
 - description: "Backward-compatibility registry no longer contains active benchbox compatibility rows"

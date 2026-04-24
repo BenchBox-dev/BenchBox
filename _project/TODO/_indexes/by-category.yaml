@@ -1,188 +1,188 @@
-generated_at: '2026-04-22T19:55:19.136923'
+generated_at: "2026-04-22T19:55:19.136923"
 total_categories: 10
 categories:
   Architecture & Refactoring:
     count: 1
     items:
-    - id: generalize-database-table-reuse-detection
-      file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
-      title: Generalize benchmark table reuse detection for managed databases
-      priority: Normal
-      status: Not Started
+      - id: generalize-database-table-reuse-detection
+        file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
+        title: Generalize benchmark table reuse detection for managed databases
+        priority: Normal
+        status: Not Started
   Benchmark Development:
     count: 4
     items:
-    - id: geospatial-primitives-benchmark
-      file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
-      title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
-      priority: Low
-      status: Not Started
-    - id: github-archive-benchmark
-      file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
-      title: GitHub Archive Benchmark - Developer Activity Analytics Workload
-      priority: Low
-      status: Not Started
-    - id: stackoverflow-benchmark
-      file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
-      title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
-      priority: Low
-      status: Not Started
-    - id: wikipedia-pageviews-benchmark
-      file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
-      title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
-      priority: Low
-      status: Not Started
+      - id: geospatial-primitives-benchmark
+        file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
+        title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
+        priority: Low
+        status: Not Started
+      - id: github-archive-benchmark
+        file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
+        title: GitHub Archive Benchmark - Developer Activity Analytics Workload
+        priority: Low
+        status: Not Started
+      - id: stackoverflow-benchmark
+        file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
+        title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+        priority: Low
+        status: Not Started
+      - id: wikipedia-pageviews-benchmark
+        file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
+        title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+        priority: Low
+        status: Not Started
   Code Quality and Technical Debt:
     count: 2
     items:
-    - id: review-dependency-upper-bounds-quarterly
-      file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
-      title: Quarterly review of dependency upper bounds
-      priority: Low
-      status: Not Started
-    - id: upgrade-pandas-to-3x
-      file: TODO/main/planning/upgrade-pandas-to-3x.yaml
-      title: Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear
-      priority: Low
-      status: Not Started
+      - id: review-dependency-upper-bounds-quarterly
+        file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
+        title: Quarterly review of dependency upper bounds
+        priority: Low
+        status: Not Started
+      - id: upgrade-pandas-to-3x
+        file: TODO/main/planning/upgrade-pandas-to-3x.yaml
+        title: Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear
+        priority: Low
+        status: Not Started
   Core Functionality:
     count: 7
     items:
-    - id: add-third-benchmark-cohort-to-corpus
-      file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
-      title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
-      priority: Medium-High
-      status: Not Started
-    - id: build-sql-compat-phase-aware-pipeline
-      file: TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
-      title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
-      priority: Medium-High
-      status: In Progress
-    - id: define-phase-3-promotion-metrics
-      file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
-      title: Define Phase 3 promotion metrics, dashboard, and review cadence
-      priority: Medium
-      status: Not Started
-    - id: design-results-ingest-storage-and-derived-read-model
-      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
-      title: Design results ingest, storage, and derived read-model architecture
-      priority: High
-      status: Not Started
-    - id: integrate-benchbox-cli-submit-and-service-auth
-      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
-      title: Integrate BenchBox CLI submission flow and service authentication
-      priority: High
-      status: Not Started
-    - id: operate-results-platform-security-observability-and-abuse-controls
-      file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
-      title: Operate results platform security, observability, and abuse controls
-      priority: Medium
-      status: Not Started
-    - id: evaluate-results-data-repo-extraction-checkpoint
-      file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
-      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
-      priority: Low
-      status: Not Started
+      - id: add-third-benchmark-cohort-to-corpus
+        file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
+        title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
+        priority: Medium-High
+        status: Not Started
+      - id: build-sql-compat-phase-aware-pipeline
+        file: TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
+        title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
+        priority: Medium-High
+        status: In Progress
+      - id: define-phase-3-promotion-metrics
+        file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
+        title: Define Phase 3 promotion metrics, dashboard, and review cadence
+        priority: Medium
+        status: Not Started
+      - id: design-results-ingest-storage-and-derived-read-model
+        file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+        title: Design results ingest, storage, and derived read-model architecture
+        priority: High
+        status: Not Started
+      - id: integrate-benchbox-cli-submit-and-service-auth
+        file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+        title: Integrate BenchBox CLI submission flow and service authentication
+        priority: High
+        status: Not Started
+      - id: operate-results-platform-security-observability-and-abuse-controls
+        file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+        title: Operate results platform security, observability, and abuse controls
+        priority: Medium
+        status: Not Started
+      - id: evaluate-results-data-repo-extraction-checkpoint
+        file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+        title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+        priority: Low
+        status: Not Started
   Performance:
     count: 1
     items:
-    - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
-      file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
-      title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
-      priority: Medium
-      status: Identified
+      - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
+        file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
+        title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
+        priority: Medium
+        status: Identified
   Platform Expansion:
     count: 8
     items:
-    - id: databend-3-mode-local-server-cloud
-      file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
-      title: Add 3-mode support to Databend platform (standalone / server / cloud)
-      priority: Low
-      status: Not Started
-    - id: bodo-jit-and-mpi-support
-      file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
-      title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
-      priority: Low
-      status: Not Started
-    - id: ballista-distributed-adapter
-      file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
-      title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
-      priority: Medium
-      status: Not Started
-    - id: siriusdb-adapter
-      file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
-      title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
-      priority: Low
-      status: Not Started
-    - id: velox-gluten-spark-adapter
-      file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
-      title: Add Velox + Gluten Spark Acceleration Platform Adapter
-      priority: Medium
-      status: Not Started
-    - id: motherduck-cloud-features
-      file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
-      title: MotherDuck Cloud Feature Completion — Credential Wizard, Cloud Upload, Cache Control
-      priority: High
-      status: Not Started
-    - id: reenable-fireducks-after-upstream-fixes
-      file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
-      title: Re-enable FireDucks after upstream stability fixes
-      priority: Low
-      status: Not Started
-    - id: tigerdata-cloud-enhancements
-      file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
-      title: TigerData Cloud Enhancements
-      priority: Low
-      status: Not Started
+      - id: databend-3-mode-local-server-cloud
+        file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
+        title: Add 3-mode support to Databend platform (standalone / server / cloud)
+        priority: Low
+        status: Not Started
+      - id: bodo-jit-and-mpi-support
+        file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
+        title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
+        priority: Low
+        status: Not Started
+      - id: ballista-distributed-adapter
+        file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
+        title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
+        priority: Medium
+        status: Not Started
+      - id: siriusdb-adapter
+        file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
+        title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
+        priority: Low
+        status: Not Started
+      - id: velox-gluten-spark-adapter
+        file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
+        title: Add Velox + Gluten Spark Acceleration Platform Adapter
+        priority: Medium
+        status: Not Started
+      - id: motherduck-cloud-features
+        file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
+        title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
+        priority: High
+        status: Not Started
+      - id: reenable-fireducks-after-upstream-fixes
+        file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
+        title: Re-enable FireDucks after upstream stability fixes
+        priority: Low
+        status: Not Started
+      - id: tigerdata-cloud-enhancements
+        file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
+        title: TigerData Cloud Enhancements
+        priority: Low
+        status: Not Started
   Repository Maintenance:
     count: 1
     items:
-    - id: fix-git-author-history-rewrite
-      file: TODO/main/planning/fix-git-author-history-rewrite.yaml
-      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
-      priority: Low
-      status: Not Started
+      - id: fix-git-author-history-rewrite
+        file: TODO/main/planning/fix-git-author-history-rewrite.yaml
+        title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+        priority: Low
+        status: Not Started
   Supporting Infrastructure:
     count: 1
     items:
-    - id: future-ideas-backlog
-      file: TODO/main/planning/future-ideas-backlog.yaml
-      title: Future Ideas Backlog — Specialized Benchmarks and Infrastructure
-      priority: Low
-      status: Not Started
+      - id: future-ideas-backlog
+        file: TODO/main/planning/future-ideas-backlog.yaml
+        title: Future Ideas Backlog - Specialized Benchmarks and Infrastructure
+        priority: Low
+        status: Not Started
   Testing & Quality:
     count: 2
     items:
-    - id: add-hypothesis-property-tests
-      file: TODO/main/planning/add-hypothesis-property-tests.yaml
-      title: Add Hypothesis property-based tests for pure-function invariants
-      priority: Medium-High
-      status: Not Started
-    - id: timing-policy-split-review-followups
-      file: TODO/main/active/timing-policy-split-review-followups.yaml
-      title: Address follow-up findings from timing-policy pre-commit split review
-      priority: Medium
-      status: In Progress
+      - id: add-hypothesis-property-tests
+        file: TODO/main/planning/add-hypothesis-property-tests.yaml
+        title: Add Hypothesis property-based tests for pure-function invariants
+        priority: Medium-High
+        status: Not Started
+      - id: timing-policy-split-review-followups
+        file: TODO/main/active/timing-policy-split-review-followups.yaml
+        title: Address follow-up findings from timing-policy pre-commit split review
+        priority: Medium
+        status: In Progress
   Testing and Quality Assurance:
     count: 4
     items:
-    - id: graduate-browser-smoke-to-blocking-gates
-      file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
-      title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
-      priority: Medium
-      status: Not Started
-    - id: external-contributor-submission-dry-run
-      file: TODO/main/planning/external-contributor-submission-dry-run.yaml
-      title: Run a Phase 2 dry-run with one external trusted contributor
-      priority: High
-      status: Not Started
-    - id: validate-and-integrate-tpc-tuning-json
-      file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
-      title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
-      priority: Medium
-      status: Not Started
-    - id: verify-ci-validation-workflow-end-to-end
-      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
-      title: Verify the validate-submission CI workflow end-to-end with a real PR
-      priority: Critical
-      status: Not Started
+      - id: graduate-browser-smoke-to-blocking-gates
+        file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
+        title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
+        priority: Medium
+        status: Not Started
+      - id: external-contributor-submission-dry-run
+        file: TODO/main/planning/external-contributor-submission-dry-run.yaml
+        title: Run a Phase 2 dry-run with one external trusted contributor
+        priority: High
+        status: Not Started
+      - id: validate-and-integrate-tpc-tuning-json
+        file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
+        title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
+        priority: Medium
+        status: Not Started
+      - id: verify-ci-validation-workflow-end-to-end
+        file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+        title: Verify the validate-submission CI workflow end-to-end with a real PR
+        priority: Critical
+        status: Not Started

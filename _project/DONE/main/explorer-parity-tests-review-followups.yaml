@@ -18,7 +18,7 @@ work:
   needs: []
   status: done
   notes: |
-    chartMath.parity.test.ts:43-45 — FIXTURES_DIR resolves via a
+    chartMath.parity.test.ts:43-45 - FIXTURES_DIR resolves via a
     four-level `../../../../` relative path from __dirname:
       path.resolve(__dirname, "../../../../tests/parity/fixtures")
 
@@ -58,13 +58,13 @@ work:
   needs: []
   status: done
   notes: |
-    chartMath.ts — computePercentile(values: number[], p: number)
+    chartMath.ts - computePercentile(values: number[], p: number)
     returns undefined when values is empty, but this behavior is not
     documented.  Callers (computeBoxStats, elsewhere) depend on this
     silently.
 
     Add a one-line JSDoc comment:
-      /** Returns undefined for empty input — callers must handle null. */
+      /** Returns undefined for empty input - callers must handle null. */
 
     Low risk: behavior already tested by percentile_ladder fixture's
     null-result cases.
@@ -74,10 +74,10 @@ work:
   needs: []
   status: done
   notes: |
-    generate_visualization_fixtures.py — builder functions follow
+    generate_visualization_fixtures.py - builder functions follow
     two naming conventions:
       - Most: build_<chart_name>_fixture() e.g. build_heatmap_color_fixture
-      - Added: build_vs_slowest_ratio_fixture() — consistent
+      - Added: build_vs_slowest_ratio_fixture() - consistent
 
     But the BUILDERS list mixes positional and named patterns with
     no enforced contract.  Consider:

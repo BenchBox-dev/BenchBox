@@ -30,11 +30,11 @@ category: Core Functionality
 
 metadata:
   tags:
-  - tuning
-  - duckdb
-  - performance
-  - zone-maps
-  - data-loading
+    - tuning
+    - duckdb
+    - performance
+    - zone-maps
+    - data-loading
   estimated_effort: "Medium"
   created_date: "2026-01-07"
 
@@ -54,10 +54,10 @@ impact:
 
 files_affected:
   modified:
-  - "benchbox/platforms/base/data_loading.py"
-  - "benchbox/platforms/duckdb.py"
+    - "benchbox/platforms/base/data_loading.py"
+    - "benchbox/platforms/duckdb.py"
   added:
-  - "tests/unit/platforms/test_duckdb_sorted_loading.py"
+    - "tests/unit/platforms/test_duckdb_sorted_loading.py"
 
 context_sections:
   "Background and Motivation": |
@@ -83,71 +83,71 @@ context_sections:
     - DataLoader.load() → currently uses INSERT INTO, needs CTAS option
 
 success_metrics:
-- "Tuning config sorting is applied during DuckDB data loading"
-- "Loaded data has expected sortedness (run length metrics)"
-- "Zone map pruning confirmed via EXPLAIN output"
-- "Performance improvement matches expectations (3-10x for selective queries)"
+  - "Tuning config sorting is applied during DuckDB data loading"
+  - "Loaded data has expected sortedness (run length metrics)"
+  - "Zone map pruning confirmed via EXPLAIN output"
+  - "Performance improvement matches expectations (3-10x for selective queries)"
 
 must_preserve:
-- "Existing INSERT INTO loading path unchanged for non-sorted tables"
-- "DuckDB adapter backward compatible when no tuning config provided"
-- "benchbox run --platform duckdb --benchmark tpch --scale 0.01 produces identical row counts"
+  - "Existing INSERT INTO loading path unchanged for non-sorted tables"
+  - "DuckDB adapter backward compatible when no tuning config provided"
+  - "benchbox run --platform duckdb --benchmark tpch --scale 0.01 produces identical row counts"
 
 anti_patterns:
-- "DO NOT modify DataLoader.load() default behavior — because existing platforms depend on INSERT INTO — add CTAS as an opt-in
-  path triggered by tuning config"
-- "DO NOT remove INSERT INTO fallback — because not all platforms support CTAS — keep both paths"
+  - "DO NOT modify DataLoader.load() default behavior - because existing platforms depend on INSERT INTO - add CTAS as an opt-in
+    path triggered by tuning config"
+  - "DO NOT remove INSERT INTO fallback - because not all platforms support CTAS - keep both paths"
 
 verification:
-- description: "Existing DuckDB tests still pass"
-  command: "uv run -- python -m pytest tests/unit/platforms/test_duckdb*.py -v --tb=short"
-  expected_output: "all tests pass, 0 failures"
-- description: "Row counts match after CTAS vs INSERT INTO loading"
-  command: "uv run -- python -m pytest tests/ -k 'sorted or ctas' -v --tb=short"
-  expected_output: "all tests pass"
+  - description: "Existing DuckDB tests still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_duckdb*.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Row counts match after CTAS vs INSERT INTO loading"
+    command: "uv run -- python -m pytest tests/ -k 'sorted or ctas' -v --tb=short"
+    expected_output: "all tests pass"
 
 open_questions:
-- "Should this be DuckDB-specific or generalized for other platforms?"
-- "How to handle mixed scenarios (some tables sorted, some not)?"
-- "Should we support incremental/append loads with maintained sorting?"
+  - "Should this be DuckDB-specific or generalized for other platforms?"
+  - "How to handle mixed scenarios (some tables sorted, some not)?"
+  - "Should we support incremental/append loads with maintained sorting?"
 work:
-- id: w1
-  summary: "Document current data loading flow in DataLoader class"
-  status: done
-- id: w2
-  summary: "Identify integration point for tuning config in load path"
-  status: done
-- id: w3
-  summary: "Design CTAS-based loading strategy for DuckDB"
-  status: done
-- id: w4
-  summary: "Handle fresh load scenario (CTAS)"
-  needs:
-  - w3
-  status: done
-- id: w5
-  summary: "Handle append scenario (temp table + ordered insert)"
-  needs:
-  - w3
-  status: done
-- id: w6
-  summary: "Add tuning_config parameter to DataLoader"
-  status: done
-- id: w7
-  summary: "Implement DuckDB CTAS handler for sorted tables"
-  status: done
-- id: w8
-  summary: "Modify DuckDB adapter to pass tuning config to loader"
-  status: done
-- id: w9
-  summary: "Add generate_ctas_ddl usage in data loading path"
-  status: done
-- id: w10
-  summary: "Unit tests for sorted CTAS loading"
-  status: done
-- id: w11
-  summary: "Integration test: verify sortedness after load"
-  status: done
-- id: w12
-  summary: "Performance validation: confirm zone map pruning benefit"
-  status: done
+  - id: w1
+    summary: "Document current data loading flow in DataLoader class"
+    status: done
+  - id: w2
+    summary: "Identify integration point for tuning config in load path"
+    status: done
+  - id: w3
+    summary: "Design CTAS-based loading strategy for DuckDB"
+    status: done
+  - id: w4
+    summary: "Handle fresh load scenario (CTAS)"
+    needs:
+      - w3
+    status: done
+  - id: w5
+    summary: "Handle append scenario (temp table + ordered insert)"
+    needs:
+      - w3
+    status: done
+  - id: w6
+    summary: "Add tuning_config parameter to DataLoader"
+    status: done
+  - id: w7
+    summary: "Implement DuckDB CTAS handler for sorted tables"
+    status: done
+  - id: w8
+    summary: "Modify DuckDB adapter to pass tuning config to loader"
+    status: done
+  - id: w9
+    summary: "Add generate_ctas_ddl usage in data loading path"
+    status: done
+  - id: w10
+    summary: "Unit tests for sorted CTAS loading"
+    status: done
+  - id: w11
+    summary: "Integration test: verify sortedness after load"
+    status: done
+  - id: w12
+    summary: "Performance validation: confirm zone map pruning benefit"
+    status: done

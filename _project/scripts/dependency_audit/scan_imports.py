@@ -211,7 +211,7 @@ def main() -> int:
     tooling_imports = collect_python_imports(root, ["_project/scripts"])
     doc_imports = collect_doc_mentions(root)
 
-    # Merge — docs are tracked separately for visibility
+    # Merge - docs are tracked separately for visibility
     all_imports: dict[str, list[str]] = defaultdict(list)
     for k, v in py_imports.items():
         all_imports[k].extend(v)

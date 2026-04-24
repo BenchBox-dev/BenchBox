@@ -7,7 +7,7 @@ category: Testing and Quality Assurance
 
 description: |
   The 2026-04-15 review flagged that the matrix leaderboard relies heavily
-  on color to convey information — a known accessibility hazard. Color is
+  on color to convey information - a known accessibility hazard. Color is
   invisible to screen readers and insufficient for users with color vision
   deficiencies. The heatmap must remain readable without color.
 
@@ -24,7 +24,7 @@ description: |
      arrow keys navigate cells with an `aria-live` announcement.
 
   4. Backfills snapshot tests for the filter bar, empty states, and the
-     integration between BenchmarkIndex and QueryHeatmap — the prior TODO
+     integration between BenchmarkIndex and QueryHeatmap - the prior TODO
      only specified QueryHeatmap itself.
 
   5. Runs axe-core against the rendered matrix in the test suite and
@@ -90,9 +90,9 @@ files_affected:
   - "results-explorer/package.json (add axe-core dev dep)"
 
 must_preserve:
-- "Existing behavior of the matrix — accessibility is additive layering, not a rewrite"
-- "Current default color mode — high-contrast is an opt-in, not a default swap"
-- "Snapshot tests from explorer-matrix-leaderboard-view — this TODO extends, does not replace them"
+- "Existing behavior of the matrix - accessibility is additive layering, not a rewrite"
+- "Current default color mode - high-contrast is an opt-in, not a default swap"
+- "Snapshot tests from explorer-matrix-leaderboard-view - this TODO extends, does not replace them"
 
 approach: |
   Accessibility work is most reliably driven by the tests themselves.
@@ -110,13 +110,13 @@ approach: |
   Reference pattern: WAI-ARIA Authoring Practices grid pattern.
 
 anti_patterns:
-- "DO NOT rely on color alone — because 4% of users have color vision deficiencies and screen readers ignore color entirely
-  — include text and aria-label on every data-bearing element"
-- "DO NOT duplicate the component for high-contrast mode — because two components drift out of sync — use CSS custom properties
+- "DO NOT rely on color alone - because 4% of users have color vision deficiencies and screen readers ignore color entirely
+  - include text and aria-label on every data-bearing element"
+- "DO NOT duplicate the component for high-contrast mode - because two components drift out of sync - use CSS custom properties
   that switch on a class"
-- "DO NOT use tabindex=0 on every cell — because that makes keyboard nav painful (tab through 22×8 cells) — use roving tabindex
+- "DO NOT use tabindex=0 on every cell - because that makes keyboard nav painful (tab through 22×8 cells) - use roving tabindex
   so tab exits the grid quickly"
-- "DO NOT fail the build on minor axe violations — because minor issues include color-contrast edge cases we may accept —
+- "DO NOT fail the build on minor axe violations - because minor issues include color-contrast edge cases we may accept -
   fail only on serious/critical"
 
 scope_limit:

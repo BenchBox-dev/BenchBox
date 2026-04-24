@@ -17,7 +17,7 @@ description: |
   references) was deliberately deferred to its own slice because:
     - High blast radius: every benchmark execution path touches this file
     - Library-specific dispatch in many methods means not every Any can
-      become LazyFrameLike — some need concrete library types
+      become LazyFrameLike - some need concrete library types
     - Should land alongside ty diagnostic reduction (93 in dataframe layer
       today) so the gain is visible
 
@@ -34,17 +34,17 @@ work:
   status: done
 
 - id: w2
-  summary: "Migrate category (a) — generic-dispatch sites — to LazyFrameLike. One commit per ~20 sites for review bounding."
+  summary: "Migrate category (a) - generic-dispatch sites - to LazyFrameLike. One commit per ~20 sites for review bounding."
   needs: [w1]
   status: done
   notes: "Verified (a) count after hand-walking: only 2 genuine generic-dispatch sites
     (wrap_dataframe + UnifiedLazyFrame.join). Both migrated in commit 486c21640. The other
     23 heuristic-flagged (a) sites were re-classified as (b) library-specific or (c)
-    escape-hatch — see Heuristic limitations + Re-classification log in
+    escape-hatch - see Heuristic limitations + Re-classification log in
     docs/development/unified_frame_any_survey.md."
 
 - id: w3
-  summary: "Migrate category (b) — library-specific sites — to concrete types (e.g., polars.LazyFrame, pyspark.sql.DataFrame).
+  summary: "Migrate category (b) - library-specific sites - to concrete types (e.g., polars.LazyFrame, pyspark.sql.DataFrame).
     Use TYPE_CHECKING imports to preserve lazy-load semantics."
   needs: [w1]
   status: done
@@ -71,7 +71,7 @@ work:
   needs: [w2, w3, w4]
   status: done
   notes: "ty diagnostic count steady at 93 (= baseline) after every w2/w3/w4 commit. No new
-    errors surfaced — the prior Any annotations were not masking type errors in the migrated
+    errors surfaced - the prior Any annotations were not masking type errors in the migrated
     sites. Verified after final commit f137b20dc."
 
 files_affected:
@@ -79,7 +79,7 @@ files_affected:
   - "benchbox/platforms/dataframe/unified_frame.py"
 
 must_preserve:
-- "Runtime behavior of unified_frame.py unchanged — annotations only"
+- "Runtime behavior of unified_frame.py unchanged - annotations only"
 - "All dataframe-platform tests pass on Polars, Pandas, PyArrow at minimum"
 - "Lazy-loading of optional backends preserved (TYPE_CHECKING imports for library-specific types)"
 - "ty diagnostic count does not increase from baseline 93"
@@ -87,15 +87,15 @@ must_preserve:
 approach: |
   Sweep one method group at a time (join operations, group_by, expression
   classes) so review can focus on a coherent slice. Use ast tooling for
-  the survey to avoid grep false positives — Any can appear in
+  the survey to avoid grep false positives - Any can appear in
   type aliases, return positions, parameter positions, and dict/list
   generic args.
 
 anti_patterns:
-- "DO NOT migrate everything to LazyFrameLike — because not every Any is a generic-dispatch site — classify first"
-- "DO NOT add runtime isinstance() checks at every call — because that's slow and noisy — type-only at boundaries"
-- "DO NOT touch unified_frame.py runtime behavior — because that's a separate concern — annotations only"
-- "DO NOT bundle the survey + migration into one commit — because it loses the ability to revert just the migration — survey
+- "DO NOT migrate everything to LazyFrameLike - because not every Any is a generic-dispatch site - classify first"
+- "DO NOT add runtime isinstance() checks at every call - because that's slow and noisy - type-only at boundaries"
+- "DO NOT touch unified_frame.py runtime behavior - because that's a separate concern - annotations only"
+- "DO NOT bundle the survey + migration into one commit - because it loses the ability to revert just the migration - survey
   first, then migrate per category"
 
 verification:

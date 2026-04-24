@@ -10,19 +10,19 @@ description: |
   SF=1 ≈ 1 GB baselines for all adjustable benchmarks. This TODO addresses three categories of
   issue discovered when reviewing how those baselines scale at SF 10, 100, and 1000:
 
-  1. **Quadratic scaling (TSBS DevOps)** — both num_hosts and duration_days scale linearly with
+  1. **Quadratic scaling (TSBS DevOps)** - both num_hosts and duration_days scale linearly with
      SF, so total rows grow as SF². SF=10 produces ~93 GB instead of ~9.3 GB. SF=100 produces
      ~9.2 TB instead of ~93 GB. This violates the "SF=N ≈ N GB" mental model.
 
-  2. **Saturation ceilings (FlightData, NYC Taxi)** — these real-data benchmarks hit hard data
+  2. **Saturation ceilings (FlightData, NYC Taxi)** - these real-data benchmarks hit hard data
      ceilings and silently stop scaling. FlightData exhausts the BTS corpus (456 months) at
      SF≈11.12, capping at ~10.7 GB. NYC Taxi saturates sample_rate at 1.0 when SF≥10, capping
      at ~9.6 GB. Neither benchmark warns the user.
 
-  3. **Documentation errors** — scale factor tables in CoffeeShop, TSBS DevOps, and NYC Taxi
+  3. **Documentation errors** - scale factor tables in CoffeeShop, TSBS DevOps, and NYC Taxi
      docs contain incorrect projections that don't match actual code behavior.
 
-  The four purely-linear benchmarks (CoffeeShop, H2O.db, JoinOrder, AMPLab) scale correctly —
+  The four purely-linear benchmarks (CoffeeShop, H2O.db, JoinOrder, AMPLab) scale correctly -
   no code changes needed for those, only the CoffeeShop doc fix.
 
 context_sections:
@@ -45,7 +45,7 @@ context_sections:
         (c) Keep hosts primary with sub-linear days multiplier
 
       Option (a) is simplest and matches canonical TSBS scaling model (host count, not duration).
-      The original harmonize TODO's w3 research gate asked "hosts, duration, or both?" — for
+      The original harmonize TODO's w3 research gate asked "hosts, duration, or both?" - for
       linear scaling the answer is: scale hosts only, keep duration fixed.
 
       Additional low-SF note: max(10, ...) and max(1, ...) cause SF=0.01 and SF=0.1 to produce
@@ -55,7 +55,7 @@ context_sections:
     summary: |
       Code: benchbox/core/flightdata/downloader.py lines 84-96
         months = min(max(1, round(41 * SF)), 456)
-      BTS corpus spans Jan 1987 – Dec 2024 = 456 months. At SF≈11.12, all months are exhausted.
+      BTS corpus spans Jan 1987 - Dec 2024 = 456 months. At SF≈11.12, all months are exhausted.
 
       Projected sizes:
         SF=1:    41 months  = ~1.0 GB  ✓
@@ -64,13 +64,13 @@ context_sections:
         SF=1000: 456 months = ~10.7 GB (saturated, 99% under expected)
 
       No error or warning is raised. The min() silently caps.
-      Fix: add warning log at minimum. Accept the ceiling — real-data benchmarks naturally cap.
+      Fix: add warning log at minimum. Accept the ceiling - real-data benchmarks naturally cap.
 
   - name: "NYC Taxi Saturation at SF=10"
     summary: |
       Code: benchbox/core/nyctaxi/downloader.py (3 downloader classes)
         sample_rate = min(1.0, SF / 10)
-      At SF≥10, sample_rate clamps to 1.0 — full available dataset.
+      At SF≥10, sample_rate clamps to 1.0 - full available dataset.
 
       Projected sizes:
         SF=1:    sample_rate=0.1 → ~0.96 GB ✓
@@ -78,7 +78,7 @@ context_sections:
         SF=100:  sample_rate=1.0 → ~9.6 GB  (saturated)
         SF=1000: sample_rate=1.0 → ~9.6 GB  (saturated)
 
-      Same pattern as FlightData — silent saturation. Fix: warning log + documentation.
+      Same pattern as FlightData - silent saturation. Fix: warning log + documentation.
 
   - name: "Documentation Errors"
     summary: |
@@ -115,27 +115,27 @@ files_affected:
     change_type: modify
 
 must_preserve:
-  - "SF=1 baselines unchanged — the original harmonization is correct at SF=1"
+  - "SF=1 baselines unchanged - the original harmonization is correct at SF=1"
   - "All existing query sets, schemas, SQL files unchanged"
   - "Benchmarks must still produce valid data at SF=0.01 (CI/testing scale)"
   - "CompressionMixin behavior unchanged"
   - "Linear benchmarks (CoffeeShop, H2O.db, JOB, AMPLab) need no code changes"
 
 anti_patterns:
-  - "DO NOT introduce a global calibration multiplier layer — because it adds indirection that makes per-benchmark tuning harder — scale each benchmark's own parameters directly"
-  - "DO NOT change row counts for spec-locked benchmarks (TPC-H, TPC-DS, SSB) — because their row counts are defined by the TPC/SSB specifications — only adjustable benchmarks are in scope"
-  - "DO NOT add backwards-compatibility shims — because BenchBox is still in beta (v0.2.0) — change formulas directly"
-  - "DO NOT synthesize fake data without research gate approval — because the value of real-data benchmarks is historical authenticity — w3 (FlightData) and w5 (NYC Taxi) research gates must evaluate replication strategies before any synthetic data is added"
+  - "DO NOT introduce a global calibration multiplier layer - because it adds indirection that makes per-benchmark tuning harder - scale each benchmark's own parameters directly"
+  - "DO NOT change row counts for spec-locked benchmarks (TPC-H, TPC-DS, SSB) - because their row counts are defined by the TPC/SSB specifications - only adjustable benchmarks are in scope"
+  - "DO NOT add backwards-compatibility shims - because BenchBox is still in beta (v0.2.0) - change formulas directly"
+  - "DO NOT synthesize fake data without research gate approval - because the value of real-data benchmarks is historical authenticity - w3 (FlightData) and w5 (NYC Taxi) research gates must evaluate replication strategies before any synthetic data is added"
 
 verification:
   - description: "TSBS scaling is linear after fix"
-    command: "uv run -- python -c \"from benchbox.core.tsbs_devops.generator import TsbsDevopsGenerator; g1=TsbsDevopsGenerator(scale_factor=1); g10=TsbsDevopsGenerator(scale_factor=10); print(f'SF=1: {g1.num_hosts} hosts, {g1.duration_days} days'); print(f'SF=10: {g10.num_hosts} hosts, {g10.duration_days} days')\""
+    command: 'uv run -- python -c "from benchbox.core.tsbs_devops.generator import TsbsDevopsGenerator; g1=TsbsDevopsGenerator(scale_factor=1); g10=TsbsDevopsGenerator(scale_factor=10); print(f''SF=1: {g1.num_hosts} hosts, {g1.duration_days} days''); print(f''SF=10: {g10.num_hosts} hosts, {g10.duration_days} days'')"'
     expected_output: "SF=10 should show ~1000 hosts with same duration as SF=1 (2 days)"
   - description: "FlightData warns at ceiling"
-    command: "uv run -- python -c \"import logging; logging.basicConfig(level=logging.WARNING); from benchbox.core.flightdata.downloader import FlightDataDownloader; d=FlightDataDownloader(scale_factor=100)\" 2>&1 | grep -i warn"
+    command: 'uv run -- python -c "import logging; logging.basicConfig(level=logging.WARNING); from benchbox.core.flightdata.downloader import FlightDataDownloader; d=FlightDataDownloader(scale_factor=100)" 2>&1 | grep -i warn'
     expected_output: "Warning message about month ceiling being reached"
   - description: "NYC Taxi warns at saturation"
-    command: "uv run -- python -c \"import logging; logging.basicConfig(level=logging.WARNING); from benchbox.core.nyctaxi.downloader import NycTaxiYellowDownloader; d=NycTaxiYellowDownloader(scale_factor=100)\" 2>&1 | grep -i warn"
+    command: 'uv run -- python -c "import logging; logging.basicConfig(level=logging.WARNING); from benchbox.core.nyctaxi.downloader import NycTaxiYellowDownloader; d=NycTaxiYellowDownloader(scale_factor=100)" 2>&1 | grep -i warn'
     expected_output: "Warning message about sample_rate saturation at 1.0"
   - description: "Existing tests pass"
     command: "uv run -- python -m pytest tests/unit/generators/test_scale_factor_harmonization.py -v"
@@ -181,7 +181,7 @@ metadata:
   dependencies:
     - id: harmonize-scale-factor-baselines
       status: completed
-      relationship: "Direct follow-on — that TODO harmonized SF=1 baselines; this addresses large-SF behavior"
+      relationship: "Direct follow-on - that TODO harmonized SF=1 baselines; this addresses large-SF behavior"
   notes: |
     Priority is Medium because SF=1 is the common case and works correctly. Large-SF issues
     primarily affect power users running big benchmarks. The TSBS quadratic scaling is the most
@@ -189,7 +189,7 @@ metadata:
 
 work:
   - id: w1
-    summary: "Research TSBS quadratic scaling — evaluate options to achieve linear SF-to-size scaling"
+    summary: "Research TSBS quadratic scaling - evaluate options to achieve linear SF-to-size scaling"
     status: done
     needs: []
     notes: |
@@ -214,7 +214,7 @@ work:
       Output: recommend the best option with projected size table and implementation plan.
 
   - id: w2
-    summary: "TSBS DevOps — linearize scaling formula to fix quadratic growth"
+    summary: "TSBS DevOps - linearize scaling formula to fix quadratic growth"
     status: done
     needs: [w1]
     notes: |
@@ -223,25 +223,25 @@ work:
       output (it shouldn't if duration stays at 2 days for SF=1).
 
   - id: w3
-    summary: "Research FlightData ceiling — evaluate whether synthetic replication can extend scaling beyond SF≈11"
+    summary: "Research FlightData ceiling - evaluate whether synthetic replication can extend scaling beyond SF≈11"
     status: done
     needs: []
     notes: |
-      The BTS flight corpus spans 456 months (Jan 1987 – Dec 2024), exhausted at SF≈11.12.
+      The BTS flight corpus spans 456 months (Jan 1987 - Dec 2024), exhausted at SF≈11.12.
       Beyond that, FlightData silently caps at ~10.7 GB. Evaluate whether controlled synthetic
       replication of the source data could extend the ceiling to achieve linear scaling at
       higher scale factors.
 
       Research questions:
       1. What replication strategies preserve benchmark validity?
-         (a) Duplicate entire months with perturbed dates (shift year/month forward) — preserves
+         (a) Duplicate entire months with perturbed dates (shift year/month forward) - preserves
              seasonal patterns and carrier distributions but creates recognizable duplicates
          (b) Row-level sampling with replacement and field perturbation (jitter delays, swap
-             carriers, randomize flight numbers) — more realistic but harder to implement
+             carriers, randomize flight numbers) - more realistic but harder to implement
          (c) Tile-based replication: at SF=20, use all 456 real months + 364 replicated months
-             with a synthetic "era" column to distinguish — simple, transparent, auditable
+             with a synthetic "era" column to distinguish - simple, transparent, auditable
          (d) Weighted oversampling of recent years (more representative of modern traffic
-             patterns) — produces more realistic large-scale data but introduces bias
+             patterns) - produces more realistic large-scale data but introduces bias
       2. Does replication compromise the benchmark's value proposition? FlightData's strength
          is real historical data. If replicated data just duplicates query results (same carriers,
          same routes, same delays), does it actually stress-test the engine differently than
@@ -254,16 +254,16 @@ work:
          Phase 2 (SF > ~11): download all 456 months + generate replicated data to fill gap
       5. What metadata should replicated rows carry? A flag column (is_synthetic=true)?
          A replicated_from_month column? Or should replicas be indistinguishable?
-      6. Impact on query result validation — if result validators compare against expected
+      6. Impact on query result validation - if result validators compare against expected
          row counts, replication would change expected counts at high SF.
 
       Output: recommend one of:
-      (a) Implement replication strategy (specify which) — with implementation sketch
-      (b) Accept the ceiling — warn and document only (current deferred item d1 approach)
-      (c) Hybrid — warn at ceiling but offer an opt-in --benchmark-option replicate=true flag
+      (a) Implement replication strategy (specify which) - with implementation sketch
+      (b) Accept the ceiling - warn and document only (current deferred item d1 approach)
+      (c) Hybrid - warn at ceiling but offer an opt-in --benchmark-option replicate=true flag
 
   - id: w4
-    summary: "FlightData — add warning log when month ceiling is hit (and apply w3 findings)"
+    summary: "FlightData - add warning log when month ceiling is hit (and apply w3 findings)"
     status: done
     needs: [w3]
     notes: |
@@ -274,7 +274,7 @@ work:
       this is just the warning + docs.
 
   - id: w5
-    summary: "Research NYC Taxi expanded data — evaluate whether Green/HVFHV corpus extends the saturation ceiling"
+    summary: "Research NYC Taxi expanded data - evaluate whether Green/HVFHV corpus extends the saturation ceiling"
     status: done
     needs: []
     notes: |
@@ -284,7 +284,7 @@ work:
 
       Research questions:
       1. What is the total data volume for each taxi type at sample_rate=1.0?
-         - Yellow: ~9.6 GB (known). Green and HVFHV: unknown — measure or estimate.
+         - Yellow: ~9.6 GB (known). Green and HVFHV: unknown - measure or estimate.
       2. When all three types are enabled (taxi_types=yellow,green,hvfhv), what is the
          combined corpus size? If Green adds ~2 GB and HVFHV adds ~25 GB (rough estimate
          from fallback row counts in downloader), the combined ceiling could be ~37 GB.
@@ -304,18 +304,18 @@ work:
       (c) Leave as-is but document the different ceilings per configuration
 
   - id: w6
-    summary: "NYC Taxi — add warning log when sample_rate saturates at 1.0"
+    summary: "NYC Taxi - add warning log when sample_rate saturates at 1.0"
     status: done
     needs: [w5]
     notes: |
       In benchbox/core/nyctaxi/downloader.py, add a logger.warning() in all 3 downloader classes
       when sample_rate clamps to 1.0 (SF≥10). Message should explain: the full dataset is being
       used, no additional scaling possible beyond SF=10.
-      Apply any findings from w5 — if the expanded corpus (Green/HVFHV) changes the saturation
+      Apply any findings from w5 - if the expanded corpus (Green/HVFHV) changes the saturation
       ceiling or the SCALE_FACTOR_SAMPLE_DIVISOR, incorporate those changes here.
 
   - id: w7
-    summary: "Fix CoffeeShop doc table — order_lines counts ~2× overstated"
+    summary: "Fix CoffeeShop doc table - order_lines counts ~2× overstated"
     status: done
     needs: []
     notes: |
@@ -324,7 +324,7 @@ work:
       Recalculate all order_lines values in the table.
 
   - id: w8
-    summary: "Fix TSBS DevOps doc table — 3 errors in scale factor projections"
+    summary: "Fix TSBS DevOps doc table - 3 errors in scale factor projections"
     status: done
     needs: [w2]
     notes: |
@@ -333,13 +333,13 @@ work:
       should reflect the post-w2 linear formula. Wait for w2 to know the final formula.
 
   - id: w9
-    summary: "Fix NYC Taxi doc table — SF=100 projection impossible due to saturation"
+    summary: "Fix NYC Taxi doc table - SF=100 projection impossible due to saturation"
     status: done
     needs: [w6]
     notes: |
       docs/benchmarks/nyctaxi.md lines 254-260. SF=100 row claims ~960M trips / ~96 GB but
       code saturates at SF=10. Update table to show ceiling and reference the saturation warning.
-      Apply w5 research findings — if expanded corpus changes the ceiling, reflect that here.
+      Apply w5 research findings - if expanded corpus changes the ceiling, reflect that here.
 
   - id: w10
     summary: "Add scaling behavior notes to each affected benchmark's docs"
@@ -348,7 +348,7 @@ work:
     notes: |
       Add a "Scaling Behavior" or "Large Scale Factors" section to docs for TSBS DevOps,
       FlightData, and NYC Taxi explaining ceilings, saturation, or (post-fix) linear scaling.
-      FlightData does not currently have a docs/benchmarks/flightdata.md — either create one
+      FlightData does not currently have a docs/benchmarks/flightdata.md - either create one
       or add notes to the most appropriate existing location.
 
   - id: w11
@@ -362,20 +362,20 @@ work:
       that FlightData/NYC Taxi ceiling warnings are emitted at high SF.
 
   - id: w12
-    summary: "Cross-benchmark validation — verify projected sizes at SF=10"
+    summary: "Cross-benchmark validation - verify projected sizes at SF=10"
     status: done
     needs: [w2, w4, w6, w11]
     notes: |
-      After all fixes, verify projected sizes at SF=10 are within 0.5×–2.0× of the expected
+      After all fixes, verify projected sizes at SF=10 are within 0.5×-2.0× of the expected
       N×1GB for all adjustable benchmarks. This is a final integration check, not a unit test.
 
 deferred:
   - id: d1
     summary: "Extend FlightData beyond natural corpus via synthetic augmentation"
-    reason: "Evaluated in w3 research gate. If w3 recommends replication, this is superseded by w4. If w3 recommends ceiling-only, this remains deferred — real-data integrity is more valuable than arbitrary scaling."
+    reason: "Evaluated in w3 research gate. If w3 recommends replication, this is superseded by w4. If w3 recommends ceiling-only, this remains deferred - real-data integrity is more valuable than arbitrary scaling."
   - id: d2
     summary: "Extend NYC Taxi beyond natural corpus via synthetic augmentation"
     reason: "Same rationale as d1. However, w4 research may reveal that the expanded Green/HVFHV corpus already raises the ceiling significantly. Revisit after w4 findings."
   - id: d3
     summary: "Fix TSBS low-SF floor behavior (SF=0.01 and SF=0.1 produce identical output)"
-    reason: "Not critical — low SFs are primarily for CI/testing where exact size doesn't matter. Document rather than fix."
+    reason: "Not critical - low SFs are primarily for CI/testing where exact size doesn't matter. Document rather than fix."

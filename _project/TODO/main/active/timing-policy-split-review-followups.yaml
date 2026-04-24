@@ -28,7 +28,7 @@ work:
     re-run install.
 
     Without local pre-push enforcement, fast-lane violations are caught
-    only in CI (.github/workflows/lint.yml:40) — the exact regression the
+    only in CI (.github/workflows/lint.yml:40) - the exact regression the
     Fix 1 change was meant to prevent.
 
     Decide between:
@@ -46,12 +46,12 @@ work:
   needs: []
   status: pending
   notes: |
-    tests/conftest.py:270 — the dead marker gate was removed because
+    tests/conftest.py:270 - the dead marker gate was removed because
     `session.items` is empty at `pytest_sessionstart` (pre-collection).
     Consequence: DB setup via `tests/databases/create_test_databases.py`
     runs on every pytest invocation, including `-m fast`.
 
-    Currently harmless — DB creation is idempotent and cheap.  If the
+    Currently harmless - DB creation is idempotent and cheap.  If the
     subprocess cost grows past ~1s (e.g., more test-DB fixtures are
     added), re-introduce the gate in `pytest_collection_modifyitems`
     where `session.items` is populated.
@@ -66,7 +66,7 @@ work:
   needs: []
   status: done
   notes: |
-    _project/scripts/timing_policy_check.py:18,26 — `_load_allowlist`
+    _project/scripts/timing_policy_check.py:18,26 - `_load_allowlist`
     returns `list[dict[str, Any]]` and `_load_fast_lane_policy` returns
     `dict[str, Any]`.
 

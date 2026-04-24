@@ -15,7 +15,7 @@ description: "Add dual-family DataFrame query implementations (expression + pand
   \ clauses (comma-separated tables with WHERE join\n   conditions) must be translated\
   \ to explicit .join() sequences\n3. LIKE patterns with wildcards need string method\
   \ equivalents\n4. Join order matters for performance, and DataFrame APIs may not\
-  \ preserve the\n   optimizer stress-testing intent — document this caveat\n\nThe\
+  \ preserve the\n   optimizer stress-testing intent - document this caveat\n\nThe\
   \ purpose of DataFrame JoinOrder is NOT to test optimizer join ordering (DataFrames\n\
   define explicit join order), but to measure multi-join execution performance across\n\
   platforms with identical join sequences.\n"
@@ -42,12 +42,12 @@ work:
   needs:
   - w1
   status: done
-  notes: "More complex queries with 5-8 table joins:\n\n- 5a: 5 tables — European\
-    \ movies with theatrical release notes\n- 6a: 5 tables — Superhero movies with\
+  notes: "More complex queries with 5-8 table joins:\n\n- 5a: 5 tables - European\
+    \ movies with theatrical release notes\n- 6a: 5 tables - Superhero movies with\
     \ specific actor (LIKE + IN)\n- 7a: 8 tables (aka_name, cast_info, info_type,\
-    \ link_type, movie_link, name,\n  person_info, title) — most complex join chain,\
+    \ link_type, movie_link, name,\n  person_info, title) - most complex join chain,\
     \ BETWEEN on production_year,\n  gender filter, name_pcode_cf LIKE\n- 8a: 7 tables\
-    \ — Japanese dubbed movies, role_type filter, NOT LIKE\n- 9a: 8 tables — American\
+    \ - Japanese dubbed movies, role_type filter, NOT LIKE\n- 9a: 8 tables - American\
     \ voice actresses, BETWEEN on year, IN on ci.note,\n  person_role_id join to char_name\n\
     \nKey challenge: 7a and 9a have 8-table joins requiring careful join sequencing.\n\
     Choose join order that matches natural FK relationships in the IMDB schema.\n"
@@ -57,13 +57,13 @@ work:
   needs:
   - w1
   status: done
-  notes: "The most complex queries:\n\n- 10a: 7 tables — American producers, company_type\
+  notes: "The most complex queries:\n\n- 10a: 7 tables - American producers, company_type\
     \ + role_type filters\n- 11a: 9 tables (company_name, company_type, keyword, link_type,\
-    \ movie_companies,\n  movie_info, movie_keyword, movie_link, title) — most tables\
+    \ movie_companies,\n  movie_info, movie_keyword, movie_link, title) - most tables\
     \ in any query,\n  country_code != '[pl]', LIKE on cn.name, IS NULL check on mc.note\n\
-    - 12a: 8 tables — Drama/horror movies with high ratings, double info_type join\n\
+    - 12a: 8 tables - Drama/horror movies with high ratings, double info_type join\n\
     \  (it1 for genres, it2 for rating), compound conditions\n\n11a is the most complex\
-    \ query in the benchmark — plan the join sequence carefully\naround the title\
+    \ query in the benchmark - plan the join sequence carefully\naround the title\
     \ table as the central fact table.\n"
 - id: w4
   summary: Create pandas-family implementations for queries 1a-6a (simpler joins)
@@ -103,11 +103,11 @@ work:
   - w3
   status: done
   notes: "Add pandas_impl functions for queries 7a, 8a, 9a, 10a, 11a, 12a (6 queries).\n\
-    Same translation patterns as w4.\n\n7a-9a have 7-8 table joins — the sequential\
+    Same translation patterns as w4.\n\n7a-9a have 7-8 table joins - the sequential\
     \ pd.merge() chain will be long.\nUse descriptive intermediate variable names\
     \ for readability:\n  merged_title_mc = pd.merge(title, movie_companies, ...)\n\
     \  merged_with_cn = pd.merge(merged_title_mc, company_name, ...)\n\n11a (9 tables)\
-    \ is the most complex — test this one carefully.\n"
+    \ is the most complex - test this one carefully.\n"
 - id: w6
   summary: Wire up JoinOrder benchmark class and registry for DataFrame dispatch
   needs:
@@ -130,7 +130,7 @@ work:
     \ are non-empty (queries with valid data should return rows)\n- Test LIKE/IN/NOT\
     \ LIKE predicates filter correctly\n- Mark tests @pytest.mark.fast where possible\n"
 deferred:
-- summary: Benchmark join order sensitivity — measure if different .join() sequences
+- summary: Benchmark join order sensitivity - measure if different .join() sequences
     change performance
   reason: Research question, not implementation work. Could inform future variant
     generation for DataFrame join ordering.
@@ -150,7 +150,7 @@ metadata:
 impact:
   business_value: 'Enables JoinOrder benchmark on DataFrame platforms, measuring multi-join
 
-    execution performance — a key differentiator between lazy (Polars) and
+    execution performance - a key differentiator between lazy (Polars) and
 
     eager (Pandas) evaluation strategies. Complements TPC-H by focusing
 
@@ -170,7 +170,7 @@ files_affected:
   - benchbox/core/joinorder/benchmark.py
   - benchbox/core/benchmark_registry.py
 must_preserve:
-- JoinOrderBenchmark SQL execution path unchanged — embedded queries and file-loaded
+- JoinOrderBenchmark SQL execution path unchanged - embedded queries and file-loaded
   queries work identically
 - JoinOrderGenerator synthetic data generation produces files loadable by both SQL
   and DataFrame paths
@@ -191,17 +191,17 @@ implementation_order: 'Implement SECOND, after df-support-flightdata establishes
 
   Reuse the same file structure and registration approach. All 5 DataFrame support
 
-  TODOs modify benchmark_registry.py — sequential implementation avoids merge conflicts.
+  TODOs modify benchmark_registry.py - sequential implementation avoids merge conflicts.
 
   '
 anti_patterns:
-- DO NOT attempt to replicate SQL optimizer stress-testing in DataFrame mode — because
-  DataFrame APIs define explicit join order, there is no optimizer to stress — focus
+- DO NOT attempt to replicate SQL optimizer stress-testing in DataFrame mode - because
+  DataFrame APIs define explicit join order, there is no optimizer to stress - focus
   on correct multi-join execution and performance measurement
-- DO NOT use nested loops or iterative joins — because that destroys performance —
+- DO NOT use nested loops or iterative joins - because that destroys performance -
   use chained .join() calls that the DataFrame engine can optimize
-- DO NOT assume table aliases from SQL map to DataFrame variables — because IMDB schema
-  has self-referential patterns — use descriptive variable names (e.g., info_type_genre,
+- DO NOT assume table aliases from SQL map to DataFrame variables - because IMDB schema
+  has self-referential patterns - use descriptive variable names (e.g., info_type_genre,
   info_type_rating for the double it join in 12a)
 verification:
 - description: All 13 DataFrame queries are registered

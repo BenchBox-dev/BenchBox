@@ -35,57 +35,57 @@ description: |
 category: Platform Expansion
 
 work:
-- id: w1
-  summary: "Fix Databend config builder — export _build_databend_config from __init__.py or move to __init__.py"
-  status: done
-  notes: "Follow Databricks pattern: move builder to __init__.py, remove eager registration from adapter.py:912-918"
+  - id: w1
+    summary: "Fix Databend config builder - export _build_databend_config from __init__.py or move to __init__.py"
+    status: done
+    notes: "Follow Databricks pattern: move builder to __init__.py, remove eager registration from adapter.py:912-918"
 
-- id: w2
-  summary: "Add LakeSail to adapter_factory._get_dataframe_adapter() mapping"
-  status: done
-  notes: "adapter_factory.py:232-240 — add 'lakesail' entry matching pattern of other DF platforms"
+  - id: w2
+    summary: "Add LakeSail to adapter_factory._get_dataframe_adapter() mapping"
+    status: done
+    notes: "adapter_factory.py:232-240 - add 'lakesail' entry matching pattern of other DF platforms"
 
-- id: w3
-  summary: "Add lakesail extra to pyproject.toml"
-  status: done
-  notes: 'Add lakesail = ["pyspark>=3.4.0"] to [project.optional-dependencies]'
+  - id: w3
+    summary: "Add lakesail extra to pyproject.toml"
+    status: done
+    notes: 'Add lakesail = ["pyspark>=3.4.0"] to [project.optional-dependencies]'
 
-- id: w4
-  summary: "Add StarRocks stub implementation to tests/integration/platforms/common.py"
-  status: done
-  notes: "Add StarRocksStubState, _StarRocksCursor, _StarRocksConnection, install_starrocks_stub"
+  - id: w4
+    summary: "Add StarRocks stub implementation to tests/integration/platforms/common.py"
+    status: done
+    notes: "Add StarRocksStubState, _StarRocksCursor, _StarRocksConnection, install_starrocks_stub"
 
-- id: w5
-  summary: "Fix pg_duckdb from_config() to pass deployment_mode and motherduck_token"
-  status: done
-  notes: "pg_duckdb.py:116-165 — add keys to the passthrough loop or extract explicitly"
+  - id: w5
+    summary: "Fix pg_duckdb from_config() to pass deployment_mode and motherduck_token"
+    status: done
+    notes: "pg_duckdb.py:116-165 - add keys to the passthrough loop or extract explicitly"
 
-- id: w6
-  summary: "Fix pg_duckdb/pg_mooncake create_connection() exception handling — re-raise or narrow catch"
-  status: done
-  notes: "pg_duckdb.py:261-265, pg_mooncake.py:171-175 — silently returning aborted connections corrupts results"
+  - id: w6
+    summary: "Fix pg_duckdb/pg_mooncake create_connection() exception handling - re-raise or narrow catch"
+    status: done
+    notes: "pg_duckdb.py:261-265, pg_mooncake.py:171-175 - silently returning aborted connections corrupts results"
 
-- id: w7
-  summary: "Add tests verifying all fixed runtime paths work"
-  needs: [w1, w2, w3, w4, w5, w6]
-  status: done
+  - id: w7
+    summary: "Add tests verifying all fixed runtime paths work"
+    needs: [w1, w2, w3, w4, w5, w6]
+    status: done
 
 metadata:
   tags:
-  - runtime-crash
-  - integration
-  - config-builder
-  - adapter-factory
-  - code-review-finding
+    - runtime-crash
+    - integration
+    - config-builder
+    - adapter-factory
+    - code-review-finding
   estimated_effort: 2 days
   created_date: "2026-02-15"
   owners:
-  - joe
+    - joe
 
 must_preserve:
-- "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-- "Existing adapter_factory paths for duckdb, polars-df, pandas-df continue working"
-- "benchbox run --platform duckdb --benchmark tpch still works end-to-end"
+  - "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  - "Existing adapter_factory paths for duckdb, polars-df, pandas-df continue working"
+  - "benchbox run --platform duckdb --benchmark tpch still works end-to-end"
 
 approach: |
   Each fix is independent and can be addressed in any order:
@@ -103,29 +103,29 @@ approach: |
   and narrow the exception handling in create_connection() to specific expected exceptions.
 
 verification:
-- description: "All platform adapter tests pass"
-  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
-  expected_output: "all tests pass"
-- description: "Databend config builder resolves"
-  command: "uv run -- python -c \"from benchbox.platforms.databend import DatabendAdapter; print('OK')\""
-  expected_output: "OK"
-- description: "LakeSail DF adapter is discoverable"
-  command: "uv run -- python -c \"from benchbox.platforms.adapter_factory import get_adapter; print('OK')\""
-  expected_output: "OK"
+  - description: "All platform adapter tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+    expected_output: "all tests pass"
+  - description: "Databend config builder resolves"
+    command: 'uv run -- python -c "from benchbox.platforms.databend import DatabendAdapter; print(''OK'')"'
+    expected_output: "OK"
+  - description: "LakeSail DF adapter is discoverable"
+    command: 'uv run -- python -c "from benchbox.platforms.adapter_factory import get_adapter; print(''OK'')"'
+    expected_output: "OK"
 
 scope_limit:
   only_modify:
-  - "benchbox/platforms/databend/__init__.py"
-  - "benchbox/platforms/databend/adapter.py"
-  - "benchbox/platforms/adapter_factory.py"
-  - "benchbox/platforms/lakesail.py"
-  - "benchbox/platforms/pg_duckdb.py"
-  - "benchbox/platforms/pg_mooncake.py"
-  - "pyproject.toml"
-  - "tests/integration/platforms/common.py"
-  - "tests/unit/platforms/test_databend_adapter.py"
-  - "tests/unit/platforms/test_pg_duckdb_adapter.py"
-  - "tests/unit/platforms/test_pg_mooncake_adapter.py"
+    - "benchbox/platforms/databend/__init__.py"
+    - "benchbox/platforms/databend/adapter.py"
+    - "benchbox/platforms/adapter_factory.py"
+    - "benchbox/platforms/lakesail.py"
+    - "benchbox/platforms/pg_duckdb.py"
+    - "benchbox/platforms/pg_mooncake.py"
+    - "pyproject.toml"
+    - "tests/integration/platforms/common.py"
+    - "tests/unit/platforms/test_databend_adapter.py"
+    - "tests/unit/platforms/test_pg_duckdb_adapter.py"
+    - "tests/unit/platforms/test_pg_mooncake_adapter.py"
   do_not_modify:
-  - "benchbox/core/runner.py"
-  - "benchbox/platforms/duckdb.py"
+    - "benchbox/core/runner.py"
+    - "benchbox/platforms/duckdb.py"

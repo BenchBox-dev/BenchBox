@@ -142,10 +142,10 @@ approach: |
   a Pandas-compatible API with a different execution backend.
 
 anti_patterns:
-  - "DO NOT modify PandasFamilyAdapter — because Bodo is just another consumer of the base class — keep all Bodo-specific code in bodo_df.py"
-  - "DO NOT require Bodo installation for unit tests — because Bodo has heavy dependencies (MPI, Numba) not available in CI — mock bodo imports in tests"
-  - "DO NOT add @bodo.jit decorators directly in adapter methods — because the adapter must work with or without JIT — handle JIT compilation optionally"
-  - "DO NOT add bodo as a required project dependency — because it is an optional platform — use conditional imports with BODO_AVAILABLE flag"
+  - "DO NOT modify PandasFamilyAdapter - because Bodo is just another consumer of the base class - keep all Bodo-specific code in bodo_df.py"
+  - "DO NOT require Bodo installation for unit tests - because Bodo has heavy dependencies (MPI, Numba) not available in CI - mock bodo imports in tests"
+  - "DO NOT add @bodo.jit decorators directly in adapter methods - because the adapter must work with or without JIT - handle JIT compilation optionally"
+  - "DO NOT add bodo as a required project dependency - because it is an optional platform - use conditional imports with BODO_AVAILABLE flag"
 
 verification:
   - description: "Bodo adapter imports correctly when bodo is available"
@@ -193,7 +193,7 @@ technical_requirements:
     - "Bodo requires MPI runtime for multi-process execution"
     - "Not all Pandas operations are supported by Bodo's JIT compiler"
     - "Type inference is stricter than standard Pandas"
-    - "Bodo is a commercial product — community edition has limitations"
+    - "Bodo is a commercial product - community edition has limitations"
 
 success_metrics:
   - "BodoDataFrameAdapter class implemented and importable"
@@ -203,6 +203,6 @@ success_metrics:
   - "No regressions in existing dataframe platform tests"
 
 open_questions:
-  - "Which Bodo edition to target — community (free) or enterprise? Community edition may have scale or feature limitations."
+  - "Which Bodo edition to target - community (free) or enterprise? Community edition may have scale or feature limitations."
   - "Should the adapter support @bodo.jit compilation of query functions, or only use Bodo's Pandas-compatible I/O? JIT compilation adds complexity but is Bodo's main value proposition."
-  - "How to handle MPI initialization in the adapter — should the adapter manage mpi4py setup, or require the user to launch with mpiexec?"
+  - "How to handle MPI initialization in the adapter - should the adapter manage mpi4py setup, or require the user to launch with mpiexec?"

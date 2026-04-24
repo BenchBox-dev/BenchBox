@@ -6,8 +6,8 @@
 # three conditions hold:
 #
 #   1. The package IS declared in pyproject.toml (core, extras, or dep-group).
-#   2. The package has NO import statement in the scan paths — not even a
-#      guarded `try: import X` block — because the AST scanner finds those too.
+#   2. The package has NO import statement in the scan paths - not even a
+#      guarded `try: import X` block - because the AST scanner finds those too.
 #   3. The package is legitimately optional (e.g. GPU-only, private distrib.).
 #
 # IMPORTANT: packages with guarded try/except imports are found by the AST
@@ -18,7 +18,7 @@
 # future maintainers can verify the declaration is still current.
 
 # --------------------------------------------------------------------------
-# NVIDIA RAPIDS / CUDA stack — optional GPU acceleration.
+# NVIDIA RAPIDS / CUDA stack - optional GPU acceleration.
 #
 # NOTE: cudf/cupy/cuml are currently NOT declared as packages in pyproject.toml;
 # extras:cudf = [] is an empty placeholder.  These entries are therefore never
@@ -29,10 +29,10 @@
 #
 # As of this writing, cudf and cupy DO have guarded try/except import sites in
 # benchbox/platforms/dataframe/cudf_df.py, so the AST scanner would find them
-# even if they were declared — they would pass via import sites, not allowlist.
+# even if they were declared - they would pass via import sites, not allowlist.
 # --------------------------------------------------------------------------
 cudf:
-  reason: "GPU DataFrame backend; guarded import in cudf_df.py. extras:cudf is currently an empty placeholder — not yet a declared package."
+  reason: "GPU DataFrame backend; guarded import in cudf_df.py. extras:cudf is currently an empty placeholder - not yet a declared package."
   extras_group: "extras:cudf"
 
 cupy:

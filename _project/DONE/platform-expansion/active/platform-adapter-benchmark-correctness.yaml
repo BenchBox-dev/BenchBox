@@ -6,7 +6,7 @@ status: Completed
 completed_date: "2026-02-15"
 description: |
   Adversarial code reviews identified three issues that directly corrupt benchmark
-  measurement accuracy — the core purpose of BenchBox:
+  measurement accuracy - the core purpose of BenchBox:
 
   1. **Databend result cache never disabled** (PR #29): disable_result_cache=True is
      stored but never applied. Queries may return cached results, inflating performance
@@ -22,7 +22,7 @@ description: |
      the cluster, not just the benchmark session. If another workload is running, it gets
      disrupted. Should use session-level SET without the global keyword.
 
-  These are Critical priority because they silently produce wrong benchmark results —
+  These are Critical priority because they silently produce wrong benchmark results -
   the most dangerous class of bug in a benchmarking tool.
 
 category: Platform Expansion
@@ -31,17 +31,17 @@ work:
 - id: w1
   summary: "Fix Databend: apply disable_result_cache in configure_for_benchmark() or create_connection()"
   status: done
-  notes: "databend/adapter.py:128, 640-648 — execute SET enable_query_result_cache = 0"
+  notes: "databend/adapter.py:128, 640-648 - execute SET enable_query_result_cache = 0"
 
 - id: w2
   summary: "Fix Databend: move USE database out of timed query execution"
   status: done
-  notes: "databend/adapter.py:506-510 — issue USE during connection setup, or start timer after USE"
+  notes: "databend/adapter.py:506-510 - issue USE during connection setup, or start timer after USE"
 
 - id: w3
   summary: "Fix Doris: change SET global to session-level SET in configure_for_benchmark()"
   status: done
-  notes: "doris.py:544, 550, 556 — remove 'global' keyword from SET statements"
+  notes: "doris.py:544, 550, 556 - remove 'global' keyword from SET statements"
 
 - id: w4
   summary: "Add tests verifying cache disable and timing isolation"
@@ -73,14 +73,14 @@ approach: |
   Databend timing: Move USE database into create_connection() after connection
   is established, before returning. Remove from execute_query().
 
-  Doris: Simple text replacement — remove 'global ' from each SET statement
+  Doris: Simple text replacement - remove 'global ' from each SET statement
   in configure_for_benchmark().
 
 anti_patterns:
-- "DO NOT add timing workarounds — because the timer should measure only the query — move the USE statement to connection
+- "DO NOT add timing workarounds - because the timer should measure only the query - move the USE statement to connection
   setup"
-- "DO NOT add global settings back as a configurable option — because session-level settings are always correct for benchmarking
-  — remove global entirely"
+- "DO NOT add global settings back as a configurable option - because session-level settings are always correct for benchmarking
+  - remove global entirely"
 
 verification:
 - description: "Databend adapter tests pass"

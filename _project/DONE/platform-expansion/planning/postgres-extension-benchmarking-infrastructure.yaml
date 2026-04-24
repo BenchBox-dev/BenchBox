@@ -13,7 +13,7 @@ description: |
   comparison framework, and Docker-based test infrastructure needed to support
   a growing family of PostgreSQL extensions efficiently.
 
-  This is NOT about creating a new abstract base class — PostgreSQLAdapter
+  This is NOT about creating a new abstract base class - PostgreSQLAdapter
   already serves that role well. Instead, this is about:
 
   1. Docker Compose templates for spinning up PostgreSQL with specific extensions
@@ -34,11 +34,11 @@ context_sections:
     - Users want to compare extensions against vanilla PostgreSQL
 
     Current and planned PostgreSQL extensions:
-    - TimescaleDB (supported) — time-series hypertables
-    - pg_duckdb (planned) — DuckDB vectorized execution on heap tables
-    - pg_mooncake (planned) — columnstore tables with DuckDB execution
-    - pg_analytics/ParadeDB (future) — DuckDB-powered data lake analytics
-    - Citus (future) — distributed PostgreSQL
+    - TimescaleDB (supported) - time-series hypertables
+    - pg_duckdb (planned) - DuckDB vectorized execution on heap tables
+    - pg_mooncake (planned) - columnstore tables with DuckDB execution
+    - pg_analytics/ParadeDB (future) - DuckDB-powered data lake analytics
+    - Citus (future) - distributed PostgreSQL
 
     Shared infrastructure reduces per-extension implementation effort from
     ~4 days to ~2 days by providing reusable Docker configs, test fixtures,
@@ -106,7 +106,7 @@ technical_requirements:
 
 must_preserve:
 - "Existing TimescaleDB adapter and tests unchanged"
-- "PostgreSQLAdapter base class unchanged — no new abstract methods"
+- "PostgreSQLAdapter base class unchanged - no new abstract methods"
 - "Platform registry behavior for all existing platforms unchanged"
 
 approach: |
@@ -138,11 +138,11 @@ approach: |
      - Benchmarking guide with recommended comparisons
 
 anti_patterns:
-- "DO NOT create a new PostgreSQLExtensionAdapter abstract class — because PostgreSQLAdapter already provides the right abstraction
-  — each extension adapts at its own override points"
-- "DO NOT merge Docker Compose files into a single file — because extensions conflict with each other — keep separate compose
+- "DO NOT create a new PostgreSQLExtensionAdapter abstract class - because PostgreSQLAdapter already provides the right abstraction
+  - each extension adapts at its own override points"
+- "DO NOT merge Docker Compose files into a single file - because extensions conflict with each other - keep separate compose
   files per extension"
-- "DO NOT add extension-specific logic to the PostgreSQL base adapter — because that couples unrelated extensions — each extension
+- "DO NOT add extension-specific logic to the PostgreSQL base adapter - because that couples unrelated extensions - each extension
   adapter handles its own setup"
 
 verification:
@@ -189,15 +189,15 @@ work:
     load time)"
   needs: [w2]
   status: done
-  notes: "Template format only — actual comparison implementation is in individual adapter items"
+  notes: "Template format only - actual comparison implementation is in individual adapter items"
 
 deferred:
 - summary: "Automated multi-extension comparison pipeline (run baseline + all extensions sequentially)"
-  reason: "Requires orchestration layer beyond current benchbox run — design separately"
+  reason: "Requires orchestration layer beyond current benchbox run - design separately"
 - summary: "CI/CD integration tests with Docker-based PostgreSQL extensions"
-  reason: "Requires Docker-in-Docker or dedicated CI runners — handle with CI infrastructure"
+  reason: "Requires Docker-in-Docker or dedicated CI runners - handle with CI infrastructure"
 - summary: "pg_analytics (ParadeDB) and Citus extension support"
-  reason: "Lower priority than pg_duckdb and pg_mooncake — plan after initial extensions are stable"
+  reason: "Lower priority than pg_duckdb and pg_mooncake - plan after initial extensions are stable"
 
 open_questions:
 - "Should Docker Compose files live in docker/ at project root or alongside platform code?"

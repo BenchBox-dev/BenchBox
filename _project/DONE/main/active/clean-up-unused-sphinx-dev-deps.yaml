@@ -8,10 +8,10 @@ category: Code Quality and Technical Debt
 description: |
   Two Sphinx-related deps are declared but inert:
 
-  - `sphinx-rtd-theme>=3.1.0` (`pyproject.toml` line 487) — `docs/conf.py`
+  - `sphinx-rtd-theme>=3.1.0` (`pyproject.toml` line 487) - `docs/conf.py`
     sets `html_theme = "furo"`. The rtd theme is never loaded. Not
     referenced anywhere in repo source.
-  - `sphinx-copybutton>=0.5.2` (`pyproject.toml` line 491) — `docs/conf.py`
+  - `sphinx-copybutton>=0.5.2` (`pyproject.toml` line 491) - `docs/conf.py`
     extensions list does **not** include `"sphinx_copybutton"`. The
     package is installed but Sphinx will not activate it.
 
@@ -63,14 +63,14 @@ approach: |
   Two-line removal in pyproject.toml. Verify by building the docs.
 
 anti_patterns:
-  - "DO NOT touch `docs/conf.py` extensions list — because the goal is removal, not feature work — file a separate TODO if copy buttons are wanted later"
+  - "DO NOT touch `docs/conf.py` extensions list - because the goal is removal, not feature work - file a separate TODO if copy buttons are wanted later"
 
 verification:
   - description: "Both deps absent from pyproject"
-    command: "uv run -- python -c \"import pathlib; t = pathlib.Path('pyproject.toml').read_text(); assert 'sphinx-rtd-theme' not in t, 'sphinx-rtd-theme still present'; assert 'sphinx-copybutton' not in t, 'sphinx-copybutton still present'; print('OK: both removed')\""
+    command: 'uv run -- python -c "import pathlib; t = pathlib.Path(''pyproject.toml'').read_text(); assert ''sphinx-rtd-theme'' not in t, ''sphinx-rtd-theme still present''; assert ''sphinx-copybutton'' not in t, ''sphinx-copybutton still present''; print(''OK: both removed'')"'
     expected_output: "OK: both removed"
   - description: "Docs build still succeeds (replace with project docs target)"
-    command: "uv run -- python -c \"import importlib; m = importlib.import_module('sphinx'); print('sphinx importable:', m.__version__)\""
+    command: 'uv run -- python -c "import importlib; m = importlib.import_module(''sphinx''); print(''sphinx importable:'', m.__version__)"'
     expected_output: "sphinx importable: <version>"
 
 scope_limit:
@@ -91,7 +91,7 @@ metadata:
 
 impact:
   business_value: |
-    Cleaner dev install — two fewer Sphinx packages that contribute nothing
+    Cleaner dev install - two fewer Sphinx packages that contribute nothing
     to the actual docs build.
   user_impact: |
     None for end users. Slightly faster `uv sync --group dev` for contributors.

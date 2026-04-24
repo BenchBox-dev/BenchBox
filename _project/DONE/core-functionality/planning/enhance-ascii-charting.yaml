@@ -12,14 +12,14 @@ description: |
   Unicode fallbacks.
 
   Key enhancements needed:
-  1. Paired comparison bar chart — side-by-side bars (e.g., SQL vs DataFrame) with inline percentage
+  1. Paired comparison bar chart - side-by-side bars (e.g., SQL vs DataFrame) with inline percentage
      change annotations, regression/improvement color coding, and scale notes
-  2. Diverging bar chart — centered-zero horizontal bars showing regression/improvement distribution,
+  2. Diverging bar chart - centered-zero horizontal bars showing regression/improvement distribution,
      sorted by magnitude, with overflow arrows for outliers
-  3. Summary box — bordered panel with key aggregate metrics (geo mean, total time, improved/stable/
+  3. Summary box - bordered panel with key aggregate metrics (geo mean, total time, improved/stable/
      regressed counts, worst/best queries)
-  4. Inline percentage annotations — "+23%", "-57%", "← !" markers alongside bars
-  5. Intelligent truncation — handle outliers (e.g., Q21 +726%) by truncating bars with indicators
+  4. Inline percentage annotations - "+23%", "-57%", "← !" markers alongside bars
+  5. Intelligent truncation - handle outliers (e.g., Q21 +726%) by truncating bars with indicators
      rather than compressing the entire scale
 
   Library evaluation conclusion: Keep custom implementation. Evaluated 10+ terminal charting libraries
@@ -37,157 +37,158 @@ description: |
 
 tasks:
   phases:
-  - title: "Add paired comparison bar chart"
-    description: |
-      New ASCIIComparisonBar class for side-by-side per-query comparison of two runs/modes.
-      Each query shows two horizontal bars (e.g., SQL and DF) with percentage change annotation.
-      Features: color-coded regression (red) vs improvement (green), configurable bar width,
-      value labels, scale indicator at bottom. Support truncation of outlier bars with "← !" marker.
-    items:
-    - description: "Create ASCIIComparisonBar class inheriting from ASCIIChartBase"
-      done: true
-    - description: "Implement paired bar rendering with 1/8 block precision"
-      done: true
-    - description: "Add inline percentage change annotations (+23%, -57%)"
-      done: true
-    - description: "Add color coding — red for regression, green for improvement, dim for stable"
-      done: true
-    - description: "Handle outlier truncation with overflow indicators"
-      done: true
-    - description: "Add scale note at bottom (e.g., 'each █ ≈ 42ms')"
-      done: true
-    - description: "Wire up factory function from_comparison_data()"
-      done: true
+    - title: "Add paired comparison bar chart"
+      description: |
+        New ASCIIComparisonBar class for side-by-side per-query comparison of two runs/modes.
+        Each query shows two horizontal bars (e.g., SQL and DF) with percentage change annotation.
+        Features: color-coded regression (red) vs improvement (green), configurable bar width,
+        value labels, scale indicator at bottom. Support truncation of outlier bars with "← !" marker.
+      items:
+        - description: "Create ASCIIComparisonBar class inheriting from ASCIIChartBase"
+          done: true
+        - description: "Implement paired bar rendering with 1/8 block precision"
+          done: true
+        - description: "Add inline percentage change annotations (+23%, -57%)"
+          done: true
+        - description: "Add color coding - red for regression, green for improvement, dim for stable"
+          done: true
+        - description: "Handle outlier truncation with overflow indicators"
+          done: true
+        - description: "Add scale note at bottom (e.g., 'each █ ≈ 42ms')"
+          done: true
+        - description: "Wire up factory function from_comparison_data()"
+          done: true
 
-  - title: "Add diverging bar chart (regression/improvement distribution)"
-    description: |
-      New ASCIIDivergingBar class showing percentage changes centered on a zero axis.
-      Left side = improvements (DataFrame faster), right side = regressions.
-      Sorted by magnitude. Handles extreme outliers with overflow arrows (──►).
-      Uses ▓ for improvements, ▒ for regressions, ░ for near-zero.
-    items:
-    - description: "Create ASCIIDivergingBar class inheriting from ASCIIChartBase"
-      done: true
-    - description: "Implement centered-zero rendering with left/right bars"
-      done: true
-    - description: "Add sorted-by-magnitude ordering"
-      done: true
-    - description: "Implement overflow arrows for extreme outliers (──► for clipped values)"
-      done: true
-    - description: "Add axis labels and directional annotations"
-      done: true
-    - description: "Wire up factory function from_regression_data()"
-      done: true
+    - title: "Add diverging bar chart (regression/improvement distribution)"
+      description: |
+        New ASCIIDivergingBar class showing percentage changes centered on a zero axis.
+        Left side = improvements (DataFrame faster), right side = regressions.
+        Sorted by magnitude. Handles extreme outliers with overflow arrows (──►).
+        Uses ▓ for improvements, ▒ for regressions, ░ for near-zero.
+      items:
+        - description: "Create ASCIIDivergingBar class inheriting from ASCIIChartBase"
+          done: true
+        - description: "Implement centered-zero rendering with left/right bars"
+          done: true
+        - description: "Add sorted-by-magnitude ordering"
+          done: true
+        - description: "Implement overflow arrows for extreme outliers (──► for clipped values)"
+          done: true
+        - description: "Add axis labels and directional annotations"
+          done: true
+        - description: "Wire up factory function from_regression_data()"
+          done: true
 
-  - title: "Add summary box renderer"
-    description: |
-      New ASCIISummaryBox class (or method) for bordered panels with aggregate stats.
-      Uses existing BOX_CHARS for borders. Contents include: title line, separator,
-      geo mean comparison, total time comparison, improved/stable/regressed counts,
-      worst/best query lists. Support both color and no-color modes.
-    items:
-    - description: "Create ASCIISummaryBox class or render method"
-      done: true
-    - description: "Implement bordered panel with title and stats rows"
-      done: true
-    - description: "Add configurable stat fields (geo mean, total, counts, worst/best)"
-      done: true
-    - description: "Support both single-run and comparison summaries"
-      done: true
+    - title: "Add summary box renderer"
+      description: |
+        New ASCIISummaryBox class (or method) for bordered panels with aggregate stats.
+        Uses existing BOX_CHARS for borders. Contents include: title line, separator,
+        geo mean comparison, total time comparison, improved/stable/regressed counts,
+        worst/best query lists. Support both color and no-color modes.
+      items:
+        - description: "Create ASCIISummaryBox class or render method"
+          done: true
+        - description: "Implement bordered panel with title and stats rows"
+          done: true
+        - description: "Add configurable stat fields (geo mean, total, counts, worst/best)"
+          done: true
+        - description: "Support both single-run and comparison summaries"
+          done: true
 
-  - title: "Integrate new chart types with MCP and CLI"
-    description: |
-      Register new chart types in the MCP generate_chart tool and CLI export paths.
-      Add chart_type options: comparison_bar, diverging_bar, summary_box.
-      Add a 'comparison' template that renders all three together (paired bars,
-      diverging distribution, summary box) as a cohesive comparison report.
-    items:
-    - description: "Register comparison_bar, diverging_bar, summary_box in MCP tool"
-      done: true
-    - description: "Add 'comparison' template that composes all three chart types"
-      done: true
-    - description: "Update _render_single_ascii_chart() dispatch in visualization.py"
-      done: true
-    - description: "Add data conversion from ResultPlotter comparison data"
-      done: true
+    - title: "Integrate new chart types with MCP and CLI"
+      description: |
+        Register new chart types in the MCP generate_chart tool and CLI export paths.
+        Add chart_type options: comparison_bar, diverging_bar, summary_box.
+        Add a 'comparison' template that renders all three together (paired bars,
+        diverging distribution, summary box) as a cohesive comparison report.
+      items:
+        - description: "Register comparison_bar, diverging_bar, summary_box in MCP tool"
+          done: true
+        - description: "Add 'comparison' template that composes all three chart types"
+          done: true
+        - description: "Update _render_single_ascii_chart() dispatch in visualization.py"
+          done: true
+        - description: "Add data conversion from ResultPlotter comparison data"
+          done: true
 
-  - title: "Tests and documentation"
-    description: |
-      Comprehensive unit tests for all new chart types. Test edge cases: zero values,
-      negative-only, single query, 100+ queries (auto-chunking), extreme outliers,
-      Unicode fallback mode, all color modes, NO_COLOR compliance.
-    items:
-    - description: "Unit tests for ASCIIComparisonBar (paired rendering, annotations, truncation)"
-      done: true
-    - description: "Unit tests for ASCIIDivergingBar (sorting, overflow, centering)"
-      done: true
-    - description: "Unit tests for ASCIISummaryBox (borders, stats, color modes)"
-      done: true
-    - description: "Integration test for comparison template (all three composed)"
-      done: true
-    - description: "Edge case tests (empty data, single item, extreme values)"
-      done: true
+    - title: "Tests and documentation"
+      description: |
+        Comprehensive unit tests for all new chart types. Test edge cases: zero values,
+        negative-only, single query, 100+ queries (auto-chunking), extreme outliers,
+        Unicode fallback mode, all color modes, NO_COLOR compliance.
+      items:
+        - description: "Unit tests for ASCIIComparisonBar (paired rendering, annotations, truncation)"
+          done: true
+        - description: "Unit tests for ASCIIDivergingBar (sorting, overflow, centering)"
+          done: true
+        - description: "Unit tests for ASCIISummaryBox (borders, stats, color modes)"
+          done: true
+        - description: "Integration test for comparison template (all three composed)"
+          done: true
+        - description: "Edge case tests (empty data, single item, extreme values)"
+          done: true
 
 must_preserve:
-- "Existing 6 ASCII chart types (bar, histogram, heatmap, box, line, scatter) must remain fully functional"
-- "ASCIIChartBase interface and render() -> str contract must not change"
-- "Factory functions from_bar_data(), from_query_latency_data(), etc. must remain backward-compatible"
-- "4-tier color degradation chain (truecolor -> 256 -> 16 -> none) must work for new chart types"
-- "Unicode -> ASCII fallback must work for all new chart types"
-- "MCP generate_chart tool must continue to work for existing chart_type values"
-- "ASCIIChartOptions(use_color=False) must produce clean output without ANSI codes for new charts"
+  - "Existing 6 ASCII chart types (bar, histogram, heatmap, box, line, scatter) must remain fully functional"
+  - "ASCIIChartBase interface and render() -> str contract must not change"
+  - "Factory functions from_bar_data(), from_query_latency_data(), etc. must remain backward-compatible"
+  - "4-tier color degradation chain (truecolor -> 256 -> 16 -> none) must work for new chart types"
+  - "Unicode -> ASCII fallback must work for all new chart types"
+  - "MCP generate_chart tool must continue to work for existing chart_type values"
+  - "ASCIIChartOptions(use_color=False) must produce clean output without ANSI codes for new charts"
 
 approach: |
   Follow existing inheritance pattern: new classes inherit from ASCIIChartBase in ascii/ module.
-  Use existing BLOCK_CHARS, INTENSITY_CHARS, BOX_CHARS from base.py — do not duplicate.
+  Use existing BLOCK_CHARS, INTENSITY_CHARS, BOX_CHARS from base.py - do not duplicate.
   Follow factory function pattern (from_*_data) for data conversion.
   Mirror _render_single_ascii_chart() dispatch pattern in visualization.py for new types.
   Reference existing bar_chart.py for 1/8 block precision rendering technique.
   Reference existing histogram.py for auto-chunking pattern if comparison charts have many queries.
 
 anti_patterns:
-- "DO NOT adopt an external charting library — because the render()->str pattern, benchmark-specific features, and sub-character
-  precision cannot be replicated; custom implementation evaluated as superior to all 10+ candidates"
-- "DO NOT print to stdout — because all ASCII charts must return strings for MCP tool responses and CLI piping"
-- "DO NOT hardcode terminal width — because base.py already handles terminal detection; use self.width from ASCIIChartBase"
-- "DO NOT skip Unicode fallback — because ASCII_BLOCK_CHARS and ASCII_BOX_CHARS exist for terminals without Unicode support"
-- "DO NOT compress the entire bar scale for outliers — because it makes most bars unreadably small; truncate outlier bars
-  instead with overflow indicators"
+  - "DO NOT adopt an external charting library - because the render()->str pattern, benchmark-specific features, and sub-character
+    precision cannot be replicated; custom implementation evaluated as superior to all 10+ candidates"
+  - "DO NOT print to stdout - because all ASCII charts must return strings for MCP tool responses and CLI piping"
+  - "DO NOT hardcode terminal width - because base.py already handles terminal detection; use self.width from ASCIIChartBase"
+  - "DO NOT skip Unicode fallback - because ASCII_BLOCK_CHARS and ASCII_BOX_CHARS exist for terminals without Unicode support"
+  - "DO NOT compress the entire bar scale for outliers - because it makes most bars unreadably small; truncate outlier bars
+    instead with overflow indicators"
 
 verification:
-- description: "All existing and new ASCII chart tests pass"
-  command: "uv run -- python -m pytest tests/ -k 'ascii' -q"
-  expected_output: "all tests pass, 0 failures"
-- description: "No regressions in visualization tests"
-  command: "uv run -- python -m pytest tests/ -k 'visualization' -q"
-  expected_output: "all tests pass, 0 failures"
-- description: "No lint errors in new or modified files"
-  command: "uv run ruff check benchbox/core/visualization/ascii/"
-  expected_output: "All checks passed or no output (clean)"
-- description: "New classes are properly exported from ascii module"
-  command: "uv run -- python -c \"from benchbox.core.visualization.ascii import ASCIIComparisonBar, ASCIIDivergingBar, ASCIISummaryBox;
-    print('imports ok')\""
-  expected_output: "imports ok"
+  - description: "All existing and new ASCII chart tests pass"
+    command: "uv run -- python -m pytest tests/ -k 'ascii' -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "No regressions in visualization tests"
+    command: "uv run -- python -m pytest tests/ -k 'visualization' -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "No lint errors in new or modified files"
+    command: "uv run ruff check benchbox/core/visualization/ascii/"
+    expected_output: "All checks passed or no output (clean)"
+  - description: "New classes are properly exported from ascii module"
+    command:
+      'uv run -- python -c "from benchbox.core.visualization.ascii import ASCIIComparisonBar, ASCIIDivergingBar, ASCIISummaryBox;
+      print(''imports ok'')"'
+    expected_output: "imports ok"
 
 scope_limit:
   only_modify:
-  - "benchbox/core/visualization/ascii/*.py"
-  - "benchbox/core/visualization/exporters.py"
-  - "benchbox/mcp/tools/visualization.py"
-  - "tests/test_ascii_charts.py"
-  - "benchbox/core/visualization/ascii/__init__.py"
+    - "benchbox/core/visualization/ascii/*.py"
+    - "benchbox/core/visualization/exporters.py"
+    - "benchbox/mcp/tools/visualization.py"
+    - "tests/test_ascii_charts.py"
+    - "benchbox/core/visualization/ascii/__init__.py"
   do_not_modify: []
 
 files_affected:
   added:
-  - "benchbox/core/visualization/ascii/comparison_bar.py"
-  - "benchbox/core/visualization/ascii/diverging_bar.py"
-  - "benchbox/core/visualization/ascii/summary_box.py"
+    - "benchbox/core/visualization/ascii/comparison_bar.py"
+    - "benchbox/core/visualization/ascii/diverging_bar.py"
+    - "benchbox/core/visualization/ascii/summary_box.py"
   modified:
-  - "benchbox/core/visualization/ascii/__init__.py"
-  - "benchbox/core/visualization/exporters.py"
-  - "benchbox/mcp/tools/visualization.py"
-  - "tests/test_ascii_charts.py"
+    - "benchbox/core/visualization/ascii/__init__.py"
+    - "benchbox/core/visualization/exporters.py"
+    - "benchbox/mcp/tools/visualization.py"
+    - "tests/test_ascii_charts.py"
 
 dependencies:
   blocks: []
@@ -207,32 +208,32 @@ impact:
     the inheritance and factory function patterns are followed correctly.
 
 context_sections:
-- title: "Library Evaluation Summary"
-  content: |
-    Evaluated 10+ Python terminal charting libraries. Key findings:
-    - plotext-plus (7/10): Best candidate but needs stdout->str wrappers, lacks benchmark annotations
-    - plotille (4/10): Good scatter/line but no bar charts
-    - termgraph (3/10): Popular but limited to simple bars, no box/scatter/heatmap
-    - uniplot (3/10): Good quality but only line/scatter, requires numpy
-    - Rich (2/10): Not a charting library; tables/panels only
-    - All others scored ≤2/10 (unmaintained, wrong license, or wrong paradigm)
-    Conclusion: Custom implementation is the right choice for BenchBox's specific needs.
+  - title: "Library Evaluation Summary"
+    content: |
+      Evaluated 10+ Python terminal charting libraries. Key findings:
+      - plotext-plus (7/10): Best candidate but needs stdout->str wrappers, lacks benchmark annotations
+      - plotille (4/10): Good scatter/line but no bar charts
+      - termgraph (3/10): Popular but limited to simple bars, no box/scatter/heatmap
+      - uniplot (3/10): Good quality but only line/scatter, requires numpy
+      - Rich (2/10): Not a charting library; tables/panels only
+      - All others scored ≤2/10 (unmaintained, wrong license, or wrong paradigm)
+      Conclusion: Custom implementation is the right choice for BenchBox's specific needs.
 
-- title: "Design Reference: Target Output"
-  content: |
-    The three new chart types should compose into a single comparison report:
-    1. Paired comparison bars — per-query side-by-side with % change annotations
-    2. Diverging distribution — sorted regression/improvement chart centered on zero
-    3. Summary box — bordered panel with aggregate statistics
-    See the example ASCII output provided in the TODO creation request for exact visual targets.
+  - title: "Design Reference: Target Output"
+    content: |
+      The three new chart types should compose into a single comparison report:
+      1. Paired comparison bars - per-query side-by-side with % change annotations
+      2. Diverging distribution - sorted regression/improvement chart centered on zero
+      3. Summary box - bordered panel with aggregate statistics
+      See the example ASCII output provided in the TODO creation request for exact visual targets.
 
 metadata:
   created_date: "2026-02-06"
   last_updated: "2026-02-06"
   estimated_effort: "3-5 days"
   tags:
-  - visualization
-  - ascii
-  - charting
-  - comparison
-  - terminal
+    - visualization
+    - ascii
+    - charting
+    - comparison
+    - terminal

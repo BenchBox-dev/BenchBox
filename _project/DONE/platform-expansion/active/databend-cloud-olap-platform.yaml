@@ -1,7 +1,7 @@
 # Databend Cloud-Native OLAP Platform Integration
 #
 # Location: _project/TODO/platform-expansion/planning/databend-cloud-olap-platform.yaml
-# Priority: Medium-High (promoted — 11/22 work units done, active investment)
+# Priority: Medium-High (promoted - 11/22 work units done, active investment)
 
 id: databend-cloud-olap-platform
 title: "Databend Cloud-Native OLAP Platform Integration"
@@ -37,11 +37,11 @@ category: Platform Expansion
 
 metadata:
   tags:
-  - cloud-native
-  - olap
-  - snowflake-compatible
-  - rust
-  - object-storage
+    - cloud-native
+    - olap
+    - snowflake-compatible
+    - rust
+    - object-storage
   estimated_effort: "2-3 days"
   created_date: "2025-01-07"
 
@@ -61,14 +61,14 @@ impact:
 
 files_affected:
   added:
-  - "benchbox/platforms/databend/__init__.py"
-  - "benchbox/platforms/databend/adapter.py"
-  - "tests/unit/platforms/test_databend_adapter.py"
+    - "benchbox/platforms/databend/__init__.py"
+    - "benchbox/platforms/databend/adapter.py"
+    - "tests/unit/platforms/test_databend_adapter.py"
   modified:
-  - "pyproject.toml"
-  - "benchbox/utils/dependencies.py"
-  - "benchbox/core/platform_registry.py"
-  - "benchbox/platforms/__init__.py"
+    - "pyproject.toml"
+    - "benchbox/utils/dependencies.py"
+    - "benchbox/core/platform_registry.py"
+    - "benchbox/platforms/__init__.py"
 
 context_sections:
   "Background and Motivation": |
@@ -115,100 +115,100 @@ context_sections:
 
 technical_requirements:
   constraints:
-  - "SQLGlot does not support Databend dialect - must use Snowflake proxy"
-  - "CI testing requires object storage (MinIO) + Databend cluster"
-  - "Query compatibility must be verified manually for TPC suites"
+    - "SQLGlot does not support Databend dialect - must use Snowflake proxy"
+    - "CI testing requires object storage (MinIO) + Databend cluster"
+    - "Query compatibility must be verified manually for TPC suites"
   dependencies:
-  - "databend-driver>=0.28.0"
-  - "databend-sqlalchemy (optional, for SQLAlchemy users)"
-  - "MinIO for local object storage testing"
+    - "databend-driver>=0.28.0"
+    - "databend-sqlalchemy (optional, for SQLAlchemy users)"
+    - "MinIO for local object storage testing"
   compatibility: |
     Python 3.7+
     Databend Cloud or self-hosted Databend
     Object storage backend required (S3, GCS, Azure Blob, MinIO)
 
 open_questions:
-- "Will Snowflake dialect translation work for all TPC queries?"
-- "What edge cases require custom QueryTransformer?"
-- "Should we support both Databend Cloud and self-hosted equally?"
-- "Is there user demand that would justify prioritization?"
+  - "Will Snowflake dialect translation work for all TPC queries?"
+  - "What edge cases require custom QueryTransformer?"
+  - "Should we support both Databend Cloud and self-hosted equally?"
+  - "Is there user demand that would justify prioritization?"
 
 success_metrics:
-- "All 22 TPC-H queries execute successfully"
-- "All 99 TPC-DS queries execute successfully"
-- "Unit test coverage >= 80%"
-- "Integration smoke tests pass in CI"
-- "Documentation covers both cloud and self-hosted deployment"
+  - "All 22 TPC-H queries execute successfully"
+  - "All 99 TPC-DS queries execute successfully"
+  - "Unit test coverage >= 80%"
+  - "Integration smoke tests pass in CI"
+  - "Documentation covers both cloud and self-hosted deployment"
 work:
-- id: w1
-  summary: "Create databend/ platform module structure"
-  status: done
-- id: w2
-  summary: "Implement base DatabendAdapter class"
-  needs:
-  - w1
-  status: done
-- id: w3
-  summary: "Implement connection handling with databend-driver"
-  needs:
-  - w1
-  status: done
-- id: w4
-  summary: "Configure Snowflake dialect as translation proxy"
-  needs:
-  - w1
-  status: done
-- id: w5
-  summary: "Implement CLI argument registration"
-  status: done
-- id: w6
-  summary: "Add databend dependency group to pyproject.toml"
-  status: done
-- id: w7
-  summary: "Implement schema creation with Snowflake SQL translation"
-  status: done
-- id: w8
-  summary: "Implement data loading (INSERT batching)"
-  status: done
-- id: w9
-  summary: "Implement query execution with result handling"
-  status: done
-- id: w10
-  summary: "Add query plan capture support (EXPLAIN)"
-  status: done
-- id: w11
-  summary: "Implement tuning support (clustering keys)"
-  status: done
-- id: w12
-  summary: "Test all 22 TPC-H queries for compatibility"
-  status: done
-- id: w13
-  summary: "Test all 99 TPC-DS queries for compatibility"
-  status: done
-- id: w14
-  summary: "Implement QueryTransformer for edge cases if needed"
-  status: done
-- id: w15
-  summary: "Document any query modifications required"
-  status: done
-- id: w16
-  summary: "Create unit tests (test_databend_adapter.py)"
-  status: done
-- id: w17
-  summary: "Create Docker Compose for Databend + MinIO"
-  status: done
-- id: w18
-  summary: "Add integration smoke tests"
-  status: done
-- id: w19
-  summary: "Add CI workflow for Databend testing"
-  status: done
-- id: w20
-  summary: "Create platform documentation (docs/platforms/databend.md)"
-  status: done
-- id: w21
-  summary: "Add example script (examples/getting_started/cloud/)"
-  status: done
-- id: w22
-  summary: "Update platform comparison matrix"
-  status: done
+  - id: w1
+    summary: "Create databend/ platform module structure"
+    status: done
+  - id: w2
+    summary: "Implement base DatabendAdapter class"
+    needs:
+      - w1
+    status: done
+  - id: w3
+    summary: "Implement connection handling with databend-driver"
+    needs:
+      - w1
+    status: done
+  - id: w4
+    summary: "Configure Snowflake dialect as translation proxy"
+    needs:
+      - w1
+    status: done
+  - id: w5
+    summary: "Implement CLI argument registration"
+    status: done
+  - id: w6
+    summary: "Add databend dependency group to pyproject.toml"
+    status: done
+  - id: w7
+    summary: "Implement schema creation with Snowflake SQL translation"
+    status: done
+  - id: w8
+    summary: "Implement data loading (INSERT batching)"
+    status: done
+  - id: w9
+    summary: "Implement query execution with result handling"
+    status: done
+  - id: w10
+    summary: "Add query plan capture support (EXPLAIN)"
+    status: done
+  - id: w11
+    summary: "Implement tuning support (clustering keys)"
+    status: done
+  - id: w12
+    summary: "Test all 22 TPC-H queries for compatibility"
+    status: done
+  - id: w13
+    summary: "Test all 99 TPC-DS queries for compatibility"
+    status: done
+  - id: w14
+    summary: "Implement QueryTransformer for edge cases if needed"
+    status: done
+  - id: w15
+    summary: "Document any query modifications required"
+    status: done
+  - id: w16
+    summary: "Create unit tests (test_databend_adapter.py)"
+    status: done
+  - id: w17
+    summary: "Create Docker Compose for Databend + MinIO"
+    status: done
+  - id: w18
+    summary: "Add integration smoke tests"
+    status: done
+  - id: w19
+    summary: "Add CI workflow for Databend testing"
+    status: done
+  - id: w20
+    summary: "Create platform documentation (docs/platforms/databend.md)"
+    status: done
+  - id: w21
+    summary: "Add example script (examples/getting_started/cloud/)"
+    status: done
+  - id: w22
+    summary: "Update platform comparison matrix"
+    status: done

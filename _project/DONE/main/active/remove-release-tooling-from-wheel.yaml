@@ -26,10 +26,10 @@ description: |
 
 metadata:
   tags:
-  - architecture
-  - packaging
-  - maintainer-tooling
-  - scope-review
+    - architecture
+    - packaging
+    - maintainer-tooling
+    - scope-review
   estimated_effort: "Small"
   created_date: "2026-03-12"
   source_review: "Orthogonal functionality review finding #1"
@@ -67,72 +67,74 @@ cost_benefit_analysis:
 
 files_affected:
   modified:
-  - "pyproject.toml"
-  - "MANIFEST.in"
-  - "scripts/sync_repos.py"
-  - "tests/unit/cli/test_cli_package_exports.py"
+    - "pyproject.toml"
+    - "MANIFEST.in"
+    - "scripts/sync_repos.py"
+    - "tests/unit/cli/test_cli_package_exports.py"
 
 work:
-- id: w1
-  summary: "Remove benchbox-sync entry point and exclude benchbox/release/ from the wheel"
-  status: done
-  notes: |
-    In pyproject.toml: remove `benchbox-sync = "benchbox.release.sync:main"`
-    from `[project.scripts]`.
-    In MANIFEST.in: add `prune benchbox/release` after the existing
-    `recursive-include benchbox` line.
-    Update scripts/sync_repos.py to invoke the module directly instead of
-    relying on the installed entry point.
+  - id: w1
+    summary: "Remove benchbox-sync entry point and exclude benchbox/release/ from the wheel"
+    status: done
+    notes: |
+      In pyproject.toml: remove `benchbox-sync = "benchbox.release.sync:main"`
+      from `[project.scripts]`.
+      In MANIFEST.in: add `prune benchbox/release` after the existing
+      `recursive-include benchbox` line.
+      Update scripts/sync_repos.py to invoke the module directly instead of
+      relying on the installed entry point.
 
-- id: w2
-  summary: "Update tests and CI to reflect the removed entry point"
-  needs: [w1]
-  status: done
-  notes: |
-    Any test asserting `benchbox-sync` is an installed script should be updated
-    to expect its absence in default installs. CI release jobs that use
-    `benchbox-sync` should switch to `uv run -- python -m benchbox.release.sync`.
+  - id: w2
+    summary: "Update tests and CI to reflect the removed entry point"
+    needs: [w1]
+    status: done
+    notes: |
+      Any test asserting `benchbox-sync` is an installed script should be updated
+      to expect its absence in default installs. CI release jobs that use
+      `benchbox-sync` should switch to `uv run -- python -m benchbox.release.sync`.
 
 must_preserve:
-- "Public `benchbox` CLI behavior for default installs"
-- "Ability to run release/sync from the source checkout via `uv run`"
-- "Release test coverage (tests still run from source, just not shipped)"
+  - "Public `benchbox` CLI behavior for default installs"
+  - "Ability to run release/sync from the source checkout via `uv run`"
+  - "Release test coverage (tests still run from source, just not shipped)"
 
 approach: |
   Edit two config files and update CI references. No code moves, no new
   packages, no compatibility shims.
 
 anti_patterns:
-- "DO NOT create a separate benchbox-maintainer package for this level of decoupling — it is over-engineered"
-- "DO NOT remove benchbox/release/ source code from the repo — because maintainers need it for release automation from the
-  source checkout — exclude from wheel only"
+  - "DO NOT create a separate benchbox-maintainer package for this level of decoupling - it is over-engineered"
+  - "DO NOT remove benchbox/release/ source code from the repo - because maintainers need it for release automation from the
+    source checkout - exclude from wheel only"
 
 verification:
-- description: "Public CLI and package-export tests still pass"
-  command: "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/test_cli_documentation.py -q"
-  expected_output: "All tests pass"
-- description: "Release and sync tests still pass from source checkout"
-  command: "uv run -- python -m pytest tests/unit/release/test_workflow.py tests/unit/release/test_release_sync_unit.py tests/unit/test_release_sync.py
-    -q"
-  expected_output: "All tests pass"
-- description: "benchbox-sync is not installed as a console script in a clean wheel install"
-  command: "uv venv /tmp/benchbox-wheel-test && uv build --wheel && uv pip install --python /tmp/benchbox-wheel-test dist/benchbox-*.whl
-    --quiet && /tmp/benchbox-wheel-test/bin/benchbox-sync --help; rm -rf /tmp/benchbox-wheel-test"
-  expected_output: "benchbox-sync not found (exit code 1)"
-- description: "benchbox.release is excluded from the wheel"
-  command: "uv build --wheel && python -m zipfile -l dist/benchbox-*.whl | grep release"
-  expected_output: "No output (zero matches)"
+  - description: "Public CLI and package-export tests still pass"
+    command: "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py tests/unit/test_cli_documentation.py -q"
+    expected_output: "All tests pass"
+  - description: "Release and sync tests still pass from source checkout"
+    command:
+      "uv run -- python -m pytest tests/unit/release/test_workflow.py tests/unit/release/test_release_sync_unit.py tests/unit/test_release_sync.py
+      -q"
+    expected_output: "All tests pass"
+  - description: "benchbox-sync is not installed as a console script in a clean wheel install"
+    command:
+      "uv venv /tmp/benchbox-wheel-test && uv build --wheel && uv pip install --python /tmp/benchbox-wheel-test dist/benchbox-*.whl
+      --quiet && /tmp/benchbox-wheel-test/bin/benchbox-sync --help; rm -rf /tmp/benchbox-wheel-test"
+    expected_output: "benchbox-sync not found (exit code 1)"
+  - description: "benchbox.release is excluded from the wheel"
+    command: "uv build --wheel && python -m zipfile -l dist/benchbox-*.whl | grep release"
+    expected_output: "No output (zero matches)"
 
 scope_limit:
   only_modify:
-  - "pyproject.toml"
-  - "MANIFEST.in"
-  - "scripts/sync_repos.py"
-  - "tests/unit/cli/test_cli_package_exports.py"
-  - "tests/unit/test_cli_documentation.py"
-  - ".github/workflows/"
+    - "pyproject.toml"
+    - "MANIFEST.in"
+    - "scripts/sync_repos.py"
+    - "tests/unit/cli/test_cli_package_exports.py"
+    - "tests/unit/test_cli_documentation.py"
+    - ".github/workflows/"
   do_not_touch:
-  - "benchbox/release/ source code (stays in repo, just excluded from wheel)"
-  - "Benchmark query implementations"
-  - "Platform adapters"
-  - "Result schemas"
+    - "benchbox/release/ source code (stays in repo, just excluded from wheel)"
+    - "Benchmark query implementations"
+    - "Platform adapters"
+    - "Result schemas"
