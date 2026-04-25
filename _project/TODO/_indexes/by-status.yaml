@@ -1,8 +1,8 @@
-generated_at: '2026-04-25T12:26:54.423855'
-total_items: 33
+generated_at: '2026-04-25T13:28:07.949718'
+total_items: 32
 statuses:
   In Progress:
-    count: 3
+    count: 2
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
@@ -13,11 +13,6 @@ statuses:
       file: TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
-      category: Core Functionality
-    - id: register-adapter-ddl-rewrites-under-sql-compat
-      file: TODO/main/active/register-adapter-ddl-rewrites-under-sql-compat.yaml
-      title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
-      priority: High
       category: Core Functionality
   Not Started:
     count: 29

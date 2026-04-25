@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T12:26:56.469261'
-total_items: 761
+generated_at: '2026-04-25T13:28:09.769029'
+total_items: 762
 priorities:
   Critical:
     count: 42
@@ -215,7 +215,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 258
+    count: 259
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1154,6 +1154,11 @@ priorities:
       title: Register PySpark SQL mode in platform registry
       category: Platform Expansion
       status: Not Started
+    - id: register-adapter-ddl-rewrites-under-sql-compat
+      file: DONE/main/active/register-adapter-ddl-rewrites-under-sql-compat.yaml
+      title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
+      category: Core Functionality
+      status: Completed
     - id: remediate-coverage-theater
       file: DONE/main/active/remediate-coverage-theater.yaml
       title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'

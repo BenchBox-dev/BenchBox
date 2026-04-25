@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T12:26:56.468672'
-total_items: 761
+generated_at: '2026-04-25T13:28:09.768499'
+total_items: 762
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3593,6 +3593,29 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Small
+- id: register-adapter-ddl-rewrites-under-sql-compat
+  file: DONE/main/active/register-adapter-ddl-rewrites-under-sql-compat.yaml
+  title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - sql-compat
+  - ddl-rewrites
+  - platform-adapters
+  - harmonization
+  - framework-cleanup
+  - compat-lint
+  - review-followup
+  estimated_effort: Large (3-5 days; sequential due to fail-CI gate on w7 requiring full audit completion)
+  completed_date: '2026-04-25'
+  work_total: 9
+  work_done: 9
+  work_ready: 0
+  deferred_count: 4
+  needs:
+  - harmonize-bypass-adapters-with-manifest
 - id: remediate-coverage-theater
   file: DONE/main/active/remediate-coverage-theater.yaml
   title: 'Remediate test suite coverage theater: delete hollow tests, replace with behavior-verifying alternatives'

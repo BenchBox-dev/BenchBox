@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T12:26:54.423830'
+generated_at: '2026-04-25T13:28:07.949694'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 9
+    count: 8
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -83,11 +83,6 @@ categories:
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
       status: Not Started
-    - id: register-adapter-ddl-rewrites-under-sql-compat
-      file: TODO/main/active/register-adapter-ddl-rewrites-under-sql-compat.yaml
-      title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
-      priority: High
-      status: In Progress
     - id: evaluate-results-data-repo-extraction-checkpoint
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo

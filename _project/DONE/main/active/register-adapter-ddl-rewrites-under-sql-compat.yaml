@@ -2,7 +2,8 @@ id: register-adapter-ddl-rewrites-under-sql-compat
 title: "Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-25"
 category: Core Functionality
 
 description: |
@@ -237,7 +238,7 @@ work:
 - id: w6
   summary: "Promote _optimize_table_definition() to a documented DdlOptimizer Protocol"
   needs: [w1, w3, w5]
-  status: pending
+  status: done
   notes: |
     Make the implicit pattern explicit so the next platform adapter
     (Velox, etc.) doesn't need to discover it through code-archaeology.
@@ -273,7 +274,7 @@ work:
 - id: w7
   summary: "Flip compat_lint to fail-CI on unregistered DDL regex"
   needs: [w4, w5, w6]
-  status: pending
+  status: done
   notes: |
     The forcing function. Cannot land until w2's punch list is fully
     addressed by w4 and w5 (zero unregistered DDL transforms across
@@ -299,7 +300,7 @@ work:
 - id: w8
   summary: "Tests harmonized: registry + transform asserted together"
   needs: [w1, w3, w6]
-  status: pending
+  status: done
   notes: |
     Existing DDL-shape tests in
     tests/unit/platforms/test_singlestore_adapter.py:1125-1199 assert
@@ -327,7 +328,7 @@ work:
 - id: w9
   summary: "Document the 'register for governance, implement in adapter' pattern"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Create / update ``benchbox/sql_compat/README.md`` with:
       - One-paragraph explanation of the phase-aware registry.

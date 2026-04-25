@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T12:26:56.469050'
+generated_at: '2026-04-25T13:28:09.768850'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -690,7 +690,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 261
+    count: 262
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1837,6 +1837,11 @@ categories:
     - id: run-lifecycle-and-export-unification-refactor
       file: DONE/main/active/run-lifecycle-and-export-unification-refactor.yaml
       title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
+      priority: High
+      status: Completed
+    - id: register-adapter-ddl-rewrites-under-sql-compat
+      file: DONE/main/active/register-adapter-ddl-rewrites-under-sql-compat.yaml
+      title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
       priority: High
       status: Completed
     - id: remove-sql-coupling-from-tpcdi-dataframe-mode

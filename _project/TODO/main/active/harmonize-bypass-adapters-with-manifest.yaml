@@ -275,7 +275,7 @@ work:
 - id: w9
   summary: "Migrate QuestDB adapter + QuestDB Docker stress verification"
   needs: [w8]
-  status: pending
+  status: done
   notes: |
     Same pattern against ``benchbox/platforms/questdb.py``. QuestDB uses
     REST ingestion via ``_load_table_via_rest_api`` (L847+). Replace

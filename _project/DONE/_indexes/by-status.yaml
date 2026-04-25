@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T12:26:56.469513'
-total_items: 761
+generated_at: '2026-04-25T13:28:09.769199'
+total_items: 762
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 710
+    count: 711
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2947,6 +2947,11 @@ statuses:
     - id: run-lifecycle-and-export-unification-refactor
       file: DONE/main/active/run-lifecycle-and-export-unification-refactor.yaml
       title: Refactor run lifecycle to a single execution path with unified export and metadata wiring
+      priority: High
+      category: Core Functionality
+    - id: register-adapter-ddl-rewrites-under-sql-compat
+      file: DONE/main/active/register-adapter-ddl-rewrites-under-sql-compat.yaml
+      title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
       priority: High
       category: Core Functionality
     - id: cleanup-project-scratch-directory

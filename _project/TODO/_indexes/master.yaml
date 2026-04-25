@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T12:26:54.423795'
-total_items: 33
+generated_at: '2026-04-25T13:28:07.949663'
+total_items: 32
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -56,7 +56,7 @@ items:
   - review-followup
   estimated_effort: Large (3-5 days, sequential due to per-adapter live verification gates)
   work_total: 10
-  work_done: 8
+  work_done: 9
   work_ready: 1
   deferred_count: 3
 - id: integrate-benchbox-cli-submit-and-service-auth
@@ -95,28 +95,6 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
-- id: register-adapter-ddl-rewrites-under-sql-compat
-  file: TODO/main/active/register-adapter-ddl-rewrites-under-sql-compat.yaml
-  title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - sql-compat
-  - ddl-rewrites
-  - platform-adapters
-  - harmonization
-  - framework-cleanup
-  - compat-lint
-  - review-followup
-  estimated_effort: Large (3-5 days; sequential due to fail-CI gate on w7 requiring full audit completion)
-  work_total: 9
-  work_done: 2
-  work_ready: 2
-  deferred_count: 4
-  needs:
-  - harmonize-bypass-adapters-with-manifest
 - id: external-contributor-submission-dry-run
   file: TODO/main/planning/external-contributor-submission-dry-run.yaml
   title: Run a Phase 2 dry-run with one external trusted contributor
