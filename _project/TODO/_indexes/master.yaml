@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T08:47:48.317815'
+generated_at: '2026-04-25T09:04:39.652427'
 total_items: 33
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -56,7 +56,7 @@ items:
   - review-followup
   estimated_effort: Large (3-5 days, sequential due to per-adapter live verification gates)
   work_total: 10
-  work_done: 0
+  work_done: 3
   work_ready: 1
   deferred_count: 3
 - id: integrate-benchbox-cli-submit-and-service-auth
@@ -110,8 +110,8 @@ items:
   - framework-cleanup
   - compat-lint
   - review-followup
-  estimated_effort: Large (3-5 days; sequential due to fail-CI gate on w6 requiring full audit completion)
-  work_total: 8
+  estimated_effort: Large (3-5 days; sequential due to fail-CI gate on w7 requiring full audit completion)
+  work_total: 9
   work_done: 0
   work_ready: 2
   deferred_count: 4
