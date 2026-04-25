@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T08:39:09.929266'
-total_items: 32
+generated_at: '2026-04-25T08:47:48.317874'
+total_items: 33
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Medium-High
       category: Core Functionality
   Not Started:
-    count: 29
+    count: 30
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -88,7 +88,7 @@ statuses:
       priority: Medium
       category: Testing and Quality Assurance
     - id: harmonize-bypass-adapters-with-manifest
-      file: TODO/main/planning/harmonize-bypass-adapters-with-manifest.yaml
+      file: TODO/main/active/harmonize-bypass-adapters-with-manifest.yaml
       title: Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure
       priority: High
       category: Core Functionality
@@ -117,6 +117,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
+    - id: register-adapter-ddl-rewrites-under-sql-compat
+      file: TODO/main/planning/register-adapter-ddl-rewrites-under-sql-compat.yaml
+      title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
+      priority: High
+      category: Core Functionality
     - id: fix-git-author-history-rewrite
       file: TODO/main/planning/fix-git-author-history-rewrite.yaml
       title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)

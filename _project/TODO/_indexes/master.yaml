@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T08:39:09.929197'
-total_items: 32
+generated_at: '2026-04-25T08:47:48.317815'
+total_items: 33
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -41,7 +41,7 @@ items:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
 - id: harmonize-bypass-adapters-with-manifest
-  file: TODO/main/planning/harmonize-bypass-adapters-with-manifest.yaml
+  file: TODO/main/active/harmonize-bypass-adapters-with-manifest.yaml
   title: Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure
   worktree: main
   category: Core Functionality
@@ -95,6 +95,28 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+- id: register-adapter-ddl-rewrites-under-sql-compat
+  file: TODO/main/planning/register-adapter-ddl-rewrites-under-sql-compat.yaml
+  title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - sql-compat
+  - ddl-rewrites
+  - platform-adapters
+  - harmonization
+  - framework-cleanup
+  - compat-lint
+  - review-followup
+  estimated_effort: Large (3-5 days; sequential due to fail-CI gate on w6 requiring full audit completion)
+  work_total: 8
+  work_done: 0
+  work_ready: 2
+  deferred_count: 4
+  needs:
+  - harmonize-bypass-adapters-with-manifest
 - id: external-contributor-submission-dry-run
   file: TODO/main/planning/external-contributor-submission-dry-run.yaml
   title: Run a Phase 2 dry-run with one external trusted contributor
