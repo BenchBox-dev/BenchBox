@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T08:29:49.621950'
+generated_at: '2026-04-25T08:39:09.929197'
 total_items: 32
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -55,7 +55,7 @@ items:
   - framework-cleanup
   - review-followup
   estimated_effort: Large (3-5 days, sequential due to per-adapter live verification gates)
-  work_total: 8
+  work_total: 10
   work_done: 0
   work_ready: 1
   deferred_count: 3

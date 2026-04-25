@@ -91,11 +91,11 @@ work:
          already use ``DataSourceResolver``.
 
   - id: w2
-    summary: "Base helpers: CsvDialect dataclass + resolve_csv_dialect() + prepare_local_load_file()"
+    summary: "CsvDialect dataclass + resolve_csv_dialect() with precedence unit tests"
     needs: [w1]
     status: pending
     notes: |
-      Two helpers added to ``benchbox/platforms/base/data_loading.py``:
+      Add to ``benchbox/platforms/base/data_loading.py``:
 
       1. ``CsvDialect`` dataclass with fields delimiter (str), has_header
          (bool), null_marker (str | None), normalize_booleans (bool),
@@ -113,25 +113,40 @@ work:
               False, null_marker=None, normalize_booleans=False.
          When falling back to (b) or (c), emit a ``logger.warning`` naming
          the table — surfaces unannotated benchmarks without breaking them.
-      3. ``prepare_local_load_file(file_path, *, dialect, strip_trailing_delim)
-         -> contextmanager[Path]``:
-           - Decompresses via ``FileFormatRegistry.get_compression_handler(file_path)``
-             — handles zstd, gzip, etc. uniformly.
-           - Strips trailing delim per-line if requested.
-           - Rewrites True/False → 1/0 if dialect.normalize_booleans.
-           - Writes a temp file in file_path.parent only when transformation
-             is required; yields original path otherwise (no spurious copies).
-           - Cleans up on exit.
 
-      Unit tests required:
-      - dialect resolution: manifest > benchmark > defaults precedence.
-      - prepare_local_load_file: gzip + zstd both decompress; trailing-pipe
-        stripped only when requested; True→1 only when normalize_booleans
-        is True; uncompressed pass-through returns original path.
+      Unit tests required (create tests/unit/platforms/test_csv_dialect.py):
+      - manifest metadata wins over benchmark attribute wins over format default.
+      - benchmark attribute wins over format default when no manifest.
+      - format-derived defaults correct for .tbl, .dat, and .csv.
+      - logger.warning emitted on fallback; not emitted when manifest wins.
 
   - id: w3
-    summary: "Annotate CSV-bearing benchmark generators with manifest metadata"
+    summary: "prepare_local_load_file() + compression/strip/boolean unit tests"
     needs: [w1, w2]
+    status: pending
+    notes: |
+      Add to ``benchbox/platforms/base/data_loading.py``:
+
+      ``prepare_local_load_file(file_path, *, dialect, strip_trailing_delim)
+      -> contextmanager[Path]``:
+        - Decompresses via ``FileFormatRegistry.get_compression_handler(file_path)``
+          — handles zstd, gzip, etc. uniformly.
+        - Strips trailing delim per-line if requested.
+        - Rewrites True/False → 1/0 if dialect.normalize_booleans.
+        - Writes a temp file in file_path.parent only when transformation
+          is required; yields original path otherwise (no spurious copies).
+        - Cleans up on exit.
+
+      Unit tests required (create tests/unit/platforms/test_prepare_local_load_file.py):
+      - gzip input decompresses correctly; zstd input decompresses correctly.
+      - uncompressed pass-through yields original path (no temp file written).
+      - trailing-pipe stripped only when strip_trailing_delim=True.
+      - True/False → 1/0 only when dialect.normalize_booleans is True.
+      - context manager cleans up temp file on exit.
+
+  - id: w4
+    summary: "Annotate CSV-bearing benchmark generators with manifest metadata"
+    needs: [w1, w3]
     status: pending
     notes: |
       For each generator below, find the ``manifest.add_entry()`` call (or
@@ -159,15 +174,15 @@ work:
       assert each table's metadata round-trips. Don't mark this work unit
       done until all six round-trip.
 
-  - id: w4
-    summary: "Migrate SingleStore adapter (HARD GATE: live stress test must pass)"
-    needs: [w2, w3]
+  - id: w5
+    summary: "Migrate SingleStore adapter data-loading logic"
+    needs: [w3, w4]
     status: pending
     notes: |
       Sequence within this work unit:
 
       1. Replace the manual ``for table_name, table_path in benchmark.tables.items()``
-         loop in ``_load_with_local_infile`` (singlestore.py:447) with
+         loop in ``_load_data_infile`` (singlestore.py:492) with
          ``DataSourceResolver(...).resolve(benchmark, data_dir)``. Iterate
          ``data_source.tables`` and consult ``data_source.table_formats``
          and ``data_source.table_metadata``.
@@ -191,16 +206,28 @@ work:
          injection, REFERENCE TABLE for nation/region, lowercase backtick
          quoting, OPTIONALLY ENCLOSED BY '"', Parquet skip-with-warning.
          These are genuinely SingleStore-specific.
-      6. Rewrite the 6 SQL-assertion tests in
+
+      Decision gate before marking w5 done and proceeding to w6:
+      - ``uv run -- python -m pytest -m fast -q`` stays green.
+      - ``uv run ruff check . && uv run ty check`` passes clean.
+
+  - id: w6
+    summary: "Rewrite SingleStore SQL-assertion tests to inject DataSource (HARD GATE: live stress)"
+    needs: [w5]
+    status: pending
+    notes: |
+      1. Rewrite the 6 SQL-assertion tests in
          tests/unit/platforms/test_singlestore_adapter.py to inject a fake
          ``DataSource`` with known ``table_metadata`` instead of mocking
          ``is_tpc_format``/``get_delimiter_for_file``.
+      2. Run full SingleStore unit suite and confirm 80/80 green (the
+         73 pre-existing + 6 SQL-assertion + 1 gzip integration test from
+         the working-tree changes).
 
-      **HARD DECISION GATE — no proceeding to w5 until both pass:**
+      **HARD DECISION GATE — no proceeding to w7 until both pass:**
 
       - ``uv run -- python -m pytest tests/unit/platforms/test_singlestore_adapter.py -q``
-        → 80/80 green (the 73 pre-existing + 6 SQL-assertion +
-        1 gzip integration test from the working-tree changes).
+        → 80/80 green.
       - ``./scripts/local_stress_test.sh --scale 1 --platform singlestore``
         → end-to-end pass against live SingleStore 9.1.1 in Docker. This
         is the same matrix that validated the band-aid commits being
@@ -209,12 +236,12 @@ work:
       If the live stress regresses, do NOT proceed to PostgreSQL — root-cause
       the regression in the SingleStore migration first.
 
-  - id: w5
+  - id: w7
     summary: "Migrate PostgreSQL adapter + Postgres Docker stress verification"
-    needs: [w4]
+    needs: [w6]
     status: pending
     notes: |
-      Same pattern as w4 against ``benchbox/platforms/postgresql.py``:
+      Same pattern as w5 against ``benchbox/platforms/postgresql.py``:
       replace the ``benchmark.tables`` loop with ``DataSourceResolver``
       + ``resolve_csv_dialect`` + ``prepare_local_load_file``. Drop the
       hardcoded ``is_zst`` block (L525) and the inline trailing-pipe strip
@@ -223,14 +250,14 @@ work:
       ``HEADER true`` / ``NULL ''`` translation. Rewrite the equivalent
       Postgres unit tests to inject ``DataSource``.
 
-      Decision gate before declaring w5 done: run a Postgres benchmark via
+      Decision gate before declaring w7 done: run a Postgres benchmark via
       docker compose against ClickBench (csv with empty strings) and TPC-DS
       (.dat with NULL trailing field) — both must load correctly without
       manual intervention.
 
-  - id: w6
+  - id: w8
     summary: "Migrate Doris adapter + Doris Docker stress verification"
-    needs: [w5]
+    needs: [w7]
     status: pending
     notes: |
       Same pattern against ``benchbox/platforms/doris.py``. Doris uses
@@ -245,9 +272,9 @@ work:
       ``project_doris_platform_fixes.md`` (memory) — none of those fixes
       should regress.
 
-  - id: w7
+  - id: w9
     summary: "Migrate QuestDB adapter + QuestDB Docker stress verification"
-    needs: [w6]
+    needs: [w8]
     status: pending
     notes: |
       Same pattern against ``benchbox/platforms/questdb.py``. QuestDB uses
@@ -260,9 +287,9 @@ work:
       (header-bearing CSV) and TPC-H (.tbl trailing pipe) — both must
       load.
 
-  - id: w8
+  - id: w10
     summary: "Test rewrites + integration coverage with negative case"
-    needs: [w7]
+    needs: [w9]
     status: pending
     notes: |
       1. Audit unit tests under tests/unit/platforms/ for any remaining
@@ -324,12 +351,15 @@ files_affected:
     - "tests/unit/platforms/test_doris_adapter.py"
     - "tests/unit/platforms/test_questdb_adapter.py"
   added:
+    - "tests/unit/platforms/test_csv_dialect.py"
+    - "tests/unit/platforms/test_prepare_local_load_file.py"
+    - "tests/unit/platforms/test_data_loading.py"
     - "tests/integration/test_manifest_driven_loading.py"
 
 must_preserve:
   - "13-benchmark SingleStore matrix that the band-aid commits fixed: TPC-H/DS NULL semantics, datavault quoting, TPC-DI True/False booleans, ClickBench empty-string preservation, Parquet skip-with-warning, header-bearing CSV (tsbs_devops, nyctaxi, flightdata) loads, OPTIONALLY ENCLOSED BY '\"' for quoted fields"
   - "Existing DataSourceResolver.resolve() callers (DuckDB, Snowflake, BigQuery, Athena, Redshift, etc.) keep working unchanged — DataSource.table_metadata gets a default factory so unannotated paths produce {} not None"
-  - "Live ./scripts/local_stress_test.sh --scale 1 --platform singlestore exit code 0 after w4 (HARD GATE)"
+  - "Live ./scripts/local_stress_test.sh --scale 1 --platform singlestore exit code 0 after w6 (HARD GATE)"
   - "Doris fixes documented in project_doris_platform_fixes.md memory entry — none should regress"
   - "ZstdHandler in base/data_loading.py:547 continues to use the system zstd command (its current implementation) — do not switch to python-zstandard mid-migration"
 
@@ -371,16 +401,16 @@ anti_patterns:
   - "DO NOT batch all four adapter migrations into one commit — because if one regresses, the others are stuck behind it — commit per adapter with the per-platform Docker stress check between each."
 
 verification:
-  - description: "DataSource.table_metadata round-trips through DataSourceResolver from a manifest with metadata populated"
+  - description: "DataSource.table_metadata round-trips through DataSourceResolver from a manifest with metadata populated (test file created in w1)"
     command: "uv run -- python -m pytest tests/unit/platforms/test_data_loading.py -q -k table_metadata"
     expected_output: "all green"
-  - description: "Backwards compat — DataSourceResolver against a benchmark with no manifest still resolves with table_metadata={}"
+  - description: "Backwards compat — DataSourceResolver against a benchmark with no manifest still resolves with table_metadata={} (test file created in w1)"
     command: "uv run -- python -m pytest tests/unit/platforms/test_data_loading.py -q -k backwards_compat"
     expected_output: "all green"
-  - description: "CsvDialect resolution precedence (manifest > benchmark > defaults)"
+  - description: "CsvDialect resolution precedence (manifest > benchmark > defaults) (test file created in w2)"
     command: "uv run -- python -m pytest tests/unit/platforms/test_csv_dialect.py -q"
     expected_output: "all green"
-  - description: "prepare_local_load_file handles gzip + zstd + uncompressed; strips trailing pipe only when asked; rewrites booleans only when asked"
+  - description: "prepare_local_load_file handles gzip + zstd + uncompressed; strips trailing pipe only when asked; rewrites booleans only when asked (test file created in w3)"
     command: "uv run -- python -m pytest tests/unit/platforms/test_prepare_local_load_file.py -q"
     expected_output: "all green"
   - description: "All four adapters' unit suites green after each migration commit"
@@ -389,13 +419,13 @@ verification:
   - description: "Project-wide fast suite stays green per commit"
     command: "uv run -- python -m pytest -m fast -q"
     expected_output: "all green"
-  - description: "SingleStore live stress (HARD GATE between w4 and w5)"
+  - description: "SingleStore live stress (HARD GATE between w6 and w7)"
     command: "./scripts/local_stress_test.sh --scale 1 --platform singlestore"
     expected_output: "exit code 0; full benchmark matrix passes"
   - description: "Lint + typecheck per commit"
     command: "uv run ruff check . && uv run ty check"
     expected_output: "All checks passed!"
-  - description: "Integration test asserts manifest-driven loading; negative case proves adapter reads manifest, not filename"
+  - description: "Integration test asserts manifest-driven loading; negative case proves adapter reads manifest, not filename (test file created in w10)"
     command: "uv run -- python -m pytest tests/integration/test_manifest_driven_loading.py -q"
     expected_output: "all green; negative case fails when an adapter falls back to filename guessing"
 
