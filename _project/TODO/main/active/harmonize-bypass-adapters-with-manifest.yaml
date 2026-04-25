@@ -177,7 +177,7 @@ work:
 - id: w5
   summary: "Migrate SingleStore adapter data-loading logic"
   needs: [w3, w4]
-  status: pending
+  status: done
   notes: |
     Sequence within this work unit:
 
@@ -214,7 +214,7 @@ work:
 - id: w6
   summary: "Rewrite SingleStore SQL-assertion tests to inject DataSource (HARD GATE: live stress)"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     1. Rewrite the 6 SQL-assertion tests in
        tests/unit/platforms/test_singlestore_adapter.py to inject a fake
