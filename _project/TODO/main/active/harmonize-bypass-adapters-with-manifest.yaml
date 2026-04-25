@@ -93,7 +93,7 @@ work:
 - id: w2
   summary: "CsvDialect dataclass + resolve_csv_dialect() with precedence unit tests"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add to ``benchbox/platforms/base/data_loading.py``:
 
