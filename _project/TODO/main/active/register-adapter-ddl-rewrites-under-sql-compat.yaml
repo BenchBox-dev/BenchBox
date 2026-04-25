@@ -143,7 +143,7 @@ work:
 - id: w3
   summary: "Extract strip_foreign_keys() shared helper and behavioral-equivalence corpus tests"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Six adapters duplicate the FK-strip regex with drift. Build the
     single canonical helper that w4 will wire into each adapter.
