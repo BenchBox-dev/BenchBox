@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T09:04:39.652499'
+generated_at: '2026-04-25T12:23:39.454279'
 total_items: 33
 priorities:
   Critical:
@@ -33,10 +33,10 @@ priorities:
       category: Platform Expansion
       status: Not Started
     - id: register-adapter-ddl-rewrites-under-sql-compat
-      file: TODO/main/planning/register-adapter-ddl-rewrites-under-sql-compat.yaml
+      file: TODO/main/active/register-adapter-ddl-rewrites-under-sql-compat.yaml
       title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

@@ -1,8 +1,8 @@
-generated_at: '2026-04-25T09:04:39.652510'
+generated_at: '2026-04-25T12:23:39.454290'
 total_items: 33
 statuses:
   In Progress:
-    count: 2
+    count: 3
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
@@ -14,8 +14,13 @@ statuses:
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
       category: Core Functionality
+    - id: register-adapter-ddl-rewrites-under-sql-compat
+      file: TODO/main/active/register-adapter-ddl-rewrites-under-sql-compat.yaml
+      title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
+      priority: High
+      category: Core Functionality
   Not Started:
-    count: 30
+    count: 29
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -117,11 +122,6 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
-    - id: register-adapter-ddl-rewrites-under-sql-compat
-      file: TODO/main/planning/register-adapter-ddl-rewrites-under-sql-compat.yaml
-      title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
-      priority: High
-      category: Core Functionality
     - id: fix-git-author-history-rewrite
       file: TODO/main/planning/fix-git-author-history-rewrite.yaml
       title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)

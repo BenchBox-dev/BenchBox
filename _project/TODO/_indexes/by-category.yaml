@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T09:04:39.652477'
+generated_at: '2026-04-25T12:23:39.454261'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -84,10 +84,10 @@ categories:
       priority: Medium
       status: Not Started
     - id: register-adapter-ddl-rewrites-under-sql-compat
-      file: TODO/main/planning/register-adapter-ddl-rewrites-under-sql-compat.yaml
+      file: TODO/main/active/register-adapter-ddl-rewrites-under-sql-compat.yaml
       title: Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint
       priority: High
-      status: Not Started
+      status: In Progress
     - id: evaluate-results-data-repo-extraction-checkpoint
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
