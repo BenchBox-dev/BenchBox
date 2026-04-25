@@ -147,7 +147,7 @@ work:
 - id: w4
   summary: "Annotate CSV-bearing benchmark generators with manifest metadata"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     For each generator below, find the ``manifest.add_entry()`` call (or
     equivalent ``write_generator_manifest()`` invocation) and pass
