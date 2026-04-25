@@ -123,7 +123,7 @@ work:
 - id: w3
   summary: "prepare_local_load_file() + compression/strip/boolean unit tests"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Add to ``benchbox/platforms/base/data_loading.py``:
 
