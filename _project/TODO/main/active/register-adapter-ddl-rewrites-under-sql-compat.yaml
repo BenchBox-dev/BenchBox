@@ -178,7 +178,7 @@ work:
 - id: w4
   summary: "Migrate all six duplicating adapters to call strip_foreign_keys() helper"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     With the shared helper and corpus tests in place from w3, replace
     each adapter's local FK-strip with a single call:
