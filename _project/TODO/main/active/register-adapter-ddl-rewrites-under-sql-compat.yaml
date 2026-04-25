@@ -204,7 +204,7 @@ work:
 - id: w5
   summary: "Register every remaining unregistered DDL transform surfaced by w2 audit"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Required precondition for w7 (fail-CI). Anything left unregistered
     becomes a CI break.
