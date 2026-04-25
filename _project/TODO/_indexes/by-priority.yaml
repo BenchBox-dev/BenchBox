@@ -1,5 +1,5 @@
-generated_at: '2026-04-22T19:55:19.136937'
-total_items: 31
+generated_at: '2026-04-25T08:29:49.622002'
+total_items: 32
 priorities:
   Critical:
     count: 1
@@ -10,11 +10,16 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 4
+    count: 5
     items:
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
+      category: Core Functionality
+      status: Not Started
+    - id: harmonize-bypass-adapters-with-manifest
+      file: TODO/main/planning/harmonize-bypass-adapters-with-manifest.yaml
+      title: Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure
       category: Core Functionality
       status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
