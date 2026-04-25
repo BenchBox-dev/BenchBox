@@ -239,7 +239,7 @@ work:
 - id: w7
   summary: "Migrate PostgreSQL adapter + Postgres Docker stress verification"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Same pattern as w5 against ``benchbox/platforms/postgresql.py``:
     replace the ``benchmark.tables`` loop with ``DataSourceResolver``
@@ -258,7 +258,7 @@ work:
 - id: w8
   summary: "Migrate Doris adapter + Doris Docker stress verification"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
     Same pattern against ``benchbox/platforms/doris.py``. Doris uses
     Stream Load HTTP, not LOAD DATA, so the ``prepare_local_load_file``

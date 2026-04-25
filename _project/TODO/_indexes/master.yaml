@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T12:23:39.454224'
+generated_at: '2026-04-25T12:26:54.423795'
 total_items: 33
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -56,7 +56,7 @@ items:
   - review-followup
   estimated_effort: Large (3-5 days, sequential due to per-adapter live verification gates)
   work_total: 10
-  work_done: 7
+  work_done: 8
   work_ready: 1
   deferred_count: 3
 - id: integrate-benchbox-cli-submit-and-service-auth
