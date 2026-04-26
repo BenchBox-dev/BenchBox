@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:07:54.900581'
-total_items: 763
+generated_at: '2026-04-26T09:07:59.550879'
+total_items: 764
 priorities:
   Critical:
     count: 42
@@ -215,7 +215,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 260
+    count: 261
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -913,6 +913,11 @@ priorities:
       file: DONE/main/active/migrate-textcharts-api-breaking-changes.yaml
       title: Migrate BenchBox imports to textcharts new API - rename ASCII*-prefixed classes to unprefixed names
       category: Core Functionality
+      status: Completed
+    - id: migrate-remaining-adapters-to-csv-resolver-pipeline
+      file: DONE/main/active/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
+      title: Migrate remaining platform adapters to the CSV resolver pipeline
+      category: Platform Expansion
       status: Completed
     - id: migrate-ascii-chart-tests-to-textcharts
       file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml

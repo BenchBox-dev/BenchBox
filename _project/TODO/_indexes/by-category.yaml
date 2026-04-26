@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T09:07:52.948873'
+generated_at: '2026-04-26T09:07:57.413745'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -97,7 +97,7 @@ categories:
       priority: Medium
       status: Identified
   Platform Expansion:
-    count: 9
+    count: 8
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -124,11 +124,6 @@ categories:
       title: Add Velox + Gluten Spark Acceleration Platform Adapter
       priority: Medium
       status: Not Started
-    - id: migrate-remaining-adapters-to-csv-resolver-pipeline
-      file: TODO/main/active/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
-      title: Migrate remaining platform adapters to the CSV resolver pipeline
-      priority: High
-      status: In Progress
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

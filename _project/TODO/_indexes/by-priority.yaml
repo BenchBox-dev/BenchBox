@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:07:52.948899'
-total_items: 33
+generated_at: '2026-04-26T09:07:57.413759'
+total_items: 32
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 6
+    count: 5
     items:
     - id: address-cross-adapter-13-pattern-audit-findings
       file: TODO/main/active/address-cross-adapter-13-pattern-audit-findings.yaml
@@ -27,11 +27,6 @@ priorities:
       title: Integrate BenchBox CLI submission flow and service authentication
       category: Core Functionality
       status: Not Started
-    - id: migrate-remaining-adapters-to-csv-resolver-pipeline
-      file: TODO/main/active/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
-      title: Migrate remaining platform adapters to the CSV resolver pipeline
-      category: Platform Expansion
-      status: In Progress
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

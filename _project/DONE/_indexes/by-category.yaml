@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T09:07:54.900348'
+generated_at: '2026-04-26T09:07:59.550687'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -2611,7 +2611,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 82
+    count: 83
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2932,6 +2932,11 @@ categories:
       file: DONE/platform-expansion/planning/fabric-spark-platform.yaml
       title: Microsoft Fabric Spark Platform
       priority: Medium-High
+      status: Completed
+    - id: migrate-remaining-adapters-to-csv-resolver-pipeline
+      file: DONE/main/active/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
+      title: Migrate remaining platform adapters to the CSV resolver pipeline
+      priority: High
       status: Completed
     - id: motherduck-platform-adapter
       file: DONE/platform-expansion/active/motherduck-platform-adapter.yaml
