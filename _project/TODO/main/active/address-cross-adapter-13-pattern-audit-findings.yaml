@@ -175,7 +175,7 @@ work:
 - id: w8
   summary: "P12 — Extract NoConstraintEnforcementMixin (cudf, datafusion, polars_platform)"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     cudf.py:605-636 ≅ polars_platform.py:618-645 ≅ datafusion.py:1400-1435
     triplicate `apply_constraint_configuration` and
