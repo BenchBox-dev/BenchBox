@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T10:19:02.355875'
+generated_at: '2026-04-26T10:32:27.028961'
 total_items: 32
 statuses:
   In Progress:
@@ -114,7 +114,8 @@ statuses:
       category: Platform Expansion
     - id: refine-sql-compat-skip-semantics
       file: TODO/main/planning/refine-sql-compat-skip-semantics.yaml
-      title: 'Refine sql_compat skip semantics: split SKIPPED, close PK enforcement coverage gap, tighten reasons'
+      title: 'Refine sql_compat outcome taxonomy: rename DEGRADED→INFORMATIONAL, split SKIPPED, close PK coverage gap, tighten
+        reasons'
       priority: Medium-High
       category: Code Quality and Technical Debt
     - id: fix-git-author-history-rewrite

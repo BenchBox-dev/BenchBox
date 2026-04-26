@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T10:19:02.355845'
+generated_at: '2026-04-26T10:32:27.028927'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -47,7 +47,8 @@ categories:
       status: Not Started
     - id: refine-sql-compat-skip-semantics
       file: TODO/main/planning/refine-sql-compat-skip-semantics.yaml
-      title: 'Refine sql_compat skip semantics: split SKIPPED, close PK enforcement coverage gap, tighten reasons'
+      title: 'Refine sql_compat outcome taxonomy: rename DEGRADED→INFORMATIONAL, split SKIPPED, close PK coverage gap, tighten
+        reasons'
       priority: Medium-High
       status: Not Started
     - id: upgrade-pandas-to-3x
