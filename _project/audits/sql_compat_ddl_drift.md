@@ -17,6 +17,8 @@
 | 5 | Doris | doris.py:1495 | Inline STRING→VARCHAR, TEXT→VARCHAR, SMALLINT→INT, ARRAY strip (inside `_inject_doris_ddl_clauses`) | ✗ | (covered by same rule as #4) | Covered by #4 registration |
 | 6 | FabricWarehouse | fabric_warehouse.py:1207 | `_optimize_table_definition()` — standard method, no rule | ✗ | `ddl_optimize.fabric_warehouse.all.optimize_table_definition` | Register in w5 |
 | 7 | DuckDB | duckdb.py:731 | Inline FOREIGN KEY / REFERENCES strip inside `create_schema()` (TPC-DS only) | ✗ | — | **Accept as-is**: duckdb.py is in `scope_limit.do_not_modify`; strip is benchmark-conditional (TPC-DS only), not a platform DDL transform |
+| 8 | pg_mooncake | pg_mooncake.py:193 | `_transform_create_statement()` appends `USING columnstore` | ✗ (post-w7) | `ddl_optimize.pg_mooncake.all.add_columnstore_access_method` | **Missed by initial audit walk** — surfaced when w7 fail-CI flipped on; registered as governance-only in follow-up commit |
+| 9 | Firebolt | firebolt.py:1077 | Inline FK-strip regex inside registered `_optimize_table_definition` | ✓ (covered) | n/a | Covered governance-wise by `firebolt_ddl_rewrites.py`; FK regex itself was duplicating `strip_foreign_keys()`. Migrated to shared helper in follow-up commit. |
 
 ---
 
@@ -51,10 +53,19 @@ These platforms have registered rules in `benchbox/sql_compat/rules/ddl_optimize
 
 ## Punch List Count
 
-- **Unregistered transforms requiring registration (w5):** 4 distinct operations across 3 adapters (PostgreSQL, QuestDB, Doris, FabricWarehouse)
+- **Unregistered transforms requiring registration (w5):** 4 distinct operations across 4 adapters (PostgreSQL, QuestDB, Doris, FabricWarehouse)
 - **Accepted as-is:** 1 (DuckDB — out of scope, benchmark-conditional)
 - **Out of scope (follow-up TODO):** 2 (Athena, BigQuery)
-- **Total count: 4** — well under the w2 decision gate threshold of 30; proceed with w5 registration
+- **Initial total: 4** — well under the w2 decision gate threshold of 30; proceed with w5 registration
+
+### Post-w7 follow-ups (surfaced after fail-CI flip)
+
+- **pg_mooncake** (`pg_mooncake.py:193`) — missed by the initial walk; registered as governance-only in
+  `pg_mooncake_ddl_rewrites.py`. Lesson: the audit should have grepped every `def _transform_create_statement`
+  across `benchbox/platforms/`, not only the adapters listed in `scope_limit.only_modify`.
+- **Firebolt** FK-strip regex (`firebolt.py:1077`) was governance-covered by the registered
+  `firebolt_ddl_rewrites.py`, but the regex itself duplicated `strip_foreign_keys()`. Migrated to the shared
+  helper to satisfy the "Zero inline FK-strip regex" success metric in literal terms.
 
 ---
 
