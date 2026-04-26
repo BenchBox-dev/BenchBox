@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:49:11.763282'
-total_items: 765
+generated_at: '2026-04-26T10:06:58.160268'
+total_items: 766
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5733,6 +5733,27 @@ items:
   category: Core Functionality
   priority: Medium
   status: In Progress
+- id: velox-gluten-spark-adapter
+  file: DONE/platform-expansion/planning/velox-gluten-spark-adapter.yaml
+  title: Add Velox + Gluten Spark Acceleration Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Completed
+  tags:
+  - platform
+  - spark
+  - velox
+  - gluten
+  - native-execution
+  - accelerated-spark
+  estimated_effort: Large - ~6-8 engineering days including jar provisioning, two deployment modes, multi-arch Docker image
+    + compose, CI strategy, and docs
+  completed_date: '2026-04-26'
+  work_total: 21
+  work_done: 21
+  work_ready: 0
+  deferred_count: 6
 - id: add-blog-with-ablog
   file: DONE/docs-experience/active/add-blog-with-ablog.yaml
   title: Add blog to BenchBox site using ABlog Sphinx extension

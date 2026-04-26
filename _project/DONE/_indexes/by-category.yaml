@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T09:49:11.763641'
+generated_at: '2026-04-26T10:06:58.160682'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -2616,7 +2616,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 83
+    count: 84
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2723,6 +2723,11 @@ categories:
       title: Add TLS/HTTPS option for HTTP-based data loading endpoints
       priority: Medium
       status: Not Started
+    - id: velox-gluten-spark-adapter
+      file: DONE/platform-expansion/planning/velox-gluten-spark-adapter.yaml
+      title: Add Velox + Gluten Spark Acceleration Platform Adapter
+      priority: Medium
+      status: Completed
     - id: cloud-platform-cost-estimation
       file: DONE/platform-expansion/active/cloud-platform-cost-estimation.yaml
       title: Add cost estimation support for cloud platforms (Firebolt, Fabric, Synapse)

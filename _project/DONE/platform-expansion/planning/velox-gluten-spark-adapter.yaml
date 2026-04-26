@@ -2,7 +2,8 @@ id: velox-gluten-spark-adapter
 title: "Add Velox + Gluten Spark Acceleration Platform Adapter"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-26"
 category: Platform Expansion
 description: |
   Add a BenchBox platform adapter for Apache Gluten with the Velox backend -
@@ -465,7 +466,7 @@ open_questions:
 work:
   - id: w1
     summary: "Research spike - pin Gluten 1.4.x + Spark 3.5.x + base Docker image, document jar URLs + sha256 for linux_amd64 and linux_arm64"
-    status: pending
+    status: done
     notes: |
       Output: a one-pager in docs/platforms/velox_jar_setup.md with exact
       jar URLs (both arches), sha256 sums, Spark/Java/OS compatibility
@@ -475,7 +476,7 @@ work:
   - id: w2
     summary: "Scaffold VeloxAdapter skeleton in benchbox/platforms/velox.py by copying LakeSail structure - class, __init__, from_config, platform_name, get_target_dialect"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Pure skeleton - no session logic yet. Goal: module imports cleanly
       with pyspark missing, same try/except shape as LakeSail.
@@ -483,7 +484,7 @@ work:
   - id: w3
     summary: "Register adapter across four wiring points - platforms/__init__.py, adapter_factory.py, utils/dependencies.py DependencyInfo, pyproject.toml 'velox' extra"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Single work unit because the four edits are trivial individually
       and must land together for the adapter to be reachable. Commit
@@ -493,12 +494,12 @@ work:
   - id: w4
     summary: "Add _build_velox_config + PlatformHookRegistry.register_config_builder('velox', ...) at the bottom of velox.py, mirroring _build_lakesail_config"
     needs: [w3]
-    status: pending
+    status: done
 
   - id: w5
     summary: "Implement local-mode _create_spark_session - SparkSession.builder with required Gluten conf, jar classpath, off-heap, ColumnarShuffleManager; validate gluten_jar_path exists with clear error"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Mirror benchbox/platforms/spark.py for builder construction; add
       Gluten-specific conf.
@@ -506,37 +507,37 @@ work:
   - id: w6
     summary: "Implement remote-mode _create_spark_session and _ensure_server_ready (endpoint parse, socket probe) - mirror LakeSail but do NOT auto-start a server"
     needs: [w2]
-    status: pending
+    status: done
 
   - id: w7
     summary: "Wire in SparkDataLoadMixin and SparkQueryExecutionMixin by implementing load_data, execute_query, create_schema, close_connection - all thin delegates, same as LakeSail"
     needs: [w5, w6]
-    status: pending
+    status: done
 
   - id: w8
     summary: "Implement get_platform_info including a 'velox_active' probe via EXPLAIN on SELECT 1 looking for VeloxColumnar plan nodes"
     needs: [w7]
-    status: pending
+    status: done
 
   - id: w9
     summary: "Implement get_query_plan using EXPLAIN EXTENDED and annotate whether each query is fully native or contains fallback nodes"
     needs: [w7]
-    status: pending
+    status: done
 
   - id: w10
     summary: "Add CLI arguments (add_cli_arguments) for --velox-deployment, --velox-endpoint, --velox-jar, --velox-version, --offheap-size, reuse Spark args where possible"
     needs: [w7]
-    status: pending
+    status: done
 
   - id: w11
     summary: "Implement SparkTuningMixin wiring (supports_tuning_type, generate_tuning_clause, apply_unified_tuning) - copy LakeSail, partitioning + sorting only"
     needs: [w7]
-    status: pending
+    status: done
 
   - id: w12
     summary: "Unit tests: config building, dependency check failure path, endpoint parsing, local vs remote dispatch (mocked SparkSession)"
     needs: [w5, w6]
-    status: pending
+    status: done
     notes: |
       Model on tests/unit/platforms/test_lakesail.py. Must run without
       pyspark installed (gated import, mock at module level).
@@ -544,12 +545,12 @@ work:
   - id: w13
     summary: "Unit tests: velox_active probe parsing, get_query_plan fallback annotation, SparkTuningMixin behavior"
     needs: [w8, w9, w11]
-    status: pending
+    status: done
 
   - id: w14
     summary: "Author docker/velox/Dockerfile - multi-arch (linux/amd64 + linux/arm64) FROM apache/spark:3.5.2, bundle jar via ARG TARGETARCH, install benchbox[velox]"
     needs: [w1, w7]
-    status: pending
+    status: done
     notes: |
       Build with: docker buildx build --platform linux/amd64,linux/arm64
       Validate on Apple Silicon (arm64) and Intel/CI (amd64) separately
@@ -558,17 +559,17 @@ work:
   - id: w15
     summary: "Author docker/velox/entrypoint.sh + docker-compose.yml with two services: velox-connect (:50051) and velox-runner (one-shot benchbox run)"
     needs: [w14]
-    status: pending
+    status: done
 
   - id: w16
     summary: "Author docker/velox/README.md - service selection, buildx arch, --memory limits, jar placement, troubleshooting"
     needs: [w15]
-    status: pending
+    status: done
 
   - id: w17
     summary: "Live integration test (live_integration marker): TPC-H Q1+Q6 at SF 0.01 inside the Docker image, asserts velox_active=True"
     needs: [w12, w13, w15]
-    status: pending
+    status: done
     notes: |
       Must be runnable via `docker run benchbox-velox:test pytest …`.
       Skipped outside the image; mark with `requires_docker` fixture.
@@ -576,22 +577,22 @@ work:
   - id: w18
     summary: "Author docs/platforms/velox.md - overview, when to choose Velox over Spark/LakeSail, config examples, known caveats; link prominently to velox_docker_dev.md"
     needs: [w7]
-    status: pending
+    status: done
 
   - id: w19
     summary: "Author docs/platforms/velox_docker_dev.md - Docker dev workflow: prereqs, buildx, compose recipes, arch selection, memory sizing, CI integration, troubleshooting"
     needs: [w16]
-    status: pending
+    status: done
 
   - id: w20
     summary: "Update docs/platforms/index.md and platform matrix to list Velox under accelerated-Spark tier, with explicit 'Linux/Docker only' note"
     needs: [w18, w19]
-    status: pending
+    status: done
 
   - id: w21
     summary: "Run full smoke: uv run -- python -m pytest -m fast -q and new unit tests; build both-arch Docker images; fix any drift"
     needs: [w12, w13, w14, w18, w19]
-    status: pending
+    status: done
 
 deferred:
   - summary: "SparkListener-based fallback-operator counter attached to per-query metadata in BenchmarkResults"

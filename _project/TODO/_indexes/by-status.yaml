@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:49:09.910347'
-total_items: 32
+generated_at: '2026-04-26T10:06:55.567233'
+total_items: 31
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Medium
       category: Testing & Quality
   Not Started:
-    count: 29
+    count: 28
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -41,11 +41,6 @@ statuses:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
-      category: Platform Expansion
-    - id: velox-gluten-spark-adapter
-      file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
-      title: Add Velox + Gluten Spark Acceleration Platform Adapter
-      priority: Medium
       category: Platform Expansion
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml

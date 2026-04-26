@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T09:49:09.910317'
+generated_at: '2026-04-26T10:06:55.567209'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -92,7 +92,7 @@ categories:
       priority: Medium
       status: Identified
   Platform Expansion:
-    count: 9
+    count: 8
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -113,11 +113,6 @@ categories:
       file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
-      status: Not Started
-    - id: velox-gluten-spark-adapter
-      file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
-      title: Add Velox + Gluten Spark Acceleration Platform Adapter
-      priority: Medium
       status: Not Started
     - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
       file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:49:09.910281'
-total_items: 32
+generated_at: '2026-04-26T10:06:55.567172'
+total_items: 31
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -38,7 +38,7 @@ items:
   - abc-conformance
   estimated_effort: Medium-Large (~5-8 days across 20 work units; most are 1-3 hours each)
   work_total: 26
-  work_done: 8
+  work_done: 11
   work_ready: 9
   deferred_count: 4
 - id: design-results-ingest-storage-and-derived-read-model
@@ -373,26 +373,6 @@ items:
   work_total: 9
   work_done: 0
   work_ready: 1
-- id: velox-gluten-spark-adapter
-  file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
-  title: Add Velox + Gluten Spark Acceleration Platform Adapter
-  worktree: platform-expansion
-  category: Platform Expansion
-  priority: Medium
-  status: Not Started
-  tags:
-  - platform
-  - spark
-  - velox
-  - gluten
-  - native-execution
-  - accelerated-spark
-  estimated_effort: Large - ~6-8 engineering days including jar provisioning, two deployment modes, multi-arch Docker image
-    + compose, CI strategy, and docs
-  work_total: 21
-  work_done: 0
-  work_ready: 1
-  deferred_count: 6
 - id: timing-policy-split-review-followups
   file: TODO/main/active/timing-policy-split-review-followups.yaml
   title: Address follow-up findings from timing-policy pre-commit split review

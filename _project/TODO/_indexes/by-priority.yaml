@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:49:09.910337'
-total_items: 32
+generated_at: '2026-04-26T10:06:55.567223'
+total_items: 31
 priorities:
   Critical:
     count: 1
@@ -61,16 +61,11 @@ priorities:
       category: Platform Expansion
       status: Not Started
   Medium:
-    count: 7
+    count: 6
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
       title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
-      category: Platform Expansion
-      status: Not Started
-    - id: velox-gluten-spark-adapter
-      file: TODO/platform-expansion/planning/velox-gluten-spark-adapter.yaml
-      title: Add Velox + Gluten Spark Acceleration Platform Adapter
       category: Platform Expansion
       status: Not Started
     - id: timing-policy-split-review-followups

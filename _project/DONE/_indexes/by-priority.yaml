@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:49:11.763834'
-total_items: 765
+generated_at: '2026-04-26T10:06:58.160900'
+total_items: 766
 priorities:
   Critical:
     count: 42
@@ -2145,7 +2145,7 @@ priorities:
       category: Platform Support
       status: Completed
   Medium:
-    count: 295
+    count: 296
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2377,6 +2377,11 @@ priorities:
       title: Add Time Series Benchmark Suite (TSBS) Implementation
       category: Core Functionality
       status: In Progress
+    - id: velox-gluten-spark-adapter
+      file: DONE/platform-expansion/planning/velox-gluten-spark-adapter.yaml
+      title: Add Velox + Gluten Spark Acceleration Platform Adapter
+      category: Platform Expansion
+      status: Completed
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
       title: Add blog to BenchBox site using ABlog Sphinx extension
