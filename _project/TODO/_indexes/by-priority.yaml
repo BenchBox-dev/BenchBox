@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T21:53:03.765662'
-total_items: 32
+generated_at: '2026-04-25T22:22:37.266527'
+total_items: 33
 priorities:
   Critical:
     count: 1
@@ -10,8 +10,13 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 5
+    count: 6
     items:
+    - id: address-cross-adapter-13-pattern-audit-findings
+      file: TODO/main/active/address-cross-adapter-13-pattern-audit-findings.yaml
+      title: Address cross-adapter 13-pattern audit findings (3 Critical, 22 Required, 8 Nit/Consider)
+      category: Code Quality and Technical Debt
+      status: In Progress
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
