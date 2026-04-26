@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T11:43:51.496126'
+generated_at: '2026-04-26T11:58:13.591331'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -33,18 +33,12 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 3
+    count: 2
     items:
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
       priority: Low
-      status: Not Started
-    - id: refine-sql-compat-skip-semantics
-      file: TODO/main/planning/refine-sql-compat-skip-semantics.yaml
-      title: 'Refine sql_compat outcome taxonomy: rename DEGRADED→INFORMATIONAL, split SKIPPED, close PK coverage gap, tighten
-        reasons'
-      priority: Medium-High
       status: Not Started
     - id: upgrade-pandas-to-3x
       file: TODO/main/planning/upgrade-pandas-to-3x.yaml

@@ -1,0 +1,522 @@
+id: refine-sql-compat-skip-semantics
+title: "Refine sql_compat outcome taxonomy: rename DEGRADED→INFORMATIONAL, split SKIPPED, close PK coverage gap, tighten reasons"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-26"
+category: Code Quality and Technical Debt
+description: |
+  After build-sql-compat-phase-aware-pipeline shipped (w17/w18, 2026-04-26),
+  reviewing the eight skip/block/degrade rows in docs/compat/skip-reference.md
+  surfaced five problems with the as-shipped support_level surface. Three are
+  readability gaps; one is a real silent-corruption window the pipeline was
+  supposed to close; one is a naming choice that biases readers toward the
+  wrong interpretation.
+
+  1. SupportLevel.DEGRADED carries performance-regression connotations and
+     reads as a judgement on the platform. The actual semantic - "the
+     workload runs end-to-end, but a documented platform-level guarantee
+     (typically PRIMARY KEY uniqueness) is not provided" - is closer to how
+     vendors document this themselves. Snowflake, Redshift, BigQuery, and
+     Databricks docs use INFORMATIONAL or NOT ENFORCED. Renaming
+     DEGRADED → INFORMATIONAL aligns with vendor terminology and removes
+     the false suggestion that the platform is performing badly.
+
+  2. SupportLevel.SKIPPED is overloaded. The same enum value covers
+     full-query exclusion (StarRocks vector_search Q2 is dropped from the
+     result set entirely on platform_version < 3.2) and DDL-fragment
+     suppression (DataFusion write_primitives / transaction_primitives
+     lock-table DDL is skipped, but the workload itself runs end-to-end).
+     The user-visible consequences are categorically different - one
+     removes a query from the benchmark; the other only drops an internal
+     coordination DDL - but the doc says "SKIPPED" for both.
+
+  3. Rule reason strings explain the platform deficiency ("DataFusion does
+     not support PRIMARY KEY syntax", "QuestDB has no VECTOR column type")
+     but not the user-visible consequence (benchmark refused at preflight /
+     query omitted from results / workload runs with documented caveat).
+     Readers consistently misread DDL-fragment skips as full-benchmark skips.
+
+  4. The generated skip-reference.md collapses BLOCKED, SKIPPED, and
+     DEGRADED into a single per-platform table. Splitting "Will not run"
+     (preflight refused or query omitted) from "Runs with caveats" (DDL
+     fragment dropped, semantic enforcement gap) would make the page
+     self-explaining.
+
+  5. PRIMARY KEY enforcement coverage is incomplete. Only four platforms
+     have PK-capability rules registered (datafusion, clickhouse,
+     starrocks, doris). Every other platform that accepts PRIMARY KEY DDL
+     but does not enforce uniqueness silently breaks the
+     write_primitives / transaction_primitives setup-lock semantics: the
+     CREATE TABLE for write_primitives_setup_lock succeeds, both lock
+     INSERTs succeed because uniqueness is not enforced, and concurrent
+     setup workers think they own the lock at the same time. The
+     legacy_bypass tuple in core/write_primitives/benchmark.py:62 is the
+     fallback when no rule resolves; it lists exactly the four covered
+     platforms, leaving Snowflake, Redshift, BigQuery, Databricks, Synapse,
+     Fabric Warehouse, Firebolt, Spark/PySpark, Trino/Presto/Athena/
+     Starburst, Databend, and any other "accepts PK DDL, does not enforce"
+     platform without protection.
+
+  Critical cross-reference for the audit: benchbox/platforms/base/no_constraint_mixin.py
+  defines NoConstraintEnforcementMixin, used by DataFusion, Polars, and cuDF.
+  Adapters using this mixin no-op apply_constraint_configuration at runtime,
+  meaning even if the registry resolved a NATIVE PK rule, the constraint
+  would never actually be applied. The mixin is direct, in-tree evidence of
+  "this platform does not enforce PK constraints". The w2 audit must use
+  it as a cross-check: every NoConstraintEnforcementMixin user must
+  classify as INFORMATIONAL (uniqueness not enforced but DDL accepted) or
+  SKIPPED_DDL_FRAGMENT (parser refuses DDL outright, like DataFusion).
+  Registering a NATIVE PK rule for a mixin user would be a parity bug.
+
+  This TODO addresses all five. The naming change (1) lands as a
+  closed-set enum rename. The structural change (2) lands as an enum
+  split with an ADR addendum and rule migration. The convention change
+  (3) lands as a reason-string format plus a lint check. The doc change
+  (4) is a generator restructure plus regenerated docs. The PK coverage
+  gap (5) lands as a per-platform audit followed by INFORMATIONAL rule
+  registrations and removal of the legacy_bypass tuple.
+
+  Coverage and taxonomy work proceed mostly in parallel after the ADR
+  addendum (w1) and the DEGRADED→INFORMATIONAL rename (w3); coverage
+  closes the bug-shaped gap; taxonomy is layered on after.
+
+work:
+- id: w1
+  summary: "ADR addendum: PK coverage policy + INFORMATIONAL rename + revised skip taxonomy + reason-string convention"
+  status: done
+  notes: |
+    Append an addendum to docs/development/adr/adr-sql-compat-phase-aware-pipeline.md
+    (or land a follow-on ADR that supersedes the relevant section) covering:
+    (a) the PK-coverage policy: every platform supported by BenchBox that
+    can host write_primitives / transaction_primitives must have a
+    registered PK-capability rule (NATIVE, REWRITTEN, SKIPPED_DDL_FRAGMENT,
+    or INFORMATIONAL) - no fallback to the legacy_bypass tuple is
+    acceptable after w5 closes; (b) the four SupportLevel outcomes for
+    this taxonomy revision - BLOCKED (preflight refusal), SKIPPED_QUERY
+    (query omitted from result set), SKIPPED_DDL_FRAGMENT (auxiliary DDL
+    dropped, workload runs), INFORMATIONAL (workload runs but a documented
+    platform guarantee is not provided); (c) the rationale for renaming
+    DEGRADED → INFORMATIONAL: vendor-aligned terminology (Snowflake,
+    Redshift, BigQuery use this exact word in their docs), no
+    performance-regression connotation; (d) the SupportLevel migration
+    table - DEGRADED → INFORMATIONAL for the two existing rules
+    (starrocks, doris); SKIPPED → SKIPPED_QUERY or SKIPPED_DDL_FRAGMENT
+    for each currently-SKIPPED rule; (e) the reason-string convention
+    (lead with user-visible consequence, then platform-deficiency cause);
+    (f) the doc-restructure plan for skip-reference.md;
+    (g) the NoConstraintEnforcementMixin cross-check policy: every
+    platform adapter using benchbox/platforms/base/no_constraint_mixin.py
+    must resolve to a non-NATIVE PK rule.
+    Blocking step - all subsequent work units cite the addendum.
+
+- id: w2
+  summary: "Audit PK enforcement on every BenchBox-supported platform; produce a per-platform classification table"
+  needs: [w1]
+  status: done
+  notes: |
+    Research-only work unit (no code change). For each platform under
+    benchbox/platforms/ that supports write_primitives /
+    transaction_primitives, classify PK behavior into one of four
+    buckets and cite a vendor-doc URL or test repro for each:
+    (a) NATIVE - parser accepts PK DDL AND uniqueness is enforced
+        (DuckDB, PostgreSQL line, MySQL/SingleStore, SQLite, MotherDuck,
+        CedarDB, pg_duckdb, pg_mooncake, TimescaleDB);
+    (b) REWRITTEN - parser accepts PK DDL but it is engine-internal
+        metadata, not a constraint (ClickHouse - already registered);
+    (c) INFORMATIONAL - parser accepts PK DDL but uniqueness is not
+        enforced (StarRocks, Doris already registered; Snowflake,
+        Redshift, BigQuery, Databricks Delta, Synapse, Fabric Warehouse,
+        Firebolt, Spark/PySpark, Trino/Presto/Athena/Starburst, Databend
+        candidates);
+    (d) SKIPPED_DDL_FRAGMENT - parser refuses PK DDL outright
+        (DataFusion already registered).
+    The audit MUST cross-check benchbox/platforms/base/no_constraint_mixin.py:
+    every adapter inheriting from NoConstraintEnforcementMixin (currently
+    DataFusion, Polars, cuDF) is in-tree evidence of "PK uniqueness not
+    enforced" and must classify into bucket (c) or (d). Polars and cuDF
+    are DataFrame platforms - flag them in the audit as out-of-scope for
+    SQL-mode primitives but ensure that if any future DataFrame primitives
+    benchmark uses the registry, the rule is already in place.
+    Deliver _project/compat/pk_audit.md with one row per platform:
+    platform_key | bucket | uses_no_constraint_mixin | failure_mode |
+    conditions | doc_url. The audit must cite first-party documentation
+    or a reproducer; "common knowledge" is not acceptable evidence.
+    Out-of-bucket findings (a platform that does not fit any of the four)
+    must be raised back to w1 for ADR amendment, not silently classified.
+
+- id: w3
+  summary: "Rename SupportLevel.DEGRADED → SupportLevel.INFORMATIONAL across the codebase"
+  needs: [w1]
+  status: done
+  notes: |
+    Closed-set enum change. Steps:
+    (a) Edit benchbox/sql_compat/decision.py: rename the DEGRADED member
+    to INFORMATIONAL (preserving its string value or updating the string
+    value to "INFORMATIONAL" - decide in w1 ADR addendum, default to
+    string-value change for vendor alignment).
+    (b) Update benchbox/sql_compat/__init__.py exports if any reference
+    DEGRADED.
+    (c) `grep -rn 'SupportLevel\.DEGRADED' benchbox/ tests/ scripts/`
+    and migrate every site in the same change set - registry rules
+    (currently 2: starrocks + doris write_primitives + transaction_primitives,
+    so 4 rule registrations total), tests, generator, lint script, any
+    governance code.
+    (d) If the doc generator filters or labels rows by support_level
+    string, update those filters too.
+    (e) Run `uv run -- python -m pytest tests/unit/sql_compat -m fast`
+    until green. Commit only when the enum module + every caller compile
+    and pass tests cleanly.
+    Sequenced before w4 (PK coverage register) so w4 can register new
+    rules using INFORMATIONAL from day one rather than registering as
+    DEGRADED and renaming later.
+
+- id: w4
+  summary: "Split SupportLevel.SKIPPED into SKIPPED_QUERY and SKIPPED_DDL_FRAGMENT"
+  needs: [w3]
+  status: done
+  notes: |
+    Same closed-set discipline as w3. Edit benchbox/sql_compat/decision.py:
+    replace SKIPPED with the two refined values. Update __init__.py
+    exports. Audit all callers of SupportLevel.SKIPPED in benchbox/
+    (resolver.py, plan.py, any governance / inventory code, tests) and
+    pick the right replacement based on the rule shape - the enum is a
+    closed set so dual-run / shadow-mode is not feasible. Land the
+    decision module change first, then fix every import-time failure
+    surfaced by `uv run -- python -m pytest tests/unit/sql_compat -m fast`
+    in tight succession; commit only when the enum module + every caller
+    compile cleanly. Sequenced after w3 so the two enum overhauls land
+    in distinct, individually-revertable commits.
+
+- id: w5
+  summary: "Register PK-capability rules for every platform surfaced by the w2 audit as missing coverage"
+  needs: [w2, w3]
+  status: done
+  notes: |
+    Extend benchbox/sql_compat/rules/schema_emit/pk_capability.py and
+    pk_capability_txn.py with one rule per platform from the w2 audit
+    that does not already have a registered rule. Each rule uses the
+    bucket assigned in w2 - INFORMATIONAL is the expected default for
+    the cloud DW class. Payload must use PKCapabilityPayload with
+    structural fields - ddl_accepted, uniqueness_enforced, conditions,
+    failure_mode_detail - not a bare boolean. After registration, the
+    legacy_bypass tuple in core/write_primitives/benchmark.py:62 and
+    core/transaction_primitives/benchmark.py becomes dead code path;
+    delete it and gate _pk_lock_bypass_required entirely on
+    REGISTRY.resolve(). Add tests/unit/sql_compat/test_pk_coverage_parity.py
+    with two assertions:
+    (a) every platform in the BenchBox platform registry's
+    write_primitives-supported set resolves to a non-None PK rule;
+    (b) every adapter inheriting from
+    benchbox.platforms.base.no_constraint_mixin.NoConstraintEnforcementMixin
+    resolves to a PK rule whose support_level is INFORMATIONAL or
+    SKIPPED_DDL_FRAGMENT (never NATIVE).
+    The second assertion is the structural guardrail tying the registry-
+    side PK rule to the adapter-side runtime no-op so they cannot drift.
+
+- id: w6
+  summary: "Migrate existing SKIPPED rules in benchbox/sql_compat/rules/ to the refined SupportLevel values"
+  needs: [w4]
+  status: done
+  notes: |
+    Walk benchbox/sql_compat/rules/. For each currently
+    SupportLevel.SKIPPED rule, classify per the w1 migration table:
+    (a) query_source.starrocks.vector_search.q2_lt_32_skip → SKIPPED_QUERY;
+    (b) schema_emit.{datafusion,clickhouse}.write_primitives.pk_lock_table_unsupported → SKIPPED_DDL_FRAGMENT
+        (note: ClickHouse is currently REWRITTEN, not SKIPPED - confirm
+        during the audit whether REWRITTEN is correct or whether it
+        should be SKIPPED_DDL_FRAGMENT);
+    (c) the parallel transaction_primitives rules.
+    Verify against the w1 migration table before editing each file. Run
+    tests/unit/sql_compat after the migration; the registry test
+    fixtures may need updates if they pin SupportLevel values.
+
+- id: w7
+  summary: "Establish reason-string convention + warn-only lint check; update existing rule reasons"
+  needs: [w5, w6]
+  status: done
+  notes: |
+    Define an approved set of consequence prefixes (e.g. "Benchmark
+    blocked at preflight.", "Query <id> omitted from results.", "Workload
+    runs; <auxiliary DDL> is suppressed.", "Workload runs; <semantic
+    gap> is not enforced."). Land the prefix list as a small module
+    under benchbox/sql_compat/ (e.g. _reason_conventions.py) so both
+    rule files and the linter import it from one place. Extend
+    scripts/compat_lint.py to walk the registry and warn (not error)
+    on rules whose reason does not start with an approved prefix.
+    Update existing rule reason strings to comply - including the
+    newly-added w5 PK-coverage rules. Promote the lint to error mode
+    in a follow-up slice once every rule complies - keep it warn-only
+    for this work unit so the rule audit and lint enforcement do not
+    have to land atomically. Sequenced after w5 and w6 so reason-string
+    churn happens once, not per-stream.
+
+- id: w8
+  summary: "Restructure skip-reference.md generator: split into 'Will not run' and 'Runs with caveats'"
+  needs: [w6]
+  status: done
+  notes: |
+    Edit scripts/generate_compat_docs.py: in _render_skip_reference,
+    partition rows by support_level into two top-level sections.
+    Section 1 ("Will not run"): BLOCKED + SKIPPED_QUERY rows - these
+    are workload-affecting outcomes the user can observe in result
+    counts. Section 2 ("Runs with caveats"): SKIPPED_DDL_FRAGMENT +
+    INFORMATIONAL rows - the workload completes but with documented
+    internal gaps (this is where the new w5 PK rules will appear).
+    Each row's "reason" cell already starts with the user-visible
+    consequence after w7. Capability matrix is unchanged.
+
+- id: w9
+  summary: "Regenerate docs, verify CI drift gate stays green, run fast tests, mark workstream complete"
+  needs: [w7, w8]
+  status: done
+  notes: |
+    Run `uv run scripts/generate_compat_docs.py` to produce the new
+    docs (now showing the expanded PK coverage in the "Runs with
+    caveats" section, the renamed INFORMATIONAL value, and the refined
+    SKIPPED_QUERY / SKIPPED_DDL_FRAGMENT values). Run
+    `make compat-docs-check` - must report "compat docs match registry".
+    Run `uv run -- python -m pytest tests/unit/sql_compat -m fast -q`
+    and `uv run scripts/compat_lint.py` - both must pass. Commit the
+    regenerated docs in a final commit so the diff is reviewable as
+    "registry semantic refinement → doc shape change" without code
+    mixed in.
+
+metadata:
+  tags:
+  - sql-compat
+  - documentation
+  - taxonomy
+  - registry
+  - primary-key
+  - silent-corruption
+  - naming
+  estimated_effort: "Large"
+  created_date: "2026-04-26"
+
+deps:
+  needs:
+  - build-sql-compat-phase-aware-pipeline
+
+impact:
+  business_value: |
+    Closes a silent-corruption window in concurrent benchmark setup on
+    most OLAP cloud DWs (Snowflake, BigQuery, Redshift, Databricks,
+    Synapse, Fabric Warehouse, Firebolt, Trino/Presto/Athena, Spark,
+    Databend). Renaming DEGRADED → INFORMATIONAL aligns BenchBox's
+    classification with how the platforms themselves document the
+    behavior, making the capability matrix immediately legible to
+    anyone with vendor doc fluency. Reviewers can audit compatibility
+    decisions from the generated docs without first reading the ADR.
+  user_impact: |
+    A user running multi-process benchmark setup against any of the
+    cloud DWs above stops getting silently double-populated staging
+    tables. A user encountering a row in skip-reference.md sees
+    INFORMATIONAL (matching their vendor's doc language) instead of
+    DEGRADED (which falsely suggests slow performance), and the
+    "Will not run" / "Runs with caveats" split tells them at a glance
+    whether their result set is affected.
+  technical_debt: |
+    Replaces an overloaded enum value (SupportLevel.SKIPPED used for two
+    semantically different outcomes) with a typed split that the registry
+    can express directly. Renames a misleadingly-named enum value
+    (DEGRADED, which biased readers toward a performance interpretation)
+    to vendor-aligned INFORMATIONAL. Deletes the legacy_bypass tuple in
+    write_primitives/transaction_primitives benchmark.py, eliminating
+    the only fallback path that was masking the PK coverage gap. Adds a
+    reason-string lint that prevents future drift from the convention.
+    Adds a coverage-parity test that prevents future silent-corruption
+    regressions when new platforms are added, and a NoConstraintEnforcementMixin
+    cross-check that prevents adapter/registry drift on PK semantics.
+
+must_preserve:
+- "REGISTRY.resolve() / resolve_all() / resolve_platform_rules() return decisions with the same action and payload for the
+  same contexts after the rename and split - only the support_level enum value changes; reason strings change only in w7"
+- "The two existing DEGRADED rules (starrocks, doris) at write_primitives + transaction_primitives keep their action (REWRITE_DDL),
+  payload (PKCapabilityPayload contents), and reason text after the w3 rename - only support_level renames"
+- "Newly-registered INFORMATIONAL PK rules in w5 do not change behavior on the four already-covered platforms (datafusion,
+  clickhouse, starrocks, doris) - their existing rules remain authoritative"
+- "Every adapter inheriting from benchbox/platforms/base/no_constraint_mixin.NoConstraintEnforcementMixin resolves to a non-NATIVE
+  PK rule after w5 - this is the structural parity guarantee the new test in w5 enforces"
+- "scripts/compat_lint.py continues to error on unregistered dialect branches in benchbox/core/ (the existing W16 acceptance
+  gate)"
+- "make compat-docs-check exits 0 after w9 and continues to be wired into .github/workflows/lint.yml"
+- "Existing tests under tests/unit/sql_compat/ continue to pass; if a test pins SupportLevel.DEGRADED or SupportLevel.SKIPPED
+  it must be migrated to the appropriate new value, not deleted"
+- "_pk_lock_bypass_required in core/{write,transaction}_primitives/benchmark.py continues to short-circuit lock acquire/release
+  for every platform that resolves to a non-NATIVE PK rule (single-process behavior unchanged on covered platforms)"
+- "NoConstraintEnforcementMixin behavior in benchbox/platforms/base/no_constraint_mixin.py is unchanged; the runtime no-op
+  is a separate concern from the registry rule and remains as-is"
+
+approach: |
+  Two parallel streams gated on the ADR addendum (w1) and the
+  closed-set enum changes (w3, w4):
+
+  - Coverage stream (w2 → w5): audit PK enforcement on every supported
+    platform with NoConstraintEnforcementMixin as a cross-check, then
+    register the missing INFORMATIONAL rules and delete the legacy_bypass
+    fallback tuple. Closes the silent-corruption window. Cannot start
+    until w3 lands (uses the new INFORMATIONAL name from day one).
+
+  - Enum stream (w3 → w4): rename DEGRADED → INFORMATIONAL atomically,
+    then split SKIPPED → SKIPPED_QUERY + SKIPPED_DDL_FRAGMENT atomically.
+    Sequenced rather than combined so each is a single, individually-
+    revertable closed-set transformation.
+
+  Then sequenced tail (w6 → w7 → w8 → w9):
+  - w6: migrate existing SKIPPED rules to refined values.
+  - w7: reason-string convention + warn-only lint, after w5 and w6 so
+    reason updates touch each rule file once.
+  - w8: generator restructure into two doc sections.
+  - w9: final docs regeneration + verification.
+
+  Mirror the original pipeline's discipline: ADR before code, structural
+  change before content migration, convention before enforcement,
+  generator change before doc commit. Keep each enum change atomic - the
+  enum is a closed set so dual-run / shadow-mode is not feasible. The
+  reason-string lint stays warn-only in this TODO; promotion to error
+  mode is a separate follow-up after every rule complies.
+
+anti_patterns:
+- "DO NOT register a NATIVE PK rule for any adapter that inherits from NoConstraintEnforcementMixin -- because the mixin no-ops
+  apply_constraint_configuration so the constraint never actually gets applied at runtime, registering NATIVE would create
+  a registry/adapter parity bug -- mixin members must classify as INFORMATIONAL or SKIPPED_DDL_FRAGMENT and the w5 parity
+  test enforces this"
+- "DO NOT register PK rules in w5 without first completing the w2 audit -- because guessing at vendor enforcement semantics
+  is exactly how silent-corruption originates -- every w5 rule must cite the audit row that justifies its bucket"
+- "DO NOT delete the legacy_bypass tuple in benchmark.py before every w2-surfaced platform has a registered rule -- because
+  a half-migration leaves uncovered platforms with neither the legacy fallback nor a registry rule, fail-closed instead of
+  fail-open -- delete the tuple as the LAST step of w5 after the parity test passes"
+- "DO NOT classify a platform as INFORMATIONAL in w2 based on 'common knowledge' or 'looks like Snowflake' -- because vendor
+  enforcement semantics shift between releases and connector layers (e.g. Trino-on-Iceberg differs from Trino-on-Hive) --
+  every classification must cite a vendor-doc URL or a reproducer"
+- "DO NOT combine the DEGRADED→INFORMATIONAL rename (w3) and the SKIPPED split (w4) into one work unit -- because both are
+  closed-set transformations on the same enum file and combining doubles the diff and the revert blast radius -- ship them
+  as two sequenced, individually-revertable commits"
+- "DO NOT delete SupportLevel.DEGRADED or SupportLevel.SKIPPED without migrating every caller in the same change set -- because
+  Python enums are closed sets and a half-migrated state will not import -- audit `grep -rn 'SupportLevel.DEGRADED' benchbox/
+  tests/ scripts/` (and the same for SKIPPED) before editing decision.py and fix every site in the same commit"
+- "DO NOT couple the coverage stream (w2/w5) to the SKIPPED-split stream (w4/w6) -- because that delays closing the silent-corruption
+  window behind metadata refactoring -- the coverage stream depends only on w3 (the rename), not on w4"
+- "DO NOT promote the reason-string lint from warn to error in the same slice that introduces the convention -- because the
+  lint and the rule audit must land atomically if it is error-mode and that doubles the diff -- ship warn-only here, promote
+  in a follow-up"
+- "DO NOT regenerate docs/compat/*.md in a work unit that also changes the rule registry -- because a single commit then mixes
+  'registry change' with 'doc shape change' and reviewers cannot tell which drove which -- always end the workstream with
+  a clean docs-only regeneration commit (w9)"
+- "DO NOT extend SupportLevel with a third skip value (e.g. SKIPPED_AUXILIARY) without ADR addendum sign-off -- because the
+  taxonomy was deliberately frozen at four outcomes (BLOCKED / SKIPPED_QUERY / SKIPPED_DDL_FRAGMENT / INFORMATIONAL) -- if
+  a rule does not fit, raise it in w1 before code lands"
+- "DO NOT touch _pk_lock_bypass_required logic beyond removing the legacy_bypass tuple -- because the function is a stable
+  consumer of the registry and changing its dispatch shape is out of scope -- if a rule cannot be expressed under the existing
+  CompatAction values, raise it in w1, not w5"
+
+verification:
+- description: "ADR addendum committed before code changes begin"
+  command: "grep -lE 'INFORMATIONAL|SKIPPED_QUERY|skip semantics|PK coverage' docs/development/adr/adr-sql-compat-phase-aware-pipeline.md
+    docs/development/adr/adr-sql-compat-skip-semantics.md 2>/dev/null | head -1 | grep -q . && echo PRESENT"
+  expected_output: "PRESENT"
+- description: "PK enforcement audit artifact present and includes NoConstraintEnforcementMixin cross-check column"
+  command: "test -s _project/compat/pk_audit.md && grep -q 'no_constraint_mixin\\|NoConstraintEnforcementMixin\\|uses_no_constraint_mixin'
+    _project/compat/pk_audit.md && echo PRESENT"
+  expected_output: "PRESENT"
+- description: "SupportLevel.DEGRADED has been renamed - no references remain in registry rules or runtime code"
+  command: "grep -rn 'SupportLevel\\.DEGRADED\\b' benchbox/ tests/ scripts/ | wc -l | tr -d ' '"
+  expected_output: "0"
+- description: "SupportLevel.INFORMATIONAL is the registered value for existing starrocks + doris PK rules"
+  command: "grep -E 'SupportLevel\\.INFORMATIONAL' benchbox/sql_compat/rules/schema_emit/pk_capability.py benchbox/sql_compat/rules/schema_emit/pk_capability_txn.py
+    | wc -l | tr -d ' '"
+  expected_output: "4"
+- description: "Every BenchBox-supported platform that runs write_primitives has a registered PK rule"
+  command: "uv run -- python -m pytest tests/unit/sql_compat/test_pk_coverage_parity.py -q"
+  expected_output: "passed"
+- description: "Every NoConstraintEnforcementMixin user resolves to a non-NATIVE PK rule (parity assertion in test_pk_coverage_parity.py)"
+  command: "uv run -- python -m pytest tests/unit/sql_compat/test_pk_coverage_parity.py::test_no_constraint_mixin_parity -q"
+  expected_output: "passed"
+- description: "legacy_bypass tuple removed from primitives benchmarks"
+  command: "grep -E 'legacy_bypass\\s*=' benchbox/core/write_primitives/benchmark.py benchbox/core/transaction_primitives/benchmark.py
+    | wc -l | tr -d ' '"
+  expected_output: "0"
+- description: "SupportLevel enum split landed in decision.py"
+  command: "grep -E 'SKIPPED_QUERY|SKIPPED_DDL_FRAGMENT' benchbox/sql_compat/decision.py | wc -l | tr -d ' '"
+  expected_output: "2"
+- description: "No rule still uses the legacy SKIPPED value after migration"
+  command: "grep -rn 'SupportLevel\\.SKIPPED\\b' benchbox/sql_compat/rules/ | wc -l | tr -d ' '"
+  expected_output: "0"
+- description: "Reason-string convention module exists and is imported by the linter"
+  command: "test -f benchbox/sql_compat/_reason_conventions.py && grep -q _reason_conventions scripts/compat_lint.py && echo
+    PRESENT"
+  expected_output: "PRESENT"
+- description: "Generated skip-reference contains the two refined sections"
+  command: "grep -E 'Will not run|Runs with caveats' docs/compat/skip-reference.md | wc -l | tr -d ' '"
+  expected_output: "2"
+- description: "CI drift gate stays green after regeneration"
+  command: "make compat-docs-check"
+  expected_output: "compat docs match registry"
+- description: "sql_compat fast tests pass under the new taxonomy and expanded coverage"
+  command: "uv run -- python -m pytest tests/unit/sql_compat -m fast -q"
+  expected_output: "passed"
+- description: "compat_lint stays clean in error mode for unregistered branches; reports warnings (not errors) on any non-conforming
+    rule reasons"
+  command: "uv run scripts/compat_lint.py 2>&1 | tail -1"
+  expected_output: "0 unregistered dialect branch(es) found"
+
+files_affected:
+  modified:
+  - "docs/development/adr/adr-sql-compat-phase-aware-pipeline.md"
+  - "benchbox/sql_compat/decision.py"
+  - "benchbox/sql_compat/__init__.py"
+  - "benchbox/sql_compat/rules/query_source/vector_search_variants.py"
+  - "benchbox/sql_compat/rules/schema_emit/pk_capability.py"
+  - "benchbox/sql_compat/rules/schema_emit/pk_capability_txn.py"
+  - "benchbox/core/write_primitives/benchmark.py"
+  - "benchbox/core/transaction_primitives/benchmark.py"
+  - "scripts/generate_compat_docs.py"
+  - "scripts/compat_lint.py"
+  - "docs/compat/skip-reference.md"
+  - "tests/unit/sql_compat/"
+  added:
+  - "benchbox/sql_compat/_reason_conventions.py"
+  - "_project/compat/pk_audit.md"
+  - "tests/unit/sql_compat/test_pk_coverage_parity.py"
+
+scope_limit:
+  only_modify_note: |
+    The coverage stream (w2/w5) extends rule registrations and removes the
+    legacy_bypass tuple in two specific benchmark files. The enum stream
+    (w3/w4/w6) and the convention/doc work (w7/w8/w9) are confined to
+    benchbox/sql_compat/ and adjacent tooling. Do not touch resolver,
+    plan, or BaseDdlOptimizer dispatch shape. Do not change the
+    _pk_lock_bypass_required function body beyond removing the
+    legacy_bypass tuple. Do not change benchbox/platforms/base/no_constraint_mixin.py
+    or any adapter that uses it - the mixin is consulted as evidence by
+    the audit but its runtime behavior is out of scope. Do not modify any
+    other benchbox/core/ or benchbox/platforms/ code.
+  only_modify:
+  - "benchbox/sql_compat/decision.py"
+  - "benchbox/sql_compat/__init__.py"
+  - "benchbox/sql_compat/_reason_conventions.py"
+  - "benchbox/sql_compat/rules/"
+  - "benchbox/core/write_primitives/benchmark.py"
+  - "benchbox/core/transaction_primitives/benchmark.py"
+  - "scripts/compat_lint.py"
+  - "scripts/generate_compat_docs.py"
+  - "docs/compat/"
+  - "docs/development/adr/"
+  - "_project/compat/"
+  - "tests/unit/sql_compat/"
+  do_not_modify:
+  - "benchbox/platforms/base/no_constraint_mixin.py"
+  - "benchbox/platforms/datafusion.py"
+  - "benchbox/platforms/polars_platform.py"
+  - "benchbox/platforms/cudf.py"
+  out_of_scope:
+  - "Promotion of the reason-string lint from warn to error mode (separate follow-up after compliance)"
+  - "Splitting SupportLevel further (e.g. SKIPPED_AUXILIARY) - the taxonomy is frozen at four outcomes for this TODO"
+  - "Reworking the action vocabulary or payload dataclasses"
+  - "Resolver, plan, or dispatch code changes"
+  - "Changes to _pk_lock_bypass_required beyond removing legacy_bypass"
+  - "Changes to NoConstraintEnforcementMixin or any adapter that uses it - the mixin is read-only evidence for the audit"
+  - "Anything in benchbox/platforms/ adapter code (PK behavior is registry-side metadata, not adapter behavior)"
+  - "Dataframe-mode primitives benchmarks - this TODO's PK coverage applies to SQL-mode write_primitives/transaction_primitives
+    only"

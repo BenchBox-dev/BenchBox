@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T11:43:53.396086'
-total_items: 767
+generated_at: '2026-04-26T11:58:15.600271'
+total_items: 768
 priorities:
   Critical:
     count: 42
@@ -1531,7 +1531,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 123
+    count: 124
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -2067,6 +2067,12 @@ priorities:
     - id: quality-refactor-adapter-base-into-cohesive-modules
       file: DONE/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
       title: Refactor 5,158-line adapter base into cohesive sub-modules
+      category: Code Quality and Technical Debt
+      status: Completed
+    - id: refine-sql-compat-skip-semantics
+      file: DONE/main/planning/refine-sql-compat-skip-semantics.yaml
+      title: 'Refine sql_compat outcome taxonomy: rename DEGRADED→INFORMATIONAL, split SKIPPED, close PK coverage gap, tighten
+        reasons'
       category: Code Quality and Technical Debt
       status: Completed
     - id: cleanup-project-scratch-directory

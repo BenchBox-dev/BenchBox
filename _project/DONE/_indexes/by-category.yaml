@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T11:43:53.395911'
+generated_at: '2026-04-26T11:58:15.600094'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -331,7 +331,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 67
+    count: 68
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -589,6 +589,12 @@ categories:
     - id: quality-refactor-adapter-base-into-cohesive-modules
       file: DONE/main/planning/quality-refactor-adapter-base-into-cohesive-modules.yaml
       title: Refactor 5,158-line adapter base into cohesive sub-modules
+      priority: Medium-High
+      status: Completed
+    - id: refine-sql-compat-skip-semantics
+      file: DONE/main/planning/refine-sql-compat-skip-semantics.yaml
+      title: 'Refine sql_compat outcome taxonomy: rename DEGRADED→INFORMATIONAL, split SKIPPED, close PK coverage gap, tighten
+        reasons'
       priority: Medium-High
       status: Completed
     - id: cleanup-project-scratch-directory

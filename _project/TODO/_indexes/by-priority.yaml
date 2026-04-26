@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T11:43:51.496141'
-total_items: 31
+generated_at: '2026-04-26T11:58:13.591350'
+total_items: 30
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 5
+    count: 4
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -54,12 +54,6 @@ priorities:
       file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
       title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
       category: Platform Expansion
-      status: Not Started
-    - id: refine-sql-compat-skip-semantics
-      file: TODO/main/planning/refine-sql-compat-skip-semantics.yaml
-      title: 'Refine sql_compat outcome taxonomy: rename DEGRADED→INFORMATIONAL, split SKIPPED, close PK coverage gap, tighten
-        reasons'
-      category: Code Quality and Technical Debt
       status: Not Started
   Medium:
     count: 6
