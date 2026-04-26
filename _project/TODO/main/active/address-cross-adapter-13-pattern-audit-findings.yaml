@@ -385,7 +385,7 @@ work:
 - id: w19
   summary: "Nit/Consider tail A — firebolt/clickhouse_cloud/questdb docs and helper cleanup"
   needs: [w23, w25]
-  status: pending
+  status: done
   notes: |
     Small Firebolt/ClickHouse/QuestDB cleanup slice:
     - firebolt.py:1056 — re-enable inline NOT NULL stripper (or document
