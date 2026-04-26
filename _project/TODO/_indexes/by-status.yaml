@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T10:06:55.567233'
-total_items: 31
+generated_at: '2026-04-26T10:07:46.428568'
+total_items: 32
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Medium
       category: Testing & Quality
   Not Started:
-    count: 28
+    count: 29
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -112,6 +112,11 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
+    - id: refine-sql-compat-skip-taxonomy
+      file: TODO/main/planning/refine-sql-compat-skip-taxonomy.yaml
+      title: 'Refine sql_compat skip taxonomy: split SupportLevel.SKIPPED and tighten user-facing reasons'
+      priority: Medium
+      category: Code Quality and Technical Debt
     - id: fix-git-author-history-rewrite
       file: TODO/main/planning/fix-git-author-history-rewrite.yaml
       title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)

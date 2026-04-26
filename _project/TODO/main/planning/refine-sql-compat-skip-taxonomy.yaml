@@ -1,0 +1,253 @@
+id: refine-sql-compat-skip-taxonomy
+title: "Refine sql_compat skip taxonomy: split SupportLevel.SKIPPED and tighten user-facing reasons"
+worktree: main
+priority: Medium
+status: Not Started
+category: Code Quality and Technical Debt
+description: |
+  After build-sql-compat-phase-aware-pipeline shipped (w17/w18, 2026-04-26),
+  reviewing the eight skip/block/degrade rows in docs/compat/skip-reference.md
+  surfaced three readability problems that a reviewer without ADR context
+  cannot resolve from the doc alone:
+
+  1. SupportLevel.SKIPPED is overloaded. The same enum value covers full-query
+     exclusion (StarRocks vector_search Q2 is dropped from the result set
+     entirely on platform_version < 3.2) and DDL-fragment suppression
+     (DataFusion write_primitives / transaction_primitives lock-table DDL is
+     skipped, but the workload itself runs end-to-end). The user-visible
+     consequences are categorically different - one removes a query from the
+     benchmark; the other only drops an internal coordination DDL - but the
+     doc says "SKIPPED" for both.
+
+  2. Rule reason strings explain the platform deficiency ("DataFusion does
+     not support PRIMARY KEY syntax", "QuestDB has no VECTOR column type")
+     but not the user-visible consequence (benchmark refused at preflight /
+     query omitted from results / workload runs with documented caveat).
+     Readers consistently misread DDL-fragment skips as full-benchmark skips.
+
+  3. The generated skip-reference.md collapses BLOCKED, SKIPPED, and
+     DEGRADED into a single per-platform table. Splitting "Will not run"
+     (preflight refused or query omitted) from "Runs with caveats" (DDL
+     fragment dropped, semantic enforcement gap) would make the page
+     self-explaining.
+
+  This TODO addresses all three. The structural change (1) lands as an
+  enum split with an ADR addendum and rule migration. The convention change
+  (2) lands as a reason-string format plus a lint check that validates the
+  format. The doc change (3) is a generator restructure plus regenerated
+  docs. None of this changes runtime behavior - rules still resolve to the
+  same actions; only the metadata reported on those actions is sharpened.
+
+work:
+  - id: w1
+    summary: "ADR addendum: revised skip taxonomy with SKIPPED_QUERY / SKIPPED_DDL_FRAGMENT split + reason-string convention"
+    status: pending
+    notes: |
+      Append an addendum to docs/development/adr/adr-sql-compat-phase-aware-pipeline.md
+      (or land a follow-on ADR that supersedes the relevant section) covering:
+      (a) the four skip-class outcomes the registry needs to express -
+      BLOCKED (preflight refusal), SKIPPED_QUERY (query omitted from
+      result set), SKIPPED_DDL_FRAGMENT (auxiliary DDL dropped, workload
+      runs), DEGRADED (workload runs with semantic enforcement gap);
+      (b) the SupportLevel enum revision and migration table for each
+      currently-SKIPPED rule; (c) the reason-string convention (lead with
+      user-visible consequence, then platform-deficiency cause); (d) the
+      doc-restructure plan for skip-reference.md. Blocking step - all
+      subsequent work units cite the addendum.
+
+  - id: w2
+    summary: "Split SupportLevel.SKIPPED into SKIPPED_QUERY and SKIPPED_DDL_FRAGMENT"
+    needs: [w1]
+    status: pending
+    notes: |
+      Edit benchbox/sql_compat/decision.py:12-18: replace SKIPPED with the
+      two refined values. Update __init__.py exports. Audit all callers of
+      SupportLevel.SKIPPED in benchbox/ (resolver.py, plan.py, any
+      governance / inventory code, tests) and pick the right replacement
+      based on the rule shape - this is the only work unit with a
+      potentially behavior-affecting touchpoint, so dual-run is not
+      possible (the enum is a closed set). Land the decision module
+      change first, then fix every import-time failure surfaced by
+      `uv run -- python -m pytest tests/unit/sql_compat -m fast` in
+      tight succession; commit only when the enum module + every caller
+      compile cleanly.
+
+  - id: w3
+    summary: "Migrate existing rules in benchbox/sql_compat/rules/ to the new SupportLevel values"
+    needs: [w2]
+    status: pending
+    notes: |
+      Walk benchbox/sql_compat/rules/. For each currently SupportLevel.SKIPPED
+      rule, classify per the w1 migration table:
+      (a) query_source.starrocks.vector_search.q2_lt_32_skip → SKIPPED_QUERY;
+      (b) schema_emit.{datafusion,clickhouse}.write_primitives.pk_lock_table_unsupported → SKIPPED_DDL_FRAGMENT
+          (note: ClickHouse is currently REWRITTEN, not SKIPPED - confirm during the audit
+          whether REWRITTEN is correct or whether it should be SKIPPED_DDL_FRAGMENT);
+      (c) the parallel transaction_primitives rules.
+      Verify against the w1 migration table before editing each file. Run
+      tests/unit/sql_compat after the migration; the registry test fixtures
+      may need updates if they pin SupportLevel values.
+
+  - id: w4
+    summary: "Establish reason-string convention + lint check in scripts/compat_lint.py"
+    needs: [w1]
+    status: pending
+    notes: |
+      Define an approved set of consequence prefixes (e.g. "Benchmark blocked
+      at preflight.", "Query <id> omitted from results.", "Workload runs;
+      <auxiliary DDL> is suppressed.", "Workload runs; <semantic gap> is
+      not enforced."). Land the prefix list as a small module under
+      benchbox/sql_compat/ (e.g. _reason_conventions.py) so both rule files
+      and the linter import it from one place. Extend scripts/compat_lint.py
+      to walk the registry and warn (not error) on rules whose reason does
+      not start with an approved prefix. Update existing rule reason strings
+      to comply. Promote the lint to error mode in a follow-up slice once
+      every rule complies - keep it warn-only for this work unit so the
+      rule audit and lint enforcement do not have to land atomically.
+
+  - id: w5
+    summary: "Restructure skip-reference.md generator: split into 'Will not run' and 'Runs with caveats'"
+    needs: [w3, w4]
+    status: pending
+    notes: |
+      Edit scripts/generate_compat_docs.py: in _render_skip_reference,
+      partition rows by support_level into two top-level sections.
+      Section 1 ("Will not run"): BLOCKED + SKIPPED_QUERY rows - these
+      are workload-affecting outcomes the user can observe in result counts.
+      Section 2 ("Runs with caveats"): SKIPPED_DDL_FRAGMENT + DEGRADED
+      rows - the workload completes but with documented internal gaps.
+      Each row's "reason" cell already starts with the user-visible
+      consequence after w4. Capability matrix is unchanged.
+
+  - id: w6
+    summary: "Regenerate docs, verify CI drift gate stays green, run fast tests"
+    needs: [w5]
+    status: pending
+    notes: |
+      Run `uv run scripts/generate_compat_docs.py` to produce the new docs.
+      Run `make compat-docs-check` - must report "compat docs match registry".
+      Run `uv run -- python -m pytest tests/unit/sql_compat -m fast -q` and
+      `uv run scripts/compat_lint.py` - both must pass. Commit the
+      regenerated docs in a final commit so the diff is reviewable as
+      "registry semantic refinement → doc shape change" without code
+      mixed in.
+
+metadata:
+  tags:
+    - sql-compat
+    - documentation
+    - taxonomy
+    - registry
+  estimated_effort: "Medium"
+  created_date: "2026-04-26"
+
+deps:
+  needs:
+    - build-sql-compat-phase-aware-pipeline
+
+impact:
+  business_value: |
+    Reviewers can audit compatibility decisions from the generated docs
+    without first reading the ADR. The capability matrix and skip
+    reference become onboarding material instead of insider artifacts.
+  user_impact: |
+    A user encountering a skip in their benchmark output can read the
+    skip reference and immediately tell whether the run was rejected,
+    a single query was omitted from the result set, or the workload ran
+    end-to-end with a documented gap. Today the doc forces them to
+    pattern-match across rule_ids and infer the consequence.
+  technical_debt: |
+    Replaces an overloaded enum value (SupportLevel.SKIPPED used for two
+    semantically different outcomes) with a typed split that the registry
+    can express directly. Adds a reason-string lint that prevents future
+    drift from the convention.
+
+must_preserve:
+  - "REGISTRY.resolve() / resolve_all() / resolve_platform_rules() return the same decisions for the same contexts after the migration - only support_level metadata changes"
+  - "scripts/compat_lint.py continues to error on unregistered dialect branches in benchbox/core/ (the existing W16 acceptance gate)"
+  - "make compat-docs-check exits 0 after w6 and continues to be wired into .github/workflows/lint.yml"
+  - "Existing tests under tests/unit/sql_compat/ continue to pass; if a test pins SupportLevel.SKIPPED it must be migrated to the appropriate new value, not deleted"
+
+approach: |
+  Mirror the original pipeline's discipline: ADR before code (w1),
+  structural change before content migration (w2 → w3), convention
+  before enforcement (w4 in warn-only mode this slice), generator change
+  before doc commit (w5 → w6). Keep the enum split atomic in w2 — the
+  enum is a closed set so dual-run / shadow-mode is not feasible. The
+  reason-string lint stays warn-only in this TODO; promotion to error
+  mode is a separate follow-up after every rule complies. Doc
+  restructure is the last work unit so the regenerated diff reads as
+  "shape change", not "shape change + content drift".
+
+anti_patterns:
+  - "DO NOT delete SupportLevel.SKIPPED without migrating every caller in the same change set -- because Python enums are closed sets and a half-migrated state will not import -- audit `grep -rn 'SupportLevel.SKIPPED' benchbox/ tests/` before editing decision.py and fix every site in the same commit"
+  - "DO NOT couple this work to query-storage format unification or any other deferred ADR item -- because that conflates a metadata refinement with structural rework -- the only registry surface this TODO touches is the SupportLevel enum and decision.reason strings"
+  - "DO NOT promote the reason-string lint from warn to error in the same slice that introduces the convention -- because the lint and the rule audit must land atomically if it is error-mode and that doubles the diff -- ship warn-only here, promote in a follow-up"
+  - "DO NOT regenerate docs/compat/*.md in a work unit that also changes the rule registry -- because a single commit then mixes 'registry change' with 'doc shape change' and reviewers cannot tell which drove which -- always end the workstream with a clean docs-only regeneration commit (w6)"
+  - "DO NOT extend SupportLevel with a third skip value (e.g. SKIPPED_AUXILIARY) without ADR addendum sign-off -- because the taxonomy was deliberately frozen at four outcomes (BLOCKED / SKIPPED_QUERY / SKIPPED_DDL_FRAGMENT / DEGRADED) -- if a rule does not fit, raise it in w1 before code lands"
+
+verification:
+  - description: "ADR addendum committed before code changes begin"
+    command: "grep -l 'SKIPPED_QUERY\\|skip taxonomy' docs/development/adr/adr-sql-compat-phase-aware-pipeline.md docs/development/adr/adr-sql-compat-skip-taxonomy.md 2>/dev/null | head -1 | grep -q . && echo PRESENT"
+    expected_output: "PRESENT"
+  - description: "SupportLevel enum split landed in decision.py"
+    command: "grep -E 'SKIPPED_QUERY|SKIPPED_DDL_FRAGMENT' benchbox/sql_compat/decision.py | wc -l | tr -d ' '"
+    expected_output: "2"
+  - description: "No rule still uses the legacy SKIPPED value after migration"
+    command: "grep -rn 'SupportLevel\\.SKIPPED\\b' benchbox/sql_compat/rules/ | wc -l | tr -d ' '"
+    expected_output: "0"
+  - description: "Reason-string convention module exists and is imported by the linter"
+    command: "test -f benchbox/sql_compat/_reason_conventions.py && grep -q _reason_conventions scripts/compat_lint.py && echo PRESENT"
+    expected_output: "PRESENT"
+  - description: "Generated skip-reference contains the two refined sections"
+    command: "grep -E 'Will not run|Runs with caveats' docs/compat/skip-reference.md | wc -l | tr -d ' '"
+    expected_output: "2"
+  - description: "CI drift gate stays green after regeneration"
+    command: "make compat-docs-check"
+    expected_output: "compat docs match registry"
+  - description: "sql_compat fast tests pass under the new taxonomy"
+    command: "uv run -- python -m pytest tests/unit/sql_compat -m fast -q"
+    expected_output: "passed"
+  - description: "compat_lint stays clean in error mode for unregistered branches; reports warnings (not errors) on any non-conforming rule reasons"
+    command: "uv run scripts/compat_lint.py 2>&1 | tail -1"
+    expected_output: "0 unregistered dialect branch(es) found"
+
+files_affected:
+  modified:
+    - "docs/development/adr/adr-sql-compat-phase-aware-pipeline.md"
+    - "benchbox/sql_compat/decision.py"
+    - "benchbox/sql_compat/__init__.py"
+    - "benchbox/sql_compat/rules/query_source/vector_search_variants.py"
+    - "benchbox/sql_compat/rules/schema_emit/pk_capability.py"
+    - "benchbox/sql_compat/rules/schema_emit/pk_capability_txn.py"
+    - "scripts/generate_compat_docs.py"
+    - "scripts/compat_lint.py"
+    - "docs/compat/skip-reference.md"
+    - "tests/unit/sql_compat/"
+  added:
+    - "benchbox/sql_compat/_reason_conventions.py"
+
+scope_limit:
+  only_modify_note: |
+    This TODO is a metadata refinement on top of an already-shipped
+    subsystem. Do not touch rule decisions (action, payload), runtime
+    code paths (resolver, plan, BaseDdlOptimizer dispatch), or any
+    benchbox/core/ or benchbox/platforms/ code. Only the SupportLevel
+    enum, rule reason strings, the linter, the generator, and the
+    generated docs are in bounds.
+  only_modify:
+    - "benchbox/sql_compat/decision.py"
+    - "benchbox/sql_compat/__init__.py"
+    - "benchbox/sql_compat/_reason_conventions.py"
+    - "benchbox/sql_compat/rules/"
+    - "scripts/compat_lint.py"
+    - "scripts/generate_compat_docs.py"
+    - "docs/compat/"
+    - "docs/development/adr/"
+    - "tests/unit/sql_compat/"
+  out_of_scope:
+    - "Promotion of the reason-string lint from warn to error mode (separate follow-up after compliance)"
+    - "Splitting SupportLevel further (e.g. SKIPPED_AUXILIARY) - the taxonomy is frozen at four outcomes for this TODO"
+    - "Reworking the action vocabulary or payload dataclasses"
+    - "Resolver, plan, or dispatch code changes"
+    - "Anything in benchbox/core/ or benchbox/platforms/"

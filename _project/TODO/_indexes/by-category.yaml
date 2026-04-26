@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T10:06:55.567209'
+generated_at: '2026-04-26T10:07:46.428538'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -33,7 +33,7 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 3
+    count: 4
     items:
     - id: address-cross-adapter-13-pattern-audit-findings
       file: TODO/main/active/address-cross-adapter-13-pattern-audit-findings.yaml
@@ -44,6 +44,11 @@ categories:
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
       priority: Low
+      status: Not Started
+    - id: refine-sql-compat-skip-taxonomy
+      file: TODO/main/planning/refine-sql-compat-skip-taxonomy.yaml
+      title: 'Refine sql_compat skip taxonomy: split SupportLevel.SKIPPED and tighten user-facing reasons'
+      priority: Medium
       status: Not Started
     - id: upgrade-pandas-to-3x
       file: TODO/main/planning/upgrade-pandas-to-3x.yaml

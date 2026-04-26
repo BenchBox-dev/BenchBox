@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T10:06:55.567172'
-total_items: 31
+generated_at: '2026-04-26T10:07:46.428498'
+total_items: 32
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -446,6 +446,24 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: refine-sql-compat-skip-taxonomy
+  file: TODO/main/planning/refine-sql-compat-skip-taxonomy.yaml
+  title: 'Refine sql_compat skip taxonomy: split SupportLevel.SKIPPED and tighten user-facing reasons'
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium
+  status: Not Started
+  tags:
+  - sql-compat
+  - documentation
+  - taxonomy
+  - registry
+  estimated_effort: Medium
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  needs:
+  - build-sql-compat-phase-aware-pipeline
 - id: validate-and-integrate-tpc-tuning-json
   file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
   title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
