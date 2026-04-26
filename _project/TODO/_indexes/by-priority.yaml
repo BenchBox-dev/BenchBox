@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:40:57.262205'
-total_items: 33
+generated_at: '2026-04-26T09:49:09.910337'
+total_items: 32
 priorities:
   Critical:
     count: 1
@@ -38,7 +38,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 5
+    count: 4
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -50,11 +50,6 @@ priorities:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       category: Core Functionality
       status: Not Started
-    - id: build-sql-compat-phase-aware-pipeline
-      file: TODO/main/active/build-sql-compat-phase-aware-pipeline.yaml
-      title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
-      category: Core Functionality
-      status: In Progress
     - id: graduate-browser-smoke-to-blocking-gates
       file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates

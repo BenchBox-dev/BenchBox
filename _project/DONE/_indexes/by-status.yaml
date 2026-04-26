@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:40:59.858645'
-total_items: 764
+generated_at: '2026-04-26T09:49:11.764019'
+total_items: 765
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 713
+    count: 714
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -954,6 +954,11 @@ statuses:
       title: Build result integrity validator for benchmark JSON output
       priority: High
       category: Testing & Quality
+    - id: build-sql-compat-phase-aware-pipeline
+      file: DONE/main/active/build-sql-compat-phase-aware-pipeline.yaml
+      title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
+      priority: Medium-High
+      category: Core Functionality
     - id: build-static-pipeline-bundles-to-read-model
       file: DONE/main/planning/build-static-pipeline-bundles-to-read-model.yaml
       title: Build static pipeline that transforms result bundles into explorer read models

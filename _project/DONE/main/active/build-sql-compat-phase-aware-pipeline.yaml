@@ -2,7 +2,8 @@ id: build-sql-compat-phase-aware-pipeline
 title: "Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
+completed_date: "2026-04-26"
 category: Core Functionality
 description: |
   BenchBox's SQL compatibility decisions are currently scattered across five

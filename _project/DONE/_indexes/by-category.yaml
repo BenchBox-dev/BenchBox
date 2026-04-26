@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T09:40:59.858215'
+generated_at: '2026-04-26T09:49:11.763641'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -690,7 +690,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 263
+    count: 264
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -965,6 +965,11 @@ categories:
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: DONE/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
       title: Build a results explorer subsite on benchbox.dev
+      priority: Medium-High
+      status: Completed
+    - id: build-sql-compat-phase-aware-pipeline
+      file: DONE/main/active/build-sql-compat-phase-aware-pipeline.yaml
+      title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
       status: Completed
     - id: build-static-pipeline-bundles-to-read-model

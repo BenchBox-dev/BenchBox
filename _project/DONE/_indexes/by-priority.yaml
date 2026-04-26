@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:40:59.858439'
-total_items: 764
+generated_at: '2026-04-26T09:49:11.763834'
+total_items: 765
 priorities:
   Critical:
     count: 42
@@ -1526,7 +1526,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 122
+    count: 123
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1707,6 +1707,11 @@ priorities:
     - id: build-results-explorer-subsite-on-benchbox-dev
       file: DONE/main/planning/build-results-explorer-subsite-on-benchbox-dev.yaml
       title: Build a results explorer subsite on benchbox.dev
+      category: Core Functionality
+      status: Completed
+    - id: build-sql-compat-phase-aware-pipeline
+      file: DONE/main/active/build-sql-compat-phase-aware-pipeline.yaml
+      title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       category: Core Functionality
       status: Completed
     - id: build-static-pipeline-bundles-to-read-model

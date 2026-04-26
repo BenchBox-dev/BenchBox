@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:40:59.857741'
-total_items: 764
+generated_at: '2026-04-26T09:49:11.763282'
+total_items: 765
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -9309,6 +9309,24 @@ items:
   work_ready: 0
   needs:
   - define-results-platform-product-and-launch-strategy
+- id: build-sql-compat-phase-aware-pipeline
+  file: DONE/main/active/build-sql-compat-phase-aware-pipeline.yaml
+  title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Completed
+  tags:
+  - sql-compat
+  - architecture
+  - dialect-translation
+  - capabilities
+  - refactor
+  estimated_effort: X-Large
+  completed_date: '2026-04-26'
+  work_total: 18
+  work_done: 18
+  work_ready: 0
 - id: build-static-pipeline-bundles-to-read-model
   file: DONE/main/planning/build-static-pipeline-bundles-to-read-model.yaml
   title: Build static pipeline that transforms result bundles into explorer read models
