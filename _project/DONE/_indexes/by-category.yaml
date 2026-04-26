@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T10:32:28.869588'
+generated_at: '2026-04-26T11:41:47.814131'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -331,7 +331,7 @@ categories:
       priority: Medium
       status: Completed
   Code Quality and Technical Debt:
-    count: 66
+    count: 67
     items:
     - id: complete-tpc-di-implementation-phase-1-core-schema-completion
       file: DONE/unknown/planning/complete-tpc-di-implementation-phase-1-core-schema-completion.yaml
@@ -372,6 +372,11 @@ categories:
       file: DONE/main/quality/quality-add-dependency-upper-bounds-policy.yaml
       title: Add upper bounds on highest-risk dependencies and document policy
       priority: Medium
+      status: Completed
+    - id: address-cross-adapter-13-pattern-audit-findings
+      file: DONE/main/active/address-cross-adapter-13-pattern-audit-findings.yaml
+      title: Address cross-adapter 13-pattern audit findings (3 Critical, 22 Required, 8 Nit/Consider)
+      priority: High
       status: Completed
     - id: audit-imported-dependencies-for-elimination
       file: DONE/main/active/audit-imported-dependencies-for-elimination.yaml

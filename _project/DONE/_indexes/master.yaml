@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T10:32:28.869241'
-total_items: 766
+generated_at: '2026-04-26T11:41:47.813701'
+total_items: 767
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1005,6 +1005,28 @@ items:
   needs:
   - ctas-sort-dataloader-connectivity
   - ctas-sort-cloud-platforms
+- id: address-cross-adapter-13-pattern-audit-findings
+  file: DONE/main/active/address-cross-adapter-13-pattern-audit-findings.yaml
+  title: Address cross-adapter 13-pattern audit findings (3 Critical, 22 Required, 8 Nit/Consider)
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: High
+  status: Completed
+  tags:
+  - audit
+  - platform-adapters
+  - modularity
+  - code-quality
+  - p1-regex
+  - p11-logging
+  - p12-drift
+  - abc-conformance
+  estimated_effort: Medium-Large (~5-8 days across 20 work units; most are 1-3 hours each)
+  completed_date: '2026-04-26'
+  work_total: 26
+  work_done: 26
+  work_ready: 0
+  deferred_count: 4
 - id: advanced-cost-analysis-framework-multi-region-pricing-models
   file: DONE/cost-intelligence-advanced/planning/advanced-cost-analysis-framework-multi-region-pricing-models.yaml
   title: Advanced Cost Analysis Framework - Multi-Region & Pricing Models

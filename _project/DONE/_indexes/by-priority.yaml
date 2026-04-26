@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T10:32:28.869760'
-total_items: 766
+generated_at: '2026-04-26T11:41:47.814337'
+total_items: 767
 priorities:
   Critical:
     count: 42
@@ -215,7 +215,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 261
+    count: 262
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -346,6 +346,11 @@ priorities:
       file: DONE/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml
       title: Add sorted data ingestion support for cloud data warehouses to compare against clustering/Z-order/partitioning
       category: Core Functionality
+      status: Completed
+    - id: address-cross-adapter-13-pattern-audit-findings
+      file: DONE/main/active/address-cross-adapter-13-pattern-audit-findings.yaml
+      title: Address cross-adapter 13-pattern audit findings (3 Critical, 22 Required, 8 Nit/Consider)
+      category: Code Quality and Technical Debt
       status: Completed
     - id: advanced-cost-analysis-framework-multi-region-pricing-models
       file: DONE/cost-intelligence-advanced/planning/advanced-cost-analysis-framework-multi-region-pricing-models.yaml

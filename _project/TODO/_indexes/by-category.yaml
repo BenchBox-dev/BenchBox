@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T10:32:27.028927'
+generated_at: '2026-04-26T11:41:45.841081'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -33,13 +33,8 @@ categories:
       priority: Low
       status: Not Started
   Code Quality and Technical Debt:
-    count: 4
+    count: 3
     items:
-    - id: address-cross-adapter-13-pattern-audit-findings
-      file: TODO/main/active/address-cross-adapter-13-pattern-audit-findings.yaml
-      title: Address cross-adapter 13-pattern audit findings (3 Critical, 22 Required, 8 Nit/Consider)
-      priority: High
-      status: In Progress
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds

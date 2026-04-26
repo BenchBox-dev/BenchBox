@@ -1,14 +1,9 @@
-generated_at: '2026-04-26T10:32:27.028961'
-total_items: 32
+generated_at: '2026-04-26T11:41:45.841105'
+total_items: 31
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
-    - id: address-cross-adapter-13-pattern-audit-findings
-      file: TODO/main/active/address-cross-adapter-13-pattern-audit-findings.yaml
-      title: Address cross-adapter 13-pattern audit findings (3 Critical, 22 Required, 8 Nit/Consider)
-      priority: High
-      category: Code Quality and Technical Debt
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
