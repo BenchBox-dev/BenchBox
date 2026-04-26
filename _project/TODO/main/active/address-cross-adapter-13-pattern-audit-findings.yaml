@@ -202,7 +202,7 @@ work:
 - id: w10
   summary: "P12 — Consolidate clickhouse_cloud S3 + GCS load paths into one helper"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
     clickhouse_cloud.py:579-712 (S3, 133 lines) vs :714-851 (GCS, 137
     lines) are 95% duplicate. Extract
