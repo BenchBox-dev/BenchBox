@@ -459,9 +459,16 @@ verification:
     tests/unit/platforms/test_doris_adapter.py tests/unit/platforms/test_starrocks_adapter.py tests/unit/platforms/test_databend_adapter.py
     tests/unit/platforms/test_questdb_adapter.py -q"
   expected_output: "all green"
-- description: "compat_lint reports zero unregistered DDL transforms across the entire codebase"
-  command: "uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift"
-  expected_output: "exit 0; zero unregistered transforms (validation errors from other compat sites are non-blocking for this check)"
+- description: "compat_lint reports zero unregistered DDL transforms across the entire codebase (integration
+    test invokes check_ddl_drift() directly, isolating from unrelated _validate_mandatory_sites errors in
+    the wrapping CLI)"
+  command: "uv run -- python -m pytest tests/integration/test_compat_lint_clean.py::test_ddl_drift_check_is_clean
+    -q"
+  expected_output: "1 passed; check_ddl_drift() returns 0 unregistered transforms"
+- description: "compat_lint CLI exits 0 on the DDL-drift portion (a separate pre-existing benchmark_gate
+    site validation issue may still set the overall exit; inspect ``DDL drift check: CLEAN`` line in stderr)"
+  command: "uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift 2>&1 | grep 'DDL drift check'"
+  expected_output: "DDL drift check: CLEAN (0 unregistered transforms)"
 - description: "compat_lint integration smoke test"
   command: "uv run -- python -m pytest tests/integration/test_compat_lint_clean.py -q"
   expected_output: "all green"
