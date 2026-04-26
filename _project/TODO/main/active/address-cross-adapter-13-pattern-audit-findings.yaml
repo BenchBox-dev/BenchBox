@@ -53,7 +53,7 @@ work:
 - id: w2
   summary: "C2 — Fix pg_mooncake.create_schema signature mismatch with parent"
   needs: []
-  status: pending
+  status: done
   notes: |
     pg_mooncake.py:193-207 — current signature
     `create_schema(self, connection, schema_ddl, **kwargs)` does not match

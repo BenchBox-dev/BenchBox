@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T22:22:37.266479'
+generated_at: '2026-04-25T22:43:10.799231'
 total_items: 33
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -38,7 +38,7 @@ items:
   - abc-conformance
   estimated_effort: Medium-Large (~5-8 days across 20 work units; most are 1-3 hours each)
   work_total: 26
-  work_done: 1
+  work_done: 2
   work_ready: 8
   deferred_count: 4
 - id: design-results-ingest-storage-and-derived-read-model
@@ -97,8 +97,8 @@ items:
   - resolver
   estimated_effort: Large (3-5 focused implementation sessions)
   work_total: 7
-  work_done: 1
-  work_ready: 4
+  work_done: 2
+  work_ready: 3
   deferred_count: 3
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
