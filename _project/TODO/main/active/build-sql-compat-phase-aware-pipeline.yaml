@@ -306,7 +306,7 @@ work:
 - id: w18
   summary: "Docs: capability matrix and skip reference generated from registry; ADR marked accepted"
   needs: [w17]
-  status: pending
+  status: done
   notes: |
     Run the generator, commit docs/compat/capability-matrix.md and
     docs/compat/skip-reference.md, and update ADR status from Proposed to
