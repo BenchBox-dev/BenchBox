@@ -96,7 +96,7 @@ work:
 - id: w2
   summary: "Migrate local and embedded text loaders: DuckDB, ClickHouse workload, StarRocks workload, and Databend"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace get_delimiter_for_file(), is_tpc_format(), and raw
     getattr(benchmark, "csv_*", None) in the listed text load paths with
