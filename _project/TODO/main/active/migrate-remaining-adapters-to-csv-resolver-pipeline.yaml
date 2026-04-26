@@ -121,7 +121,7 @@ work:
 - id: w4
   summary: "Migrate Databricks CSV FORMAT_OPTIONS to resolved CsvDialect"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace is_tpc_format(base_name) delimiter inference in
     benchbox/platforms/databricks/adapter.py with resolver-backed dialect
