@@ -1,7 +1,7 @@
 id: graduate-browser-smoke-to-blocking-gates
 title: "Graduate Firefox and WebKit @smoke CI jobs to blocking gates"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Testing and Quality Assurance
 

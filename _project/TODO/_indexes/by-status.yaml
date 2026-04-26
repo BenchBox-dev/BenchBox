@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T09:11:50.240932'
+generated_at: '2026-04-26T09:38:03.860288'
 total_items: 33
 statuses:
   In Progress:
@@ -90,7 +90,7 @@ statuses:
     - id: graduate-browser-smoke-to-blocking-gates
       file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
-      priority: Medium
+      priority: Medium-High
       category: Testing and Quality Assurance
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -100,7 +100,7 @@ statuses:
     - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
       file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
       title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
-      priority: Medium
+      priority: Medium-High
       category: Platform Expansion
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml

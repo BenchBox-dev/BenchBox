@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T09:11:50.240922'
+generated_at: '2026-04-26T09:38:03.860277'
 total_items: 33
 priorities:
   Critical:
@@ -38,7 +38,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 3
+    count: 5
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -55,8 +55,18 @@ priorities:
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       category: Core Functionality
       status: In Progress
+    - id: graduate-browser-smoke-to-blocking-gates
+      file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
+      title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
+      category: Testing and Quality Assurance
+      status: Not Started
+    - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
+      file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
+      title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
+      category: Platform Expansion
+      status: Not Started
   Medium:
-    count: 9
+    count: 7
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -83,16 +93,6 @@ priorities:
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       category: Performance
       status: Identified
-    - id: graduate-browser-smoke-to-blocking-gates
-      file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
-      title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
-      category: Testing and Quality Assurance
-      status: Not Started
-    - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
-      file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
-      title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
-      category: Platform Expansion
-      status: Not Started
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

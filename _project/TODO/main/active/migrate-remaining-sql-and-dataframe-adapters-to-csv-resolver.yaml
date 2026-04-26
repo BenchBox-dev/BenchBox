@@ -1,7 +1,7 @@
 id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
 title: "Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Platform Expansion
 description: |

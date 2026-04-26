@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T09:11:50.240909'
+generated_at: '2026-04-26T09:38:03.860259'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -127,7 +127,7 @@ categories:
     - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
       file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
       title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
@@ -179,7 +179,7 @@ categories:
     - id: graduate-browser-smoke-to-blocking-gates
       file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
-      priority: Medium
+      priority: Medium-High
       status: Not Started
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
