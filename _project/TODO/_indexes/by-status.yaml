@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T13:28:07.949718'
-total_items: 32
+generated_at: '2026-04-25T21:09:10.595990'
+total_items: 31
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Medium-High
       category: Core Functionality
   Not Started:
-    count: 29
+    count: 28
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -87,11 +87,6 @@ statuses:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       priority: Medium
       category: Testing and Quality Assurance
-    - id: harmonize-bypass-adapters-with-manifest
-      file: TODO/main/active/harmonize-bypass-adapters-with-manifest.yaml
-      title: Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure
-      priority: High
-      category: Core Functionality
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T13:28:07.949663'
-total_items: 32
+generated_at: '2026-04-25T21:09:10.595935'
+total_items: 31
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -40,25 +40,6 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
-- id: harmonize-bypass-adapters-with-manifest
-  file: TODO/main/active/harmonize-bypass-adapters-with-manifest.yaml
-  title: Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - data-loading
-  - manifest
-  - platform-adapters
-  - harmonization
-  - framework-cleanup
-  - review-followup
-  estimated_effort: Large (3-5 days, sequential due to per-adapter live verification gates)
-  work_total: 10
-  work_done: 9
-  work_ready: 1
-  deferred_count: 3
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

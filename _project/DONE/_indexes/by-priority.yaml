@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T13:28:09.769029'
-total_items: 762
+generated_at: '2026-04-25T21:09:12.618643'
+total_items: 763
 priorities:
   Critical:
     count: 42
@@ -215,7 +215,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 259
+    count: 260
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -744,6 +744,11 @@ priorities:
       title: Harden plan comparison and visualization for unknown operator types
       category: Core Functionality
       status: Not Started
+    - id: harmonize-bypass-adapters-with-manifest
+      file: DONE/main/active/harmonize-bypass-adapters-with-manifest.yaml
+      title: Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure
+      category: Core Functionality
+      status: Completed
     - id: harmonize-benchmark-runtime-contract-and-base-classes
       file: DONE/core-functionality/active/harmonize-benchmark-runtime-contract-and-base-classes.yaml
       title: Harmonize benchmark runtime contract and base classes across all benchmarks

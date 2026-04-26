@@ -2,7 +2,8 @@ id: harmonize-bypass-adapters-with-manifest
 title: "Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-25"
 category: Core Functionality
 
 description: |
@@ -290,7 +291,7 @@ work:
 - id: w10
   summary: "Test rewrites + integration coverage with negative case"
   needs: [w9]
-  status: pending
+  status: done
   notes: |
     1. Audit unit tests under tests/unit/platforms/ for any remaining
        tests that mock ``is_tpc_format``/``get_delimiter_for_file``/

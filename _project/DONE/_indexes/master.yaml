@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T13:28:09.768499'
-total_items: 762
+generated_at: '2026-04-25T21:09:12.618026'
+total_items: 763
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2312,6 +2312,26 @@ items:
   owners:
   - joe
   estimated_effort: Small
+- id: harmonize-bypass-adapters-with-manifest
+  file: DONE/main/active/harmonize-bypass-adapters-with-manifest.yaml
+  title: Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - data-loading
+  - manifest
+  - platform-adapters
+  - harmonization
+  - framework-cleanup
+  - review-followup
+  estimated_effort: Large (3-5 days, sequential due to per-adapter live verification gates)
+  completed_date: '2026-04-25'
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  deferred_count: 3
 - id: harmonize-benchmark-runtime-contract-and-base-classes
   file: DONE/core-functionality/active/harmonize-benchmark-runtime-contract-and-base-classes.yaml
   title: Harmonize benchmark runtime contract and base classes across all benchmarks

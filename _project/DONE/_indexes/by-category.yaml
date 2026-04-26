@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T13:28:09.768850'
+generated_at: '2026-04-25T21:09:12.618432'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -690,7 +690,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 262
+    count: 263
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1403,6 +1403,11 @@ categories:
       title: Harden plan comparison and visualization for unknown operator types
       priority: High
       status: Not Started
+    - id: harmonize-bypass-adapters-with-manifest
+      file: DONE/main/active/harmonize-bypass-adapters-with-manifest.yaml
+      title: Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure
+      priority: High
+      status: Completed
     - id: harmonize-benchmark-runtime-contract-and-base-classes
       file: DONE/core-functionality/active/harmonize-benchmark-runtime-contract-and-base-classes.yaml
       title: Harmonize benchmark runtime contract and base classes across all benchmarks

@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T13:28:07.949694'
+generated_at: '2026-04-25T21:09:10.595966'
 total_categories: 10
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 8
+    count: 7
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -66,11 +66,6 @@ categories:
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
-      priority: High
-      status: Not Started
-    - id: harmonize-bypass-adapters-with-manifest
-      file: TODO/main/active/harmonize-bypass-adapters-with-manifest.yaml
-      title: Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure
       priority: High
       status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth

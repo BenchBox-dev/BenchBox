@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T13:28:09.769199'
-total_items: 762
+generated_at: '2026-04-25T21:09:12.618824'
+total_items: 763
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 711
+    count: 712
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2058,6 +2058,11 @@ statuses:
       title: Harden CI and static analysis to catch Windows-specific failures before merge
       priority: High
       category: Testing & Quality
+    - id: harmonize-bypass-adapters-with-manifest
+      file: DONE/main/active/harmonize-bypass-adapters-with-manifest.yaml
+      title: Harmonize SingleStore/Postgres/Doris/QuestDB with manifest + base data-loading infrastructure
+      priority: High
+      category: Core Functionality
     - id: harmonize-benchmark-runtime-contract-and-base-classes
       file: DONE/core-functionality/active/harmonize-benchmark-runtime-contract-and-base-classes.yaml
       title: Harmonize benchmark runtime contract and base classes across all benchmarks
