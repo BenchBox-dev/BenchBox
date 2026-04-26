@@ -228,7 +228,7 @@ work:
 - id: w22
   summary: "P1 cluster B — replace PK/FK regex strippers with the balanced walker from w5"
   needs: [w11]
-  status: pending
+  status: done
   notes: |
     Second balanced-walker migration slice. Sites and triggers:
     - duckdb.py:733-739 (table-level + inline FK) → breaks on
