@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T09:38:03.860209'
+generated_at: '2026-04-26T09:40:57.262137'
 total_items: 33
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -38,7 +38,7 @@ items:
   - abc-conformance
   estimated_effort: Medium-Large (~5-8 days across 20 work units; most are 1-3 hours each)
   work_total: 26
-  work_done: 5
+  work_done: 6
   work_ready: 8
   deferred_count: 4
 - id: design-results-ingest-storage-and-derived-read-model

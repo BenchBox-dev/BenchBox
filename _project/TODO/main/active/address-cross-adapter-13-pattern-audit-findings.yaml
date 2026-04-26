@@ -159,7 +159,7 @@ work:
 - id: w7
   summary: "N1 — Fix ClickHouse Cloud COUNT(*) throughput inflation in S3/GCS load loops"
   needs: []
-  status: pending
+  status: done
   notes: |
     clickhouse_cloud.py:676-682 (S3) and :816-822 (GCS) — loop assigns
     `total_rows_loaded = SELECT COUNT(*) FROM table` per iteration; the
