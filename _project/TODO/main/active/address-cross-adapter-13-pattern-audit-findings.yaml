@@ -241,7 +241,7 @@ work:
 - id: w23
   summary: "P1 cluster C — fix ClickHouse nullable and Fabric table-definition regex edge cases"
   needs: [w22]
-  status: pending
+  status: done
   notes: |
     Third balanced-walker migration slice. Sites and triggers:
     - clickhouse/workload.py:65-70 `Nullable\\([^)]+\\)\\s+NOT\\s+NULL`
