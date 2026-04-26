@@ -298,7 +298,7 @@ work:
 - id: w15
   summary: "Add ABC-conformance test that introspects every concrete adapter's method signatures"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Defensive — prevents future N2 (ABC contract divergence). New test
     `tests/unit/platforms/test_abc_conformance.py` walks every concrete
