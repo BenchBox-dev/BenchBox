@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T13:41:12.483041'
-total_items: 30
+generated_at: '2026-04-26T16:07:36.282721'
+total_items: 33
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Testing & Quality
   Not Started:
-    count: 28
+    count: 31
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -37,11 +37,21 @@ statuses:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
       category: Platform Expansion
+    - id: add-maintainer-release-guide
+      file: TODO/main/planning/add-maintainer-release-guide.yaml
+      title: Add a maintainer-facing release guide at docs/operations/release-guide.md
+      priority: Medium-High
+      category: Documentation
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
+    - id: integrate-public-divergence-preflight-into-automate-release
+      file: TODO/main/planning/integrate-public-divergence-preflight-into-automate-release.yaml
+      title: Add public-repo divergence preflight to automate_release.py via benchbox-sync
+      priority: High
+      category: Release Tooling
     - id: define-phase-3-promotion-metrics
       file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
       title: Define Phase 3 promotion metrics, dashboard, and review cadence
@@ -132,6 +142,11 @@ statuses:
       title: TigerData Cloud Enhancements
       priority: Low
       category: Platform Expansion
+    - id: unify-public-path-curation-predicate
+      file: TODO/main/planning/unify-public-path-curation-predicate.yaml
+      title: Unify public-path curation onto a single is_public_path(rel_path) predicate
+      priority: High
+      category: Release Tooling
     - id: upgrade-pandas-to-3x
       file: TODO/main/planning/upgrade-pandas-to-3x.yaml
       title: Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear

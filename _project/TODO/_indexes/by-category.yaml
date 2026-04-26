@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T13:41:12.483018'
-total_categories: 10
+generated_at: '2026-04-26T16:07:36.282692'
+total_categories: 12
 categories:
   Architecture & Refactoring:
     count: 1
@@ -78,6 +78,14 @@ categories:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       status: Not Started
+  Documentation:
+    count: 1
+    items:
+    - id: add-maintainer-release-guide
+      file: TODO/main/planning/add-maintainer-release-guide.yaml
+      title: Add a maintainer-facing release guide at docs/operations/release-guide.md
+      priority: Medium-High
+      status: Not Started
   Performance:
     count: 1
     items:
@@ -128,6 +136,19 @@ categories:
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
       priority: Low
+      status: Not Started
+  Release Tooling:
+    count: 2
+    items:
+    - id: integrate-public-divergence-preflight-into-automate-release
+      file: TODO/main/planning/integrate-public-divergence-preflight-into-automate-release.yaml
+      title: Add public-repo divergence preflight to automate_release.py via benchbox-sync
+      priority: High
+      status: Not Started
+    - id: unify-public-path-curation-predicate
+      file: TODO/main/planning/unify-public-path-curation-predicate.yaml
+      title: Unify public-path curation onto a single is_public_path(rel_path) predicate
+      priority: High
       status: Not Started
   Repository Maintenance:
     count: 1

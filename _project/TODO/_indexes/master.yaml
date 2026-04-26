@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T13:41:12.482984'
-total_items: 30
+generated_at: '2026-04-26T16:07:36.282655'
+total_items: 33
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -20,6 +20,16 @@ items:
   work_ready: 1
   needs:
   - implement-pr-based-result-submission-workflow
+- id: integrate-public-divergence-preflight-into-automate-release
+  file: TODO/main/planning/integrate-public-divergence-preflight-into-automate-release.yaml
+  title: Add public-repo divergence preflight to automate_release.py via benchbox-sync
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Not Started
+  work_total: 6
+  work_done: 0
+  work_ready: 1
 - id: design-results-ingest-storage-and-derived-read-model
   file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
   title: Design results ingest, storage, and derived read-model architecture
@@ -97,6 +107,16 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
+- id: unify-public-path-curation-predicate
+  file: TODO/main/planning/unify-public-path-curation-predicate.yaml
+  title: Unify public-path curation onto a single is_public_path(rel_path) predicate
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Not Started
+  work_total: 6
+  work_done: 0
+  work_ready: 1
 - id: databend-3-mode-local-server-cloud
   file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
   title: Add 3-mode support to Databend platform (standalone / server / cloud)
@@ -470,6 +490,19 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 1
+- id: add-maintainer-release-guide
+  file: TODO/main/planning/add-maintainer-release-guide.yaml
+  title: Add a maintainer-facing release guide at docs/operations/release-guide.md
+  worktree: main
+  category: Documentation
+  priority: Medium-High
+  status: Not Started
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - unify-public-path-curation-predicate
+  - integrate-public-divergence-preflight-into-automate-release
 - id: add-third-benchmark-cohort-to-corpus
   file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
   title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
