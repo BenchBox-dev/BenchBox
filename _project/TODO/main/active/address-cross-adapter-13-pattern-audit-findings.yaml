@@ -123,7 +123,7 @@ work:
 - id: w6
   summary: "P11 cluster A — promote adapter destructive-op debug logs to info/warning"
   needs: []
-  status: pending
+  status: done
   notes: |
     Mechanical, low-risk adapter-local visibility changes. Promote
     `logger.debug` → `logger.info` (or log_operation_complete) at:
