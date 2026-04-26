@@ -132,7 +132,7 @@ work:
 - id: w5
   summary: "Refactor SparkDataLoadMixin so spark, velox, and lakesail consume CsvDialect instead of direct csv_delimiter getattr"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     SparkDataLoadMixin already constructs DataSourceResolver, but it discards
     table_metadata when choosing CSV reader options. Change the mixin to
