@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:07:57.413759'
-total_items: 32
+generated_at: '2026-04-26T09:11:50.240922'
+total_items: 33
 priorities:
   Critical:
     count: 1
@@ -56,7 +56,7 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium:
-    count: 8
+    count: 9
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -87,6 +87,11 @@ priorities:
       file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       category: Testing and Quality Assurance
+      status: Not Started
+    - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
+      file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
+      title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
+      category: Platform Expansion
       status: Not Started
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml

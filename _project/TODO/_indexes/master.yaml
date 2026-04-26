@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T09:07:57.413710'
-total_items: 32
+generated_at: '2026-04-26T09:11:50.240875'
+total_items: 33
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -467,6 +467,23 @@ items:
   work_ready: 2
   needs:
   - stabilize-webkit-browser-smoke-flake-under-parallel-workers
+- id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
+  file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
+  title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
+  worktree: main
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - data-loading
+  - csv-dialect
+  - manifest
+  - platform-adapters
+  - resolver
+  estimated_effort: Medium (2-3 focused implementation sessions)
+  work_total: 7
+  work_done: 0
+  work_ready: 1
 - id: operate-results-platform-security-observability-and-abuse-controls
   file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
   title: Operate results platform security, observability, and abuse controls
