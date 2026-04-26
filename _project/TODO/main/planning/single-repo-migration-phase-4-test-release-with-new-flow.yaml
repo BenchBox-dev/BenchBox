@@ -1,0 +1,156 @@
+id: single-repo-migration-phase-4-test-release-with-new-flow
+title: "Single-repo migration phase 4: cut one real PyPI release using the new flow only"
+worktree: main
+priority: High
+status: Not Started
+category: Release Tooling
+
+deps:
+  needs:
+  - single-repo-migration-phase-3-new-release-flow
+
+description: |
+  Prove the new flow works end-to-end on a live PyPI release, while the
+  old tooling is still present as a fallback. This is the safety-net
+  release: if anything goes wrong, automate_release.py is one command
+  away.
+
+  This is the release that ships the results-explorer (the only thing
+  genuinely held back today). Likely versioned 0.3.0 since it adds a
+  major feature.
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 4).
+
+work:
+- id: w1
+  summary: "Confirm explorer is ready to ship and remove it from HOLD_BACK_PATHS"
+  status: pending
+  notes: |
+    Read benchbox/release/workflow.py:18-43. The HOLD_BACK_PATHS list
+    contains explorer-related entries:
+      - benchbox/core/explorer_pipeline
+      - benchbox/cli/commands/explorer.py
+      - tests/unit/core/explorer_pipeline
+      - tests/unit/cli/test_explorer_build_contract.py
+      - .github/workflows/results-explorer-browser.yml
+      - docs/development/results-explorer-*.md
+    Remove these entries from HOLD_BACK_PATHS so prepare_release.py
+    (still in use as the fallback) would also include them. This is
+    intentional: the explorer is now public, regardless of which
+    release flow is used.
+    Confirm with the user that the explorer is feature-complete and
+    documented before removing.
+
+- id: w2
+  summary: "Determine the release version (likely 0.3.0)"
+  status: pending
+  notes: |
+    Check current version in benchbox/__init__.py. Apply semver: a new
+    public-facing feature (results-explorer) is a minor bump.
+    Last tag was likely v0.2.1 - so v0.3.0 is the natural next step.
+    Confirm by running git describe --tags --abbrev=0.
+
+- id: w3
+  summary: "Run make release VERSION=0.3.0"
+  needs: [w1, w2]
+  status: pending
+  notes: |
+    make release VERSION=0.3.0
+    Review the auto-generated changelog. Edit any awkward summarisation.
+    The Claude CLI step will run on real commits and produce a real
+    draft - this is its first end-to-end exercise.
+
+- id: w4
+  summary: "Squash-merge the release PR"
+  needs: [w3]
+  status: pending
+  notes: |
+    Use GitHub UI's "Squash and merge". The merge commit on main will
+    have the PR title as its subject and the PR body in the message.
+    Verify after merge: git log -1 on main shows the squashed commit.
+
+- id: w5
+  summary: "Tag the merge commit and push the tag"
+  needs: [w4]
+  status: pending
+  notes: |
+    git checkout main && git pull
+    git tag v0.3.0
+    git push origin v0.3.0
+    Watch .github/workflows/release.yml run.
+
+- id: w6
+  summary: "Verify the release published to PyPI and is installable"
+  needs: [w5]
+  status: pending
+  notes: |
+    Wait for release.yml to complete green.
+    pip index versions benchbox  # should show 0.3.0
+    python -m venv /tmp/post-release-test
+    /tmp/post-release-test/bin/pip install benchbox==0.3.0
+    /tmp/post-release-test/bin/benchbox --help
+    /tmp/post-release-test/bin/python -c "import benchbox; assert benchbox.__version__ == '0.3.0'"
+    Confirm wheel does not contain _project, scripts/automate_release.py,
+    benchbox/release/, etc. (the wheel hygiene from Phase 1).
+
+- id: w7
+  summary: "Compare to a fallback automate_release.py run on the same source SHA (optional)"
+  needs: [w6]
+  status: pending
+  notes: |
+    Optional smoke check that the new flow produces equivalent
+    artefacts to the old. Run automate_release.py against a scratch
+    target with --skip-push, build the wheel, diff its contents
+    against the just-published 0.3.0 wheel. Differences should be
+    minimal (timestamps may differ if SOURCE_DATE_EPOCH path is
+    different; that is fine).
+    If structural differences appear (missing files, wrong layout),
+    fix the new flow before declaring this phase complete.
+
+verification:
+- description: "PyPI has the new version"
+  command: "pip index versions benchbox 2>&1 | grep -c '0.3.0'"
+  expected_output: "at least 1"
+- description: "Tag exists on main"
+  command: "git rev-parse v0.3.0"
+  expected_output: "valid SHA"
+- description: "Installed wheel is clean of maintainer scaffolding"
+  command: "pip show -f benchbox | grep -E '_project|automate_release|benchbox/release/' | wc -l"
+  expected_output: "0"
+- description: "release.yml workflow concluded successfully"
+  command: "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'"
+  expected_output: "success"
+
+must_preserve:
+- The explorer code is added to the public release; this is the
+  feature-complete launch. HOLD_BACK_PATHS still exists in workflow.py
+  but is now smaller; deletion of HOLD_BACK_PATHS itself is Phase 6.
+- The fallback path (automate_release.py) is not deleted yet - if
+  release.yml fails for any reason, the old flow is one command away.
+- PyPI versioning is monotonic - if 0.3.0 fails partway through and
+  needs a re-cut, the next attempt is 0.3.1. PyPI rejects re-uploads
+  of the same version.
+
+anti_patterns:
+- DO NOT release a version that overlaps with a prior failed attempt -
+  because PyPI rejects, leaving you in a state where pip cannot resolve
+  the intended version; bump the patch number and move on.
+- DO NOT skip the post-publish smoke test (w6) - because release.yml
+  going green only proves the workflow ran; it does not prove the
+  wheel is installable; only a fresh pip install does.
+- DO NOT delete automate_release.py at the end of this phase - because
+  Phase 5 (repo flip) and Phase 6 (deletion) are separate gates; running
+  ahead conflates two risk profiles.
+
+scope_limit:
+  only_modify:
+  - benchbox/release/workflow.py  # remove explorer entries from HOLD_BACK_PATHS only
+  - benchbox/__init__.py  # via update_version.py
+  - pyproject.toml  # via update_version.py
+  - CHANGELOG.md  # via generate_changelog_entry.py
+  - docs/  # version markers via update_version.py
+  - landing/  # version badge via update_landing_page_version
+  notes: |
+    Do NOT touch any other code. This phase exercises the new release
+    flow on a real release and observes the result. Code changes are
+    limited to those that any release would make.

@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T16:07:36.282692'
+generated_at: '2026-04-26T17:10:18.457237'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -81,9 +81,9 @@ categories:
   Documentation:
     count: 1
     items:
-    - id: add-maintainer-release-guide
-      file: TODO/main/planning/add-maintainer-release-guide.yaml
-      title: Add a maintainer-facing release guide at docs/operations/release-guide.md
+    - id: single-repo-migration-phase-7-docs-cleanup
+      file: TODO/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
+      title: 'Single-repo migration phase 7: docs and meta-files reflect the new workflow'
       priority: Medium-High
       status: Not Started
   Performance:
@@ -138,17 +138,57 @@ categories:
       priority: Low
       status: Not Started
   Release Tooling:
-    count: 2
+    count: 10
     items:
-    - id: integrate-public-divergence-preflight-into-automate-release
-      file: TODO/main/planning/integrate-public-divergence-preflight-into-automate-release.yaml
-      title: Add public-repo divergence preflight to automate_release.py via benchbox-sync
+    - id: single-repo-migration-phase-0-audit
+      file: TODO/main/planning/single-repo-migration-phase-0-audit.yaml
+      title: 'Single-repo migration phase 0: gitleaks scan and content audit of private history'
+      priority: Critical
+      status: Not Started
+    - id: single-repo-migration-phase-1-wheel-hygiene
+      file: TODO/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
+      title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'
       priority: High
       status: Not Started
-    - id: unify-public-path-curation-predicate
-      file: TODO/main/planning/unify-public-path-curation-predicate.yaml
-      title: Unify public-path curation onto a single is_public_path(rel_path) predicate
+    - id: single-repo-migration-phase-2-continuous-ci
+      file: TODO/main/planning/single-repo-migration-phase-2-continuous-ci.yaml
+      title: 'Single-repo migration phase 2: continuous CI on push to main and every PR'
       priority: High
+      status: Not Started
+    - id: single-repo-migration-phase-3-new-release-flow
+      file: TODO/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
+      title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
+      priority: High
+      status: Not Started
+    - id: single-repo-migration-phase-4-test-release-with-new-flow
+      file: TODO/main/planning/single-repo-migration-phase-4-test-release-with-new-flow.yaml
+      title: 'Single-repo migration phase 4: cut one real PyPI release using the new flow only'
+      priority: High
+      status: Not Started
+    - id: single-repo-migration-phase-5-repo-flip
+      file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
+      title: 'Single-repo migration phase 5: rename benchbox-private to BenchBox and flip visibility'
+      priority: Critical
+      status: Not Started
+    - id: single-repo-migration-phase-6-delete-obsolete-tooling
+      file: TODO/main/planning/single-repo-migration-phase-6-delete-obsolete-tooling.yaml
+      title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'
+      priority: Medium-High
+      status: Not Started
+    - id: single-repo-migration-phase-8-first-post-migration-release
+      file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
+      title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
+      priority: Medium
+      status: Not Started
+    - id: single-repo-migration-phase-9-decommission-archive
+      file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml
+      title: 'Single-repo migration phase 9: decommission BenchBox-archive after 60-90 day soak'
+      priority: Low
+      status: Not Started
+    - id: single-repo-migration-decisions-gate
+      file: TODO/main/planning/single-repo-migration-decisions-gate.yaml
+      title: 'Single-repo migration: decisions gate (D1-D7) before any code or repo changes'
+      priority: Critical
       status: Not Started
   Repository Maintenance:
     count: 1

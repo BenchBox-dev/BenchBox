@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T16:07:38.216530'
-total_items: 769
+generated_at: '2026-04-26T17:10:20.294871'
+total_items: 772
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 718
+    count: 721
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3466,6 +3466,21 @@ statuses:
       title: '[DuckDB Architecture] Verify ''under 10 seconds'' TPC-H claim'
       priority: Medium
       category: Blog Revision
+    - id: add-maintainer-release-guide
+      file: DONE/main/planning/add-maintainer-release-guide.yaml
+      title: '[OBSOLETED] Add a maintainer-facing release guide at docs/operations/release-guide.md'
+      priority: Medium-High
+      category: Documentation
+    - id: integrate-public-divergence-preflight-into-automate-release
+      file: DONE/main/planning/integrate-public-divergence-preflight-into-automate-release.yaml
+      title: '[OBSOLETED] Add public-repo divergence preflight to automate_release.py via benchbox-sync'
+      priority: High
+      category: Release Tooling
+    - id: unify-public-path-curation-predicate
+      file: DONE/main/planning/unify-public-path-curation-predicate.yaml
+      title: '[OBSOLETED] Unify public-path curation onto a single is_public_path(rel_path) predicate'
+      priority: High
+      category: Release Tooling
     - id: tutorial-benchmark-verification
       file: DONE/blog-content/planning/tutorial-benchmark-verification.yaml
       title: '[Tutorials] Verify benchmark commands in tutorial posts'

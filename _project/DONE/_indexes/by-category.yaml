@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T16:07:38.216177'
-total_categories: 80
+generated_at: '2026-04-26T17:10:20.294536'
+total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -2140,7 +2140,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 23
+    count: 24
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -2256,6 +2256,11 @@ categories:
       file: DONE/main/planning/write-results-platform-phase-2-operations-runbook.yaml
       title: Write the Phase 2 results-platform operations runbook
       priority: Medium
+      status: Completed
+    - id: add-maintainer-release-guide
+      file: DONE/main/planning/add-maintainer-release-guide.yaml
+      title: '[OBSOLETED] Add a maintainer-facing release guide at docs/operations/release-guide.md'
+      priority: Medium-High
       status: Completed
   Documentation and Developer Experience:
     count: 2
@@ -3488,6 +3493,19 @@ categories:
       file: DONE/main/active/close-pre-beta-release-blockers.yaml
       title: Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating
       priority: Critical
+      status: Completed
+  Release Tooling:
+    count: 2
+    items:
+    - id: integrate-public-divergence-preflight-into-automate-release
+      file: DONE/main/planning/integrate-public-divergence-preflight-into-automate-release.yaml
+      title: '[OBSOLETED] Add public-repo divergence preflight to automate_release.py via benchbox-sync'
+      priority: High
+      status: Completed
+    - id: unify-public-path-curation-predicate
+      file: DONE/main/planning/unify-public-path-curation-predicate.yaml
+      title: '[OBSOLETED] Unify public-path curation onto a single is_public_path(rel_path) predicate'
+      priority: High
       status: Completed
   Reliability:
     count: 1

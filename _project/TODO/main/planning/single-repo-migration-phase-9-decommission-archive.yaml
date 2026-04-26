@@ -1,0 +1,105 @@
+id: single-repo-migration-phase-9-decommission-archive
+title: "Single-repo migration phase 9: decommission BenchBox-archive after 60-90 day soak"
+worktree: main
+priority: Low
+status: Not Started
+category: Release Tooling
+
+deps:
+  needs:
+  - single-repo-migration-phase-8-first-post-migration-release
+
+description: |
+  Optional final cleanup. After enough time has passed (60-90 days post
+  Phase 8) that you are confident no external link, fork, or PyPI
+  consumer depends on the archived previous public repo
+  (joeharris76/BenchBox-archive), the archive can be deleted.
+
+  This is intentionally low priority and deferred. The archive costs
+  nothing to keep; deleting it is irreversible. Default action is to
+  leave it forever as a historical reference - this TODO exists only
+  in case you want to clean up later.
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 9).
+
+work:
+- id: w1
+  summary: "Wait at least 60 days from Phase 5 (repo flip) before considering deletion"
+  status: pending
+  notes: |
+    Calendar gate. Phase 5 sets the clock. Confirm by checking the
+    Phase 5 completed_date when this item moves to in_progress.
+
+- id: w2
+  summary: "Check for any traffic to the archived repo"
+  status: pending
+  notes: |
+    GitHub UI: joeharris76/BenchBox-archive -> Insights -> Traffic.
+    If there is meaningful clone or visit traffic, the archive is
+    still useful. Keep it.
+    If traffic is essentially zero for 30+ days, deletion is safe.
+
+- id: w3
+  summary: "Audit external references"
+  status: pending
+  notes: |
+    Search for the old repo URL pattern in any place you control:
+    blog posts, slides, papers, social profiles, talks, READMEs of
+    other projects, etc.
+    Update each to point at joeharris76/BenchBox.
+
+- id: w4
+  summary: "Decide: delete the archive, or keep it indefinitely"
+  needs: [w1, w2, w3]
+  status: pending
+  notes: |
+    Two reasonable choices:
+    - DELETE: GitHub UI -> Settings on BenchBox-archive -> Danger zone
+      -> Delete this repository. Irreversible. Frees the repo name
+      from your account.
+    - KEEP: do nothing. The archive sits there forever as a frozen
+      historical artefact. Costs zero.
+    Default to KEEP unless there is a specific reason to delete (e.g.,
+    embarrassing content discovered post-archive, or repo-name
+    reclamation needed for some other purpose).
+    Record the decision in _project/decisions/single-repo-migration.md
+    as the final entry.
+
+- id: w5
+  summary: "Remove MIGRATION-NOTES.md from repo root if it was added in Phase 5"
+  needs: [w4]
+  status: pending
+  notes: |
+    If Phase 5 added a MIGRATION-NOTES.md, remove it now. The
+    migration is no longer "recent" and the note clutters the repo
+    root. Open a PR with the deletion.
+
+verification:
+- description: "Decision recorded in decisions doc"
+  command: "grep -c 'phase 9\\|archive' _project/decisions/single-repo-migration.md"
+  expected_output: "at least 1"
+- description: "MIGRATION-NOTES.md removed if it existed"
+  command: "test ! -f MIGRATION-NOTES.md && echo OK"
+  expected_output: "OK"
+
+must_preserve:
+- All git history on the canonical joeharris76/BenchBox repo is
+  preserved. The archive deletion (if any) only removes the old
+  forked-state copy.
+- Any external bookmarks to the old URL pattern still resolve via
+  GitHub redirect for as long as the source repo exists with the
+  current name.
+
+anti_patterns:
+- DO NOT rush this - because the archive costs nothing to keep, and
+  deletion is irreversible. The default action is to do nothing.
+- DO NOT delete the archive if forks exist on it - because users who
+  forked from the old URL will lose their fork's upstream.
+
+scope_limit:
+  only_modify:
+  - _project/decisions/single-repo-migration.md  # record final decision
+  - MIGRATION-NOTES.md  # remove if it was added
+  notes: |
+    GitHub UI changes only (potential archive deletion). No code
+    changes in the local repo beyond the optional notes file removal.

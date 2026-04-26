@@ -1,0 +1,194 @@
+id: single-repo-migration-phase-5-repo-flip
+title: "Single-repo migration phase 5: rename benchbox-private to BenchBox and flip visibility"
+worktree: main
+priority: Critical
+status: Not Started
+category: Release Tooling
+
+deps:
+  needs:
+  - single-repo-migration-phase-4-test-release-with-new-flow
+
+description: |
+  Make joeharris76/benchbox-private the canonical public repo. This is the
+  irreversible event of the migration - the visibility change cannot be
+  undone except by deleting and re-creating the repo.
+
+  Pre-conditions:
+  - Phase 0 audit clean (or remediated)
+  - Phase 4 succeeded at least once
+  - Decisions doc finalised
+  - Local backup of benchbox-private (mirror clone) exists
+
+  Sequence is ordered. Pause between each step to verify the previous
+  one took effect. Most steps are reversible until step w5 (visibility
+  change), which is the one-way gate.
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 5).
+
+work:
+- id: w1
+  summary: "Create local mirror backup of benchbox-private"
+  status: pending
+  notes: |
+    git clone --mirror git@github.com:joeharris76/benchbox-private.git \
+      /tmp/benchbox-private-backup-$(date +%Y%m%d).git
+    Verify the clone size matches GitHub's reported repo size. Keep
+    this backup until at least Phase 8 ships green.
+
+- id: w2
+  summary: "Confirm pre-conditions: clean git status, no in-flight branches with valuable work"
+  needs: [w1]
+  status: pending
+  notes: |
+    git status   # must be clean
+    git branch -a   # review feature branches; merge or delete stragglers
+    git stash list   # nothing important stashed
+    Stop here if anything is dirty.
+
+- id: w3
+  summary: "Rename joeharris76/BenchBox to joeharris76/BenchBox-archive on GitHub"
+  needs: [w2]
+  status: pending
+  notes: |
+    GitHub UI: Settings on joeharris76/BenchBox -> Repository name ->
+    rename to BenchBox-archive. GitHub creates an automatic redirect
+    from the old URL.
+
+- id: w4
+  summary: "Archive joeharris76/BenchBox-archive (read-only, banner)"
+  needs: [w3]
+  status: pending
+  notes: |
+    GitHub UI: Settings on joeharris76/BenchBox-archive -> "Archive
+    this repository" at the bottom. Confirms it is a frozen historical
+    artefact.
+
+- id: w5
+  summary: "Rename joeharris76/benchbox-private to joeharris76/BenchBox"
+  needs: [w4]
+  status: pending
+  notes: |
+    GitHub UI: Settings on joeharris76/benchbox-private -> Repository
+    name -> rename to BenchBox. The redirect from benchbox-private
+    will resolve to the new location.
+
+- id: w6
+  summary: "Change visibility from private to public (THE IRREVERSIBLE STEP)"
+  needs: [w5]
+  status: pending
+  notes: |
+    GitHub UI: Settings on joeharris76/BenchBox -> Danger zone -> Change
+    repository visibility -> Public. Type the repo name to confirm.
+    This is the point of no return. Once public, all history is
+    indexable forever.
+    Wait 2-3 minutes after the flip and visit the repo URL in an
+    incognito window to confirm public access.
+
+- id: w7
+  summary: "Update local git remotes to point at the new canonical URL"
+  needs: [w6]
+  status: pending
+  notes: |
+    cd /Users/joe/Developer/BenchBox
+    git remote -v   # current state
+    git remote remove public        # the curated mirror; gone now
+    git remote rename private origin
+    git remote set-url origin git@github.com:joeharris76/BenchBox.git
+    git remote -v   # verify single origin
+    git fetch origin
+
+- id: w8
+  summary: "Set up branch protection on main using settings recorded in Phase 2"
+  needs: [w6]
+  status: pending
+  notes: |
+    GitHub UI: Settings -> Branches -> Add rule for main:
+      - Require pull request before merging
+      - Require status checks: select the CI workflow from Phase 2
+      - Require linear history
+      - Allow squash-merge ONLY (uncheck merge commits and rebase-merge
+        in repo Settings -> General)
+      - Block force pushes
+      - Block deletions
+    Do NOT require approving review (solo maintainer would self-block).
+    Test by opening a no-op PR and merging it.
+
+- id: w9
+  summary: "Update PyPI project URL to the new GitHub URL"
+  needs: [w6]
+  status: pending
+  notes: |
+    PyPI -> manage benchbox project -> set Homepage to
+    https://github.com/joeharris76/BenchBox.
+    Update any other URL fields (issues, source) if listed.
+
+- id: w10
+  summary: "Strip two-remote-rule sections from CLAUDE.md and AGENTS.md (interim - full update in Phase 7)"
+  needs: [w7]
+  status: pending
+  notes: |
+    Delete the "Git Remotes - CRITICAL" section in CLAUDE.md so future
+    sessions stop pushing to the wrong (now non-existent) remote.
+    Same for AGENTS.md. Replace with a one-line placeholder:
+      "Single repo, single origin. See docs/operations/release-guide.md."
+    The rest of the docs cleanup is Phase 7. This step is the minimum
+    to prevent foot-guns in subsequent commits.
+
+- id: w11
+  summary: "Optional: pin a MIGRATION-NOTES.md at repo root for 60-90 days"
+  needs: [w6]
+  status: pending
+  notes: |
+    Brief note explaining the migration for any external visitors:
+    "BenchBox migrated to a single-repo workflow on YYYY-MM-DD. The
+    archived previous public repo is at joeharris76/BenchBox-archive."
+    Remove in Phase 9.
+
+verification:
+- description: "Repo is public and accessible without authentication"
+  command: "curl -sSf -o /dev/null https://github.com/joeharris76/BenchBox && echo OK"
+  expected_output: "OK"
+- description: "Local origin remote points to the new URL"
+  command: "git remote get-url origin"
+  expected_output: "git@github.com:joeharris76/BenchBox.git or https equivalent"
+- description: "Old public repo is archived (returns archive metadata)"
+  command: "gh api repos/joeharris76/BenchBox-archive --jq '.archived'"
+  expected_output: "true"
+- description: "CLAUDE.md no longer mentions the two-remote rule"
+  command: "grep -c 'CRITICAL' CLAUDE.md | head -1"
+  expected_output: "0 or substantially reduced"
+
+must_preserve:
+- All git history is preserved when the repo is renamed (rename is
+  metadata-only; history stays).
+- Existing tags continue to point at the same commits and remain
+  installable from PyPI (PyPI's wheels are independent of repo
+  visibility - they are already published artefacts).
+- The mirror backup from w1 is retained for at least 90 days as the
+  ultimate fallback.
+
+anti_patterns:
+- DO NOT delete the BenchBox-archive repo at the end of this phase -
+  because external links, forks, and stars point to it; archiving
+  preserves them with read-only access.
+- DO NOT skip the incognito-window check after flipping to public -
+  because cached browser sessions can show "the repo is accessible to
+  me" while it is private to everyone else.
+- DO NOT push any commits to the newly-public main between w6 and w8 -
+  because branch protection is not yet in place; an accidental
+  force-push or direct commit could land before the rules are active.
+- DO NOT change visibility back-and-forth - because GitHub treats each
+  visibility flip as a notable event for security scanners and
+  external services.
+
+scope_limit:
+  only_modify:
+  - .git/config  # remote URLs, via git remote commands
+  - CLAUDE.md  # interim two-remote-rule strip
+  - AGENTS.md  # interim two-remote-rule strip
+  - MIGRATION-NOTES.md  # optional, at repo root
+  notes: |
+    The vast majority of work in this phase happens in GitHub UI, not
+    in the local repo. Source code is unchanged. Phase 6 deletes the
+    obsolete tooling; Phase 7 does the full docs cleanup.

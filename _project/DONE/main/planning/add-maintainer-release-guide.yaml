@@ -1,16 +1,27 @@
 id: add-maintainer-release-guide
-title: "Add a maintainer-facing release guide at docs/operations/release-guide.md"
+title: "[OBSOLETED] Add a maintainer-facing release guide at docs/operations/release-guide.md"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-26"
 category: Documentation
 
-deps:
-  needs:
-  - unify-public-path-curation-predicate
-  - integrate-public-divergence-preflight-into-automate-release
-
 description: |
+  OBSOLETED on 2026-04-26: superseded by the single-repo migration plan
+  (_project/TODO/main/planning/single-repo-migration-phase-*.yaml). The
+  release guide is still produced, but as part of the single-repo
+  migration's Phase 7 (docs cleanup), describing a much simpler flow
+  (Makefile + GitHub Actions release workflow). The original version
+  of this TODO described the guide for the old two-repo orchestration,
+  which no longer exists post-migration.
+
+  Original deps removed (the two depended-on TODOs were also obsoleted
+  the same day).
+
+  Original description below preserved for historical context.
+
+  ---
+
   Release knowledge today is fragmented across:
   - `scripts/automate_release.py` docstring (developer-facing, not skimmable)
   - `AGENTS.md` (mixed agent guidance)

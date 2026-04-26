@@ -1,11 +1,23 @@
 id: unify-public-path-curation-predicate
-title: "Unify public-path curation onto a single is_public_path(rel_path) predicate"
+title: "[OBSOLETED] Unify public-path curation onto a single is_public_path(rel_path) predicate"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-26"
 category: Release Tooling
 
 description: |
+  OBSOLETED on 2026-04-26: superseded by the single-repo migration plan
+  (_project/TODO/main/planning/single-repo-migration-phase-*.yaml). The
+  is_public_path predicate exists to maintain a curated public mirror of
+  a private repo; the migration deletes the curation apparatus entirely.
+  Phase 6 of that migration explicitly removes this work item's target
+  code (workflow.py).
+
+  Original description below preserved for historical context.
+
+  ---
+
   Today, "what goes into the public repo" is decided in two structurally different
   code paths:
 

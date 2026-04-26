@@ -1,6 +1,40 @@
-generated_at: '2026-04-26T16:07:36.282655'
-total_items: 33
+generated_at: '2026-04-26T17:10:18.457201'
+total_items: 41
 items:
+- id: single-repo-migration-phase-0-audit
+  file: TODO/main/planning/single-repo-migration-phase-0-audit.yaml
+  title: 'Single-repo migration phase 0: gitleaks scan and content audit of private history'
+  worktree: main
+  category: Release Tooling
+  priority: Critical
+  status: Not Started
+  work_total: 6
+  work_done: 0
+  work_ready: 5
+  needs:
+  - single-repo-migration-decisions-gate
+- id: single-repo-migration-phase-5-repo-flip
+  file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
+  title: 'Single-repo migration phase 5: rename benchbox-private to BenchBox and flip visibility'
+  worktree: main
+  category: Release Tooling
+  priority: Critical
+  status: Not Started
+  work_total: 11
+  work_done: 0
+  work_ready: 1
+  needs:
+  - single-repo-migration-phase-4-test-release-with-new-flow
+- id: single-repo-migration-decisions-gate
+  file: TODO/main/planning/single-repo-migration-decisions-gate.yaml
+  title: 'Single-repo migration: decisions gate (D1-D7) before any code or repo changes'
+  worktree: main
+  category: Release Tooling
+  priority: Critical
+  status: Not Started
+  work_total: 3
+  work_done: 0
+  work_ready: 1
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
   title: Verify the validate-submission CI workflow end-to-end with a real PR
@@ -20,16 +54,6 @@ items:
   work_ready: 1
   needs:
   - implement-pr-based-result-submission-workflow
-- id: integrate-public-divergence-preflight-into-automate-release
-  file: TODO/main/planning/integrate-public-divergence-preflight-into-automate-release.yaml
-  title: Add public-repo divergence preflight to automate_release.py via benchbox-sync
-  worktree: main
-  category: Release Tooling
-  priority: High
-  status: Not Started
-  work_total: 6
-  work_done: 0
-  work_ready: 1
 - id: design-results-ingest-storage-and-derived-read-model
   file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
   title: Design results ingest, storage, and derived read-model architecture
@@ -107,9 +131,9 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
-- id: unify-public-path-curation-predicate
-  file: TODO/main/planning/unify-public-path-curation-predicate.yaml
-  title: Unify public-path curation onto a single is_public_path(rel_path) predicate
+- id: single-repo-migration-phase-1-wheel-hygiene
+  file: TODO/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
+  title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'
   worktree: main
   category: Release Tooling
   priority: High
@@ -117,6 +141,45 @@ items:
   work_total: 6
   work_done: 0
   work_ready: 1
+  needs:
+  - single-repo-migration-phase-0-audit
+- id: single-repo-migration-phase-2-continuous-ci
+  file: TODO/main/planning/single-repo-migration-phase-2-continuous-ci.yaml
+  title: 'Single-repo migration phase 2: continuous CI on push to main and every PR'
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Not Started
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - single-repo-migration-phase-0-audit
+- id: single-repo-migration-phase-3-new-release-flow
+  file: TODO/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
+  title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Not Started
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - single-repo-migration-phase-1-wheel-hygiene
+  - single-repo-migration-phase-2-continuous-ci
+- id: single-repo-migration-phase-4-test-release-with-new-flow
+  file: TODO/main/planning/single-repo-migration-phase-4-test-release-with-new-flow.yaml
+  title: 'Single-repo migration phase 4: cut one real PyPI release using the new flow only'
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Not Started
+  work_total: 7
+  work_done: 0
+  work_ready: 2
+  needs:
+  - single-repo-migration-phase-3-new-release-flow
 - id: databend-3-mode-local-server-cloud
   file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
   title: Add 3-mode support to Databend platform (standalone / server / cloud)
@@ -279,6 +342,18 @@ items:
   needs:
   - implement-pr-based-result-submission-workflow
   - define-phase-3-promotion-metrics
+- id: single-repo-migration-phase-9-decommission-archive
+  file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml
+  title: 'Single-repo migration phase 9: decommission BenchBox-archive after 60-90 day soak'
+  worktree: main
+  category: Release Tooling
+  priority: Low
+  status: Not Started
+  work_total: 5
+  work_done: 0
+  work_ready: 3
+  needs:
+  - single-repo-migration-phase-8-first-post-migration-release
 - id: stackoverflow-benchmark
   file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
   title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
@@ -445,6 +520,19 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: single-repo-migration-phase-8-first-post-migration-release
+  file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
+  title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
+  worktree: main
+  category: Release Tooling
+  priority: Medium
+  status: Not Started
+  work_total: 7
+  work_done: 0
+  work_ready: 2
+  needs:
+  - single-repo-migration-phase-6-delete-obsolete-tooling
+  - single-repo-migration-phase-7-docs-cleanup
 - id: singlestore-non-tpc-csv-null-marker
   file: TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml
   title: 'SingleStore: set csv_null_marker for nyctaxi/clickbench/amplab before smoke tests'
@@ -490,19 +578,6 @@ items:
   work_total: 5
   work_done: 0
   work_ready: 1
-- id: add-maintainer-release-guide
-  file: TODO/main/planning/add-maintainer-release-guide.yaml
-  title: Add a maintainer-facing release guide at docs/operations/release-guide.md
-  worktree: main
-  category: Documentation
-  priority: Medium-High
-  status: Not Started
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - unify-public-path-curation-predicate
-  - integrate-public-divergence-preflight-into-automate-release
 - id: add-third-benchmark-cohort-to-corpus
   file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
   title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
@@ -544,6 +619,30 @@ items:
   work_ready: 2
   needs:
   - stabilize-webkit-browser-smoke-flake-under-parallel-workers
+- id: single-repo-migration-phase-6-delete-obsolete-tooling
+  file: TODO/main/planning/single-repo-migration-phase-6-delete-obsolete-tooling.yaml
+  title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'
+  worktree: main
+  category: Release Tooling
+  priority: Medium-High
+  status: Not Started
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  needs:
+  - single-repo-migration-phase-5-repo-flip
+- id: single-repo-migration-phase-7-docs-cleanup
+  file: TODO/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
+  title: 'Single-repo migration phase 7: docs and meta-files reflect the new workflow'
+  worktree: main
+  category: Documentation
+  priority: Medium-High
+  status: Not Started
+  work_total: 8
+  work_done: 0
+  work_ready: 4
+  needs:
+  - single-repo-migration-phase-5-repo-flip
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

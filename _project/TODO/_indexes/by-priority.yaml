@@ -1,22 +1,32 @@
-generated_at: '2026-04-26T16:07:36.282711'
-total_items: 33
+generated_at: '2026-04-26T17:10:18.457256'
+total_items: 41
 priorities:
   Critical:
-    count: 1
+    count: 4
     items:
+    - id: single-repo-migration-phase-0-audit
+      file: TODO/main/planning/single-repo-migration-phase-0-audit.yaml
+      title: 'Single-repo migration phase 0: gitleaks scan and content audit of private history'
+      category: Release Tooling
+      status: Not Started
+    - id: single-repo-migration-phase-5-repo-flip
+      file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
+      title: 'Single-repo migration phase 5: rename benchbox-private to BenchBox and flip visibility'
+      category: Release Tooling
+      status: Not Started
+    - id: single-repo-migration-decisions-gate
+      file: TODO/main/planning/single-repo-migration-decisions-gate.yaml
+      title: 'Single-repo migration: decisions gate (D1-D7) before any code or repo changes'
+      category: Release Tooling
+      status: Not Started
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 6
+    count: 8
     items:
-    - id: integrate-public-divergence-preflight-into-automate-release
-      file: TODO/main/planning/integrate-public-divergence-preflight-into-automate-release.yaml
-      title: Add public-repo divergence preflight to automate_release.py via benchbox-sync
-      category: Release Tooling
-      status: Not Started
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
@@ -37,23 +47,33 @@ priorities:
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
       status: Not Started
-    - id: unify-public-path-curation-predicate
-      file: TODO/main/planning/unify-public-path-curation-predicate.yaml
-      title: Unify public-path curation onto a single is_public_path(rel_path) predicate
+    - id: single-repo-migration-phase-1-wheel-hygiene
+      file: TODO/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
+      title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'
+      category: Release Tooling
+      status: Not Started
+    - id: single-repo-migration-phase-2-continuous-ci
+      file: TODO/main/planning/single-repo-migration-phase-2-continuous-ci.yaml
+      title: 'Single-repo migration phase 2: continuous CI on push to main and every PR'
+      category: Release Tooling
+      status: Not Started
+    - id: single-repo-migration-phase-3-new-release-flow
+      file: TODO/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
+      title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
+      category: Release Tooling
+      status: Not Started
+    - id: single-repo-migration-phase-4-test-release-with-new-flow
+      file: TODO/main/planning/single-repo-migration-phase-4-test-release-with-new-flow.yaml
+      title: 'Single-repo migration phase 4: cut one real PyPI release using the new flow only'
       category: Release Tooling
       status: Not Started
   Medium-High:
-    count: 4
+    count: 5
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
       title: Add Hypothesis property-based tests for pure-function invariants
       category: Testing & Quality
-      status: Not Started
-    - id: add-maintainer-release-guide
-      file: TODO/main/planning/add-maintainer-release-guide.yaml
-      title: Add a maintainer-facing release guide at docs/operations/release-guide.md
-      category: Documentation
       status: Not Started
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -65,8 +85,18 @@ priorities:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       category: Testing and Quality Assurance
       status: Not Started
+    - id: single-repo-migration-phase-6-delete-obsolete-tooling
+      file: TODO/main/planning/single-repo-migration-phase-6-delete-obsolete-tooling.yaml
+      title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'
+      category: Release Tooling
+      status: Not Started
+    - id: single-repo-migration-phase-7-docs-cleanup
+      file: TODO/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
+      title: 'Single-repo migration phase 7: docs and meta-files reflect the new workflow'
+      category: Documentation
+      status: Not Started
   Medium:
-    count: 7
+    count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -93,6 +123,11 @@ priorities:
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
       status: Not Started
+    - id: single-repo-migration-phase-8-first-post-migration-release
+      file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
+      title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
+      category: Release Tooling
+      status: Not Started
     - id: singlestore-non-tpc-csv-null-marker
       file: TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml
       title: 'SingleStore: set csv_null_marker for nyctaxi/clickbench/amplab before smoke tests'
@@ -104,7 +139,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Low:
-    count: 14
+    count: 15
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -155,6 +190,11 @@ priorities:
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       category: Core Functionality
+      status: Not Started
+    - id: single-repo-migration-phase-9-decommission-archive
+      file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml
+      title: 'Single-repo migration phase 9: decommission BenchBox-archive after 60-90 day soak'
+      category: Release Tooling
       status: Not Started
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml

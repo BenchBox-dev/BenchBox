@@ -1,11 +1,23 @@
 id: integrate-public-divergence-preflight-into-automate-release
-title: "Add public-repo divergence preflight to automate_release.py via benchbox-sync"
+title: "[OBSOLETED] Add public-repo divergence preflight to automate_release.py via benchbox-sync"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-26"
 category: Release Tooling
 
 description: |
+  OBSOLETED on 2026-04-26: superseded by the single-repo migration plan
+  (_project/TODO/main/planning/single-repo-migration-phase-*.yaml). The
+  divergence preflight protects against external commits on the public
+  mirror being destroyed by force-push; the migration deletes the
+  force-push and the bidirectional sync model entirely. Phase 6 deletes
+  automate_release.py and benchbox-sync.
+
+  Original description below preserved for historical context.
+
+  ---
+
   `scripts/automate_release.py` calls `prepare_release.py` (line 1073), which
   deletes and rebuilds the target public tree from scratch. Anything on public
   main that is not present in private at that point is destroyed. Today,

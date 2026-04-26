@@ -1,0 +1,123 @@
+id: single-repo-migration-phase-0-audit
+title: "Single-repo migration phase 0: gitleaks scan and content audit of private history"
+worktree: main
+priority: Critical
+status: Not Started
+category: Release Tooling
+
+deps:
+  needs:
+  - single-repo-migration-decisions-gate
+
+description: |
+  Before the private repo can become public (Phase 5), its full git history
+  must be audited for content that should not be exposed. This is the only
+  load-bearing audit gate; once visibility is flipped, exposed content is
+  forever indexable on GitHub even if deleted.
+
+  Risks audited here:
+  1. Secrets ever committed (API keys, tokens, .env files)
+  2. Internal commentary, stakeholder names, vendor complaints in
+     _project/, _blog/drafts/, code comments
+  3. Embarrassing or rough commit messages
+  4. Large or sensitive binary blobs in history
+
+  Outcome: either go-ahead, or a remediation plan (git filter-repo to scrub,
+  squash to fresh history, etc.) before proceeding to Phase 1.
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 0).
+
+work:
+- id: w1
+  summary: "Install gitleaks and run full-history scan"
+  status: pending
+  notes: |
+    brew install gitleaks
+    cd /Users/joe/Developer/BenchBox
+    gitleaks detect --source . --log-opts='--all' --report-path=/tmp/gitleaks-report.json
+    Review report. Triage each finding as: real secret (must scrub +
+    rotate), false positive (add to .gitleaksignore), or low-risk legacy
+    test fixture.
+
+- id: w2
+  summary: "Audit _project/ for sensitive content"
+  status: pending
+  notes: |
+    find _project -name '*.yaml' -o -name '*.md' | xargs grep -l -i \
+      'TODO\|FIXME\|HACK\|XXX'
+    Read what comes back. Look for stakeholder names, internal vendor
+    complaints, references to private business plans. Most TODO content
+    is fine to publish; the goal is to catch outliers.
+
+- id: w3
+  summary: "Audit _blog/drafts/ for unpublished content"
+  status: pending
+  notes: |
+    Read every file under _blog/drafts/ and decide: ship as-is, edit
+    before public, or move to a wip/ branch that never merges (per D4).
+    Drafts are higher-risk than TODOs because they may contain unedited
+    opinions.
+
+- id: w4
+  summary: "Scan commit messages for embarrassing language"
+  status: pending
+  notes: |
+    git log --all --format='%h %s' | grep -iE \
+      'wip|hack|fix(?:me|up)|temp|stupid|broken|fuck|shit'
+    Decide whether the commits are publishable or whether the migration
+    needs fresh-history (D2 reconfirmation).
+
+- id: w5
+  summary: "Check for unintended large blobs in history"
+  status: pending
+  notes: |
+    git rev-list --objects --all | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | awk '$1=="blob" && $3 > 5000000' | sort -k3 -nr | head
+    Anything over 5 MB is suspicious. Check whether it should have been
+    .gitignore'd. If yes, plan a git filter-repo run to remove it from
+    full history.
+
+- id: w6
+  summary: "Decide: proceed-as-is, scrub-then-proceed, or fresh-history"
+  needs: [w1, w2, w3, w4, w5]
+  status: pending
+  notes: |
+    Update _project/decisions/single-repo-migration.md with the final
+    D2 choice based on findings. Three options:
+    - PROCEED: gitleaks clean, content acceptable
+    - SCRUB: use git filter-repo to remove specific paths/blobs from
+      full history before going public
+    - FRESH-HISTORY: squash all of private into one commit on the new
+      public main; loses blame but eliminates content risk
+    Document the choice and reason.
+
+verification:
+- description: "gitleaks report exists, all findings triaged"
+  command: "test -f /tmp/gitleaks-report.json && jq 'length' /tmp/gitleaks-report.json"
+  expected_output: "0 (or all findings categorized in decisions doc)"
+- description: "Decision doc updated with D2 final choice and audit summary"
+  command: "grep -c 'D2' _project/decisions/single-repo-migration.md"
+  expected_output: "at least 1 (D2 entry retains its row)"
+
+must_preserve:
+- The private repo is unchanged by this audit. Audit is read-only;
+  remediation (if any) is staged for a later step.
+- The decisions doc from the gate item is the canonical record - this
+  audit updates it with findings, not a new doc.
+
+anti_patterns:
+- DO NOT run git filter-repo during this audit - because filter-repo
+  rewrites history; that should be a deliberate, separately-scheduled
+  step after the audit decision is made.
+- DO NOT skip the commit-message audit - because GitHub indexes commit
+  messages for search; embarrassing language in old messages is just
+  as exposed as embarrassing content.
+- DO NOT proceed to Phase 1 until w6 is complete - because the
+  remediation strategy may require additional preparation that is
+  cheaper to do before further changes layer on.
+
+scope_limit:
+  only_modify:
+  - _project/decisions/single-repo-migration.md  # update with audit findings
+  notes: |
+    Read-only audit. No code changes. No history rewrites yet. The only
+    output is the updated decisions doc and a triage summary.

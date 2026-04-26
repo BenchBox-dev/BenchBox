@@ -1,0 +1,99 @@
+id: single-repo-migration-decisions-gate
+title: "Single-repo migration: decisions gate (D1-D7) before any code or repo changes"
+worktree: main
+priority: Critical
+status: Not Started
+category: Release Tooling
+
+description: |
+  Starting gate for the single-repo migration. Seven decisions (D1-D7) must
+  be made and recorded before Phase 0 begins. Some decisions can be revisited
+  based on Phase 0 audit findings (notably D2: fresh-history vs full-history,
+  which depends on whether gitleaks finds anything in the existing history).
+
+  This is a no-code item. Output: a one-page decisions doc committed to the
+  repo so future-you and any collaborators can see why each choice was made.
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md
+
+  Decisions to make:
+
+  - D1: Which GitHub repo URL becomes canonical?
+    Recommended: rename joeharris76/BenchBox -> BenchBox-archive (archive it),
+    rename joeharris76/benchbox-private -> BenchBox, make public. GitHub
+    auto-redirects renamed repos.
+
+  - D2: Full history or fresh-squash history on the new public main?
+    Recommended: full history, after gitleaks audit (Phase 0). Reconfirm
+    after Phase 0 findings.
+
+  - D3: Where do _project/TODO and _project/DONE live?
+    Recommended: on main, excluded from wheel.
+
+  - D4: Where do _blog/drafts/ live?
+    Recommended: on main, excluded from wheel; or in a wip/ branch that
+    never merges.
+
+  - D5: Merge strategy on main?
+    Recommended: squash-merge only.
+
+  - D6: Continuous CI surface?
+    Recommended: every push to main, every PR.
+
+  - D7: Reproducibility apparatus?
+    Recommended: keep SOURCE_DATE_EPOCH from tag commit; drop the rest of
+    the timestamp normalization machinery.
+
+work:
+- id: w1
+  summary: "Read /Users/joe/.claude/plans/single-repo-migration.md fully and the rationale tables"
+  status: pending
+  notes: |
+    The plan covers each decision with the recommendation and trade-off.
+    Spend time on D2 (history strategy) and D4 (drafts location) as they
+    have the highest variance in possible answers.
+
+- id: w2
+  summary: "Write the decisions doc at _project/decisions/single-repo-migration.md"
+  needs: [w1]
+  status: pending
+  notes: |
+    Format: one paragraph context, then a table with columns
+    (ID, Decision, Choice, Reason). Keep under one page.
+    For each D1-D7: record the choice and a short reason. If you
+    deviated from the recommendation, write down why.
+
+- id: w3
+  summary: "Commit decisions doc on a feature branch, open PR, self-review, merge"
+  needs: [w2]
+  status: pending
+  notes: |
+    This is also the first exercise of the new PR-based workflow on
+    benchbox-private. Branch protection is not set up yet, so this PR
+    is just a process check.
+
+verification:
+- description: "Decisions doc exists and lists all of D1-D7 with explicit choices"
+  command: "test -f _project/decisions/single-repo-migration.md && grep -c '^| D[1-7]' _project/decisions/single-repo-migration.md"
+  expected_output: "7"
+
+must_preserve:
+- This item is a gate, not a refactor. Nothing changes in the codebase
+  except the new decisions doc.
+- The plan file remains the source of truth for the migration; the
+  decisions doc only records the per-decision answers.
+
+anti_patterns:
+- DO NOT skip D2 (history strategy) - because it is the only decision
+  that is irreversible after Phase 5; getting it right depends on
+  Phase 0 audit findings.
+- DO NOT defer the decisions doc until after Phase 0 - because then there
+  is no gate; the audit happens with implicit assumptions instead of
+  explicit choices.
+
+scope_limit:
+  only_modify:
+  - _project/decisions/single-repo-migration.md  # new file
+  notes: |
+    Do NOT touch any source code, scripts, or other docs. This item is
+    scope-limited to writing one decision document.

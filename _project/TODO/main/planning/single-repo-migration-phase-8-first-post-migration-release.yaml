@@ -1,0 +1,134 @@
+id: single-repo-migration-phase-8-first-post-migration-release
+title: "Single-repo migration phase 8: cut the first release after deletion and docs cleanup"
+worktree: main
+priority: Medium
+status: Not Started
+category: Release Tooling
+
+deps:
+  needs:
+  - single-repo-migration-phase-6-delete-obsolete-tooling
+  - single-repo-migration-phase-7-docs-cleanup
+
+description: |
+  End-to-end validation that the new flow works in the now-canonical
+  single-repo state, with all old tooling deleted and all docs aligned.
+  This is the first release where there is no fallback - the old
+  automate_release.py is gone.
+
+  If anything is still missing or broken in the new flow, this is where
+  it surfaces. Fixes are quick because the surface area is small (a
+  Makefile target, one workflow file, one changelog generator).
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 8).
+
+work:
+- id: w1
+  summary: "Confirm main is green and all migration phases are merged"
+  status: pending
+  notes: |
+    git checkout main && git pull
+    Check the latest CI run is green: gh run list --branch main --limit 1
+    Confirm Phase 6 deletions and Phase 7 docs are merged to main.
+
+- id: w2
+  summary: "Pick the next version (likely 0.3.1 if Phase 4 was 0.3.0)"
+  status: pending
+  notes: |
+    git describe --tags --abbrev=0
+    Next version: bump patch number unless a new feature warrants minor.
+
+- id: w3
+  summary: "Run make release VERSION=X.Y.Z"
+  needs: [w1, w2]
+  status: pending
+  notes: |
+    The release target now runs without any fallback. If it fails,
+    the failure is in the new flow itself - not because of stale old
+    code. Fix and retry.
+
+- id: w4
+  summary: "Review the release PR, edit changelog if needed, squash-merge"
+  needs: [w3]
+  status: pending
+  notes: |
+    By this point the changelog generator has been exercised at least
+    once (Phase 4). Output should be reasonable. Spend a few minutes
+    polishing the user-facing bullets.
+
+- id: w5
+  summary: "Tag the merge commit, push, watch release.yml"
+  needs: [w4]
+  status: pending
+  notes: |
+    git checkout main && git pull
+    git tag vX.Y.Z
+    git push origin vX.Y.Z
+    Watch release.yml run. Should complete green and publish to PyPI.
+
+- id: w6
+  summary: "Smoke test from PyPI in a fresh venv"
+  needs: [w5]
+  status: pending
+  notes: |
+    python -m venv /tmp/post-migration-test
+    /tmp/post-migration-test/bin/pip install benchbox==X.Y.Z
+    /tmp/post-migration-test/bin/benchbox --help
+    /tmp/post-migration-test/bin/python -c "import benchbox; print(benchbox.__version__)"
+    Verify wheel contents have no maintainer scaffolding (Phase 1 excludes
+    are still in effect).
+
+- id: w7
+  summary: "Declare migration complete; record retrospective notes"
+  needs: [w6]
+  status: pending
+  notes: |
+    Append a brief retrospective to _project/decisions/single-repo-migration.md:
+      - What worked
+      - What surprised
+      - What would do differently
+    Useful future-you reference if a similar migration ever comes up
+    (it might not - but the discipline of writing it down is cheap).
+
+verification:
+- description: "PyPI has the new version"
+  command: "pip index versions benchbox 2>&1 | head -1"
+  expected_output: "shows the new version"
+- description: "Wheel installs and is clean"
+  command: "python -m venv /tmp/pmt && /tmp/pmt/bin/pip install benchbox==<version>"
+  expected_output: "exit 0, clean install"
+- description: "release.yml succeeded"
+  command: "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'"
+  expected_output: "success"
+- description: "No remaining references to deleted modules anywhere in the repo"
+  command: "rg -l 'automate_release|prepare_release|benchbox-sync|benchbox\\.release\\.workflow' | wc -l"
+  expected_output: "0 (or only this TODO file itself)"
+
+must_preserve:
+- The new release flow is the ONLY release flow now. There is no
+  fallback. If something breaks, fix it in the new flow.
+- All previously published versions on PyPI remain installable; this
+  release is purely additive.
+
+anti_patterns:
+- DO NOT resurrect deleted scripts as a "just in case" workaround -
+  because the entire point of the migration was to delete them; if
+  the new flow has a gap, fix the gap, do not regrow the old surface.
+- DO NOT skip the smoke test (w6) - because release.yml going green
+  proves the workflow ran, not that the wheel is functional; only a
+  fresh pip install does.
+- DO NOT release a marketing or major-feature version here unless it
+  was already planned - because this release is a process validation,
+  not a product event; keep the user-facing change small.
+
+scope_limit:
+  only_modify:
+  - benchbox/__init__.py  # via update_version.py
+  - pyproject.toml  # via update_version.py
+  - CHANGELOG.md  # via generate_changelog_entry.py
+  - docs/  # version markers via update_version.py
+  - landing/  # version badge
+  - _project/decisions/single-repo-migration.md  # retrospective notes
+  notes: |
+    No code changes beyond what any release would do, plus the
+    retrospective in the decisions doc.
