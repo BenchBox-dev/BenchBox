@@ -87,7 +87,7 @@ work:
 - id: w4
   summary: "Shared helper P2 + P7 — base/ddl_helpers.py inline-REFERENCES + import-discipline docstring"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     base/ddl_helpers.py:25-69 — `_FK_CLAUSE_RE` requires the table-level
     `FOREIGN KEY (...)` header. Add a second regex pass for inline
