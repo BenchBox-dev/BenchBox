@@ -88,7 +88,7 @@ work:
 - id: w2
   summary: "Migrate Fabric Warehouse COPY INTO field_terminator selection"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace is_tpc_format/get_delimiter_for_file at
     benchbox/platforms/fabric_warehouse.py:945,950,1024 with
@@ -97,7 +97,7 @@ work:
 - id: w3
   summary: "Migrate DataFusion CSV delimiter detection"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace get_delimiter_for_file fallback in _detect_csv_format() at
     benchbox/platforms/datafusion.py:845 with resolver lookup. DataFusion's
@@ -106,7 +106,7 @@ work:
 - id: w4
   summary: "Migrate Azure Synapse COPY INTO and direct INSERT delimiters"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace get_delimiter_for_file usages at
     benchbox/platforms/azure_synapse.py:541,610 with resolver-backed dialect.
