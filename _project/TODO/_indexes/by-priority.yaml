@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T10:07:46.428558'
+generated_at: '2026-04-26T10:19:02.355865'
 total_items: 32
 priorities:
   Critical:
@@ -38,7 +38,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 4
+    count: 5
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -60,8 +60,13 @@ priorities:
       title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
       category: Platform Expansion
       status: Not Started
+    - id: refine-sql-compat-skip-semantics
+      file: TODO/main/planning/refine-sql-compat-skip-semantics.yaml
+      title: 'Refine sql_compat skip semantics: split SKIPPED, close PK enforcement coverage gap, tighten reasons'
+      category: Code Quality and Technical Debt
+      status: Not Started
   Medium:
-    count: 7
+    count: 6
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -87,11 +92,6 @@ priorities:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
-      status: Not Started
-    - id: refine-sql-compat-skip-taxonomy
-      file: TODO/main/planning/refine-sql-compat-skip-taxonomy.yaml
-      title: 'Refine sql_compat skip taxonomy: split SupportLevel.SKIPPED and tighten user-facing reasons'
-      category: Code Quality and Technical Debt
       status: Not Started
     - id: validate-and-integrate-tpc-tuning-json
       file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml

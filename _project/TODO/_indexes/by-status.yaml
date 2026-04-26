@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T10:07:46.428568'
+generated_at: '2026-04-26T10:19:02.355875'
 total_items: 32
 statuses:
   In Progress:
@@ -112,10 +112,10 @@ statuses:
       title: Re-enable FireDucks after upstream stability fixes
       priority: Low
       category: Platform Expansion
-    - id: refine-sql-compat-skip-taxonomy
-      file: TODO/main/planning/refine-sql-compat-skip-taxonomy.yaml
-      title: 'Refine sql_compat skip taxonomy: split SupportLevel.SKIPPED and tighten user-facing reasons'
-      priority: Medium
+    - id: refine-sql-compat-skip-semantics
+      file: TODO/main/planning/refine-sql-compat-skip-semantics.yaml
+      title: 'Refine sql_compat skip semantics: split SKIPPED, close PK enforcement coverage gap, tighten reasons'
+      priority: Medium-High
       category: Code Quality and Technical Debt
     - id: fix-git-author-history-rewrite
       file: TODO/main/planning/fix-git-author-history-rewrite.yaml

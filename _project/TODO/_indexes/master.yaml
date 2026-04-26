@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T10:07:46.428498'
+generated_at: '2026-04-26T10:19:02.355807'
 total_items: 32
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -38,8 +38,8 @@ items:
   - abc-conformance
   estimated_effort: Medium-Large (~5-8 days across 20 work units; most are 1-3 hours each)
   work_total: 26
-  work_done: 11
-  work_ready: 9
+  work_done: 15
+  work_ready: 7
   deferred_count: 4
 - id: design-results-ingest-storage-and-derived-read-model
   file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
@@ -446,24 +446,6 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
-- id: refine-sql-compat-skip-taxonomy
-  file: TODO/main/planning/refine-sql-compat-skip-taxonomy.yaml
-  title: 'Refine sql_compat skip taxonomy: split SupportLevel.SKIPPED and tighten user-facing reasons'
-  worktree: main
-  category: Code Quality and Technical Debt
-  priority: Medium
-  status: Not Started
-  tags:
-  - sql-compat
-  - documentation
-  - taxonomy
-  - registry
-  estimated_effort: Medium
-  work_total: 6
-  work_done: 0
-  work_ready: 1
-  needs:
-  - build-sql-compat-phase-aware-pipeline
 - id: validate-and-integrate-tpc-tuning-json
   file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
   title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
@@ -556,6 +538,26 @@ items:
   work_total: 7
   work_done: 0
   work_ready: 1
+- id: refine-sql-compat-skip-semantics
+  file: TODO/main/planning/refine-sql-compat-skip-semantics.yaml
+  title: 'Refine sql_compat skip semantics: split SKIPPED, close PK enforcement coverage gap, tighten reasons'
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - sql-compat
+  - documentation
+  - taxonomy
+  - registry
+  - primary-key
+  - silent-corruption
+  estimated_effort: Large
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  needs:
+  - build-sql-compat-phase-aware-pipeline
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases
