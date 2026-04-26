@@ -109,7 +109,7 @@ work:
 - id: w3
   summary: "Migrate cloud warehouse loaders: Firebolt, Redshift, and BigQuery"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Thread resolved CsvDialect into Firebolt COPY/external-table load SQL,
     Redshift COPY delimiter/null handling, and BigQuery LoadJobConfig
