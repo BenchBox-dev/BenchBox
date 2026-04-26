@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T11:58:13.591293'
+generated_at: '2026-04-26T13:41:12.482984'
 total_items: 30
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -425,6 +425,17 @@ items:
   needs:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: singlestore-non-tpc-csv-null-marker
+  file: TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml
+  title: 'SingleStore: set csv_null_marker for nyctaxi/clickbench/amplab before smoke tests'
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - singlestore
+  - csv-loading
+  - null-handling
 - id: validate-and-integrate-tpc-tuning-json
   file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
   title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
@@ -500,23 +511,6 @@ items:
   work_ready: 2
   needs:
   - stabilize-webkit-browser-smoke-flake-under-parallel-workers
-- id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
-  file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
-  title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
-  worktree: main
-  category: Platform Expansion
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - data-loading
-  - csv-dialect
-  - manifest
-  - platform-adapters
-  - resolver
-  estimated_effort: Medium (2-3 focused implementation sessions)
-  work_total: 7
-  work_done: 1
-  work_ready: 5
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

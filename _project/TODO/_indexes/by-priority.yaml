@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T11:58:13.591350'
+generated_at: '2026-04-26T13:41:12.483031'
 total_items: 30
 priorities:
   Critical:
@@ -33,7 +33,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium-High:
-    count: 4
+    count: 3
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -50,13 +50,8 @@ priorities:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       category: Testing and Quality Assurance
       status: Not Started
-    - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
-      file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
-      title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
-      category: Platform Expansion
-      status: Not Started
   Medium:
-    count: 6
+    count: 7
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -82,6 +77,11 @@ priorities:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       category: Core Functionality
+      status: Not Started
+    - id: singlestore-non-tpc-csv-null-marker
+      file: TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml
+      title: 'SingleStore: set csv_null_marker for nyctaxi/clickbench/amplab before smoke tests'
+      category: Platform Expansion
       status: Not Started
     - id: validate-and-integrate-tpc-tuning-json
       file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml

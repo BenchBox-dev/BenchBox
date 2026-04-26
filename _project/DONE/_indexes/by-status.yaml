@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T11:58:15.600451'
-total_items: 768
+generated_at: '2026-04-26T13:41:14.373790'
+total_items: 769
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 717
+    count: 718
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2419,6 +2419,11 @@ statuses:
       title: Migrate PostgreSQL driver from psycopg2-binary to psycopg3 (psycopg)
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
+      file: DONE/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
+      title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
+      priority: Medium-High
+      category: Platform Expansion
     - id: migrate-remaining-print-leaks-to-emit
       file: DONE/main/active/migrate-remaining-print-leaks-to-emit.yaml
       title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION

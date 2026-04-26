@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T11:58:13.591361'
+generated_at: '2026-04-26T13:41:12.483041'
 total_items: 30
 statuses:
   In Progress:
@@ -82,11 +82,6 @@ statuses:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
       category: Core Functionality
-    - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
-      file: TODO/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
-      title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
-      priority: Medium-High
-      category: Platform Expansion
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
@@ -122,6 +117,11 @@ statuses:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       category: Core Functionality
+    - id: singlestore-non-tpc-csv-null-marker
+      file: TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml
+      title: 'SingleStore: set csv_null_marker for nyctaxi/clickbench/amplab before smoke tests'
+      priority: Medium
+      category: Platform Expansion
     - id: stackoverflow-benchmark
       file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload

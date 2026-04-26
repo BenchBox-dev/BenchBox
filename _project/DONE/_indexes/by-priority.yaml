@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T11:58:15.600271'
-total_items: 768
+generated_at: '2026-04-26T13:41:14.373622'
+total_items: 769
 priorities:
   Critical:
     count: 42
@@ -1531,7 +1531,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 124
+    count: 125
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1988,6 +1988,11 @@ priorities:
       file: DONE/main/active/datavault-sha256-hash-migration.yaml
       title: Migrate DataVault hash key schema from VARCHAR(32) to VARCHAR(64) and enable SHA-256
       category: Core Functionality
+      status: Completed
+    - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
+      file: DONE/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
+      title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
+      category: Platform Expansion
       status: Completed
     - id: migrate-remaining-print-leaks-to-emit
       file: DONE/main/active/migrate-remaining-print-leaks-to-emit.yaml

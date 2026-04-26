@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T11:58:15.600094'
+generated_at: '2026-04-26T13:41:14.373429'
 total_categories: 80
 categories:
   '"Bug Fixes & Reliability"':
@@ -2627,7 +2627,7 @@ categories:
       priority: Medium
       status: Completed
   Platform Expansion:
-    count: 84
+    count: 85
     items:
     - id: aws-athena-platform-adapter
       file: DONE/platform-expansion-athena/completed/aws-athena-platform-adapter.yaml
@@ -2952,6 +2952,11 @@ categories:
     - id: fabric-spark-platform
       file: DONE/platform-expansion/planning/fabric-spark-platform.yaml
       title: Microsoft Fabric Spark Platform
+      priority: Medium-High
+      status: Completed
+    - id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
+      file: DONE/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
+      title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
       priority: Medium-High
       status: Completed
     - id: migrate-remaining-adapters-to-csv-resolver-pipeline

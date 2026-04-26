@@ -2,7 +2,8 @@ id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
 title: "Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-04-26"
 category: Platform Expansion
 description: |
   Follow-up to migrate-remaining-adapters-to-csv-resolver-pipeline (completed
@@ -114,7 +115,7 @@ work:
 - id: w5
   summary: "Migrate dataframe adapters (pandas, modin, cudf, pyspark, dask, lakesail)"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace is_tpc_format() usages in benchbox/platforms/dataframe/*.py with
     resolve_csv_dialect(). Affected: pandas_df.py:231, pyspark_df.py:462,
@@ -126,7 +127,7 @@ work:
 - id: w6
   summary: "Decide migration vs documentation for base/utils.detect_file_format"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     benchbox/platforms/base/utils.py:detect_file_format() is a shared utility
     called without DataSource context. Either migrate callers to thread the
@@ -136,7 +137,7 @@ work:
 - id: w7
   summary: "Extend the regression guard to cover the newly migrated adapters"
   needs: [w2, w3, w4, w5]
-  status: pending
+  status: done
   notes: |
     Add the new adapter paths to _MIGRATED_ADAPTER_PATHS in
     tests/unit/platforms/test_csv_dialect.py so future regressions are

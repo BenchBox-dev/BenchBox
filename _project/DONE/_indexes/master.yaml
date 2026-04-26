@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T11:58:15.599763'
-total_items: 768
+generated_at: '2026-04-26T13:41:14.373091'
+total_items: 769
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -10286,6 +10286,24 @@ items:
   completed_date: '2026-04-17'
   work_total: 6
   work_done: 6
+  work_ready: 0
+- id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
+  file: DONE/main/active/migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver.yaml
+  title: Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver
+  worktree: main
+  category: Platform Expansion
+  priority: Medium-High
+  status: Completed
+  tags:
+  - data-loading
+  - csv-dialect
+  - manifest
+  - platform-adapters
+  - resolver
+  estimated_effort: Medium (2-3 focused implementation sessions)
+  completed_date: '2026-04-26'
+  work_total: 7
+  work_done: 7
   work_ready: 0
 - id: migrate-remaining-print-leaks-to-emit
   file: DONE/main/active/migrate-remaining-print-leaks-to-emit.yaml
