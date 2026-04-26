@@ -256,7 +256,7 @@ work:
 - id: w12
   summary: "P12 — Restore Presto/Trino symmetry: NOT NULL stripping, friendly connect error, qualified _load_table_data"
   needs: [w11]
-  status: pending
+  status: done
   notes: |
     Three asymmetric drift items between presto.py and trino.py:
     1. presto.py:847-854 strips NOT NULL for memory catalog; trino.py
