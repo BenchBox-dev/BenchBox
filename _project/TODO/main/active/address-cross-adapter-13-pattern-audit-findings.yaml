@@ -141,7 +141,7 @@ work:
 - id: w21
   summary: "P11 cluster B — make shared-helper and local-dir destructive ops visible"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Mechanical, low-risk shared/local cleanup visibility changes. Promote
     destructive operation logging at:
