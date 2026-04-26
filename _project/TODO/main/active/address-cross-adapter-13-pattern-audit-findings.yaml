@@ -400,7 +400,7 @@ work:
 - id: w26
   summary: "Nit/Consider tail B — singlestore/doris/fabric cleanup"
   needs: [w19]
-  status: pending
+  status: done
   notes: |
     Small SingleStore/Doris/Fabric cleanup slice:
     - singlestore.py:713-798 — extract `_extract_create_table_name(stmt)`
