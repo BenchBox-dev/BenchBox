@@ -70,7 +70,7 @@ work:
 - id: w3
   summary: "C3 — Conform snowpark_connect.{create_schema,load_data,execute_query} to PlatformAdapter ABC"
   needs: []
-  status: pending
+  status: done
   notes: |
     snowpark_connect.py:291,314,385 vs spark.py:590,632,663.
     create_schema(self, schema_name=None) → must accept (benchmark, connection).
