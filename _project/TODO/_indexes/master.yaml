@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T21:09:10.595935'
-total_items: 31
+generated_at: '2026-04-25T21:49:28.534110'
+total_items: 32
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -61,6 +61,24 @@ items:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: migrate-remaining-adapters-to-csv-resolver-pipeline
+  file: TODO/main/planning/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
+  title: Migrate remaining platform adapters to the CSV resolver pipeline
+  worktree: main
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - data-loading
+  - csv-dialect
+  - manifest
+  - platform-adapters
+  - resolver
+  estimated_effort: Large (3-5 focused implementation sessions)
+  work_total: 7
+  work_done: 0
+  work_ready: 1
+  deferred_count: 3
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

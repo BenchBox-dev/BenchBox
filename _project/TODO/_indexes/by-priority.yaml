@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T21:09:10.595980'
-total_items: 31
+generated_at: '2026-04-25T21:49:28.534167'
+total_items: 32
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 4
+    count: 5
     items:
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
@@ -21,6 +21,11 @@ priorities:
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
       category: Core Functionality
+      status: Not Started
+    - id: migrate-remaining-adapters-to-csv-resolver-pipeline
+      file: TODO/main/planning/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
+      title: Migrate remaining platform adapters to the CSV resolver pipeline
+      category: Platform Expansion
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml

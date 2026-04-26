@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T21:09:10.595990'
-total_items: 31
+generated_at: '2026-04-25T21:49:28.534178'
+total_items: 32
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: Medium-High
       category: Core Functionality
   Not Started:
-    count: 28
+    count: 29
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -92,6 +92,11 @@ statuses:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
       category: Core Functionality
+    - id: migrate-remaining-adapters-to-csv-resolver-pipeline
+      file: TODO/main/planning/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
+      title: Migrate remaining platform adapters to the CSV resolver pipeline
+      priority: High
+      category: Platform Expansion
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
