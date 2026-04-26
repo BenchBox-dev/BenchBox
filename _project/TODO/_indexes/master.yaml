@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T09:07:40.084584'
+generated_at: '2026-04-26T09:07:52.948836'
 total_items: 33
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -97,7 +97,7 @@ items:
   - resolver
   estimated_effort: Large (3-5 focused implementation sessions)
   work_total: 7
-  work_done: 5
+  work_done: 6
   work_ready: 1
   deferred_count: 3
 - id: motherduck-cloud-features
