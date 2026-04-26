@@ -188,7 +188,7 @@ work:
 - id: w9
   summary: "P12 — Extract _build_postgres_connection_kwargs helper for PG family from_config"
   needs: []
-  status: pending
+  status: done
   notes: |
     timescaledb.py:110-159 ≅ postgresql.py:154-201 ≅ pg_duckdb.py:124-181 ≅
     pg_mooncake.py:67-116 ≅ cedardb.py:73-119 — ~30 identical lines for
@@ -273,7 +273,7 @@ work:
 - id: w13
   summary: "P3 — Fix motherduck `--platform-option token=<token>` advertised in docstring but not wired"
   needs: []
-  status: pending
+  status: done
   notes: |
     motherduck.py:56,116,135-138 — module docstring at :56 advertises
     `--platform-option token=<token>`, but `add_cli_arguments` registers
