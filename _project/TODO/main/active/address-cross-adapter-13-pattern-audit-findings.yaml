@@ -311,7 +311,7 @@ work:
 - id: w16
   summary: "P11/P9 cluster — postgresql FK-strip silent retry + presto bare raise + cedardb per-table drop logs"
   needs: [w12, w21]
-  status: pending
+  status: done
   notes: |
     Smaller correctness/visibility items batched as one PR:
     - postgresql.py:444-451 — FK-stripped retry catches the second
@@ -367,7 +367,7 @@ work:
 - id: w18
   summary: "P7 — Add import-by-name discipline docstring to remaining shared helpers"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Following the canonical _spark_helpers.py pattern, add the same
     docstring paragraph to:
@@ -417,7 +417,7 @@ work:
 - id: w20
   summary: "P5 — Make docker/questdb truly ephemeral (or fix the misleading comment)"
   needs: []
-  status: pending
+  status: done
   notes: |
     docker/questdb/docker-compose.yml:23-47 — comment claims "Data is
     ephemeral - no named volume," but with no `tmpfs:` block and
