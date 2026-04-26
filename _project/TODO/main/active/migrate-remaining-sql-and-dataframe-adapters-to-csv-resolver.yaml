@@ -76,7 +76,7 @@ deps:
 work:
 - id: w1
   summary: "Migrate Snowflake _get_file_format_for_table to resolve_csv_dialect"
-  status: pending
+  status: done
   notes: |
     Replace is_tpc_format(first_file) in
     benchbox/platforms/snowflake.py:_get_file_format_for_table with a
@@ -154,13 +154,18 @@ files_affected:
 
 must_preserve:
 - "DataSourceResolver remains the single source of table/file resolution; do not reimplement manifest walking inside adapters."
-- "resolve_csv_dialect() precedence remains manifest table_metadata first, then real benchmark csv_* attributes, then file-extension fallback with logging."
-- "null_marker=None remains semantically distinct from a missing null marker; adapters must not replace explicit None with a default string."
-- "Snowflake named file format objects (BENCHBOX_TBL_FORMAT, BENCHBOX_CSV_FORMAT) still load TPC and CSV data with their existing column/null/date semantics."
-- "Dataframe adapter trailing-delimiter probing preserves the `null_marker is not None` gate so non-TPC CSVs do not pay the extra disk read."
+- "resolve_csv_dialect() precedence remains manifest table_metadata first, then real benchmark csv_* attributes, then file-extension
+  fallback with logging."
+- "null_marker=None remains semantically distinct from a missing null marker; adapters must not replace explicit None with
+  a default string."
+- "Snowflake named file format objects (BENCHBOX_TBL_FORMAT, BENCHBOX_CSV_FORMAT) still load TPC and CSV data with their existing
+  column/null/date semantics."
+- "Dataframe adapter trailing-delimiter probing preserves the `null_marker is not None` gate so non-TPC CSVs do not pay the
+  extra disk read."
 
 verification:
-  command: "uv run -- python -m pytest tests/unit/platforms/test_csv_dialect.py tests/unit/platforms/test_snowflake_csv_dialect.py tests/unit/platforms/ -k csv_dialect -q"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_csv_dialect.py tests/unit/platforms/test_snowflake_csv_dialect.py
+    tests/unit/platforms/ -k csv_dialect -q"
   expected: "All csv_dialect tests pass; no is_tpc_format imports remain in the migrated adapter paths listed in _MIGRATED_ADAPTER_PATHS"
 
 approach: |
