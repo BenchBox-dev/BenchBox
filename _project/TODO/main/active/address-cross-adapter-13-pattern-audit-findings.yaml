@@ -106,7 +106,7 @@ work:
 - id: w5
   summary: "Lift balanced-paren constraint walker out of _spark_helpers.py into shared module"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     `_strip_balanced_paren_constraints` in _spark_helpers.py is the
     canonical fix for Pattern 1 (greedy `[^)]*` over balanced parens).
