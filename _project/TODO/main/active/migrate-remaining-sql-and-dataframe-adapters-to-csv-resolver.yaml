@@ -23,15 +23,17 @@ description: |
   - benchbox/platforms/fabric_warehouse.py:945,950,1024 — branches on
     is_tpc_format(data_file) to pick field_terminator and reads
     get_delimiter_for_file(data_file) for COPY INTO statements.
-  - benchbox/platforms/datafusion.py:844 — _detect_csv_delimiter() falls back
+  - benchbox/platforms/datafusion.py:845 — _detect_csv_format() falls back
     to get_delimiter_for_file(file_paths[0]).
-  - benchbox/platforms/azure_synapse.py:540,609 — uses
+  - benchbox/platforms/azure_synapse.py:541,610 — uses
     get_delimiter_for_file(first_file) for COPY INTO field_terminator and
     direct INSERT delimiter.
-  - benchbox/platforms/dataframe/{modin,cudf,pandas,pyspark}_df.py — use
-    is_tpc_format(path) to gate has_trailing_delimiter() probing in
+  - benchbox/platforms/dataframe/{modin,cudf,pandas,pyspark,dask,lakesail}_df.py
+    — use is_tpc_format(path) to gate has_trailing_delimiter() probing in
     DataFrame loaders. Same trailing-delimiter behaviour change addressed in
-    DuckDB needs to be propagated through these read paths.
+    DuckDB needs to be propagated through these read paths. (Note: the
+    predecessor TODO migrated the SQL lakesail.py platform; lakesail_df.py
+    and dask_df.py were not included and still use is_tpc_format.)
   - benchbox/platforms/base/utils.py:45 — detect_file_format() uses
     is_tpc_format() to pick a default delimiter when no metadata is supplied.
     This is a shared utility — verify whether it should be migrated or
@@ -97,9 +99,9 @@ work:
   needs: [w1]
   status: pending
   notes: |
-    Replace _detect_csv_delimiter at benchbox/platforms/datafusion.py:844
-    with resolver lookup. DataFusion's loader already has the DataSource
-    available — just plumb the dialect.
+    Replace get_delimiter_for_file fallback in _detect_csv_format() at
+    benchbox/platforms/datafusion.py:845 with resolver lookup. DataFusion's
+    loader already has the DataSource available — just plumb the dialect.
 
 - id: w4
   summary: "Migrate Azure Synapse COPY INTO and direct INSERT delimiters"
@@ -107,18 +109,19 @@ work:
   status: pending
   notes: |
     Replace get_delimiter_for_file usages at
-    benchbox/platforms/azure_synapse.py:540,609 with resolver-backed dialect.
+    benchbox/platforms/azure_synapse.py:541,610 with resolver-backed dialect.
 
 - id: w5
-  summary: "Migrate dataframe adapters (pandas, modin, cudf, pyspark)"
+  summary: "Migrate dataframe adapters (pandas, modin, cudf, pyspark, dask, lakesail)"
   needs: [w1]
   status: pending
   notes: |
     Replace is_tpc_format() usages in benchbox/platforms/dataframe/*.py with
-    resolve_csv_dialect(). Preserve the `null_marker is not None` gate for
-    has_trailing_delimiter() established in the DuckDB external-scan
-    migration. Add focused regression tests per adapter mirroring
-    test_spark_csv_dialect_resolver.py.
+    resolve_csv_dialect(). Affected: pandas_df.py:231, pyspark_df.py:462,
+    modin_df.py:296, cudf_df.py:238, dask_df.py:284, lakesail_df.py:330.
+    Preserve the `null_marker is not None` gate for has_trailing_delimiter()
+    established in the DuckDB external-scan migration. Add focused regression
+    tests per adapter mirroring test_spark_csv_dialect_resolver.py.
 
 - id: w6
   summary: "Decide migration vs documentation for base/utils.detect_file_format"
@@ -155,6 +158,10 @@ must_preserve:
 - "null_marker=None remains semantically distinct from a missing null marker; adapters must not replace explicit None with a default string."
 - "Snowflake named file format objects (BENCHBOX_TBL_FORMAT, BENCHBOX_CSV_FORMAT) still load TPC and CSV data with their existing column/null/date semantics."
 - "Dataframe adapter trailing-delimiter probing preserves the `null_marker is not None` gate so non-TPC CSVs do not pay the extra disk read."
+
+verification:
+  command: "uv run -- python -m pytest tests/unit/platforms/test_csv_dialect.py tests/unit/platforms/test_snowflake_csv_dialect.py tests/unit/platforms/ -k csv_dialect -q"
+  expected: "All csv_dialect tests pass; no is_tpc_format imports remain in the migrated adapter paths listed in _MIGRATED_ADAPTER_PATHS"
 
 approach: |
   Mirror the structure of the completed migrate-remaining-adapters TODO:
