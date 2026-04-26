@@ -327,7 +327,7 @@ work:
 - id: w17
   summary: "P14 cluster A — normalize PG-family legacy flag shims against option specs"
   needs: [w13]
-  status: pending
+  status: done
   notes: |
     PG-family adapters wire BOTH `register_option_specs` AND
     `add_cli_arguments` for the same fields, with undefined precedence:
@@ -342,7 +342,7 @@ work:
 - id: w24
   summary: "P14 cluster B — normalize SingleStore and Snowpark Connect legacy flag shims"
   needs: [w17]
-  status: pending
+  status: done
   notes: |
     Follow the w17 shim/deprecation pattern for:
     - singlestore.py:137-175
@@ -354,7 +354,7 @@ work:
 - id: w25
   summary: "P14 cluster C — settle sqlite option-spec registration policy"
   needs: [w24]
-  status: pending
+  status: done
   notes: |
     Inverse case: sqlite.py has only legacy flags and no option-spec
     registration.
