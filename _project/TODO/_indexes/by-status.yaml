@@ -1,8 +1,8 @@
-generated_at: '2026-04-25T21:49:28.534178'
+generated_at: '2026-04-25T21:53:03.765673'
 total_items: 32
 statuses:
   In Progress:
-    count: 2
+    count: 3
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
@@ -14,8 +14,13 @@ statuses:
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
       category: Core Functionality
+    - id: migrate-remaining-adapters-to-csv-resolver-pipeline
+      file: TODO/main/active/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
+      title: Migrate remaining platform adapters to the CSV resolver pipeline
+      priority: High
+      category: Platform Expansion
   Not Started:
-    count: 29
+    count: 28
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -92,11 +97,6 @@ statuses:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: High
       category: Core Functionality
-    - id: migrate-remaining-adapters-to-csv-resolver-pipeline
-      file: TODO/main/planning/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
-      title: Migrate remaining platform adapters to the CSV resolver pipeline
-      priority: High
-      category: Platform Expansion
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

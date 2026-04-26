@@ -1,4 +1,4 @@
-generated_at: '2026-04-25T21:49:28.534110'
+generated_at: '2026-04-25T21:53:03.765479'
 total_items: 32
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -62,12 +62,12 @@ items:
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
 - id: migrate-remaining-adapters-to-csv-resolver-pipeline
-  file: TODO/main/planning/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
+  file: TODO/main/active/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
   title: Migrate remaining platform adapters to the CSV resolver pipeline
   worktree: main
   category: Platform Expansion
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - data-loading
   - csv-dialect
@@ -76,8 +76,8 @@ items:
   - resolver
   estimated_effort: Large (3-5 focused implementation sessions)
   work_total: 7
-  work_done: 0
-  work_ready: 1
+  work_done: 1
+  work_ready: 4
   deferred_count: 3
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
