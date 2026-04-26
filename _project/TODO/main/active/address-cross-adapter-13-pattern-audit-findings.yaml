@@ -286,7 +286,7 @@ work:
 - id: w14
   summary: "P15 — Fix snowflake.drop_database reference-before-assignment in exception handler"
   needs: []
-  status: pending
+  status: done
   notes: |
     snowflake.py:441-453 — `database` is referenced in the except branch
     but bound only after `_create_admin_connection(...)`. If
