@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T22:53:25.916639'
-total_items: 763
+generated_at: '2026-04-25T23:09:26.668839'
+total_items: 764
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 712
+    count: 713
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2414,6 +2414,11 @@ statuses:
       title: Migrate remaining custom ASCII chart functions to textcharts library
       priority: Medium-High
       category: Core Functionality
+    - id: migrate-remaining-adapters-to-csv-resolver-pipeline
+      file: DONE/main/active/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
+      title: Migrate remaining platform adapters to the CSV resolver pipeline
+      priority: High
+      category: Platform Expansion
     - id: timing-runtime-wide-monotonic-migration
       file: DONE/main/active/timing-runtime-wide-monotonic-migration.yaml
       title: Migrate runtime elapsed and timeout timing to centralized monotonic clock

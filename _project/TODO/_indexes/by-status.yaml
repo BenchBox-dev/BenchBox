@@ -1,8 +1,8 @@
-generated_at: '2026-04-25T23:03:00.545534'
-total_items: 33
+generated_at: '2026-04-25T23:09:24.739959'
+total_items: 32
 statuses:
   In Progress:
-    count: 4
+    count: 3
     items:
     - id: address-cross-adapter-13-pattern-audit-findings
       file: TODO/main/active/address-cross-adapter-13-pattern-audit-findings.yaml
@@ -19,11 +19,6 @@ statuses:
       title: Build sql_compat phase-aware compatibility pipeline (centralized decision ownership)
       priority: Medium-High
       category: Core Functionality
-    - id: migrate-remaining-adapters-to-csv-resolver-pipeline
-      file: TODO/main/active/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
-      title: Migrate remaining platform adapters to the CSV resolver pipeline
-      priority: High
-      category: Platform Expansion
   Not Started:
     count: 28
     items:

@@ -1,5 +1,5 @@
-generated_at: '2026-04-25T22:53:25.914663'
-total_items: 763
+generated_at: '2026-04-25T23:09:26.668106'
+total_items: 764
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2867,6 +2867,25 @@ items:
   work_total: 2
   work_done: 2
   work_ready: 0
+- id: migrate-remaining-adapters-to-csv-resolver-pipeline
+  file: DONE/main/active/migrate-remaining-adapters-to-csv-resolver-pipeline.yaml
+  title: Migrate remaining platform adapters to the CSV resolver pipeline
+  worktree: main
+  category: Platform Expansion
+  priority: High
+  status: Completed
+  tags:
+  - data-loading
+  - csv-dialect
+  - manifest
+  - platform-adapters
+  - resolver
+  estimated_effort: Large (3-5 focused implementation sessions)
+  completed_date: '2026-04-25'
+  work_total: 7
+  work_done: 7
+  work_ready: 0
+  deferred_count: 3
 - id: migrate-ascii-chart-tests-to-textcharts
   file: DONE/main/active/migrate-ascii-chart-tests-to-textcharts.yaml
   title: Migrate ~290 pure-rendering tests from BenchBox to textcharts library; retain ~65 integration tests

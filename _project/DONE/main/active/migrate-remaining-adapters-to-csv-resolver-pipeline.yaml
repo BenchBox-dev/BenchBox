@@ -2,7 +2,8 @@ id: migrate-remaining-adapters-to-csv-resolver-pipeline
 title: "Migrate remaining platform adapters to the CSV resolver pipeline"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-25"
 category: Platform Expansion
 description: |
   Commit 73f3a582e migrated only the Doris, PostgreSQL, QuestDB, and
@@ -160,7 +161,7 @@ work:
 - id: w7
   summary: "Run targeted adapter tests plus fast smoke, then record any unsupported platform-specific follow-ups"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Run the targeted unit suites for migrated adapters first, then the fast
     marker suite. If a platform cannot represent part of CsvDialect exactly
