@@ -214,7 +214,7 @@ work:
 - id: w11
   summary: "P1 cluster A — replace WITH/DDL option regex strippers with the balanced walker from w5"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     First balanced-walker migration slice. Sites and triggers:
     - athena.py:685 `\\s+WITH\\s*\\([^)]*\\)` → breaks on
