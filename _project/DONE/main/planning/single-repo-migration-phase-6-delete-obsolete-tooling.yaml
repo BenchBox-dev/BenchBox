@@ -2,7 +2,8 @@ id: single-repo-migration-phase-6-delete-obsolete-tooling
 title: "Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: 2026-04-27
 category: Release Tooling
 
 deps:
@@ -29,7 +30,7 @@ description: |
 work:
 - id: w1
   summary: "Inventory consumers of the modules being deleted"
-  status: pending
+  status: done
   notes: |
     rg -l 'benchbox\.release\.(sync|workflow|content_validation)' --type py
     rg -l 'automate_release|prepare_release|finalize_release|verify_release|build_release|sync_repos|benchbox-sync' --type py --type md --type yaml
@@ -39,7 +40,7 @@ work:
 - id: w2
   summary: "Delete the 6 release scripts and the .github/workflows entries that reference them"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     git rm scripts/automate_release.py
     git rm scripts/prepare_release.py
@@ -53,7 +54,7 @@ work:
 - id: w3
   summary: "Delete benchbox/release/sync.py, workflow.py, content_validation.py"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     git rm benchbox/release/sync.py
     git rm benchbox/release/workflow.py
@@ -66,7 +67,7 @@ work:
 - id: w4
   summary: "Delete test files for the now-gone code"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     git rm -r tests/unit/release/
     git rm tests/unit/test_release_scripts.py
@@ -81,7 +82,7 @@ work:
 - id: w5
   summary: "Update pyproject.toml to remove benchbox-sync entry point and excludes pointing at deleted paths"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Search pyproject.toml for benchbox-sync, benchbox.release, and any
     other references to deleted code. Remove [project.scripts]
@@ -92,7 +93,7 @@ work:
 - id: w6
   summary: "Trim or delete update_version.py imports"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     update_version.py is kept (used by Makefile release target).
     Audit its imports - it should not depend on workflow.py or sync.py.
@@ -103,7 +104,7 @@ work:
 - id: w7
   summary: "Run the full test suite and lint, fix import errors and reference cleanups"
   needs: [w2, w3, w4, w5, w6]
-  status: pending
+  status: done
   notes: |
     uv run -- python -m pytest -m fast
     uv run ruff check .
@@ -116,7 +117,7 @@ work:
 - id: w8
   summary: "Retire the three obsolete TODOs created earlier today"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
     These three were superseded by this migration:
       - unify-public-path-curation-predicate
@@ -128,7 +129,8 @@ work:
 
 verification:
 - description: "scripts/ no longer contains release machinery"
-  command: "ls scripts/ | grep -E 'automate_release|prepare_release|finalize_release|verify_release|build_release|sync_repos' | wc -l"
+  command: "ls scripts/ | grep -E 'automate_release|prepare_release|finalize_release|verify_release|build_release|sync_repos'
+    | wc -l"
   expected_output: "0"
 - description: "benchbox/release/ no longer contains sync or workflow modules"
   command: "ls benchbox/release/ 2>/dev/null | grep -E 'sync\\.py|workflow\\.py|content_validation\\.py' | wc -l"
@@ -141,27 +143,22 @@ verification:
   expected_output: "0"
 
 must_preserve:
-- The actual benchbox package functionality (CLI, MCP, platforms,
-  benchmarks) is unchanged. Only the release-machinery is removed.
+- The actual benchbox package functionality (CLI, MCP, platforms, benchmarks) is unchanged. Only the release-machinery 
+  is removed.
 - update_version.py is retained - the Makefile release target uses it.
-- generate_changelog_entry.py from Phase 3 is retained - the Makefile
-  release target uses it.
-- benchbox/release/__init__.py may be retained as an empty stub if
-  the package import structure relies on it; otherwise delete the
-  whole directory.
+- generate_changelog_entry.py from Phase 3 is retained - the Makefile release target uses it.
+- benchbox/release/__init__.py may be retained as an empty stub if the package import structure relies on it; otherwise 
+  delete the whole directory.
 
 anti_patterns:
-- DO NOT skip the test-suite run in w7 - because deleting modules
-  silently breaks importers; tests are the cheapest way to find them.
-- DO NOT keep "just in case" wrappers around deleted scripts -
-  because they accumulate; if you need any of these scripts back,
-  pull them from git history.
-- DO NOT delete update_version.py - because the new release flow
-  depends on it; check it has no transitive imports of the deleted
-  modules first (w6).
-- DO NOT delete tests/unit/test_xdist_safety.py without checking -
-  because it tested xdist behaviour that may still apply to the
-  ambient CI in Phase 2; review before removing.
+- DO NOT skip the test-suite run in w7 - because deleting modules silently breaks importers; tests are the cheapest way 
+  to find them.
+- DO NOT keep "just in case" wrappers around deleted scripts - because they accumulate; if you need any of these scripts
+  back, pull them from git history.
+- DO NOT delete update_version.py - because the new release flow depends on it; check it has no transitive imports of 
+  the deleted modules first (w6).
+- DO NOT delete tests/unit/test_xdist_safety.py without checking - because it tested xdist behaviour that may still 
+  apply to the ambient CI in Phase 2; review before removing.
 
 scope_limit:
   only_modify:

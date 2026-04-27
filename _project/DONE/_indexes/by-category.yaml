@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T14:52:32.992260'
+generated_at: '2026-04-27T15:06:34.102069'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -3500,7 +3500,7 @@ categories:
       priority: Critical
       status: Completed
   Release Tooling:
-    count: 8
+    count: 9
     items:
     - id: single-repo-migration-phase-0-audit
       file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
@@ -3527,6 +3527,11 @@ categories:
       file: DONE/main/planning/single-repo-migration-phase-5-repo-flip.yaml
       title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
       priority: Critical
+      status: Completed
+    - id: single-repo-migration-phase-6-delete-obsolete-tooling
+      file: DONE/main/planning/single-repo-migration-phase-6-delete-obsolete-tooling.yaml
+      title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'
+      priority: Medium-High
       status: Completed
     - id: single-repo-migration-decisions-gate
       file: DONE/main/planning/single-repo-migration-decisions-gate.yaml

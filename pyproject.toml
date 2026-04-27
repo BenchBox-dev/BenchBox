@@ -60,9 +60,6 @@ include = ["benchbox*"]
 exclude = [
     "benchmark_runs",
     "benchmark_runs.*",
-    # benchbox.release contains internal release tooling — never ship in the default wheel.
-    "benchbox.release",
-    "benchbox.release.*",
     # benchbox.experimental is intentionally INCLUDED in the default wheel (Option A, Beta contract).
     # It is an explicitly unsupported namespace with no CLI/registry integration.
     # See README.md "Beta Software" section for the documented support boundary.

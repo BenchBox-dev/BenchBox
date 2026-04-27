@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T14:52:31.167779'
+generated_at: '2026-04-27T15:06:32.171985'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -130,18 +130,13 @@ categories:
       priority: Low
       status: Not Started
   Release Tooling:
-    count: 4
+    count: 3
     items:
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
       title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
       priority: High
       status: In Progress
-    - id: single-repo-migration-phase-6-delete-obsolete-tooling
-      file: TODO/main/planning/single-repo-migration-phase-6-delete-obsolete-tooling.yaml
-      title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'
-      priority: Medium-High
-      status: Not Started
     - id: single-repo-migration-phase-8-first-post-migration-release
       file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
       title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'

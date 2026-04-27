@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T14:52:31.167751'
-total_items: 34
+generated_at: '2026-04-27T15:06:32.171948'
+total_items: 33
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -549,18 +549,6 @@ items:
   work_ready: 2
   needs:
   - stabilize-webkit-browser-smoke-flake-under-parallel-workers
-- id: single-repo-migration-phase-6-delete-obsolete-tooling
-  file: TODO/main/planning/single-repo-migration-phase-6-delete-obsolete-tooling.yaml
-  title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'
-  worktree: main
-  category: Release Tooling
-  priority: Medium-High
-  status: Not Started
-  work_total: 8
-  work_done: 0
-  work_ready: 1
-  needs:
-  - single-repo-migration-phase-5-repo-flip
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases
