@@ -596,7 +596,7 @@ allowed-complexity = [
 
     def test_private_blocks_lines_exist_in_pyproject(self):
         """Every private line in PYPROJECT_PRIVATE_BLOCKS must exist in pyproject.toml."""
-        pyproject = (Path(__file__).parent.parent.parent / "pyproject.toml").read_text()
+        pyproject = (Path(__file__).parent.parent.parent / "pyproject.toml").read_text(encoding="utf-8")
         for _anchor, block in PYPROJECT_PRIVATE_BLOCKS:
             for line in block:
                 assert line.strip() in pyproject, f"Private line not found: {line.strip()}"
