@@ -2,7 +2,7 @@ id: single-repo-migration-phase-4-test-release-with-new-flow
 title: "Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Release Tooling
 
 deps:
@@ -42,7 +42,7 @@ description: |
 work:
 - id: w1
   summary: "Confirm explorer is ready to ship and remove explorer entries from HOLD_BACK_PATHS"
-  status: pending
+  status: done
   notes: |
     Read benchbox/release/workflow.py:18-43. Remove from HOLD_BACK_PATHS:
       - benchbox/core/explorer_pipeline
@@ -57,7 +57,7 @@ work:
 - id: w2
   summary: "Reduce HOLD_BACK_PATHS to the bare minimum for the final sync"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     After w1 removes explorer entries, further reduce HOLD_BACK_PATHS to
     contain only paths that should NEVER reach public:
@@ -81,7 +81,7 @@ work:
 - id: w3
   summary: "Expand ALLOWED_ROOT_FILES to include dev-tooling root files currently silently excluded"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     The curated flow uses an ALLOWED_ROOT_FILES allowlist. Files at repo
     root NOT in the allowlist are silently dropped — including dev-tooling
@@ -236,38 +236,28 @@ verification:
   expected_output: "success"
 
 must_preserve:
-- The explorer code is added to the public release; this is the
-  feature-complete launch.
-- The fallback path (automate_release.py on private) is not deleted yet -
-  if release.yml fails for any reason, the old flow is one command away.
-- _project/** retains its original commit graph on public; `git blame`
-  on TODO/DONE files resolves to original private-side commits with their
-  original SHAs, dates, and authors.
-- PyPI versioning is monotonic - if 0.3.0 fails partway through and
-  needs a re-cut, the next attempt is 0.3.1. PyPI rejects re-uploads
-  of the same version.
-- The 9 pre-existing curated commits on public main are preserved untouched
-  (no force-push, no rewrite).
+- The explorer code is added to the public release; this is the feature-complete launch.
+- The fallback path (automate_release.py on private) is not deleted yet - if release.yml fails for any reason, the old
+  flow is one command away.
+- _project/** retains its original commit graph on public; `git blame` on TODO/DONE files resolves to original
+  private-side commits with their original SHAs, dates, and authors.
+- PyPI versioning is monotonic - if 0.3.0 fails partway through and needs a re-cut, the next attempt is 0.3.1. PyPI
+  rejects re-uploads of the same version.
+- The 9 pre-existing curated commits on public main are preserved untouched (no force-push, no rewrite).
 
 anti_patterns:
-- DO NOT squash-merge the _project/** history PR (w6) - because squashing
-  collapses the preserved history into a single commit, defeating the
-  D2a decision; use a regular merge commit specifically for this PR.
-- DO NOT skip the diff -rq inspection in w4 - because surprises in what
-  the curated sync includes/excludes are the most common way the final
-  sync goes wrong; manual review is the gating step.
-- DO NOT release a version that overlaps with a prior failed attempt -
-  because PyPI rejects, leaving you in a state where pip cannot resolve
-  the intended version; bump the patch number and move on.
-- DO NOT skip the post-publish smoke test (w8) - because release.yml
-  going green only proves the workflow ran; it does not prove the wheel
-  is installable; only a fresh pip install does.
-- DO NOT delete automate_release.py at the end of this phase - because
-  Phase 5 (dev locus migration) and Phase 6 (deletion) are separate gates;
-  running ahead conflates two risk profiles.
-- DO NOT enable branch-protection's "linear history" rule before w6
-  lands - because the merge commit from w6 is a one-time non-linear event;
-  enable that rule in Phase 5 AFTER w6 merges.
+- DO NOT squash-merge the _project/** history PR (w6) - because squashing collapses the preserved history into a single
+  commit, defeating the D2a decision; use a regular merge commit specifically for this PR.
+- DO NOT skip the diff -rq inspection in w4 - because surprises in what the curated sync includes/excludes are the most
+  common way the final sync goes wrong; manual review is the gating step.
+- DO NOT release a version that overlaps with a prior failed attempt - because PyPI rejects, leaving you in a state
+  where pip cannot resolve the intended version; bump the patch number and move on.
+- DO NOT skip the post-publish smoke test (w8) - because release.yml going green only proves the workflow ran; it does
+  not prove the wheel is installable; only a fresh pip install does.
+- DO NOT delete automate_release.py at the end of this phase - because Phase 5 (dev locus migration) and Phase 6
+  (deletion) are separate gates; running ahead conflates two risk profiles.
+- DO NOT enable branch-protection's "linear history" rule before w6 lands - because the merge commit from w6 is a
+  one-time non-linear event; enable that rule in Phase 5 AFTER w6 merges.
 
 scope_limit:
   only_modify:
