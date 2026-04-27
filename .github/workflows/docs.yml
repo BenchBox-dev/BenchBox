@@ -40,9 +40,6 @@ jobs:
   # Build HTML documentation with warnings as errors
   build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -181,9 +178,19 @@ jobs:
         with:
           path: site
 
+  # Deploy to GitHub Pages (main pushes only)
+  # Isolated as its own job so the github-pages environment protection
+  # rules don't gate the build job on PRs.
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/deploy-pages@v4
 
   # Validate example files and documentation references
