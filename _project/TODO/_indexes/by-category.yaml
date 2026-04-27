@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T19:06:04.815797'
+generated_at: '2026-04-27T19:07:27.174802'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -158,8 +158,13 @@ categories:
       priority: Medium
       status: In Progress
   Testing and Quality Assurance:
-    count: 4
+    count: 5
     items:
+    - id: fix-chromium-result-detail-sort-flake
+      file: TODO/main/planning/fix-chromium-result-detail-sort-flake.yaml
+      title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
+      priority: Medium-High
+      status: Identified
     - id: graduate-browser-smoke-to-blocking-gates
       file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates

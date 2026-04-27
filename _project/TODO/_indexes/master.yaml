@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:06:04.815766'
-total_items: 29
+generated_at: '2026-04-27T19:07:27.174773'
+total_items: 30
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -450,6 +450,24 @@ items:
   needs:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
+- id: fix-chromium-result-detail-sort-flake
+  file: TODO/main/planning/fix-chromium-result-detail-sort-flake.yaml
+  title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium-High
+  status: Identified
+  tags:
+  - results
+  - explorer
+  - browser
+  - ci
+  - flake
+  - chromium
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
 - id: graduate-browser-smoke-to-blocking-gates
   file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
   title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
