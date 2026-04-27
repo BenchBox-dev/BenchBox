@@ -2,8 +2,12 @@ id: single-repo-migration-phase-5-repo-flip
 title: "Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)"
 worktree: main
 priority: Critical
-status: Not Started
+status: In Progress
 category: Release Tooling
+amendment_2026-04-27: |
+  Phase 4 v0.3.0 release cut deferred per user direction. Phase 5
+  proceeds without v0.3.0 — dev locus migrates to public develop branch
+  while v0.3.0 is held back for later.
 
 deps:
   needs:

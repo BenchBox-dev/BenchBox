@@ -109,7 +109,7 @@ work:
 - id: w4
   summary: "Run the final curated sync (last use of prepare_release.py)"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     cd /Users/joe/Developer/BenchBox
     # First do a dry-run to inspect:
@@ -137,7 +137,7 @@ work:
 - id: w5
   summary: "Filter-clone private's _project/** history into a temp directory"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     git filter-repo lives outside core git: install it first:
       pip install git-filter-repo  (or brew install git-filter-repo)
@@ -155,7 +155,7 @@ work:
 - id: w6
   summary: "Merge _project/** history into public main with --allow-unrelated-histories"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     cd ~/Developer/benchbox-public
     git remote add private-project-history /tmp/private-project-history
@@ -183,27 +183,39 @@ work:
   needs: [w6]
   status: pending
   notes: |
-    cd ~/Developer/benchbox-public
-    git checkout main && git pull
-    git describe --tags --abbrev=0   # current latest tag (likely v0.2.x)
-    # New public-facing feature (explorer) = minor bump = 0.3.0
+    DEFERRED on user direction (2026-04-27): "We are not ready to cut
+    v0.3.0 yet. Proceed with steps 1-6." w7 and w8 stay pending until
+    the user signals readiness.
 
-    make release VERSION=0.3.0
-    # Review the auto-generated changelog. Edit any awkward Claude
-    # summarisation. The Claude CLI step exercises the new generator
-    # for the first time.
-    # Squash-merge the release PR.
-
-    git checkout main && git pull
-    git tag v0.3.0
-    git push origin v0.3.0
-    # Watch .github/workflows/release.yml run.
+    Updated mechanics under the version-branch flow (see decisions doc
+    A4 / A5):
+      cd ~/Developer/benchbox-public
+      git checkout develop && git pull
+      # Bump version + draft changelog on develop (or in a release-prep PR)
+      make bump VERSION=0.3.0
+      make changelog-draft VERSION=0.3.0   # optional helper
+      # Commit version bump on develop
+      git add benchbox/__init__.py pyproject.toml CHANGELOG.md docs/ landing/
+      git commit -m "chore(release): bump to 0.3.0 + changelog draft"
+      git push origin develop
+      # Cut the release branch
+      make release-prepare VERSION=0.3.0
+      # Review the PR (curation drops _project/, _blog/, agent files).
+      # Squash-merge to main on GitHub.
+      # Tag main:
+      git checkout main && git pull
+      git tag v0.3.0 && git push origin v0.3.0
+      # release.yml fires; verify PyPI publish.
+      # Then rebase develop onto main:
+      make release-rebase-develop VERSION=0.3.0
 
 - id: w8
   summary: "Verify the release published to PyPI and is installable"
   needs: [w7]
   status: pending
   notes: |
+    DEFERRED on user direction (2026-04-27): blocked by w7.
+
     Wait for release.yml to complete green.
     pip index versions benchbox  # should show 0.3.0
     python -m venv /tmp/post-release-test

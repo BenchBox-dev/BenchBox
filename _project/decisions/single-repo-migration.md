@@ -138,17 +138,17 @@ dates).
     --commit-callback '
       author_ts = int(commit.author_date.split()[0])
       committer_ts = int(commit.committer_date.split()[0])
-      if author_ts < 1735689600 or committer_ts < 1735689600:
+      if author_ts < 1767225600 or committer_ts < 1767225600:
           commit.skip()
     ' \
     --force
   ```
-  (Unix timestamp `1735689600` = 2026-01-01 00:00:00 UTC.)
+  (Unix timestamp `1767225600` = 2026-01-01 00:00:00 UTC.)
 
-- **Surviving commit count**: 1523 commits dated 2026-01-01 or later.
-  This preserves the great majority of the decision archaeology the
-  filter-merge was designed to carry forward; the dropped 400 are early
-  exploratory commits with low residual value.
+- **Surviving commit count** (executed 2026-04-27): **1537 commits**
+  dated 2026-01-01 or later landed on public's `develop` branch via the
+  filter-merge. The dropped 380 commits were early exploratory work
+  (earliest: 2025-06-18) with low residual value.
 - **File modification dates on public**: the curated `develop` → `main`
   sync uses `_normalize_timestamps()` from `benchbox/release/workflow.py`
   to set every file's mtime to the release timestamp (current whole

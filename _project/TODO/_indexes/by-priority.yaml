@@ -1,11 +1,11 @@
-generated_at: '2026-04-27T09:19:05.308166'
+generated_at: '2026-04-27T10:12:00.026194'
 total_items: 36
 priorities:
   Critical:
     count: 2
     items:
     - id: single-repo-migration-phase-5-repo-flip
-      file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
+      file: TODO/main/active/single-repo-migration-phase-5-repo-flip.yaml
       title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
       category: Release Tooling
       status: Not Started
@@ -38,10 +38,10 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
     - id: single-repo-migration-phase-4-test-release-with-new-flow
-      file: TODO/main/planning/single-repo-migration-phase-4-test-release-with-new-flow.yaml
+      file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
       title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
       category: Release Tooling
-      status: Not Started
+      status: In Progress
   Medium-High:
     count: 5
     items:

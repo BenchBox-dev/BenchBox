@@ -1,16 +1,21 @@
-generated_at: '2026-04-27T09:19:05.308177'
+generated_at: '2026-04-27T10:12:00.026204'
 total_items: 36
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Medium
       category: Testing & Quality
+    - id: single-repo-migration-phase-4-test-release-with-new-flow
+      file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
+      title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
+      priority: High
+      category: Release Tooling
   Not Started:
-    count: 34
+    count: 33
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -117,13 +122,8 @@ statuses:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       category: Core Functionality
-    - id: single-repo-migration-phase-4-test-release-with-new-flow
-      file: TODO/main/planning/single-repo-migration-phase-4-test-release-with-new-flow.yaml
-      title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
-      priority: High
-      category: Release Tooling
     - id: single-repo-migration-phase-5-repo-flip
-      file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
+      file: TODO/main/active/single-repo-migration-phase-5-repo-flip.yaml
       title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
       priority: Critical
       category: Release Tooling
