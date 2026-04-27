@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T19:43:40.070519'
+generated_at: '2026-04-27T19:59:32.612795'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -701,7 +701,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 268
+    count: 269
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1388,6 +1388,11 @@ categories:
       file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
       title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
       priority: High
+      status: Completed
+    - id: fix-submission-hash-mismatch-vs-validator-directory-scope
+      file: DONE/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
+      title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
+      priority: Critical
       status: Completed
     - id: fix-datagen-layout-and-manifest-hygiene
       file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml

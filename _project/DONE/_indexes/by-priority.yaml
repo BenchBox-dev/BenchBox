@@ -1,8 +1,8 @@
-generated_at: '2026-04-27T19:43:40.070694'
-total_items: 786
+generated_at: '2026-04-27T19:59:32.612984'
+total_items: 787
 priorities:
   Critical:
-    count: 46
+    count: 47
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -103,6 +103,11 @@ priorities:
       file: DONE/platform-expansion/active/platform-adapter-benchmark-correctness.yaml
       title: Fix benchmark correctness issues in Databend, Doris, and pg_duckdb adapters
       category: Platform Expansion
+      status: Completed
+    - id: fix-submission-hash-mismatch-vs-validator-directory-scope
+      file: DONE/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
+      title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
+      category: Core Functionality
       status: Completed
     - id: fix-ci-critical-issues
       file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml

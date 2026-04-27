@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:43:40.070203'
-total_items: 786
+generated_at: '2026-04-27T19:59:32.612467'
+total_items: 787
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -317,6 +317,25 @@ items:
   - joe
   estimated_effort: 1 day
   completed_date: '2026-02-15'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+- id: fix-submission-hash-mismatch-vs-validator-directory-scope
+  file: DONE/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
+  title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
+  worktree: main
+  category: Core Functionality
+  priority: Critical
+  status: Completed
+  tags:
+  - results
+  - submission
+  - ci
+  - phase-2
+  - bug
+  - blocker
+  estimated_effort: Small
+  completed_date: '2026-04-27'
   work_total: 4
   work_done: 4
   work_ready: 0

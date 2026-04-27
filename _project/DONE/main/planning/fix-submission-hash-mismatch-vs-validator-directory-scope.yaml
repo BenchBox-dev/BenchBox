@@ -2,7 +2,8 @@ id: fix-submission-hash-mismatch-vs-validator-directory-scope
 title: "Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission"
 worktree: main
 priority: Critical
-status: Identified
+status: Completed
+completed_date: "2026-04-27"
 category: Core Functionality
 
 description: |
@@ -35,7 +36,7 @@ description: |
 work:
   - id: w1
     summary: "Decide which side defines the contract: per-file hash or directory hash"
-    status: pending
+    status: done
     notes: |
       Two paths:
 
@@ -60,7 +61,7 @@ work:
   - id: w2
     summary: "Update both implementations to match the chosen contract"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Update `benchbox/cli/commands/submit.py:_compute_bundle_hash`
       and `scripts/validate_submission.py:_validate_manifest_hash` so
@@ -83,7 +84,7 @@ work:
   - id: w3
     summary: "Add unit tests covering the contract on both sides"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       A round-trip test: package via the submit command, copy bundle
       + manifest into a fixture mimicking results-data/bundles/ with
@@ -97,7 +98,7 @@ work:
   - id: w4
     summary: "Re-run the verify-ci-validation end-to-end test once the fix lands"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       Open one new test PR against `published-results` with a
       maintainer-run small bundle. Confirm: workflow accepts on the

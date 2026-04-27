@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T19:43:38.178181'
+generated_at: '2026-04-27T19:59:30.756408'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -46,18 +46,13 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 3
+    count: 2
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       status: Not Started
-    - id: fix-submission-hash-mismatch-vs-validator-directory-scope
-      file: TODO/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
-      title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
-      priority: Critical
-      status: Identified
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

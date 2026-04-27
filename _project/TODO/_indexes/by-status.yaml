@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:43:38.178207'
-total_items: 29
+generated_at: '2026-04-27T19:59:30.756435'
+total_items: 28
 statuses:
   In Progress:
     count: 3
@@ -144,15 +144,10 @@ statuses:
       priority: Low
       category: Benchmark Development
   Identified:
-    count: 2
+    count: 1
     items:
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       priority: Medium
       category: Performance
-    - id: fix-submission-hash-mismatch-vs-validator-directory-scope
-      file: TODO/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
-      title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
-      priority: Critical
-      category: Core Functionality

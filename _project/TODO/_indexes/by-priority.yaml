@@ -1,14 +1,6 @@
-generated_at: '2026-04-27T19:43:38.178198'
-total_items: 29
+generated_at: '2026-04-27T19:59:30.756425'
+total_items: 28
 priorities:
-  Critical:
-    count: 1
-    items:
-    - id: fix-submission-hash-mismatch-vs-validator-directory-scope
-      file: TODO/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
-      title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
-      category: Core Functionality
-      status: Identified
   High:
     count: 4
     items:
