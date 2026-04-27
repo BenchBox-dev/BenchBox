@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T09:11:00.653608'
-total_items: 37
+generated_at: '2026-04-27T09:19:05.308115'
+total_items: 36
 items:
 - id: single-repo-migration-phase-5-repo-flip
   file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
@@ -109,19 +109,6 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
-- id: single-repo-migration-phase-3-new-release-flow
-  file: TODO/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
-  title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
-  worktree: main
-  category: Release Tooling
-  priority: High
-  status: Not Started
-  work_total: 5
-  work_done: 0
-  work_ready: 1
-  needs:
-  - single-repo-migration-phase-1-wheel-hygiene
-  - single-repo-migration-phase-2-continuous-ci
 - id: single-repo-migration-phase-4-test-release-with-new-flow
   file: TODO/main/planning/single-repo-migration-phase-4-test-release-with-new-flow.yaml
   title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'

@@ -2,7 +2,8 @@ id: single-repo-migration-phase-3-new-release-flow
 title: "Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: 2026-04-27
 category: Release Tooling
 
 deps:
@@ -36,7 +37,7 @@ description: |
 work:
 - id: w1
   summary: "Extract scripts/generate_changelog_entry.py from automate_release.py"
-  status: pending
+  status: done
   notes: |
     Lift functions automate_release.py:_build_raw_changelog,
     _summarize_changelog_with_claude, and generate_changelog_entry
@@ -49,7 +50,7 @@ work:
 - id: w2
   summary: "Add Makefile release target"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Append to Makefile:
       release:
@@ -70,7 +71,7 @@ work:
 - id: w3
   summary: "Add .github/RELEASE_PR_TEMPLATE.md"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Short template with a checklist:
       ## Release vX.Y.Z
@@ -84,7 +85,7 @@ work:
 - id: w4
   summary: "Add .github/workflows/release.yml triggered by v* tag push"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Triggers: push tags v*.
     Jobs:
@@ -103,7 +104,7 @@ work:
 - id: w5
   summary: "(Optional) Dry-run with v0.0.0-test on a sandbox branch"
   needs: [w2, w3, w4]
-  status: pending
+  status: done
   notes: |
     Optional. Under Option B, the new flow gets exercised on real public
     main in Phase 4; most issues will surface there. Skip this work unit
@@ -132,22 +133,19 @@ verification:
   expected_output: "Release v0.0.0-test (or similar)"
 
 must_preserve:
-- automate_release.py and friends still work end-to-end during this
-  phase. The new flow runs alongside, not in place of, the old one.
-- The PyPI trusted-publisher configuration remains unchanged - the new
-  workflow uses the same publisher as the old one would have.
+- automate_release.py and friends still work end-to-end during this phase. The new flow runs alongside, not in place of,
+  the old one.
+- The PyPI trusted-publisher configuration remains unchanged - the new workflow uses the same publisher as the old one
+  would have.
 - update_version.py is reused as-is, not duplicated.
 
 anti_patterns:
-- DO NOT publish to real PyPI from a sandbox/test workflow run -
-  because PyPI rejects re-uploads of the same version; a botched test
-  burns the version number forever.
-- DO NOT skip the SOURCE_DATE_EPOCH computation - because reproducible
-  builds were the one piece of the old apparatus worth keeping (D7);
-  computing it from the tag commit preserves that property cheaply.
-- DO NOT bake secrets or tokens into release.yml - because trusted
-  publisher uses OIDC and needs no static tokens; if you find yourself
-  reaching for a PYPI_API_TOKEN, you are doing it wrong.
+- DO NOT publish to real PyPI from a sandbox/test workflow run - because PyPI rejects re-uploads of the same version; a
+  botched test burns the version number forever.
+- DO NOT skip the SOURCE_DATE_EPOCH computation - because reproducible builds were the one piece of the old apparatus
+  worth keeping (D7); computing it from the tag commit preserves that property cheaply.
+- DO NOT bake secrets or tokens into release.yml - because trusted publisher uses OIDC and needs no static tokens; if
+  you find yourself reaching for a PYPI_API_TOKEN, you are doing it wrong.
 
 scope_limit:
   only_modify:

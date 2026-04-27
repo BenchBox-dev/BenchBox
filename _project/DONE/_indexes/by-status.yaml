@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T09:11:02.512899'
-total_items: 776
+generated_at: '2026-04-27T09:19:07.225083'
+total_items: 777
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 725
+    count: 726
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3199,6 +3199,11 @@ statuses:
     - id: single-repo-migration-phase-2-continuous-ci
       file: DONE/main/planning/single-repo-migration-phase-2-continuous-ci.yaml
       title: 'Single-repo migration phase 2: continuous CI on push to main and every PR'
+      priority: High
+      category: Release Tooling
+    - id: single-repo-migration-phase-3-new-release-flow
+      file: DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
+      title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
       priority: High
       category: Release Tooling
     - id: single-repo-migration-decisions-gate

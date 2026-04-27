@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T09:11:02.512233'
-total_items: 776
+generated_at: '2026-04-27T09:19:07.224335'
+total_items: 777
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4015,6 +4015,20 @@ items:
   work_ready: 0
   needs:
   - single-repo-migration-phase-0-audit
+- id: single-repo-migration-phase-3-new-release-flow
+  file: DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
+  title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Completed
+  completed_date: 2026-04-27
+  work_total: 5
+  work_done: 5
+  work_ready: 0
+  needs:
+  - single-repo-migration-phase-1-wheel-hygiene
+  - single-repo-migration-phase-2-continuous-ci
 - id: first-class-clickhouse-local-server-cloud-platforms
   file: DONE/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
   title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
