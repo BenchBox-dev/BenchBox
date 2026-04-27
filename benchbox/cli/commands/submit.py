@@ -57,22 +57,13 @@ def _get_git_username() -> str:
         return ""
 
 
-def _compute_bundle_hash(bundle_dir: Path) -> str:
-    """Compute SHA-256 hash over all files in the bundle directory.
-
-    Uses the POSIX relative path from bundle_dir (not just the filename)
-    so that files in subdirectories are distinguished.
-    """
+def _compute_file_hash(file_path: Path) -> str:
+    """Compute SHA-256 of a single file's contents."""
     h = hashlib.sha256()
-    for file_path in sorted(bundle_dir.rglob("*")):
-        if file_path.is_symlink():
-            continue
-        if file_path.is_file():
-            h.update(file_path.relative_to(bundle_dir).as_posix().encode())
-            try:
-                h.update(file_path.read_bytes())
-            except PermissionError:
-                raise PermissionError(f"Cannot read file for hashing: {file_path}") from None
+    try:
+        h.update(file_path.read_bytes())
+    except PermissionError:
+        raise PermissionError(f"Cannot read file for hashing: {file_path}") from None
     return h.hexdigest()
 
 
@@ -237,14 +228,21 @@ def submit(ctx, result_file, last, benchmark, platform, output_dir, dry_run):
     for comp in companions:
         shutil.copy2(comp, bundle_dir / comp.name)
 
-    # Compute composite hash over ALL files in the bundle (after assembly, before manifest).
-    bundle_hash = _compute_bundle_hash(bundle_dir)
+    # Per-file hashes — bundle_hash covers the primary bundle JSON only,
+    # companion_hashes maps each companion's filename to its SHA-256.
+    # Per-file is the contract used by scripts/validate_submission.py;
+    # using a directory-level hash here would not survive the user
+    # copying the files into results-data/bundles/ where 13+ other
+    # bundles already live.
+    bundle_hash = _compute_file_hash(bundle_dir / source_path.name)
+    companion_hashes = {comp.name: _compute_file_hash(bundle_dir / comp.name) for comp in companions}
 
     manifest = {
         "submission_tool_version": f"benchbox/{benchbox.__version__}",
         "submitted_at": datetime.now(timezone.utc).isoformat(),
         "bundle_file": source_path.name,
         "bundle_hash": bundle_hash,
+        "companion_hashes": companion_hashes,
         "benchmark": result.benchmark_name,
         "platform": result.platform,
         "scale_factor": result.scale_factor,
