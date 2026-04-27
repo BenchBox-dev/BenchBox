@@ -31,7 +31,7 @@ branch-to-branch use; it is no longer a two-repo bridge but a `develop` →
 | D2 | Bulk private commit history | Leave behind. Working-tree contents only via the final curated sync, into the new `develop` branch on public. **D2a (`_project/**` history)**: preserve via `git filter-repo --path _project/` + `--allow-unrelated-histories` merge into `develop`. Reconfirm D2a after Phase 0 audit. | No archaeological value in a year of solo `wip:`/`hack:` commits; removes audit burden on every commit message. `_project/**` carries decision rationale worth preserving on a narrow filter. |
 | D3 | `_project/TODO` and `_project/DONE` location | On `develop` only; never reaches `main`. | Per the `main`-is-released-code directive. Released wheels never carry TODO/DONE under any model. |
 | D4 | `_blog/` location | Entire `_blog/` on `develop` only; never reaches `main`. Working-tree only (no history preserved). | Per the `main`-is-released-code directive. Drafts and published posts alike are dev-side artefacts under the new model. |
-| D5 | Merge strategy | (a) Dev PRs → `develop`: squash-merge. (b) Release PRs `develop` → `main`: curated overwrite (one commit per release). (c) Phase 4 one-time `_project/**` filter-merge → `develop`: regular merge commit (squashing defeats the purpose). | Keeps `main` lineage release-only; preserves filter-merge value; standard squash for routine dev. |
+| D5 | Merge strategy | (a) Dev PRs → `develop`: squash-merge. (b) Releases use a short-lived `vX.Y.Z` release branch cut from `develop`: curate the tree on the release branch, **squash-merge** to `main` (one commit per release on main), tag the resulting `main` commit, then **rebase `develop` onto `main`** so the next dev cycle starts from the release-shaped state. (c) Version-branch lifecycle: keep `vX.Y.Z` until the next release branch is cut, then delete (option c). (d) Phase 4 one-time `_project/**` filter-merge → `develop`: regular merge commit (squashing defeats the purpose). | Keeps `main` lineage release-only; supports clean hotfix re-cuts during the active release window; rebase keeps `develop` linear off `main` rather than diverging; standard squash for routine dev. |
 | D6 | Continuous CI surface | Every push to `develop`, every push to `main`, every PR targeting either branch. Same checks as today's `automate_release.py:run_ci_checks` (ruff check, ruff format --check, ty check, fast pytest with coverage gate). | Removes CI gating from the release path. Both branches stay green at all times. |
 | D7 | Reproducibility | Keep `SOURCE_DATE_EPOCH=$(git log -1 --format=%ct ${tag})` in `release.yml`. Drop the rest of the timestamp-normalization machinery. | The wheel was the only consumer that mattered; the rest was unverified. |
 | D8 | Disposition of `/Users/joe/Developer/BenchBox` (private clone) after Phase 5 | Rename to `BenchBox.retired-YYYYMMDD/`. Future development happens in `~/Developer/benchbox-public` on the `develop` branch (not `main`). Delete after 60-day soak. | Renaming prevents shell muscle-memory mistakes; the soak preserves an emergency reference. |
@@ -43,15 +43,53 @@ branch-to-branch use; it is no longer a two-repo bridge but a `develop` →
 - **A3 — Tree split**:
   - **`main` only**: `benchbox/`, `tests/`, `docs/`, `examples/`, `_binaries/`, `_sources/`, `_chart_data/`, release-related contents of `scripts/`, `pyproject.toml`, `MANIFEST.in`, `Makefile`, `README.md`, `CHANGELOG.md`, `LICENSE`, `COPYRIGHT.md`, `DISCLAIMER.md`, `CONTRIBUTING.md`, `pytest.ini`, `pytest-ci.ini`, `uv.lock`, `.gitignore`, `.codespell-ignore.txt`, `landing/`, `.github/` (workflows + templates).
   - **`develop` only** (in addition to everything on `main`): `_project/`, `_blog/`, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.claude/`, `.codex/`, `.gemini/`, `.pre-commit-config.yaml`, `_benchbox_pytest_xdist_safety.py`, `todo.config.yaml`, `skill-sync.yaml`, `skill-sync.lock`, `.coveragerc_core`, `.dockerignore`, `.env.example`, `.mcp.json`, dev-only scripts.
-- **A4 — Release flow**: `develop` contents → curated overwrite onto `main` (single commit per release) → tag `main` → `release.yml` publishes to PyPI. The curated-sync engine survives the migration repurposed for branch-to-branch use.
+- **A4 — Release flow** (post-migration, repeated each release):
+
+  ```
+  1. develop is at SHA D (current dev state).
+  2. Cut release branch:
+       git checkout -b vX.Y.Z develop
+  3. Curate the vX.Y.Z branch tree (drop _project/, _blog/, agent
+     configs, dev-tooling root files; apply transforms via repurposed
+     workflow.py / prepare_release.py; bump version; generate CHANGELOG
+     entry; commit on vX.Y.Z).
+  4. Squash-merge vX.Y.Z into main:
+       git checkout main && git merge --squash vX.Y.Z
+       git commit -m "Release vX.Y.Z"
+  5. Tag the release on main:
+       git tag vX.Y.Z && git push origin main vX.Y.Z
+     → release.yml workflow fires; publishes to PyPI.
+  6. Rebase develop onto main, dropping commits that became the release:
+       git rebase --onto main vX.Y.Z develop
+     → develop now starts from the release-shaped main HEAD; only
+       post-release dev work replays.
+  7. Delete the previous release branch (option c lifecycle):
+       once the next release branch (vX.Y.Z+1) is cut, delete vX.Y.Z
+       (the tag on main is the canonical reference). The branch is kept
+       in the meantime so any same-version hotfix can re-cut from it.
+  ```
+- **A5 — Version-branch lifecycle (option c)**: a `vX.Y.Z` branch is
+  cut at step 2, used for curation + squash-merge at step 4, kept alive
+  until step 7 of the *next* release. Hotfix re-cuts during the active
+  window: branch from `vX.Y.Z`, cherry-pick the fix, bump to `vX.Y.Z.1`,
+  squash-merge to `main`, tag, rebase. The retained branch lets a hotfix
+  re-cut the release without rebuilding the curation.
 
 ## Knock-on effects on subsequent TODOs
 
-- **Phase 1 (wheel hygiene)** — defence-in-depth, not the primary barrier: `main`'s tree no longer carries `_project/`/`_blog/`/dev tooling at all.
-- **Phase 4 (final sync + history merge + first release)** — restructures: create `develop` from current public `main`, sync the working-tree into `develop`, `_project/**` filter-merge into `develop`, cut the release `develop` → curated → `main`, tag `main`.
-- **Phase 5 (dev-locus migration + branch protection)** — separate rulesets per branch: strict release-only on `main`, squash-merge on `develop`. Linear-history rule on `main` only; `develop` retains its filter-merge commit.
-- **Phase 6 (delete obsolete tooling)** — shrinks substantially. Keep `benchbox/release/workflow.py` and `scripts/prepare_release.py` (repurposed for `develop` → `main`). Likely delete: `automate_release.py`, `sync_repos.py`, bidirectional `sync.py` helpers, divergence preflight. The Phase 6 TODO will be revised when reached.
-- **Phase 7 (docs)** — describes the two-branch model and the release-PR flow.
+The TODO YAML files in `_project/TODO/main/active/` and `_project/TODO/main/planning/` for phases 2 onwards will be amended in-place when each phase becomes the active work, to reflect the version-branch flow. Specifically:
+
+- **Phase 1 (wheel hygiene)** — completed 2026-04-27. Defence-in-depth MANIFEST.in prunes added; wheel + sdist verified clean of maintainer scaffolding.
+- **Phase 2 (continuous CI)** — surface widens to: every push to `develop`, every push to `main`, every push to `v*` release branches, every PR targeting any of those.
+- **Phase 3 (new release flow)** — Makefile `release` target rewires to the new flow: cut `vX.Y.Z` from `develop` → curate (re-using `workflow.py` / `prepare_release.py` outputs) → squash-merge to `main` → tag → rebase `develop`. The release.yml workflow stays the same shape (triggered by tag push, builds, publishes to PyPI).
+- **Phase 4 (final sync + history merge + first release)** — restructures: create `develop` from current public `main`, sync the working-tree into `develop`, `_project/**` filter-merge into `develop` (with date filter dropping pre-2026 commits per Phase 0 D2a), cut `v0.3.0` release branch from `develop`, curate, squash-merge to `main`, tag, rebase `develop` onto `main`.
+- **Phase 5 (dev-locus migration + branch protection)** — three rulesets:
+  - `main`: squash-merge only, source restricted to `vX.Y.Z` PR sources, status checks required, linear history (post-Phase-4 only).
+  - `develop`: squash-merge only, status checks required, linear history.
+  - `v*` release branches: minimal protection (short-lived; maintainer-owned). Block force-pushes; allow direct commits during curation.
+- **Phase 6 (delete obsolete tooling)** — shrinks substantially. Keep `benchbox/release/workflow.py` and `scripts/prepare_release.py` (repurposed for branch-to-branch curation). Likely delete: `automate_release.py`, `sync_repos.py`, bidirectional `sync.py` helpers, divergence preflight. The Phase 6 TODO will be revised when reached.
+- **Phase 7 (docs)** — `docs/operations/release-guide.md` describes the version-branch flow (the seven steps in A4 above).
+- **Phase 8 (first post-migration release)** — exercises the full flow end-to-end on `v0.3.1`: cut `v0.3.1` from `develop`, curate, squash-merge to `main`, tag, rebase `develop`, then optionally delete `v0.3.0` branch (option c lifecycle).
 
 ## Phase 0 D2a reconfirmation hooks
 
