@@ -55,46 +55,86 @@ deps:
 work:
   - id: w1
     summary: "Re-audit duckdb-wasm runtime flags and the HTTP file-reader code path for the current version"
-    status: pending
+    status: done
     notes: |
-      Read `@duckdb/duckdb-wasm` `src/bindings/runtime.ts` (or the
-      shipped `duckdb-browser-eh.worker.js` if source is not vendored)
-      and confirm whether `registerFileURL` / `DuckDBConfig.filesystem`
-      now expose a supported way to set `reliableHeadRequests=true`
-      and/or `allowFullHttpReads=false` per registered URL.
+      Audited duckdb-wasm 1.32.0 (latest stable as of 2026-04-27;
+      1.33.x exists only as dev pre-release builds). Findings:
+
+      - `DuckDBConfig.filesystem` in
+        `dist/types/src/bindings/config.d.ts` exposes three booleans:
+        `reliableHeadRequests`, `allowFullHTTPReads`, and
+        `forceFullHTTPReads`. There is no per-URL override on
+        `registerFileURL`.
+      - `db.open({filesystem: {...}})` is the public entry point.
+      - Order matters: `open` AFTER `registerFileURL` resets the
+        WebFileSystem and breaks the registration; `open` BEFORE
+        registration is the supported sequence.
+      - `allowFullHTTPReads: false` makes the runtime error on
+        first ATTACH ("IO Error: Cannot open database 'results.duckdb'
+        in read-only mode: database does not exist"). This matches
+        upstream issue duckdb/duckdb-wasm#1984's analysis: when the
+        flag is false the runtime "always errors". So we cannot use it
+        to force range-only reads.
+      - With `reliableHeadRequests: true` + `forceFullHTTPReads: false`
+        + the default `allowFullHTTPReads: true`, the page loads but
+        the runtime still issues a single whole-file GET against the
+        registered URL (verified by the test harness transfer log:
+        total 6,565,888 bytes = full DB size, no 206 responses).
+      - Issue #1984 documents the underlying buggy code path: even
+        when the runtime first attempts a range read, an extra "full
+        GET anyway" code block runs after. This block has not been
+        removed in 1.32.0.
+
+      Conclusion: there is no flag combination on duckdb-wasm 1.32.0
+      that yields range-only reads against an HTTP-registered URL.
+      The fix must come from upstream (or from a 1.33.x stable
+      release once one ships). The byte-budget assertion has been
+      added to range-read-budget.spec.ts under `test.skip` so it
+      auto-enables when the runtime starts issuing 206s.
 
   - id: w2
     summary: "Pick an unblock path and prototype it"
     needs: [w1]
     status: pending
     notes: |
-      Three candidate paths, in order of preference:
+      Of the three candidate paths:
 
-      1. Upgrade duckdb-wasm to a version that supports the override.
-         Verify against the browser suite that `ATTACH` with a registered
-         HTTP URL issues a HEAD probe followed by ranged GETs.
-      2. Configure the flag via a supported runtime API (e.g. passing a
-         `DuckDBConfig.filesystem` object to `db.open` *after* the URL
-         is registered and before the first query, if the registration
-         survives an open).
-      3. File an upstream issue/PR and pin to a patched build.
+      1. **Library upgrade** — no stable 1.33.x release is available
+         (only dev builds 1.33.1-dev1 through 1.33.1-dev53 as of
+         2026-04-14). Pinning to a dev pre-release violates the
+         `approach` constraint ("Do not introduce a custom forked build
+         of duckdb-wasm unless every other avenue fails").
+      2. **Supported runtime API** — w1 verified that no flag
+         combination on the public `DuckDBConfig.filesystem` API yields
+         range-only reads. The buggy "Perform a full GET anyways" code
+         path in runtime_browser.ts is not toggleable from the page.
+      3. **Upstream issue/PR** — this is the path forward. File or
+         comment on duckdb/duckdb-wasm#1984 with a minimal repro
+         showing that even `reliableHeadRequests: true` +
+         `forceFullHTTPReads: false` produces a whole-file GET on
+         ATTACH against an `HTTP, directIO=true` registration. Pin to
+         the first 1.33.x stable that includes the fix.
 
-      Prototype the winning path inside a branch; keep the rest of the
-      explorer untouched so the RG-2 assertion is the sole change in
-      the validation commit.
+      This work unit unblocks once a 1.33.x stable release with the
+      fix is published OR a private patched build is acceptable.
 
   - id: w3
     summary: "Re-enable the byte-budget assertion and close the RG-2 gate"
     needs: [w2]
     status: pending
     notes: |
-      Replace the capability-only assertions in
-      `results-explorer/e2e/capability/range-read-budget.spec.ts` with the
-      original server-side transfer-log assertion: after a cold `goto`
-      of `/results/` followed by `waitForDataLoaded`, the sum of
-      `Content-Length` transfers under `/results/data/results.duckdb`
-      must be ≤10% of the on-disk DB size, and at least one transfer
-      must be a 206 ranged response.
+      Partially landed: the byte-budget assertion is now coded in
+      `results-explorer/e2e/capability/range-read-budget.spec.ts`
+      under `test.skip`. It asserts after a cold `goto` of `/results/`
+      followed by `waitForDataLoaded` that:
+        - the sum of `Content-Length` transfers under
+          `/results/data/results.duckdb` is ≤10% of the on-disk DB
+          size, and
+        - at least one transfer is a 206 ranged response.
+
+      The test is currently `.skip` because w2 is blocked. Removing
+      `.skip` is a one-line change once the runtime issues range
+      reads. The capability tests survive as a diagnostic.
 
 must_preserve:
   - "`results-explorer/src/db.ts` continues to ATTACH the snapshot READ_ONLY and must not fall back to a JSON-only path."
