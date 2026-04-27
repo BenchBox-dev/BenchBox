@@ -1,25 +1,24 @@
-generated_at: '2026-04-27T19:07:27.174773'
+generated_at: '2026-04-27T19:31:20.276927'
 total_items: 30
 items:
-- id: verify-ci-validation-workflow-end-to-end
-  file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
-  title: Verify the validate-submission CI workflow end-to-end with a real PR
+- id: fix-submission-hash-mismatch-vs-validator-directory-scope
+  file: TODO/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
+  title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
   worktree: main
-  category: Testing and Quality Assurance
+  category: Core Functionality
   priority: Critical
-  status: Not Started
+  status: Identified
   tags:
   - results
+  - submission
   - ci
   - phase-2
-  - validation
-  - end-to-end
+  - bug
+  - blocker
   estimated_effort: Small
-  work_total: 5
+  work_total: 4
   work_done: 0
   work_ready: 1
-  needs:
-  - implement-pr-based-result-submission-workflow
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

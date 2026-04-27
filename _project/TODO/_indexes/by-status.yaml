@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T19:07:27.174832'
+generated_at: '2026-04-27T19:31:20.276999'
 total_items: 30
 statuses:
   In Progress:
@@ -20,7 +20,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 25
+    count: 24
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -138,18 +138,13 @@ statuses:
       title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
       priority: Medium
       category: Testing and Quality Assurance
-    - id: verify-ci-validation-workflow-end-to-end
-      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
-      title: Verify the validate-submission CI workflow end-to-end with a real PR
-      priority: Critical
-      category: Testing and Quality Assurance
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
   Identified:
-    count: 2
+    count: 3
     items:
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
@@ -161,3 +156,8 @@ statuses:
       title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: fix-submission-hash-mismatch-vs-validator-directory-scope
+      file: TODO/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
+      title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
+      priority: Critical
+      category: Core Functionality

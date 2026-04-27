@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T19:07:29.038893'
+generated_at: '2026-04-27T19:31:22.159147'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -3756,7 +3756,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 45
+    count: 46
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3964,6 +3964,11 @@ categories:
       title: Test Suite Reliability ✅ COMPLETED
       priority: Medium
       status: Completed
+    - id: verify-ci-validation-workflow-end-to-end
+      file: DONE/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+      title: Verify the validate-submission CI workflow end-to-end with a real PR
+      priority: Critical
+      status: Not Started
     - id: verify-trust-badge-rendering-in-explorer
       file: DONE/main/planning/verify-trust-badge-rendering-in-explorer.yaml
       title: Visually verify TrustBadge rendering across all 4 explorer pages

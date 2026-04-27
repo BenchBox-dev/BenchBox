@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T19:07:27.174802'
+generated_at: '2026-04-27T19:31:20.276970'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -46,13 +46,18 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 2
+    count: 3
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       status: Not Started
+    - id: fix-submission-hash-mismatch-vs-validator-directory-scope
+      file: TODO/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
+      title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
+      priority: Critical
+      status: Identified
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -158,7 +163,7 @@ categories:
       priority: Medium
       status: In Progress
   Testing and Quality Assurance:
-    count: 5
+    count: 4
     items:
     - id: fix-chromium-result-detail-sort-flake
       file: TODO/main/planning/fix-chromium-result-detail-sort-flake.yaml
@@ -179,9 +184,4 @@ categories:
       file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
       title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
       priority: Medium
-      status: Not Started
-    - id: verify-ci-validation-workflow-end-to-end
-      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
-      title: Verify the validate-submission CI workflow end-to-end with a real PR
-      priority: Critical
       status: Not Started

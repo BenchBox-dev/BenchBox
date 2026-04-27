@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:07:29.039247'
-total_items: 784
+generated_at: '2026-04-27T19:31:22.159510'
+total_items: 785
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 47
+    count: 48
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -252,6 +252,11 @@ statuses:
       title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
       priority: Medium-High
       category: Core Functionality
+    - id: verify-ci-validation-workflow-end-to-end
+      file: DONE/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+      title: Verify the validate-submission CI workflow end-to-end with a real PR
+      priority: Critical
+      category: Testing and Quality Assurance
   Identified:
     count: 2
     items:
