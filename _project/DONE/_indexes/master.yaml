@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T08:22:35.956627'
-total_items: 773
+generated_at: '2026-04-27T08:54:33.887836'
+total_items: 774
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -542,6 +542,20 @@ items:
   work_total: 17
   work_done: 17
   work_ready: 0
+- id: single-repo-migration-phase-0-audit
+  file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
+  title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
+    check)'
+  worktree: main
+  category: Release Tooling
+  priority: Critical
+  status: Completed
+  completed_date: 2026-04-27
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  needs:
+  - single-repo-migration-decisions-gate
 - id: single-repo-migration-decisions-gate
   file: DONE/main/planning/single-repo-migration-decisions-gate.yaml
   title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'

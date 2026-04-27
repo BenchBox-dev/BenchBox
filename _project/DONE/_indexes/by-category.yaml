@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T08:22:35.956946'
+generated_at: '2026-04-27T08:54:33.888206'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -3495,8 +3495,14 @@ categories:
       priority: Critical
       status: Completed
   Release Tooling:
-    count: 3
+    count: 4
     items:
+    - id: single-repo-migration-phase-0-audit
+      file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
+      title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
+        check)'
+      priority: Critical
+      status: Completed
     - id: single-repo-migration-decisions-gate
       file: DONE/main/planning/single-repo-migration-decisions-gate.yaml
       title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'

@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T08:22:34.161859'
+generated_at: '2026-04-27T08:54:32.034928'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -138,14 +138,8 @@ categories:
       priority: Low
       status: Not Started
   Release Tooling:
-    count: 9
+    count: 8
     items:
-    - id: single-repo-migration-phase-0-audit
-      file: TODO/main/active/single-repo-migration-phase-0-audit.yaml
-      title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
-        check)'
-      priority: Critical
-      status: In Progress
     - id: single-repo-migration-phase-1-wheel-hygiene
       file: TODO/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
       title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'

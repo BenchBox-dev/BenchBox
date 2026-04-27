@@ -1,15 +1,9 @@
-generated_at: '2026-04-27T08:22:34.161874'
-total_items: 40
+generated_at: '2026-04-27T08:54:32.034943'
+total_items: 39
 priorities:
   Critical:
-    count: 3
+    count: 2
     items:
-    - id: single-repo-migration-phase-0-audit
-      file: TODO/main/active/single-repo-migration-phase-0-audit.yaml
-      title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
-        check)'
-      category: Release Tooling
-      status: In Progress
     - id: single-repo-migration-phase-5-repo-flip
       file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
       title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'

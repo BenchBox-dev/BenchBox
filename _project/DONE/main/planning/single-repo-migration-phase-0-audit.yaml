@@ -2,7 +2,8 @@ id: single-repo-migration-phase-0-audit
 title: "Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence check)"
 worktree: main
 priority: Critical
-status: In Progress
+status: Completed
+completed_date: 2026-04-27
 category: Release Tooling
 
 deps:
@@ -36,7 +37,7 @@ description: |
 work:
 - id: w1
   summary: "Install gitleaks and run working-tree scan"
-  status: pending
+  status: done
   notes: |
     brew install gitleaks
     cd /Users/joe/Developer/BenchBox
@@ -48,7 +49,7 @@ work:
 
 - id: w2
   summary: "Run gitleaks on _project/** history (the only history being published)"
-  status: pending
+  status: done
   notes: |
     gitleaks detect --source . \
       --log-opts='--all -- _project/' \
@@ -60,7 +61,7 @@ work:
 
 - id: w3
   summary: "Audit _project/ for sensitive content"
-  status: pending
+  status: done
   notes: |
     find _project -name '*.yaml' -o -name '*.md' | xargs grep -l -i \
       'TODO\|FIXME\|HACK\|XXX'
@@ -70,7 +71,7 @@ work:
 
 - id: w4
   summary: "Audit _blog/drafts/ for unpublished content"
-  status: pending
+  status: done
   notes: |
     Read every file under _blog/drafts/ and decide: ship as-is, edit
     before final sync, or move to a wip/ branch that never merges (per D4).
@@ -80,7 +81,7 @@ work:
 
 - id: w5
   summary: "Scan _project/** commit messages for embarrassing language"
-  status: pending
+  status: done
   notes: |
     Only _project/** history is being published, so only _project/**'s
     commit messages need this audit:
@@ -91,7 +92,7 @@ work:
 
 - id: w6
   summary: "Divergence check: anything on public mirror not represented in private"
-  status: pending
+  status: done
   notes: |
     cd /Users/joe/Developer/BenchBox
     git log --format='%s' public/main | sort -u > /tmp/public-msgs.txt
@@ -108,7 +109,7 @@ work:
 
 - id: w7
   summary: "Check for unintended large blobs in _project/** history"
-  status: pending
+  status: done
   notes: |
     git rev-list --objects --all -- _project/ | \
       git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | \
@@ -120,7 +121,7 @@ work:
 - id: w8
   summary: "Decide: proceed-as-is, scrub-then-proceed, or working-tree-only-for-_project"
   needs: [w1, w2, w3, w4, w5, w6, w7]
-  status: pending
+  status: done
   notes: |
     Update _project/decisions/single-repo-migration.md with the final
     D2a choice based on findings. Three options:
@@ -147,23 +148,18 @@ verification:
   expected_output: "at least 1"
 
 must_preserve:
-- The private repo is unchanged by this audit. Audit is read-only;
-  remediation (if any) is staged for a later step.
-- The decisions doc from the gate item is the canonical record - this
-  audit updates it with findings, not a new doc.
-- Bulk private history is being left behind anyway, so commit-message
-  audits on non-_project/** paths are NOT needed (a meaningful narrowing
-  vs Option A).
+- The private repo is unchanged by this audit. Audit is read-only; remediation (if any) is staged for a later step.
+- The decisions doc from the gate item is the canonical record - this audit updates it with findings, not a new doc.
+- Bulk private history is being left behind anyway, so commit-message audits on non-_project/** paths are NOT needed (a
+  meaningful narrowing vs Option A).
 
 anti_patterns:
-- DO NOT run git filter-repo during this audit - because filter-repo
-  rewrites history; that should be a deliberate, separately-scheduled
-  step in Phase 4 (or skipped entirely if D2a flips to working-tree-only).
-- DO NOT audit commit messages on the full repo - because Option B does
-  not publish bulk history; only _project/** messages matter (w5).
-- DO NOT proceed to Phase 1 until w8 is complete - because the
-  remediation strategy may require additional preparation that is
-  cheaper to do before further changes layer on.
+- DO NOT run git filter-repo during this audit - because filter-repo rewrites history; that should be a deliberate,
+  separately-scheduled step in Phase 4 (or skipped entirely if D2a flips to working-tree-only).
+- DO NOT audit commit messages on the full repo - because Option B does not publish bulk history; only _project/**
+  messages matter (w5).
+- DO NOT proceed to Phase 1 until w8 is complete - because the remediation strategy may require additional preparation
+  that is cheaper to do before further changes layer on.
 
 scope_limit:
   only_modify:

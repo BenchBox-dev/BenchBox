@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T08:22:35.957299'
-total_items: 773
+generated_at: '2026-04-27T08:54:33.888571'
+total_items: 774
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 722
+    count: 723
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3185,6 +3185,12 @@ statuses:
       title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'
       priority: Medium-High
       category: Developer Experience
+    - id: single-repo-migration-phase-0-audit
+      file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
+      title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
+        check)'
+      priority: Critical
+      category: Release Tooling
     - id: single-repo-migration-decisions-gate
       file: DONE/main/planning/single-repo-migration-decisions-gate.yaml
       title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'

@@ -1,8 +1,8 @@
-generated_at: '2026-04-27T08:22:35.957131'
-total_items: 773
+generated_at: '2026-04-27T08:54:33.888403'
+total_items: 774
 priorities:
   Critical:
-    count: 43
+    count: 44
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -178,6 +178,12 @@ priorities:
       file: DONE/main/active/remove-alpha-backward-compatibility-surface.yaml
       title: Remove alpha-stage backward compatibility surface across BenchBox
       category: Core Functionality
+      status: Completed
+    - id: single-repo-migration-phase-0-audit
+      file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
+      title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
+        check)'
+      category: Release Tooling
       status: Completed
     - id: single-repo-migration-decisions-gate
       file: DONE/main/planning/single-repo-migration-decisions-gate.yaml
