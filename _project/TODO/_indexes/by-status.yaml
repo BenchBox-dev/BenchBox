@@ -1,16 +1,22 @@
-generated_at: '2026-04-27T08:21:20.404803'
+generated_at: '2026-04-27T08:22:34.161885'
 total_items: 40
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Medium
       category: Testing & Quality
+    - id: single-repo-migration-phase-0-audit
+      file: TODO/main/active/single-repo-migration-phase-0-audit.yaml
+      title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
+        check)'
+      priority: Critical
+      category: Release Tooling
   Not Started:
-    count: 38
+    count: 37
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -117,12 +123,6 @@ statuses:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       category: Core Functionality
-    - id: single-repo-migration-phase-0-audit
-      file: TODO/main/planning/single-repo-migration-phase-0-audit.yaml
-      title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
-        check)'
-      priority: Critical
-      category: Release Tooling
     - id: single-repo-migration-phase-1-wheel-hygiene
       file: TODO/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
       title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'

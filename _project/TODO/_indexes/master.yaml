@@ -1,14 +1,14 @@
-generated_at: '2026-04-27T08:21:20.404735'
+generated_at: '2026-04-27T08:22:34.161826'
 total_items: 40
 items:
 - id: single-repo-migration-phase-0-audit
-  file: TODO/main/planning/single-repo-migration-phase-0-audit.yaml
+  file: TODO/main/active/single-repo-migration-phase-0-audit.yaml
   title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
     check)'
   worktree: main
   category: Release Tooling
   priority: Critical
-  status: Not Started
+  status: In Progress
   work_total: 8
   work_done: 0
   work_ready: 7

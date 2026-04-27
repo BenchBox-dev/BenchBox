@@ -2,7 +2,7 @@ id: single-repo-migration-phase-0-audit
 title: "Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence check)"
 worktree: main
 priority: Critical
-status: Not Started
+status: In Progress
 category: Release Tooling
 
 deps:
