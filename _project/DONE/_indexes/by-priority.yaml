@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T16:08:49.557918'
-total_items: 780
+generated_at: '2026-04-27T16:13:31.674986'
+total_items: 782
 priorities:
   Critical:
     count: 45
@@ -231,7 +231,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 267
+    count: 268
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1288,6 +1288,11 @@ priorities:
     - id: single-repo-migration-phase-3-new-release-flow
       file: DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
       title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
+      category: Release Tooling
+      status: Completed
+    - id: single-repo-migration-phase-4-test-release-with-new-flow
+      file: DONE/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
+      title: 'Single-repo migration phase 4: final sync + _project/** history merge'
       category: Release Tooling
       status: Completed
     - id: first-class-clickhouse-local-server-cloud-platforms
@@ -3703,7 +3708,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 44
+    count: 45
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3894,6 +3899,11 @@ priorities:
       file: DONE/query-plan-remediation/phase-9-advanced-features.yaml
       title: 'Query Plan Remediation - Phase 9: Advanced Features'
       category: Enhancement
+      status: Completed
+    - id: fix-git-author-history-rewrite
+      file: DONE/main/planning/fix-git-author-history-rewrite.yaml
+      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+      category: Repository Maintenance
       status: Completed
     - id: runtime-module-refactor-batch-two
       file: DONE/runtime-ops/planning/runtime-module-refactor-batch-two.yaml

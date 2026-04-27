@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T16:08:49.557740'
-total_categories: 81
+generated_at: '2026-04-27T16:13:31.674804'
+total_categories: 82
 categories:
   '"Bug Fixes & Reliability"':
     count: 1
@@ -3500,7 +3500,7 @@ categories:
       priority: Critical
       status: Completed
   Release Tooling:
-    count: 9
+    count: 10
     items:
     - id: single-repo-migration-phase-0-audit
       file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
@@ -3521,6 +3521,11 @@ categories:
     - id: single-repo-migration-phase-3-new-release-flow
       file: DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
       title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
+      priority: High
+      status: Completed
+    - id: single-repo-migration-phase-4-test-release-with-new-flow
+      file: DONE/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
+      title: 'Single-repo migration phase 4: final sync + _project/** history merge'
       priority: High
       status: Completed
     - id: single-repo-migration-phase-5-repo-flip
@@ -3555,6 +3560,14 @@ categories:
       file: DONE/query-plan-remediation/phase-7-parser-resilience.yaml
       title: 'Query Plan Remediation - Phase 7: Parser Resilience'
       priority: Medium
+      status: Completed
+  Repository Maintenance:
+    count: 1
+    items:
+    - id: fix-git-author-history-rewrite
+      file: DONE/main/planning/fix-git-author-history-rewrite.yaml
+      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+      priority: Low
       status: Completed
   Result Validation and Architecture:
     count: 1

@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T16:08:47.741840'
-total_categories: 11
+generated_at: '2026-04-27T16:13:29.875920'
+total_categories: 10
 categories:
   Architecture & Refactoring:
     count: 1
@@ -132,11 +132,11 @@ categories:
   Release Tooling:
     count: 3
     items:
-    - id: single-repo-migration-phase-4-test-release-with-new-flow
-      file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
-      title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
-      priority: High
-      status: In Progress
+    - id: cut-release-v0-3-0
+      file: TODO/main/planning/cut-release-v0-3-0.yaml
+      title: Cut the v0.3.0 release using the version-branch flow
+      priority: Medium
+      status: Not Started
     - id: single-repo-migration-phase-8-first-post-migration-release
       file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
       title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
@@ -146,14 +146,6 @@ categories:
       file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml
       title: 'Single-repo migration phase 9: decommission archived benchbox-private and retired private clone after 60-90
         day soak'
-      priority: Low
-      status: Not Started
-  Repository Maintenance:
-    count: 1
-    items:
-    - id: fix-git-author-history-rewrite
-      file: TODO/main/planning/fix-git-author-history-rewrite.yaml
-      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
       priority: Low
       status: Not Started
   Supporting Infrastructure:

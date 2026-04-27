@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T16:08:49.557428'
-total_items: 780
+generated_at: '2026-04-27T16:13:31.674481'
+total_items: 782
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4042,6 +4042,19 @@ items:
   needs:
   - single-repo-migration-phase-1-wheel-hygiene
   - single-repo-migration-phase-2-continuous-ci
+- id: single-repo-migration-phase-4-test-release-with-new-flow
+  file: DONE/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
+  title: 'Single-repo migration phase 4: final sync + _project/** history merge'
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Completed
+  completed_date: '2026-04-27'
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  needs:
+  - single-repo-migration-phase-3-new-release-flow
 - id: first-class-clickhouse-local-server-cloud-platforms
   file: DONE/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
   title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms
@@ -5230,6 +5243,22 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: 2-3 weeks (can be split into incremental releases)
+- id: fix-git-author-history-rewrite
+  file: DONE/main/planning/fix-git-author-history-rewrite.yaml
+  title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+  worktree: main
+  category: Repository Maintenance
+  priority: Low
+  status: Completed
+  tags:
+  - git
+  - history-rewrite
+  - author
+  estimated_effort: Medium
+  completed_date: '2026-04-27'
+  work_total: 10
+  work_done: 0
+  work_ready: 1
 - id: runtime-module-refactor-batch-two
   file: DONE/runtime-ops/planning/runtime-module-refactor-batch-two.yaml
   title: Runtime Module Refactor - Batch Two

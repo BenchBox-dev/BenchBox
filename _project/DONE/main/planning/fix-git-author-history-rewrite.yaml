@@ -2,7 +2,25 @@ id: fix-git-author-history-rewrite
 title: "Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-04-27"
+closure_note: |
+  Closed without execution. The single-repo migration (completed phases 0-7,
+  active phase 4) eliminated the two-remote private/public split this TODO
+  was structured around: there is no longer a private remote to force-push
+  rewritten history to, only the public origin. Force-pushing main and the
+  v0.1.0-v0.2.0 tags on the public repo (with PyPI-published releases tied
+  to those SHAs) is materially riskier than the original plan envisioned -
+  consumers of those tags would see SHAs change, and the tags are
+  load-bearing for `pip install benchbox==X.Y.Z` reproducibility.
+
+  Cost/benefit no longer justifies the action: cleaning the author name
+  on 2,286 historical commits is a cosmetic improvement; force-pushing a
+  public repo's main + version tags carries real risk of breaking external
+  forks, archive references, and historical SHA citations.
+
+  If a future need arises (e.g., a security-mandated re-author), revisit
+  the approach under single-repo constraints rather than reusing this plan.
 description: |
   On 2026-01-28, a local git config entry `user.name=user.email` was written
   to .git/config, setting the commit author name to the literal string "user.email"

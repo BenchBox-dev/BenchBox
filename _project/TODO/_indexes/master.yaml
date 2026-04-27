@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T16:08:47.741811'
-total_items: 33
+generated_at: '2026-04-27T16:13:29.875890'
+total_items: 32
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -76,18 +76,6 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
-- id: single-repo-migration-phase-4-test-release-with-new-flow
-  file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
-  title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
-  worktree: main
-  category: Release Tooling
-  priority: High
-  status: In Progress
-  work_total: 8
-  work_done: 6
-  work_ready: 1
-  needs:
-  - single-repo-migration-phase-3-new-release-flow
 - id: databend-3-mode-local-server-cloud
   file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
   title: Add 3-mode support to Databend platform (standalone / server / cloud)
@@ -213,21 +201,6 @@ items:
   priority: Low
   status: Not Started
   work_total: 4
-  work_done: 0
-  work_ready: 1
-- id: fix-git-author-history-rewrite
-  file: TODO/main/planning/fix-git-author-history-rewrite.yaml
-  title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
-  worktree: main
-  category: Repository Maintenance
-  priority: Low
-  status: Not Started
-  tags:
-  - git
-  - history-rewrite
-  - author
-  estimated_effort: Medium
-  work_total: 10
   work_done: 0
   work_ready: 1
 - id: evaluate-results-data-repo-extraction-checkpoint
@@ -372,6 +345,21 @@ items:
   work_total: 3
   work_done: 1
   work_ready: 2
+- id: cut-release-v0-3-0
+  file: TODO/main/planning/cut-release-v0-3-0.yaml
+  title: Cut the v0.3.0 release using the version-branch flow
+  worktree: main
+  category: Release Tooling
+  priority: Medium
+  status: Not Started
+  tags:
+  - release
+  - pypi
+  - version-branch-flow
+  estimated_effort: Small
+  work_total: 5
+  work_done: 0
+  work_ready: 1
 - id: design-results-ingest-storage-and-derived-read-model
   file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
   title: Design results ingest, storage, and derived read-model architecture

@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T16:08:49.558081'
-total_items: 780
+generated_at: '2026-04-27T16:13:31.675156'
+total_items: 782
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 729
+    count: 731
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3125,6 +3125,11 @@ statuses:
       title: Rewrite architecture.md and structure.md to match current codebase
       priority: High
       category: Documentation
+    - id: fix-git-author-history-rewrite
+      file: DONE/main/planning/fix-git-author-history-rewrite.yaml
+      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+      priority: Low
+      category: Repository Maintenance
     - id: runtime-module-refactor-batch-two
       file: DONE/runtime-ops/planning/runtime-module-refactor-batch-two.yaml
       title: Runtime Module Refactor - Batch Two
@@ -3204,6 +3209,11 @@ statuses:
     - id: single-repo-migration-phase-3-new-release-flow
       file: DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
       title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
+      priority: High
+      category: Release Tooling
+    - id: single-repo-migration-phase-4-test-release-with-new-flow
+      file: DONE/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
+      title: 'Single-repo migration phase 4: final sync + _project/** history merge'
       priority: High
       category: Release Tooling
     - id: single-repo-migration-phase-5-repo-flip

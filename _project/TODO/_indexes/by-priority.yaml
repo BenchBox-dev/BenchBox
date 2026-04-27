@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T16:08:47.741859'
-total_items: 33
+generated_at: '2026-04-27T16:13:29.875937'
+total_items: 32
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 4
+    count: 3
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -27,11 +27,6 @@ priorities:
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
       status: Not Started
-    - id: single-repo-migration-phase-4-test-release-with-new-flow
-      file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
-      title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
-      category: Release Tooling
-      status: In Progress
   Medium-High:
     count: 3
     items:
@@ -51,7 +46,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium:
-    count: 9
+    count: 10
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -63,6 +58,11 @@ priorities:
       title: Address follow-up findings from timing-policy pre-commit split review
       category: Testing & Quality
       status: In Progress
+    - id: cut-release-v0-3-0
+      file: TODO/main/planning/cut-release-v0-3-0.yaml
+      title: Cut the v0.3.0 release using the version-branch flow
+      category: Release Tooling
+      status: Not Started
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
       title: Design results ingest, storage, and derived read-model architecture
@@ -99,7 +99,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Low:
-    count: 15
+    count: 14
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -140,11 +140,6 @@ priorities:
       file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
       title: Re-enable FireDucks after upstream stability fixes
       category: Platform Expansion
-      status: Not Started
-    - id: fix-git-author-history-rewrite
-      file: TODO/main/planning/fix-git-author-history-rewrite.yaml
-      title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
-      category: Repository Maintenance
       status: Not Started
     - id: evaluate-results-data-repo-extraction-checkpoint
       file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml

@@ -1,8 +1,9 @@
 id: single-repo-migration-phase-4-test-release-with-new-flow
-title: "Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)"
+title: "Single-repo migration phase 4: final sync + _project/** history merge"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-27"
 category: Release Tooling
 
 deps:
@@ -10,8 +11,10 @@ deps:
   - single-repo-migration-phase-3-new-release-flow
 
 description: |
-  Dominant phase of the migration under Option B. Three sequenced operations
-  on the public repo:
+  Dominant phase of the migration under Option B. Two sequenced operations
+  on the public repo (the third, "cut v0.3.0", was deferred per user
+  direction on 2026-04-27 and split out into the standalone TODO
+  `cut-release-v0-3-0` so this phase can close cleanly):
 
   1. FINAL CURATED SYNC from private → public, with HOLD_BACK_PATHS reduced
      to the bare minimum (per-user agent config + secrets only) AND
@@ -29,15 +32,12 @@ description: |
      regular merge commit (NOT squash — squashing defeats the purpose).
      This preserves TODO/DONE archaeology per D2a.
 
-  3. CUT v0.3.0 from public using the new release flow (Makefile target +
-     release.yml workflow). Old automate_release.py is still on private
-     as a fallback; it gets deleted in Phase 6.
-
-  This is the "release that ships the explorer" — the only feature
-  genuinely held back today. Likely versioned 0.3.0 since it adds a
-  major feature.
-
   Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 4).
+
+  Closure note (2026-04-27): w1-w6 all completed. w7 (cut v0.3.0) and
+  w8 (PyPI verify) were deferred and have been moved to the dedicated
+  `cut-release-v0-3-0` TODO, where they can be picked up independently
+  when the user signals readiness.
 
 work:
 - id: w1
@@ -178,74 +178,13 @@ work:
     # "Squash and merge". If branch protection enforces squash-only at
     # this point, temporarily disable it for this PR.
 
-- id: w7
-  summary: "Determine release version (likely v0.3.0) and cut release"
-  needs: [w6]
-  status: pending
-  notes: |
-    DEFERRED on user direction (2026-04-27): "We are not ready to cut
-    v0.3.0 yet. Proceed with steps 1-6." w7 and w8 stay pending until
-    the user signals readiness.
-
-    Updated mechanics under the version-branch flow (see decisions doc
-    A4 / A5):
-      cd /Users/joe/Developer/BenchBox
-      git checkout develop && git pull
-      # Bump version + draft changelog on develop (or in a release-prep PR)
-      make bump VERSION=0.3.0
-      make changelog-draft VERSION=0.3.0   # optional helper
-      # Commit version bump on develop
-      git add benchbox/__init__.py pyproject.toml CHANGELOG.md docs/ landing/
-      git commit -m "chore(release): bump to 0.3.0 + changelog draft"
-      git push origin develop
-      # Cut the release branch
-      make release-prepare VERSION=0.3.0
-      # Review the PR (curation drops _project/, _blog/, agent files).
-      # Squash-merge to main on GitHub.
-      # Tag main:
-      git checkout main && git pull
-      git tag v0.3.0 && git push origin v0.3.0
-      # release.yml fires; verify PyPI publish.
-      # Then rebase develop onto main:
-      make release-rebase-develop VERSION=0.3.0
-
-- id: w8
-  summary: "Verify the release published to PyPI and is installable"
-  needs: [w7]
-  status: pending
-  notes: |
-    DEFERRED on user direction (2026-04-27): blocked by w7.
-
-    Wait for release.yml to complete green.
-    pip index versions benchbox  # should show 0.3.0
-    python -m venv /tmp/post-release-test
-    /tmp/post-release-test/bin/pip install benchbox==0.3.0
-    /tmp/post-release-test/bin/benchbox --help
-    /tmp/post-release-test/bin/python -c "import benchbox; assert benchbox.__version__ == '0.3.0'"
-    # Confirm wheel content has no maintainer scaffolding:
-    /tmp/post-release-test/bin/pip show -f benchbox | \
-      grep -E '_project|_blog|automate_release|benchbox/release/|\.pre-commit'
-    # Should match nothing — Phase 1 wheel hygiene excludes these.
-
 verification:
-- description: "PyPI has v0.3.0"
-  command: "pip index versions benchbox 2>&1 | grep -c '0.3.0'"
-  expected_output: "at least 1"
-- description: "Tag exists on public main"
-  command: "git -C /Users/joe/Developer/BenchBox rev-parse v0.3.0"
-  expected_output: "valid SHA"
 - description: "_project/** history is preserved on public"
   command: "git -C /Users/joe/Developer/BenchBox log --oneline -- _project/TODO/ | wc -l"
   expected_output: "more than 1 (multiple commits, not just a single migration commit)"
 - description: ".pre-commit-config.yaml landed on public"
   command: "test -f /Users/joe/Developer/BenchBox/.pre-commit-config.yaml && echo OK"
   expected_output: "OK"
-- description: "Installed wheel is clean of maintainer scaffolding"
-  command: "pip show -f benchbox | grep -E '_project|automate_release|benchbox/release/' | wc -l"
-  expected_output: "0"
-- description: "release.yml workflow concluded successfully"
-  command: "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'"
-  expected_output: "success"
 
 must_preserve:
 - The explorer code is added to the public release; this is the feature-complete launch.
@@ -253,8 +192,6 @@ must_preserve:
   flow is one command away.
 - _project/** retains its original commit graph on public; `git blame` on TODO/DONE files resolves to original
   private-side commits with their original SHAs, dates, and authors.
-- PyPI versioning is monotonic - if 0.3.0 fails partway through and needs a re-cut, the next attempt is 0.3.1. PyPI
-  rejects re-uploads of the same version.
 - The 9 pre-existing curated commits on public main are preserved untouched (no force-push, no rewrite).
 
 anti_patterns:
@@ -262,10 +199,6 @@ anti_patterns:
   commit, defeating the D2a decision; use a regular merge commit specifically for this PR.
 - DO NOT skip the diff -rq inspection in w4 - because surprises in what the curated sync includes/excludes are the most
   common way the final sync goes wrong; manual review is the gating step.
-- DO NOT release a version that overlaps with a prior failed attempt - because PyPI rejects, leaving you in a state
-  where pip cannot resolve the intended version; bump the patch number and move on.
-- DO NOT skip the post-publish smoke test (w8) - because release.yml going green only proves the workflow ran; it does
-  not prove the wheel is installable; only a fresh pip install does.
 - DO NOT delete automate_release.py at the end of this phase - because Phase 5 (dev locus migration) and Phase 6
   (deletion) are separate gates; running ahead conflates two risk profiles.
 - DO NOT enable branch-protection's "linear history" rule before w6 lands - because the merge commit from w6 is a
