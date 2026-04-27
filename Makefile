@@ -1,7 +1,7 @@
 # BenchBox Makefile
 # This makefile provides commands for building, testing and development
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json codex-skills-sync codex-skills-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json codex-skills-sync codex-skills-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -693,6 +693,77 @@ release-rebase-develop:
 	@echo "develop rebased onto main."
 	@echo "Per option-c lifecycle: previous release branch (e.g. vPREV) can be deleted on the next release-prepare run."
 
+# =============================================================================
+# PR + worktree workflow
+# Solo-dev develop is PR-gated (CI must be green; linear history; squash).
+# These targets collapse the PR roundtrip to one command and let multiple
+# branches stay live in parallel via worktrees.
+# =============================================================================
+
+.PHONY: pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune
+
+# Mirror the CI gate locally before pushing. Catches ~all CI failures
+# without the network roundtrip. Same checks as `lint` ruleset rule.
+pr-preflight:
+	@echo "==> ruff check"
+	@uv run ruff check .
+	@echo "==> ruff format --check"
+	@uv run ruff format --check .
+	@echo "==> fast tests"
+	@uv run -- python -m pytest -m fast -q
+
+# Push current branch and open a PR against develop with auto-merge enabled.
+# Squash-merge happens automatically once `lint` + `test (ubuntu-latest, 3.12)`
+# go green. Refuses to run from develop/main.
+pr-open:
+	@CURRENT=$$(git branch --show-current); \
+	case "$$CURRENT" in \
+		develop|main) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
+	esac; \
+	git push -u origin "$$CURRENT" && \
+	URL=$$(gh pr create --base develop --fill --head "$$CURRENT") && \
+	echo "$$URL" && \
+	gh pr merge --auto --squash "$$URL"
+
+# Show open PRs against develop and their CI + auto-merge state.
+pr-status:
+	@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
+		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
+
+# Create a worktree off origin/develop. Usage: make worktree-add BRANCH=fix/foo
+# Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
+# After: cd into the path, work, run `make pr-open` from inside.
+worktree-add:
+	@test -n "$(BRANCH)" || { echo "Usage: make worktree-add BRANCH=<branch-name>"; exit 1; }
+	@WTNAME=$$(echo "$(BRANCH)" | tr '/' '-'); \
+	WTPATH="../BenchBox.$$WTNAME"; \
+	test ! -e "$$WTPATH" || { echo "Path exists: $$WTPATH"; exit 1; }; \
+	git fetch origin develop --quiet && \
+	git worktree add -b "$(BRANCH)" "$$WTPATH" origin/develop && \
+	echo "" && \
+	echo "Worktree ready: $$WTPATH" && \
+	echo "Branch:        $(BRANCH) (based on origin/develop)" && \
+	echo "Next:          cd $$WTPATH && uv sync --group dev"
+
+worktree-list:
+	@git worktree list
+
+# Remove worktrees whose branches are gone on origin (already merged).
+# Pairs with auto-merge: PR merges → branch deleted → worktree pruned.
+worktree-prune:
+	@git fetch --prune --quiet
+	@git worktree list --porcelain | awk '/^worktree /{wt=$$2} /^branch /{br=$$2; print wt"|"br}' | \
+		while IFS='|' read -r wt br; do \
+			[ "$$wt" = "$$(git rev-parse --show-toplevel)" ] && continue; \
+			short=$${br#refs/heads/}; \
+			if ! git ls-remote --exit-code --heads origin "$$short" >/dev/null 2>&1; then \
+				echo "Removing worktree (branch gone on origin): $$wt [$$short]"; \
+				git worktree remove "$$wt" 2>/dev/null || git worktree remove --force "$$wt"; \
+				git branch -D "$$short" 2>/dev/null || true; \
+			fi; \
+		done
+	@git worktree prune
+
 # Help
 help:
 	@echo "BenchBox Makefile"
@@ -791,5 +862,13 @@ help:
 	@echo "  make docs-validate   Validate example references, syntax, and screenshot sync"
 	@echo "  make docs-images     Refresh generated visualization screenshots and sync docs/blog copies"
 	@echo "  make docs-check      Run all documentation checks (validate, linkcheck, build)"
+	@echo ""
+	@echo "PR Workflow & Worktrees:"
+	@echo "  make pr-preflight    Run lint + fast tests locally; mirrors CI gate"
+	@echo "  make pr-open         Push branch + open PR vs develop + enable auto-merge (squash)"
+	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
+	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"
+	@echo "  make worktree-list   List active worktrees"
+	@echo "  make worktree-prune  Remove worktrees whose branches are gone on origin (post-merge cleanup)"
 	@echo ""
 	@echo "  make help            Show this help message"

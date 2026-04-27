@@ -15,6 +15,27 @@ during the single-repo migration).
   release-only.
 - **Dev PRs**: feature branch off `develop` → PR → squash-merge to
   `develop`. Required CI: `lint` + `test (ubuntu-latest, 3.12)`.
+- **One-shot PR flow** (the canonical path — use this, not bare git):
+  - From a feature branch: `make pr-preflight && make pr-open`. Opens
+    the PR vs `develop` with `gh pr create --fill` and enables
+    `gh pr merge --auto --squash` so it lands the moment CI is green.
+    Walk away — don't poll.
+  - In Claude Code, the project-local `/pr` slash command
+    (`.claude/commands/pr.md`) wraps this end-to-end (commit if needed,
+    preflight, push, open PR, enable auto-merge). Prefer `/pr` over the
+    user-global `/commit-push-pr` plugin in this repo — `/pr` targets
+    `develop`, runs preflight, and enables auto-merge.
+  - Pre-push hook (`pr-preflight-fast-tests` in `.pre-commit-config.yaml`)
+    runs the fast lane on every push. Activate once with `pre-commit install`.
+- **Worktrees** for parallel branches (the convention):
+  - `~/Developer/BenchBox/` stays on `develop`, always. Don't swap
+    branches in the main clone.
+  - `make worktree-add BRANCH=fix/foo` creates `../BenchBox.fix-foo/`
+    off `origin/develop` with branch `fix/foo` checked out. `cd` into it,
+    run `uv sync --group dev`, work, `make pr-open` from inside.
+  - `make worktree-prune` removes worktrees whose branches are gone
+    upstream (post-merge cleanup). Pairs with auto-merge: PR merges →
+    branch deleted on origin → next prune sweeps the worktree.
 - **Releases** (version-branch flow): on `develop`, run `make bump
   VERSION=X.Y.Z` and `make changelog-draft VERSION=X.Y.Z`, then `make
   release-prepare VERSION=X.Y.Z` cuts the `vX.Y.Z` branch with curated
@@ -65,8 +86,9 @@ benchbox run --help | --help-topic all | --help-topic examples | --help-topic be
 
 ## Pre-approved Commands
 - **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `uv run -- python -m pytest *`
+- **PR/Worktree**: `make pr-preflight`, `make pr-status`, `make worktree-list`, `make worktree-prune`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
 - **Files**: `ls*`, `find*`, `cat*`, `head*`, `tail*`, `wc*`, `file*`, `stat*`, `du*`, `tree*`, `which*`
-- **Git**: `git status`, `git diff*`, `git log*`, `git show*`, `git branch*`, `git remote*`, `git config --list`
+- **Git**: `git status`, `git diff*`, `git log*`, `git show*`, `git branch*`, `git remote*`, `git config --list`, `git worktree list*`
 - **Python**: `uv tree`, `uv pip list`, `uv pip show*`, `uv export`, `uv run -- python -c*`, `uv run -- python -m*`
 - **TPC**: `timeout 30s _binaries/tpc-{h,ds}/<platform>/dsdgen*`, `timeout 60s _binaries/tpc-{h,ds}/<platform>/dsqgen*`
 - **TODO**: `uv run --project _project/scripts -- python _project/scripts/todo_cli.py list*|show*|stats|ready|next*|done*|check-graph`, `uv run --project _project/scripts -- python _project/scripts/validate_todo.py*`, `uv run _project/scripts/generate_indexes.py`, `uv run _project/scripts/migrate_todo_format.py*`

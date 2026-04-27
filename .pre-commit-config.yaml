@@ -34,6 +34,18 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
+      # Mirror the CI gate locally so PR pushes don't need to discover lint
+      # failures via the network roundtrip. ruff-format is enforced via the
+      # ruff-format hook below at commit time, so pre-push only re-checks
+      # `ruff check` (catches anything bypassed with --no-verify on commit)
+      # plus the fast test lane.
+      - id: pr-preflight-fast-tests
+        name: pr-preflight (fast tests, mirrors CI)
+        entry: uv run -- python -m pytest -m fast -q
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
       # Warn-only duplicate-code gate. Manual stage so it doesn't slow
       # every commit (pylint over benchbox/ takes ~60s). Run with
       # `pre-commit run duplicate-code-warn --all-files --hook-stage manual`.
