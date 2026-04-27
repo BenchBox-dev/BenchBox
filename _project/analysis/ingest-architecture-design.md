@@ -86,9 +86,13 @@ ingest queue.
   `.plans.json`), `tuning` (optional `.tuning.json`),
   `submission_manifest` (required, signed envelope with submitter
   identity + content hashes).
-- Maximum bundle size: enforce client-side at 10 MB (server checks 25
-  MB hard cap). Larger bundles indicate a benchmark misuse; reject with
-  a clear error pointing at scale-factor guidance.
+- Maximum bundle size: enforce client-side at 10 MB (server checks
+  the 50 MB hard cap defined in
+  [`docs/reference/threat-model.md`][threat] under the submission-layer
+  DoS mitigation). Larger bundles indicate a benchmark misuse; reject
+  with a clear error pointing at scale-factor guidance.
+
+[threat]: ../../docs/reference/threat-model.md
 - The service **does not** repackage the bundle. Bytes-as-received are
   what land in storage. Hash check on receipt; mismatch rejects the
   submission with the offending file path.
