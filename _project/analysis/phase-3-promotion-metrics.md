@@ -27,9 +27,9 @@ requests is enough signal that the demand is real, not anecdotal.
 | 1 | Merged community submissions / month (90d window) | `gh pr list --base published-results --state merged`      | ≥ 50 sustained for 3 mo    | PR review at scale; hosted ingest reduces maintainer toil   |
 | 2 | Median PR review latency (open → merge, hours)    | `gh pr list --base published-results --state merged --json` | > 72h median over 30d    | Reviewers are the bottleneck; async ingest would help       |
 | 3 | PR backlog (open against published-results > 7d)  | `gh pr list --base published-results --state open --json` | ≥ 5 sustained for 30d      | Queue is growing; signals chronic capacity gap              |
-| 4 | Distinct requests for private/unlisted results    | `_project/notes/phase-2-requests.md` § Private/Unlisted   | ≥ 3 distinct requesters    | Public-only constraint blocks legitimate use cases          |
-| 5 | Submissions blocked by maintainer-only constraints | `_project/notes/phase-2-requests.md` § Blocked-Maintainer | ≥ 5 distinct submissions   | PR-mediated trust model is gating real contributions        |
-| 6 | Org-account / team-space requests                 | `_project/notes/phase-2-requests.md` § Org-Spaces         | ≥ 3 distinct organizations | Multi-tenant identity needed; can't fake with PR labels     |
+| 4 | Distinct requests for private/unlisted results    | § Private/Unlisted, count distinct **Requester**          | ≥ 3 distinct requesters    | Public-only constraint blocks legitimate use cases          |
+| 5 | Submissions blocked by maintainer-only constraints | § Blocked-Maintainer, count entries (one per **Date**)    | ≥ 5 entries                | PR-mediated trust model is gating real contributions        |
+| 6 | Org-account / team-space requests                 | § Org-Spaces, count distinct **Organization**             | ≥ 3 distinct organizations | Multi-tenant identity needed; can't fake with PR labels     |
 
 ### Why these six and not others
 
@@ -41,7 +41,11 @@ requests is enough signal that the demand is real, not anecdotal.
 - **Qualitative signals (4, 5, 6)** capture demand the public-PR model
   fundamentally cannot serve (private results, anonymous submitters,
   org-isolated namespaces). Even a single such request is meaningful;
-  3 distinct ones rules out one loud user.
+  the count rules deliberately differ — distinct *requesters* for
+  private (one loud user shouldn't dominate), total *entries* for
+  blocked submissions (one heavy contributor with multiple blocks is
+  itself the signal), and distinct *organizations* for Org-Spaces
+  (org-level demand, not individual employee asks).
 
 ### What we explicitly do NOT measure
 

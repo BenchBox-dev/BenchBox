@@ -6,15 +6,35 @@ metrics #4-#6 in
 
 ## Format
 
-Append entries under the relevant section. Each entry must include:
+Append entries under the relevant section. Each entry is a bullet
+block with bold field labels. The script `scripts/phase2_metrics.py`
+parses these by regex.
 
-- **Date** (YYYY-MM-DD)
+Required fields per entry:
+
+- **Date** (YYYY-MM-DD) — also used as the entry-count anchor
 - **Source** (issue #, PR #, Discord thread, email, in-conversation)
 - **Requester** (handle or "anonymous"; do not log private contact info)
 - **Summary** (one sentence)
 
-`scripts/phase2_metrics.py` parses entries by counting distinct
-**Requester** values per section over a configurable window.
+Section-specific fields:
+
+- **Org-Spaces** entries also need an **Organization** line — distinct
+  org names are what the threshold counts (one org with 5 employees
+  asking is one signal, not five).
+
+How each section is counted:
+
+| Section            | Count rule                               |
+|--------------------|------------------------------------------|
+| Private/Unlisted   | distinct **Requester** values, lowercased |
+| Blocked-Maintainer | total entries (one per **Date** line)    |
+| Org-Spaces         | distinct **Organization** values, lowercased |
+
+The Blocked-Maintainer section is counted by entry rather than by
+requester because one heavy contributor with three blocked submissions
+is a stronger signal than one submission, and the strategy doc
+specifies submissions, not people.
 
 ## Private/Unlisted
 
@@ -36,5 +56,8 @@ _(none yet)_
 
 Requests for organization or team accounts: shared submission
 namespace, group-level trust labels, multi-user attribution.
+
+Each entry must include an **Organization** field (this is what the
+metric counts; distinct organizations, not distinct requesters).
 
 _(none yet)_

@@ -53,7 +53,18 @@ SECTION_PRIVATE = "Private/Unlisted"
 SECTION_BLOCKED = "Blocked-Maintainer"
 SECTION_ORG = "Org-Spaces"
 
+# Cap on PRs returned per gh call. Set 10x the volume threshold (50/mo × 3
+# months = 150) so we don't silently truncate when M1 is at-or-near breach.
+GH_PR_LIMIT = 500
+
+# Per-section counting rules, keyed by the kind of request the section
+# represents:
+#   "distinct_requesters" — distinct **Requester** values, lowercased
+#   "entry_count"         — count of entries (one per **Date** line)
+#   "distinct_orgs"       — distinct **Organization** values, lowercased
 REQUESTER_LINE_RE = re.compile(r"\*\*Requester\*\*:\s*(.+?)\s*$", re.MULTILINE)
+ORG_LINE_RE = re.compile(r"\*\*Organization\*\*:\s*(.+?)\s*$", re.MULTILINE)
+DATE_LINE_RE = re.compile(r"\*\*Date\*\*:\s*\d{4}-\d{2}-\d{2}", re.MULTILINE)
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +117,7 @@ def _gh_prs(repo: str, base: str, state: str) -> list[dict] | GhError:
             "--state",
             state,
             "--limit",
-            "200",
+            str(GH_PR_LIMIT),
             "--json",
             "number,title,createdAt,closedAt,mergedAt,state,author,url",
         ]
@@ -215,19 +226,44 @@ def _split_sections(text: str) -> dict[str, str]:
     return sections
 
 
-def _count_distinct_requesters(section_text: str) -> int:
-    """Count distinct **Requester**: values within a section."""
-    matches = REQUESTER_LINE_RE.findall(section_text)
-    return len({m.strip() for m in matches if m.strip()})
+def _count_distinct_lowercased(section_text: str, pattern: re.Pattern[str]) -> int:
+    """Count distinct case-folded values matching `pattern` in a section."""
+    matches = pattern.findall(section_text)
+    return len({m.strip().lower() for m in matches if m.strip()})
 
 
-def metric_qualitative(notes_text: str, section: str, threshold: int) -> MetricResult:
-    name = f"Distinct requesters in '{section}' section"
+def _count_entries(section_text: str) -> int:
+    """Count entries in a section, one per **Date**: line."""
+    return len(DATE_LINE_RE.findall(section_text))
+
+
+def metric_qualitative(
+    notes_text: str,
+    section: str,
+    threshold: int,
+    rule: str,
+    label: str,
+) -> MetricResult:
+    """Compute a qualitative metric.
+
+    `rule` selects the count strategy ("distinct_requesters" /
+    "distinct_orgs" / "entry_count"). `label` is the noun used in the
+    report row name.
+    """
+    name = f"{label} in '{section}' section"
     threshold_str = f">= {threshold}"
     sections = _split_sections(notes_text)
     if section not in sections:
         return MetricResult(name, "n/a", None, threshold_str, f"section '{section}' missing")
-    count = _count_distinct_requesters(sections[section])
+    body = sections[section]
+    if rule == "distinct_requesters":
+        count = _count_distinct_lowercased(body, REQUESTER_LINE_RE)
+    elif rule == "distinct_orgs":
+        count = _count_distinct_lowercased(body, ORG_LINE_RE)
+    elif rule == "entry_count":
+        count = _count_entries(body)
+    else:
+        return MetricResult(name, "n/a", None, threshold_str, f"unknown rule '{rule}'")
     return MetricResult(name, str(count), count >= threshold, threshold_str)
 
 
@@ -319,9 +355,27 @@ def main(argv: list[str] | None = None) -> int:
         metric_merged_volume(merged_prs, now),
         metric_review_latency(merged_prs, now),
         metric_backlog(open_prs, now),
-        metric_qualitative(notes_text, SECTION_PRIVATE, THRESH_PRIVATE),
-        metric_qualitative(notes_text, SECTION_BLOCKED, THRESH_BLOCKED_MAINTAINER),
-        metric_qualitative(notes_text, SECTION_ORG, THRESH_ORG_SPACES),
+        metric_qualitative(
+            notes_text,
+            SECTION_PRIVATE,
+            THRESH_PRIVATE,
+            rule="distinct_requesters",
+            label="Distinct requesters",
+        ),
+        metric_qualitative(
+            notes_text,
+            SECTION_BLOCKED,
+            THRESH_BLOCKED_MAINTAINER,
+            rule="entry_count",
+            label="Distinct submissions",
+        ),
+        metric_qualitative(
+            notes_text,
+            SECTION_ORG,
+            THRESH_ORG_SPACES,
+            rule="distinct_orgs",
+            label="Distinct organizations",
+        ),
     ]
 
     report = render_report(args.repo, args.base_branch, results, now)
