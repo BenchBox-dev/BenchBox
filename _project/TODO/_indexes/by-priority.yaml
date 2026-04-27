@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T12:47:44.998124'
-total_items: 35
+generated_at: '2026-04-27T14:52:31.167791'
+total_items: 34
 priorities:
   Critical:
     count: 1
@@ -38,7 +38,7 @@ priorities:
       category: Release Tooling
       status: In Progress
   Medium-High:
-    count: 5
+    count: 4
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -59,11 +59,6 @@ priorities:
       file: TODO/main/planning/single-repo-migration-phase-6-delete-obsolete-tooling.yaml
       title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'
       category: Release Tooling
-      status: Not Started
-    - id: single-repo-migration-phase-7-docs-cleanup
-      file: TODO/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
-      title: 'Single-repo migration phase 7: docs and meta-files reflect the new workflow'
-      category: Documentation
       status: Not Started
   Medium:
     count: 8

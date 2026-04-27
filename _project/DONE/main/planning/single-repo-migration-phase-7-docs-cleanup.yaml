@@ -2,7 +2,8 @@ id: single-repo-migration-phase-7-docs-cleanup
 title: "Single-repo migration phase 7: docs and meta-files reflect the new workflow"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: 2026-04-27
 category: Documentation
 
 deps:
@@ -24,7 +25,7 @@ description: |
 work:
 - id: w1
   summary: "Update CLAUDE.md - replace two-remote section with single-repo guidance"
-  status: pending
+  status: done
   notes: |
     Phase 5 stripped the section as an interim step. Now write a
     proper replacement:
@@ -42,7 +43,7 @@ work:
 
 - id: w2
   summary: "Update AGENTS.md - same treatment"
-  status: pending
+  status: done
   notes: |
     Strip the two-remote rule. Update the Release section to point
     to the new runbook. Keep dependency-bounds policy and other
@@ -50,7 +51,7 @@ work:
 
 - id: w3
   summary: "Update CONTRIBUTING.md"
-  status: pending
+  status: done
   notes: |
     Update line 193 area ("Releases are handled by maintainers") to:
       "External contributions land via PR against main. Releases are
@@ -61,7 +62,7 @@ work:
 
 - id: w4
   summary: "Update README.md - URLs and any lingering private/public references"
-  status: pending
+  status: done
   notes: |
     Update GitHub URL in any badge or link to point at
     joeharris76/BenchBox (already correct after the rename, but
@@ -72,7 +73,7 @@ work:
 - id: w5
   summary: "Write docs/operations/release-guide.md (~300 words)"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Short, scannable. Sections:
       # Cutting a BenchBox release
@@ -99,7 +100,7 @@ work:
 - id: w6
   summary: "Add the new guide to docs/index.rst toctree under Contributing"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     .. toctree::
        :maxdepth: 1
@@ -112,7 +113,7 @@ work:
 - id: w7
   summary: "Replace docs/development/development.md release-prep stub with a redirect"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     At line 99 area, the "Release Preparation Workflow" section is a
     stub. Replace its body with a single line:
@@ -123,7 +124,7 @@ work:
 - id: w8
   summary: "Build docs locally with -W and verify the new page"
   needs: [w6, w7]
-  status: pending
+  status: done
   notes: |
     cd docs && uv run -- python -m sphinx -W -b html . _build/html
     Must complete with zero warnings. Open the rendered page and
@@ -144,21 +145,17 @@ verification:
   expected_output: "between 200 and 800 words"
 
 must_preserve:
-- All other docs (benchmarks, platforms, MCP server, getting-started)
-  are unchanged. This phase only touches release-related docs and
-  meta-files.
-- docs/operations/results-phase-2-runbook.md (results publishing) is
-  unchanged - it covers a different runbook.
+- All other docs (benchmarks, platforms, MCP server, getting-started) are unchanged. This phase only touches 
+  release-related docs and meta-files.
+- docs/operations/results-phase-2-runbook.md (results publishing) is unchanged - it covers a different runbook.
 
 anti_patterns:
-- DO NOT duplicate the Makefile release target into the release
-  guide - because the Makefile is canonical; the guide should
-  reference and explain, not paste-and-replicate.
-- DO NOT write a long history section - because the guide describes
-  how to release TODAY; migration history belongs in MIGRATION-NOTES.md
-  (if kept) or git history.
-- DO NOT add screenshots - because they rot quickly and the existing
-  docs are text-only; ASCII tables and code blocks are sufficient.
+- DO NOT duplicate the Makefile release target into the release guide - because the Makefile is canonical; the guide 
+  should reference and explain, not paste-and-replicate.
+- DO NOT write a long history section - because the guide describes how to release TODAY; migration history belongs in 
+  MIGRATION-NOTES.md (if kept) or git history.
+- DO NOT add screenshots - because they rot quickly and the existing docs are text-only; ASCII tables and code blocks 
+  are sufficient.
 
 scope_limit:
   only_modify:

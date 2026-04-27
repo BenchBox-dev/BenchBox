@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T12:47:46.743858'
+generated_at: '2026-04-27T14:52:32.992260'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -2140,7 +2140,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 24
+    count: 25
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -2236,6 +2236,11 @@ categories:
       file: DONE/main/planning/docs-rewrite-architecture-and-structure.yaml
       title: Rewrite architecture.md and structure.md to match current codebase
       priority: High
+      status: Completed
+    - id: single-repo-migration-phase-7-docs-cleanup
+      file: DONE/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
+      title: 'Single-repo migration phase 7: docs and meta-files reflect the new workflow'
+      priority: Medium-High
       status: Completed
     - id: docs-fix-naming-inconsistencies
       file: DONE/main/planning/docs-fix-naming-inconsistencies.yaml

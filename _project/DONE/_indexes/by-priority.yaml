@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T12:47:46.744037'
-total_items: 778
+generated_at: '2026-04-27T14:52:32.992451'
+total_items: 779
 priorities:
   Critical:
     count: 45
@@ -1572,7 +1572,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 126
+    count: 127
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -2145,6 +2145,11 @@ priorities:
       file: DONE/main/active/simplify-dataframe-extra-naming.yaml
       title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'
       category: Developer Experience
+      status: Completed
+    - id: single-repo-migration-phase-7-docs-cleanup
+      file: DONE/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
+      title: 'Single-repo migration phase 7: docs and meta-files reflect the new workflow'
+      category: Documentation
       status: Completed
     - id: snowpark-connect-platform
       file: DONE/platform-expansion/planning/snowpark-connect-platform.yaml

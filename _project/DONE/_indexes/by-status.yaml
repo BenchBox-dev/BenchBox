@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T12:47:46.744203'
-total_items: 778
+generated_at: '2026-04-27T14:52:32.992615'
+total_items: 779
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 727
+    count: 728
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3211,6 +3211,11 @@ statuses:
       title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
       priority: Critical
       category: Release Tooling
+    - id: single-repo-migration-phase-7-docs-cleanup
+      file: DONE/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
+      title: 'Single-repo migration phase 7: docs and meta-files reflect the new workflow'
+      priority: Medium-High
+      category: Documentation
     - id: single-repo-migration-decisions-gate
       file: DONE/main/planning/single-repo-migration-decisions-gate.yaml
       title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'

@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T12:47:44.998083'
-total_items: 35
+generated_at: '2026-04-27T14:52:31.167751'
+total_items: 34
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -559,18 +559,6 @@ items:
   work_total: 8
   work_done: 0
   work_ready: 1
-  needs:
-  - single-repo-migration-phase-5-repo-flip
-- id: single-repo-migration-phase-7-docs-cleanup
-  file: TODO/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
-  title: 'Single-repo migration phase 7: docs and meta-files reflect the new workflow'
-  worktree: main
-  category: Documentation
-  priority: Medium-High
-  status: Not Started
-  work_total: 8
-  work_done: 0
-  work_ready: 4
   needs:
   - single-repo-migration-phase-5-repo-flip
 - id: generalize-database-table-reuse-detection

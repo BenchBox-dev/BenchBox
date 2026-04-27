@@ -192,7 +192,18 @@ Please update documentation when adding or modifying features. We use Sphinx for
 
 ## Releasing
 
-Releases are handled by the maintainers. We follow semantic versioning.
+External contributions land via PR against `develop` (squash-merge). Releases
+are cut by maintainers via the version-branch flow documented in
+[`docs/operations/release-guide.md`](docs/operations/release-guide.md):
+
+1. `make bump VERSION=X.Y.Z` and `make changelog-draft VERSION=X.Y.Z` on `develop`.
+2. `make release-prepare VERSION=X.Y.Z` cuts `vX.Y.Z` from `develop` with a
+   release-curated tree and opens a PR against `main`.
+3. Squash-merge the PR; tag `main`; `release.yml` publishes to PyPI.
+4. `make release-rebase-develop VERSION=X.Y.Z` rebases `develop` onto the
+   release-shaped `main`.
+
+We follow semantic versioning.
 
 ## License
 

@@ -6,18 +6,20 @@
 
 ## Git workflow
 
-Single repo, single remote (`origin` → `joeharris76/BenchBox`).
-Working clone: `~/Developer/benchbox-public` (or wherever it ended up after
-the single-repo migration; the previous `/Users/joe/Developer/BenchBox`
-private clone was retired and may now be a symlink to the public clone).
+Single repo, single remote (`origin` → `joeharris76/BenchBox`). Working
+clone: `~/Developer/benchbox-public` (canonical path
+`/Users/joe/Developer/BenchBox` is a symlink).
 
-- Long-lived dev branch: `develop`. All dev PRs squash-merge to `develop`.
-- Releases use the version-branch flow (see `_project/decisions/single-repo-migration.md` D5/A4):
-  cut `vX.Y.Z` from `develop`, curate, squash-merge to `main`, tag, rebase
-  `develop`. Helpers: `make release-prepare VERSION=X.Y.Z`,
-  `make release-rebase-develop VERSION=X.Y.Z`.
-- Full release runbook lands in Phase 7 docs cleanup (see
-  `docs/operations/release-guide.md` once written).
+- **Branches**: `develop` is the long-lived dev branch; `main` is
+  release-only.
+- **Dev PRs**: feature branch off `develop` → PR → squash-merge to
+  `develop`. Required CI: `lint` + `test (ubuntu-latest, 3.12)`.
+- **Releases** (version-branch flow): on `develop`, run `make bump
+  VERSION=X.Y.Z` and `make changelog-draft VERSION=X.Y.Z`, then `make
+  release-prepare VERSION=X.Y.Z` cuts the `vX.Y.Z` branch with curated
+  tree → PR → squash-merge to `main` → tag `main` → `release.yml`
+  publishes to PyPI → `make release-rebase-develop VERSION=X.Y.Z`
+  rebases develop. Full runbook: `docs/operations/release-guide.md`.
 
 ## Commands
 
