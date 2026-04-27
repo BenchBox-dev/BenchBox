@@ -47,6 +47,14 @@ THRESH_PRIVATE = 3
 THRESH_BLOCKED_MAINTAINER = 5
 THRESH_ORG_SPACES = 3
 
+# results-data/ extraction triggers (see
+# _project/analysis/results-data-extraction-trigger.md). Either trigger
+# firing surfaces "EXTRACTION EVALUATION RECOMMENDED" in the report.
+RESULTS_DATA_DIR = Path("results-data")
+EXTRACTION_SIZE_THRESHOLD_BYTES = 250 * 1024 * 1024  # 250 MB
+EXTRACTION_PR_VOLUME_PER_MONTH = 20
+EXTRACTION_PR_VOLUME_MONTHS = 3
+
 # Section names in the qualitative notes file (must match the headers
 # in the `_project/notes/phase-2-requests.md` template).
 SECTION_PRIVATE = "Private/Unlisted"
@@ -268,6 +276,64 @@ def metric_qualitative(
 
 
 # ---------------------------------------------------------------------------
+# results-data/ extraction triggers
+# ---------------------------------------------------------------------------
+
+
+def _results_data_size(root: Path) -> int | None:
+    """Sum file sizes under results-data/. Returns None if the dir is missing."""
+    if not root.is_dir():
+        return None
+    total = 0
+    for path in root.rglob("*"):
+        if path.is_file():
+            total += path.stat().st_size
+    return total
+
+
+def _trigger_q1_size(root: Path) -> MetricResult:
+    name = "[Q1] results-data/ total size"
+    threshold = f"> {EXTRACTION_SIZE_THRESHOLD_BYTES // (1024 * 1024)} MB"
+    size = _results_data_size(root)
+    if size is None:
+        return MetricResult(name, "n/a", None, threshold, "results-data/ not found")
+    breached = size > EXTRACTION_SIZE_THRESHOLD_BYTES
+    return MetricResult(name, f"{size / (1024 * 1024):.1f} MB", breached, threshold)
+
+
+def _trigger_q2_pr_volume(prs: list[dict] | GhError, now: datetime) -> MetricResult:
+    name = f"[Q2] PR volume to base, last {EXTRACTION_PR_VOLUME_MONTHS} mo (each)"
+    threshold = f">= {EXTRACTION_PR_VOLUME_PER_MONTH}/mo for {EXTRACTION_PR_VOLUME_MONTHS} consecutive months"
+    if isinstance(prs, GhError):
+        return MetricResult(name, "n/a", None, threshold, prs.message)
+
+    buckets = [0] * EXTRACTION_PR_VOLUME_MONTHS
+    for pr in prs:
+        merged = _parse_iso(pr.get("mergedAt"))
+        if merged is None:
+            continue
+        delta_days = (now - merged).days
+        bucket = delta_days // 30
+        if 0 <= bucket < EXTRACTION_PR_VOLUME_MONTHS:
+            buckets[bucket] += 1
+
+    breached = all(b >= EXTRACTION_PR_VOLUME_PER_MONTH for b in buckets)
+    value = " / ".join(str(b) for b in buckets) + " (most recent 30d first)"
+    return MetricResult(name, value, breached, threshold)
+
+
+def evaluate_extraction_triggers(
+    root: Path,
+    merged_prs: list[dict] | GhError,
+    now: datetime,
+) -> list[MetricResult]:
+    return [
+        _trigger_q1_size(root),
+        _trigger_q2_pr_volume(merged_prs, now),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Report rendering
 # ---------------------------------------------------------------------------
 
@@ -278,7 +344,13 @@ def _glyph(breached: bool | None) -> str:
     return "BREACHED" if breached else "ok"
 
 
-def render_report(repo: str, base: str, results: list[MetricResult], now: datetime) -> str:
+def render_report(
+    repo: str,
+    base: str,
+    results: list[MetricResult],
+    extraction_triggers: list[MetricResult],
+    now: datetime,
+) -> str:
     lines: list[str] = []
     lines.append(f"# Phase 3 Promotion Metrics — {now.strftime('%Y-%m-%d')}")
     lines.append("")
@@ -315,6 +387,33 @@ def render_report(repo: str, base: str, results: list[MetricResult], now: dateti
         note = r.note.replace("|", "\\|") if r.note else ""
         lines.append(f"| {i} | {r.name} | {r.value} | {r.threshold} | {_glyph(r.breached)} | {note} |")
     lines.append("")
+    lines.append("## results-data/ Extraction Triggers")
+    lines.append("")
+    lines.append(
+        "Quantitative triggers from "
+        "`_project/analysis/results-data-extraction-trigger.md`. Either firing "
+        "surfaces an EXTRACTION EVALUATION RECOMMENDED line below."
+    )
+    lines.append("")
+    lines.append("| Metric | Value | Threshold | Status |")
+    lines.append("|--------|-------|-----------|--------|")
+    for r in extraction_triggers:
+        lines.append(f"| {r.name} | {r.value} | {r.threshold} | {_glyph(r.breached)} |")
+    lines.append("")
+    triggered = [r for r in extraction_triggers if r.breached is True]
+    if triggered:
+        for r in triggered:
+            lines.append(f"**EXTRACTION EVALUATION RECOMMENDED**: {r.name} — {r.value}")
+        lines.append("")
+        lines.append(
+            "See `_project/analysis/results-data-extraction-trigger.md` for the "
+            "evaluation procedure. Open `evaluate-results-data-extraction-decision` "
+            "and copy `docs/development/adr/TEMPLATE-results-data-extraction.md` "
+            "to start the ADR."
+        )
+    else:
+        lines.append("No extraction triggers fired.")
+    lines.append("")
     return "\n".join(lines) + "\n"
 
 
@@ -338,6 +437,12 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=None,
         help="Write report to this file instead of stdout",
+    )
+    parser.add_argument(
+        "--results-data-dir",
+        type=Path,
+        default=RESULTS_DATA_DIR,
+        help="Path to results-data/ for the extraction-trigger size check",
     )
     args = parser.parse_args(argv)
 
@@ -378,7 +483,8 @@ def main(argv: list[str] | None = None) -> int:
         ),
     ]
 
-    report = render_report(args.repo, args.base_branch, results, now)
+    extraction_triggers = evaluate_extraction_triggers(args.results_data_dir, merged_prs, now)
+    report = render_report(args.repo, args.base_branch, results, extraction_triggers, now)
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
