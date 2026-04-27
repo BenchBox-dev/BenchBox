@@ -4,21 +4,20 @@
 
 **Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`). Never `git add -A`. TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
 
-## Git Remotes - CRITICAL
+## Git workflow
 
-This repo has two remotes. **Getting this wrong leaks private work to the public repo.**
+Single repo, single remote (`origin` → `joeharris76/BenchBox`).
+Working clone: `~/Developer/benchbox-public` (or wherever it ended up after
+the single-repo migration; the previous `/Users/joe/Developer/BenchBox`
+private clone was retired and may now be a symlink to the public clone).
 
-| Remote    | Repo                              | Policy |
-|-----------|-----------------------------------|--------|
-| `private` | `joeharris76/benchbox-private`    | **Default for ALL pushes and PRs** |
-| `public`  | `joeharris76/BenchBox` (public)   | **READ-ONLY - never push without explicit user approval** |
-
-Rules:
-- Always push to `private`: `git push private <branch>`
-- Always target private for PRs: `gh pr create --repo joeharris76/benchbox-private ...`
-- Never run `git push public` or `git push` without specifying the remote
-- Never run `gh pr create` without `--repo joeharris76/benchbox-private`
-- If you are unsure which remote to use, **stop and ask**
+- Long-lived dev branch: `develop`. All dev PRs squash-merge to `develop`.
+- Releases use the version-branch flow (see `_project/decisions/single-repo-migration.md` D5/A4):
+  cut `vX.Y.Z` from `develop`, curate, squash-merge to `main`, tag, rebase
+  `develop`. Helpers: `make release-prepare VERSION=X.Y.Z`,
+  `make release-rebase-develop VERSION=X.Y.Z`.
+- Full release runbook lands in Phase 7 docs cleanup (see
+  `docs/operations/release-guide.md` once written).
 
 ## Commands
 

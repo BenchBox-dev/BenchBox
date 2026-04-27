@@ -80,7 +80,7 @@ work:
 - id: w4
   summary: "Archive joeharris76/benchbox-private on GitHub"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     GitHub UI: Settings on joeharris76/benchbox-private -> Danger zone ->
     "Archive this repository". Confirm.
@@ -91,7 +91,7 @@ work:
 - id: w5
   summary: "Retire the local private clone (rename, do not delete)"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     mv /Users/joe/Developer/BenchBox \
        /Users/joe/Developer/BenchBox.retired-$(date +%Y%m%d)
@@ -102,7 +102,7 @@ work:
 - id: w6
   summary: "(Optional) Reclaim /Users/joe/Developer/BenchBox path for the public clone"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Two options — pick whichever:
     - mv ~/Developer/benchbox-public /Users/joe/Developer/BenchBox
@@ -136,7 +136,7 @@ work:
 - id: w8
   summary: "Verify PyPI project URLs (no change needed under Option B)"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     PyPI Homepage already points at https://github.com/joeharris76/BenchBox,
     which is unchanged under Option B (no rename happened). Verify by
