@@ -46,8 +46,8 @@ work:
     1. From a fresh branch off `published-results`, copy the bundle into
        `results-data/bundles/tpch/duckdb/sf0.01/<bundle-id>/` along with the
        `submission-manifest.json` sidecar.
-    2. Push to private remote and open PR against `published-results`:
-       `gh pr create --repo joeharris76/benchbox-private --base published-results ...`
+    2. Push to origin and open PR against `published-results`:
+       `gh pr create --repo joeharris76/BenchBox --base published-results ...`
     3. Confirm `validate-submission` workflow auto-triggers (no manual dispatch).
     4. Capture the rendered PR comment (paste markdown into evidence file at
        `_project/handoffs/ci-validation-evidence-<date>.md`).

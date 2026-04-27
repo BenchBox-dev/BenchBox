@@ -115,15 +115,15 @@ work:
     # First do a dry-run to inspect:
     uv run python scripts/prepare_release.py --target /tmp/final-sync-preview \
       --no-commit
-    # Diff the previewed tree against ~/Developer/benchbox-public to confirm
+    # Diff the previewed tree against /Users/joe/Developer/BenchBox to confirm
     # only the expected NEW additions appear (explorer, _blog, dev-tooling
     # root files) and no SURPRISE removals:
-    diff -rq /tmp/final-sync-preview ~/Developer/benchbox-public | head -50
+    diff -rq /tmp/final-sync-preview /Users/joe/Developer/BenchBox | head -50
     # Investigate every "Only in" line. Surprises = bugs. Fix HOLD_BACK or
     # ALLOWED_ROOT_FILES until happy.
     # When clean, sync via PR (preferred over force-push since branch
     # protection may be on public main):
-    cd ~/Developer/benchbox-public
+    cd /Users/joe/Developer/BenchBox
     git checkout -b migration/final-sync
     # Apply tree from /tmp/final-sync-preview onto this branch:
     rsync -a --delete --exclude='.git' /tmp/final-sync-preview/ ./
@@ -157,7 +157,7 @@ work:
   needs: [w5]
   status: done
   notes: |
-    cd ~/Developer/benchbox-public
+    cd /Users/joe/Developer/BenchBox
     git remote add private-project-history /tmp/private-project-history
     git fetch private-project-history
     git checkout -b migration/project-history-merge main
@@ -189,7 +189,7 @@ work:
 
     Updated mechanics under the version-branch flow (see decisions doc
     A4 / A5):
-      cd ~/Developer/benchbox-public
+      cd /Users/joe/Developer/BenchBox
       git checkout develop && git pull
       # Bump version + draft changelog on develop (or in a release-prep PR)
       make bump VERSION=0.3.0
@@ -232,13 +232,13 @@ verification:
   command: "pip index versions benchbox 2>&1 | grep -c '0.3.0'"
   expected_output: "at least 1"
 - description: "Tag exists on public main"
-  command: "git -C ~/Developer/benchbox-public rev-parse v0.3.0"
+  command: "git -C /Users/joe/Developer/BenchBox rev-parse v0.3.0"
   expected_output: "valid SHA"
 - description: "_project/** history is preserved on public"
-  command: "git -C ~/Developer/benchbox-public log --oneline -- _project/TODO/ | wc -l"
+  command: "git -C /Users/joe/Developer/BenchBox log --oneline -- _project/TODO/ | wc -l"
   expected_output: "more than 1 (multiple commits, not just a single migration commit)"
 - description: ".pre-commit-config.yaml landed on public"
-  command: "test -f ~/Developer/benchbox-public/.pre-commit-config.yaml && echo OK"
+  command: "test -f /Users/joe/Developer/BenchBox/.pre-commit-config.yaml && echo OK"
   expected_output: "OK"
 - description: "Installed wheel is clean of maintainer scaffolding"
   command: "pip show -f benchbox | grep -E '_project|automate_release|benchbox/release/' | wc -l"
@@ -279,8 +279,8 @@ scope_limit:
   - CHANGELOG.md  # via generate_changelog_entry.py
   - docs/  # version markers via update_version.py
   - landing/  # version badge via update_landing_page_version
-  - ~/Developer/benchbox-public/**  # the destination of the final sync and history merge
+  - /Users/joe/Developer/BenchBox/**  # the destination of the final sync and history merge
   notes: |
-    Most touch is on the destination clone (~/Developer/benchbox-public).
+    Most touch is on the destination clone (/Users/joe/Developer/BenchBox).
     On the source clone (private), only workflow.py changes plus the
     standard release-time version bump in __init__.py / pyproject.toml.
