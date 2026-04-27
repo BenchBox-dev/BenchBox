@@ -1,33 +1,34 @@
-generated_at: '2026-04-26T17:10:18.457201'
+generated_at: '2026-04-26T21:04:10.415024'
 total_items: 41
 items:
 - id: single-repo-migration-phase-0-audit
   file: TODO/main/planning/single-repo-migration-phase-0-audit.yaml
-  title: 'Single-repo migration phase 0: gitleaks scan and content audit of private history'
+  title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
+    check)'
   worktree: main
   category: Release Tooling
   priority: Critical
   status: Not Started
-  work_total: 6
+  work_total: 8
   work_done: 0
-  work_ready: 5
+  work_ready: 7
   needs:
   - single-repo-migration-decisions-gate
 - id: single-repo-migration-phase-5-repo-flip
   file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
-  title: 'Single-repo migration phase 5: rename benchbox-private to BenchBox and flip visibility'
+  title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
   worktree: main
   category: Release Tooling
   priority: Critical
   status: Not Started
-  work_total: 11
+  work_total: 10
   work_done: 0
   work_ready: 1
   needs:
   - single-repo-migration-phase-4-test-release-with-new-flow
 - id: single-repo-migration-decisions-gate
   file: TODO/main/planning/single-repo-migration-decisions-gate.yaml
-  title: 'Single-repo migration: decisions gate (D1-D7) before any code or repo changes'
+  title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'
   worktree: main
   category: Release Tooling
   priority: Critical
@@ -170,14 +171,14 @@ items:
   - single-repo-migration-phase-2-continuous-ci
 - id: single-repo-migration-phase-4-test-release-with-new-flow
   file: TODO/main/planning/single-repo-migration-phase-4-test-release-with-new-flow.yaml
-  title: 'Single-repo migration phase 4: cut one real PyPI release using the new flow only'
+  title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
   worktree: main
   category: Release Tooling
   priority: High
   status: Not Started
-  work_total: 7
+  work_total: 8
   work_done: 0
-  work_ready: 2
+  work_ready: 1
   needs:
   - single-repo-migration-phase-3-new-release-flow
 - id: databend-3-mode-local-server-cloud
@@ -344,12 +345,13 @@ items:
   - define-phase-3-promotion-metrics
 - id: single-repo-migration-phase-9-decommission-archive
   file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml
-  title: 'Single-repo migration phase 9: decommission BenchBox-archive after 60-90 day soak'
+  title: 'Single-repo migration phase 9: decommission archived benchbox-private and retired private clone after 60-90 day
+    soak'
   worktree: main
   category: Release Tooling
   priority: Low
   status: Not Started
-  work_total: 5
+  work_total: 6
   work_done: 0
   work_ready: 3
   needs:

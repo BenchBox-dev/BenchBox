@@ -1,5 +1,5 @@
 id: single-repo-migration-phase-0-audit
-title: "Single-repo migration phase 0: gitleaks scan and content audit of private history"
+title: "Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence check)"
 worktree: main
 priority: Critical
 status: Not Started
@@ -10,36 +10,55 @@ deps:
   - single-repo-migration-decisions-gate
 
 description: |
-  Before the private repo can become public (Phase 5), its full git history
-  must be audited for content that should not be exposed. This is the only
-  load-bearing audit gate; once visibility is flipped, exposed content is
-  forever indexable on GitHub even if deleted.
+  Under Option B, no bulk private history is published — only the working
+  tree (via the final curated sync in Phase 4) and the _project/** subtree
+  history (via filter-merge in Phase 4). Audit scope shrinks accordingly:
+  the only paths whose contents land on public are the ones in scope here.
 
-  Risks audited here:
-  1. Secrets ever committed (API keys, tokens, .env files)
-  2. Internal commentary, stakeholder names, vendor complaints in
-     _project/, _blog/drafts/, code comments
-  3. Embarrassing or rough commit messages
-  4. Large or sensitive binary blobs in history
+  Risks audited:
+  1. Secrets in the working tree of any path that will land via the final
+     curated sync (i.e., everything except .claude, .codex, .gemini, secrets)
+  2. Secrets in the commit history of _project/** (which WILL be published
+     via filter-merge if D2a stays on its recommended choice)
+  3. Internal commentary, stakeholder names, vendor complaints in _project/,
+     _blog/drafts/, code comments
+  4. Embarrassing or rough commit messages on _project/** specifically
+  5. Divergence between private working tree and public mirror history
+     (any commits made only on the public mirror that should be replicated
+     on private before the final sync)
 
-  Outcome: either go-ahead, or a remediation plan (git filter-repo to scrub,
-  squash to fresh history, etc.) before proceeding to Phase 1.
+  Outcome: either go-ahead, or a remediation plan (fix files in working
+  tree, scrub _project/** history with filter-repo, drop _project/** to
+  working-tree-only sync, etc.) before proceeding to Phase 1.
 
   Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 0).
 
 work:
 - id: w1
-  summary: "Install gitleaks and run full-history scan"
+  summary: "Install gitleaks and run working-tree scan"
   status: pending
   notes: |
     brew install gitleaks
     cd /Users/joe/Developer/BenchBox
-    gitleaks detect --source . --log-opts='--all' --report-path=/tmp/gitleaks-report.json
-    Review report. Triage each finding as: real secret (must scrub +
-    rotate), false positive (add to .gitleaksignore), or low-risk legacy
-    test fixture.
+    gitleaks detect --no-git --source . \
+      --report-path=/tmp/gitleaks-worktree.json
+    Review report. Triage each finding as: real secret in a file (must
+    fix before final sync + rotate), false positive (add to
+    .gitleaksignore), or low-risk legacy test fixture.
 
 - id: w2
+  summary: "Run gitleaks on _project/** history (the only history being published)"
+  status: pending
+  notes: |
+    gitleaks detect --source . \
+      --log-opts='--all -- _project/' \
+      --report-path=/tmp/gitleaks-project-history.json
+    If clean: D2a (filter-merge) is safe.
+    If dirty with real secrets: choose between scrubbing via
+    git filter-repo --replace-text/--invert-paths, or downgrading
+    _project/** to working-tree-only (override D2a).
+
+- id: w3
   summary: "Audit _project/ for sensitive content"
   status: pending
   notes: |
@@ -49,69 +68,100 @@ work:
     complaints, references to private business plans. Most TODO content
     is fine to publish; the goal is to catch outliers.
 
-- id: w3
+- id: w4
   summary: "Audit _blog/drafts/ for unpublished content"
   status: pending
   notes: |
     Read every file under _blog/drafts/ and decide: ship as-is, edit
-    before public, or move to a wip/ branch that never merges (per D4).
+    before final sync, or move to a wip/ branch that never merges (per D4).
     Drafts are higher-risk than TODOs because they may contain unedited
-    opinions.
-
-- id: w4
-  summary: "Scan commit messages for embarrassing language"
-  status: pending
-  notes: |
-    git log --all --format='%h %s' | grep -iE \
-      'wip|hack|fix(?:me|up)|temp|stupid|broken|fuck|shit'
-    Decide whether the commits are publishable or whether the migration
-    needs fresh-history (D2 reconfirmation).
+    opinions. Note: only the working-tree state of _blog/ is published;
+    history is not preserved (no filter-merge for _blog/).
 
 - id: w5
-  summary: "Check for unintended large blobs in history"
+  summary: "Scan _project/** commit messages for embarrassing language"
   status: pending
   notes: |
-    git rev-list --objects --all | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | awk '$1=="blob" && $3 > 5000000' | sort -k3 -nr | head
-    Anything over 5 MB is suspicious. Check whether it should have been
-    .gitignore'd. If yes, plan a git filter-repo run to remove it from
-    full history.
+    Only _project/** history is being published, so only _project/**'s
+    commit messages need this audit:
+      git log --all --format='%h %s' -- _project/ | grep -iE \
+        'wip|hack|fix(?:me|up)|temp|stupid|broken|fuck|shit'
+    If hits exist: scrub via filter-repo --message-callback before the
+    Phase 4 filter-merge, or override D2a to working-tree-only.
 
 - id: w6
-  summary: "Decide: proceed-as-is, scrub-then-proceed, or fresh-history"
-  needs: [w1, w2, w3, w4, w5]
+  summary: "Divergence check: anything on public mirror not represented in private"
+  status: pending
+  notes: |
+    cd /Users/joe/Developer/BenchBox
+    git log --format='%s' public/main | sort -u > /tmp/public-msgs.txt
+    git log --format='%s' --all | sort -u > /tmp/private-msgs.txt
+    comm -23 /tmp/public-msgs.txt /tmp/private-msgs.txt
+    Output: commit subjects on public mirror absent from private.
+    Should be empty or trivially explainable. Investigate any leftovers —
+    they may represent fix-ups applied directly to the curated mirror
+    that should be replicated on private (or accepted as left-behind)
+    before the final sync. Verified prior: at least two such fix-ups
+    exist (landing badge fix, linkcheck fix); they ARE represented in
+    private but with different SHAs from prepare_release.py squashing,
+    so this comm check should still come back empty by message.
+
+- id: w7
+  summary: "Check for unintended large blobs in _project/** history"
+  status: pending
+  notes: |
+    git rev-list --objects --all -- _project/ | \
+      git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | \
+      awk '$1=="blob" && $3 > 5000000' | sort -k3 -nr | head
+    Anything over 5 MB in _project/ history is suspicious. If found,
+    plan a filter-repo --strip-blobs-bigger-than run before the
+    Phase 4 filter-merge.
+
+- id: w8
+  summary: "Decide: proceed-as-is, scrub-then-proceed, or working-tree-only-for-_project"
+  needs: [w1, w2, w3, w4, w5, w6, w7]
   status: pending
   notes: |
     Update _project/decisions/single-repo-migration.md with the final
-    D2 choice based on findings. Three options:
-    - PROCEED: gitleaks clean, content acceptable
-    - SCRUB: use git filter-repo to remove specific paths/blobs from
-      full history before going public
-    - FRESH-HISTORY: squash all of private into one commit on the new
-      public main; loses blame but eliminates content risk
+    D2a choice based on findings. Three options:
+    - PROCEED: gitleaks clean, content acceptable, divergence empty
+    - SCRUB: use git filter-repo to remove specific paths/blobs/messages
+      from _project/** history before the Phase 4 filter-merge
+    - WORKING-TREE-ONLY: drop _project/** to part of the final curated
+      sync (no preserved history); loses TODO/DONE archaeology but
+      eliminates content risk
     Document the choice and reason.
 
 verification:
-- description: "gitleaks report exists, all findings triaged"
-  command: "test -f /tmp/gitleaks-report.json && jq 'length' /tmp/gitleaks-report.json"
+- description: "Working-tree gitleaks scan triaged"
+  command: "test -f /tmp/gitleaks-worktree.json && jq 'length' /tmp/gitleaks-worktree.json"
   expected_output: "0 (or all findings categorized in decisions doc)"
-- description: "Decision doc updated with D2 final choice and audit summary"
-  command: "grep -c 'D2' _project/decisions/single-repo-migration.md"
-  expected_output: "at least 1 (D2 entry retains its row)"
+- description: "_project/** history gitleaks scan triaged"
+  command: "test -f /tmp/gitleaks-project-history.json && jq 'length' /tmp/gitleaks-project-history.json"
+  expected_output: "0 (or all findings categorized in decisions doc)"
+- description: "Divergence check has empty (or explained) output"
+  command: "comm -23 /tmp/public-msgs.txt /tmp/private-msgs.txt | wc -l"
+  expected_output: "0 (or each line accounted for in decisions doc)"
+- description: "Decision doc updated with D2a final choice and audit summary"
+  command: "grep -c 'D2a' _project/decisions/single-repo-migration.md"
+  expected_output: "at least 1"
 
 must_preserve:
 - The private repo is unchanged by this audit. Audit is read-only;
   remediation (if any) is staged for a later step.
 - The decisions doc from the gate item is the canonical record - this
   audit updates it with findings, not a new doc.
+- Bulk private history is being left behind anyway, so commit-message
+  audits on non-_project/** paths are NOT needed (a meaningful narrowing
+  vs Option A).
 
 anti_patterns:
 - DO NOT run git filter-repo during this audit - because filter-repo
   rewrites history; that should be a deliberate, separately-scheduled
-  step after the audit decision is made.
-- DO NOT skip the commit-message audit - because GitHub indexes commit
-  messages for search; embarrassing language in old messages is just
-  as exposed as embarrassing content.
-- DO NOT proceed to Phase 1 until w6 is complete - because the
+  step in Phase 4 (or skipped entirely if D2a flips to working-tree-only).
+- DO NOT audit commit messages on the full repo - because Option B does
+  not publish bulk history; only _project/** messages matter (w5).
+- DO NOT proceed to Phase 1 until w8 is complete - because the
   remediation strategy may require additional preparation that is
   cheaper to do before further changes layer on.
 

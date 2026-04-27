@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T17:10:18.457256'
+generated_at: '2026-04-26T21:04:10.415080'
 total_items: 41
 priorities:
   Critical:
@@ -6,17 +6,18 @@ priorities:
     items:
     - id: single-repo-migration-phase-0-audit
       file: TODO/main/planning/single-repo-migration-phase-0-audit.yaml
-      title: 'Single-repo migration phase 0: gitleaks scan and content audit of private history'
+      title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
+        check)'
       category: Release Tooling
       status: Not Started
     - id: single-repo-migration-phase-5-repo-flip
       file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
-      title: 'Single-repo migration phase 5: rename benchbox-private to BenchBox and flip visibility'
+      title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
       category: Release Tooling
       status: Not Started
     - id: single-repo-migration-decisions-gate
       file: TODO/main/planning/single-repo-migration-decisions-gate.yaml
-      title: 'Single-repo migration: decisions gate (D1-D7) before any code or repo changes'
+      title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'
       category: Release Tooling
       status: Not Started
     - id: verify-ci-validation-workflow-end-to-end
@@ -64,7 +65,7 @@ priorities:
       status: Not Started
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/planning/single-repo-migration-phase-4-test-release-with-new-flow.yaml
-      title: 'Single-repo migration phase 4: cut one real PyPI release using the new flow only'
+      title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
       category: Release Tooling
       status: Not Started
   Medium-High:
@@ -193,7 +194,8 @@ priorities:
       status: Not Started
     - id: single-repo-migration-phase-9-decommission-archive
       file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml
-      title: 'Single-repo migration phase 9: decommission BenchBox-archive after 60-90 day soak'
+      title: 'Single-repo migration phase 9: decommission archived benchbox-private and retired private clone after 60-90
+        day soak'
       category: Release Tooling
       status: Not Started
     - id: stackoverflow-benchmark

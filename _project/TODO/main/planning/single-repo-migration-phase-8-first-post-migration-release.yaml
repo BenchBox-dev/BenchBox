@@ -14,11 +14,14 @@ description: |
   End-to-end validation that the new flow works in the now-canonical
   single-repo state, with all old tooling deleted and all docs aligned.
   This is the first release where there is no fallback - the old
-  automate_release.py is gone.
+  automate_release.py is gone, and the retired private clone is no
+  longer a viable working copy.
 
   If anything is still missing or broken in the new flow, this is where
   it surfaces. Fixes are quick because the surface area is small (a
   Makefile target, one workflow file, one changelog generator).
+
+  Run from ~/Developer/benchbox-public (the new dev locus).
 
   Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 8).
 

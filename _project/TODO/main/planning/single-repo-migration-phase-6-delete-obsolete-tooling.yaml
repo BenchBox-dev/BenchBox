@@ -10,8 +10,8 @@ deps:
   - single-repo-migration-phase-5-repo-flip
 
 description: |
-  After the repo flip and at least one successful release on the new flow,
-  delete the now-obsolete machinery:
+  After the dev locus migration and v0.3.0 release on the new flow, delete
+  the now-obsolete machinery:
     - 6 release scripts in scripts/
     - benchbox/release/sync.py, workflow.py, content_validation.py
     - HOLD_BACK_PATHS, ALLOWED_ROOT_FILES, _SOURCES_INCLUDE_PATHS,
@@ -20,6 +20,9 @@ description: |
 
   Net effect: thousands of lines deleted. The repo gets simpler; future
   contributors have less surface area to learn.
+
+  This phase lands as a normal PR on public from ~/Developer/benchbox-public
+  (the new dev locus). Squash-merge.
 
   Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 6).
 

@@ -24,6 +24,13 @@ description: |
   automate_release.py and the rest of the old machinery still exist during
   this phase as a fallback. They are deleted in Phase 6.
 
+  Under Option B, these artefacts are added on private (current dev locus)
+  and land on public via the Phase 4 final sync. The Makefile target uses
+  `origin` from the start; when invoked from the public clone post-Phase 5,
+  origin is the canonical repo. Do NOT invoke `make release` from the
+  private clone — its `origin` remote does not exist (private has `private`
+  and `public` remotes today).
+
   Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 3).
 
 work:
@@ -54,8 +61,11 @@ work:
           git commit -m "Release v$(VERSION)"
           git push origin release/v$(VERSION)
           gh pr create --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
-    Note: "origin" assumes Phase 5 has been done (repo flip). Until then
-    use "private". Document this in the Makefile comment.
+    Note: under Option B, `origin` is the canonical remote in the public
+    clone (~/Developer/benchbox-public). The Makefile is intended to run
+    from there post-Phase 5. Add a comment in the Makefile explaining
+    this so it is not invoked accidentally from the private clone before
+    dev-locus migration.
 
 - id: w3
   summary: "Add .github/RELEASE_PR_TEMPLATE.md"
@@ -91,18 +101,21 @@ work:
     Permissions: id-token: write (PyPI), contents: read.
 
 - id: w5
-  summary: "Dry-run with v0.0.0-test on a sandbox branch (no merge, no real publish)"
+  summary: "(Optional) Dry-run with v0.0.0-test on a sandbox branch"
   needs: [w2, w3, w4]
   status: pending
   notes: |
-    git checkout -b sandbox-release-flow
-    make release VERSION=0.0.0-test
-    Review the resulting PR. Check:
-      - Version bump touched the right files
-      - Changelog stub is reasonable (or empty/minimal if no commits)
-      - PR body uses the template
-    Close the PR without merging. Delete the branch. No PyPI publish
-    happens because no tag was pushed.
+    Optional. Under Option B, the new flow gets exercised on real public
+    main in Phase 4; most issues will surface there. Skip this work unit
+    if you would rather catch issues during the actual v0.3.0 cut and
+    iterate.
+    If running:
+      git checkout -b sandbox-release-flow
+      make release VERSION=0.0.0-test
+      Review the resulting PR. Close without merging. No PyPI publish
+      because no tag was pushed.
+    Note: requires a public clone with origin set, since the Makefile
+    pushes to origin. From private clone this will fail.
 
 verification:
 - description: "scripts/generate_changelog_entry.py exists and is importable as a CLI"

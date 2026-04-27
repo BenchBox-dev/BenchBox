@@ -14,7 +14,10 @@ description: |
   release guide that captures the new flow in one page.
 
   Can run in parallel with Phase 6 (deletion). Both depend only on the
-  repo flip, not on each other.
+  dev locus migration, not on each other.
+
+  This phase lands as a normal PR on public from ~/Developer/benchbox-public.
+  Squash-merge.
 
   Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 7).
 
@@ -27,6 +30,9 @@ work:
     proper replacement:
       ## Git workflow
       Single repo, single remote (origin -> joeharris76/BenchBox).
+      Working clone at ~/Developer/benchbox-public (or your local
+      equivalent — the previous private clone was retired in the
+      Option B migration).
       Work on feature branches, open PRs against main, squash-merge.
       Releases: make release VERSION=X.Y.Z, then tag-push to publish.
       See docs/operations/release-guide.md for details.

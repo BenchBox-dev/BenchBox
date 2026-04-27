@@ -19,6 +19,12 @@ description: |
   Once continuous CI is in place, the release-time CI gate in
   automate_release.py is dead code (and gets deleted in Phase 6).
 
+  Under Option B, this workflow file is added on private and lands on
+  public via the Phase 4 final sync (alongside everything else). The
+  no-op verification commit happens on public after Phase 4. Branch
+  protection is configured in Phase 5 once dev locus is on the public
+  clone.
+
   Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 2).
 
 work:
@@ -49,15 +55,20 @@ work:
     Cache uv dependencies for speed.
 
 - id: w3
-  summary: "Push a no-op commit and confirm the workflow runs green"
+  summary: "Push a no-op commit on public AFTER Phase 4 to confirm the workflow runs green"
   needs: [w2]
   status: pending
   notes: |
-    git commit --allow-empty -m "chore: trigger CI"
-    git push private main
+    Cannot be tested on private (private has no equivalent CI workflow
+    setup that mirrors public). The verification happens after Phase 4
+    lands the workflow on public:
+      cd ~/Developer/benchbox-public
+      git commit --allow-empty -m "chore: trigger CI"
+      git push origin main  # or via PR if branch protection is already on
     Watch the workflow. If it fails, fix on a branch, PR, merge.
-    If existing main is not green, surface that here - it is better to
-    discover this now than during Phase 4 release.
+    If existing main is not green after Phase 4, surface that here -
+    it is better to discover this now than during the v0.3.1 release
+    (Phase 8).
 
 - id: w4
   summary: "Document branch protection settings in decisions doc (apply in Phase 5)"
