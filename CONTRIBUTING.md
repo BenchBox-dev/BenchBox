@@ -10,105 +10,123 @@ This document provides guidelines and instructions for contributing.
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.10+
 - Git
-- uv (fast Python package manager)
+- [uv](https://docs.astral.sh/uv/) (fast Python package manager)
+- [GitHub CLI](https://cli.github.com/) (`gh`) — required for the one-shot PR flow below
 
 ### Setting Up Your Environment
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/username/benchbox.git
-   cd benchbox
+   git clone https://github.com/joeharris76/BenchBox.git
+   cd BenchBox
    ```
 
 2. Install the package in development mode:
    ```bash
-   make develop
+   make develop          # equivalent to: uv sync --group dev
    ```
 
-   Or manually with uv (modern approach):
-   ```bash
-   uv sync --group dev
-   ```
-
-3. Install pre-commit hooks:
+3. Install the pre-commit + pre-push hooks:
    ```bash
    pre-commit install
    ```
 
+   This installs two hooks (configured in `.pre-commit-config.yaml`):
+   - **pre-commit**: ruff format/check, codespell, YAML / markdown lint, timing-policy check.
+   - **pre-push**: `pr-preflight-fast-tests` — re-runs the fast test lane so PR pushes don't discover failures via the CI roundtrip.
+
+   If `pre-commit install` errors with `Cowardly refusing to install hooks with core.hooksPath set` and points at the default `.git/hooks` location, run `git config --unset-all core.hooksPath` and try again — that's a redundant override left over from earlier tooling.
+
+## Branches & PR gate
+
+`develop` is the long-lived development branch; **all changes land via PR**. `main` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
+
+Required CI checks on `develop`: `lint` + `test (ubuntu-latest, 3.12)`. Reviews are not required for solo-dev work; auto-merge handles landing.
+
 ## Development Workflow
 
-1. Create a new branch for your feature or bugfix:
+The canonical loop is **branch → edit → preflight → `make pr-open`**. Auto-merge takes the PR over the line once CI is green; you don't poll.
+
+1. **Create a feature branch off `develop`.** For parallel work, prefer a worktree so the main clone keeps `develop` checked out:
+
    ```bash
-   git checkout -b feature-name
+   # Single-branch (simplest):
+   git checkout develop && git pull
+   git checkout -b feat/your-thing
+
+   # Or, parallel-friendly (creates ../BenchBox.feat-your-thing/):
+   make worktree-add BRANCH=feat/your-thing
+   cd ../BenchBox.feat-your-thing && uv sync --group dev
    ```
 
-2. Make your changes and ensure all tests pass:
+2. **Make your changes.** Iterate with the fast lane:
+
    ```bash
-   make test
+   make test              # fast lane (~1 min)
+   make format            # ruff format .
+   make lint              # ruff check .
+   make typecheck         # ty check
    ```
 
-   Or run tests directly:
+   The pre-commit hook re-runs format/lint/etc. at commit time, so if you forget, the commit will fix or block as appropriate.
+
+3. **Commit using [Conventional Commits](https://www.conventionalcommits.org/)** (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `ci:`, `refactor:`):
+
    ```bash
-   uv run -- python -m pytest
+   git add path/to/file.py path/to/test.py    # explicit paths, never -A
+   git commit -m "fix: resolve race in foo loader"
    ```
 
-3. Ensure your code follows our style guidelines:
+4. **Run the local preflight, then open the PR with auto-merge in one shot:**
+
    ```bash
-   make format    # Format code with ruff
-   make lint      # Check code style
-   make typecheck # Type checking with ty
+   make pr-preflight      # ruff check + ruff format --check + fast tests (mirrors CI)
+   make pr-open           # push + gh pr create --base develop + gh pr merge --auto --squash
    ```
 
-   Or run checks directly:
-   ```bash
-   uv run ruff format .
-   uv run ruff check .
-   uv run ty check
-   ```
-   (Note: pre-commit will run these checks automatically when you commit)
+   `make pr-open` refuses to run from `develop` or `main`. The PR will squash-merge the moment the required checks turn green. Don't poll for CI — auto-merge handles it.
 
-4. Commit your changes:
+5. **After merge**, the remote branch auto-deletes (repo setting `delete_branch_on_merge`). Sweep any stale local branches and worktrees with:
+
    ```bash
-   git commit -m "Description of changes"
+   make worktree-prune    # removes worktrees whose branches are gone on origin
    ```
 
-5. Push your branch and create a pull request:
-   ```bash
-   git push origin feature-name
-   ```
+   Inspect open PRs at any time with `make pr-status`.
 
 ## Pre-Push Validation
 
-Before pushing code, run the CI checks locally to catch issues early:
+There are two layers, and you only need the first:
+
+**Required gate (mirrors what CI enforces):**
 
 ```bash
-# Run ALL CI checks (recommended before pushing)
+make pr-preflight
+```
+
+This runs `ruff check` + `ruff format --check` + the fast test lane. It's identical in spirit to the required checks (`lint` + `test (ubuntu-latest, 3.12)`), so a green preflight almost always means a green CI. The pre-push git hook runs the test portion automatically, so `make pr-open` (and any plain `git push`) is gated even if you forget.
+
+**Optional thoroughness check** — only useful when you've changed cross-cutting things (CI workflows, packaging, docs build, integration paths):
+
+```bash
 make ci-local
 ```
 
-This runs the same checks as GitHub Actions:
-1. Lint + format + type checking (`make ci-lint`)
-2. Fast tests with coverage (`make ci-test`)
-3. Integration smoke tests (`make test-integration-smoke`)
-4. Documentation build (`make ci-docs`)
-5. Package build and install test (`make test-package`)
+This runs the broader CI mirror:
 
-You can also run individual checks:
+| Step | Target |
+|---|---|
+| Lint + format + type checking | `make ci-lint` |
+| Fast tests with coverage | `make ci-test` |
+| Integration smoke tests | `make test-integration-smoke` |
+| Documentation build | `make ci-docs` |
+| Package build + install test | `make test-package` |
 
-```bash
-make ci-lint              # Lint, format check, and type checking
-make ci-test              # Fast tests with 75% coverage threshold
-make ci-docs              # Build documentation
-make test-integration-smoke  # Quick integration tests
-make test-package         # Build and test package installation
-make security-audit       # Run pip-audit security scan
-make spellcheck           # Check spelling with codespell
-make docstring-coverage   # Check docstring coverage
-```
+Or run any of those individually. Additional one-offs: `make security-audit`, `make spellcheck`, `make docstring-coverage`.
 
-Running `make ci-local` before every push ensures CI will pass and saves time waiting for GitHub Actions feedback.
+Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. Auto-merge will block on any non-required check failure that *is* surfaced (e.g. doc build), so the cost of being wrong is just a re-push.
 
 ## Testing
 
