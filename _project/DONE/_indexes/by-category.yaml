@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T19:01:48.615809'
+generated_at: '2026-04-27T19:02:48.330061'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -701,7 +701,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 267
+    count: 268
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1698,6 +1698,11 @@ categories:
     - id: move-remaining-platform-drivers-to-optional-extras
       file: DONE/main/active/move-remaining-platform-drivers-to-optional-extras.yaml
       title: Move polars, clickhouse-connect, and psycopg2-binary out of core dependencies into optional extras
+      priority: Medium
+      status: Completed
+    - id: operate-results-platform-security-observability-and-abuse-controls
+      file: DONE/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+      title: Operate results platform security, observability, and abuse controls
       priority: Medium
       status: Completed
     - id: pt-01-ddl-generator-protocol

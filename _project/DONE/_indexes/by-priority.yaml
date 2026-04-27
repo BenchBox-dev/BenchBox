@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:01:48.615985'
-total_items: 783
+generated_at: '2026-04-27T19:02:48.330242'
+total_items: 784
 priorities:
   Critical:
     count: 45
@@ -2222,7 +2222,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 297
+    count: 298
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3146,6 +3146,11 @@ priorities:
       file: DONE/testing-improvements/completed/open-table-format-smoke-tests.yaml
       title: Open Table Format Smoke Tests
       category: Testing and Quality Assurance
+      status: Completed
+    - id: operate-results-platform-security-observability-and-abuse-controls
+      file: DONE/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+      title: Operate results platform security, observability, and abuse controls
+      category: Core Functionality
       status: Completed
     - id: optimize-benchmark-results-json-output-format
       file: DONE/unknown/planning/optimize-benchmark-results-json-output-format.yaml

@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:01:46.777054'
-total_items: 30
+generated_at: '2026-04-27T19:02:46.567156'
+total_items: 29
 priorities:
   Critical:
     count: 1
@@ -51,7 +51,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium:
-    count: 7
+    count: 6
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -68,11 +68,6 @@ priorities:
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       category: Performance
       status: Identified
-    - id: operate-results-platform-security-observability-and-abuse-controls
-      file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
-      title: Operate results platform security, observability, and abuse controls
-      category: Core Functionality
-      status: Not Started
     - id: single-repo-migration-phase-8-first-post-migration-release
       file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
       title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'

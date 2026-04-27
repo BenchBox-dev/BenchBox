@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:01:46.777011'
-total_items: 30
+generated_at: '2026-04-27T19:02:46.567110'
+total_items: 29
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -372,26 +372,6 @@ items:
   work_ready: 1
   needs:
   - implement-results-explorer-browser-functional-tests
-- id: operate-results-platform-security-observability-and-abuse-controls
-  file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
-  title: Operate results platform security, observability, and abuse controls
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - security
-  - observability
-  - moderation
-  - operations
-  estimated_effort: Large
-  work_total: 8
-  work_done: 0
-  work_ready: 1
-  needs:
-  - define-hosted-results-contract-and-governance-model
-  - design-results-ingest-storage-and-derived-read-model
 - id: single-repo-migration-phase-8-first-post-migration-release
   file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
   title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'

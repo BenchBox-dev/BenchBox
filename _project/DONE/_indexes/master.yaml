@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:01:48.615473'
-total_items: 783
+generated_at: '2026-04-27T19:02:48.329723'
+total_items: 784
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -7736,6 +7736,27 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Small
+- id: operate-results-platform-security-observability-and-abuse-controls
+  file: DONE/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+  title: Operate results platform security, observability, and abuse controls
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - results
+  - security
+  - observability
+  - moderation
+  - operations
+  estimated_effort: Large
+  completed_date: '2026-04-27'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  needs:
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
 - id: optimize-benchmark-results-json-output-format
   file: DONE/unknown/planning/optimize-benchmark-results-json-output-format.yaml
   title: Optimize Benchmark Results JSON Output Format

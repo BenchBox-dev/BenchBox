@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:01:46.777063'
-total_items: 30
+generated_at: '2026-04-27T19:02:46.567165'
+total_items: 29
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 27
+    count: 26
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -82,11 +82,6 @@ statuses:
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
       priority: High
       category: Platform Expansion
-    - id: operate-results-platform-security-observability-and-abuse-controls
-      file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
-      title: Operate results platform security, observability, and abuse controls
-      priority: Medium
-      category: Core Functionality
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
