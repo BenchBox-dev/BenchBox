@@ -725,10 +725,10 @@ pr-open:
 	echo "$$URL" && \
 	gh pr merge --auto --squash "$$URL"
 
-# Show PRs you have open against develop and their CI state.
+# Show open PRs against develop and their CI + auto-merge state.
 pr-status:
-	@gh pr list --author "@me" --base develop --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
-		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}enabled{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
+	@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
+		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
 # Create a worktree off origin/develop. Usage: make worktree-add BRANCH=fix/foo
 # Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
