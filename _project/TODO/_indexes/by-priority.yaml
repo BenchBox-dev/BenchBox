@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T09:00:33.658552'
-total_items: 38
+generated_at: '2026-04-27T09:11:00.653655'
+total_items: 37
 priorities:
   Critical:
     count: 2
@@ -15,7 +15,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 7
+    count: 6
     items:
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
@@ -36,11 +36,6 @@ priorities:
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
-      status: Not Started
-    - id: single-repo-migration-phase-2-continuous-ci
-      file: TODO/main/planning/single-repo-migration-phase-2-continuous-ci.yaml
-      title: 'Single-repo migration phase 2: continuous CI on push to main and every PR'
-      category: Release Tooling
       status: Not Started
     - id: single-repo-migration-phase-3-new-release-flow
       file: TODO/main/planning/single-repo-migration-phase-3-new-release-flow.yaml

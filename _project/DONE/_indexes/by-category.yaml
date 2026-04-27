@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T09:00:35.830035'
+generated_at: '2026-04-27T09:11:02.512553'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -3495,7 +3495,7 @@ categories:
       priority: Critical
       status: Completed
   Release Tooling:
-    count: 5
+    count: 6
     items:
     - id: single-repo-migration-phase-0-audit
       file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
@@ -3506,6 +3506,11 @@ categories:
     - id: single-repo-migration-phase-1-wheel-hygiene
       file: DONE/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
       title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'
+      priority: High
+      status: Completed
+    - id: single-repo-migration-phase-2-continuous-ci
+      file: DONE/main/planning/single-repo-migration-phase-2-continuous-ci.yaml
+      title: 'Single-repo migration phase 2: continuous CI on push to main and every PR'
       priority: High
       status: Completed
     - id: single-repo-migration-decisions-gate

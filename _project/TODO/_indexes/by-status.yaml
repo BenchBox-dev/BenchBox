@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T09:00:33.658563'
-total_items: 38
+generated_at: '2026-04-27T09:11:00.653665'
+total_items: 37
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Testing & Quality
   Not Started:
-    count: 36
+    count: 35
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -117,11 +117,6 @@ statuses:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       category: Core Functionality
-    - id: single-repo-migration-phase-2-continuous-ci
-      file: TODO/main/planning/single-repo-migration-phase-2-continuous-ci.yaml
-      title: 'Single-repo migration phase 2: continuous CI on push to main and every PR'
-      priority: High
-      category: Release Tooling
     - id: single-repo-migration-phase-3-new-release-flow
       file: TODO/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
       title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'

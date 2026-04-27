@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T09:00:35.830214'
-total_items: 775
+generated_at: '2026-04-27T09:11:02.512732'
+total_items: 776
 priorities:
   Critical:
     count: 44
@@ -226,7 +226,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 265
+    count: 266
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -1273,6 +1273,11 @@ priorities:
     - id: single-repo-migration-phase-1-wheel-hygiene
       file: DONE/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
       title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'
+      category: Release Tooling
+      status: Completed
+    - id: single-repo-migration-phase-2-continuous-ci
+      file: DONE/main/planning/single-repo-migration-phase-2-continuous-ci.yaml
+      title: 'Single-repo migration phase 2: continuous CI on push to main and every PR'
       category: Release Tooling
       status: Completed
     - id: first-class-clickhouse-local-server-cloud-platforms
