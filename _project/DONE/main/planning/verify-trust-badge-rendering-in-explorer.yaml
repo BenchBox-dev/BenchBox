@@ -1,0 +1,140 @@
+id: verify-trust-badge-rendering-in-explorer
+title: "Visually verify TrustBadge rendering across all 4 explorer pages"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-12"
+completed_note: "Visual verification performed 2026-04-12 via Playwright-driven local explorer build. Captured 20 screenshots (5 trust-label variants × 4 pages) under `_project/handoffs/trust-badge-screenshots-2026-04-12/`. No visual defects found; fixture branch discarded per scope_limit."
+category: Testing and Quality Assurance
+
+deps:
+  needs:
+    - implement-pr-based-result-submission-workflow
+
+description: |
+  The `TrustBadge` component (`results-explorer/src/components/TrustBadge.tsx`)
+  was added in PR #53 and integrated into ResultDetail, BenchmarkIndex,
+  PlatformIndex, and Compare pages. Unit tests cover the data flow from
+  pipeline → manifest → page props, but the rendered visual output has never
+  been eyeballed in a real browser build. CSS regressions, color contrast
+  issues, and compact-vs-full variant misuse will only surface in a real
+  render.
+
+  This item builds the explorer locally, walks all four pages with seeded
+  corpus data covering every trust label (`maintainer-run`,
+  `community-submission`, `ci`, `local`, plus an unknown label fallback),
+  captures screenshots, and files visual bugs found.
+
+work:
+  - id: w1
+    summary: "Seed local corpus with one bundle per trust label"
+    status: done
+    notes: |
+      The current seed corpus is all `maintainer-run`. To verify all variants,
+      temporarily add 4 fixture bundles in a local-only branch (do NOT commit
+      to main):
+        - 1 with no sidecar → maintainer-run (already exists)
+        - 1 with `submission-manifest.json` sidecar → community-submission
+        - 1 with explicit `trust_label: ci` injected via pipeline override
+        - 1 with `trust_label: local`
+        - 1 with `trust_label: experimental` (unknown - confirms graceful fallback)
+      Use the existing TPC-H SF 0.01 DuckDB bundle as the source; only the
+      metadata/sidecar varies.
+
+  - id: w2
+    summary: "Build and serve the explorer locally"
+    needs: [w1]
+    status: done
+    notes: |
+      cd results-explorer
+      npm install
+      npm run build
+      npx serve dist
+      # Open http://localhost:3000/results/ in Chrome, Firefox, Safari
+
+  - id: w3
+    summary: "Verify badge rendering on all 4 pages and capture screenshots"
+    needs: [w2]
+    status: done
+    notes: |
+      For each page, confirm: badge renders, color matches spec
+      (Maintainer=blue, Community=yellow, CI=gray, Local=gray, Unknown=neutral
+      fallback), text label readable, compact variant fits inside table cells
+      without wrapping or overflow.
+
+      Pages and locations:
+        - ResultDetail (full badge, line ~95 of ResultDetail.tsx) - visit one
+          URL per trust label
+        - BenchmarkIndex (compact, line ~127) - Source column shows badge per row
+        - PlatformIndex (compact, line ~135) - same
+        - Compare (compact, line ~165) - beside fastest indicator
+
+      Save screenshots to `_project/handoffs/trust-badge-screenshots-<date>/`
+      organized by `<page>-<label>.png`. 5 labels × 4 pages = 20 screenshots
+      minimum.
+
+  - id: w4
+    summary: "Cross-browser sanity check (Chrome, Firefox, Safari)"
+    needs: [w3]
+    status: done
+    notes: |
+      Re-open one ResultDetail page per browser. Confirm color, font, and
+      layout match Chrome. Document any browser-specific issues
+      (Safari often differs on flexbox / SVG sizing). One screenshot per
+      browser is sufficient unless a regression is found.
+
+  - id: w5
+    summary: "File defects and update handoff status"
+    needs: [w4]
+    status: done
+    notes: |
+      - For each visual issue, create a focused bug TODO referencing the
+        offending screenshot and the source file/line.
+      - Update step #1 of `_project/handoffs/results-publishing-handoff-2026-04-04.md`
+        to mark TrustBadge verification complete and link to the screenshot
+        directory.
+      - Discard the local-only fixture branch from w1 - DO NOT merge fixture
+        bundles into the real corpus.
+
+verification:
+  - description: "Screenshot directory exists with >= 20 files"
+    command: "ls _project/handoffs/trust-badge-screenshots-*/ | wc -l"
+    expected_output: ">= 20"
+
+must_preserve:
+  - The seed corpus on `published-results` (do not commit fixture bundles).
+  - Existing TrustBadge component API and props (verification only - no code changes unless filing/fixing a defect).
+  - Trust label mapping in `benchbox/core/explorer_pipeline/pipeline.py`.
+
+anti_patterns:
+  - DO NOT commit the fixture bundles from w1 - because they would pollute the curated maintainer corpus; they exist only on a local branch that gets discarded.
+  - DO NOT silently fix CSS/component issues during this verification pass - because that conflates verification with implementation; file a follow-up TODO and address it as a separate change.
+  - DO NOT skip the unknown-label case - because graceful degradation for future trust tiers (Phase 3) is the most likely source of regression.
+
+scope_limit:
+  only_modify:
+    - _project/handoffs/trust-badge-screenshots-*/ # new screenshots
+    - _project/handoffs/results-publishing-handoff-2026-04-04.md # status update only
+    - _project/TODO/main/planning/ # follow-up TODOs only if defects found
+  do_not_touch:
+    - results-explorer/src/components/TrustBadge.tsx
+    - results-explorer/src/pages/
+    - results-data/bundles/
+
+metadata:
+  tags:
+    - results
+    - explorer
+    - frontend
+    - trust-labels
+    - visual-qa
+  estimated_effort: "Small"
+  created_date: "2026-04-12"
+
+impact:
+  business_value: |
+    Catches visual regressions before community submissions land, when the
+    trust-label distinction is the user-facing signal of bundle provenance.
+  user_impact: |
+    Users can immediately distinguish maintainer vs community results without
+    having to inspect bundle metadata.

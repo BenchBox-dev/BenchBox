@@ -1,0 +1,73 @@
+# Unified PostgreSQL Extension Docker Compose - DEVELOPMENT/TEST ONLY
+# Runs pg_duckdb and pg_mooncake on separate ports to avoid conflicts.
+# Plaintext credentials below are for local testing only - do not use in production.
+#
+# Usage:
+#   docker compose -f docker/postgres-extensions/docker-compose.yml up -d --wait
+#   make test-docker-up-pg-extensions
+#
+# Ports:
+#   5432 - pg_duckdb (PostgreSQL + DuckDB extension)
+#   5433 - pg_mooncake (PostgreSQL + mooncake columnstore extension)
+#
+# NOTE: pg_duckdb and pg_mooncake share libduckdb.so and cannot coexist in
+# the same PostgreSQL instance. This compose file runs them as separate
+# containers on different ports.
+#
+# Default credentials (all services):
+#   Username: benchbox
+#   Password: benchbox
+#   Database: benchbox_test
+#
+# NOTE: pg_duckdb moved from PostgreSQL 17 to 18, and the current pg_mooncake
+# image is also PG18-backed via pg_duckdb. This compose file uses fresh named
+# volumes for both PG18-backed services; migrate manually from the old
+# `pg-duckdb-test-data` / `pg-mooncake-test-data` volumes if you need to
+# preserve local extension state.
+
+services:
+  pg-duckdb:
+    image: pgduckdb/pgduckdb:18-v1.1.1
+    container_name: benchbox-pg-duckdb-test
+    environment:
+      POSTGRES_USER: benchbox
+      POSTGRES_PASSWORD: benchbox
+      POSTGRES_DB: benchbox_test
+    ports:
+      - "${PG_DUCKDB_PORT:-5432}:5432"
+    volumes:
+      - pg-duckdb18-test-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benchbox -d benchbox_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    shm_size: "256mb"
+
+  pg-mooncake:
+    image: mooncakelabs/pg_mooncake:latest
+    container_name: benchbox-pg-mooncake-test
+    environment:
+      POSTGRES_USER: benchbox
+      POSTGRES_PASSWORD: benchbox
+      POSTGRES_DB: benchbox_test
+    ports:
+      - "${PG_MOONCAKE_PORT:-5433}:5432"
+    volumes:
+      - pg-mooncake18-test-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benchbox -d benchbox_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    shm_size: "256mb"
+
+volumes:
+  pg-duckdb18-test-data:
+    driver: local
+  pg-mooncake18-test-data:
+    driver: local

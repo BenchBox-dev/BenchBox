@@ -1,0 +1,155 @@
+id: extract-project-scripts-to-isolated-env
+title: "Extract _project/scripts/ to its own pinned env so internal tooling deps leave the main manifest"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-04-15"
+category: Code Quality and Technical Debt
+description: |
+  Internal TODO/release tooling under `_project/scripts/` is the structural
+  reason `jsonschema` lives in `[project] dependencies` and `ruamel-yaml`
+  lives in `[dependency-groups] dev`. These packages are not part of the
+  shipped wheel - `_project/` is excluded from packaging.
+
+  Audited tooling-only imports today:
+    - `_project/scripts/validate_todo.py` → `jsonschema`
+    - `_project/scripts/todo_cli.py` → `ruamel.yaml`
+
+  The interim fix in Phase 0 (`move-jsonschema-out-of-core-runtime-deps`)
+  shifts `jsonschema` from core to dev. That removes it from end-user
+  installs but keeps it in every contributor's dev env. The structural
+  fix is to give `_project/scripts/` its own `pyproject.toml` so the
+  boundary between "ships in the wheel" and "internal tooling" is
+  enforced by tooling, not by convention.
+
+  Source: `docs/development/dependency-inventory.md` findings F2 +
+  consolidation note on `_project/` being out of the public manifest.
+
+work:
+  - id: w1
+    summary: "Inventory every third-party import under `_project/scripts/` via AST scan. Capture the full set, not just jsonschema/ruamel-yaml."
+    status: done
+    notes: |
+      Reuse `_project/scratch/scan_imports.py --root _project/scripts` or an
+      equivalent ad-hoc AST walker.
+
+  - id: w2
+    summary: "Create `_project/scripts/pyproject.toml` declaring the inventoried deps. Pin to versions consistent with current uv.lock for reproducibility."
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Decide invocation pattern (uv --project flag vs wrapper script) and document it in `_project/scripts/README.md`."
+    needs: [w2]
+    status: done
+    notes: |
+      Option A: `uv run --project _project/scripts <script>`.
+      Option B: thin wrapper at repo root that activates the isolated env.
+
+  - id: w4
+    summary: "Update CLAUDE.md / AGENTS.md pre-approved command patterns for `_project/scripts/todo_cli.py *` and `_project/scripts/validate_todo.py *` to match the new invocation pattern."
+    needs: [w3]
+    status: done
+
+  - id: w5
+    summary: "Remove `jsonschema` and `ruamel-yaml` from the main `pyproject.toml` (they were already moved to dev in Phase 0; this step removes them entirely). Refresh `uv.lock` with `uv lock`."
+    needs: [w2, w3]
+    status: done
+
+  - id: w6
+    summary: "Run fast suite + execute `_project/scripts/todo_cli.py list` and `_project/scripts/validate_todo.py` against a known-good TODO to confirm tooling still works under the isolated env."
+    needs: [w5]
+    status: done
+
+deferred:
+  - summary: "Move `_project/scratch/` audit scripts under the same isolated env"
+    reason: "Phase 4 (`add-dependency-audit-ci-guard`) handles those scripts; defer to that TODO so we don't fork the work."
+  - summary: "Migrate `scripts/` (top-level) to an isolated env"
+    reason: "Out of scope. `scripts/` may include pieces that ship in the wheel or are otherwise coupled to runtime; needs separate audit."
+
+files_affected:
+  added:
+    - "_project/scripts/pyproject.toml"
+    - "_project/scripts/README.md" # if not already present
+  modified:
+    - "pyproject.toml"
+    - "uv.lock"
+    - "CLAUDE.md"
+    - "AGENTS.md"
+
+must_preserve:
+  - "`_project/scripts/todo_cli.py` and `_project/scripts/validate_todo.py` continue to function with their existing CLI surface"
+  - "Pre-approved command patterns in CLAUDE.md / AGENTS.md remain executable (with whatever invocation prefix the new pattern requires)"
+  - "Fast suite green after the change"
+  - "BenchBox wheel install does NOT pull jsonschema or ruamel-yaml unless an extras explicitly requires them (none should)"
+
+approach: |
+  Make the wheel/tooling boundary structural. After this TODO, contributors
+  installing benchbox in dev mode no longer pick up `jsonschema` or
+  `ruamel-yaml` transitively - those live in the isolated tooling env and
+  are only resolved when a TODO/release script is actually invoked.
+
+  Pattern reference: `uv` supports per-directory pyproject.toml resolution
+  via `--project`. Alternative is a tiny shim: `_project/scripts/run.sh`
+  that wraps `uv run --project $(dirname "$0") "$@"`.
+
+anti_patterns:
+  - "DO NOT silently drop the deps from main pyproject without first creating the isolated env - because contributors invoking the scripts will get ImportError - set up the new env first, verify, then remove"
+  - "DO NOT pin to floating versions in `_project/scripts/pyproject.toml` - because internal tooling regressions are hard to debug - pin to current uv.lock versions"
+  - "DO NOT modify the scripts themselves - because behavior change is out of scope - only the invocation environment"
+
+verification:
+  - description: "jsonschema and ruamel-yaml absent from main pyproject"
+    command: 'uv run -- python -c "import pathlib; t = pathlib.Path(''pyproject.toml'').read_text(); assert ''jsonschema'' not in t, ''jsonschema still in main manifest''; assert ''ruamel-yaml'' not in t and ''ruamel.yaml'' not in t, ''ruamel-yaml still in main manifest''; print(''OK: tooling deps removed from main manifest'')"'
+    expected_output: "OK: tooling deps removed from main manifest"
+  - description: "Isolated env exists and resolves"
+    command: 'uv run -- python -c "import pathlib; assert pathlib.Path(''_project/scripts/pyproject.toml'').exists(), ''isolated env pyproject missing''; print(''OK: isolated env present'')"'
+    expected_output: "OK: isolated env present"
+  - description: "Tooling still functions"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py list --status 'Not Started' 2>&1 | head -5"
+    expected_output: "non-empty output, no ImportError"
+  - description: "Fast suite passes"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "no failures"
+
+scope_limit:
+  only_modify:
+    - "_project/scripts/pyproject.toml"
+    - "_project/scripts/README.md"
+    - "pyproject.toml"
+    - "uv.lock"
+    - "CLAUDE.md"
+    - "AGENTS.md"
+  do_not_modify:
+    - "_project/scripts/*.py" # behavior change is out of scope
+    - "benchbox/"
+    - "tests/"
+    - ".github/workflows/" # CI integration handled by Phase 4 TODO
+
+deps:
+  needs:
+    - "move-jsonschema-out-of-core-runtime-deps" # Phase 0 must land first
+
+metadata:
+  tags: ["maintenance", "supply-chain", "deps", "tooling", "audit-followup"]
+  estimated_effort: "Medium (4-8 hours: AST inventory + new pyproject + invocation refactor + docs update)"
+  created_date: "2026-04-15"
+
+impact:
+  business_value: |
+    Makes the "ships in the wheel" vs "internal tooling" boundary
+    structural rather than convention-based. Future tooling deps cannot
+    leak into the public install.
+  user_impact: |
+    End users: zero direct change (tooling deps were never in their install
+    path after Phase 0). Contributors: one extra invocation flag for
+    `_project/scripts/*` commands; cleaner dev install in exchange.
+  technical_debt: |
+    Closes the structural cause of audit finding F2 and prevents the same
+    pattern from recurring with future tooling deps.
+
+success_metrics:
+  - "Verification command 'OK: tooling deps removed from main manifest' passes"
+  - "Verification command 'OK: isolated env present' passes"
+  - "todo_cli.py and validate_todo.py executable under the new invocation pattern"
+  - "Fast suite green"

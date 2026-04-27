@@ -1,0 +1,43 @@
+id: address-outstanding-todos
+title: ✅ Address Outstanding TODOs
+category: Pre-Release High Priority Tasks (COMPLETED)
+sections:
+  Notes: '- "**Priority**: High"
+
+    - "**Status**: Completed ✅"
+
+    - "**Description**: Hardened resource monitoring and performance summary support in `benchbox/platforms/base.py`, removing
+    the final TODO placeholders before release."
+
+    - "**Context**: The base adapter previously exposed minimal metrics and left TODO markers, making benchmark outputs inconsistent
+    and limiting result diagnostics."
+
+    - "**Tasks**:"
+
+    - "**Files Affected**:"
+
+    - "**Success Metrics**:"
+
+    - "**Impact**: HIGH - Provides actionable telemetry in benchmark results, clears lingering TODOs, and gives users immediate
+    insight into performance and resource profiles."'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Priority**: High"
+
+  - "**Status**: Completed ✅"
+
+  - "**Description**: Hardened resource monitoring and performance summary support in `benchbox/platforms/base.py`, removing
+  the final TODO placeholders before release."
+
+  - "**Context**: The base adapter previously exposed minimal metrics and left TODO markers, making benchmark outputs inconsistent
+  and limiting result diagnostics."
+
+  - "**Tasks**:"
+
+  - "**Files Affected**:"
+
+  - "**Success Metrics**:"
+
+  - "**Impact**: HIGH - Provides actionable telemetry in benchmark results, clears lingering TODOs, and gives users immediate
+  insight into performance and resource profiles."'

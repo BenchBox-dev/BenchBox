@@ -1,0 +1,163 @@
+id: integrate-explorer-into-github-pages-deployment
+title: "Integrate results explorer into GitHub Pages deployment workflow"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-03"
+category: Core Functionality
+deps:
+  needs:
+    - build-static-pipeline-bundles-to-read-model
+    - scaffold-results-explorer-frontend
+    - implement-explorer-home-and-browse-pages
+    - implement-result-detail-page
+    - implement-results-compare-view
+description: |
+  Wire the results explorer into the existing GitHub Pages deployment so that
+  a single `git push` to `main` builds and deploys the complete site:
+  landing page + Sphinx docs + blog + results explorer.
+
+  This TODO modifies `.github/workflows/docs.yml` (or adds a companion workflow)
+  to include the explorer build steps: run the static build pipeline, build the
+  Vite app, and assemble the output into the `/site/results/` directory.
+
+  It also adds the "Results" link to the shared site navigation so users can
+  discover the explorer from any page on benchbox.dev.
+
+work:
+  - id: w1
+    summary: "Add explorer build steps to the GitHub Pages workflow"
+    status: done
+    notes: |
+      Modify `.github/workflows/docs.yml` so the workflow also triggers on
+      `results-explorer/**` and `results-data/**`, then add build steps after the
+      existing Sphinx build:
+
+      1. Set up Node.js (v20+)
+      2. Install explorer dependencies: `cd results-explorer && npm ci`
+      3. Run static build pipeline: `uv run -- python scripts/build_read_model.py --input results-data/bundles/ --output results-explorer/public/data/`
+      4. Build explorer: `cd results-explorer && npm run build`
+      5. Copy explorer output to site assembly: `mkdir -p site/results && cp -R results-explorer/dist/. site/results/`
+
+      The step order matters: pipeline must run before Vite build (Vite needs data
+      files in `public/data/`), and explorer copy must happen before the Pages
+      upload action.
+
+      Consider caching `node_modules` and `.duckdb` artifacts for faster CI.
+
+  - id: w2
+    summary: "Add results-explorer npm dependencies to CI"
+    needs: [w1]
+    status: done
+    notes: |
+      Ensure the workflow installs Node.js and npm dependencies. Add caching:
+      - Cache `results-explorer/node_modules` keyed on `package-lock.json` hash
+      - Cache DuckDB-WASM binaries if they're large
+
+      Verify the workflow runs end-to-end on a test branch before merging.
+
+  - id: w3
+    summary: "Add 'Results' navigation link to the shared site header"
+    needs: [w1]
+    status: done
+    notes: |
+      Add a "Results" link to the benchbox.dev navigation that appears on:
+      - Landing page header (in `landing/`)
+      - Sphinx docs header (via Furo theme customization in `docs/conf.py` or
+        `docs/_templates/`)
+      - Blog header
+      - Explorer header (already has it from scaffold TODO)
+
+      The link should point to `/results/` and be visually consistent with
+      existing nav items.
+
+  - id: w4
+    summary: "Add 404 fallback for client-side routing"
+    needs: [w1]
+    status: done
+    notes: |
+      GitHub Pages serves 404.html for unknown paths. For the explorer's
+      client-side routes (especially compare view with query params), add a
+      `404.html` in the `results/` directory that:
+      1. Detects if the URL is a valid explorer route
+      2. If yes, loads the explorer app and handles routing client-side
+      3. If no, shows a friendly "result not found" page
+
+      Alternatively, if all routes are pre-rendered at build time, the 404
+      only needs to handle truly invalid paths. Test both scenarios.
+
+  - id: w5
+    summary: "End-to-end deployment test on a staging branch"
+    needs: [w1, w2, w3, w4]
+    status: done
+    notes: |
+      Before merging to main:
+      1. Push to a test branch with GitHub Pages enabled
+      2. Verify the full site deploys: landing + docs + blog + explorer
+      3. Verify all explorer pages load correctly:
+         - /results/ (home)
+         - /results/tpch/ (benchmark index)
+         - /results/duckdb/ (platform index)
+         - /results/r/{id} (detail page)
+         - /results/compare?ids=a,b (compare view)
+      4. Verify DuckDB-WASM loads and filtering works
+      5. Verify raw bundle download links work
+      6. Test on Chrome, Firefox, Safari
+      7. Check that existing docs, landing, and blog pages are unaffected
+
+metadata:
+  tags:
+    - results
+    - explorer
+    - phase-1
+    - deployment
+    - github-pages
+    - ci
+  estimated_effort: "Medium"
+  created_date: "2026-03-29"
+  completed_date: "2026-04-03"
+
+impact:
+  business_value: |
+    Without deployment integration, the explorer exists only locally. This is
+    the TODO that makes it publicly accessible at benchbox.dev/results/.
+  user_impact: |
+    Users access the explorer at the real URL. The site feels integrated -
+    navigation links connect docs, blog, and results.
+  technical_debt: |
+    Establishes a single deployment pipeline for the full site instead of
+    letting the explorer drift into a separate deployment process.
+
+must_preserve:
+  - "Existing landing page, Sphinx docs, and blog must continue to build and deploy correctly"
+  - "Existing docs workflow jobs (linkcheck, spellcheck, example-validation, docstring-coverage) must not be affected"
+  - "GitHub Pages deployment must remain a single atomic upload (not multiple competing deployments)"
+
+approach: |
+  Extend the existing docs.yml workflow rather than creating a separate workflow.
+  This ensures atomic site assembly: all components (landing, docs, blog, explorer)
+  are built in one workflow run and deployed together. The explorer build is
+  additive - it adds steps but doesn't change existing ones.
+
+anti_patterns:
+  - "DO NOT create a separate GitHub Pages deployment for the explorer - because GitHub Pages supports only one source per repo - assemble everything into one /site/ directory"
+  - "DO NOT let explorer build failures silently skip deployment - because a broken explorer should block deployment - fail the workflow explicitly"
+
+verification:
+  - description: "Full site builds successfully in CI"
+    command: "act -j build --dryrun"
+    expected_output: "All steps listed, no errors"
+  - description: "Explorer pages are present in assembled site"
+    command: "ls site/results/index.html site/results/tpch/index.html site/results/r/*/index.html"
+    expected_output: "All files exist"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/docs.yml"
+    - "landing/"
+    - "docs/_templates/"
+    - "docs/conf.py"
+    - "results-explorer/"
+  do_not_modify:
+    - "benchbox/"
+    - "tests/"

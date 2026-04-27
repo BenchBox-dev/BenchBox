@@ -1,0 +1,155 @@
+id: implement-results-compare-view
+title: "Implement results compare view for side-by-side benchmark analysis"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-04-03"
+category: Core Functionality
+deps:
+  needs:
+  - scaffold-results-explorer-frontend
+  - build-static-pipeline-bundles-to-read-model
+description: |
+  Build the dynamic comparison tool at `/results/compare?ids=id1,id2[,id3]`.
+  **This is the primary Phase 1 deliverable** - the feature that validates the
+  core hypothesis ("people want to browse and compare public benchmark results")
+  and differentiates the explorer from a file listing.
+
+  The compare view is a dynamic tool: visitors pick a benchmark, scale factor,
+  and platforms, then see a side-by-side query-level timing breakdown. It is the
+  feature that makes users come back and share links.
+
+  Comparison requires strict cohort validation: results must share the same
+  benchmark and scale factor to be compared. Incompatible comparisons (different
+  benchmark or different scale factor) must be hard-blocked with a clear error,
+  not merely warned. This prevents misleading cross-context comparisons from
+  ever reaching the user.
+
+  Note: this TODO does NOT depend on the result detail page. Compare and detail
+  are independent siblings, both depending only on the scaffold.
+
+work:
+- id: w1
+  summary: "Implement cohort validation and comparison data loading"
+  status: done
+  notes: |
+    When the compare view loads with `?ids=id1,id2`:
+    1. Fetch detail JSON for each result ID
+    2. Validate cohort compatibility (strict - block incompatible, don't warn):
+       - Same benchmark: required (hard-block if mismatched - show error, refuse to render)
+       - Same scale factor: required (hard-block if mismatched - show error, refuse to render)
+       - Same query set: warn if different (e.g., subset vs full) but allow comparison
+       - Different platform/config: expected and fine
+    3. Build a merged query-level dataset: for each query ID, collect timings
+       from all compared results
+    4. Handle missing queries gracefully (show "N/A" if a result doesn't have
+       a particular query)
+
+- id: w2
+  summary: "Implement the comparison summary header"
+  needs: [w1]
+  status: done
+  notes: |
+    Show a summary comparing the selected results:
+    - Side-by-side cards: platform, config, date, total duration for each
+    - Speedup indicator: "Result A is X.Xx faster/slower than Result B" (based
+      on total duration or geometric mean of query times)
+    - Cohort info: benchmark, scale factor, query count
+    - Warnings if non-blocking configurations differ (query subset, tuning mode)
+
+- id: w3
+  summary: "Implement the query-level comparison table"
+  needs: [w1]
+  status: done
+  notes: |
+    Sortable table with one row per query:
+    | Query | Result A (ms) | Result B (ms) | Diff | Speedup |
+    |-------|--------------|--------------|------|---------|
+    | Q1    | 45.2         | 38.1         | -7.1 | 1.19x   |
+    | Q2    | 12.1         | 15.3         | +3.2 | 0.79x   |
+
+    Color-code: green for faster, red for slower, neutral for within 5%.
+    Support sorting by any column. Highlight queries with >2x difference.
+
+    For 3+ results, extend the table with additional columns. Keep it readable
+    up to 4 results; beyond that, suggest using DuckDB-WASM for custom analysis.
+
+- id: w4
+  summary: "Implement the query-level comparison chart"
+  needs: [w1]
+  status: done
+  notes: |
+    Grouped bar chart showing query times for each compared result:
+    - X-axis: query IDs (Q1, Q2, ..., Q22)
+    - Y-axis: execution time (ms)
+    - One bar color per result
+    - Hover/click shows exact timing
+
+    Use lightweight SVG rendering (no charting library needed for grouped bars).
+    If the chart gets complex, consider a small library like uPlot or Chart.css.
+
+    Also show a summary chart: total duration or geometric mean comparison.
+
+- id: w5
+  summary: "Implement compare URL sharing and result selection UX"
+  needs: [w2, w3]
+  status: done
+  notes: |
+    - Compare URLs are shareable: `/results/compare?ids=id1,id2`
+    - "Add to comparison" button on detail pages and browse pages
+    - Comparison selection persists in session storage (not lost on navigation)
+    - "Clear comparison" action
+    - Maximum 4 results in one comparison (warn if user tries to add more)
+    - Deep link from browse pages: checkbox select → "Compare Selected" button
+
+metadata:
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - frontend
+  - compare
+  - analysis
+  estimated_effort: "Large"
+  created_date: "2026-03-29"
+  completed_date: "2026-04-03"
+
+impact:
+  business_value: |
+    Comparison is the killer feature that differentiates a results explorer from
+    a file listing. It's what makes users come back and share links.
+  user_impact: |
+    Users can answer "how does DuckDB compare to DataFusion on TPC-H SF1?"
+    with a single page load and a shareable URL.
+
+must_preserve:
+- "Compare URLs must be stable and shareable - query params, not session state"
+- "Cohort validation must hard-block incompatible comparisons (different benchmark or scale factor) - never render them with a warning"
+
+approach: |
+  Load detail JSONs for each compared result, merge on query ID, and render
+  a table + chart. Use DuckDB-WASM for the merge query if convenient, or
+  do it in TypeScript for simpler results. Keep the comparison honest -
+  hard-block incompatible cohorts (different benchmark or scale factor), and
+  warn about non-blocking configuration differences without hiding them.
+
+anti_patterns:
+- "DO NOT allow comparing results from different benchmarks or different scale factors - because cross-context comparison is meaningless and misleading - hard-block with an error, do not render the comparison"
+- "DO NOT compute a single 'score' that hides per-query variation - because aggregate scores obscure important per-query behavior - show query-level detail prominently"
+
+verification:
+- description: "Vite build succeeds with compare view included"
+  command: "cd results-explorer && npm run build"
+  expected_output: "Build completes with exit code 0"
+- description: "Compare route fallback page exists in build output"
+  command: "cd results-explorer && test -f dist/compare/index.html || test -f dist/404.html"
+  expected_output: "At least one fallback for client-side compare routing exists"
+- description: "Compare view component tests pass (cohort validation, data merge, rendering)"
+  command: "cd results-explorer && npm run typecheck && npm run build"
+  expected_output: "Typecheck and build both pass"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/"
+  do_not_modify:
+  - "benchbox/"

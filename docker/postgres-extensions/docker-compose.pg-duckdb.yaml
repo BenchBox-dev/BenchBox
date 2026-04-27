@@ -1,0 +1,39 @@
+# pg_duckdb Docker Compose
+# PostgreSQL with pg_duckdb extension for DuckDB-accelerated analytics
+#
+# Usage:
+#   docker compose -f docker-compose.pg-duckdb.yaml up -d
+#   benchbox run --platform pg-duckdb --benchmark tpch --scale 0.01 \
+#     --platform-option host=localhost --platform-option password=benchbox
+#
+# Ports:
+#   5432 - PostgreSQL with pg_duckdb
+#
+# NOTE: The PG18 image cannot reuse a PG17 data directory in place. This file
+# intentionally uses a fresh named volume; migrate manually from the old
+# `pg-duckdb-data` volume if you need the previous local data.
+
+services:
+  pg-duckdb:
+    image: pgduckdb/pgduckdb:18-v1.1.1
+    container_name: benchbox-pg-duckdb
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: benchbox
+      POSTGRES_DB: benchbox
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-duckdb18-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    shm_size: "256mb"
+
+volumes:
+  pg-duckdb18-data:
+    driver: local

@@ -1,0 +1,127 @@
+id: result-object-migration-benchmarkresult-benchmarkresults
+title: Result Object Migration (BenchmarkResult → BenchmarkResults)
+worktree: result-object-migration
+category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+priority: High
+status: Completed
+description: 'Consolidate on the lifecycle-aware BenchmarkResults type by eliminating legacy BenchmarkResult usage in CLI
+  execution paths, data-only pipeline flows, exporters, and documentation.
+
+  '
+context_sections:
+- name: Legacy Baseline
+  summary: 'BenchmarkResult in benchbox/core/config.py is limited to CLI error handling with minimal metadata, lacking phase
+    tracking, platform context, and validation details.
+
+    '
+- name: Target State
+  summary: 'BenchmarkResults from benchbox/core/results/models.py already power platform adapters and lifecycle runners, providing
+    rich metadata, execution phases, and validation tracking.
+
+    '
+- name: Risk Profile
+  summary: 'Migration impacts CLI pipelines, exporter schemas, and widespread imports; regressions could trigger CLI output
+    changes or schema mismatches if not carefully validated.
+
+    '
+impact: HIGH - Aligns all result generation on the canonical model, reduces duplication, and unlocks exporter/type simplification
+  ahead of release.
+research_value: 'Establishes pre/post migration JSON export baselines to confirm structural parity and surface unexpected
+  regressions early.
+
+  '
+tasks:
+- phase: Phase 1 - Extend BaseBenchmark Helper
+  description: 'Add a minimal BenchmarkResults factory for error and interrupt scenarios without changing existing workflows.
+
+    '
+  items:
+  - summary: Implement BaseBenchmark.create_minimal_benchmark_result helper.
+    done: true
+  - summary: Unit test minimal result creation covering validation status and metadata defaults.
+    done: true
+- phase: Phase 2 - Migrate CLI Error Handlers
+  description: 'Replace BenchmarkResult constructions during KeyboardInterrupt and exception handling in benchbox/cli/execution.py.
+
+    '
+  items:
+  - summary: Cache benchmark_instance on BenchmarkExecutor for downstream error contexts.
+    done: true
+  - summary: Use create_minimal_benchmark_result in KeyboardInterrupt and exception flows.
+    done: true
+  - summary: Verify CLI output formatting parity for error cases.
+    done: true
+- phase: Phase 3 - Update data_only Pipeline
+  description: 'Emit enhanced benchmark results for data_only mode, mirroring lifecycle runner patterns.
+
+    '
+  items:
+  - summary: Replace legacy BenchmarkResult with create_enhanced_benchmark_result invocation.
+    done: true
+  - summary: Populate phases and execution metadata consistent with runner expectations.
+    done: true
+  - summary: Validate data_only exports against schema v1.0 baseline fixtures.
+    done: true
+- phase: Phase 4 - Remove Legacy BenchmarkResult
+  description: 'Delete the legacy class definition and update all imports and type hints to rely solely on BenchmarkResults.
+
+    '
+  items:
+  - summary: Remove benchbox/core/config.py BenchmarkResult definition and related helpers.
+    done: true
+  - summary: Update imports and type hints across 60+ files to reference BenchmarkResults only.
+    done: true
+  - summary: Simplify exporter build_canonical_payload signature (drop Union types).
+    done: true
+  - summary: Run full pytest suite and integration tests to confirm no regressions.
+    done: true
+- phase: Phase 5 - Documentation and Cleanup
+  description: 'Document the migration and communicate breaking changes to contributors and early adopters.
+
+    '
+  items:
+  - summary: Author docs/migration/result_object_migration.md with migration guidance and examples.
+    done: true
+  - summary: Add CHANGELOG entry covering removal of BenchmarkResult and new helper usage.
+    done: true
+  - summary: Update exporter documentation and samples to reflect canonical result type.
+    done: true
+  - summary: Remove lingering BenchmarkResult references in examples and schema notes.
+    done: true
+technical_requirements:
+- category: Validation
+  items:
+  - '"Maintain 100% JSON schema v1.0 validation pass rate before and after migration."'
+- category: Testing
+  items:
+  - '"Full pytest suite passes; targeted CLI tests (`tests/unit/cli/test_cli_*.py`) stay green."'
+- category: Compatibility
+  items:
+  - CLI error output remains unchanged despite internal result type migration.
+- category: Documentation
+  items:
+  - Migration guide includes follow-along code snippets for new helper usage.
+- category: Tooling
+  items:
+  - Baseline vs migrated JSON exports captured for regression comparison.
+files_affected:
+  modified:
+  - benchbox/core/base_benchmark.py
+  - benchbox/cli/execution.py
+  - benchbox/cli/execution_pipeline.py
+  - benchbox/core/results/exporter.py
+  - benchbox/core/config.py
+  added:
+  - docs/migration/result_object_migration.md
+  removed: []
+metadata:
+  owners:
+  - '"@benchbox-maintainers"'
+  tags:
+  - results
+  - cli
+  due_date: '2024-08-15'
+open_questions:
+- Should we provide a deprecated shim for external BenchmarkResult imports despite pre-release status?
+- Should error cases hydrate system_profile within create_minimal_benchmark_result?
+- Do we add explicit regression tests asserting BenchmarkResult import fails post-migration?

@@ -972,8 +972,10 @@ class TestRunCommandValidation:
         assert "Too many queries" in result.output
 
     def test_queries_too_long_id_rejected(self):
+        from benchbox.utils.input_validation import MAX_QUERY_ID_LENGTH
+
         runner = CliRunner()
-        long_id = "Q" + "x" * 20  # 21 chars, exceeds max 20
+        long_id = "Q" + "x" * MAX_QUERY_ID_LENGTH  # exceeds limit by 1
         with _non_interactive_base_patches():
             result = runner.invoke(
                 run,
@@ -981,7 +983,7 @@ class TestRunCommandValidation:
                 obj=_run_obj(),
             )
         assert result.exit_code != 0
-        assert "Query ID too long (max 20 chars)" in result.output
+        assert f"Query ID too long (max {MAX_QUERY_ID_LENGTH} chars)" in result.output
 
     def test_non_interactive_missing_benchmark_rejected(self):
         runner = CliRunner()

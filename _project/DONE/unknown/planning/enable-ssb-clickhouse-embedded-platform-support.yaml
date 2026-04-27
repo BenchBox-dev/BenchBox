@@ -1,0 +1,17 @@
+id: enable-ssb-clickhouse-embedded-platform-support
+title: Enable SSB ClickHouse Embedded Platform Support
+category: Data Quality and Compatibility Issues
+sections:
+  Notes: '- "**Tasks**:"
+
+    - "**Final Result**:"
+
+    - "**Files Affected**:"'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Tasks**:"
+
+  - "**Final Result**:"
+
+  - "**Files Affected**:"'

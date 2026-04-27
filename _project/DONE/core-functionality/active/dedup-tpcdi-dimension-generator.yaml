@@ -1,0 +1,78 @@
+id: dedup-tpcdi-dimension-generator
+title: "Extract _generate_dimension helper for TPC-DI SQL generator scaffolding"
+worktree: core-functionality
+priority: Medium
+status: Completed
+completed_date: "2026-02-21"
+category: Core Functionality
+description: |
+  Group 4 from the duplicate-check report identifies 6 methods with identical
+  scaffolding in benchbox/core/tpcdi/generator/sql.py:
+  - generate_time_dimension (line ~225)
+  - generate_company_dimension (line 263)
+  - generate_security_dimension (line 315)
+  - generate_customer_dimension (line 359)
+  - generate_account_dimension (line 427)
+  - generate_trade_facts (line 467)
+
+  All 6 share the same pattern: progress log → mono_time() → conn.execute(sql)
+  → elapsed_seconds → stats update (4 keys) → completion log → return count.
+  Only the SQL INSERT body and record count computation differ.
+
+  Note: generate_time_dimension extracts its record count from the query result
+  rather than pre-computing it. generate_account_dimension derives its count
+  from a formula (num_customers * 1.5) rather than base_X * scale_factor.
+
+approach: |
+  Extract a `_generate_table(self, conn, table_name, num_records, insert_sql)`
+  helper that handles: progress logging, timing via mono_time/elapsed_seconds,
+  conn.execute(insert_sql), stats dict updates (records_generated, tables_generated,
+  generation_times, sql_operations), completion logging.
+
+  The helper should accept an optional `num_records` parameter. When provided,
+  it is used for stats and logging. When None, the helper extracts the count
+  from the query result (as generate_time_dimension currently does).
+
+  Each of the 6 generator methods reduces to: compute count (if known),
+  build SQL string, call self._generate_table(conn, "TableName", count, sql).
+
+work:
+  - id: w1
+    summary: "Extract _generate_table helper and refactor all 6 generator methods to use it"
+    status: done
+
+  - id: w2
+    summary: "Run TPC-DI tests to verify no regressions"
+    needs: [w1]
+    status: done
+
+files_affected:
+  modified:
+    - "benchbox/core/tpcdi/generator/sql.py"
+
+verification:
+  - description: "TPC-DI tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k tpcdi"
+    expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpcdi/generator/sql.py"
+    - "tests/"
+
+must_preserve:
+  - "generation_stats dict populated identically after each dimension generation"
+  - "Progress logging messages include table name and record count"
+  - "generate_time_dimension returns count extracted from query result, not pre-computed"
+
+anti_patterns:
+  - "DO NOT assume record count is always a pre-computed variable - generate_time_dimension extracts it from the query result - the helper must accept an optional count and fall back to result extraction"
+  - "DO NOT hardcode count formula as base_X * scale_factor - generate_account_dimension uses num_customers * 1.5 - each caller computes its own count before invoking the helper"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - refactoring
+  estimated_effort: "1-2 hours"
+  created_date: "2026-02-21"

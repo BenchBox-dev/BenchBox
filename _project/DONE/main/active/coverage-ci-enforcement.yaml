@@ -1,0 +1,116 @@
+id: coverage-ci-enforcement
+title: "Enforce per-module 50% coverage floor in CI"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-02-18"
+category: Testing and Quality Assurance
+description: |
+  Once all modules reach ≥50% coverage (via the companion TODO items),
+  add CI enforcement to prevent regressions below the floor.
+
+  Current CI uses --cov-fail-under=50 which checks OVERALL coverage only.
+  This allows individual modules to drop to 0% as long as the aggregate
+  stays above 50%. A per-module check would catch this.
+
+  Options:
+    1. Use coverage.py's [report] fail_under per-package (limited granularity)
+    2. Add a custom script that parses coverage.xml and fails on any module <50%
+    3. Use diff-cover to enforce coverage on changed files only
+
+  Recommend option 2: a lightweight Python script in scripts/ that parses
+  coverage.xml, groups by top-level package, and fails if any package is
+  below threshold.
+
+metadata:
+  tags:
+    - testing
+    - coverage
+    - ci
+    - enforcement
+  estimated_effort: Small
+  created_date: "2026-02-07"
+  last_updated: "2026-02-18T16:20:00"
+
+impact:
+  business_value: |
+    Prevents coverage from silently regressing. Once the floor is established,
+    every PR that drops a module below 50% will be caught automatically.
+  technical_debt: |
+    Without per-module enforcement, the overall 50% threshold can be gamed
+    by high-coverage modules compensating for low-coverage ones.
+
+must_preserve:
+  - "ci-test Makefile target continues to run pytest with existing flags and pass"
+  - "Existing passing CI jobs remain passing with no increase in runtime >20%"
+
+approach: |
+  Write a standalone Python script (no external dependencies beyond stdlib)
+  that uses xml.etree.ElementTree to parse coverage.xml. Group files by
+  their first two path components (e.g., benchbox/cli, benchbox/core/tpch).
+  Print a table of packages with coverage, highlight failures, exit 1 if
+  any package is below threshold. Make threshold configurable via CLI arg.
+
+anti_patterns:
+  - "DO NOT add external dependencies to the coverage script - because it runs in CI where install time matters - use only stdlib
+    (xml.etree, pathlib, argparse)"
+  - "DO NOT make the script fail on missing coverage.xml - because not all CI runs generate it - exit 0 with a warning if the
+    file is absent"
+
+verification:
+  - description: "Script correctly identifies modules below threshold"
+    command: "uv run -- python scripts/check_module_coverage.py --coverage-xml coverage.xml --threshold 50 --exclude-module benchbox/data --exclude-module benchbox/examples"
+    expected_output: "table of per-module coverage with pass/fail indicators"
+  - description: "Script exits non-zero when modules fail"
+    command: "uv run -- python scripts/check_module_coverage.py --coverage-xml coverage.xml --threshold 99 --exclude-module benchbox/data --exclude-module benchbox/examples; echo $?"
+    expected_output: "exit code 1 (since no module is at 99%)"
+
+files_affected:
+  added:
+    - "scripts/check_module_coverage.py"
+    - "tests/unit/test_check_module_coverage.py"
+  modified:
+    - "Makefile"
+    - ".github/workflows/test.yml"
+
+scope_limit:
+  do_not_modify:
+    - "benchbox/"
+deps:
+  needs:
+    - coverage-core-benchmarks
+    - coverage-core-tpcdi
+    - coverage-cli-modules
+    - coverage-platforms
+    - coverage-core-utilities
+work:
+  - id: w1
+    summary: "Write scripts/check_module_coverage.py that parses coverage.xml"
+    status: done
+  - id: w2
+    summary: "Parse coverage.xml, group by benchbox/* top-level package"
+    needs:
+      - w1
+    status: done
+  - id: w3
+    summary: "Report per-package coverage with pass/fail against 50% threshold"
+    needs:
+      - w1
+    status: done
+  - id: w4
+    summary: "Exit non-zero if any package fails"
+    needs:
+      - w1
+    status: done
+  - id: w5
+    summary: "Add tests for the coverage check script itself"
+    status: done
+  - id: w6
+    summary: "Add check_module_coverage.py to Makefile as coverage-check target"
+    status: done
+  - id: w7
+    summary: "Add to ci-test target in Makefile after pytest coverage run"
+    status: done
+  - id: w8
+    summary: "Update GitHub Actions workflow to run the check"
+    status: done

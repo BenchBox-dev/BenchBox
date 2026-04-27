@@ -1,0 +1,39 @@
+# Runtime benchmark outputs (gitignored locally; never needed in any Docker build)
+# **/benchmark_runs matches at any depth (docker/doris/benchmark_runs/ etc.)
+**/benchmark_runs
+htmlcov/
+.coverage
+.coverage.*
+test-results.xml
+
+# Python build and packaging artifacts
+build/
+dist/
+sdist/
+*.egg-info/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Generated source trees (TPC tool compilations etc.)
+_sources/
+
+# Release build trees (produced by automate_release.py)
+release/
+
+# Front-end node_modules (results-explorer has its own build pipeline)
+results-explorer/node_modules/
+
+# Python virtual environments (root and nested — e.g. inside worktrees)
+**/.venv
+
+# Local AI tool state and worktrees (contain nested venvs that confuse pip)
+.claude/
+.codex/
+.gemini/
+
+# Type-checker cache
+.mypy_cache/
+
+# Git metadata
+.git/

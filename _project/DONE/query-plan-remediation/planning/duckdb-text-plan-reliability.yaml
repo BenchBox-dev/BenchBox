@@ -1,0 +1,69 @@
+id: duckdb-text-plan-reliability
+title: "Make DuckDB text plan parsing reliable or fail fast"
+worktree: "query-plan-remediation"
+priority: "Medium"
+status: "Not Started"
+description: |
+  The DuckDB text parser flattens box-drawing plans into a linear chain, losing
+  joins/branching and producing misleading fingerprints/insights whenever JSON
+  parsing fails. Implement real hierarchy extraction from box art (or explicitly
+  disable fallback with clear errors) so captured plans remain trustworthy. Add
+  detection to prefer JSON and surface warnings when text parsing is incomplete.
+category: "Core Functionality"
+tasks:
+  phases:
+  - phase: "Phase 1: Strategy and detection"
+    done: false
+    items:
+    - summary: "Decide whether to implement full box-drawing hierarchy parsing or to fail fast and require JSON; document
+        tradeoffs and expected user messaging."
+      done: false
+    - summary: "Tighten format detection so obviously malformed/non-box text does not proceed to linearized parsing silently."
+      done: false
+  - phase: "Phase 2: Implementation"
+    done: false
+    items:
+    - summary: "Implement chosen approach: either proper tree reconstruction using box connectors/indentation, or explicit
+        error with recovery hint when hierarchy cannot be derived."
+      done: false
+    - summary: "Emit parser warning metadata when parsing falls back or skips structure so downstream tools can display fidelity
+        level."
+      done: false
+  - phase: "Phase 3: Testing and documentation"
+    done: false
+    items:
+    - summary: "Add unit tests covering complex branching text plans and malformed inputs to ensure no silent linearization;
+        update existing DuckDB parser tests accordingly."
+      done: false
+    - summary: "Document recommended EXPLAIN FORMAT JSON usage and the fallback behavior in CLI help and parser docs if applicable."
+      done: false
+metadata:
+  owners:
+  - "joe"
+  tags:
+  - "query-plans"
+  - "parser"
+  estimated_effort: "Medium"
+  created_date: "2025-11-26"
+impact:
+  business_value: |
+    Ensures captured plans reflect real execution structure, preventing false
+    similarity scores and misleading insights when DuckDB returns text plans.
+  user_impact: |
+    Users get accurate comparisons or actionable errors instead of silent,
+    flattened plans when JSON parsing fails, improving trust in benchmarks.
+  technical_debt: |
+    Removes a known silent failure mode in the parsing pipeline and clarifies
+    expectations for DuckDB plan capture fidelity.
+files_affected:
+  modified:
+  - "benchbox/core/query_plans/parsers/duckdb.py"
+  - "benchbox/core/query_plans/parsers/base.py"
+  - "benchbox/core/query_plans/parsers/test_duckdb_parser*.py"
+  - "benchbox/cli/commands/run.py"
+  added: []
+  removed: []
+success_metrics:
+- "Text EXPLAIN parsing either builds correct hierarchy for branching plans or returns a clear error instead of a linear chain."
+- "CLI surfaces a warning when falling back from JSON or when text parsing fidelity is low."
+- "New parser tests cover branching box plans and malformed inputs without silent success."

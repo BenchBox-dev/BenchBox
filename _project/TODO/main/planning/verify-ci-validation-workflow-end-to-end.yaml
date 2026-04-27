@@ -1,0 +1,142 @@
+id: verify-ci-validation-workflow-end-to-end
+title: "Verify the validate-submission CI workflow end-to-end with a real PR"
+worktree: main
+priority: Critical
+status: Not Started
+category: Testing and Quality Assurance
+
+deps:
+  needs:
+  - implement-pr-based-result-submission-workflow
+
+description: |
+  The Phase 2 CI validation workflow (`.github/workflows/validate-submission.yml`)
+  was merged in PR #53 with 28 unit tests but has never been triggered by an
+  actual PR against `published-results`. Test PR #54 (`test/ci-submission-validation`)
+  was opened then closed without confirming the workflow's PR-comment flow.
+
+  Without a real end-to-end exercise we don't know whether:
+    - the workflow trigger filter (`paths: results-data/bundles/**` on PRs to
+      `published-results`) actually fires,
+    - the markdown PR comment renders correctly (create + idempotent update),
+    - hash-mismatch and schema failures produce clear, actionable error output,
+    - permissions allow the workflow to comment on PRs from forks.
+
+  This item runs the workflow against a maintainer-controlled PR with both a
+  passing case and a tampered failure case, capturing the resulting comments
+  as evidence and filing follow-up bugs for any defects observed.
+
+work:
+- id: w1
+  summary: "Prepare a known-good submission package for the happy-path test PR"
+  status: pending
+  notes: |
+    1. Run a small bundle locally:
+       `benchbox run --platform duckdb --benchmark tpch --scale 0.01 --queries Q1,Q6`
+    2. Package it: `benchbox submit --last --output /tmp/submission-test/`
+    3. Verify the package contains: bundle .json, optional companions,
+       submission-manifest.json with valid SHA256.
+    4. Save the package outside the repo for use in w2.
+
+- id: w2
+  summary: "Open a happy-path PR against published-results and capture workflow output"
+  needs: [w1]
+  status: pending
+  notes: |
+    1. From a fresh branch off `published-results`, copy the bundle into
+       `results-data/bundles/tpch/duckdb/sf0.01/<bundle-id>/` along with the
+       `submission-manifest.json` sidecar.
+    2. Push to origin and open PR against `published-results`:
+       `gh pr create --repo joeharris76/BenchBox --base published-results ...`
+    3. Confirm `validate-submission` workflow auto-triggers (no manual dispatch).
+    4. Capture the rendered PR comment (paste markdown into evidence file at
+       `_project/handoffs/ci-validation-evidence-<date>.md`).
+    5. Push a no-op change (touch the manifest description) to confirm the
+       comment is UPDATED in place rather than duplicated.
+    6. Close the PR without merging.
+
+- id: w3
+  summary: "Open a tampered-bundle PR and verify CI rejects with a clear error"
+  needs: [w1]
+  status: pending
+  notes: |
+    1. Branch off `published-results` again with the same bundle.
+    2. Mutate the bundle file AFTER the manifest hash is computed (e.g.,
+       change a single timing value) so SHA256 no longer matches.
+    3. Open PR against `published-results`.
+    4. Confirm workflow fails and PR comment cites the hash mismatch with the
+       offending file path.
+    5. Repeat with a schema-invalid bundle (e.g., delete a required schema-v2
+       field) and capture the schema validation error message.
+    6. Append both failure-case comments to the same evidence file.
+    7. Close PRs without merging.
+
+- id: w4
+  summary: "Verify fork-PR permissions allow comment posting"
+  needs: [w2]
+  status: pending
+  notes: |
+    Open one happy-path PR from a fork (use a personal fork or a throwaway
+    GitHub account if required) and confirm the workflow's
+    `pull-requests: write` permission is sufficient for a fork PR. Document
+    in the evidence file. If posting fails, capture the error and file a
+    follow-up TODO to switch to `pull_request_target` (with the usual
+    security caveats).
+
+- id: w5
+  summary: "File follow-up TODOs for any defects, attach evidence to PR description"
+  needs: [w3, w4]
+  status: pending
+  notes: |
+    - For each defect observed (missing comment, wrong status, unclear error),
+      create a focused bug TODO under `_project/TODO/main/planning/`.
+    - Update `_project/handoffs/results-publishing-handoff-2026-04-04.md`
+      step #2 ("Test CI Workflow on a Real PR") to mark it complete and link
+      to the evidence file.
+    - Mark this TODO Completed only when the evidence file exists and at
+      least one passing + one failing PR comment have been observed in
+      production.
+
+verification:
+- description: "Evidence file exists with at least 3 captured PR-comment markdown blocks (1 pass, 2 fail)"
+  command: "test -f _project/handoffs/ci-validation-evidence-*.md && grep -c '^## ' _project/handoffs/ci-validation-evidence-*.md"
+  expected_output: "count >= 3"
+
+must_preserve:
+- The existing `validate-submission.yml` workflow filename and trigger paths (downstream consumers may already reference them).
+- The `published-results` branch as the protected target for community submissions.
+- All test PRs are CLOSED, never merged, so the corpus stays clean.
+
+anti_patterns:
+- DO NOT modify the validation workflow or validator script during this task - because the goal is to observe real behavior, not patch around it; file follow-up TODOs for any fixes needed.
+- DO NOT push test bundles to `main` or `published-results` directly - because that pollutes the curated corpus; PRs only, and close without merging.
+- DO NOT use `--no-verify` or skip the CI step locally to "shortcut" the test - because the entire point is to exercise the GitHub Actions runner, not the local validator.
+
+scope_limit:
+  only_modify:
+  - _project/handoffs/ci-validation-evidence-*.md  # new evidence file
+  - _project/handoffs/results-publishing-handoff-2026-04-04.md  # status update only
+  - _project/TODO/main/planning/  # follow-up TODOs only if defects found
+  do_not_touch:
+  - .github/workflows/validate-submission.yml
+  - scripts/validate_submission.py
+  - benchbox/core/explorer_pipeline/
+
+metadata:
+  tags:
+  - results
+  - ci
+  - phase-2
+  - validation
+  - end-to-end
+  estimated_effort: "Small"
+  created_date: "2026-04-12"
+
+impact:
+  business_value: |
+    Confirms Phase 2 community-submission infrastructure actually works in
+    production before inviting external contributors. Catches CI/permissions
+    bugs while we control all the test PRs.
+  user_impact: |
+    External contributors get a working, predictable CI experience on their
+    first submission instead of becoming the unwitting test case.

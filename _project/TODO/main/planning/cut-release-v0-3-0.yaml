@@ -1,0 +1,123 @@
+id: cut-release-v0-3-0
+title: "Cut the v0.3.0 release using the version-branch flow"
+worktree: main
+priority: Medium
+status: Not Started
+category: Release Tooling
+
+description: |
+  Extracted from single-repo-migration-phase-4 w7+w8 on 2026-04-27. Phase-4's
+  migration work (final sync, _project/** history merge) was completed
+  through w6; cutting v0.3.0 was deferred per user direction ("not ready to
+  cut v0.3.0 yet, proceed with steps 1-6"). Splitting the deferred release
+  out of phase-4 lets phase-4 close as Completed and tracks the v0.3.0
+  decision as its own item with its own readiness signal.
+
+  The release exercises the new version-branch flow end-to-end on the
+  single-repo for the first time. Phase-8 (cut the FIRST post-migration
+  release) is essentially this item if v0.3.0 is the chosen version - in
+  practice this item supersedes phase-8 once it lands.
+
+  Mechanics under the version-branch flow (see decisions doc A4 / A5 and
+  docs/operations/release-guide.md).
+
+work:
+- id: w1
+  summary: "Bump version + draft changelog on develop"
+  status: pending
+  notes: |
+    cd /Users/joe/Developer/BenchBox
+    git checkout develop && git pull
+    make bump VERSION=0.3.0
+    make changelog-draft VERSION=0.3.0   # optional helper
+    git add benchbox/__init__.py pyproject.toml CHANGELOG.md docs/ landing/
+    git commit -m "chore(release): bump to 0.3.0 + changelog draft"
+    git push origin develop
+
+- id: w2
+  summary: "Cut the release branch and squash-merge to main"
+  needs: [w1]
+  status: pending
+  notes: |
+    make release-prepare VERSION=0.3.0
+    # Review the release PR; curation drops _project/, _blog/, agent files.
+    # Squash-merge to main on GitHub.
+
+- id: w3
+  summary: "Tag main and watch release.yml publish to PyPI"
+  needs: [w2]
+  status: pending
+  notes: |
+    git checkout main && git pull
+    git tag v0.3.0 && git push origin v0.3.0
+    # release.yml fires; verify PyPI publish in w4.
+
+- id: w4
+  summary: "Verify the release published to PyPI and is installable"
+  needs: [w3]
+  status: pending
+  notes: |
+    Wait for release.yml to complete green:
+      gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'
+    pip index versions benchbox  # should show 0.3.0
+    python -m venv /tmp/post-release-test
+    /tmp/post-release-test/bin/pip install benchbox==0.3.0
+    /tmp/post-release-test/bin/benchbox --help
+    /tmp/post-release-test/bin/python -c "import benchbox; assert benchbox.__version__ == '0.3.0'"
+    # Confirm wheel content has no maintainer scaffolding:
+    /tmp/post-release-test/bin/pip show -f benchbox | \
+      grep -E '_project|_blog|automate_release|benchbox/release/|\.pre-commit'
+    # Should match nothing - Phase 1 wheel hygiene excludes these.
+
+- id: w5
+  summary: "Rebase develop onto main"
+  needs: [w3]
+  status: pending
+  notes: |
+    make release-rebase-develop VERSION=0.3.0
+    # Confirms develop is fast-forward-able to the new main + version bump.
+
+verification:
+- description: "PyPI has v0.3.0"
+  command: "pip index versions benchbox 2>&1 | grep -c '0.3.0'"
+  expected_output: "at least 1"
+- description: "Tag exists on main"
+  command: "git -C /Users/joe/Developer/BenchBox rev-parse v0.3.0"
+  expected_output: "valid SHA"
+- description: "release.yml workflow concluded successfully"
+  command: "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'"
+  expected_output: "success"
+- description: "Installed wheel is clean of maintainer scaffolding"
+  command: "pip show -f benchbox | grep -E '_project|automate_release|benchbox/release/' | wc -l"
+  expected_output: "0"
+
+must_preserve:
+- PyPI versioning is monotonic - if 0.3.0 fails partway through and needs a re-cut, the next attempt is 0.3.1.
+  PyPI rejects re-uploads of the same version.
+- All previously published versions on PyPI remain installable; this release is purely additive.
+- The release-curation step drops _project/, _blog/, and agent files; the wheel must not contain maintainer scaffolding.
+
+anti_patterns:
+- "DO NOT release a version that overlaps with a prior failed attempt - because PyPI rejects, leaving pip unable to resolve the intended version; bump the patch number and move on."
+- "DO NOT skip the post-publish smoke test (w4) - because release.yml going green only proves the workflow ran; it does not prove the wheel is installable; only a fresh pip install does."
+- "DO NOT tag main before the release PR is squash-merged - because the tag would point at a commit that does not include the curation; pull main locally first, then tag."
+
+scope_limit:
+  only_modify:
+  - benchbox/__init__.py  # via update_version.py
+  - pyproject.toml  # via update_version.py
+  - CHANGELOG.md  # via generate_changelog_entry.py
+  - docs/  # version markers via update_version.py
+  - landing/  # version badge via update_landing_page_version
+  notes: |
+    No code changes beyond what any release would do. The release-prepare
+    step generates the curated release branch automatically.
+
+metadata:
+  tags:
+  - release
+  - pypi
+  - version-branch-flow
+  estimated_effort: "Small"
+  created_date: "2026-04-27"
+  source: "Extracted from single-repo-migration-phase-4 (w7+w8) on 2026-04-27"

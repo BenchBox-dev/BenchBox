@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "max_fast_tests": 22000,
+  "_ceiling_note": "Bumped 13200 -> 22000 on 2026-04-13 to reflect grown fast-lane (20,184 collected). Ratchet down if the lane contracts; never raise without justification.",
+  "forbidden_marker_expressions": [
+    "resource_heavy",
+    "stress",
+    "live_integration"
+  ],
+  "forbidden_path_substrings": []
+}

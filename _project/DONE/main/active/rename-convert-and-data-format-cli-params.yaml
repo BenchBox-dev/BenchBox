@@ -1,0 +1,230 @@
+# Rename --convert to --table-format and --data-format to --presort
+#
+# Location: _project/TODO/main/planning/rename-convert-and-data-format-cli-params.yaml
+
+id: rename-convert-and-data-format-cli-params
+title: "Rename --convert to --table-format and --data-format to --presort"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-03-04"
+category: CLI UX
+description: |
+  Two CLI parameter names on `benchbox run` don't clearly express user intent:
+
+  1. `--convert` is a verb describing the implementation action (converting files),
+     not the user's intent (choosing a table format). Users think "I want to
+     benchmark with Delta Lake", not "I want to convert my data."
+
+  2. `--data-format` coexists ambiguously with the new `--table-format`. It controls
+     pre-sorted data generation (parquet-sorted, delta-sorted, iceberg-sorted) and
+     pairs with `--sorted-ingestion-mode`/`--sorted-ingestion-method`.
+
+  Renaming to `--table-format` aligns with industry terminology ("open table formats"),
+  the BenchBox blog series title, and pairs naturally with `--table-mode`.
+
+  Renaming to `--presort` removes the "format" confusion and aligns with the
+  sorted-ingestion parameter family.
+
+  Alpha status: no backward compatibility needed.
+
+  Design decisions:
+  - `benchbox convert` subcommand: KEEP as-is (verb appropriate for subcommand)
+  - `FormatConversionOrchestrator`: KEEP as-is (internal; it IS a conversion orchestrator)
+  - Post-run summary label: "Convert" → "Table Format"
+  - `prompt_data_format()` → `prompt_table_format()` (feeds into --table-format, not --data-format)
+  - JSON output keys: clean break (convert_format → table_format, etc.)
+
+  Full plan: .claude/plans/lazy-hugging-unicorn.md
+
+metadata:
+  tags:
+  - cli
+  - ux
+  - naming
+  - refactor
+  estimated_effort: Medium
+  created_date: "2026-03-04"
+
+impact:
+  business_value: |
+    Clearer CLI parameter names improve developer experience and reduce confusion
+    between related format parameters. Users can intuitively understand what each
+    parameter does without reading documentation.
+  user_impact: |
+    Breaking change for Alpha users: --convert becomes --table-format, --data-format
+    becomes --presort. No backward compatibility shim needed (Alpha status).
+
+files_affected:
+  modified:
+  # Core data model
+  - benchbox/cli/composite_params.py
+  - benchbox/core/schemas.py
+  - benchbox/core/results/builder.py
+  - benchbox/core/results/schema.py
+  - benchbox/core/results/result_factory.py
+  # Runner layer
+  - benchbox/core/runner/runner.py
+  # Platform layer
+  - benchbox/platforms/base/adapter.py
+  # Visualization
+  - benchbox/core/visualization/post_run_summary.py
+  # CLI layer
+  - benchbox/cli/commands/run.py
+  - benchbox/cli/dryrun.py
+  - benchbox/cli/benchmarks.py
+  # Tests
+  - tests/unit/cli/test_composite_params_coverage.py
+  - tests/unit/cli/test_cli_dryrun.py
+  - tests/unit/cli/test_interactive_dry_run.py
+  - tests/unit/core/test_runner_lifecycle.py
+  - tests/unit/platforms/test_base_adapter.py
+  - tests/unit/core/results/test_builder.py
+  - tests/unit/core/visualization/test_post_run_summary.py
+  - tests/unit/cli/test_run_data_organization.py
+  # Documentation
+  - CLAUDE.md
+  - docs/guides/table-formats/index.md
+  - docs/guides/table-formats/vortex-guide.md
+  - docs/guides/table-formats/delta-lake-guide.md
+  - docs/guides/table-formats/iceberg-guide.md
+  - _project/specs/cli/dryrun.md
+  - _project/specs/cli/composite_params.md
+
+scope_limit:
+  only_modify:
+  - "benchbox/cli/"
+  - "benchbox/core/schemas.py"
+  - "benchbox/core/results/"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/core/visualization/post_run_summary.py"
+  - "benchbox/platforms/base/adapter.py"
+  - "tests/unit/cli/"
+  - "tests/unit/core/"
+  - "tests/unit/platforms/"
+  - "docs/"
+  - "CLAUDE.md"
+  - "_project/specs/"
+  do_not_modify:
+  - "benchbox/cli/commands/convert.py"
+  - "benchbox/core/runner/conversion.py"
+  - "benchbox/core/tpcdi/"
+  - "benchbox/platforms/influxdb/"
+  - "benchbox/platforms/datafusion.py"
+  - "_project/DONE/"
+
+must_preserve:
+- "Standalone `benchbox convert` subcommand and its test file test_convert_command.py remain unchanged"
+- "FormatConversionOrchestrator class name in benchbox/core/runner/conversion.py stays as-is"
+- "Unrelated data_format variables in TPC-DI, InfluxDB, DataFusion modules must NOT be renamed"
+- "_project/DONE/ files are historical records and must not be updated"
+- "All existing CLI functionality continues working (just under new parameter names)"
+
+anti_patterns:
+- "DO NOT add backward compatibility aliases - because we are in Alpha status - just rename directly"
+- "DO NOT rename the `benchbox convert` subcommand - because verbs are appropriate for subcommand names - only rename the
+  --convert parameter on `benchbox run`"
+- "DO NOT rename data_format variables in unrelated modules (TPC-DI, InfluxDB, DataFusion) - because those refer to different
+  concepts - only rename the CLI parameter and its direct usage path"
+
+verification:
+- description: "Ruff format passes"
+  command: "uv run ruff format --check ."
+  expected_output: "no files would be reformatted"
+- description: "Ruff lint passes"
+  command: "uv run ruff check ."
+  expected_output: "no errors"
+- description: "All affected tests pass"
+  command: >-
+    uv run -- python -m pytest
+    tests/unit/cli/test_composite_params_coverage.py
+    tests/unit/cli/test_cli_dryrun.py
+    tests/unit/cli/test_interactive_dry_run.py
+    tests/unit/core/test_runner_lifecycle.py
+    tests/unit/platforms/test_base_adapter.py
+    tests/unit/core/results/test_builder.py
+    tests/unit/core/visualization/test_post_run_summary.py
+    tests/unit/cli/test_run_data_organization.py -v
+  expected_output: "all tests pass"
+- description: "Fast test suite passes"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all tests pass"
+- description: "No stale --convert references in source (excluding standalone convert command)"
+  command: "grep -rn 'convert_format\\|ConvertConfig\\|\"--convert\"' --include='*.py' . | grep -v _project/DONE | grep -v
+    commands/convert.py | grep -v test_convert_command.py | head -5"
+  expected_output: "no output (no stale references)"
+- description: "No stale --data-format references in CLI layer"
+  command: "grep -rn '\"--data-format\"\\|\"data_format\"' --include='*.py' benchbox/cli/ tests/unit/cli/ | head -5"
+  expected_output: "no output (no stale references)"
+
+work:
+- id: w1
+  summary: "Rename ConvertConfig → TableFormatConfig, ConvertParamType → TableFormatParamType, CONVERT → TABLE_FORMAT in composite_params.py"
+  status: done
+- id: w2
+  summary: "Rename convert_format → table_format, conversion_compression → table_format_compression, conversion_partition_cols
+    → table_format_partition_cols in core/schemas.py"
+  status: done
+- id: w3
+  summary: "Rename fields and dict keys in core/results/ (builder.py, schema.py, result_factory.py)"
+  needs:
+  - w2
+  status: done
+- id: w4
+  summary: "Rename convert_format variables and dict key accesses throughout core/runner/runner.py"
+  needs:
+  - w2
+  status: done
+- id: w5
+  summary: "Rename dict keys in platforms/base/adapter.py run config metadata"
+  needs:
+  - w2
+  status: done
+- id: w6
+  summary: "Rename variables and update display label in core/visualization/post_run_summary.py"
+  needs:
+  - w2
+  status: done
+- id: w7
+  summary: "Rename --convert → --table-format CLI option, imports, function params, and all options dict assignments in cli/commands/run.py"
+  needs:
+  - w1
+  - w4
+  status: done
+- id: w8
+  summary: "Rename --data-format → --presort CLI option, function param, _resolve_data_organization_payload param, and options
+    dict keys in cli/commands/run.py"
+  status: done
+- id: w9
+  summary: "Rename convert_format → table_format and flag string in cli/dryrun.py"
+  needs:
+  - w7
+  status: done
+- id: w10
+  summary: "Rename prompt_data_format() → prompt_table_format() in cli/benchmarks.py"
+  needs:
+  - w7
+  status: done
+- id: w11
+  summary: "Update all test files for Part A (--convert → --table-format): imports, assertions, dict keys, method names"
+  needs:
+  - w7
+  status: done
+- id: w12
+  summary: "Update test_run_data_organization.py for Part B (--data-format → --presort)"
+  needs:
+  - w8
+  status: done
+- id: w13
+  summary: "Update documentation: CLAUDE.md, docs/guides/table-formats/*.md, _project/specs/cli/*.md"
+  needs:
+  - w7
+  - w8
+  status: done
+- id: w14
+  summary: "Run verification suite: ruff, tests, stale reference grep checks"
+  needs:
+  - w11
+  - w12
+  - w13
+  status: done

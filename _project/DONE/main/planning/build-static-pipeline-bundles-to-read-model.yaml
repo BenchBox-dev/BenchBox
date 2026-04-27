@@ -1,0 +1,167 @@
+id: build-static-pipeline-bundles-to-read-model
+title: "Build static pipeline that transforms result bundles into explorer read models"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-03"
+category: Core Functionality
+deps:
+  needs:
+    - define-results-platform-product-and-launch-strategy
+    - generate-seed-corpus-for-results-explorer
+description: |
+  The results explorer consumes derived read models, not raw schema-v2 bundles
+  directly. This TODO builds the static build pipeline - a Python script that
+  reads canonical result bundles from the corpus directory and produces:
+
+  1. `manifest.json` - global navigation index (all results with summary metadata)
+  2. Per-result detail JSON files - full query timings + metadata for result pages
+  3. `results.duckdb` - DuckDB database file for browser-side DuckDB-WASM analytics
+  4. Copies raw bundles to `bundles/` for download links
+
+  The pipeline runs in CI as part of the site build and outputs to a directory
+  that the Vite explorer app consumes as static data.
+
+  Design principle: the pipeline is a pure function from bundles → read models.
+  It has no state, no database, and no network dependencies. It can be re-run
+  from scratch at any time to rebuild the full read model.
+
+work:
+  - id: w1
+    summary: "Define the derived read model schemas for manifest, detail, and DuckDB tables"
+    status: done
+    notes: |
+      Finalize the JSON schemas and DuckDB table schemas. Key decisions:
+
+      manifest.json schema:
+      - results[]: id, benchmark, platform, scale_factor, timestamp, total_duration_ms,
+        query_count, queries_passed, source (maintainer|community), bundle_path
+      - benchmarks[]: unique benchmark names
+      - platforms[]: unique platform names
+      - generated_at: ISO timestamp
+
+      Per-result detail JSON schema (one file per result):
+      - id, metadata (benchmark, platform, scale_factor, environment summary)
+      - queries[]: id, ms, rows, status (from canonical bundle)
+      - summary: total_ms, passed, failed, validation_status
+      - bundle_download: relative path to raw bundle
+      - companion_files: paths to .plans.json, .tuning.json if present
+
+      DuckDB tables:
+      - results: one row per result run (id, benchmark, platform, scale_factor,
+        timestamp, total_duration_ms, query_count, queries_passed, os, arch,
+        cpu_count, memory_gb, source)
+      - queries: one row per query execution (result_id, query_id, ms, rows,
+        status, run_type)
+
+  - id: w2
+    summary: "Implement the bundle-to-manifest transformation"
+    needs: [w1]
+    status: done
+    notes: |
+      Write a Python script (e.g., `scripts/build_read_model.py`) that:
+      1. Reads all schema-v2 JSON bundles from the corpus directory
+      2. Extracts summary fields for the manifest
+      3. Generates a stable, human-readable result ID from metadata
+         (e.g., `tpch-duckdb-sf1-20260315`)
+      4. Writes `manifest.json` to the output directory
+      5. Writes per-result detail JSON files to `details/{result_id}.json`
+      6. Copies raw bundles + companions to `bundles/`
+
+      The ID generation must be deterministic and collision-resistant. Use
+      benchmark + platform + scale_factor + date, with a short hash suffix if needed.
+
+  - id: w3
+    summary: "Implement DuckDB snapshot generation"
+    needs: [w1]
+    status: done
+    notes: |
+      Extend the build script to create a `results.duckdb` file containing the
+      `results` and `queries` tables defined in w1. Use DuckDB Python API to:
+      1. Create tables with appropriate types
+      2. Insert flattened data from all bundles
+      3. Write the `.duckdb` file to the output directory
+
+      The DuckDB file will be loaded by DuckDB-WASM in the browser for client-side
+      SQL queries. Keep the file size reasonable - at 30-100 results this should be
+      well under 1MB.
+
+  - id: w4
+    summary: "Add pipeline CLI entry point and CI integration"
+    needs: [w2, w3]
+    status: done
+    notes: |
+      Add a CLI entry point: `uv run -- python scripts/build_read_model.py --input results-data/bundles/ --output results-explorer/public/data/`
+      The script should:
+      - Accept input corpus directory and output directory as arguments
+      - Log progress (N bundles processed, N queries indexed)
+      - Exit non-zero on validation errors
+      - Be idempotent (clean output dir on each run)
+      This entry point will be called by the GitHub Pages workflow before the
+      Vite build. The Vite output in `results-explorer/dist/` is then copied to
+      `site/results/` during site assembly.
+
+  - id: w5
+    summary: "Add tests for the static build pipeline"
+    needs: [w2, w3]
+    status: done
+    notes: |
+      Write unit tests that:
+      - Feed a small set of known schema-v2 bundles through the pipeline
+      - Assert manifest.json has correct structure and counts
+      - Assert detail JSONs match expected query data
+      - Assert DuckDB snapshot has correct row counts and queryable tables
+      - Assert ID generation is deterministic
+      Use fixture bundles from the test suite or generate minimal test bundles.
+
+metadata:
+  tags:
+    - results
+    - explorer
+    - phase-1
+    - build-pipeline
+    - read-model
+  estimated_effort: "Medium"
+  created_date: "2026-03-29"
+  completed_date: "2026-04-03"
+
+impact:
+  business_value: |
+    The build pipeline is the bridge between BenchBox's canonical result format
+    and the explorer's data needs. Without it, the explorer has no data to render.
+  user_impact: |
+    Users get fast, pre-processed data for browsing and rich DuckDB-WASM powered
+    filtering - not raw JSON parsing in the browser.
+  technical_debt: |
+    Establishes a clean boundary: canonical bundles are the source of truth,
+    derived read models are rebuildable projections. No mutable state.
+
+must_preserve:
+  - "Schema-v2 bundle files are read-only inputs - the pipeline must not modify them"
+  - "The derived read model is fully rebuildable from bundles - no state accumulation"
+
+approach: |
+  Pure Python script using only stdlib + duckdb for the snapshot. No web frameworks,
+  no databases, no network calls. The script is a build tool, not a service.
+  Use `benchbox.core.results.schema` for validation if convenient, but the pipeline
+  should work standalone.
+
+anti_patterns:
+  - "DO NOT query raw bundles from the browser at runtime - because bundle files are verbose and unindexed - serve pre-built read models instead"
+  - "DO NOT generate result IDs that depend on file paths or insertion order - because IDs must be stable across rebuilds - derive them from bundle metadata deterministically"
+
+verification:
+  - description: "Pipeline produces valid read models from seed corpus"
+    command: "uv run -- python scripts/build_read_model.py --input results-data/bundles/ --output /tmp/test-read-model/ && ls /tmp/test-read-model/"
+    expected_output: "manifest.json, details/, bundles/, results.duckdb"
+  - description: "Pipeline unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/scripts/test_build_read_model.py -q"
+    expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+    - "scripts/build_read_model.py"
+    - "tests/unit/scripts/"
+  do_not_modify:
+    - "benchbox/"
+    - "results-data/"

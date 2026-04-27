@@ -1,0 +1,149 @@
+id: move-remaining-platform-drivers-to-optional-extras
+title: "Move polars, clickhouse-connect, and psycopg2-binary out of core dependencies into optional extras"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-02-23"
+description: |
+  Three platform drivers are currently in [project.dependencies] (pyproject.toml lines 41-43),
+  meaning uv installs them for every BenchBox user - even those who never run polars,
+  ClickHouse, or PostgreSQL benchmarks:
+
+    "polars>=1.36.1",          # line 41 - ~20 MB, no reason to force on all users
+    "clickhouse-connect>=0.10.0",  # line 42 - cloud-only driver, not needed locally
+    "psycopg2-binary>=2.9.11",     # line 43 - PostgreSQL driver, irrelevant for DuckDB users
+
+  More importantly, pinning them in core means uv enforces those exact lower-bound
+  versions on every uv run - a user who manually installs polars==1.20.0 for comparison
+  testing will have it silently reverted to >=1.36.1.
+
+  This was the same problem we fixed for DuckDB (see move-duckdb-to-optional-extras).
+  The fix is the same: move each package out of core and into a named optional extra.
+
+  Current extras state (pyproject.toml):
+    - polars: optional extra "polars" already exists at line 222 with "polars>=1.35.2"
+    - postgresql: optional extra "postgresql" already exists at line 159 with "psycopg2-binary>=2.9.0"
+    - clickhouse-connect: NO clickhouse-connect optional extra exists (only "clickhouse" extra
+      at line ~161 uses clickhouse-driver, a different package for a different ClickHouse adapter)
+
+  Work required:
+    1. Remove the three packages from [project.dependencies]
+    2. Add a new "clickhouse-connect" optional extra (analogous to the "duckdb" extra)
+    3. Add all three to [project.optional-dependencies].all
+    4. Add all three to [dependency-groups].dev (so contributors still get them)
+    5. Update README.md installation instructions for each affected platform
+
+category: Core Functionality
+
+work:
+  - id: w1
+    summary:
+      "Audit pyproject.toml lines 39-120: confirm version floors for polars, clickhouse-connect, psycopg2-binary in core
+      and in existing extras; record decisions as comments above new stanzas"
+    status: done
+
+  - id: w2
+    summary:
+      "Remove the three packages from [project.dependencies]; add new 'clickhouse-connect' optional extra; add all three
+      to [project.optional-dependencies].all"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary:
+      "Add polars, clickhouse-connect, psycopg2-binary to [dependency-groups].dev with explanatory comments; run uv lock
+      to verify no resolution errors"
+    needs: [w2]
+    status: done
+
+  - id: w4
+    summary:
+      "Update README.md install tables: add [polars], [clickhouse-connect], [postgresql] extras to quick-start and platform
+      install sections; follow the same pattern used for [duckdb]"
+    needs: [w2]
+    status: done
+
+  - id: w5
+    summary:
+      "Run smoke tests to verify a fresh install without extras doesn't import-error on DuckDB benchmark, and a polars
+      run still works when the polars extra is present"
+    needs: [w3, w4]
+    status: done
+
+metadata:
+  created_date: "2026-02-23"
+  estimated_effort: "Small (1-2 hours)"
+  tags:
+    - packaging
+    - driver-versioning
+    - polars
+    - clickhouse
+    - postgresql
+
+impact:
+  business_value: |
+    Reduces the BenchBox default install footprint. Users benchmarking only DuckDB
+    no longer need polars (~20 MB) or database drivers they'll never use.
+  user_impact: |
+    uv no longer enforces lower-bound versions for unused platform drivers.
+    Users can install any polars/clickhouse-connect/psycopg2-binary version
+    they want without uv silently reverting it on each run.
+  technical_debt: |
+    Makes the extras model consistent: every platform driver is opt-in.
+    DuckDB was already fixed; this completes the remaining three cases.
+
+files_affected:
+  modified:
+    - "pyproject.toml"
+    - "README.md"
+
+must_preserve:
+  - "uv sync --group dev still installs polars, clickhouse-connect, and psycopg2-binary for contributors"
+  - "benchbox[all] extra continues to include all three packages"
+  - "Existing 'clickhouse' extra (clickhouse-driver) is NOT changed - it is a different driver for a different adapter"
+  - "Existing 'postgresql' optional extra remains unchanged in its own entry"
+  - "DuckDB optional extra added in the previous TODO is not modified"
+
+approach: |
+  Follow the exact pattern used for DuckDB in move-duckdb-to-optional-extras:
+
+  1. Remove from [project.dependencies] (lines 41-43)
+  2. Add new stanza in [project.optional-dependencies]:
+       # clickhouse-connect: moved out of core - see move-remaining-platform-drivers-to-optional-extras
+       clickhouse-connect = ["clickhouse-connect>=0.10.0"]
+     (polars and postgresql extras already exist; just confirm they're present)
+  3. Add polars>=X, clickhouse-connect>=X, psycopg2-binary>=X to [project.optional-dependencies].all
+  4. Add each to [dependency-groups].dev with a comment:
+       "polars>=1.36.1",  # polars: moved out of core deps; must be explicit here for dev environment
+       "clickhouse-connect>=0.10.0",  # clickhouse-connect: moved out of core deps; must be explicit here for dev environment
+       "psycopg2-binary>=2.9.11",  # psycopg2-binary: moved out of core deps; must be explicit here for dev environment
+
+  Note: uv.lock is gitignored - do not attempt to commit it. Just verify `uv lock` resolves
+  successfully after the changes.
+
+anti_patterns:
+  - "DO NOT modify the existing 'clickhouse' extra (clickhouse-driver) - because that is a separate driver for the clickhouse
+    (non-cloud) adapter - only add the new 'clickhouse-connect' extra"
+  - "DO NOT remove polars or psycopg2-binary from their existing optional extra entries - because those already exist and are
+    correct - only remove them from [project.dependencies]"
+  - "DO NOT set a higher minimum version in the new extras than what was previously in core - because that would be more restrictive,
+    not less - use the same or lower floor"
+
+verification:
+  - description: "polars, clickhouse-connect, psycopg2-binary are no longer in [project.dependencies]"
+    command:
+      'python -c "import tomllib; d=tomllib.load(open(''pyproject.toml'',''rb'')); deps=d[''project''][''dependencies'']; print(''polars
+      in core:'', any(''polars'' in x for x in deps)); print(''clickhouse-connect in core:'', any(''clickhouse-connect'' in x for x
+      in deps)); print(''psycopg2-binary in core:'', any(''psycopg2-binary'' in x for x in deps))"'
+    expected_output: "polars in core: False, clickhouse-connect in core: False, psycopg2-binary in core: False"
+  - description: "uv lock resolves without errors after the changes"
+    command: "uv lock"
+    expected_output: "Lock file updated (or already up to date), no resolution errors"
+  - description: "Fast unit tests still pass"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "All tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - "pyproject.toml"
+    - "README.md"

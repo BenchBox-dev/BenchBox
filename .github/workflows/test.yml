@@ -2,9 +2,14 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - develop
+      - 'v*'
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - develop
 
 jobs:
   test:
@@ -252,7 +257,6 @@ jobs:
   # match the current Python implementations, AND that the Vitest suite passes.
   parity:
     runs-on: ubuntu-latest
-    if: false  # results-explorer is not included in the public release
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

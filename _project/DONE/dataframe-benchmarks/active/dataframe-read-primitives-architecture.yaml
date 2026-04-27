@@ -1,0 +1,82 @@
+id: dataframe-read-primitives-architecture
+title: Assess DataFrame Architecture for Read Primitives Integration
+worktree: dataframe-benchmarks
+priority: Medium
+status: Completed
+completed_date: '2026-02-07'
+description: 'Assess architecture requirements for Read Primitives DataFrame support in this
+
+  initiative context.
+
+
+  Read Primitives includes catalog-driven and DB-specific operations that may need
+
+  a separate execution path and applicability filtering rather than direct mapping
+
+  through the current query model.
+
+  '
+category: Core Functionality
+tasks:
+  phases:
+  - phase: 'Phase 1: Applicability Audit'
+    done: true
+    items:
+    - summary: Classify primitives into DataFrame-applicable vs SQL-only
+      done: true
+    - summary: Document rationale for excluded primitive categories
+      done: true
+  - phase: 'Phase 2: Architecture and Plan'
+    done: true
+    items:
+    - summary: Define execution approach for applicable primitives
+      done: true
+    - summary: Define reporting semantics for skipped primitives
+      done: true
+    - summary: Create follow-on implementation TODO if approved
+      done: true
+metadata:
+  owners:
+  - joe
+  tags:
+  - dataframe
+  - read-primitives
+  - planning
+  estimated_effort: Medium
+  created_date: '2026-02-07'
+  last_updated: '2026-02-07T00:00:00'
+impact:
+  business_value: 'Prevents mixing incompatible primitive categories into one execution model.
+
+    '
+  user_impact: 'Improves benchmark clarity with explicit applicability boundaries.
+
+    '
+success_metrics:
+- Applicability matrix completed
+- Architecture decision and next-step TODO documented
+dependencies:
+  related:
+  - _project/TODO/dataframe-benchmarks/planning/integrate-read-primitives-dataframe-mode.yaml
+sections:
+  Decision Summary: 'Decision: Read Primitives DataFrame support should be integrated as a
+
+    capability-filtered benchmark mode, using existing DataFrame query registry.'
+  Current-State Evidence: 'Existing implementations already exist in:
+
+    - `benchbox/core/read_primitives/dataframe_queries.py`
+
+    - `ReadPrimitivesBenchmark.get_dataframe_queries()` and skip helpers.
+
+
+    Benchmark metadata still lists `supports_dataframe: False`, indicating an
+
+    integration/reporting gap rather than missing core query implementations.'
+  Applicability Model: '- DataFrame-applicable primitives execute via query registry.
+
+    - SQL-only primitives remain skipped with explicit rationale surfaced to users.
+
+    - Result summaries must report executed vs skipped counts by category.'
+  Output: 'Created follow-on integration TODO:
+
+    `_project/TODO/dataframe-benchmarks/planning/integrate-read-primitives-dataframe-mode.yaml`.'

@@ -1,0 +1,90 @@
+# Pre-commit hooks for BenchBox
+# Install: pre-commit install  (installs both pre-commit and pre-push stages
+#                               via default_install_hook_types below)
+# Run manually: pre-commit run --all-files
+
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: local
+    hooks:
+      - id: corpus-inventory
+        name: corpus-inventory drift check
+        entry: uv run -- python scripts/generate_corpus_inventory.py --check
+        language: system
+        pass_filenames: false
+        files: ^results-data/bundles/
+
+      # Fast (<1s) allowlist-only scan. Runs on every commit.
+      # The pytest-collection fast-lane checks moved to `timing-policy-fast-lane`
+      # (pre-push stage) because a ~30s hook at commit time was racing with
+      # concurrent working-tree edits, causing spurious "files were modified by
+      # this hook" aborts.
+      - id: timing-policy-check
+        name: timing policy (wall-clock allowlist)
+        entry: uv run -- python _project/scripts/timing_policy_check.py --strict --skip-fast-lane
+        language: system
+        pass_filenames: false
+        files: \.(py|json)$
+
+      - id: timing-policy-fast-lane
+        name: timing policy (fast-lane collect)
+        entry: uv run -- python _project/scripts/timing_policy_check.py --strict --only-fast-lane
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      # Warn-only duplicate-code gate. Manual stage so it doesn't slow
+      # every commit (pylint over benchbox/ takes ~60s). Run with
+      # `pre-commit run duplicate-code-warn --all-files --hook-stage manual`.
+      # Promote to a hard-fail blocking hook in a follow-up TODO once
+      # the R-06/R-07/R-08/R-09 refactors land.
+      - id: duplicate-code-warn
+        name: pylint duplicate-code (warn-only)
+        entry: uv run -- python _project/scripts/pylint_duplicate_code_warn.py
+        language: system
+        pass_filenames: false
+        stages: [manual]
+
+  # Code formatting with ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.13
+    hooks:
+      # Run the linter
+      - id: ruff
+        args: [--fix]
+      # Run the formatter
+      - id: ruff-format
+
+  # Spell checking
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        args:
+          - --ignore-words=.codespell-ignore.txt
+          - --skip=*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,*.csv
+          - --quiet-level=2
+        exclude: ^_sources/  # vendored upstream sources; preserve byte-for-byte
+
+  # YAML validation
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        args: [--unsafe]  # Allow custom YAML tags
+      - id: end-of-file-fixer
+        exclude: ^(_sources/|_binaries/.*EULA\.txt)  # vendored upstream sources; preserve byte-for-byte
+      - id: trailing-whitespace
+        exclude: ^(_sources/|_binaries/.*EULA\.txt)  # vendored upstream sources; preserve byte-for-byte
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.43.0
+    hooks:
+      - id: markdownlint
+        args: [--fix, --disable, MD013, MD033, MD041]  # Disable line-length, HTML, first-line-heading rules

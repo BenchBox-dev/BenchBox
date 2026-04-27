@@ -1,0 +1,142 @@
+id: dataframe-dependency-resolution-and-optional-groups-strategy
+title: DataFrame Dependency Resolution and Optional Groups Strategy
+worktree: dataframe-phase0-deps
+category: Core Functionality
+priority: Critical
+status: Not Started
+description: 'Establish dependency management strategy for 8 dataframe platforms with
+
+  overlapping dependencies (numpy, pyarrow, pandas). Some platforms have
+
+  incompatible version requirements that must be resolved.
+
+  '
+context_sections:
+- name: Dependency Conflict Problem
+  summary: 'cuDF requires specific CUDA-compatible numpy versions. PySpark has strict
+
+    pyspark+pyarrow requirements. Modin has ray/dask dependencies that conflict
+
+    with standalone installations. Installing all 8 platforms simultaneously may
+
+    be impossible.
+
+    '
+- name: Solution Approach
+  summary: 'Create separate optional dependency groups per platform in pyproject.toml.
+
+    Test installation matrices to identify compatible combinations. Document
+
+    incompatible platform combinations clearly.
+
+    '
+impact: 'CRITICAL - Without this, users cannot install platforms, implementation cannot
+
+  be tested, and deployment will fail. This is a hard blocker for all subsequent
+
+  work.
+
+  '
+tasks:
+- phase: 'Phase 0.1: Dependency Analysis'
+  items:
+  - summary: Analyze dependency trees for all 8 platforms
+    done: false
+    details: 'Use pip-compile or similar to identify:
+
+      - Direct dependencies per platform
+
+      - Transitive dependency conflicts
+
+      - Version ranges that are incompatible
+
+      '
+  - summary: Create compatibility matrix
+    done: false
+    details: 'Document which platforms can be installed together:
+
+      - pandas + polars: ✓
+
+      - pandas + dask: ✓
+
+      - cudf + polars: ✗ (numpy version conflict)
+
+      - etc.
+
+      '
+- phase: 'Phase 0.2: pyproject.toml Configuration'
+  items:
+  - summary: Define optional dependency groups in pyproject.toml
+    done: false
+    details: '[project.optional-dependencies]
+
+      dataframe-pandas = ["pandas>=2.0.0,<3.0.0"]
+
+      dataframe-modin = ["modin[all]>=0.25.0", "pandas>=2.0.0,<3.0.0"]
+
+      dataframe-cudf = ["cudf-cu11>=23.0.0"]  # CUDA 11 specific
+
+      dataframe-dask = ["dask[dataframe]>=2023.1.0", "pandas>=2.0.0,<3.0.0"]
+
+      dataframe-polars = ["polars>=0.19.0,<0.21.0"]
+
+      dataframe-pyspark = ["pyspark>=3.4.0,<4.0.0", "pyarrow>=10.0.0,<15.0.0"]
+
+      dataframe-datafusion = ["datafusion>=34.0.0", "pyarrow>=10.0.0,<15.0.0"]
+
+
+      # Convenience groups (test for conflicts!)
+
+      dataframe-pandas-family = [...pandas, modin, dask...]
+
+      dataframe-expression-family = [...polars, pyspark, datafusion...]
+
+      '
+  - summary: Pin exact tested versions for reproducibility
+    done: false
+  - summary: Document installation instructions per platform
+    done: false
+    details: 'README section:
+
+      "Installing DataFrame Platform Support"
+
+      - For Pandas: pip install benchbox[dataframe-pandas]
+
+      - For Polars: pip install benchbox[dataframe-polars]
+
+      - For multiple: pip install benchbox[dataframe-pandas,dataframe-polars]
+
+      - Known conflicts: ...
+
+      '
+- phase: 'Phase 0.3: Installation Matrix Testing'
+  items:
+  - summary: Test all single-platform installations
+    done: false
+    details: 8 platforms × clean venv = 8 test cases
+  - summary: Test pandas-family combination installs
+    done: false
+    details: pandas+modin, pandas+dask, modin+dask, etc.
+  - summary: Test expression-family combination installs
+    done: false
+    details: polars+pyspark, polars+datafusion, pyspark+datafusion
+  - summary: Test cross-family combinations
+    done: false
+    details: pandas+polars (common case), pandas+pyspark, etc.
+  - summary: Document confirmed incompatible combinations
+    done: false
+files_affected:
+  modified:
+  - pyproject.toml
+  - docs/dataframe/installation.md
+  - tests/dependencies/test_optional_installs.py
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - dataframe
+  - dependencies
+  - phase0
+  estimated_effort: 2-3 days

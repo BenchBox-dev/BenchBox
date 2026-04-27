@@ -1,0 +1,140 @@
+id: dedup-wave2-dataframe-platform
+title: "Consolidate DataFrame platform helpers: temporal extraction, window funcs, aggregation, data loading"
+worktree: core-functionality
+priority: Medium
+status: Completed
+completed_date: "2026-03-12"
+category: "Code Quality and Technical Debt"
+description: |
+  Wave-2 duplicate-check triage (2026-03-12) identifies 4 consolidation-worthy
+  groups in the DataFrame platform layer (unified_frame.py, polars_df.py,
+  expression_family.py, pandas_family.py). These are identical dispatch patterns
+  that vary only by the underlying function name or method parameter.
+
+  Targets (report rank → dup lines):
+
+  G7 (60 dup lines): day/hour/minute/year/month temporal extraction in
+      unified_frame.py:585-649. 5 methods with identical multi-platform
+      dispatch (PySpark → DataFusion → Polars fallback), differing only
+      in the extraction function name (e.g., F.year vs F.month).
+
+  G10 (58 dup lines): window_rank/window_row_number/window_dense_rank in
+      polars_df.py:532-591. 3 methods with identical pattern: unpack
+      order_by → create Polars expression → apply rank with different
+      method parameter ("min", "ordinal", "dense") → handle partition.
+
+  G16 (55 dup lines): max/mean/min aggregation methods in
+      unified_frame.py:1018-1127. 6 copies with identical multi-platform
+      dispatch for aggregations, differing only by the function name
+      (F.sum, F.avg, F.min, F.max, etc.).
+
+  G23 (52 dup lines): load_tables_from_data_source in
+      expression_family.py:1230 and pandas_family.py:1037. Identical
+      data loading logic (resolve source → iterate tables → normalize
+      paths → load) differing only by context type signature.
+
+approach: |
+  1. G7 - Temporal extraction:
+     Add `_extract_date_part(self, part_name: str)` private method to
+     the relevant UnifiedExpr class that handles the platform dispatch.
+     Each public method (year, month, day, hour, minute) becomes:
+     `return self._extract_date_part("year")`.
+
+  2. G10 - Polars window functions:
+     Add `_polars_window_rank(self, method: str, order_by, partition_by)`
+     private method. Each public method becomes:
+     `return self._polars_window_rank("min", order_by, partition_by)`.
+
+  3. G16 - Aggregation dispatch:
+     Add `_apply_aggregation(self, pyspark_fn, datafusion_fn, polars_method)`
+     private method that handles the 3-platform dispatch.
+     Each aggregation method becomes a one-liner.
+
+  4. G23 - Data loading:
+     Extract shared logic into a standalone function
+     `_load_tables_from_data_source_impl(ctx, data_dir, schema_info)`
+     in benchbox/platforms/dataframe/shared_loading.py or as a method
+     on a shared base. Both family classes call this implementation.
+
+deps:
+  needs: [dedup-wave2-ignore-rules]
+
+work:
+  - id: w1
+    summary: "Extract _extract_date_part helper in unified_frame.py, refactor 5 temporal methods"
+    status: done
+
+  - id: w2
+    summary: "Extract _polars_window_rank helper in polars_df.py, refactor 3 window methods"
+    status: done
+
+  - id: w3
+    summary: "Extract _apply_aggregation helper in unified_frame.py, refactor 6 aggregation methods"
+    status: done
+
+  - id: w4
+    summary: "Extract shared load_tables_from_data_source into shared_loading.py, update both families"
+    status: done
+
+  - id: w5
+    summary: "Run DataFrame platform tests: pytest -k 'dataframe or unified_frame or polars'"
+    needs: [w1, w2, w3, w4]
+    status: done
+
+  - id: w6
+    summary: "Run full test suite to verify no regressions: make test-all"
+    needs: [w5]
+    status: done
+
+files_affected:
+  modified:
+    - "benchbox/platforms/dataframe/unified_frame.py"
+    - "benchbox/platforms/dataframe/polars_df.py"
+    - "benchbox/platforms/dataframe/expression_family.py"
+    - "benchbox/platforms/dataframe/pandas_family.py"
+  created:
+    - "benchbox/platforms/dataframe/shared_loading.py"
+
+verification:
+  - description: "DataFrame platform tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'dataframe or unified'"
+    expected_output: "all tests pass"
+  - description: "Polars adapter tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k polars"
+    expected_output: "all tests pass"
+  - description: "Duplicate check shows reduction for these groups"
+    command:
+      "make duplicate-check-verbose 2>&1 | grep -c 'day, hour, minute\\|window_dense_rank, window_rank\\|max, mean, min\\\
+      |load_tables_from_data'"
+    expected_output: "0 or reduced counts"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/dataframe/unified_frame.py"
+    - "benchbox/platforms/dataframe/polars_df.py"
+    - "benchbox/platforms/dataframe/expression_family.py"
+    - "benchbox/platforms/dataframe/pandas_family.py"
+    - "benchbox/platforms/dataframe/shared_loading.py"
+    - "tests/"
+
+must_preserve:
+  - "All temporal extraction methods return identical UnifiedExpr types"
+  - "Polars window functions produce identical rank semantics (min/ordinal/dense)"
+  - "Aggregation methods dispatch correctly across PySpark, DataFusion, and Polars"
+  - "Data loading produces identical table_stats and loaded data for both families"
+  - "Type signatures on public methods remain compatible for callers"
+
+anti_patterns:
+  - "DO NOT change public method signatures - only extract internal dispatch logic"
+  - "DO NOT use getattr-based dynamic dispatch for the aggregation helper - pass explicit function references to maintain IDE
+    navigability and type safety"
+  - "DO NOT merge expression_family and pandas_family into one class - only share the loading function"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - refactoring
+    - dataframe
+  estimated_effort: "3-4 hours"
+  created_date: "2026-03-12"

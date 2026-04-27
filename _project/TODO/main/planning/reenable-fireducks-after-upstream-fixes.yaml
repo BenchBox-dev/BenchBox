@@ -1,0 +1,66 @@
+id: reenable-fireducks-after-upstream-fixes
+title: "Re-enable FireDucks after upstream stability fixes"
+worktree: main
+priority: Low
+status: Not Started
+description: |
+  FireDucks support is intentionally disabled due to runtime instability in local
+  execution environments (native crash behavior during import/use).
+
+  Re-enable only after upstream publishes a stable release that resolves known
+  crash conditions and can pass BenchBox validation in supported environments.
+
+category: Platform Expansion
+
+work:
+  - id: w1
+    summary: "Track upstream FireDucks release notes/issues and define re-enable criteria"
+    status: pending
+
+  - id: w2
+    summary: "Reintroduce adapter and platform routing behind a guarded availability path"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Restore FireDucks dependency extras, docs/examples, and platform metadata"
+    needs: [w2]
+    status: pending
+
+  - id: w4
+    summary: "Add/restore unit and integration coverage and verify no regression in non-FireDucks flows"
+    needs: [w3]
+    status: pending
+
+must_preserve:
+  - "Current DataFrame platform routing and availability checks remain stable for polars-df, pandas-df, modin-df, cudf-df, dask-df, datafusion-df, bodo-df, and pyspark-df"
+  - "benchbox CLI startup and platform listing do not crash when optional DataFrame dependencies are unavailable"
+
+approach: |
+  Follow existing optional-adapter patterns used by other DataFrame platforms,
+  but avoid eager imports that can crash process startup. Prefer lazy loading
+  with robust fallback on import failure.
+
+anti_patterns:
+  - "DO NOT re-enable FireDucks via eager module import -- because native crashes can terminate process startup -- use deferred import paths and guarded checks"
+  - "DO NOT advertise FireDucks in docs/CLI until validation passes -- because users will treat it as production-ready -- gate public exposure on verification completion"
+
+verification:
+  - description: "Core DataFrame platform listing remains stable without FireDucks crashes"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_dataframe_factory.py tests/unit/platforms/dataframe/test_pandas_family_adapters.py -q"
+    expected_output: "All tests pass with 0 failures"
+  - description: "FireDucks-specific tests pass once re-enabled in supported environment"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/test_fireducks_df.py -n 0 -q"
+    expected_output: "Exit code 0 in validated environment"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/dataframe/"
+    - "benchbox/platforms/__init__.py"
+    - "benchbox/platforms/adapter_factory.py"
+    - "benchbox/core/platform_registry.py"
+    - "pyproject.toml"
+    - "tests/unit/platforms/dataframe/"
+    - "tests/integration/dataframe/"
+    - "docs/"
+    - "examples/tunings/dataframe/"

@@ -1,0 +1,117 @@
+id: manifest-table-name-collision-detection
+title: "Invalidate manifest reuse when untracked directories collide with table names"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-03-11"
+description: |
+  The datagen manifest validation (_validate_manifest_if_present in runner.py)
+  only checks that its own recorded files exist with correct sizes. It has no
+  concept of "unexpected entries" in the datagen directory. When stale Iceberg
+  table directories (customer/, lineitem/) coexist with valid manifest-tracked
+  files (customer.tbl.1.zst), validation passes but loading breaks.
+
+  Fix: add narrow collision detection that invalidates reuse when an untracked
+  directory shares a table name. This triggers regeneration (or raises under
+  no_regenerate), preventing users from ever reaching the broken load state.
+
+  Also add an entry type guard: if a manifest entry resolves to a directory but
+  is not marked is_directory, treat as invalid (catches corrupted state).
+
+  DataFrame paths also need narrow protection: if file-based loading encounters
+  a directory path, prefer colocated manifest file entries when available;
+  otherwise raise a clear error instead of surfacing IsADirectoryError.
+
+category: Core Functionality
+
+deps:
+  needs:
+    - loud-loader-failures-for-contaminated-data
+
+work:
+  - id: w1
+    summary: "Add table-name directory collision check after entry validation loop in _validate_manifest_if_present"
+    status: done
+  - id: w2
+    summary: "Add entry type guard: file entry resolving to directory without is_directory flag invalidates manifest"
+    status: done
+  - id: w3
+    summary: "Add defense-in-depth warning in _populate_tables_from_manifest for directory/type mismatch"
+    status: done
+  - id: w4
+    summary: "Add manifest reuse tests: collision invalidates, tracked dir validates across formats, file-as-dir invalidates"
+    needs: [w1, w2, w3]
+    status: done
+  - id: w5
+    summary: "Reproduce contamination scenario in tmp dir (manifest + stale table-name dirs) and run pandas-df/polars-df load path to confirm no IsADirectoryError"
+    needs: [w4]
+    status: done
+  - id: w6
+    summary: "Add narrow DataFrame recovery/guard in _get_source_files(): if a directory path is encountered, prefer colocated manifest file entries; otherwise raise clear ValueError"
+    needs: [w5]
+    status: done
+    note: "w5 verification confirmed manifest validation catches contamination before DataFrame code runs. Guard not needed."
+  - id: w7
+    summary: "Add DataFrame regression tests: directory path falls back to manifest file entries when available, otherwise raises clearly"
+    needs: [w6]
+    status: done
+    note: "Skipped because w6 was not needed."
+
+deferred:
+  - summary: "Self-healing cleanup in file-based generators if regeneration still leaves stale directories"
+    reason: "Only needed if users loop between 'invalid manifest' and 'still contaminated'. Would add targeted cleanup in benchbox/core/tpch/generator.py using existing stale-pruning hooks."
+
+verification:
+  - description: "Manifest reuse tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/test_runner_manifest_reuse.py -v"
+    expected_output: "All new manifest reuse tests pass; existing tests still pass"
+  - description: "DataFrame contamination regression tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/dataframe/test_data_loader.py -v"
+    expected_output: "Directory-path fallback and clear-error cases pass; no IsADirectoryError leaks from file-based DataFrame loading"
+  - description: "No regressions in fast suite"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "All fast tests pass"
+
+must_preserve:
+  - "Legitimate Delta/Iceberg directory entries tracked in manifest with is_directory must still validate and reuse"
+  - "A directory recorded anywhere for a table across manifest formats must not be treated as untracked contamination"
+  - "Existing test_directory_entry_validates_successfully and test_directory_entry_size_mismatch_detected still pass"
+  - "Cloud path handling unchanged - collision check gated on isinstance(output_dir, Path)"
+  - "V1 and V2 manifest validation both still work"
+
+approach: |
+  Target file: benchbox/core/runner/runner.py
+
+  Collision check (after line ~1198, before return True):
+  - For each table_name in manifest tables, check if output_dir/table_name is a directory
+  - Determine whether output_dir/table_name is recorded anywhere for that table
+    across all manifest entries and formats, not just the selected/default
+    entries returned by get_table_files()
+  - If directory exists and is not tracked, return (False, None, True) with logger.warning
+
+  Entry type guard (within existing entry validation loop, ~line 1192-1198):
+  - If fp.is_dir() and not entry.get("is_directory", False), return (False, None, True)
+  - Must be gated on isinstance(fp, Path) to skip cloud paths
+
+  Defense-in-depth (_populate_tables_from_manifest, ~line 1127):
+  - When building paths list, check full_path.is_dir() + not is_directory → logger.warning
+  - This is belt-and-suspenders in case validation is somehow bypassed
+
+  Target file: benchbox/core/dataframe/data_loader.py
+  - In _get_source_files(), if a resolved file-based path is a directory, first
+    consult the colocated datagen manifest for file entries for that table
+  - If manifest file entries exist, use them instead of the directory path
+  - If no usable file entries exist, raise a clear ValueError with --force datagen hint
+
+anti_patterns:
+  - "DO NOT add a full directory scan with os.listdir() - check only table-name collisions, because a broad scan requires fragile allowlists"
+  - "DO NOT add allowlist constants for known auxiliary files - they create maintenance burden for marginal value"
+  - "DO NOT warn-only for collisions - invalidate reuse, because warning still lets users hit the broken state"
+  - "DO NOT use get_table_files() alone to decide whether a colliding directory is tracked - it only reflects the selected/default entries"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/runner/runner.py"
+    - "benchbox/core/dataframe/data_loader.py"
+    - "tests/unit/core/test_runner_manifest_reuse.py"
+    - "tests/unit/core/dataframe/test_data_loader.py"

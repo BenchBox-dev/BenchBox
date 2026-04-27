@@ -1,0 +1,127 @@
+id: pyspark-sql-adapter-core
+title: Implement PySparkSQLAdapter core functionality
+worktree: dataframe-expansion
+priority: High
+status: Not Started
+category: Platform Expansion
+
+description: |
+  Create PySparkSQLAdapter extending PlatformAdapter base class.
+  Implements all required abstract methods for SQL benchmark execution.
+
+  This adapter enables running TPC-H/TPC-DS benchmarks via Spark SQL syntax,
+  complementing the existing DataFrame adapter for a dual-mode platform.
+
+  Required abstract method implementations:
+  | Method | Implementation |
+  |--------|----------------|
+  | create_connection() | Return SparkSession from shared manager |
+  | create_schema() | Execute translated CREATE TABLE statements |
+  | load_data() | Read files -> DataFrame -> saveAsTable() |
+  | execute_query() | spark.sql(query).collect() with timing |
+  | get_target_dialect() | Return "spark" |
+  | configure_for_benchmark() | Set OLAP optimizations |
+
+context_sections:
+  "Adapter Skeleton": |
+    ```python
+    # benchbox/platforms/pyspark/sql_adapter.py
+    class PySparkSQLAdapter(PlatformAdapter):
+        def __init__(self, config: dict | None = None):
+            super().__init__()
+            self._config = config or {}
+            self._spark: SparkSession | None = None
+
+        def create_connection(self) -> SparkSession:
+            from benchbox.platforms.pyspark.session import SparkSessionManager
+            self._spark = SparkSessionManager.get_or_create(self._config)
+            return self._spark
+
+        def get_target_dialect(self) -> str:
+            return "spark"
+
+        def execute_query(self, connection, query, query_id, ...):
+            start = time.perf_counter()
+            result_df = self._spark.sql(query)
+            rows = result_df.collect()  # Force eager evaluation
+            elapsed = time.perf_counter() - start
+            return QueryResult(...)
+    ```
+
+  "Dialect Translation": |
+    Use SQLGlot for translation from DuckDB to Spark SQL:
+    ```python
+    import sqlglot
+    spark_sql = sqlglot.transpile(
+        duckdb_sql,
+        read="duckdb",
+        write="spark"
+    )[0]
+    ```
+
+tasks:
+  phases:
+  - phase: "Phase 1: Create Adapter Skeleton"
+    done: false
+    items:
+    - summary: Create sql_adapter.py with PySparkSQLAdapter class
+      done: false
+    - summary: Inherit from PlatformAdapter base class
+      done: false
+    - summary: Add __init__ with configuration handling
+      done: false
+
+  - phase: "Phase 2: Implement Core Methods"
+    done: false
+    items:
+    - summary: Implement create_connection() using SparkSessionManager
+      done: false
+    - summary: Implement get_target_dialect() returning "spark"
+      done: false
+    - summary: Implement execute_query() with timing
+      done: false
+    - summary: Implement configure_for_benchmark() for OLAP settings
+      done: false
+    - summary: Implement close() for session cleanup
+      done: false
+
+  - phase: "Phase 3: Basic Smoke Test"
+    done: false
+    items:
+    - summary: Add basic test for SELECT 1
+      done: false
+    - summary: Verify connection management
+      done: false
+    - summary: Verify dialect translation works
+      done: false
+
+files_affected:
+  added:
+  - benchbox/platforms/pyspark/sql_adapter.py
+  modified:
+  - benchbox/platforms/pyspark/__init__.py
+
+metadata:
+  owners:
+  - "@benchbox-maintainers"
+  tags:
+  - pyspark
+  - sql
+  - adapter
+  - platform
+  estimated_effort: Large
+  created_date: "2025-12-07"
+
+success_metrics:
+- PySparkSQLAdapter class implements all PlatformAdapter abstract methods
+- get_target_dialect() returns "spark"
+- Basic smoke test (SELECT 1) passes
+- execute_query() correctly times query execution
+
+dependencies:
+  blocked_by:
+  - dataframe-expansion/planning/pyspark-sql-session-manager.yaml
+  blocks:
+  - dataframe-expansion/planning/pyspark-sql-data-loading.yaml
+  - dataframe-expansion/planning/pyspark-sql-schema-translation.yaml
+  - dataframe-expansion/planning/pyspark-sql-registry-integration.yaml

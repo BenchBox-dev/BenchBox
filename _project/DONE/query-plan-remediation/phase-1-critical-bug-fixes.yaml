@@ -1,0 +1,339 @@
+id: phase-1-critical-bug-fixes
+title: 'Query Plan Remediation - Phase 1: Critical Bug Fixes'
+worktree: query-plan-remediation
+category: Bug Fixes
+priority: Critical
+status: Completed
+description: 'Fix critical bugs discovered in adversarial review that cause silent failures,
+
+  incorrect behavior, and potential performance/security issues. These are P0
+
+  issues that must be fixed before the query plan feature can be considered
+
+  production-ready.
+
+
+  **Problems Addressed**:
+
+  - Silent capture failures (no error signaling to user)
+
+  - Operator ID counter leakage across queries (breaks comparison)
+
+  - Unbounded serialization (can cause memory/storage issues)
+
+  - Inefficient BFS queue (O(n) pop operations)
+
+  - No timeout protection on EXPLAIN queries (can hang benchmarks)
+
+  '
+context_sections:
+- name: Silent Failure Issue
+  summary: 'When plan capture fails (parser unavailable, EXPLAIN error, parse failure),
+
+    the code returns None with only a debug-level log message. Users with
+
+    --capture-plans enabled get no indication that capture failed until they
+
+    inspect results and find 0 plans captured.
+
+
+    Location: benchbox/platforms/base/adapter.py:capture_query_plan()
+
+    '
+- name: Operator ID Counter Leakage
+  summary: 'DuckDBQueryPlanParser inherits _operator_id_counter from base class but
+
+    never resets it between parse calls. When parsing 22 TPC-H queries, the
+
+    first query gets IDs 1-10, second gets 11-25, etc. This makes cross-query
+
+    comparison impossible because operator IDs are cumulative instead of
+
+    per-query.
+
+
+    Location: benchbox/parsers/duckdb_parser.py, benchbox/parsers/base.py
+
+    '
+- name: Unbounded Serialization
+  summary: 'QueryPlanDAG.to_dict() recursively serializes entire operator tree with no
+
+    depth limits or size guards. Large plans (100+ operators) can produce
+
+    megabytes of JSON. Circular references (if introduced by bugs) cause
+
+    infinite recursion. No protection mechanism exists.
+
+
+    Location: benchbox/core/results/query_plan_models.py:to_dict()
+
+    '
+- name: BFS Queue Performance
+  summary: 'Plan comparison uses list.pop(0) in BFS traversal, which is O(n). For
+
+    trees with 100+ operators, this creates quadratic behavior. Should use
+
+    collections.deque with popleft() for O(1).
+
+
+    Location: benchbox/comparisons/query_plan_comparison.py:_compare_operator_trees()
+
+    '
+- name: EXPLAIN Timeout Risk
+  summary: 'No timeout protection on get_query_plan() calls. If EXPLAIN hangs (buggy
+
+    query, platform issue, network timeout for remote DB), entire benchmark
+
+    hangs indefinitely. User must kill process.
+
+
+    Location: benchbox/platforms/base/adapter.py:get_query_plan()
+
+    '
+impact: 'CRITICAL - These bugs cause incorrect behavior, confusing UX, and potential
+
+  benchmark hangs. Must fix before any production use of query plan feature.
+
+
+  - Silent failures confuse users who expect plans but get none
+
+  - ID leakage breaks all cross-query comparison functionality
+
+  - Unbounded serialization risks OOM or huge result files
+
+  - BFS performance degrades on complex queries
+
+  - Timeout issue can hang long-running benchmarks
+
+  '
+research_value: 'Demonstrates importance of defensive programming in capture paths that run
+
+  during benchmark execution. Shows need for graceful degradation and clear
+
+  error signaling in optional features.
+
+  '
+tasks:
+- phase: 'Task 1.1: Fix Silent Failure Mode'
+  description: Add explicit error signaling when plan capture fails
+  items:
+  - summary: Add --strict-plan-capture CLI flag to benchbox/cli/run.py
+    done: false
+    details: 'When enabled, fail entire benchmark if plan capture fails for any query.
+
+      Default: False (graceful degradation)
+
+      '
+  - summary: Create PlanCaptureError exception class
+    done: false
+    details: "File: benchbox/core/errors.py (or new file)\n\n@dataclass\nclass PlanCaptureError:\n    reason: str  # \"parser_unavailable\"\
+      , \"explain_failed\", \"parse_error\"\n    platform: str\n    query_id: str\n    details: str | None\n"
+  - summary: Emit WARNING logs when parser unavailable
+    done: false
+    details: "In adapter.py:capture_query_plan(), change:\n  self.logger.debug(\"No query plan parser available...\")\nTo:\n\
+      \  self.logger.warning(\n      \"Query plan capture disabled for %s: no parser available. \"\n      \"Plans will not\
+      \ be captured for this benchmark run.\",\n      self.platform_name\n  )\n"
+  - summary: Add plan_capture_failures counter to BenchmarkResults
+    done: false
+    details: "File: benchbox/core/results/models.py\n\n@dataclass\nclass BenchmarkResults:\n    # ... existing fields ...\n\
+      \    query_plans_captured: int = 0\n    plan_capture_failures: int = 0  # NEW\n    plan_capture_errors: list[dict[str,\
+      \ str]] = field(default_factory=list)  # NEW\n"
+  - summary: Track failures and include in results summary
+    done: false
+    details: "In adapter.py:capture_query_plan(), on failure:\n  self.results.plan_capture_failures += 1\n  self.results.plan_capture_errors.append({\n\
+      \      \"query_id\": query_id,\n      \"reason\": \"parser_unavailable\",\n      \"message\": \"No parser for platform\
+      \ X\"\n  })\n"
+  - summary: Emit final summary with capture statistics
+    done: false
+    details: "At end of benchmark run, log:\n  \"Query plans: 18/22 captured, 4 failed\"\n\nIf failures > 0 and user specified\
+      \ --capture-plans, emit INFO or WARNING\n"
+  - summary: Add tests for failure modes
+    done: false
+    details: 'File: tests/unit/platforms/test_plan_capture_errors.py
+
+
+      - Test: parser unavailable → warning logged + counter incremented
+
+      - Test: --strict-plan-capture → raises exception on failure
+
+      - Test: graceful degradation → benchmark continues
+
+      '
+- phase: 'Task 1.2: Fix Operator ID Counter Leakage'
+  description: Reset counter for each parse to ensure consistent IDs
+  items:
+  - summary: Reset counter at start of parse_explain_output()
+    done: false
+    details: "File: benchbox/parsers/duckdb_parser.py\n\ndef parse_explain_output(self, query_id: str, explain_output: str):\n\
+      \    self._operator_id_counter = 0  # RESET HERE\n    return self._parse_impl(query_id, explain_output)\n"
+  - summary: Apply same fix to base QueryPlanParser class
+    done: false
+    details: 'File: benchbox/parsers/base.py
+
+
+      Make reset in base class or document that subclasses must reset
+
+      '
+  - summary: Add test for ID consistency across multiple parses
+    done: false
+    details: "File: tests/parsers/test_duckdb_parser.py\n\ndef test_operator_ids_reset_between_parses():\n    parser = DuckDBQueryPlanParser()\n\
+      \    plan1 = parser.parse_explain_output(\"q01\", explain_output_1)\n    plan2 = parser.parse_explain_output(\"q02\"\
+      , explain_output_2)\n\n    # Both should have operators starting at ID 1\n    assert first_operator_id(plan1) == 1\n\
+      \    assert first_operator_id(plan2) == 1  # Not 11!\n"
+  - summary: Verify fix doesn't break existing tests
+    done: false
+    details: Run full test suite, ensure all parser tests pass
+- phase: 'Task 1.3: Add Serialization Size Limits'
+  description: Protect against unbounded recursion and memory issues
+  items:
+  - summary: Add max_depth parameter to to_dict()
+    done: false
+    details: "File: benchbox/core/results/query_plan_models.py\n\ndef to_dict(self, max_depth: int = 50) -> dict[str, Any]:\n\
+      \    \"\"\"Serialize to dict with depth protection.\"\"\"\n    return self._to_dict_impl(max_depth=max_depth, current_depth=0)\n\
+      \ndef _to_dict_impl(self, max_depth: int, current_depth: int):\n    if current_depth > max_depth:\n        raise SerializationError(f\"\
+      Max depth {max_depth} exceeded\")\n    # ... serialize, recurse with current_depth + 1\n"
+  - summary: Create SerializationError exception class
+    done: false
+    details: "File: benchbox/core/errors.py\n\nclass SerializationError(Exception):\n    \"\"\"Raised when plan serialization\
+      \ fails or exceeds limits.\"\"\"\n"
+  - summary: Add estimate_serialized_size() method
+    done: false
+    details: "def estimate_serialized_size(self) -> int:\n    \"\"\"Estimate JSON size in bytes.\"\"\"\n    return len(json.dumps(self.to_dict(),\
+      \ indent=None))\n"
+  - summary: Log warning if plan exceeds size threshold
+    done: false
+    details: "In adapter.py after parsing plan:\n  size_kb = plan.estimate_serialized_size() / 1024\n  if size_kb > 100:\n\
+      \      self.logger.warning(\n          \"Large query plan for %s: %.1f KB. \"\n          \"Consider using external plan\
+      \ storage.\",\n          query_id, size_kb\n      )\n"
+  - summary: Add tests for depth limit enforcement
+    done: false
+    details: 'File: tests/unit/core/results/test_query_plan_serialization.py
+
+
+      - Test: Deep tree (60 levels) raises SerializationError
+
+      - Test: Tree at limit (50 levels) succeeds
+
+      - Test: Size estimation accuracy
+
+      '
+- phase: 'Task 1.4: Fix BFS Queue Performance'
+  description: Replace list with deque for O(1) operations
+  items:
+  - summary: Import collections.deque
+    done: false
+    details: 'File: benchbox/comparisons/query_plan_comparison.py
+
+
+      from collections import deque
+
+      '
+  - summary: Replace list with deque in _compare_operator_trees()
+    done: false
+    details: "Change:\n  queue: list[tuple[...]] = [(left, right)]\n  while queue:\n      op_left, op_right = queue.pop(0)\
+      \  # O(n)\n\nTo:\n  queue: deque[tuple[...]] = deque([(left, right)])\n  while queue:\n      op_left, op_right = queue.popleft()\
+      \  # O(1)\n"
+  - summary: Verify fix doesn't change comparison behavior
+    done: false
+    details: 'Run existing comparison tests, ensure all pass.
+
+      BFS order should be identical, just more efficient.
+
+      '
+  - summary: Add performance test
+    done: false
+    details: 'File: tests/performance/test_comparison_performance.py
+
+
+      - Create plan with 200 operators
+
+      - Time comparison before/after fix
+
+      - Verify speedup
+
+      '
+- phase: 'Task 1.5: Add EXPLAIN Timeout Protection'
+  description: Prevent benchmarks from hanging on slow EXPLAIN queries
+  items:
+  - summary: Add plan_capture_timeout_seconds config parameter
+    done: false
+    details: "File: benchbox/config/benchmark_config.py\n\n@dataclass\nclass BenchmarkConfig:\n    # ... existing fields ...\n\
+      \    plan_capture_timeout_seconds: int = 30\n"
+  - summary: Wrap get_query_plan() with timeout mechanism
+    done: false
+    details: "File: benchbox/platforms/base/adapter.py\n\nimport signal\nfrom contextlib import contextmanager\n\n@contextmanager\n\
+      def timeout(seconds):\n    def timeout_handler(signum, frame):\n        raise TimeoutError(\"Operation timed out\")\n\
+      \    signal.signal(signal.SIGALRM, timeout_handler)\n    signal.alarm(seconds)\n    try:\n        yield\n    finally:\n\
+      \        signal.alarm(0)\n\nIn capture_query_plan():\n    try:\n        with timeout(self.config.plan_capture_timeout_seconds):\n\
+      \            explain_output = self.get_query_plan(connection, query)\n    except TimeoutError:\n        self.logger.warning(\n\
+      \            \"Query plan capture timed out for %s after %ds\",\n            query_id, self.config.plan_capture_timeout_seconds\n\
+      \        )\n        return None\n"
+  - summary: Add CLI flag --plan-timeout
+    done: false
+    details: "File: benchbox/cli/run.py\n\n@click.option(\"--plan-timeout\", default=30, type=int,\n             help=\"Timeout\
+      \ for EXPLAIN queries (seconds)\")\n"
+  - summary: Add tests for timeout behavior
+    done: false
+    details: 'File: tests/unit/platforms/test_plan_capture_timeout.py
+
+
+      - Mock slow EXPLAIN query (sleep 40s)
+
+      - Verify timeout after 30s
+
+      - Verify benchmark continues
+
+      - Verify failure counted
+
+      '
+  - summary: Document timeout in user guide
+    done: false
+    details: 'Note: Some platforms may have slow EXPLAIN for complex queries.
+
+      Use --plan-timeout to adjust if needed.
+
+      '
+technical_requirements:
+- category: Error Handling
+  items:
+  - All failures logged with WARNING or ERROR level (never DEBUG only)
+  - User-visible summary at end of benchmark
+  - Graceful degradation (continue benchmark unless --strict)
+- category: Performance
+  items:
+  - BFS queue operations must be O(1)
+  - Serialization depth limit prevents stack overflow
+  - Timeout prevents indefinite hangs
+- category: Testing
+  items:
+  - Unit tests for each bug fix
+  - Integration tests for failure modes
+  - Performance regression tests
+files_affected:
+  modified:
+  - benchbox/platforms/base/adapter.py
+  - benchbox/parsers/base.py
+  - benchbox/parsers/duckdb_parser.py
+  - benchbox/core/results/query_plan_models.py
+  - benchbox/comparisons/query_plan_comparison.py
+  - benchbox/core/results/models.py
+  - benchbox/cli/run.py
+  - benchbox/core/errors.py (if not exists)
+  - tests/unit/platforms/test_plan_capture_errors.py
+  - tests/unit/platforms/test_plan_capture_timeout.py
+  - tests/parsers/test_operator_id_consistency.py
+  - tests/unit/core/results/test_serialization_limits.py
+  - tests/performance/test_comparison_performance.py
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - bug-fix
+  - critical
+  - p0
+  dependencies: []
+  estimated_effort: 3-4 days
+  lines_of_code: ~300 LOC (fixes + error handling + tests)

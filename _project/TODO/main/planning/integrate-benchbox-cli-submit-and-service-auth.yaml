@@ -1,0 +1,165 @@
+id: integrate-benchbox-cli-submit-and-service-auth
+title: "Integrate BenchBox CLI submission flow and service authentication"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+deps:
+  needs:
+    - define-results-platform-product-and-launch-strategy
+    - define-hosted-results-contract-and-governance-model
+    - design-results-ingest-storage-and-derived-read-model
+description: |
+  BenchBox already has strong local run/export/history workflows, but it does
+  not have a supported hosted submission flow. This item adds the hosted CLI
+  contract, authentication model, and status/reporting flow for sending
+  canonical result bundles to BenchBox services.
+
+  The critical product rule is that hosted submission should not overload the
+  semantics of local artifact publication. `benchbox publish` and
+  `benchbox submit` must stay distinct so users know whether they are copying
+  files to storage or uploading results into the hosted platform.
+
+  **Phase assignment:** Phase 2-3. Phase 2 uses a simpler PR-based submission
+  model (`benchbox submit --output` packages a bundle for PR contribution).
+  The full hosted API + auth flow described here is Phase 3, contingent on
+  submission volume exceeding what PR-based review can handle.
+
+work:
+  - id: w1
+    summary: "Sketch the CLI surface: draft `benchbox submit --help` output and config key names"
+    status: pending
+    notes: |
+      Write the full --help text before any code is written. Define all flags
+      (--last, --bundle, --dry-run), config keys (service.url, service.token),
+      and the explicit distinction from `benchbox publish`. Reconcile with
+      existing service_url placeholder. Output: submit-cli-surface.md under
+      _project/research/.
+
+  - id: w2
+    summary: "Map submit to existing result export surfaces - identify reuse points in exporter and results CLI"
+    needs: [w1]
+    status: pending
+    notes: |
+      Read benchbox/cli/commands/results.py and benchbox/core/results/exporter.py.
+      Identify which existing code is reused (export path resolution, bundle
+      validation) vs. net-new (network layer, auth). Document the composition
+      seam before writing any implementation.
+
+  - id: w3
+    summary: "Implement `benchbox submit` command skeleton with --dry-run and local validation"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      Create benchbox/cli/commands/submit.py. Wire into CLI entrypoint.
+      --dry-run must work without credentials - just validates the bundle and
+      prints what would be uploaded. Passes `benchbox submit --help` and
+      `benchbox submit --dry-run <path>` smoke tests before w4 begins.
+
+  - id: w4
+    summary: "Implement authentication: token fetch, local keychain storage, and refresh flow"
+    needs: [w3]
+    status: pending
+    notes: |
+      On first submit, prompt for token. Store securely (keyring or encrypted
+      file). On subsequent runs, load token from storage. Handle 401 by prompting
+      for re-auth rather than hard-failing. Do not store plaintext tokens in
+      config files.
+
+  - id: w5
+    summary: "Implement upload, status polling, retries, and idempotent re-submit"
+    needs: [w4]
+    status: pending
+    notes: |
+      POST the canonical schema-v2 bundle. Poll for async processing status
+      (accepted → validated → published). Retry on transient errors (5xx,
+      network). Re-submit with same bundle must be idempotent - service returns
+      the existing hosted URL rather than creating a duplicate.
+
+  - id: w6
+    summary: "Connect hosted result URL and submission history into `benchbox results --submitted`"
+    needs: [w5]
+    status: pending
+    notes: |
+      After a successful submission, persist the hosted URL in local history.
+      `benchbox results --submitted` lists past submissions with their hosted
+      URLs. Builds on the existing results history surfaces without modifying
+      the exporter.
+
+  - id: w7
+    summary: "Write unit and integration tests for the full hosted submission flow"
+    needs: [w5, w6]
+    status: pending
+    notes: |
+      Unit tests: CLI flag parsing, dry-run output, auth token storage/retrieval.
+      Integration tests: full submit flow with a mock service (httpretty or
+      respx). Cover retry, idempotency, and 401 re-auth paths.
+
+  - id: w8
+    summary: "Update CLI reference docs and add hosted-submission walkthrough"
+    needs: [w6, w7]
+    status: pending
+    notes: |
+      Update docs/CLI_REFERENCE.md and docs/reference/cli/ with submit command
+      docs. Add a how-to page covering the end-to-end workflow:
+      run → export → submit → track hosted URL.
+
+metadata:
+  tags:
+    - results
+    - cli
+    - auth
+    - submission
+    - api
+  estimated_effort: "Large"
+  created_date: "2026-03-29"
+
+impact:
+  business_value: |
+    Creates the user-facing bridge from BenchBox CLI runs to the hosted results
+    platform.
+  user_impact: |
+    Users can submit canonical result bundles directly from BenchBox and track
+    what happened to the submission.
+  technical_debt: |
+    Prevents the current placeholder service settings from staying as dead or
+    misleading configuration surface.
+
+must_preserve:
+  - "`benchbox run`, `benchbox export`, and `benchbox results` remain valid for users who never interact with the hosted platform"
+  - "Hosted submission uploads the canonical schema-v2 bundle instead of a second bespoke payload shape"
+
+approach: |
+  Build hosted submission on top of existing export/history surfaces, not as a
+  parallel runner. Submission should work for already-exported results first,
+  then compose naturally with the run lifecycle.
+
+anti_patterns:
+  - "DO NOT hide hosted submission inside generic export or results flags -- because users need to understand when they are invoking a networked service -- expose a first-class submit surface"
+  - "DO NOT bypass the existing exporter when sending hosted submissions -- because that creates incompatible local vs hosted artifacts -- submit the canonical bundle"
+
+verification:
+  - description: "Submit command skeleton is importable and --help works"
+    command: "uv run -- python -m benchbox submit --help 2>&1 | grep -c 'submit'"
+    expected_output: "1"
+  - description: "Submit unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q"
+    expected_output: "All tests pass"
+  - description: "Submit integration tests pass against mock service"
+    command: "uv run -- python -m pytest tests/integration/test_hosted_submission.py -q"
+    expected_output: "All tests pass"
+
+files_affected:
+  modified:
+    - "benchbox/cli/commands/"
+    - "benchbox/core/results/"
+    - "docs/reference/cli/"
+    - "docs/CLI_REFERENCE.md"
+    - "tests/"
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/"
+    - "benchbox/core/results/"
+    - "docs/"
+    - "tests/"

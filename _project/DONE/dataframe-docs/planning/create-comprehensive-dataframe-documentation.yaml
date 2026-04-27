@@ -1,0 +1,130 @@
+id: create-comprehensive-dataframe-documentation
+title: Create Comprehensive DataFrame Documentation
+worktree: dataframe-docs
+category: Documentation
+priority: High
+status: Not Started
+description: 'Complete user and developer documentation for DataFrame support.
+
+  '
+tasks:
+- phase: 'Phase 8.1: User Documentation'
+  items:
+  - summary: Create docs/dataframe/overview.md
+    done: false
+    details: '- What is DataFrame mode
+
+      - When to use SQL vs DataFrame
+
+      - Supported platforms
+
+      - Performance characteristics
+
+      '
+  - summary: Create docs/dataframe/getting-started.md
+    done: false
+    details: '- Installation
+
+      - First DataFrame benchmark
+
+      - Platform selection
+
+      - Basic examples
+
+      '
+  - summary: Create docs/dataframe/platforms.md
+    done: false
+    details: 'Platform-specific guides:
+
+      - Pandas setup
+
+      - Polars setup
+
+      - PySpark setup (local + distributed)
+
+      - Modin setup
+
+      - cuDF setup (GPU requirements)
+
+      - Dask setup (distributed)
+
+      - DataFusion setup
+
+      '
+  - summary: Create docs/dataframe/query-translation.md
+    done: false
+    details: '- SQL to DataFrame translation guide
+
+      - Common patterns
+
+      - Subquery handling
+
+      - Window functions
+
+      '
+- phase: 'Phase 8.2: API Documentation'
+  items:
+  - summary: Create docs/api/dataframe-query.md
+    done: false
+  - summary: Create docs/api/dataframe-ops.md
+    done: false
+  - summary: Create docs/api/dataframe-context.md
+    done: false
+  - summary: Create docs/api/platform-adapters.md
+    done: false
+- phase: 'Phase 8.3: Developer Documentation'
+  items:
+  - summary: Create docs/development/adding-dataframe-platform.md
+    done: false
+    details: '- How to add new platform
+
+      - Family determination (Pandas vs Expression)
+
+      - Adapter implementation guide
+
+      - Testing requirements
+
+      '
+  - summary: Create docs/development/dataframe-architecture.md
+    done: false
+    details: '- Architecture overview
+
+      - Family-based design rationale
+
+      - Code organization
+
+      - Extension points
+
+      '
+  - summary: Update CONTRIBUTING.md with DataFrame guidelines
+    done: false
+- phase: 'Phase 8.4: Examples'
+  items:
+  - summary: Create examples/dataframe/pandas_tpch.py
+    done: false
+  - summary: Create examples/dataframe/polars_tpch.py
+    done: false
+  - summary: Create examples/dataframe/pyspark_tpch.py
+    done: false
+  - summary: Create examples/dataframe/cross_platform_comparison.py
+    done: false
+  - summary: Create examples/dataframe/sql_vs_dataframe.py
+    done: false
+files_affected:
+  modified:
+  - docs/dataframe/overview.md
+  - docs/dataframe/getting-started.md
+  - docs/dataframe/platforms.md
+  - docs/dataframe/query-translation.md
+  - docs/api/dataframe-*.md
+  - docs/development/dataframe-*.md
+  - examples/dataframe/*.py
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - dataframe
+  - documentation
+  estimated_effort: 1 week

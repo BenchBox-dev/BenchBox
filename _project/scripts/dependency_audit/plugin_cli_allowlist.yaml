@@ -1,0 +1,71 @@
+# Plugin and CLI tool allowlist for the dependency audit.
+#
+# Packages listed here are expected to have ZERO direct `import` sites in
+# benchbox/, scripts/, tests/, or docs/. They are invoked as CLI tools,
+# pytest plugins, or build-time plugins activated via config files rather
+# than Python imports.
+#
+# Each entry MUST include a `reason` explaining why zero import sites is correct.
+# Reference the relevant config surface where this tool is activated.
+
+# --------------------------------------------------------------------------
+# pytest plugins - activated via pytest.ini / pyproject.toml [tool.pytest],
+# not via import statements in test files (pytest auto-discovers them).
+# --------------------------------------------------------------------------
+pytest:
+  reason: "Test runner CLI; invoked as `pytest` or via -m pytest. Not imported."
+
+pytest-cov:
+  reason: "Coverage plugin; loaded by pytest via addopts in pytest.ini. Import alias is pytest_cov but never imported directly."
+
+pytest-benchmark:
+  reason: "Benchmark plugin; fixtures auto-injected by pytest. Not imported."
+
+pytest-xdist:
+  reason: "Parallel test plugin; loaded via pytest addopts `-n auto`. Not imported."
+
+pytest-timeout:
+  reason: "Timeout plugin; loaded via pytest marks/config. Not imported."
+
+# --------------------------------------------------------------------------
+# Linting and type-checking CLI tools - invoked as shell commands.
+# --------------------------------------------------------------------------
+ruff:
+  reason: "Linter/formatter CLI; invoked as `uv run ruff check/format`. Not imported."
+
+ty:
+  reason: "Type checker CLI; invoked as `uv run ty check`. Not imported."
+
+tox:
+  reason: "Test orchestration CLI; invoked as `tox`. Not imported."
+
+mutmut:
+  reason: "Mutation testing CLI; invoked as `mutmut run`. Not imported."
+
+codespell:
+  reason: "Spell checker CLI; invoked as `codespell`. Not imported."
+
+# --------------------------------------------------------------------------
+# Sphinx and documentation build plugins - activated via docs/conf.py
+# extensions list or as theme packages.
+# --------------------------------------------------------------------------
+furo:
+  reason: "Sphinx HTML theme; activated via html_theme='furo' in docs/conf.py. Not imported."
+
+myst-parser:
+  reason: "Sphinx Markdown parser; activated via extensions=['myst_parser'] in docs/conf.py."
+
+sphinxcontrib-mermaid:
+  reason: "Sphinx Mermaid diagram extension; activated in docs/conf.py extensions."
+
+sphinx-tags:
+  reason: "Sphinx tagging extension; activated in docs/conf.py extensions."
+
+sphinx-design:
+  reason: "Sphinx design components extension; activated in docs/conf.py extensions."
+
+ablog:
+  reason: "Sphinx blogging extension; activated in docs/conf.py extensions."
+
+roman-numerals:
+  reason: "Sphinx dependency for roman numeral support; pulled in via sphinx>=9 requirement. Not directly imported."

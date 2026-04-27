@@ -1,0 +1,136 @@
+id: generate-seed-corpus-for-results-explorer
+title: "Generate seed corpus of benchmark results for the results explorer"
+worktree: main
+priority: Medium-High
+status: Completed
+category: Core Functionality
+deps:
+  needs:
+  - define-results-platform-product-and-launch-strategy
+description: |
+  The Phase 1 results explorer needs a curated seed corpus of real benchmark
+  results to be useful at launch. This TODO covers defining which benchmarks,
+  platforms, and scale factors to include, building a reproducible CI workflow
+  that generates the results, and committing the canonical schema-v2 bundles
+  to a data directory that the static build pipeline can consume.
+
+  **Corpus strategy: depth over breadth.** The primary deliverable is a dynamic
+  comparison tool, so the corpus must have sufficient depth per benchmark - many
+  platforms at the same scale factor - rather than just hitting a raw bundle
+  count. The target is: each included benchmark has ≥3 comparable platforms at
+  the same scale factor, across most supported benchmarks and platforms at
+  limited scale factors.
+
+  Coverage matrix: TPC-H (SF 0.01, 0.1, 1), TPC-DS (SF 1), and SSB (SF 0.01,
+  0.1) across DuckDB, DataFusion, ClickHouse, and Polars, plus additional
+  platforms as available. Each bundle must include companion files (plans,
+  tuning) where supported.
+
+  The corpus should be regenerable from CI so it stays fresh as BenchBox and
+  platforms evolve. Results are committed under `results-data/` at the repo
+  root. A dedicated data repo is explicitly deferred until repo size or corpus
+  churn makes extraction worthwhile.
+
+work:
+- id: w1
+  summary: "Define seed corpus spec: benchmarks, platforms, scale factors, and storage location"
+  status: done
+  notes: |
+    Decide:
+    - Which benchmark×platform×scale combinations to include (prioritize depth:
+      ≥3 platforms per benchmark×scale, across most supported benchmarks)
+    - Exact directory layout under `results-data/bundles/`
+    - Naming convention for bundles (e.g., `tpch-duckdb-sf0.01-{date}.json`)
+    - Whether to capture query plans for all runs (recommended: yes for DuckDB/DataFusion)
+    Minimum coverage matrix:
+    | Benchmark | Platforms | Scale Factors |
+    |-----------|-----------|---------------|
+    | TPC-H | DuckDB, DataFusion, Polars, ClickHouse | 0.01, 0.1, 1.0 |
+    | TPC-DS | DuckDB, DataFusion, Polars, ClickHouse | 1.0 |
+    | SSB | DuckDB, DataFusion, Polars, ClickHouse | 0.01, 0.1 |
+    This establishes a 24-run floor with ≥4 platforms per benchmark×scale
+    cohort, satisfying the depth criterion. Additional runs (cloud platforms,
+    extra curated cohorts) are welcome but not required to meet launch criteria.
+
+- id: w2
+  summary: "Build a GitHub Actions workflow that generates seed corpus bundles"
+  needs: [w1]
+  status: done
+  notes: |
+    Create `.github/workflows/seed-corpus.yml` (or extend an existing workflow)
+    that runs the specified benchmark matrix using `benchbox run`. Each run should:
+    - Export canonical schema-v2 bundles with companion files
+    - Use `--capture-plans` where supported
+    - Use `--validation full` for correctness verification
+    - Output bundles to a consistent directory structure
+    The workflow should be manually triggerable (`workflow_dispatch`) and
+    optionally scheduled (weekly/monthly) for corpus freshness.
+
+- id: w3
+  summary: "Run initial seed corpus generation and commit bundles"
+  needs: [w2]
+  status: done
+  notes: |
+    Execute the workflow, verify all bundles pass schema validation, and commit
+    the initial corpus. Verify that each bundle has valid metadata, query timings,
+    and companion files. Document any platforms that failed or were skipped and why.
+
+- id: w4
+  summary: "Add a corpus inventory manifest and validation script"
+  needs: [w3]
+  status: done
+  notes: |
+    Create a simple `corpus-inventory.json` that lists all bundles with their
+    benchmark, platform, scale factor, date, and file paths. Add a validation
+    script that checks all listed bundles exist, pass schema validation, and
+    have consistent metadata. This manifest is consumed by the static build
+    pipeline (separate TODO).
+
+metadata:
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - seed-corpus
+  - ci
+  estimated_effort: "Medium"
+  created_date: "2026-03-29"
+  completed_date: "2026-04-04"
+
+impact:
+  business_value: |
+    Without real data, the explorer is an empty shell. The seed corpus is the
+    minimum viable content that makes the Phase 1 explorer worth launching.
+  user_impact: |
+    Users see real benchmark results from day one instead of placeholder data.
+  technical_debt: |
+    Establishes a reproducible corpus generation workflow that prevents the
+    explorer from depending on manually curated or stale data.
+
+must_preserve:
+- "Existing benchbox run and export workflows must not be modified - seed generation uses them as-is"
+- "Schema-v2 bundle format is the canonical artifact - no custom export shapes"
+
+approach: |
+  Use `benchbox run` directly to generate all seed results. The seed workflow is
+  a consumer of the existing CLI, not a new code path. Focus on depth per
+  benchmark (≥3 platforms at the same scale factor per benchmark) to ensure the
+  dynamic comparison tool has meaningful content at launch.
+
+anti_patterns:
+- "DO NOT include only synthetic or trivially small results - because the explorer must show realistic platform behavior - run actual benchmarks at SF 0.01+ with full query sets"
+- "DO NOT commit large bundles (>10MB each) directly to the main repo - because git history bloats permanently - use a data repo, LFS, or CI-generated artifacts if bundles are large"
+- "DO NOT generate the corpus manually and commit ad hoc - because the corpus must be reproducible and refreshable - build a CI workflow from the start"
+
+verification:
+- description: "All seed bundles pass schema validation and depth-per-benchmark criterion"
+  command: "uv run -- python -c \"import json, pathlib, collections; bundles = list(pathlib.Path('results-data/bundles').glob('*.json')); print(f'{len(bundles)} bundles found'); cohorts = collections.defaultdict(set); [cohorts[(json.load(open(b))['metadata']['benchmark'], str(json.load(open(b))['metadata'].get('scale_factor','')))].add(json.load(open(b))['metadata']['platform']) for b in bundles]; [print(f'  {k}: {len(v)} platforms') for k,v in sorted(cohorts.items())]; assert all(len(v) >= 3 for v in cohorts.values()), f'Some cohorts have <3 platforms: {dict((k,len(v)) for k,v in cohorts.items() if len(v)<3)}'\""
+  expected_output: "All bundles found; every benchmark×scale cohort has ≥3 platforms"
+
+scope_limit:
+  only_modify:
+  - "results-data/"
+  - ".github/workflows/"
+  do_not_modify:
+  - "benchbox/"
+  - "tests/"

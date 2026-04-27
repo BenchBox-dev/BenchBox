@@ -618,6 +618,81 @@ dist: clean
 run-test:
 	uv run -- python $(TEST)
 
+# ---------------------------------------------------------------------------
+# Release flow (single-repo migration, version-branch model)
+# ---------------------------------------------------------------------------
+# These targets must be run from the public clone (origin -> joeharris76/BenchBox).
+# Do NOT invoke from the legacy private clone — it has no `origin` remote.
+#
+# Flow: develop -> v$(VERSION) -> (squash) main -> rebase develop -> v$(VERSION+1)
+# See docs/operations/release-guide.md and _project/decisions/single-repo-migration.md (A4).
+
+.PHONY: bump changelog-draft release-prepare release-rebase-develop
+
+# Bump version in __init__.py, pyproject.toml, docs landing pages.
+# Usage: make bump VERSION=X.Y.Z
+bump:
+	@test -n "$(VERSION)" || (echo "Usage: make bump VERSION=X.Y.Z" && exit 1)
+	uv run python scripts/update_version.py --version $(VERSION) --update-pyproject
+
+# Draft a CHANGELOG.md entry from conventional commits since the last v* tag.
+# Auto-summarises with Claude CLI when available; falls back to raw bullets.
+# Usage: make changelog-draft VERSION=X.Y.Z
+changelog-draft:
+	@test -n "$(VERSION)" || (echo "Usage: make changelog-draft VERSION=X.Y.Z" && exit 1)
+	uv run python scripts/generate_changelog_entry.py --version $(VERSION)
+
+# Cut the release branch from develop, drop maintainer paths, push, open PR.
+# Pre-conditions enforced:
+#   - Currently on develop branch
+#   - Working tree clean
+#   - pyproject.toml version already matches $(VERSION) (run `make bump` first)
+# Usage: make release-prepare VERSION=X.Y.Z
+release-prepare:
+	@test -n "$(VERSION)" || (echo "Usage: make release-prepare VERSION=X.Y.Z" && exit 1)
+	@[ "$$(git rev-parse --abbrev-ref HEAD)" = "develop" ] || (echo "Error: must be on develop branch" && exit 1)
+	@[ -z "$$(git status --porcelain)" ] || (echo "Error: working tree must be clean" && exit 1)
+	@grep -q '^version = "$(VERSION)"$$' pyproject.toml || (echo "Error: pyproject.toml version is not $(VERSION); run 'make bump VERSION=$(VERSION)' first" && exit 1)
+	git fetch origin
+	@# Anchor pre-release point on develop so the post-release rebase knows
+	@# which commits to drop from develop (everything up to this anchor was
+	@# squashed into the release commit; only later commits should replay).
+	git tag pre-release-v$(VERSION) develop
+	git checkout -b v$(VERSION) develop
+	@# Curation: drop develop-only paths from the release branch.
+	@# These are paths recorded in A3 of _project/decisions/single-repo-migration.md
+	@# as "develop only". Released wheels never carry these.
+	-git rm -rf _project _blog .claude .codex .gemini
+	-git rm -f .pre-commit-config.yaml _benchbox_pytest_xdist_safety.py todo.config.yaml skill-sync.yaml skill-sync.lock .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md
+	git commit -m "Release v$(VERSION)"
+	git push -u origin v$(VERSION)
+	gh pr create --base main --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
+	@echo
+	@echo "Release PR opened. Next steps:"
+	@echo "  1. Review the PR. Confirm CHANGELOG.md is correct and curation looks right."
+	@echo "  2. Squash-merge the PR on GitHub."
+	@echo "  3. git checkout main && git pull && git tag v$(VERSION) && git push origin v$(VERSION)"
+	@echo "  4. Watch .github/workflows/release.yml run; verify PyPI publish."
+	@echo "  5. make release-rebase-develop VERSION=$(VERSION)"
+
+# After release-prepare's PR is squash-merged and tag pushed, rebase develop
+# onto main so the next dev cycle starts from the release-shaped state.
+# Usage: make release-rebase-develop VERSION=X.Y.Z
+release-rebase-develop:
+	@test -n "$(VERSION)" || (echo "Usage: make release-rebase-develop VERSION=X.Y.Z" && exit 1)
+	git fetch origin --tags
+	@[ -n "$$(git tag -l v$(VERSION))" ] || (echo "Error: tag v$(VERSION) not found locally" && exit 1)
+	@[ -n "$$(git tag -l pre-release-v$(VERSION))" ] || (echo "Error: anchor tag pre-release-v$(VERSION) not found (was release-prepare run?)" && exit 1)
+	@git merge-base --is-ancestor v$(VERSION) origin/main || (echo "Error: tag v$(VERSION) is not on origin/main; squash-merge the release PR first" && exit 1)
+	git checkout develop
+	git pull --ff-only origin develop
+	git rebase --onto main pre-release-v$(VERSION) develop
+	git push --force-with-lease origin develop
+	git tag -d pre-release-v$(VERSION)
+	@echo
+	@echo "develop rebased onto main."
+	@echo "Per option-c lifecycle: previous release branch (e.g. vPREV) can be deleted on the next release-prepare run."
+
 # Help
 help:
 	@echo "BenchBox Makefile"

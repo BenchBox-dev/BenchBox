@@ -1,0 +1,69 @@
+id: harden-operator-type-handling
+title: "Harden plan comparison and visualization for unknown operator types"
+worktree: "query-plan-remediation"
+priority: "High"
+status: "Not Started"
+description: |
+  Comparison and visualization paths assume LogicalOperatorType enums and call
+  .value on unknown operator strings. Any new/unsupported operator from parsers
+  causes crashes in compare-plans and show-plan. Add safe handling for string
+  operator types, surface unknown-type warnings, and keep output usable instead
+  of failing hard. Expand tests so future parsers can introduce new operators
+  without breaking downstream tooling.
+category: "Core Functionality"
+tasks:
+  phases:
+  - phase: "Phase 1: Guardrails and APIs"
+    done: false
+    items:
+    - summary: "Introduce helper to safely render operator_type irrespective of enum vs string and use it in comparator and
+        visualizer paths."
+      done: false
+    - summary: "Add logging/metadata for unmapped operator types so parser authors can spot gaps without user-facing crashes."
+      done: false
+  - phase: "Phase 2: Implementation"
+    done: false
+    items:
+    - summary: "Update comparison diff construction and summaries to avoid .value on plain strings; ensure structure/type
+        comparisons still function with mixed types."
+      done: false
+    - summary: "Update visualization rendering and property formatting to degrade gracefully when operator types are strings
+        or missing."
+      done: false
+  - phase: "Phase 3: Testing"
+    done: false
+    items:
+    - summary: "Add unit tests with mixed enum/string operator types to ensure compare-plans and show-plan run without exceptions
+        and report readable output."
+      done: false
+metadata:
+  owners:
+  - "joe"
+  tags:
+  - "query-plans"
+  - "stability"
+  estimated_effort: "Small"
+  created_date: "2025-11-26"
+impact:
+  business_value: |
+    Prevents production CLI commands from crashing when engines introduce new
+    operators, keeping benchmark UX stable and trustworthy.
+  user_impact: |
+    Users get resilient comparisons and visualizations even when parsers emit
+    unmapped operator types; failures become warnings instead of hard errors.
+  technical_debt: |
+    Reduces coupling between parser outputs and downstream tools, making it safer
+    to add new platforms or operator mappings.
+files_affected:
+  modified:
+  - "benchbox/core/query_plans/comparison.py"
+  - "benchbox/core/query_plans/visualization.py"
+  - "benchbox/core/results/query_plan_models.py"
+  - "tests/unit/core/query_plans/test_comparison.py"
+  - "tests/unit/core/query_plans/test_visualization.py"
+  added: []
+  removed: []
+success_metrics:
+- "compare-plans and show-plan run without exceptions when operator_type is a string."
+- "Unknown operator types appear in output with clear labeling and optional warnings."
+- "New tests covering mixed operator types pass in the suite."

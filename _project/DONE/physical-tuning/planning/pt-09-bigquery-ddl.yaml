@@ -1,0 +1,185 @@
+# Physical Tuning #09: BigQuery DDL Generator Enhancement
+#
+# BigQuery has existing support but needs full tuning config integration.
+
+id: pt-09-bigquery-ddl
+title: "PT-09: BigQuery Physical Tuning DDL Generator Enhancement"
+worktree: "physical-tuning"
+priority: "Medium"
+status: "Not Started"
+category: "Platform Expansion"
+
+description: |
+  Enhance BigQuery DDL generation to fully utilize the tuning configuration
+  system with support for partitioning, clustering, and BigQuery-specific features.
+
+  ## BigQuery Physical Tuning Features
+
+  ### Time-based Partitioning
+  ```sql
+  CREATE TABLE t (...) PARTITION BY DATE(timestamp_col);
+  CREATE TABLE t (...) PARTITION BY DATETIME_TRUNC(datetime_col, DAY);
+  CREATE TABLE t (...) PARTITION BY DATE_TRUNC(date_col, MONTH);
+  ```
+
+  ### Integer Range Partitioning
+  ```sql
+  CREATE TABLE t (...)
+  PARTITION BY RANGE_BUCKET(int_col, GENERATE_ARRAY(0, 100, 10));
+  ```
+
+  ### Clustering (up to 4 columns)
+  ```sql
+  CREATE TABLE t (...) CLUSTER BY col1, col2, col3, col4;
+  ```
+
+  ### Require Partition Filter
+  Prevents expensive full-table scans:
+  ```sql
+  CREATE TABLE t (...)
+  PARTITION BY DATE(ts)
+  OPTIONS (require_partition_filter = true);
+  ```
+
+  ## Current State
+
+  BigQuery adapter (`benchbox/platforms/bigquery.py`) has:
+  - Inline PARTITION BY in `_create_table_statement()` (line ~1292)
+  - Inline CLUSTER BY (line ~1295)
+  - `generate_tuning_clause()` method (line ~1473)
+  - Uses adapter config (partitioning_field), not tuning YAML
+
+context_sections:
+  "BigQuery DDL Syntax": |
+    ```sql
+    -- Time-based partitioning with clustering
+    CREATE TABLE project.dataset.lineitem (
+        l_orderkey INT64 NOT NULL,
+        l_partkey INT64 NOT NULL,
+        l_suppkey INT64 NOT NULL,
+        l_linenumber INT64 NOT NULL,
+        l_quantity NUMERIC,
+        l_extendedprice NUMERIC,
+        l_discount NUMERIC,
+        l_tax NUMERIC,
+        l_returnflag STRING,
+        l_linestatus STRING,
+        l_shipdate DATE,
+        l_commitdate DATE,
+        l_receiptdate DATE,
+        l_shipinstruct STRING,
+        l_shipmode STRING,
+        l_comment STRING
+    )
+    PARTITION BY l_shipdate
+    CLUSTER BY l_orderkey, l_partkey
+    OPTIONS (
+        require_partition_filter = true,
+        description = 'TPC-H lineitem table'
+    );
+
+    -- Monthly partitioning
+    CREATE TABLE orders (...)
+    PARTITION BY DATE_TRUNC(o_orderdate, MONTH)
+    CLUSTER BY o_custkey;
+
+    -- Integer range partitioning
+    CREATE TABLE sales (...)
+    PARTITION BY RANGE_BUCKET(customer_id, GENERATE_ARRAY(0, 1000000, 10000))
+    CLUSTER BY product_id;
+    ```
+
+  "BigQuery Considerations": |
+    - Clustering is automatically maintained (no manual reclustering)
+    - Max 4 clustering columns
+    - Clustering order matters (first column most selective)
+    - Partitioning required for tables > 10TB (cost control)
+    - Distribution not applicable (BigQuery handles internally)
+
+tasks:
+  phases:
+  - phase: "Phase 1: Refactor to DDL Generator Protocol"
+    done: false
+    items:
+    - summary: "Create benchbox/core/tuning/generators/bigquery.py"
+      done: false
+    - summary: "Implement generate_tuning_clauses()"
+      done: false
+    - summary: "Wire tuning YAML config to DDL generation"
+      done: false
+
+  - phase: "Phase 2: Enhanced Partitioning Support"
+    done: false
+    items:
+    - summary: "Support DATE, DATETIME, TIMESTAMP partition columns"
+      done: false
+    - summary: "Support partition granularity (DAY, MONTH, YEAR)"
+      done: false
+    - summary: "Support integer RANGE_BUCKET partitioning"
+      done: false
+    - summary: "Generate require_partition_filter option"
+      done: false
+
+  - phase: "Phase 3: Clustering Enhancement"
+    done: false
+    items:
+    - summary: "Validate max 4 clustering columns"
+      done: false
+    - summary: "Support clustering column ordering"
+      done: false
+    - summary: "Warn on suboptimal clustering order"
+      done: false
+
+  - phase: "Phase 4: Integration with Adapter"
+    done: false
+    items:
+    - summary: "Replace inline DDL with generator calls"
+      done: false
+    - summary: "Remove adapter-level partitioning_field in favor of tuning config"
+      done: false
+    - summary: "Deprecate old config options with migration path"
+      done: false
+
+  - phase: "Phase 5: Testing"
+    done: false
+    items:
+    - summary: "Unit tests for BigQuery DDL generator"
+      done: false
+    - summary: "Integration tests (requires GCP credentials)"
+      done: false
+    - summary: "Verify partition pruning via INFORMATION_SCHEMA"
+      done: false
+
+files_affected:
+  modified:
+  - "benchbox/platforms/bigquery.py"
+  - "examples/tunings/bigquery/tpch_tuned.yaml"
+  added:
+  - "benchbox/core/tuning/generators/bigquery.py"
+  - "tests/unit/core/tuning/generators/test_bigquery_ddl.py"
+
+technical_requirements:
+  constraints:
+  - "Must validate max 4 clustering columns"
+  - "Must support all partition granularities"
+  - "Must maintain backward compat with partitioning_field config"
+
+success_metrics:
+- "Tables created with correct partitioning from tuning YAML"
+- "Clustering applied with correct column order"
+- "Partition filter requirement enforced"
+
+dependencies:
+  blocked_by:
+  - "_project/TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml"
+
+metadata:
+  owners:
+  - "joe"
+  tags:
+  - "tuning"
+  - "bigquery"
+  - "gcp"
+  - "ddl-generation"
+  estimated_effort: "Small"
+  created_date: "2026-01-03"

@@ -52,7 +52,6 @@ jobs:
           echo "path=$current" >> "$GITHUB_OUTPUT"
 
       - name: Compare against baseline (fail on >10% regression)
-        if: hashFiles('_project/baselines/perf_smoke_duckdb_tpch_001.json') != ''
         run: |
           uv run benchbox compare \
             _project/baselines/perf_smoke_duckdb_tpch_001.json \
@@ -64,5 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: perf-smoke-result
-          path: ${{ steps.current.outputs.path }}
+          path: |
+            ${{ steps.current.outputs.path }}
+            _project/baselines/perf_smoke_duckdb_tpch_001.json
           retention-days: 14

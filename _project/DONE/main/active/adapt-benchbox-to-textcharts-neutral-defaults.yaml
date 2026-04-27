@@ -1,0 +1,205 @@
+id: adapt-benchbox-to-textcharts-neutral-defaults
+title: "Adapt BenchBox to textcharts neutralized defaults and new APIs"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-03-09"
+superseded_by: "align-benchbox-with-textcharts-de-benchboxing"
+completion_notes: |
+  w1 (golden parity) and w4 (value_formatter) done. Remaining work units were
+  blocked on textcharts completing its neutralization. Now that textcharts is
+  fully de-benchboxed, this TODO is superseded by a new one with accurate work
+  units based on the actual API changes.
+description: |
+  textcharts has a planned 5-group neutralization pass (see
+  `_project/prompts/textcharts-neutralize-defaults.md`). Current status:
+
+  Completed in textcharts:
+  - Group 2 partial: `value_formatter` added to SummaryStats and StackedBar
+  - Group 2 partial: `_format_metric()` dispatch in SummaryBox
+
+  NOT yet completed in textcharts (blocked):
+  - Group 1: Default labels/titles still domain-specific
+  - Group 3: `lower_is_better` parameter not added
+  - Group 4: Factory function renames not done (no generic names, no deprecation)
+  - Group 5: Outlier cap not configurable
+
+  BenchBox-side work that CAN proceed now:
+  - Verify `value_formatter` addition doesn't affect existing behavior
+  - Verify golden test parity with current textcharts
+  - Run full test suite to confirm no regressions
+
+  BenchBox-side work BLOCKED on textcharts:
+  - Migrate factory calls to new generic names (Group 4)
+  - Update scatter param names cost→x, performance→y (Group 4)
+  - Update compatibility shim re-exports (Groups 1, 4)
+
+  Related: extract-ascii-charting-into-standalone-library (parent extraction TODO)
+
+category: Core Functionality
+
+deps:
+  needs: []
+
+work:
+- id: w1
+  summary: "Update textcharts dependency and verify golden test parity"
+  status: done
+  notes: |
+    1. Bump textcharts version in pyproject.toml
+    2. Run full test suite: `uv run -- python -m pytest -q`
+    3. Run golden snapshot tests specifically:
+       `uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v`
+    4. If any golden tests fail, inspect output changes - they should only affect
+       charts rendered WITHOUT explicit labels (i.e., test-only fixtures, not
+       BenchBox production paths). Regenerate with `--update-golden` after review.
+    5. Run BenchBox smoke test to confirm CLI output unchanged:
+       `benchbox run --platform duckdb --benchmark tpch --scale 0.01 --dry-run /tmp/verify`
+
+- id: w2
+  summary: "Migrate factory function calls to new generic names"
+  needs: [w1]
+  status: pending
+  blocked_by: "textcharts Group 4 not yet implemented - old names are still primary, no generic aliases exist"
+  notes: |
+    textcharts renamed benchmark-specific factory functions and deprecated the old
+    names. BenchBox call sites in `ascii_runtime.py` need updating to silence
+    DeprecationWarnings:
+
+    | Old name                      | New name        | Call site in ascii_runtime.py |
+    |-------------------------------|-----------------|------------------------------|
+    | from_query_results()          | from_series()   | _render_cdf, _render_percentile |
+    | from_normalized_results()     | from_ratios()   | _render_speedup              |
+    | from_heatmap_data()           | from_matrix()   | _render_rank_table           |
+    | from_bar_data()               | from_data()     | _render_bar                  |
+    | from_comparison_data()        | from_data()     | _render_comparison           |
+    | from_query_latency_data()     | from_data()     | _render_histogram            |
+    | from_regression_data()        | from_data()     | _render_diverging            |
+    | from_time_series_points()     | from_points()   | _render_line                 |
+    | from_distribution_series()    | from_series()   | _render_box_plot             |
+    | from_cost_performance_points()| from_points()   | _render_scatter              |
+    | from_phase_data()             | from_data()     | _render_stacked              |
+    | from_metrics()                | (unchanged)     | _render_sparkline            |
+
+    Also check: post_run_summary.py, exporters.py for any factory calls.
+    After migration, run: `python -W error::DeprecationWarning -m pytest -q` to
+    confirm no remaining deprecation warnings from textcharts.
+
+- id: w3
+  summary: "Update factory function parameter names (scatter cost→x, performance→y)"
+  needs: [w2]
+  status: pending
+  blocked_by: "textcharts Group 4 not yet implemented - from_points() does not exist yet"
+  notes: |
+    The renamed `from_points()` in scatter_plot uses `x_label`/`y_label` instead
+    of `cost_label`/`performance_label`. Check `_render_scatter` in ascii_runtime.py
+    and update kwargs accordingly.
+
+    Similarly check if any other factory parameter names changed and update.
+
+- id: w4
+  summary: "Verify value_formatter has no impact on existing behavior"
+  needs: [w1]
+  status: done
+  notes: |
+    textcharts added `value_formatter: Callable[[float], str] | None = None` to:
+    - ASCIIStackedBar.__init__()
+    - SummaryStats dataclass
+
+    BenchBox does NOT set value_formatter, so it defaults to None. When None AND
+    metric_label is "ms" (BenchBox's default), the existing _format_time() is used
+    - behavior is identical.
+
+    Additionally, ASCIISummaryBox now routes _format_time() through _format_metric()
+    dispatch. When metric_label != "ms", total_time and best/worst values use
+    _format_value() + metric_label instead of hardcoded ms→s→min. Since BenchBox
+    always uses metric_label="ms", this is a no-op for us.
+
+    Verification:
+    1. Grep BenchBox for all SummaryStats and ASCIIStackedBar construction sites
+    2. Confirm each uses metric_label="ms" (or omits it, defaulting to "ms")
+    3. Golden tests should already cover this from w1
+
+- id: w5
+  summary: "Verify lower_is_better has no impact on existing behavior"
+  needs: [w1]
+  status: pending
+  blocked_by: "textcharts Group 3 not yet implemented - lower_is_better parameter does not exist yet"
+  notes: |
+    textcharts has NOT yet added `lower_is_better`. When it does, verify:
+    - ComparisonBar.__init__() default True matches BenchBox latency semantics
+    - DivergingBar.__init__() default True matches BenchBox latency semantics
+    - SummaryStats dataclass default True matches BenchBox latency semantics
+    - Color coding for regression/improvement annotations is unchanged
+
+- id: w6
+  summary: "Update compatibility shim re-exports if textcharts added new public names"
+  needs: [w1, w2]
+  status: pending
+  blocked_by: "textcharts Groups 1 and 4 not yet implemented - no new public names to re-export"
+  notes: |
+    The BenchBox compatibility shim in `benchbox/core/visualization/ascii/__init__.py`
+    re-exports textcharts symbols. If textcharts added new public names (e.g.,
+    `from_data`, `from_series`, `from_points`, `from_ratios`), decide whether to
+    re-export them through the shim or only use them via direct textcharts import.
+
+    Recommendation: re-export new factory names to keep the shim complete, but
+    don't re-export `lower_is_better` or `value_formatter` (they're constructor
+    params, not standalone symbols).
+
+- id: w7
+  summary: "Update ascii_api.py facade if new exports were added"
+  needs: [w6]
+  status: pending
+  notes: |
+    If w6 added new re-exports to the shim, ensure `ascii_api.py` picks them up.
+    The facade does `from benchbox.core.visualization.ascii import *` so it should
+    be automatic, but verify `__all__` is updated if explicit.
+
+verification:
+- description: "Full test suite passes with updated textcharts"
+  command: "uv run -- python -m pytest -q"
+  expected_output: "All tests pass"
+- description: "Golden snapshot parity maintained"
+  command: "uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -v"
+  expected_output: "All snapshot tests pass"
+- description: "No deprecation warnings from textcharts"
+  command: "uv run -- python -W error::DeprecationWarning -m pytest tests/unit/visualization/ -q"
+  expected_output: "All tests pass without DeprecationWarning"
+- description: "Lint and typecheck pass"
+  command: "uv run ruff check benchbox/core/visualization/ && uv run ty check"
+  expected_output: "No errors"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/visualization/ascii_runtime.py"
+  - "benchbox/core/visualization/ascii_api.py"
+  - "benchbox/core/visualization/ascii/__init__.py"
+  - "benchbox/core/visualization/post_run_summary.py"
+  - "benchbox/core/visualization/exporters.py"
+  - "tests/unit/visualization/"
+  - "tests/contracts/visualization/"
+  - "tests/fixtures/golden/ascii/"
+  - "pyproject.toml"
+  do_not_modify:
+  - "packages/textcharts/"
+  - "benchbox/core/runner.py"
+  - "benchbox/platforms/"
+
+must_preserve:
+- "All existing golden snapshot tests pass unchanged (or with reviewed regeneration)"
+- "BenchBox CLI and MCP chart output unchanged for latency-metric benchmarks"
+- "No DeprecationWarning emitted during normal BenchBox operation"
+- "Compatibility shim continues working for any external callers using old import paths"
+
+approach: |
+  This is a low-risk follow-up to the textcharts neutralization. Most changes are
+  mechanical renames (old factory → new factory) and verification-only (confirming
+  new params with defaults don't change behavior). The golden snapshot tests are
+  the primary safety net.
+
+anti_patterns:
+- "DO NOT adopt value_formatter or lower_is_better without a concrete use case -- these are available for future use but BenchBox's
+  latency-focused defaults are correct today -- adopt when Power@Size or throughput metrics are added"
+- "DO NOT remove deprecated factory function aliases from the shim -- external callers may still use old names through the
+  BenchBox compatibility layer -- keep re-exports of both old and new names"

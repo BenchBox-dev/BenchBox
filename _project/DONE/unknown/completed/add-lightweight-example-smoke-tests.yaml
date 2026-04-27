@@ -1,0 +1,18 @@
+id: add-lightweight-example-smoke-tests
+title: ✅ Add Lightweight Example Smoke Tests
+category: Testing and Quality Assurance
+status: Completed
+priority: Medium
+impact: Keeps published examples trustworthy by catching regressions quickly without requiring credentials or heavy data generation.
+sections:
+  Description: Added fast pytest-based smoke coverage for the unified runner example so CI can validate example entry points
+    stay functional.
+  Notes: '- "Introduced `tests/examples/test_unified_runner_smoke.py` to cover platform listing and DuckDB dry-run execution
+    paths in `examples/unified_runner.py`."
+
+    - Smoke tests write artifacts into a temporary output directory to avoid polluting the repository while still verifying
+    dry-run outputs.'
+  Tests: '- "`uv run -- python -m pytest tests/examples/test_unified_runner_smoke.py`"'
+worktree: unknown
+description: Added fast pytest-based smoke coverage for the unified runner example so CI can validate example entry points
+  stay functional.

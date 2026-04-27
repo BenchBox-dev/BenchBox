@@ -1,0 +1,53 @@
+id: prepare-project-for-publication
+title: Prepare Project for Publication
+worktree: release-readiness
+category: Project Lifecycle Management
+priority: High
+status: Completed
+completed_date: '2025-11-27'
+description: Create a clean version of this project for first-time public release
+impact: Prepares project for first-time public distribution with clean history and sanitized content
+tasks:
+- phase: Create fresh repository with git initialization
+  done: true
+  notes: Implemented via prepare_public_release(init_git=True)
+- phase: Set up basic .gitignore
+  done: true
+  notes: DEFAULT_GITIGNORE constant in workflow.py, applied via _write_gitignore()
+- phase: Copy only production files
+  done: true
+  notes: ALLOWED_ROOT_FILES defines what to include (benchbox, tests, docs, etc.)
+- phase: Skip development artifacts
+  done: true
+  notes: HOLD_BACK_PATHS defines exclusions, .git and venv automatically excluded
+- phase: Reset file timestamps
+  done: true
+  notes: _normalize_timestamps() sets all files to most recent Saturday midnight UTC
+- phase: Clean content
+  done: true
+  notes: Sanitized pyproject.toml applied, license headers already in source files
+- phase: Initialize clean history
+  done: true
+  notes: init_git=True stages all files; commit message left to user
+sections:
+  Implementation Summary: 'Already implemented via:
+
+    - benchbox/release/workflow.py: prepare_public_release() function
+
+    - scripts/prepare_release.py: CLI script for running the release preparation
+
+    - tests/unit/release/test_workflow.py: Test coverage for release workflow
+
+
+    Usage: python scripts/prepare_release.py ../project-public --version 1.0.0 --init-git
+
+
+    Features:
+
+    - Copies only ALLOWED_ROOT_FILES (benchbox, tests, docs, README, LICENSE, etc.)
+
+    - Normalizes timestamps to Saturday midnight UTC for reproducibility
+
+    - Writes standard .gitignore
+
+    - Optional git initialization and staging'

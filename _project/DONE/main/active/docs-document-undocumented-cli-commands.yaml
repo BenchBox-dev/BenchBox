@@ -1,0 +1,165 @@
+id: docs-document-undocumented-cli-commands
+title: "Document 10 undocumented CLI commands and 13 undocumented run flags"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-01"
+description: |
+  Documentation audit (2026-04-01) found 10 CLI commands with NO documentation
+  and 13 flags on `benchbox run` that are undocumented.
+
+  Undocumented commands:
+  - benchbox visualize (benchbox/cli/commands/visualize.py)
+  - benchbox report (benchbox/cli/commands/report.py)
+  - benchbox metrics (benchbox/cli/commands/metrics.py)
+  - benchbox aggregate (benchbox/cli/commands/aggregate.py)
+  - benchbox datagen (benchbox/cli/commands/datagen.py)
+  - benchbox download-answers (benchbox/cli/commands/download_answers.py)
+  - benchbox plan-history (benchbox/cli/commands/plan_history.py)
+  - benchbox show-plan (benchbox/cli/commands/show_plan.py)
+  - benchbox setup (benchbox/cli/commands/setup.py)
+  - benchbox run-official (benchbox/cli/commands/run_official.py - hidden)
+
+  Undocumented `benchbox run` flags:
+  --table-mode, --table-format, --presort, --sorted-ingestion-mode,
+  --sorted-ingestion-method, --databricks-clustering-strategy,
+  --liquid-clustering-columns, --mode, --no-monitoring, --no-progress,
+  --ignore-memory-warnings, --global-cache, --plan-config
+
+  Some commands may be intentionally hidden (run-official). For those, a brief
+  internal note is sufficient rather than full public docs.
+
+category: Documentation
+
+metadata:
+  tags:
+  - documentation
+  - cli
+  - completeness
+  - user-facing
+  estimated_effort: "Large"
+  created_date: "2026-04-01"
+  source_review: "Comprehensive documentation audit conversation"
+
+impact:
+  user_impact: |
+    Users discovering these commands via --help have no documentation to
+    reference for usage patterns, examples, or caveats.
+  maintainer_impact: |
+    Undocumented features generate support questions and inconsistent usage.
+  regression_risk: |
+    Zero - documentation-only changes.
+
+work:
+- id: w1
+  summary: "Document Databricks-specific run flags (5 flags)"
+  status: done
+  needs: []
+  description: |
+    Add to docs/reference/cli/run.md a Databricks section covering:
+    --databricks-clustering-strategy, --liquid-clustering-columns,
+    --sorted-ingestion-mode, --sorted-ingestion-method, --presort.
+    Include type, default, valid choices, and 1-2 examples.
+  files:
+  - docs/reference/cli/run.md
+
+- id: w2
+  summary: "Document general undocumented run flags (8 flags)"
+  status: done
+  needs: []
+  description: |
+    Add to docs/reference/cli/run.md documentation for:
+    --table-mode, --table-format, --mode (sql vs dataframe guidance),
+    --no-monitoring, --no-progress, --ignore-memory-warnings,
+    --global-cache, --plan-config. Include type, default, valid choices.
+  files:
+  - docs/reference/cli/run.md
+
+- id: w3
+  summary: "Create docs for visualize command"
+  status: done
+  needs: []
+  description: |
+    Create docs/reference/cli/visualize.md. Document all subcommands and
+    flags from Click decorators in benchbox/cli/commands/visualize.py.
+    Include at least 2 usage examples.
+  files:
+  - docs/reference/cli/visualize.md
+  - benchbox/cli/commands/visualize.py  # source of truth
+
+- id: w4
+  summary: "Create docs for report and metrics commands"
+  status: done
+  needs: []
+  description: |
+    Create docs/reference/cli/report.md and docs/reference/cli/metrics.md.
+    Document flags from benchbox/cli/commands/report.py and metrics.py.
+    Include at least 2 usage examples per command.
+  files:
+  - docs/reference/cli/report.md
+  - docs/reference/cli/metrics.md
+  - benchbox/cli/commands/report.py     # source of truth
+  - benchbox/cli/commands/metrics.py    # source of truth
+
+- id: w5
+  summary: "Create docs for datagen, aggregate, and setup commands"
+  status: done
+  needs: []
+  description: |
+    Create docs/reference/cli/datagen.md, aggregate.md, and setup.md.
+    Document standalone data generation workflow, result aggregation
+    options, and credential setup flow per platform.
+  files:
+  - docs/reference/cli/datagen.md
+  - docs/reference/cli/aggregate.md
+  - docs/reference/cli/setup.md
+  - benchbox/cli/commands/datagen.py            # source of truth
+  - benchbox/cli/commands/aggregate.py          # source of truth
+  - benchbox/cli/commands/setup.py              # source of truth
+
+- id: w6
+  summary: "Create docs for plan-history, show-plan, and download-answers"
+  status: done
+  needs: []
+  description: |
+    Create docs/reference/cli/query-plans.md covering plan-history and
+    show-plan as a workflow. Create docs/reference/cli/download-answers.md.
+    Document flags from Click decorators.
+  files:
+  - docs/reference/cli/query-plans.md
+  - docs/reference/cli/download-answers.md
+  - benchbox/cli/commands/plan_history.py       # source of truth
+  - benchbox/cli/commands/show_plan.py          # source of truth
+  - benchbox/cli/commands/download_answers.py   # source of truth
+
+- id: w7
+  summary: "Update CLI_REFERENCE.md and index to list all commands"
+  status: done
+  needs: [w1, w2, w3, w4, w5, w6]
+  description: |
+    Update CLI_REFERENCE.md to list every non-hidden command with links to
+    detailed docs in docs/reference/cli/. Update docs/reference/cli/index.md
+    to include new pages. Exclude hidden commands (run-official) from
+    public index. Ensure consistent formatting with existing entries.
+  files:
+  - docs/CLI_REFERENCE.md
+  - docs/reference/cli/index.md
+
+verification:
+- description: "All non-hidden commands have doc pages"
+  command: "for cmd in visualize report metrics aggregate datagen setup; do [ -f docs/reference/cli/$cmd.md ] && echo \"PASS: $cmd\" || echo \"FAIL: $cmd missing\"; done"
+  expected_output: "PASS for all commands"
+- description: "New run flags documented"
+  command: "grep -c 'table-mode\\|table-format\\|presort\\|plan-config\\|no-monitoring\\|no-progress\\|ignore-memory-warnings\\|global-cache\\|mode' docs/reference/cli/run.md | xargs -I{} test {} -ge 8 && echo 'PASS: flags documented' || echo 'FAIL: flags missing'"
+  expected_output: "PASS: flags documented"
+- description: "CLI_REFERENCE.md indexes new commands"
+  command: "for cmd in visualize report metrics aggregate datagen setup; do grep -qi $cmd docs/CLI_REFERENCE.md && echo \"PASS: $cmd\" || echo \"FAIL: $cmd missing\"; done"
+  expected_output: "PASS for all commands"
+
+scope_limit:
+  only_modify:
+  - "docs/reference/cli/"
+  - "docs/CLI_REFERENCE.md"
+  do_not_touch:
+  - "Any source code files"
+  - "Existing CLI command implementations"

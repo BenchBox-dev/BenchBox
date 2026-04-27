@@ -1,0 +1,223 @@
+id: explorer-phase-a-f-review-followups
+title: "Fix nit-level findings from six explorer phase A-F code reviews (2026-04-17 TODOs)"
+worktree: main
+priority: Low
+status: Completed
+completed_date: "2026-04-19"
+category: Code Quality
+
+description: |
+  Non-required nits surfaced during code review of the six explorer-*
+  TODOs completed 2026-04-17 (ultraplan phases A-F):
+
+    - explorer-result-detail-median-first        (Phase A)
+    - explorer-master-leaderboard-home           (Phase B)
+    - explorer-query-workbench                   (Phase C)
+    - explorer-unified-chart-panel               (Phase D)
+    - explorer-url-synced-filter-state           (Phase E)
+    - explorer-pipeline-meta-leaderboard-widening (Phase F)
+
+  All typecheck and Vitest tests are green; post-feature fix commits
+  (59aa46440, a79af024c) already addressed required issues. These are
+  cleanup items only.
+
+work:
+  - id: w1
+    summary: "Align avg_rank decimal precision across Home.tsx and MetaLeaderboard.tsx"
+    status: done
+    notes: |
+      Home.tsx line 98 rounds avg_rank to 2 decimals; MetaLeaderboard.tsx
+      line 218 renders via `.toFixed(1)`. Pick one (1 decimal is enough
+      for visual scan) and drop the more precise round at the source.
+
+  - id: w2
+    summary: "Preserve trust and date-window filters in MetaLeaderboard cohort hrefs"
+    status: done
+    notes: |
+      Home.tsx buildCohortHref (lines 161-168) only carries `tuning` to
+      the cohort landing page. Passing `trust` and `window` (date) as
+      well would keep the filter slice consistent when navigating to a
+      cohort detail - verify BenchmarkIndex reads the same param names.
+
+  - id: w3
+    summary: "Clean up describeCell's JSX-vs-string coupling in MetaLeaderboard.tsx"
+    status: done
+    notes: |
+      MetaLeaderboard.tsx line 304 falls back to `${rank.rank}/${rank.total}`
+      when renderCellValue returns JSX ("ranks" mode). Factor the a11y
+      announcement text out of renderCellValue so describeCell doesn't
+      mirror the formatting logic.
+
+  - id: w4
+    summary: "Clarify MetaRank `total` - count only rankable rows, not null-metric rows"
+    status: done
+    notes: |
+      pipeline.py _build_meta_leaderboard (line 242) uses
+      `len(sorted_rows)` for `total`, which counts platforms whose
+      primary metric is None. A cohort of 3 where 1 platform has no
+      metric currently shows "1/3" and "2/3" - arguably it should be
+      "1/2" and "2/2". Consider `sum(1 for r in sorted_rows if _get_val(r) is not None)`.
+
+  - id: w5
+    summary: "Drop duplicated primary_metric/primary_order from per-cell MetaRank"
+    status: done
+    notes: |
+      pipeline.py:240-247 duplicates primary_metric/primary_order into
+      every rank cell when it's already on the parent cohort record.
+      Frontend reads cohort.primary_order anyway - we can trim the
+      per-cell copies to keep meta_leaderboard.json smaller and remove
+      the divergence risk. Requires follow-up on frontend: drop the
+      optional fields from MetaRank and update MetaLeaderboard.tsx
+      cellShadeMetric to pull from the cohort.
+
+  - id: w6
+    summary: "Populate Query workbench date-window facet counts"
+    status: done
+    notes: |
+      Query.tsx:285-295 hardcodes `{count: 0}` for each date-window
+      option. Add a dedicated facet query that buckets rows by
+      (now − 30d, 90d, 365d) so users see the impact before clicking.
+
+  - id: w7
+    summary: "Defensively sanitize or parameterize exportName in CSV COPY TO"
+    status: done
+    notes: |
+      Query.tsx:192 uses
+        COPY (...) TO '${exportName}' (FORMAT CSV, ...)
+      exportName is currently built from Date.now() so injection is
+      impossible today, but any future change that weaves user input
+      into the filename would silently become injectable. Either
+      runtime-assert `exportName` matches `/^benchbox-query-export-\d+\.csv$/`
+      or use DuckDB parameterization if the driver supports it.
+
+  - id: w8
+    summary: "Stabilize Advanced SQL result column derivation"
+    status: done
+    notes: |
+      Query.tsx:399 uses `Object.keys(sqlRows[0]!)` to derive headers.
+      Heterogeneous rows (UNION ALL over schema-drifted views) would
+      miss columns only present in later rows. Compute the union of
+      keys across all rows, or warn the user.
+
+  - id: w9
+    summary: "Render code-marker backticks as inline <code> in Query.tsx copy"
+    status: done
+    notes: |
+      Query.tsx line 232 uses literal backticks in prose - they render
+      as visible characters rather than code styling. Replace with
+      `<code>results.duckdb</code>` spans.
+
+  - id: w10
+    summary: "Keyboard-enable sortable table headers in ResultDetail.tsx"
+    status: done
+    notes: |
+      ResultDetail.tsx uses <th onClick={toggleSort(...)}> without
+      role="button", tabIndex, or onKeyDown. Add keyboard affordances
+      matching the MetaLeaderboard a11y pattern: role="button",
+      tabIndex=0, Enter/Space activation.
+
+  - id: w11
+    summary: "Memoize sorted arrays in ResultDetail.tsx"
+    status: done
+    notes: |
+      `sortedMedians` / `sortedRawQueries` (lines 68-86) sort on every
+      render. Low impact but easy useMemo win.
+
+  - id: w12
+    summary: "Memoize ChartPanel context objects at call sites"
+    status: done
+    notes: |
+      ResultDetail.tsx:282 and BenchmarkIndex/Compare/PlatformIndex
+      pass `context={{ kind: "...", ... }}` as inline literals. Each
+      render produces a new object identity, invalidating the
+      applicableCharts/summary/historical/compareRows useMemos inside
+      ChartPanel. Wrap each site's context in useMemo or let
+      ChartPanel accept discrete props (kind, detail, summary, ...)
+      and build the discriminated union internally.
+
+  - id: w13
+    summary: "Emit chart spec IDs as a JSON fixture for the parity test"
+    status: done
+    notes: |
+      chartRegistry.parity.test.ts regex-matches _CHART_SPECS in
+      chart_types.py. Any Python syntax change (formatting, comments
+      inside the tuple) risks silently breaking the extraction.
+      Generate `tests/parity/fixtures/chart_ids.json` from Python
+      during make parity-fixtures and have the test read that file
+      instead. Related to follow-up nit w11 on
+      explorer-visualization-review-followup-nits.
+
+  - id: w14
+    summary: "Broaden SummaryBoxPanel primary-metric fallback"
+    status: done
+    notes: |
+      ChartPanel.tsx:419 hardcodes `benchmark === "tpch" || benchmark === "tpcds"`
+      as the Power@Size carve-out when summary.ranking is missing. The
+      ranking config emitted by the pipeline should always be present
+      - if it isn't, error/log rather than guess. Alternatively read
+      a shared RANKING_METRIC_BY_FAMILY mirror on the frontend.
+
+  - id: w15
+    summary: "Stabilize useUrlState's initial/value references at call sites"
+    status: done
+    notes: |
+      Call sites like Home.tsx:23-24 pass fresh `[]` as `initial`. The
+      popstate useEffect at useUrlState.ts:116 depends on `initial`,
+      so it re-subscribes on every render. Behavior is correct
+      (cleanup runs) but wasteful. Either hoist the empty-array
+      literals to module-level constants or ignore `initial` in the
+      effect dep array (it is semantically a constant after mount).
+
+  - id: w16
+    summary: "Memoize useUrlState's setValue via useCallback"
+    status: done
+    notes: |
+      useUrlState.ts:126 returns a new setValue function each render.
+      Downstream memoized subtrees re-render when it is passed as a
+      prop. useCallback((v) => ..., [key, initial]) is a minor but
+      easy win.
+
+files_affected:
+  modified:
+    - "results-explorer/src/pages/Home.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/components/MetaLeaderboard.tsx"
+    - "results-explorer/src/components/ChartPanel.tsx"
+    - "results-explorer/src/lib/useUrlState.ts"
+    - "results-explorer/src/__tests__/chartRegistry.parity.test.ts"
+    - "benchbox/core/explorer_pipeline/pipeline.py"
+    - "results-explorer/src/types.ts"
+  added:
+    - "tests/parity/fixtures/chart_ids.json (if w13 chosen)"
+
+must_preserve:
+  - "All existing Vitest suites continue to pass (229 tests across 23 files as of 2026-04-18)"
+  - "Python explorer_pipeline tests continue to pass"
+  - "meta_leaderboard.json artifact shape remains backward-compatible for any frontend older than w5"
+
+verification:
+  - description: "Explorer typecheck + Vitest"
+    command: "cd results-explorer && npm run typecheck && npm test"
+    expected_output: "all green"
+  - description: "Pipeline tests"
+    command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -q"
+    expected_output: "all green"
+
+deps:
+  needs:
+    - explorer-master-leaderboard-home
+    - explorer-pipeline-meta-leaderboard-widening
+    - explorer-query-workbench
+    - explorer-result-detail-median-first
+    - explorer-unified-chart-panel
+    - explorer-url-synced-filter-state
+
+metadata:
+  tags: ["explorer", "cleanup", "nit", "ultraplan", "follow-up"]
+  estimated_effort: "Medium (4-6 hours)"
+  created_date: "2026-04-18"
+  source: "Code reviews of six explorer-* TODOs (ultraplan phases A-F) completed 2026-04-17, reviewed 2026-04-18"

@@ -1,0 +1,68 @@
+id: migration-from-uv-pip-install-to-uv-add-syntax
+title: ✅ Migration from `uv pip install` to `uv add` Syntax
+category: Documentation and Tooling
+status: Completed
+priority: Medium
+impact: Migrated entire project from legacy pip-compatible `uv pip install` syntax to modern declarative `uv add` syntax.
+  Updated 281 occurrences across 50+ files including core docs, Python source, platform adapters, CLI commands, CI/CD workflows,
+  build system, examples, and tests. All documentation now shows both syntaxes with `uv add` as primary recommendation.
+sections:
+  Summary: Completed comprehensive migration from `uv pip install package` to `uv add package` syntax throughout the entire
+    BenchBox project. This modernizes the project to use uv's declarative package management approach while maintaining backward
+    compatibility documentation. The migration improves reproducibility by ensuring all dependencies are tracked in pyproject.toml
+    and uv.lock.
+  Completed Phases: '- Phase 1: Core Documentation (README, CLAUDE.md, GEMINI.md, CONTRIBUTING.md)
+
+    - Phase 2: Python Source Code (dependencies.py, platform adapters, CLI)
+
+    - Phase 3: Documentation Files (docs/usage/, docs/platforms/, docs/guides/)
+
+    - Phase 4: CI/CD Workflows (.github/workflows/)
+
+    - Phase 5: Build System (Makefile)
+
+    - Phase 6: Examples and Release Documentation
+
+    - Phase 7: Test Suite Updates'
+  Technical Details: '- Syntax Change: uv pip install "package[extra]" → uv add package --extra extra
+
+    - Multiple Extras: --extra cloud --extra clickhouse (not comma-separated)
+
+    - CI/CD Tools: uv tool install + uvx (for safety, twine, sphinx)
+
+    - Development: uv sync --group dev (replaces pip install -e ".[dev]")
+
+    - Build: uv build (replaces pip install build + python -m build)
+
+    - Documentation Strategy: Show both syntaxes, uv add as primary'
+  Files Modified: '- Core Docs: README.md (29 instances), CLAUDE.md, GEMINI.md, CONTRIBUTING.md
+
+    - Python Source: benchbox/utils/dependencies.py (52 instances), platform adapters, CLI commands
+
+    - Documentation: docs/usage/*.md, docs/platforms/*.md, docs/guides/tpc/*.md, docs/reference/*.rst
+
+    - CI/CD: .github/workflows/test.yml, .github/workflows/release.yml
+
+    - Build: Makefile
+
+    - Examples: examples/README.md, examples/getting_started/*.md, examples/*.py
+
+    - Tests: tests/unit/utils/test_dependencies.py, tests/unit/cli/test_cli_check_deps.py'
+  Commits: '- d619f8fe - docs: migrate README, CLAUDE.md, GEMINI.md, CONTRIBUTING.md, and dependencies.py to uv add syntax
+
+    - 3a972cd7 - refactor: update platform adapters and CLI to use uv add syntax
+
+    - 9a4c98dd - docs: migrate all documentation to uv add syntax (50+ files)
+
+    - 302c9118 - ci: migrate workflows to use uv tool install and uv sync
+
+    - a592b97a - build: modernize Makefile to use uv sync and uv build
+
+    - 2a85f3a5 - docs: update examples and release documentation to uv add syntax
+
+    - a84ed60b - test: update test assertion for new uv add syntax'
+worktree: unknown
+description: Completed comprehensive migration from `uv pip install package` to `uv add package` syntax throughout the entire
+  BenchBox project. This modernizes the project to use uv's declarative package management approach while maintaining backward
+  compatibility documentation. The migration improves reproducibility by ensuring all dependencies are tracked in pyproject.toml
+  and uv.lock.

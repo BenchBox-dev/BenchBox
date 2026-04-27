@@ -1,0 +1,281 @@
+id: remove-vulture-dead-code
+title: "Remove dead code identified by vulture static analysis"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-03-27"
+description: |
+  A vulture analysis (80% confidence) identified 25 dead-code findings across
+  3 categories. One of the unreachable-code findings is an active bug:
+  `transformations.py._get_worker_pool_config` has `self.table_dependencies`
+  initialization stranded after a `return` statement, making it unreachable -
+  but the dict is read by `_get_topological_sort_order` at lines 2126/2130,
+  which will raise AttributeError at runtime.
+
+  Findings by category:
+  - Unreachable code (3): duplicate returns/stranded init after return
+  - Unused function parameters (12): 100%-confidence, params never read in body
+  - Unused platform imports (10): 90%-confidence, need TYPE_CHECKING inspection
+
+category: Testing & Quality
+
+metadata:
+  tags:
+    - quality
+    - dead-code
+    - vulture
+  estimated_effort: "Small"
+  created_date: "2026-03-27"
+  source_review: "vulture static analysis run 2026-03-27"
+
+impact:
+  user_impact: |
+    None for parameter/import cleanup. The transformations.py bug (w1) could
+    cause an AttributeError in TPC-DI ETL at runtime if topological sort is
+    reached.
+  maintainer_impact: |
+    Cleaner codebase. Removes confusing dead parameter signatures and stray
+    import noise. Prevents future confusion about whether stranded code is
+    intentional.
+  regression_risk: |
+    Low for w2/w3 (no behavior change). Medium for w1 - moving init code back
+    into __init__ changes when it runs; requires verifying no other call path
+    already initializes table_dependencies.
+
+justification: |
+  The unreachable `table_dependencies` initialization is a latent bug: any
+  TPC-DI workload that triggers `_get_topological_sort_order` without a prior
+  successful `_get_worker_pool_config` call will crash. Unused parameters and
+  imports are lower severity but degrade readability and confuse static
+  analysis tooling.
+
+work:
+  - id: w1
+    summary: "Fix unreachable code - 3 instances including latent bug in transformations.py"
+    status: done
+    needs: []
+    description: |
+      Three locations with unreachable code to fix:
+
+      1. benchbox/core/ssb/generator.py:183
+         Duplicate `return file_paths` after a try/finally block that already
+         returns at line 178. Delete the duplicate return.
+
+      2. benchbox/core/tpcdi/etl/transformations.py:1658-1682
+         LATENT BUG: `_get_worker_pool_config` returns at line 1656, leaving
+         `self._configure_performance_settings()` and the full
+         `self.table_dependencies = {...}` dict stranded as dead code.
+         `table_dependencies` is read by `_get_topological_sort_order` at
+         lines 2126/2130 - AttributeError at runtime if that path is hit.
+         Fix: move the two statements (`_configure_performance_settings()` call
+         and `table_dependencies` assignment) into `__init__`, before the
+         method definitions. Verify no other path already sets this attribute.
+
+      3. benchbox/platforms/databricks/adapter.py:674
+         Duplicate `return elapsed_seconds(start_time)` after a try/except/finally
+         block that either returns `duration` (line 665) or re-raises. Delete the
+         duplicate return.
+    files:
+      - benchbox/core/ssb/generator.py
+      - benchbox/core/tpcdi/etl/transformations.py
+      - benchbox/platforms/databricks/adapter.py
+
+  - id: w2
+    summary: "Fix unused function parameters - prefix with _ or implement (12 instances)"
+    status: done
+    needs: [w1]
+    description: |
+      12 function parameters declared but never read in their method bodies.
+      For each: if the param is part of a public API or Protocol stub, rename to
+      `_param` (signals intentional non-use to linters); if it was meant to
+      affect behavior, implement it.
+
+      Locations:
+      - benchbox/cli/output.py:379           show_query_details (static method param)
+      - benchbox/core/dataframe/protocols.py:330  *aggregations, **named_aggregations (Protocol stub)
+      - benchbox/core/tpc_compliance.py:427  test_result (method param)
+      - benchbox/core/tpc_metrics.py:590     include_details (static method param)
+      - benchbox/core/tpcdi/source_generators.py:980  issue_rate (method param)
+      - benchbox/core/tpcds/benchmark/runner.py:925-926  refresh_functions, data_maintenance
+      - benchbox/core/tpcds_obt/query_conversion.py:950  dim_col
+      - benchbox/core/tpch/maintenance_test.py:107  query_stream_duration
+      - benchbox/platforms/fabric_warehouse.py:1182  constraint_configs
+
+      For Protocol stubs (protocols.py), *args/**kwargs-style params are part of
+      the interface definition - rename the concrete params to _aggregations /
+      **_named_aggregations if the body is abstract.
+
+      DO NOT rename params that are part of an overriding method that must match
+      a base class signature - use `# noqa: ARG002` instead if rename would
+      break override compatibility.
+    files:
+      - benchbox/cli/output.py
+      - benchbox/core/dataframe/protocols.py
+      - benchbox/core/tpc_compliance.py
+      - benchbox/core/tpc_metrics.py
+      - benchbox/core/tpcdi/source_generators.py
+      - benchbox/core/tpcds/benchmark/runner.py
+      - benchbox/core/tpcds_obt/query_conversion.py
+      - benchbox/core/tpch/maintenance_test.py
+      - benchbox/platforms/fabric_warehouse.py
+
+  - id: w3
+    summary: "Audit unused import: athena.py:47 AthenaCursor"
+    status: done
+    needs: [w2]
+    description: |
+      Read ~20 lines around athena.py:47. Decide: delete if unused, move into
+      TYPE_CHECKING block if annotation-only, or add `# noqa: F401` with comment
+      if used dynamically (e.g. re-exported, except ImportError pattern).
+    files:
+      - benchbox/platforms/athena.py
+
+  - id: w4
+    summary: "Audit unused import: cudf.py:39 dask_cudf"
+    status: done
+    needs: [w2]
+    description: |
+      Read ~20 lines around cudf.py:39. dask_cudf is an optional GPU dep -
+      likely used in an `except ImportError` block or conditional branch.
+      Decide: delete, TYPE_CHECKING guard, or noqa with explanation.
+    files:
+      - benchbox/platforms/cudf.py
+
+  - id: w5
+    summary: "Audit unused import: databricks/adapter.py:42 DatabricksConnection"
+    status: done
+    needs: [w2]
+    description: |
+      Read ~20 lines around adapter.py:42. DatabricksConnection may be used in
+      type annotations or an except block. Decide: delete, TYPE_CHECKING guard,
+      or noqa with explanation.
+    files:
+      - benchbox/platforms/databricks/adapter.py
+
+  - id: w6
+    summary: "Audit unused import: delta_lake_maintenance.py:30 deltalake"
+    status: done
+    needs: [w2]
+    description: |
+      Read ~20 lines around delta_lake_maintenance.py:30. deltalake is an
+      optional dep - check for conditional import / except ImportError pattern.
+      Decide: delete, TYPE_CHECKING guard, or noqa with explanation.
+    files:
+      - benchbox/platforms/dataframe/delta_lake_maintenance.py
+
+  - id: w7
+    summary: "Audit unused import: iceberg_maintenance.py:35 pyiceberg"
+    status: done
+    needs: [w2]
+    description: |
+      Read ~20 lines around iceberg_maintenance.py:35. pyiceberg is an optional
+      dep - check for conditional import / except ImportError pattern.
+      Decide: delete, TYPE_CHECKING guard, or noqa with explanation.
+    files:
+      - benchbox/platforms/dataframe/iceberg_maintenance.py
+
+  - id: w8
+    summary: "Audit unused imports: lakesail.py:47 DateType, DecimalType"
+    status: done
+    needs: [w2]
+    description: |
+      Read ~20 lines around lakesail.py:47. DateType and DecimalType may be
+      used in type annotations or schema-building logic. Handle both in one
+      pass since they're co-located. Decide: delete, TYPE_CHECKING guard, or
+      noqa with explanation.
+    files:
+      - benchbox/platforms/lakesail.py
+
+  - id: w9
+    summary: "Audit unused import: snowflake.py:37 SnowflakeError"
+    status: done
+    needs: [w2]
+    description: |
+      Read ~20 lines around snowflake.py:37. SnowflakeError is likely used in
+      an except clause - confirm whether it appears elsewhere in the file.
+      Decide: delete, TYPE_CHECKING guard, or noqa with explanation.
+    files:
+      - benchbox/platforms/snowflake.py
+
+  - id: w10
+    summary: "Audit unused imports: spark.py:39 DateType, DecimalType"
+    status: done
+    needs: [w2]
+    description: |
+      Read ~20 lines around spark.py:39. DateType and DecimalType are PySpark
+      types often used in schema definitions. Handle both in one pass since
+      they're co-located. Decide: delete, TYPE_CHECKING guard, or noqa with
+      explanation.
+    files:
+      - benchbox/platforms/spark.py
+
+  - id: w11
+    summary: "Audit unused import: cloud_storage.py:23 CloudPathNotExistsError"
+    status: done
+    needs: [w2]
+    description: |
+      Read ~20 lines around cloud_storage.py:23. CloudPathNotExistsError may
+      be re-exported or used in an except block. Decide: delete, TYPE_CHECKING
+      guard, or noqa with explanation.
+    files:
+      - benchbox/utils/cloud_storage.py
+
+must_preserve:
+  - "transformations._get_topological_sort_order must be callable without AttributeError after w1"
+  - "TPC-DI ETL smoke test passes: uv run -- python -m pytest tests/unit/core/tpcdi/ -q"
+  - "No change to any public method signatures (rename params to _ only, never remove)"
+  - "Optional-dependency platform adapters still importable when dep is absent"
+
+approach: |
+  w1 first - it contains the only runtime-impacting bug. Read each file before
+  editing. For transformations.py, grep the __init__ method to confirm
+  table_dependencies isn't already set before adding the assignment.
+  For w2, prefer `_param` rename over noqa comments; use noqa only when the
+  param is required by a base class override signature. For w3, read each
+  import site before deleting.
+
+anti_patterns:
+  - "DO NOT remove function parameters from public methods - only rename to _ prefix. Removing breaks callers."
+  - "DO NOT add blanket noqa: F401 to suppress all platform imports - inspect each individually."
+  - "DO NOT batch all 3 work units into a single commit - commit each work unit separately so regressions are bisectable."
+
+verification:
+  - description: "All unit tests pass after w1 (latent bug fix)"
+    command: "uv run -- python -m pytest tests/unit/core/tpcdi/ tests/unit/core/ssb/ tests/unit/platforms/databricks/ -q"
+    expected_output: "All tests pass, 0 errors"
+  - description: "Full fast test suite passes after each work unit"
+    command: "make test-fast"
+    expected_output: "All tests pass"
+  - description: "vulture confirms dead code removed"
+    command: "uv run --with vulture vulture benchbox --min-confidence 80 --ignore-names issue_rate"
+    expected_output: "Zero findings (issue_rate whitelisted: public kwarg used by tests)"
+  - description: "Lint clean after all changes"
+    command: "uv run ruff check benchbox"
+    expected_output: "All checks passed"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/ssb/generator.py"
+    - "benchbox/core/tpcdi/etl/transformations.py"
+    - "benchbox/platforms/databricks/adapter.py"
+    - "benchbox/cli/output.py"
+    - "benchbox/core/dataframe/protocols.py"
+    - "benchbox/core/tpc_compliance.py"
+    - "benchbox/core/tpc_metrics.py"
+    - "benchbox/core/tpcdi/source_generators.py"
+    - "benchbox/core/tpcds/benchmark/runner.py"
+    - "benchbox/core/tpcds_obt/query_conversion.py"
+    - "benchbox/core/tpch/maintenance_test.py"
+    - "benchbox/platforms/fabric_warehouse.py"
+    - "benchbox/platforms/athena.py"
+    - "benchbox/platforms/cudf.py"
+    - "benchbox/platforms/dataframe/delta_lake_maintenance.py"
+    - "benchbox/platforms/dataframe/iceberg_maintenance.py"
+    - "benchbox/platforms/lakesail.py"
+    - "benchbox/platforms/snowflake.py"
+    - "benchbox/platforms/spark.py"
+    - "benchbox/utils/cloud_storage.py"
+  do_not_touch:
+    - "Test files"
+    - "pyproject.toml"
+    - "Any file not in the vulture findings list"

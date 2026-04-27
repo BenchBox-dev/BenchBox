@@ -1,0 +1,26 @@
+id: add-global-quiet-mode-quiet-q-to-suppress-all-output
+title: '"✅ Add Global Quiet Mode (`--quiet`/`-q`) to Suppress All Output"'
+category: Project Lifecycle Management
+sections:
+  Status: Completed
+  Description: Implemented a global quiet mode that suppresses all user-facing output across the CLI and platform execution
+    when enabled. Quiet mode overrides any verbosity flags and ensures clean, silent runs suitable for CI and scripted environments
+    while preserving exit codes and writing artifacts as usual.
+  Key Changes: '- CLI
+
+    - Utils
+
+    - Config
+
+    - Tests'
+  Files Modified/Added: '- "Modified: `benchbox/cli/main.py`, `benchbox/core/config_merger.py`"
+
+    - "Added: `benchbox/utils/printing.py`, `tests/unit/cli/test_quiet_mode.py`"'
+  Acceptance: '- "Verified via tests that `--quiet` produces no output for a minimal data-only run and default mode still
+    emits messages."
+
+    - Logging suppressed to CRITICAL ensures platform verbose logs do not emit under quiet.'
+worktree: unknown
+priority: Medium
+status: Completed
+description: 'Archived DONE item for: "✅ Add Global Quiet Mode (`--quiet`/`-q`) to Suppress All Output"'

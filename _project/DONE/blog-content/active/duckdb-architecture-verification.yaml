@@ -1,0 +1,89 @@
+id: duckdb-architecture-verification
+title: "[DuckDB Architecture] Verify 'under 10 seconds' TPC-H claim"
+worktree: blog-content
+priority: Medium
+status: Completed
+completed_date: "2026-02-20"
+category: Blog Revision
+description: |
+  Verify the claim in duckdb-architecture.md that DuckDB processes TPC-H SF10
+  "in under 10 seconds" on a modern laptop.
+
+  Current text (line 17-19):
+  > "DuckDB regularly matches or beats traditional data warehouses on TPC-H
+  > benchmarks. This isn't marketing - on a modern laptop, DuckDB processes
+  > TPC-H SF10 (60 million lineitem rows) in under 10 seconds."
+
+  This claim has no citation and should be verified with our own benchmark.
+  Quick validation run, update the draft with actual measured time.
+
+  Reference draft: _blog/platform-deep-dives/drafts/duckdb-architecture.md
+
+metadata:
+  tags:
+  - duckdb
+  - platform-deep-dives
+  - verification
+  - quick-task
+  estimated_effort: "10-15 minutes"
+  created_date: "2025-12-15"
+
+impact:
+  business_value: |
+    Ensures claims in deep-dive posts are accurate and reproducible.
+    Demonstrates we verify even our own assertions.
+  user_impact: |
+    Readers get accurate performance expectations and can reproduce
+    the result on their own hardware.
+
+files_affected:
+  modified:
+  - "_blog/platform-deep-dives/drafts/duckdb-architecture.md"
+  added:
+  - "_blog/platform-deep-dives/research/duckdb-architecture-verification-2026-02-20.md"
+
+success_metrics:
+- "Benchmark completes successfully"
+- "Draft updated with actual time"
+- "Hardware specs documented"
+- "Reproducibility command added"
+work:
+- id: w1
+  summary: "Confirm local benchmark environment and exact DuckDB TPC-H SF10 run configuration"
+  status: done
+- id: w2
+  summary: "Execute baseline DuckDB TPC-H SF10 benchmark command and capture raw timing output"
+  needs:
+  - w1
+  status: done
+- id: w3
+  summary: "Run two additional trials and record per-run timings plus median runtime"
+  needs:
+  - w2
+  status: done
+- id: w4
+  summary: "Record hardware context used for the benchmark (CPU, RAM, storage, OS)"
+  needs:
+  - w3
+  status: done
+- id: w5
+  summary: "Update draft claim with measured runtime and variability context from captured runs"
+  needs:
+  - w3
+  status: done
+- id: w6
+  summary: "Add reproducibility command and run notes for readers"
+  needs:
+  - w2
+  status: done
+- id: w7
+  summary: "Cross-check all updated performance statements against captured benchmark evidence"
+  needs:
+  - w4
+  - w5
+  - w6
+  status: done
+- id: w8
+  summary: "Final editorial pass for consistency, citation clarity, and reproducibility wording"
+  needs: [w7]
+  status: done

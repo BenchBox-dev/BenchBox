@@ -1,0 +1,602 @@
+id: address-cross-adapter-13-pattern-audit-findings
+title: "Address cross-adapter 13-pattern audit findings (3 Critical, 22 Required, 8 Nit/Consider)"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-26"
+category: Code Quality and Technical Debt
+
+description: |
+  A 13-pattern defect audit across 30 platform adapters (excluding the
+  already-fixed spark/lakesail/velox triple), shared helpers in
+  benchbox/platforms/base/, cloud_shared.py, presto_trino_utils.py,
+  questdb_rewriter.py, datafusion_*.py rewriters, benchbox/sql_compat/,
+  and all docker/*/ surfaced 33 actionable findings: 3 Critical, 22 Required,
+  and 8 Nit/Consider. Those findings span the original 13-pattern catalogue
+  plus 4 newly-named patterns (P14 stale-flag-coexistence,
+  P15 reference-before-assignment, N1 COUNT(*) throughput inflation,
+  N2 ABC contract divergence).
+
+  The audit ran on commit 73f3a582e (post velox/lakesail/spark fixes for
+  W8/W9/W10). The canonical fixes for patterns 1-13 already exist in
+  benchbox/platforms/_spark_helpers.py (`_strip_balanced_paren_constraints`,
+  the "import discipline" docstring block, the SparkLikeAdapterMixin)
+  and benchbox/platforms/{spark,lakesail,velox}.py — implementers should
+  port those patterns rather than reinvent.
+
+  Work units are sequenced by blast radius and dependency order: Critical
+  contract bugs first, then shared-helper drift (highest leverage), then
+  destructive-op visibility, then the silent-throughput bug, then
+  modularity-drift extractions, then the long tail of P1/P2 regex bugs
+  in individual adapters.
+
+  Audit report and pattern catalogue are in conversation context (not
+  committed). This TODO is intended to be self-contained enough to start
+  implementation, but every work unit must still confirm the cited snippet
+  against the current file before editing because line numbers were captured
+  at commit 73f3a582e.
+
+work:
+- id: w1
+  summary: "C1 — Add per-statement rollback to timescaledb create_schema DDL loop"
+  needs: []
+  status: done
+  notes: |
+    timescaledb.py:378-393 — psycopg2 keeps the txn open after a failed
+    cursor.execute. Add `connection.rollback()` in the except branch
+    (mirror postgresql.py:440). Optional improvement: adopt the parent's
+    FK-strip retry path instead of replacing it.
+    Trigger: any benchmark whose first DDL stmt fails (extension-dependent
+    type, missing role) — every subsequent stmt then raises
+    InFailedSqlTransaction and warning-logs, so the whole schema silently
+    fails.
+
+- id: w2
+  summary: "C2 — Fix pg_mooncake.create_schema signature mismatch with parent"
+  needs: []
+  status: done
+  notes: |
+    pg_mooncake.py:193-207 — current signature
+    `create_schema(self, connection, schema_ddl, **kwargs)` does not match
+    PostgreSQLAdapter.create_schema(self, benchmark, connection) -> float
+    (verified at postgresql.py:422 and base/adapter.py:254).
+
+    Refactor to override `_transform_create_statement` (the SingleStore
+    pattern) so the columnstore USING clause is injected per-statement
+    inside the parent's normal flow. Delete the broken create_schema
+    override. Update tests/unit/platforms/test_pg_mooncake_*.py — current
+    tests acknowledge they "can't call create_schema directly without a
+    real connection," which is what masked the regression.
+
+- id: w3
+  summary: "C3 — Conform snowpark_connect.{create_schema,load_data,execute_query} to PlatformAdapter ABC"
+  needs: []
+  status: done
+  notes: |
+    snowpark_connect.py:291,314,385 vs spark.py:590,632,663.
+    create_schema(self, schema_name=None) → must accept (benchmark, connection).
+    load_data(self, tables, source_dir, file_format=...) → must accept
+    (benchmark, connection, data_dir).
+    execute_query(self, query, **kwargs) → must accept (connection, query,
+    query_id, ...) and return the standard dict
+    {query_id, stream_id, status, execution_time_seconds, ...}.
+
+    If Snowpark Session replaces the "connection" arg, accept and ignore
+    it positionally. The orchestrator's standard call site will TypeError
+    on the current code.
+
+- id: w4
+  summary: "Shared helper P2 + P7 — base/ddl_helpers.py inline-REFERENCES + import-discipline docstring"
+  needs: [w1, w2]
+  status: done
+  notes: |
+    base/ddl_helpers.py:25-69 — `_FK_CLAUSE_RE` requires the table-level
+    `FOREIGN KEY (...)` header. Add a second regex pass for inline
+    `\s+REFERENCES\s+...` (mirroring questdb.py:670-675), normalize
+    trailing commas, then DELETE questdb._strip_fk_constraints since the
+    base helper now covers both forms.
+
+    Also add the "Import discipline" paragraph from
+    _spark_helpers.py:7-13 to the module docstring (callers:
+    postgresql:19, singlestore:27, doris:35, questdb:28,
+    databend/adapter:53, starrocks/workload:12 — all import by name).
+
+    Verify against TPC-DS-style inline FK form
+    (`cs_sold_date_sk INTEGER REFERENCES date_dim(d_date_sk)`).
+
+- id: w5
+  summary: "Lift balanced-paren constraint walker out of _spark_helpers.py into shared module"
+  needs: [w4]
+  status: done
+  notes: |
+    `_strip_balanced_paren_constraints` in _spark_helpers.py is the
+    canonical fix for Pattern 1 (greedy `[^)]*` over balanced parens).
+    Move it into benchbox/platforms/base/ddl_helpers.py (or a new
+    benchbox/platforms/base/sql_paren_walker.py) and re-export from
+    _spark_helpers.py for backward compat. This unblocks w11 — every
+    adapter rewriter can then call the same balanced walker instead of
+    rolling its own broken `\([^)]*\)` regex.
+
+    Add unit tests with at least: `CHECK ((a>0) AND (b>0))`,
+    `DECIMAL(10,2)`, `PARTITION BY (date_trunc('day',ts))`,
+    `DEFAULT (now())`, `WITH (partitioning = ARRAY['bucket(x, 16)'])`.
+
+- id: w6
+  summary: "P11 cluster A — promote adapter destructive-op debug logs to info/warning"
+  needs: []
+  status: done
+  notes: |
+    Mechanical, low-risk adapter-local visibility changes. Promote
+    `logger.debug` → `logger.info` (or log_operation_complete) at:
+    - athena.py:1054 (DROP staging table)
+    - athena.py:1070 (S3 staging delete)
+    - redshift.py:1156-1158 (DROP TABLE)
+    - azure_synapse.py:452-462 (DROP TABLE in schema recreate)
+    - fabric_warehouse.py:741-742 (DROP TABLE)
+    - presto.py:559 (DROP TABLE)
+    - questdb.py:476-480 (pre-create DROP failures → warning, not info)
+
+    Keep this PR limited to adapter-local logging sites. Shared helper
+    and local-working-dir destructive operations are covered by w21.
+
+- id: w21
+  summary: "P11 cluster B — make shared-helper and local-dir destructive ops visible"
+  needs: [w6]
+  status: done
+  notes: |
+    Mechanical, low-risk shared/local cleanup visibility changes. Promote
+    destructive operation logging at:
+    - base/connection_lifecycle.py:255-275 (unlink/rmtree/drop_database)
+    - datafusion.py:1450-1459 (shutil.rmtree(working_dir))
+    - polars_platform.py:657-666 (mirror of datafusion)
+    - presto_trino_utils.py:198-205 (add INFO between DROP and recreate
+      in execute_schema_statements "already exists" handler)
+    - base/psycopg2_mixin.py:67-85 (warning, not debug, on
+      _get_existing_tables exception)
+
+    Single PR, no behavior change beyond log output. QuestDB failed
+    pre-create DROP attempts must stay warning-level per w6.
+
+- id: w7
+  summary: "N1 — Fix ClickHouse Cloud COUNT(*) throughput inflation in S3/GCS load loops"
+  needs: []
+  status: done
+  notes: |
+    clickhouse_cloud.py:676-682 (S3) and :816-822 (GCS) — loop assigns
+    `total_rows_loaded = SELECT COUNT(*) FROM table` per iteration; the
+    source comment acknowledges the bug. On rerun-into-non-empty-table,
+    the count includes pre-existing rows and silently inflates throughput
+    in published BenchmarkResults.
+
+    Either TRUNCATE before the loop, or take COUNT(*) once after the
+    loop and assign once. Add a regression test that loads two files
+    into a non-empty table and asserts total_rows_loaded == sum of new
+    file row counts only.
+
+- id: w8
+  summary: "P12 — Extract NoConstraintEnforcementMixin (cudf, datafusion, polars_platform)"
+  needs: [w5]
+  status: done
+  notes: |
+    cudf.py:605-636 ≅ polars_platform.py:618-645 ≅ datafusion.py:1400-1435
+    triplicate `apply_constraint_configuration` and
+    `apply_platform_optimizations`; only the platform-name string differs.
+
+    Add benchbox/platforms/base/no_constraint_enforcement_mixin.py with
+    the parameterised methods (read self.platform_name). Update the three
+    adapters to inherit. Update or delete the three duplicate test files.
+
+- id: w9
+  summary: "P12 — Extract _build_postgres_connection_kwargs helper for PG family from_config"
+  needs: []
+  status: done
+  notes: |
+    timescaledb.py:110-159 ≅ postgresql.py:154-201 ≅ pg_duckdb.py:124-181 ≅
+    pg_mooncake.py:67-116 ≅ cedardb.py:73-119 — ~30 identical lines for
+    host/port/username/password/schema/sslmode + database-naming.
+
+    Add a class method `_build_postgres_connection_kwargs(cls, config)`
+    on PostgreSQLAdapter that the four subclasses call. Concrete drift
+    risk: pg_mooncake/cedardb already lack `enable_timescale` and
+    `statement_timeout` while sharing the same parent __init__.
+
+- id: w10
+  summary: "P12 — Consolidate clickhouse_cloud S3 + GCS load paths into one helper"
+  needs: [w7]
+  status: done
+  notes: |
+    clickhouse_cloud.py:579-712 (S3, 133 lines) vs :714-851 (GCS, 137
+    lines) are 95% duplicate. Extract
+    `_load_data_via_object_storage(provider_kind, ...)` that takes the
+    storage SDK and the `INSERT FROM s3()`/`INSERT FROM gcs()` table
+    function as parameters. Sequenced after w7 so the COUNT(*) fix
+    propagates correctly.
+
+- id: w11
+  summary: "P1 cluster A — replace WITH/DDL option regex strippers with the balanced walker from w5"
+  needs: [w5]
+  status: done
+  notes: |
+    First balanced-walker migration slice. Sites and triggers:
+    - athena.py:685 `\\s+WITH\\s*\\([^)]*\\)` → breaks on
+      `WITH (partitioning = ARRAY['bucket(ws_sold_date_sk, 16)'])`
+    - presto.py:852 + trino.py:852 (`WITH ([^)]*)`) → breaks on
+      `WITH (partitioning = ARRAY[date_trunc('day', ts)])`
+
+    Add unit tests covering each trigger. Keep adapter-specific PK/FK and
+    ClickHouse/Fabric cases in w22/w23 so failures isolate cleanly.
+
+- id: w22
+  summary: "P1 cluster B — replace PK/FK regex strippers with the balanced walker from w5"
+  needs: [w11]
+  status: done
+  notes: |
+    Second balanced-walker migration slice. Sites and triggers:
+    - duckdb.py:733-739 (table-level + inline FK) → breaks on
+      `FOREIGN KEY (...) REFERENCES date_dim(d_date_sk) ON DELETE CASCADE`
+    - firebolt.py:1055,1059-1064 (PK + FK) → breaks on composite PK with
+      expression members `PRIMARY KEY ("a", coalesce(b,0))`
+
+    Add unit tests covering each trigger.
+
+- id: w23
+  summary: "P1 cluster C — fix ClickHouse nullable and Fabric table-definition regex edge cases"
+  needs: [w22]
+  status: done
+  notes: |
+    Third balanced-walker migration slice. Sites and triggers:
+    - clickhouse/workload.py:65-70 `Nullable\\([^)]+\\)\\s+NOT\\s+NULL`
+      → silently breaks decimal-bearing TPC-DS tables for ALL clickhouse
+      adapters (`Nullable(Decimal(38,0)) NOT NULL`)
+    - clickhouse/workload.py:116 inline PK regex on parametrized types
+    - fabric_warehouse.py:1218-1226 `_optimize_table_definition` uses
+      str.replace after re.search → munges `CREATE TABLE IF NOT EXISTS orders`
+
+    Add unit tests covering each trigger.
+
+- id: w12
+  summary: "P12 — Restore Presto/Trino symmetry: NOT NULL stripping, friendly connect error, qualified _load_table_data"
+  needs: [w11]
+  status: done
+  notes: |
+    Three asymmetric drift items between presto.py and trino.py:
+    1. presto.py:847-854 strips NOT NULL for memory catalog; trino.py
+       does NOT. Trino memory catalog also rejects NOT NULL.
+    2. presto.py:633-635 uses bare `raise`; trino.py:640-647 calls
+       `_build_friendly_connection_error`. Lift the helper to
+       presto_trino_utils.py and use in both.
+    3. trino.py:681-696 _load_table_data sends unqualified
+       `INSERT INTO orders`; presto.py:669-697 prepends `catalog.schema.`.
+       Promote to a shared helper that always qualifies.
+
+    Starburst inherits via TrinoAdapter — no separate fix needed there.
+
+- id: w13
+  summary: "P3 — Fix motherduck `--platform-option token=<token>` advertised in docstring but not wired"
+  needs: []
+  status: done
+  notes: |
+    motherduck.py:56,116,135-138 — module docstring at :56 advertises
+    `--platform-option token=<token>`, but `add_cli_arguments` registers
+    `--motherduck-token`/`--motherduck-database` and `from_config` reads
+    `motherduck_token`/`motherduck_database` keys (not `token`/`database`
+    from options). Either (a) make from_config read both option keys
+    AND the legacy ones, or (b) align the docstring with the actual flag.
+    Prefer (a) — it's the migration path other adapters took.
+
+- id: w14
+  summary: "P15 — Fix snowflake.drop_database reference-before-assignment in exception handler"
+  needs: []
+  status: done
+  notes: |
+    snowflake.py:441-453 — `database` is referenced in the except branch
+    but bound only after `_create_admin_connection(...)`. If
+    connection-build raises, the handler raises NameError and masks the
+    original. Move
+    `database = connection_config.get("database", self.database)` to the
+    top of the function before any callable that can raise.
+
+- id: w15
+  summary: "Add ABC-conformance test that introspects every concrete adapter's method signatures"
+  needs: [w3]
+  status: done
+  notes: |
+    Defensive — prevents future N2 (ABC contract divergence). New test
+    `tests/unit/platforms/test_abc_conformance.py` walks every concrete
+    subclass of PlatformAdapter, asserts that
+    {create_schema, load_data, execute_query, drop_database} match the
+    ABC signature using `inspect.signature`. Snowpark Connect (after w3),
+    pg_mooncake (after w2) should pass; failures mean someone diverged
+    again.
+
+- id: w16
+  summary: "P11/P9 cluster — postgresql FK-strip silent retry + presto bare raise + cedardb per-table drop logs"
+  needs: [w12, w21]
+  status: done
+  notes: |
+    Smaller correctness/visibility items batched as one PR:
+    - postgresql.py:444-451 — FK-stripped retry catches the second
+      exception, warning-logs, and proceeds. Promote to raise (or push
+      onto critical_failures list like SingleStore) when the second
+      attempt also fails on a CREATE TABLE. (P9 Required.)
+    - presto.py:633-635 — verify the bare raise was replaced by w12's
+      shared `_build_friendly_connection_error`; do not duplicate the fix here.
+    - cedardb.py:243-247 — multi-table DROP loop emits no per-table log
+      lines until final summary.
+    - doris.py:643-665 — wrap bare `raise` to include host/user context.
+
+- id: w17
+  summary: "P14 cluster A — normalize PG-family legacy flag shims against option specs"
+  needs: [w13]
+  status: done
+  notes: |
+    PG-family adapters wire BOTH `register_option_specs` AND
+    `add_cli_arguments` for the same fields, with undefined precedence:
+    postgresql.py:55-118, pg_duckdb.py:64-122, timescaledb.py:76-107,
+    cedardb.py:56-70.
+
+    Per adapter: either (a) make add_cli_arguments a thin shim that
+    enumerates option-spec keys and registers them as legacy flags
+    pointing at the same dest, or (b) delete the duplicates after a
+    deprecation cycle. Preserve existing legacy invocations.
+
+- id: w24
+  summary: "P14 cluster B — normalize SingleStore and Snowpark Connect legacy flag shims"
+  needs: [w17]
+  status: done
+  notes: |
+    Follow the w17 shim/deprecation pattern for:
+    - singlestore.py:137-175
+    - snowpark_connect.py:503-538
+
+    Snowpark Connect is urgent because its unprefixed `--user`/`--password`/
+    `--account` collide with other adapters' flags in shared parsers.
+
+- id: w25
+  summary: "P14 cluster C — settle sqlite option-spec registration policy"
+  needs: [w24]
+  status: done
+  notes: |
+    Inverse case: sqlite.py has only legacy flags and no option-spec
+    registration.
+
+    Either register sqlite under
+    benchbox/platforms/__init__.py or document that sqlite intentionally
+    bypasses the registry (and update the error message at sqlite.py:124-127
+    accordingly).
+
+- id: w18
+  summary: "P7 — Add import-by-name discipline docstring to remaining shared helpers"
+  needs: [w4]
+  status: done
+  notes: |
+    Following the canonical _spark_helpers.py pattern, add the same
+    docstring paragraph to:
+    - benchbox/platforms/cloud_shared.py:1-9
+    - benchbox/platforms/presto_trino_utils.py:1
+    - benchbox/platforms/questdb_rewriter.py:1-110
+    - benchbox/platforms/datafusion_query_transformer.py
+    - benchbox/platforms/datafusion_write_transformer.py
+
+    One-paragraph note: "Adapters import these functions by name; tests
+    must monkeypatch on the adapter module
+    (e.g. benchbox.platforms.snowflake.validate_session_cache_control),
+    not on this module, or the patch silently no-ops."
+
+- id: w19
+  summary: "Nit/Consider tail A — firebolt/clickhouse_cloud/questdb docs and helper cleanup"
+  needs: [w23, w25]
+  status: done
+  notes: |
+    Small Firebolt/ClickHouse/QuestDB cleanup slice:
+    - firebolt.py:1056 — re-enable inline NOT NULL stripper (or document
+      the deliberate keep)
+    - firebolt.py:1275-1315 — refactor validate_session_cache_control to
+      delegate to cloud_shared (parameterise query string)
+    - clickhouse_cloud.py:75,79 — clean up docstring that mixes
+      `--clickhouse-cloud-*` and `--platform-option` forms
+    - questdb.py — set `_max_identifier_length = 127` on the adapter;
+      move the override out of the mixin docstring
+
+- id: w26
+  summary: "Nit/Consider tail B — singlestore/doris/fabric cleanup"
+  needs: [w19]
+  status: done
+  notes: |
+    Small SingleStore/Doris/Fabric cleanup slice:
+    - singlestore.py:713-798 — extract `_extract_create_table_name(stmt)`
+      helper; replace 4 copies of the regex
+    - doris.py:579-586 — delegate `_validate_identifier` to
+      benchbox.utils.sql_identifier.is_valid_sql_identifier (with
+      max_length=128)
+    - fabric_lakehouse.py:230,266 — pick a single error model
+      (raise everywhere, or return-as-dict everywhere); align with
+      sibling fabric_warehouse.py
+    - fabric_spark_adapter.py:730 — wrap CLI args in a parser group for
+      consistency with sibling Fabric adapters
+
+- id: w20
+  summary: "P5 — Make docker/questdb truly ephemeral (or fix the misleading comment)"
+  needs: []
+  status: done
+  notes: |
+    docker/questdb/docker-compose.yml:23-47 — comment claims "Data is
+    ephemeral - no named volume," but with no `tmpfs:` block and
+    `restart: unless-stopped`, state actually sticks to the container
+    instance across `docker compose restart`.
+    Either (a) add `tmpfs: - <questdb_data_dir>` to make it RAM-backed,
+    or (b) rewrite the comment to "no host-mounted volume; container
+    recreate clears state." Mirror docker/velox/docker-compose.yml
+    canonical pattern.
+
+deferred:
+- summary: "P1 (Consider) — base/ddl_helpers.py:28,31 inline `[^)]*` in FK column-list regex"
+  reason: "Speculative — current TPC schemas don't use functional refs in column lists. Re-evaluate when a benchmark adds
+    expressions inside REFERENCES col lists."
+- summary: "P1 (Consider) — questdb_rewriter.py:451-454 CTE column-list `[^)]+`"
+  reason: "Speculative — bare-identifier-only CTE column lists are universal. Will be addressed when the rewriter migrates
+    to SQLGlot AST per its own design philosophy."
+- summary: "P4 (Consider) — fabric_spark Iceberg classpath probe"
+  reason: "Speculative — Fabric managed Spark runtime ships Iceberg JARs by default on supported runtime versions. Add probe
+    only if a real failure surfaces."
+- summary: "Audit duckdb/sqlite/snowflake docker dirs for P5"
+  reason: "Most cloud DW and embedded engines have no local docker dir; the questdb finding (w20) was the only one in the
+    audited set."
+
+files_affected:
+  modified:
+  - "benchbox/platforms/timescaledb.py"
+  - "benchbox/platforms/pg_mooncake.py"
+  - "benchbox/platforms/snowpark_connect.py"
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/pg_duckdb.py"
+  - "benchbox/platforms/cedardb.py"
+  - "benchbox/platforms/sqlite.py"
+  - "benchbox/platforms/singlestore.py"
+  - "benchbox/platforms/doris.py"
+  - "benchbox/platforms/questdb.py"
+  - "benchbox/platforms/duckdb.py"
+  - "benchbox/platforms/motherduck.py"
+  - "benchbox/platforms/firebolt.py"
+  - "benchbox/platforms/snowflake.py"
+  - "benchbox/platforms/redshift.py"
+  - "benchbox/platforms/athena.py"
+  - "benchbox/platforms/azure_synapse.py"
+  - "benchbox/platforms/presto.py"
+  - "benchbox/platforms/trino.py"
+  - "benchbox/platforms/clickhouse_cloud.py"
+  - "benchbox/platforms/fabric_lakehouse.py"
+  - "benchbox/platforms/fabric_warehouse.py"
+  - "benchbox/platforms/datafusion.py"
+  - "benchbox/platforms/polars_platform.py"
+  - "benchbox/platforms/cudf.py"
+  - "benchbox/platforms/cloud_shared.py"
+  - "benchbox/platforms/presto_trino_utils.py"
+  - "benchbox/platforms/questdb_rewriter.py"
+  - "benchbox/platforms/datafusion_query_transformer.py"
+  - "benchbox/platforms/datafusion_write_transformer.py"
+  - "benchbox/platforms/clickhouse/workload.py"
+  - "benchbox/platforms/base/ddl_helpers.py"
+  - "benchbox/platforms/base/connection_lifecycle.py"
+  - "benchbox/platforms/base/psycopg2_mixin.py"
+  - "benchbox/platforms/_spark_helpers.py"
+  - "docker/questdb/docker-compose.yml"
+  added:
+  - "benchbox/platforms/base/no_constraint_enforcement_mixin.py"
+  - "tests/unit/platforms/test_abc_conformance.py"
+
+must_preserve:
+- "Spark/lakesail/velox triple continues to pass tests/unit/platforms/test_{spark,lakesail,velox}_*.py — they are the canonical
+  reference for patterns 1-13"
+- "_strip_balanced_paren_constraints behavior in _spark_helpers.py is unchanged when lifted to base/ — re-export must keep
+  import paths stable"
+- "PostgreSQLAdapter.create_schema(self, benchmark, connection) -> float signature stays canonical for the entire PG family"
+- "PlatformAdapter ABC method signatures stay stable; w15's conformance test enforces them going forward"
+- "All currently-passing fast tests continue to pass: `uv run -- python -m pytest -m fast -q`"
+- "Existing CLI invocations using legacy `--<adapter>-<flag>` flags continue to work where w17 keeps a shim (deprecation must
+  not be a hard break)"
+
+approach: |
+  Sequence is deliberate and dependency-aware:
+  - w1-w3 (Critical) ship first, individually. Each is a contract bug
+    that breaks production and needs no shared infrastructure.
+  - w4-w5 (shared-helper foundation) ship next. They are the leverage
+    that makes w8/w11 mechanical instead of bespoke per-adapter.
+  - w6 (P11 visibility cluster) and w7 (N1 throughput inflation) are
+    independent of the foundation work — can ship in parallel with w4/w5.
+  - w8/w9/w10 (modularity-drift extractions) ship after w4/w5.
+  - w11/w22/w23/w12 (per-adapter regex fixes) ship after w5 in bounded
+    adapter-family slices.
+  - w13/w14 are independent one-liners.
+  - w15 (ABC test) ships after w3 and gates future regressions.
+  - w16/w17/w24/w25/w18/w19/w26/w20 are cleanup; ship last.
+
+  Reference the canonical fixes already in the repo:
+  - benchbox/platforms/_spark_helpers.py for balanced-paren walker,
+    SparkLikeAdapterMixin, "Import discipline" docstring block
+  - benchbox/platforms/{spark,lakesail,velox}.py for the lambda-capture
+    pattern (w10-style), the on_pre_loop hook wiring, the
+    --platform-option error message rewrite (P3 canonical fix)
+  - docker/velox/docker-compose.yml for the canonical tmpfs pattern
+    that w20 should mirror
+
+  Grep before each work unit:
+    git diff 73f3a582e -- <file>     # confirm file hasn't drifted from audit baseline
+    grep -n '<exact snippet>' <file> # confirm line numbers
+  Audit lines were captured at 73f3a582e; subsequent commits may shift them.
+
+anti_patterns:
+- "DO NOT skip w15 (ABC conformance test) — without it, the next snowpark_connect-style divergence will land silently, and
+  the C3 fix becomes wasted work the moment someone adds a new adapter"
+- "DO NOT batch the 3 Critical fixes into a single PR — each touches different test files and orthogonal failure modes; landing
+  them separately keeps blast radius small if one regresses"
+- "DO NOT 'fix' the deferred speculative items (FK column expressions, CTE column lists) — they are guarded by 'speculative'
+  for a reason. The audit explicitly downgraded them. Re-evaluate only when a real failing benchmark surfaces."
+- "DO NOT delete questdb._strip_fk_constraints in w4 without first running questdb integration tests — it carries inline-REFERENCES
+  handling that the base helper does not yet have"
+- "DO NOT change the PG adapter from_config signatures during w9 — only extract the duplicated body. Caller compatibility
+  comes first."
+- "DO NOT promote questdb.py:476-480 pre-create DROP failures to logger.info in w6 — the audit specifically calls for `warning`
+  (failed destructive intent), not info"
+- "DO NOT treat `_project/TODO/` or `_project/DONE/` as product-code scope during implementation — TODO status moves, work-unit
+  completion, and index regeneration are required by the workflow"
+
+verification:
+- description: "Fast tests still pass after every work unit"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all tests pass"
+- description: "Lint clean"
+  command: "uv run -- ruff check benchbox/platforms/ tests/unit/platforms/"
+  expected_output: "All checks passed"
+- description: "Typecheck clean"
+  command: "uv run -- ty check benchbox/platforms/"
+  expected_output: "All checks passed"
+- description: "ABC conformance test exists and passes after w15"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_abc_conformance.py -v"
+  expected_output: "all concrete adapters conform to PlatformAdapter ABC"
+- description: "C1 — timescaledb rolls back on per-statement failure"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_timescaledb_*.py -v -k rollback"
+  expected_output: "rollback test passes"
+- description: "C2 — pg_mooncake create_schema delegates correctly through parent"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_pg_mooncake_*.py -v"
+  expected_output: "all tests pass; new test exercises full create_schema flow"
+- description: "C3 — snowpark_connect ABC conformance"
+  command: "uv run -- python -c 'import inspect; from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter; from
+    benchbox.platforms.base.adapter import PlatformAdapter; print(inspect.signature(SnowparkConnectAdapter.create_schema))'"
+  expected_output: "(self, benchmark, connection) (or compatible)"
+- description: "P11 cluster — destructive ops visible at INFO"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v -k 'log_level or destructive'"
+  expected_output: "all destructive ops emit INFO-level log entries"
+- description: "N1 — clickhouse_cloud throughput regression test"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_cloud_*.py -v -k throughput"
+  expected_output: "total_rows_loaded matches sum of per-file row counts only"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/"
+  - "tests/unit/platforms/"
+  - "docker/questdb/"
+  do_not_modify:
+  - "benchbox/core/"
+  - "benchbox/cli/"
+  - "benchbox/mcp/"
+  - "benchbox/platforms/spark.py"
+  - "benchbox/platforms/lakesail.py"
+  - "benchbox/platforms/velox.py"
+  - "docker/velox/"
+
+success_metrics:
+- "All 3 Critical findings fixed; each has a regression test"
+- "All 22 Required findings either fixed or explicitly deferred with rationale"
+- "Pattern 1 (greedy [^)]*) eliminated from production paths — `grep -rn '\\\\([^)]*\\\\)' benchbox/platforms/ | grep -v _spark_helpers
+  | grep -v test_` returns ≤2 matches (the deferred specs)"
+- "Pattern 7 (import discipline docstring) present in 5+ shared helpers"
+- "Pattern 12 (drift) reduced — NoConstraintEnforcementMixin and _build_postgres_connection_kwargs collapse 8 duplicated method
+  bodies"
+- "ABC conformance test exists and passes for all concrete adapters"
+
+metadata:
+  tags: ["audit", "platform-adapters", "modularity", "code-quality", "p1-regex", "p11-logging", "p12-drift", "abc-conformance"]
+  estimated_effort: "Medium-Large (~5-8 days across 20 work units; most are 1-3 hours each)"
+  created_date: "2026-04-25"
+  source: "Cross-adapter audit of 13-pattern catalogue (commit 73f3a582e), 4 parallel Explore agents"

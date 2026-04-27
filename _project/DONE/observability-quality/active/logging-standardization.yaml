@@ -1,0 +1,90 @@
+id: logging-standardization
+title: Logging Standardization
+worktree: observability-quality
+category: Monitoring and Operations
+priority: Medium
+status: Completed
+completed_date: '2025-11-28'
+description: Inconsistent logging patterns across modules
+impact: Improves debugging and operational monitoring
+tasks:
+- phase: Standardize logging configuration and levels
+  done: true
+  notes: '- setup_verbose_logging() in benchbox/cli/commands/run.py
+
+    - VerbositySettings dataclass for normalized verbosity flags
+
+    - Levels: quiet (ERROR), default (WARNING), -v (INFO), -vv (DEBUG)
+
+    - Root logger configuration with handler management
+
+    '
+- phase: Add structured logging for better operational visibility
+  done: true
+  notes: '- benchbox/core/validation/shared/logging.py provides log_row_count_summary()
+
+    - log_debug_context() for structured key-value logging
+
+    - Consistent log formatting across 102+ modules
+
+    '
+- phase: Implement performance metrics logging
+  done: true
+  notes: '- VerbosityMixin.log_operation_start/complete() with timing
+
+    - benchbox/monitoring module for performance tracking
+
+    - ResourceMonitor for CPU/memory metrics
+
+    '
+- phase: Add debugging support for troubleshooting
+  done: true
+  notes: '- log_debug_info() for version/system context
+
+    - log_error_with_debug_info() with traceback
+
+    - log_import_debug() for module loading issues
+
+    - Version consistency warnings in debug output
+
+    '
+- phase: Create logging configuration guidelines
+  done: true
+  notes: '- docs/reference/cli-reference.md documents -v, -vv, --quiet flags
+
+    - docs/usage/troubleshooting.md covers common debugging scenarios
+
+    - 28+ tests in tests/unit/cli/test_cli_verbose.py and related files
+
+    '
+sections:
+  Implementation Summary: 'Logging is standardized across the codebase:
+
+
+    Key components:
+
+    - VerbositySettings/VerbosityMixin (benchbox/utils/verbosity.py)
+
+    - setup_verbose_logging() (benchbox/cli/commands/run.py)
+
+    - Structured log helpers (benchbox/core/validation/shared/logging.py)
+
+
+    Features:
+
+    - 3 verbosity levels: default, -v (INFO), -vv (DEBUG)
+
+    - --quiet flag suppresses all non-critical output
+
+    - Structured logging for validation results
+
+    - Operation timing with log_operation_start/complete()
+
+    - Debug context including version and system info
+
+
+    Testing:
+
+    - 28+ tests covering logging infrastructure
+
+    - Integration tests for verbose logging flows'

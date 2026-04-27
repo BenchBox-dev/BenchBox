@@ -1,0 +1,136 @@
+id: design-and-implement-core-dataframe-abstractions
+title: Design and Implement Core DataFrame Abstractions
+worktree: dataframe-core
+category: Core Functionality
+priority: Critical
+status: Completed
+completed_date: '2025-12-02'
+description: 'Implement the foundational abstractions for DataFrame benchmarking including
+
+  DataFrameQuery protocol, DataFrameContext, and DataFrameOps protocol that
+
+  will enable 95%+ code reuse across 8 dataframe platforms using a family-based
+
+  architecture.
+
+  '
+context_sections:
+- name: Architecture Decision
+  summary: 'Research shows Python dataframe libraries cluster into 2 syntactic families:
+
+    Pandas-like (Pandas, Modin, cuDF, Vaex, Dask) and Expression-based (Polars,
+
+    PySpark, DataFusion). This enables 72% code reduction vs per-platform approach.
+
+    '
+- name: Design Philosophy
+  summary: 'Each query is implemented once per family (not once per platform). Families
+
+    share 95%+ of query code, with platform differences isolated to thin adapters
+
+    handling I/O and type conversions.
+
+    '
+impact: 'CRITICAL - Foundation for entire DataFrame support. Enables 8 platforms with
+
+  only 2 family implementations. 72% code reduction vs per-platform approach.
+
+  Estimated 9-11 weeks total timeline vs 13+ weeks for per-platform.
+
+  '
+research_value: 'Validates family-based architecture pattern. Demonstrates that syntactic
+
+  clustering enables massive code reuse while maintaining platform-specific
+
+  optimizations.
+
+  '
+implementation_summary: 'Implemented complete DataFrame abstractions in benchbox/core/dataframe/:
+
+  - DataFrameQuery dataclass with query_id, name, description, categories
+
+  - Dual implementation support: expression_impl and pandas_impl
+
+  - DataFrameContext protocol for table access and expression helpers
+
+  - DataFrameContextImpl concrete implementation
+
+  - Expression helpers: col(), lit(), date_add(), date_sub(), cast_date()
+
+  - QueryRegistry for TPC-H query management
+
+
+  Also implemented platform adapters in benchbox/platforms/dataframe/:
+
+  - ExpressionFamilyAdapter base class for Polars-like libraries
+
+  - PandasFamilyAdapter base class for Pandas-like libraries
+
+  - PolarsDataFrameAdapter concrete implementation
+
+  - PandasDataFrameAdapter concrete implementation
+
+  - Platform availability detection and requirements
+
+  '
+tasks:
+- phase: 'Phase 1.1: Core Protocol Definitions'
+  description: Define the core abstractions and protocols
+  items:
+  - summary: Create benchbox/core/dataframe/__init__.py package structure
+    done: true
+  - summary: Implement DataFrameQuery dataclass in benchbox/core/dataframe/query.py
+    done: true
+    details: 'Implemented with query_id, query_name, description, categories,
+
+      expression_impl, pandas_impl, expected_rows, and execute() method.
+
+      '
+  - summary: Define DataFrameOps protocol in benchbox/core/dataframe/query.py
+    done: true
+    details: Implemented protocol methods for DataFrame operations
+  - summary: Define DataFrameGroupBy protocol for grouped operations
+    done: true
+  - summary: Define JoinType and AggregateFunction enums
+    done: true
+  - summary: Create comprehensive unit tests for protocols
+    done: true
+    details: 83 unit tests covering all protocols and abstractions
+- phase: 'Phase 1.2: DataFrameContext Implementation'
+  description: Context object for table access and expression helpers
+  items:
+  - summary: Define DataFrameContext protocol in benchbox/core/dataframe/context.py
+    done: true
+  - summary: Implement DataFrameContextImpl concrete class
+    done: true
+  - summary: Create unit tests for context
+    done: true
+files_affected:
+  modified:
+  - benchbox/core/dataframe/__init__.py
+  - benchbox/core/dataframe/query.py
+  - benchbox/core/dataframe/context.py
+  - benchbox/platforms/dataframe/__init__.py
+  - benchbox/platforms/dataframe/expression_family.py
+  - benchbox/platforms/dataframe/pandas_family.py
+  - benchbox/platforms/dataframe/polars_df.py
+  - benchbox/platforms/dataframe/pandas_df.py
+  - benchbox/platforms/dataframe/platform_checker.py
+  - tests/unit/core/dataframe/test_query.py
+  - tests/unit/core/dataframe/test_context.py
+  - tests/unit/platforms/dataframe/test_expression_family.py
+  - tests/unit/platforms/dataframe/test_pandas_family.py
+  - tests/unit/platforms/dataframe/test_polars_df.py
+  - tests/unit/platforms/dataframe/test_pandas_df.py
+  - tests/unit/platforms/dataframe/test_platform_checker.py
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - dataframe
+  - core
+  - architecture
+  estimated_effort: 1 week
+  actual_effort: Completed in multiple sessions

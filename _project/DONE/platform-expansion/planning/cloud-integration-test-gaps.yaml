@@ -1,0 +1,172 @@
+id: cloud-integration-test-gaps
+title: "Cloud Integration Test Infrastructure - Address Review Gaps"
+worktree: platform-expansion
+priority: Medium-High
+status: Completed
+completed_date: "2026-03-29"
+category: Platform Expansion
+description: |
+  Code review of the cloud-integration-test-infrastructure implementation
+  (bcccb82..877e7452d) scored 7/10. Bug fixes were committed (5f8caffb2),
+  raising it to ~8.5. Four structural gaps remain:
+
+  1. Test depth parity - Firebolt (4 tests), Starburst (5), MotherDuck (5)
+     are significantly thinner than Snowflake (9), BigQuery (10), Databricks (9).
+     Missing: SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures.
+  2. Scope creep - PREFER_PLATFORM_FORMAT_ORDER production code refactor
+     (format_capabilities.py, data_loading.py) was bundled in a test TODO.
+     Already committed; acknowledge in commit message only.
+  3. Comparison test fragility - test_pg_extension_comparison.py shells out
+     to CLI via subprocess. Depends on --output flag + JSON schema stability.
+     Should use Python adapter API directly.
+  4. S3 test fixture gap - test_s3_parquet_query assumes pre-existing
+     test.parquet in S3. No setup script or fixture creates it.
+
+context_sections:
+  "Test Depth Pattern": |
+    Existing deep live tests (Snowflake, BigQuery, Databricks) follow a
+    5-class structure: Connection → SchemaManagement → DataLoading →
+    QueryExecution → SpecificFeatures. Each uses conftest fixtures:
+    unique_test_schema, test_scale_factor, test_output_dir. Data loading
+    uses TPCH(scale_factor=0.01, output_dir=..., verbose=False) with
+    generate_data(), get_create_tables_sql(dialect=...), adapter.load_data().
+
+  "Platform-Specific Constraints": |
+    - Firebolt: dialect="postgres", uses databases not schemas, cursor-based
+    - MotherDuck: DuckDB dialect, connection.execute() not cursor
+    - Starburst: dialect="trino", default catalog tpch is READ-ONLY;
+      writable ops need STARBURST_WRITABLE_CATALOG env var
+    - cleanup_test_schema fixture calls nonexistent adapter.execute_sql()
+      and silently fails - all cleanup must be in finally blocks
+
+  "Comparison Test Architecture": |
+    Current: subprocess CLI → parse JSON result files → compare.
+    Target: adapter API → build result dicts in-process → compare.
+    Adapter execute_query() returns {"status": "SUCCESS", "execution_time_seconds": ...}.
+    Comparison test checks status == "success" (lowercase) - must lowercase.
+
+metadata:
+  tags:
+  - integration-tests
+  - cloud
+  - review-followup
+  estimated_effort: "Medium - 5 files, mostly additive test code"
+  created_date: "2026-03-28"
+  follows: cloud-integration-test-infrastructure
+
+guardrails:
+  verification:
+    command: "uv run ruff check tests/integration/platforms/test_firebolt_live.py tests/integration/platforms/test_motherduck_live.py tests/integration/platforms/test_starburst_live.py tests/integration/platforms/test_pg_extension_comparison.py tests/integration/platforms/test_pg_duckdb_live.py && make test-fast"
+    expected: "Ruff clean on all 5 files; all fast tests pass; new test code is credential-gated and does not run without env vars"
+    spot_checks:
+    - "uv run -- python -m pytest tests/integration/platforms/test_firebolt_live.py --collect-only 2>&1 | grep 'test session starts' - verifies no import errors, expect 9 tests"
+    - "uv run -- python -m pytest tests/integration/platforms/test_motherduck_live.py --collect-only 2>&1 | grep 'test session starts' - expect 9 tests"
+    - "uv run -- python -m pytest tests/integration/platforms/test_starburst_live.py --collect-only 2>&1 | grep 'test session starts' - expect 9 tests"
+  must_preserve:
+  - "Existing test behavior in test_firebolt_live.py, test_starburst_live.py, test_motherduck_live.py - new classes are additive"
+  - "Existing comparison test assertions in TestPgExtensionComparisonOrchestration and TestPgExtensionComparisonReport"
+  - "Marker hierarchy: integration > live_integration > live_{platform}"
+  - "make test-fast exclusion of live_integration tests"
+  approach: |
+    Follow the Snowflake/BigQuery/Databricks test structure exactly:
+    1. SchemaManagement: CREATE SCHEMA/DATABASE, verify, cleanup in finally
+    2. DataLoading: TPCH(), generate_data(), get_create_tables_sql(), load_data(), verify stats
+    3. QueryExecution: get_query(1, seed=42), prefix table refs with schema, assert results
+    4. SpecificFeatures: platform-unique capabilities + cleanup test
+    All cleanup in finally blocks (not via cleanup_test_schema fixture).
+    Comparison test refactor: replace subprocess with adapter.create_schema/load_data/execute_query.
+  anti_patterns:
+  - "DO NOT rely on cleanup_test_schema fixture for cleanup - it calls adapter.execute_sql() which doesn't exist as a public method and silently fails via try/except - use explicit finally blocks"
+  - "DO NOT use writable operations against Starburst's default tpch catalog - it's read-only; gate write tests on STARBURST_WRITABLE_CATALOG env var"
+  - "DO NOT import adapter classes at module level in comparison test - use lazy imports inside _run_benchmark_via_adapter() to avoid ImportError when platform deps aren't installed"
+  scope_limit:
+  - "Only modify test files - no production code changes"
+  - "Do not change conftest.py fixtures, pytest.ini markers, or Makefile targets"
+
+work:
+- id: w0
+  summary: "S3 test fixture - replace pre-existing file assumption with self-contained setup/teardown"
+  status: done
+  notes: |
+    In test_pg_duckdb_live.py, replace s3_test_bucket fixture with
+    s3_test_parquet fixture that:
+    1. Skips if BENCHBOX_S3_TEST_BUCKET / AWS creds not set
+    2. Generates small parquet (100 rows) via pyarrow
+    3. Uploads to s3://{bucket}/benchbox_test/test.parquet via boto3
+    4. Yields {"bucket", "key", "row_count": 100}
+    5. Deletes S3 object in teardown
+    Update test_s3_parquet_query to use new fixture, assert exact row count.
+    Remove inner try/except pytest.skip guard (fixture guarantees file exists).
+
+- id: w1
+  summary: "Firebolt test depth - add SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures"
+  status: done
+  notes: |
+    Add to test_firebolt_live.py:
+    - TestLiveFireboltSchemaManagement: test_create_and_drop_database
+      (Firebolt uses databases not schemas)
+    - TestLiveFireboltDataLoading: test_tpch_data_load
+      (TPCH, dialect="postgres", adapter.load_data, verify stats)
+    - TestLiveFireboltQueryExecution: add test_tpch_query_1
+      (get_query(1, seed=42), execute, assert results > 0, skip if no data)
+    - TestLiveFireboltSpecificFeatures: test_result_cache_control, test_cleanup
+    Target: 4→9 tests. Add `from benchbox import TPCH`.
+
+- id: w2
+  summary: "MotherDuck test depth - add SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures"
+  status: done
+  notes: |
+    Add to test_motherduck_live.py:
+    - TestLiveMotherDuckSchemaManagement: test_schema_creation
+      (CREATE SCHEMA, verify via information_schema, cleanup)
+    - TestLiveMotherDuckDataLoading: test_tpch_data_load
+      (DuckDB dialect, connection.execute() pattern)
+    - TestLiveMotherDuckQueryExecution: add test_tpch_query_1
+    - TestLiveMotherDuckSpecificFeatures: move test_duckdb_extensions here,
+      add test_cloud_databases (SHOW DATABASES), test_cleanup
+    Target: 5→9 tests. Add `from benchbox import TPCH`.
+
+- id: w3
+  summary: "Starburst test depth - add SchemaManagement, DataLoading, TPC-H QueryExecution, SpecificFeatures"
+  status: done
+  notes: |
+    Add to test_starburst_live.py:
+    - Module-level starburst_writable_catalog() fixture
+      (skips if STARBURST_WRITABLE_CATALOG not set)
+    - TestLiveStarburstSchemaManagement: test_schema_creation
+      (in writable catalog, gated on fixture)
+    - TestLiveStarburstDataLoading: test_tpch_data_load
+      (in writable catalog, dialect="trino")
+    - TestLiveStarburstQueryExecution: add test_tpch_builtin_query
+      (query tpch.tiny.lineitem with GROUP BY, guard TrinoUserError)
+    - TestLiveStarburstSpecificFeatures: move test_show_catalogs here,
+      add test_information_schema, test_cleanup
+    Target: 5→9 tests. Update module docstring for STARBURST_WRITABLE_CATALOG.
+
+- id: w4
+  summary: "Comparison test refactor - replace subprocess CLI with Python adapter API"
+  needs: [w1, w2, w3]
+  status: done
+  notes: |
+    In test_pg_extension_comparison.py:
+    1. Remove subprocess/json imports, remove _run_benchmark_for_platform()
+    2. Add TPCH import, add adapter_class paths to PG_EXTENSIONS dict
+    3. New _run_benchmark_via_adapter():
+       - Instantiate adapter, TPCH(scale=0.01), generate_data()
+       - adapter.create_schema(), adapter.load_data()
+       - adapter.execute_query() for each query, collect timings
+       - Assemble result dict matching expected structure
+       - Lowercase status field (adapter returns "SUCCESS", test checks "success")
+       - Cleanup in finally
+    4. Update comparison_results fixture to call new function
+    5. Test classes and assertions remain unchanged
+    Depends on w1-w3 for familiarity with adapter API patterns.
+
+- id: w5
+  summary: "Scope creep acknowledgment - note in commit message"
+  needs: [w0, w1, w2, w3, w4]
+  status: done
+  notes: |
+    Include in the final commit message a note about the PREFER_PLATFORM_FORMAT_ORDER
+    production code refactor (commit ccbd69f56) that was bundled in the original
+    test infrastructure TODO. No code changes needed - documentation only.

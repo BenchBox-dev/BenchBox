@@ -1,0 +1,65 @@
+id: performance-regression-detection-system
+title: Performance Regression Detection System
+worktree: enterprise-ops-regression
+category: Enterprise Operations
+priority: Medium
+status: Completed
+description: |
+  Automated performance regression detection with baseline management,
+  statistical testing, and alerting.
+
+completion:
+  date: '2025-11-29'
+  commits:
+  - existing: "Implemented as part of Ranking & Aggregation System"
+  implementation_notes: |
+    Performance regression detection is fully implemented across multiple modules:
+
+    Database Layer (benchbox/core/results/database.py):
+    - PerformanceTrend dataclass with is_regression flag
+    - detect_regressions() method with configurable threshold and lookback
+    - Trend detection comparing recent results to historical baselines
+    - Statistical comparison using mean, median, stddev
+
+    CLI Commands:
+    - benchbox report regressions - Detect regressions across all platforms
+    - benchbox report trends - Show performance trends with regression highlighting
+    - benchbox compare --fail-on-regression - Fail on regression detection
+    - benchbox compare-plans - Plan comparison with regression correlation
+
+    Features Implemented:
+    - Threshold-based detection (configurable percentage, default 10%)
+    - Lookback period configuration (default 30 days)
+    - Statistical testing (mean, median, standard deviation)
+    - Trend analysis (up/down/stable classification)
+    - CLI alerting with colored output
+    - Rich table formatting for regression reports
+
+    Tests:
+    - TestRegressionDetection::test_detect_regressions
+    - TestRegressionDetection::test_detect_no_regressions
+    - TestPerformanceTrends (trend analysis tests)
+
+  phases_completed:
+  - Baseline management (SQLite historical storage)
+  - Statistical testing (mean/median/stddev comparison)
+  - Threshold-based detection (configurable %)
+  - CLI alerting (colored output, tables)
+  - Trend detection (up/down/stable)
+
+  note: |
+    This functionality was implemented as part of the Ranking & Aggregation System.
+    The regression detection is integrated with the result database and accessible
+    via the `benchbox report regressions` CLI command.
+
+metadata:
+  estimated_effort: 2 weeks (0.5 FTE)
+  budget: $8K-11K
+  due_date: '2027-02-01'
+  blocking_posts: 'Week 87: Platform Reliability ($340)'
+
+success_metrics:
+- Automated regression detection - ACHIEVED (detect_regressions() method)
+- Baseline management - ACHIEVED (SQLite historical storage)
+- Statistical testing - ACHIEVED (mean, median, stddev)
+- Alerting - ACHIEVED (CLI output with colors)

@@ -1,0 +1,115 @@
+id: single-repo-migration-decisions-gate
+title: "Single-repo migration: decisions gate (D1-D8) before any code or repo changes"
+worktree: main
+priority: Critical
+status: Completed
+completed_date: 2026-04-27
+category: Release Tooling
+
+description: |
+  Starting gate for the single-repo migration (Option B). Eight decisions
+  must be made and recorded before Phase 0 begins. Some decisions can be
+  revisited based on Phase 0 audit findings (notably D2a: filter-merge vs
+  working-tree-only for _project/**, which depends on whether gitleaks finds
+  anything in _project/**'s history).
+
+  This is a no-code item. Output: a one-page decisions doc committed to the
+  repo so future-you and any collaborators can see why each choice was made.
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md
+
+  Decisions to make:
+
+  - D1: Which GitHub repo URL becomes canonical?
+    Recommended: existing joeharris76/BenchBox (current public) stays
+    canonical. Archive joeharris76/benchbox-private after dev locus
+    migrates. No rename, no visibility flip — avoids the only
+    irreversible step.
+
+  - D2: Bulk private commit history — preserve or leave behind?
+    Recommended: leave behind. Bring working-tree contents only via one
+    final curated sync. No concrete archaeological value identified for
+    ~year of solo private commits; removes audit burden on every
+    wip/hack/temp commit message.
+
+  - D2a: TODO/DONE history specifically?
+    Recommended: preserve via git filter-repo --path _project/ then merge
+    with --allow-unrelated-histories. _project/ contents are decision
+    rationale with long-term value. Reconfirm after Phase 0 audit findings.
+
+  - D3: Where do _project/TODO and _project/DONE live?
+    Recommended: on main, excluded from wheel.
+
+  - D4: Where do _blog/drafts/ live?
+    Recommended: on main, excluded from wheel; or in a wip/ branch that
+    never merges. Working-tree only (no history preserved).
+
+  - D5: Merge strategy on main?
+    Recommended: squash-merge only — with one explicit exception: the
+    Phase 4 _project/** filter-merge PR uses a regular merge commit
+    (squashing would defeat the history-preservation purpose).
+
+  - D6: Continuous CI surface?
+    Recommended: every push to main, every PR.
+
+  - D7: Reproducibility apparatus?
+    Recommended: keep SOURCE_DATE_EPOCH from tag commit; drop the rest of
+    the timestamp normalization machinery.
+
+  - D8: /Users/joe/Developer/BenchBox (private clone) disposition after Phase 5?
+    Recommended: rename to BenchBox.retired-YYYYMMDD/ to prevent shell
+    muscle-memory mistakes; delete after 60-day soak. Future development
+    happens in ~/Developer/benchbox-public (optionally renamed/symlinked
+    to /Users/joe/Developer/BenchBox if you want the canonical path back).
+
+work:
+- id: w1
+  summary: "Read /Users/joe/.claude/plans/single-repo-migration.md fully and the rationale tables"
+  status: done
+  notes: |
+    The plan covers each decision with the recommendation and trade-off.
+    Spend time on D2/D2a (history strategy) and D4 (drafts location) as
+    they have the highest variance in possible answers.
+
+- id: w2
+  summary: "Write the decisions doc at _project/decisions/single-repo-migration.md"
+  needs: [w1]
+  status: done
+  notes: |
+    Format: one paragraph context, then a table with columns
+    (ID, Decision, Choice, Reason). Keep under one page.
+    For each D1-D8: record the choice and a short reason. If you
+    deviated from the recommendation, write down why.
+
+- id: w3
+  summary: "Commit decisions doc on a feature branch, open PR, self-review, merge"
+  needs: [w2]
+  status: done
+  notes: |
+    Lands on private via the curated flow (since dev locus is still on
+    private at this point). It will arrive on public as part of the
+    Phase 4 _project/** filter-merge.
+
+verification:
+- description: "Decisions doc exists and lists all of D1-D8 with explicit choices"
+  command: "test -f _project/decisions/single-repo-migration.md && grep -c '^| D[1-8]' _project/decisions/single-repo-migration.md"
+  expected_output: "8"
+
+must_preserve:
+- This item is a gate, not a refactor. Nothing changes in the codebase except the new decisions doc.
+- The plan file remains the source of truth for the migration; the decisions doc only records the per-decision answers.
+
+anti_patterns:
+- DO NOT skip D1 reconfirmation - because Option B (current public stays canonical) is the load-bearing assumption of
+  the entire plan; if this decision flips back to Option A (rename + flip), the plan and 10 other TODOs need rewriting.
+- DO NOT skip D2a (TODO/DONE history) - because it determines whether Phase 4 includes a filter-merge step or whether
+  _project/** is just working-tree synced. The mechanics differ substantially.
+- DO NOT defer the decisions doc until after Phase 0 - because then there is no gate; the audit happens with implicit
+  assumptions instead of explicit choices.
+
+scope_limit:
+  only_modify:
+  - _project/decisions/single-repo-migration.md  # new file
+  notes: |
+    Do NOT touch any source code, scripts, or other docs. This item is
+    scope-limited to writing one decision document.

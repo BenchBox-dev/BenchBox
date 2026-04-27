@@ -1,0 +1,169 @@
+id: bidirectional-repo-sync-v2
+title: "Bidirectional Repository Sync (Redesigned)"
+worktree: "release-sync"
+priority: "High"
+status: "Completed"
+category: "Core Functionality"
+completed_date: "2026-01-18"
+
+description: |
+  Implement bidirectional sync between private (BenchBox) and public (BenchBox-public)
+  repositories. This is a redesign after the previous implementation failed due to:
+  - Building separate filtering logic that ignored DOCS_DIR_EXCLUDES, CLAUDE_DIR_EXCLUDES
+  - Copying files without committing them
+  - No awareness of which version was newer
+  - Silently overwriting public repo changes
+
+  The new design reuses existing prepare_release.py infrastructure and always commits
+  after sync operations.
+
+completion_summary: |
+  Implemented bidirectional repository sync with ~280 lines of new code (workflow.py: ~200 lines,
+  sync_repos.py: ~370 lines). All success metrics met:
+  - status command correctly excludes docs/_build, .claude/settings.local.json, and FORBIDDEN_PATTERNS
+  - push command creates git commit in public repo
+  - Conflicts detected and require --force to overwrite
+  - 31 unit tests passing
+
+tasks:
+  phases:
+  - phase: "Phase 1: Core Functions in workflow.py"
+    done: true
+    items:
+    - summary: "Add get_syncable_files() function"
+      done: true
+      subtasks:
+      - summary: "Implement file enumeration using ALLOWED_ROOT_FILES"
+        done: true
+      - summary: "Apply DOCS_DIR_EXCLUDES, CLAUDE_DIR_EXCLUDES, GLOBAL_EXCLUDES"
+        done: true
+      - summary: "Filter out FORBIDDEN_PATTERNS"
+        done: true
+    - summary: "Add compare_repos() function"
+      done: true
+      subtasks:
+      - summary: "Detect files added (in private, not in public)"
+        done: true
+      - summary: "Detect files modified (differ between repos)"
+        done: true
+      - summary: "Detect files deleted (in public, not in private)"
+        done: true
+      - summary: "Detect conflicts (modified in both)"
+        done: true
+    - summary: "Add apply_transforms() for bidirectional transformations"
+      done: true
+
+  - phase: "Phase 2: Sync CLI Script"
+    done: true
+    items:
+    - summary: "Create scripts/sync_repos.py"
+      done: true
+    - summary: "Implement 'status' command (read-only diff)"
+      done: true
+    - summary: "Implement 'push' command (private → public + commit)"
+      done: true
+      subtasks:
+      - summary: "Verify public repo is clean"
+        done: true
+      - summary: "Fetch latest from public origin"
+        done: true
+      - summary: "Apply transforms and copy files"
+        done: true
+      - summary: "Git add + commit in public repo"
+        done: true
+    - summary: "Implement 'pull' command (public → private, no commit)"
+      done: true
+      subtasks:
+      - summary: "Reverse transforms when copying"
+        done: true
+      - summary: "Show summary for user review"
+        done: true
+    - summary: "Add --dry-run, --force, --message options"
+      done: true
+
+  - phase: "Phase 3: Testing and Validation"
+    done: true
+    items:
+    - summary: "Add unit tests for get_syncable_files()"
+      done: true
+      subtasks:
+      - summary: "Test docs/_build is excluded"
+        done: true
+      - summary: "Test .claude/settings.local.json is excluded"
+        done: true
+      - summary: "Test FORBIDDEN_PATTERNS are excluded"
+        done: true
+    - summary: "Add unit tests for compare_repos()"
+      done: true
+      subtasks:
+      - summary: "Test conflict detection"
+        done: true
+      - summary: "Test transform application"
+        done: true
+    - summary: "Manual integration testing"
+      done: true
+      subtasks:
+      - summary: "Verify status shows correct differences"
+        done: true
+      - summary: "Verify push creates commit"
+        done: true
+      - summary: "Verify pull does not auto-commit"
+        done: true
+
+  - phase: "Phase 4: Documentation"
+    done: true
+    items:
+    - summary: "Update release/RELEASE_AUTOMATION.md"
+      done: true
+    - summary: "Add usage examples to CLI --help"
+      done: true
+
+metadata:
+  owners:
+  - "joeharris76"
+  tags:
+  - "release-automation"
+  - "sync"
+  - "infrastructure"
+  estimated_effort: "2-3 days"
+  created_date: "2026-01-18"
+
+impact:
+  business_value: |
+    Enables incremental releases without full tree replacement. Allows importing
+    external contributions from the public repo back to private.
+  user_impact: |
+    Faster bug fix releases. Ability to accept community contributions.
+  technical_debt: |
+    Replaces failed sync implementation with simpler, more robust design that
+    reuses existing infrastructure.
+
+files_affected:
+  modified:
+  - "benchbox/release/workflow.py"
+  - "benchbox/release/__init__.py"
+  - "release/RELEASE_AUTOMATION.md"
+  added:
+  - "scripts/sync_repos.py"
+  - "tests/unit/test_release_sync.py"
+
+context_sections:
+  "Lessons from Failed Implementation": |
+    The previous sync module (benchbox/release/sync.py) was removed because:
+    1. Built separate filtering logic that duplicated and diverged from prepare_release.py
+    2. Left 1000+ files uncommitted in public repo
+    3. Overwrote newer .github/workflows files with older versions
+    4. ~800 lines of code that should have been ~200 lines
+
+  "Design Principles": |
+    1. Reuse prepare_release.py infrastructure for filtering
+    2. Always commit after sync (never leave uncommitted files)
+    3. Git-based diff for direction awareness
+    4. Minimal new code - extend existing scripts
+    5. Explicit conflict handling - never silently overwrite
+
+success_metrics:
+- "status command shows docs/_build is NOT included ✓"
+- "push command creates git commit in public repo ✓"
+- "Conflicts are detected and require --force to overwrite ✓"
+- "~200 lines of new code (not 800) ✓ - actual: ~280 lines workflow.py + 370 lines CLI"

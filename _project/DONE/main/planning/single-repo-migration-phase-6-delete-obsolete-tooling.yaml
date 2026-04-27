@@ -1,0 +1,174 @@
+id: single-repo-migration-phase-6-delete-obsolete-tooling
+title: "Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: 2026-04-27
+category: Release Tooling
+
+deps:
+  needs:
+  - single-repo-migration-phase-5-repo-flip
+
+description: |
+  After the dev locus migration and v0.3.0 release on the new flow, delete
+  the now-obsolete machinery:
+    - 6 release scripts in scripts/
+    - benchbox/release/sync.py, workflow.py, content_validation.py
+    - HOLD_BACK_PATHS, ALLOWED_ROOT_FILES, _SOURCES_INCLUDE_PATHS,
+      transforms, etc. - all of it
+    - test files that covered held-back code or release machinery
+
+  Net effect: thousands of lines deleted. The repo gets simpler; future
+  contributors have less surface area to learn.
+
+  This phase lands as a normal PR on public from ~/Developer/benchbox-public
+  (the new dev locus). Squash-merge.
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 6).
+
+work:
+- id: w1
+  summary: "Inventory consumers of the modules being deleted"
+  status: done
+  notes: |
+    rg -l 'benchbox\.release\.(sync|workflow|content_validation)' --type py
+    rg -l 'automate_release|prepare_release|finalize_release|verify_release|build_release|sync_repos|benchbox-sync' --type py --type md --type yaml
+    Make a list. Each hit is either a deletion or an edit (to remove
+    the reference).
+
+- id: w2
+  summary: "Delete the 6 release scripts and the .github/workflows entries that reference them"
+  needs: [w1]
+  status: done
+  notes: |
+    git rm scripts/automate_release.py
+    git rm scripts/prepare_release.py
+    git rm scripts/finalize_release.py
+    git rm scripts/verify_release.py
+    git rm scripts/build_release.py
+    git rm scripts/sync_repos.py
+    Check .github/workflows/ for any workflow that calls these scripts
+    (results-explorer-browser.yml? others?). Update or delete as needed.
+
+- id: w3
+  summary: "Delete benchbox/release/sync.py, workflow.py, content_validation.py"
+  needs: [w1]
+  status: done
+  notes: |
+    git rm benchbox/release/sync.py
+    git rm benchbox/release/workflow.py
+    Check benchbox/release/__init__.py - delete release-specific exports.
+    For content_validation.py: if you want em-dash checks, move them
+    into a pre-commit hook or CI step, then delete the module. If you
+    do not, just delete.
+    git rm benchbox/release/content_validation.py
+
+- id: w4
+  summary: "Delete test files for the now-gone code"
+  needs: [w3]
+  status: done
+  notes: |
+    git rm -r tests/unit/release/
+    git rm tests/unit/test_release_scripts.py
+    git rm tests/unit/test_release_size_check.py
+    git rm tests/unit/test_release_exclusion_invariants.py
+    git rm tests/unit/test_release_fingerprint.py
+    git rm tests/unit/test_release_timestamps.py
+    git rm tests/unit/test_release_sync.py
+    Check tests/unit/test_xdist_safety.py - was it held back? If yes,
+    either keep (now public) or delete with the rest.
+
+- id: w5
+  summary: "Update pyproject.toml to remove benchbox-sync entry point and excludes pointing at deleted paths"
+  needs: [w2, w3]
+  status: done
+  notes: |
+    Search pyproject.toml for benchbox-sync, benchbox.release, and any
+    other references to deleted code. Remove [project.scripts]
+    benchbox-sync entry if present. Trim hatch/setuptools excludes
+    that pointed at now-deleted paths (e.g., benchbox/release/**
+    is moot if benchbox/release/ no longer exists).
+
+- id: w6
+  summary: "Trim or delete update_version.py imports"
+  needs: [w5]
+  status: done
+  notes: |
+    update_version.py is kept (used by Makefile release target).
+    Audit its imports - it should not depend on workflow.py or sync.py.
+    If it does (per automate_release.py:34-41 it uses
+    DOCUMENTATION_PATHS, update_landing_page_version, etc.), keep
+    those self-contained inside update_version.py.
+
+- id: w7
+  summary: "Run the full test suite and lint, fix import errors and reference cleanups"
+  needs: [w2, w3, w4, w5, w6]
+  status: done
+  notes: |
+    uv run -- python -m pytest -m fast
+    uv run ruff check .
+    uv run ruff format --check .
+    uv run ty check
+    Expect import errors in remaining files that referenced the
+    deleted modules. Each error is either a stale import to delete
+    or a function call to remove.
+
+- id: w8
+  summary: "Retire the three obsolete TODOs created earlier today"
+  needs: [w7]
+  status: done
+  notes: |
+    These three were superseded by this migration:
+      - unify-public-path-curation-predicate
+      - integrate-public-divergence-preflight-into-automate-release
+      - add-maintainer-release-guide
+    They were already moved to DONE during the same session that
+    created this TODO. Verify their location and delete the planning
+    files if any leftover.
+
+verification:
+- description: "scripts/ no longer contains release machinery"
+  command: "ls scripts/ | grep -E 'automate_release|prepare_release|finalize_release|verify_release|build_release|sync_repos'
+    | wc -l"
+  expected_output: "0"
+- description: "benchbox/release/ no longer contains sync or workflow modules"
+  command: "ls benchbox/release/ 2>/dev/null | grep -E 'sync\\.py|workflow\\.py|content_validation\\.py' | wc -l"
+  expected_output: "0"
+- description: "Full test suite passes"
+  command: "uv run -- python -m pytest -m fast"
+  expected_output: "all green"
+- description: "No remaining references to deleted modules"
+  command: "rg -l 'benchbox\\.release\\.(sync|workflow|content_validation)' --type py | wc -l"
+  expected_output: "0"
+
+must_preserve:
+- The actual benchbox package functionality (CLI, MCP, platforms, benchmarks) is unchanged. Only the release-machinery 
+  is removed.
+- update_version.py is retained - the Makefile release target uses it.
+- generate_changelog_entry.py from Phase 3 is retained - the Makefile release target uses it.
+- benchbox/release/__init__.py may be retained as an empty stub if the package import structure relies on it; otherwise 
+  delete the whole directory.
+
+anti_patterns:
+- DO NOT skip the test-suite run in w7 - because deleting modules silently breaks importers; tests are the cheapest way 
+  to find them.
+- DO NOT keep "just in case" wrappers around deleted scripts - because they accumulate; if you need any of these scripts
+  back, pull them from git history.
+- DO NOT delete update_version.py - because the new release flow depends on it; check it has no transitive imports of 
+  the deleted modules first (w6).
+- DO NOT delete tests/unit/test_xdist_safety.py without checking - because it tested xdist behaviour that may still 
+  apply to the ambient CI in Phase 2; review before removing.
+
+scope_limit:
+  only_modify:
+  - scripts/  # delete listed files
+  - benchbox/release/  # delete listed files
+  - tests/unit/release/  # delete entire directory
+  - tests/unit/test_release_*.py  # delete listed files
+  - pyproject.toml  # remove entry points and stale excludes
+  - .github/workflows/  # update or delete workflows that called deleted scripts
+  notes: |
+    Do NOT delete update_version.py, generate_changelog_entry.py,
+    or any non-release script. Touch the actual benchbox/ package
+    contents only via the release/__init__.py if it needs trimming.

@@ -1,0 +1,72 @@
+id: implement-tpcds-obt-dataframe-queries
+title: Implement TPC-DS-OBT DataFrame Query Families
+worktree: dataframe-benchmarks
+priority: Medium-High
+status: Completed
+completed_date: '2026-02-07'
+description: 'Implement DataFrame expression and pandas-family query implementations for
+
+  TPC-DS-OBT using OBT-specific semantics.
+
+
+  This work should use the OBT SQL query manager as validation reference and
+
+  avoid assuming normalized TPC-DS join structures.
+
+  '
+category: Core Functionality
+tasks:
+  phases:
+  - phase: 'Phase 1: Query Family Scaffolding'
+    done: true
+    items:
+    - summary: Create tpcds_obt/dataframe_queries module structure
+      done: true
+    - summary: Register query implementations and metadata
+      done: true
+  - phase: 'Phase 2: Query Implementation'
+    done: true
+    items:
+    - summary: Implement expression-family queries in batches
+      done: true
+    - summary: Implement pandas-family queries in batches
+      done: true
+  - phase: 'Phase 3: Validation'
+    done: true
+    items:
+    - summary: Validate DataFrame outputs against OBT SQL outputs
+      done: true
+metadata:
+  owners:
+  - joe
+  tags:
+  - dataframe
+  - tpcds-obt
+  - implementation
+  estimated_effort: Large
+  created_date: '2026-02-07'
+  last_updated: '2026-02-07T00:00:00'
+sections:
+  Implementation Summary: 'Completed TPC-DS-OBT DataFrame query family integration and validation for
+
+    the implemented query set.
+
+
+    Delivered:
+
+    - Restored and finalized `tpcds_obt/dataframe_queries.py` module.
+
+    - Registered expression-family and pandas-family implementations for Q1-Q3.
+
+    - Kept benchmark wiring via `TPCDSOBTBenchmark.get_dataframe_queries()`.
+
+    - Added SQL-reference validation against OBT SQL equivalents using DuckDB.
+
+
+    Validation now covers:
+
+    - registry integrity,
+
+    - expression/pandas parity,
+
+    - parity with SQL reference outputs.'

@@ -1,0 +1,276 @@
+id: stackoverflow-benchmark
+title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+worktree: benchmark-expansion
+category: Benchmark Development
+priority: Low
+status: Not Started
+description: |
+  Implement a Stack Overflow benchmark using the publicly available Stack Exchange
+  data dumps. This benchmark provides a realistic multi-table OLAP workload based
+  on one of the world's largest Q&A platforms, featuring rich analytical patterns
+  including tag analysis, reputation systems, and temporal trends.
+
+  Stack Overflow is an excellent benchmark dataset because:
+  - Real-world data with natural distributions (highly skewed, long-tail)
+  - Multi-table schema with diverse join patterns
+  - Large scale: 630M+ rows across 7 tables, ~150-200 GB
+  - Rich analytical patterns: tags, reputation, temporal, text search
+  - Publicly accessible via multiple sources (BigQuery, ClickHouse, dumps)
+
+  Use cases covered:
+  - Tag popularity and co-occurrence analysis
+  - User reputation progression and engagement metrics
+  - Question/answer quality metrics
+  - Temporal trends and seasonal patterns
+  - Multi-table aggregations with complex joins
+
+context_sections:
+- name: Data Sources
+  summary: |
+    **Primary Access Methods:**
+    | Source | Access | Update Frequency | Cost |
+    |--------|--------|------------------|------|
+    | Data.StackExchange.com | Web SQL | Weekly | Free |
+    | BigQuery Public Dataset | SQL Query | Monthly | Free (1TB/month) |
+    | ClickHouse Example | Pre-loaded | Periodic | Free |
+    | XML Dumps | Download | Periodic | Free |
+    | Kaggle | Download | Variable | Free |
+
+    **Recommended for BenchBox:**
+    - BigQuery for development/testing (no download needed)
+    - Parquet conversion of XML dumps for local benchmarks
+    - ClickHouse pre-loaded format for analytics reference
+
+- name: Schema Structure
+  summary: |
+    **7 Core Tables:**
+
+    | Table | Rows | Description |
+    |-------|------|-------------|
+    | Posts | 59.8M | Questions and answers (PostTypeId=1,2) |
+    | Votes | 239.0M | Up/down/accept votes (largest table) |
+    | PostHistory | 160.8M | Edit/revision history |
+    | Comments | 90.4M | Discussion on posts |
+    | Badges | 51.3M | User achievements |
+    | Users | 22.5M | User profiles and reputation |
+    | PostLinks | 6.6M | Duplicate/related links |
+
+    **Key Relationships:**
+    - Posts.OwnerUserId -> Users.Id
+    - Votes.PostId -> Posts.Id
+    - Comments.PostId -> Posts.Id
+    - Badges.UserId -> Users.Id
+    - PostHistory.PostId -> Posts.Id
+
+    **Storage:**
+    - Parquet (compressed): 38-67 GB
+    - Uncompressed: ~150-200 GB
+
+- name: Query Workload Categories
+  summary: |
+    **Tag Analysis (5+ queries):**
+    - Top tags by question count
+    - Tag popularity trends over time
+    - Tag co-occurrence patterns
+    - Tag-specific answer rates
+
+    **User Reputation (4+ queries):**
+    - User reputation progression
+    - Top contributors by tag
+    - Badge distribution and rarity
+    - Activity patterns analysis
+
+    **Temporal Trends (4+ queries):**
+    - Question/answer volume by time
+    - Response time analysis
+    - Seasonal activity patterns
+    - Year-over-year growth
+
+    **Content Quality (4+ queries):**
+    - Post score distributions
+    - Answer acceptance rates
+    - View-to-answer ratios
+    - Edit frequency patterns
+
+    **Complex Multi-Table (5+ queries):**
+    - Top answerers by tag (3-table join)
+    - User impact score calculation
+    - Post lifecycle analysis
+    - Cross-table aggregations
+
+- name: Scale Factor Design
+  summary: |
+    **TPC-aligned scale factors (SF=1 ≈ 1GB raw data):**
+
+    | Scale | Total Rows | Size (Raw) | Parquet | Use Case |
+    |-------|------------|------------|---------|----------|
+    | 0.01 | ~35K | ~10 MB | ~4 MB | CI/testing |
+    | 0.1 | ~350K | ~100 MB | ~40 MB | Development |
+    | 1.0 | ~3.5M | ~1 GB | ~400 MB | Standard |
+    | 10.0 | ~35M | ~10 GB | ~4 GB | Large scale |
+    | 100.0 | ~350M | ~100 GB | ~40 GB | Extended |
+    | Full | ~630M | ~175 GB | ~60 GB | Maximum |
+
+    **Scaling Strategy:**
+    - Time-based subset (recent years) to preserve join relationships
+    - Proportional sampling across tables maintaining foreign keys
+    - Avoid random sampling which breaks relationship integrity
+    - Full dataset (SF=Full) exceeds SF=100 convention due to fixed dataset size
+
+files_affected:
+- change_type: New
+  paths:
+  - benchbox/core/stackoverflow/__init__.py
+  - benchbox/core/stackoverflow/schema.py
+  - benchbox/core/stackoverflow/downloader.py
+  - benchbox/core/stackoverflow/queries.py
+  - benchbox/core/stackoverflow/benchmark.py
+  - tests/unit/core/stackoverflow/
+  - tests/integration/test_stackoverflow_duckdb.py
+
+- change_type: Modified
+  paths:
+  - benchbox/core/__init__.py
+  - benchbox/core/platform_registry.py
+  - benchbox/cli/commands/run.py
+
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - benchmark
+  - real-world
+  - stackoverflow
+  - olap
+  - multi-table
+  estimated_effort: 3-4 weeks
+  created_date: "2026-01-12"
+  dependencies:
+  - Existing NYC Taxi benchmark pattern (benchbox/core/nyctaxi/) for downloader/schema design
+  - BaseBenchmark class (benchbox/core/base.py) for benchmark integration
+  - TPC-H benchmark (benchbox/core/tpch/) for multi-table join patterns
+  notes: |
+    - ClickHouse has pre-loaded dataset for reference
+    - BigQuery offers free 1TB/month for development
+    - Body/Text fields require text search for some queries
+    - Read-only workload (no INSERT/UPDATE testing)
+    - Highly skewed distribution (power-law on reputation, views)
+
+  migration_review_required: true
+must_preserve:
+- "BaseBenchmark interface contract unchanged"
+- "Platform registry backward compatible"
+
+anti_patterns:
+- "DO NOT parse XML dumps at benchmark runtime - because XML parsing is 10-100x slower than Parquet reads - always pre-convert
+  to Parquet in the data generation phase"
+- "DO NOT require internet access for benchmark execution - because air-gapped environments exist - only the data acquisition
+  phase should download"
+
+verification:
+- description: "StackOverflow benchmark module imports"
+  command: "uv run -- python -c \"from benchbox.core.stackoverflow import StackOverflowBenchmark; print('OK')\""
+  expected_output: "OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/stackoverflow/ -v --tb=short"
+  expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/stackoverflow/"
+  - "tests/unit/core/stackoverflow/"
+  do_not_modify:
+  - "benchbox/core/runner.py"
+
+success_metrics:
+- All 7 tables loadable with referential integrity
+- 20+ analytical queries covering all categories
+- Scale factors from 0.01 (~10MB) to 100.0 (~100GB) working
+- DuckDB integration tests passing
+- Query execution under 30 seconds for SF=1.0 (~1GB, ~3.5M rows)
+work:
+- id: w1
+  summary: Design data acquisition strategy
+  status: pending
+  notes: "Options:\nA) Download XML dumps and convert to Parquet\nB) Export from BigQuery to GCS then download\nC) Use ClickHouse
+    pre-converted Parquet files\n\nRecommendation: Option C (ClickHouse Parquet) for simplicity,\nwith Option B as fallback
+    for freshest data\n"
+- id: w2
+  summary: Create stackoverflow module structure
+  status: pending
+  notes: "- benchbox/core/stackoverflow/__init__.py\n- benchbox/core/stackoverflow/schema.py\n- benchbox/core/stackoverflow/downloader.py\n\
+    - benchbox/core/stackoverflow/queries.py\n- benchbox/core/stackoverflow/benchmark.py\n"
+- id: w3
+  summary: Implement schema definitions
+  status: pending
+  notes: "Define dataclasses/schemas for all 7 tables:\n- Posts: Id, PostTypeId, CreationDate, Score, ViewCount, Body, Title,
+    Tags, OwnerUserId, AnswerCount\n- Users: Id, Reputation, DisplayName, Views, UpVotes, DownVotes, Location, CreationDate\n\
+    - Votes: Id, PostId, VoteTypeId, UserId, CreationDate\n- Comments: Id, PostId, Score, Text, UserId, CreationDate\n- Badges:
+    Id, UserId, Name, Class, Date\n- PostLinks: Id, PostId, RelatedPostId, LinkTypeId\n- PostHistory: Id, PostId, PostHistoryTypeId,
+    UserId, CreationDate\n"
+- id: w4
+  summary: Implement Parquet downloader
+  status: pending
+  notes: "- Download from ClickHouse S3 bucket or similar source\n- Validate checksums and file integrity\n- Support incremental
+    download for large files\n"
+- id: w5
+  summary: Implement scale factor sampling
+  status: pending
+  notes: "- Time-based sampling (e.g., last N years)\n- Maintain referential integrity across tables\n- Generate reproducible
+    subsets with seed\n"
+- id: w6
+  summary: Implement data loading for platforms
+  status: pending
+  notes: "- DuckDB: Direct Parquet loading\n- PostgreSQL: COPY from Parquet via DuckDB export\n- ClickHouse: Native Parquet
+    import\n- Snowflake: Stage and COPY INTO\n"
+- id: w7
+  summary: Implement tag analysis queries
+  status: pending
+  notes: "- so_top_tags: Top 20 tags by question count\n- so_tag_trends: Tag popularity over time (monthly)\n- so_tag_cooccurrence:
+    Common tag pairs\n- so_tag_answer_rate: Answer rate by tag\n- so_tag_score_distribution: Score distribution by top tags\n"
+- id: w8
+  summary: Implement user reputation queries
+  status: pending
+  notes: "- so_top_users: Highest reputation users\n- so_user_growth: Reputation progression over time\n- so_user_by_tag:
+    Top answerers per tag\n- so_badge_rarity: Badge distribution by class\n"
+- id: w9
+  summary: Implement temporal analysis queries
+  status: pending
+  notes: "- so_activity_by_month: Questions/answers over time\n- so_response_time: Time to first answer\n- so_seasonal_patterns:
+    Day-of-week, hour patterns\n- so_yoy_growth: Year-over-year metrics\n"
+- id: w10
+  summary: Implement content quality queries
+  status: pending
+  notes: "- so_score_distribution: Post score histogram\n- so_acceptance_rate: Answer acceptance by tag\n- so_view_answer_ratio:
+    Views per answer\n- so_edit_frequency: Edits per post by age\n"
+- id: w11
+  summary: Implement complex multi-table queries
+  status: pending
+  notes: "- so_user_impact: Combined reputation + votes + badges\n- so_post_lifecycle: Creation -> votes -> edits timeline\n\
+    - so_expert_identification: Multi-factor expertise scoring\n- so_community_health: Aggregated engagement metrics\n"
+- id: w12
+  summary: Implement StackOverflowBenchmark class
+  status: pending
+  notes: "- Inherit from BaseBenchmark\n- Handle multi-table data loading\n- Manage foreign key relationships\n- Implement
+    phases: generate, load, warmup, power\n"
+- id: w13
+  summary: Register benchmark with CLI
+  status: pending
+  notes: "- Add to platform_registry.py\n- Add to benchbox run --benchmark stackoverflow\n- Add scale factor validation\n"
+- id: w14
+  summary: Add platform-specific query variants
+  status: pending
+  notes: "- Handle text search differences (Body, Comments)\n- Handle datetime functions across platforms\n- Handle string
+    operations (Tags parsing)\n"
+- id: w15
+  summary: Create unit tests
+  status: pending
+  notes: "- Schema parsing tests\n- Query syntax validation\n- Scale factor calculation tests\n"
+- id: w16
+  summary: Create integration tests
+  status: pending
+  notes: "- DuckDB full workflow test\n- Data loading verification\n- Query execution and result validation\n"
+- id: w17
+  summary: Document benchmark
+  status: pending
+  notes: "- Query catalog documentation\n- Scale factor recommendations\n- Platform compatibility matrix\n"

@@ -1,0 +1,165 @@
+id: cloud-spark-dependency-groups
+title: "Cloud Spark Dependency Groups in pyproject.toml"
+worktree: platform-expansion
+priority: Medium-High
+status: Completed
+category: Core Functionality
+
+description: |
+  Add dependency groups for cloud Spark platforms to pyproject.toml.
+  Enables users to install platform-specific dependencies with
+  `uv add benchbox --extra cloud-spark-<provider>`.
+
+  **Current State (as of 2026-01-07):**
+  All 7 cloud Spark platform adapters are COMPLETE and registered:
+  - AWS: Glue, EMR Serverless, Athena Spark (all use boto3)
+  - GCP: Dataproc, Dataproc Serverless (use google-cloud-dataproc + storage)
+  - Azure: Synapse Spark, Fabric Spark (use azure-identity + datalake + requests)
+  - Snowflake: Snowpark Connect (uses snowflake-snowpark-python)
+
+  **Problem:**
+  The existing `cloud-spark` extra in pyproject.toml only includes Databricks
+  dependencies and has an outdated "Future: AWS Glue, EMR..." comment.
+  Provider-specific extras (cloud-spark-aws, cloud-spark-gcp, cloud-spark-azure)
+  don't exist.
+
+  **Scope:**
+  This TODO is ONLY about pyproject.toml dependency groups, not platform
+  implementation (which is already complete).
+
+tasks:
+  phases:
+  - phase: "Phase 1: Add Provider-Specific Dependency Groups"
+    done: true
+    items:
+    - summary: "Add cloud-spark-aws = [\"boto3>=1.34.0\"]"
+      done: true
+      notes: "Covers Glue, EMR Serverless, Athena Spark"
+    - summary: "Add cloud-spark-gcp = [\"google-cloud-dataproc>=5.0.0\", \"google-cloud-storage>=2.0.0\"]"
+      done: true
+      notes: "Covers Dataproc and Dataproc Serverless"
+    - summary: "Add cloud-spark-azure = [\"azure-identity>=1.15.0\", \"azure-storage-file-datalake>=12.14.0\", \"requests>=2.31.0\"\
+        ]"
+      done: true
+      notes: "Covers Synapse Spark and Fabric Spark"
+    - summary: "Add cloud-spark-snowflake = [\"snowflake-snowpark-python>=1.11.0\", \"pyspark>=3.5.0\"]"
+      done: true
+      notes: "For SnowparkConnectAdapter (already implemented)"
+
+  - phase: "Phase 2: Update cloud-spark Meta-Group"
+    done: true
+    items:
+    - summary: "Update cloud-spark to combine all provider deps + Databricks"
+      done: true
+      subtasks:
+      - summary: "Add boto3>=1.34.0 for AWS platforms"
+        done: true
+      - summary: "Add google-cloud-dataproc>=5.0.0, google-cloud-storage>=2.0.0 for GCP"
+        done: true
+      - summary: "Add azure-identity>=1.15.0, azure-storage-file-datalake>=12.14.0, requests>=2.31.0 for Azure"
+        done: true
+      - summary: "Add snowflake-snowpark-python>=1.11.0, pyspark>=3.5.0 for Snowflake"
+        done: true
+      - summary: "Keep existing Databricks deps (databricks-*, cloudpathlib)"
+        done: true
+      - summary: "Remove outdated '# Future: AWS Glue, EMR...' comment"
+        done: true
+
+  - phase: "Phase 3: Documentation"
+    done: true
+    items:
+    - summary: "Update docs/installation.md with new extras"
+      done: true
+      subtasks:
+      - summary: "Document cloud-spark-aws for AWS Glue/EMR/Athena Spark"
+        done: true
+      - summary: "Document cloud-spark-gcp for Dataproc platforms"
+        done: true
+      - summary: "Document cloud-spark-azure for Synapse/Fabric Spark"
+        done: true
+      - summary: "Document cloud-spark-snowflake for Snowpark Connect"
+        done: true
+      - summary: "Document cloud-spark for all-in-one installation"
+        done: true
+    - summary: "Add example combining extras (e.g., --extra cloud-spark-aws --extra athena)"
+      done: true
+
+  - phase: "Phase 4: Validation"
+    done: true
+    items:
+    - summary: "Test uv add benchbox --extra cloud-spark-aws works"
+      done: true
+    - summary: "Test uv add benchbox --extra cloud-spark-gcp works"
+      done: true
+    - summary: "Test uv add benchbox --extra cloud-spark-azure works"
+      done: true
+    - summary: "Test uv add benchbox --extra cloud-spark-snowflake works"
+      done: true
+    - summary: "Test uv add benchbox --extra cloud-spark installs all"
+      done: true
+
+metadata:
+  tags:
+  - cloud-spark
+  - dependencies
+  - pyproject
+  - documentation
+  estimated_effort: "Small"
+  created_date: "2025-12-24"
+  last_updated: "2026-01-07"
+  completed_date: "2026-01-07"
+
+impact:
+  business_value: |
+    Users can install only the cloud provider dependencies they need rather
+    than installing everything. Reduces dependency bloat and installation
+    conflicts for single-cloud users.
+  user_impact: |
+    Clear installation path for each cloud provider:
+    - AWS users: `uv add benchbox --extra cloud-spark-aws`
+    - GCP users: `uv add benchbox --extra cloud-spark-gcp`
+    - Azure users: `uv add benchbox --extra cloud-spark-azure`
+    - Snowflake users: `uv add benchbox --extra cloud-spark-snowflake`
+    - Multi-cloud: `uv add benchbox --extra cloud-spark`
+
+files_affected:
+  modified:
+  - pyproject.toml
+  - docs/usage/installation.md
+
+success_metrics:
+- "uv add benchbox --extra cloud-spark-aws installs boto3"
+- "uv add benchbox --extra cloud-spark-gcp installs google-cloud-dataproc"
+- "uv add benchbox --extra cloud-spark-azure installs azure-identity"
+- "uv add benchbox --extra cloud-spark-snowflake installs snowflake-snowpark-python"
+- "uv add benchbox --extra cloud-spark installs all provider deps"
+- "docs/installation.md documents all cloud-spark extras"
+
+completion_notes: |
+  Implemented all cloud Spark dependency groups:
+
+  1. Added 5 provider-specific extras:
+     - cloud-spark-aws: boto3 for AWS Glue/EMR/Athena Spark
+     - cloud-spark-gcp: google-cloud-dataproc/storage for Dataproc
+     - cloud-spark-azure: azure-identity/datalake for Synapse/Fabric
+     - cloud-spark-snowflake: snowflake-snowpark-python for Snowpark
+     - cloud-spark-databricks: databricks-connect/sdk (new consistent naming)
+
+  2. Updated cloud-spark meta-group to include all provider dependencies
+
+  3. Added "Cloud Spark Platforms" section to docs/usage/installation.md
+     with table of extras and usage examples
+
+  4. Validated all extras resolve correctly via uv lock
+
+  Bonus: Added cloud-spark-databricks for naming consistency (answering
+  the open question about whether to add it).
+
+commits:
+- 630b8d11
+
+dependencies:
+  blocked_by:
+  - _project/DONE/platform-expansion/planning/synapse-spark-platform.yaml
+  - _project/DONE/platform-expansion/planning/dataproc-serverless-platform.yaml
+  - _project/DONE/platform-expansion/planning/athena-spark-platform.yaml

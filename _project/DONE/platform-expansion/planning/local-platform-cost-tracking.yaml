@@ -1,0 +1,154 @@
+# Local/Self-Hosted Platform Cost Tracking
+#
+# Location: _project/TODO/platform-expansion/planning/local-platform-cost-tracking.yaml
+
+# ============================================================================
+# REQUIRED FIELDS
+# ============================================================================
+
+id: local-platform-cost-tracking
+title: "Add cost tracking for local/self-hosted platforms"
+worktree: "platform-expansion"
+priority: "Low"
+status: "Completed"
+description: |
+  Local and self-hosted platforms (PostgreSQL, Trino, Presto, TimescaleDB, InfluxDB,
+  Spark, PySpark, DataFusion, SQLite, Polars) currently have no cost tracking.
+
+  While these platforms don't have direct per-query cloud costs, tracking execution
+  metrics enables:
+  - Resource usage comparison across platforms
+  - Compute-time-based cost estimation for on-prem infrastructure
+  - Consistent schema for all platforms in benchmark results
+
+  This is lower priority than cloud platform cost estimation since users of local
+  platforms typically aren't comparing query-level costs.
+
+# ============================================================================
+# COMMON OPTIONAL FIELDS
+# ============================================================================
+
+category: "Platform Expansion"
+
+tasks:
+  phases:
+  - phase: "Phase 1: Schema Definition"
+    done: false
+    items:
+    - summary: "Add all local platforms to RESOURCE_USAGE_SCHEMA"
+      done: false
+      subtasks:
+      - summary: "Add postgresql schema (execution_time_seconds, rows_processed)"
+        done: false
+      - summary: "Add trino/presto schema (execution_time, bytes_read, splits_processed)"
+        done: false
+      - summary: "Add timescaledb schema (execution_time_seconds, chunks_accessed)"
+        done: false
+      - summary: "Add influxdb schema (execution_time_seconds, series_scanned)"
+        done: false
+      - summary: "Add spark/pyspark schema (execution_time, shuffle_bytes, stages)"
+        done: false
+      - summary: "Add datafusion schema (execution_time_seconds)"
+        done: false
+      - summary: "Add sqlite schema (execution_time_seconds)"
+        done: false
+      - summary: "Add polars schema (execution_time_seconds, memory_usage)"
+        done: false
+
+  - phase: "Phase 2: Zero-Cost Handlers"
+    done: false
+    items:
+    - summary: "Extend existing duckdb/clickhouse pattern for local platforms"
+      done: false
+      subtasks:
+      - summary: "Group all local SQL platforms into zero-cost handler"
+        done: false
+      - summary: "Group all DataFrame platforms into zero-cost handler"
+        done: false
+      - summary: "Ensure QueryCost objects include execution metrics in pricing_details"
+        done: false
+
+  - phase: "Phase 3: Optional Compute-Time Costing"
+    done: false
+    items:
+    - summary: "Design optional compute_cost_per_hour config parameter"
+      done: false
+    - summary: "Implement time-based cost calculation for on-prem infrastructure"
+      done: false
+    - summary: "Document usage for users who want to estimate on-prem costs"
+      done: false
+
+metadata:
+  tags:
+  - "cost-estimation"
+  - "local-platforms"
+  - "self-hosted"
+  - "resource-tracking"
+  estimated_effort: "1-2 days"
+  created_date: "2024-12-24"
+  last_updated: "2026-01-07"
+
+completed_date: "2026-01-07"
+completion_summary: |
+  Implemented zero-cost tracking for all local/self-hosted platforms:
+
+  Phase 1 & 2 (Combined):
+  - Added RESOURCE_USAGE_SCHEMA definitions for 15 local platforms with
+    platform-appropriate optional metrics
+  - Extended _local_platforms set from 2 to 20 platforms
+  - All local platforms now return QueryCost(compute_cost=0.0) instead of None
+
+  Platforms added: postgresql, sqlite, timescaledb, trino, presto, influxdb,
+  spark, pyspark, datafusion, polars, polars-df, pandas-df, cudf-df, modin-df, dask-df
+
+  Phase 3 (Skipped):
+  - Optional compute-time costing deferred as YAGNI - users can estimate
+    on-prem costs externally if needed
+
+  Success metrics achieved:
+  - ✅ All platforms return QueryCost objects (not None)
+  - ✅ No "Cost calculation not supported" warnings for registered platforms
+  - ✅ 247 cost module tests passing
+
+impact:
+  business_value: |
+    Provides consistent cost tracking schema across all platforms, even when
+    the cost is zero. Enables future features like on-prem cost estimation.
+  user_impact: |
+    Users running local platforms will see consistent result schemas with
+    execution metrics in pricing_details, rather than missing cost data.
+  technical_debt: |
+    Reduces special-case handling in result processing code that currently
+    must handle missing cost fields for some platforms.
+
+files_affected:
+  modified:
+  - "benchbox/core/cost/calculator.py"
+
+context_sections:
+  "Background": |
+    Currently, only duckdb and clickhouse have zero-cost handlers in the
+    calculate_query_cost() method. All other local platforms fall through
+    to the "Cost calculation not supported" warning path.
+
+    This creates inconsistent behavior where some local platforms return
+    QueryCost(compute_cost=0.0) with metrics, while others return None.
+
+  "Platforms Affected": |
+    SQL Platforms:
+    - postgresql, sqlite, timescaledb, trino, presto
+
+    Distributed/Analytics:
+    - spark, pyspark, influxdb
+
+    DataFrame:
+    - datafusion, polars (cudf, pandas, modin, dask are dataframe-only)
+
+success_metrics:
+- "All platforms return QueryCost objects (not None) from calculate_query_cost()"
+- "Execution metrics included in pricing_details for all platforms"
+- "No 'Cost calculation not supported' warnings for registered platforms"
+
+open_questions:
+- "Should DataFrame-only platforms (pandas, dask, modin, cudf) have cost tracking?"
+- "What on-prem cost estimation formula makes sense? $/vCPU-hour? $/GB-hour?"

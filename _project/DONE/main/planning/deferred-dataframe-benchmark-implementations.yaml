@@ -1,0 +1,93 @@
+id: deferred-dataframe-benchmark-implementations
+title: "Deferred DataFrame Benchmark Implementations - Architecturally Complex Benchmarks"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-02-18"
+category: Benchmark Expansion
+description: |
+  Consolidates 6 deferred benchmark implementations from
+  implement-dataframe-benchmarks (completed 2026-02-18) and 3 DataFusion-specific
+  gaps from fix-read-primitives-datafusion-df (completed 2026-02-12).
+
+  These benchmarks were descoped because they don't map cleanly to the DataFrame
+  read-query model. Each needs dedicated architecture work before implementation.
+
+  DataFrame benchmark deferrals:
+  - TPC-DI (38 ops): ETL pipeline with mutation-heavy SCD Type 2 operations
+  - Write Primitives (109 ops): INSERT/UPDATE/DELETE/DDL - needs write-operation adapter layer
+  - TPC-DS-OBT (89 queries): Fully denormalized table doesn't map to TPC-DS DataFrame schema
+  - TPC-Havoc (220 queries): Tests SQL optimizer syntax rewriting - meaningless for DataFrames
+  - JoinOrder (113 queries): Tests SQL optimizer join ordering - DataFrames handle joins programmatically
+  - Read Primitives (136 queries): Catalog-driven architecture with DB-specific features
+
+  DataFusion v50 gaps:
+  - string_to_array returning actual list expressions (not split_part proxy)
+  - array_sum / list.sum() (no built-in; needs unnest+aggregate workaround)
+  - array_distinct Arrow type normalization (returns Dictionary instead of Utf8)
+
+context_sections:
+  "Architectural Analysis": |
+    The DataFrame benchmarking model assumes read-query semantics: load data into
+    DataFrames, execute analytical queries, validate results. Five of the six
+    deferred benchmarks violate this assumption:
+    - TPC-DI and Write Primitives require mutation (INSERT/UPDATE/DELETE)
+    - TPC-Havoc and JoinOrder test SQL optimizer behavior, not query results
+    - Read Primitives uses programmatic query generation from catalog metadata
+
+    TPC-DS-OBT is potentially feasible but needs a denormalization step that
+    doesn't exist in the current DataFrame loading pipeline.
+
+  "DataFusion Gaps": |
+    Three DataFusion DataFrame operations have incomplete support in v50.
+    These are upstream issues that may resolve with future DataFusion releases.
+    Monitor DataFusion changelog for string_to_array, array_sum, and
+    array_distinct fixes.
+
+metadata:
+  tags:
+  - dataframe
+  - benchmarks
+  - deferred-followup
+  - architecture
+  estimated_effort: "Large - each benchmark needs dedicated design"
+  created_date: "2026-02-18"
+  split_from_multiple:
+  - implement-dataframe-benchmarks
+  - fix-read-primitives-datafusion-df
+
+work:
+- id: w1
+  summary: "Evaluate TPC-DS-OBT feasibility - design denormalization step for DataFrame loading pipeline"
+  status: done
+  notes: |
+    Completed 2026-02-07 via dataframe-tpcds-obt-adaptation +
+    implement-tpcds-obt-dataframe-queries (DONE/dataframe-benchmarks/active/).
+
+- id: w2
+  summary: "Design write-operation adapter layer for DataFrame platforms (INSERT/UPDATE/DELETE semantics)"
+  status: done
+  notes: |
+    Completed 2026-02-07 via dataframe-write-primitives-model +
+    integrate-write-primitives-dataframe-mode + dataframe-write-primitives
+    (DONE/dataframe-benchmarks/active/ and DONE/dataframe-expansion/active/).
+
+- id: w3
+  summary: "Evaluate Read Primitives DataFrame approach - catalog-driven query generation with different architecture"
+  status: done
+  notes: |
+    Completed via dataframe-read-primitives-architecture +
+    integrate-read-primitives-dataframe-mode + dataframe-read-primitives-complete
+    (DONE/dataframe-benchmarks/active/ and DONE/dataframe-expansion/).
+
+- id: w4
+  summary: "Monitor DataFusion releases for string_to_array, array_sum, array_distinct fixes - update adapter when resolved"
+  status: done
+  notes: |
+    Resolved 2026-02-12 via fix-read-primitives-datafusion-df
+    (DONE/dataframe-benchmarks/active/). string_to_array and array_distinct fixed;
+    array_sum confirmed genuinely unsupported in DataFusion v50 - skipped with xfail.
+
+deferred:
+- summary: "TPC-Havoc and JoinOrder DataFrame implementations"
+  reason: "These benchmarks test SQL optimizer behavior (syntax rewriting, join ordering) which is meaningless for DataFrame execution. Likely never applicable to DataFrame mode."

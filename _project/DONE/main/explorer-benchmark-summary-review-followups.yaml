@@ -1,0 +1,118 @@
+id: explorer-benchmark-summary-review-followups
+title: "Address follow-up findings from benchmark-summary artifact code review"
+worktree: main
+priority: Low
+status: Completed
+completed_date: "2026-04-19"
+category: Core Functionality
+
+description: |
+  Non-required nits and improvements surfaced by the code review of
+  explorer-emit-benchmark-summary-artifact.  The two Required issues
+  (missing percentile_stats test, missing sort-order test) were fixed
+  immediately post-review.  This item tracks the remaining nit/consider findings.
+
+work:
+- id: w1
+  summary: "Consult RankingConfig.primary_order in _platform_row_sort_key"
+  needs: []
+  status: done
+  notes: |
+    pipeline.py:78-87 - _platform_row_sort_key hardcodes sort direction: negate
+    power_score (higher-is-better), use geomean_ms as-is (lower-is-better).
+    This is correct for all current benchmark families but duplicates logic
+    already encoded in RankingConfig.primary_order.
+
+    If a future family added a metric where the direction didn't match these
+    assumptions, the sort would silently be wrong.
+
+    Fix: pass `benchmark` name to _platform_row_sort_key and look up
+    get_ranking_config(benchmark).primary_order to derive the negation flag:
+      cfg = get_ranking_config(benchmark)
+      primary_val = getattr(row, cfg.primary_metric)
+      if primary_val is None:
+          return (ineligible, float("inf"))
+      metric = -primary_val if cfg.primary_order == "desc" else primary_val
+      return (ineligible, metric)
+
+    Note: _build_benchmark_summaries already has the benchmark name in scope
+    and already calls get_ranking_config(benchmark) at line 142.
+
+- id: w2
+  summary: "Filter empty strings from _natural_sort_key output"
+  needs: []
+  status: done
+  notes: |
+    pipeline.py:54-56 - re.split(r"(\d+)", s) produces empty strings between
+    number groups (e.g., "Q10" → ["", "Q", "10", ""]). Python's sort handles
+    empty strings correctly (they sort first), but the intent is clearer with:
+      return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", s) if c]
+
+    Low-risk: behavior is identical for all current query IDs.
+
+- id: w3
+  summary: "Document why percentile filter uses display_ms > 0 not >= 0"
+  needs: []
+  status: done
+  notes: |
+    transformer.py:272 - filter `dt.display_ms is not None and dt.display_ms > 0`
+    excludes zero-millisecond measurements. For extremely fast queries (sub-ms
+    rounded to 0), this would silently exclude them from percentile stats.
+
+    Fix: add a comment explaining the reason - presumably 0ms indicates a
+    timing error or warmup artifact, not a genuine instant result. If the
+    intent is to exclude non-positive values, document it. If 0ms is valid,
+    change to `>= 0`.
+
+- id: w4
+  summary: "Use Path.is_relative_to() for path-traversal guard"
+  needs: []
+  status: done
+  notes: |
+    pipeline.py:381,395 - Path traversal check uses string prefix:
+      if not str(detail_path).startswith(str(details_dir.resolve()) + "/"):
+
+    Python 3.9+ has Path.is_relative_to() which is more readable and avoids
+    the string manipulation:
+      if not detail_path.is_relative_to(details_dir.resolve()):
+
+    Functionally identical; Python ≥3.9 is already required by the project.
+
+- id: w5
+  summary: "Refactor _build_meta_leaderboard into smaller helpers"
+  needs: []
+  status: done
+  notes: |
+    pipeline.py:165-256 - _build_meta_leaderboard is ~90 lines with nested
+    functions and multiple accumulation passes. Consider extracting:
+      _rank_platforms_in_cohort(summary) → list[dict]
+      _compute_average_ranks(cohort_rows) → dict[str, float]
+
+    Not urgent; logic is correct and well-commented. Low value until the
+    function needs modification.
+
+files_affected:
+  modified:
+  - "benchbox/core/explorer_pipeline/pipeline.py"
+  - "benchbox/core/explorer_pipeline/transformer.py"
+
+must_preserve:
+- "_platform_row_sort_key behavior for all current benchmark families - only extensibility changes in w1"
+- "_natural_sort_key output for all current query IDs - empty-string filter is behavior-equivalent in w2"
+
+verification:
+- description: "Benchmark summary tests still pass"
+  command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/test_benchmark_summary.py -v -n 0"
+  expected_output: "16 passed"
+- description: "Full fast test suite green"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all green"
+
+anti_patterns:
+- "DO NOT change sort behavior in w1 for any currently-registered benchmark family - only the mechanism changes"
+
+metadata:
+  tags: ["explorer", "pipeline", "artifact", "review-followup"]
+  estimated_effort: "Tiny (< 1 hour)"
+  created_date: "2026-04-16"
+  source: "Code review of explorer-emit-benchmark-summary-artifact (2026-04-16)"

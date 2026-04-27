@@ -1,0 +1,99 @@
+id: graduate-browser-smoke-to-blocking-gates
+title: "Graduate Firefox and WebKit @smoke CI jobs to blocking gates"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Both `firefox-smoke` and `webkit-smoke` jobs in
+  `.github/workflows/results-explorer-browser.yml` run with
+  `continue-on-error: true`, making them advisory-only. This item
+  flips each to a blocking gate once it demonstrates sufficient CI
+  stability.
+
+  WebKit: the DuckDB-WASM init race was fixed in
+  `stabilize-webkit-browser-smoke-flake-under-parallel-workers` (w2) by
+  serializing workers. Gate is 10 consecutive green CI runs post-fix.
+
+  Firefox: no known active flake. Gate is the same 10-consecutive-green
+  criterion applied independently - Firefox may be ready before WebKit
+  if it is already passing consistently.
+
+  Each browser is flipped independently; do not wait for both before
+  promoting one.
+
+deps:
+  needs:
+    - stabilize-webkit-browser-smoke-flake-under-parallel-workers
+
+work:
+  - id: w1
+    summary: "Flip webkit-smoke to a blocking gate after 10 consecutive CI green runs"
+    status: pending
+    notes: |
+      Check the last 10 WebKit job conclusions:
+        gh run list --workflow=results-explorer-browser.yml --repo joeharris76/BenchBox \
+          --limit=15 --json databaseId \
+          | jq -r '.[].databaseId' \
+          | xargs -I{} gh api repos/joeharris76/BenchBox/actions/runs/{}/jobs \
+              --jq '.jobs[] | select(.name=="WebKit (@smoke, non-blocking)") | .conclusion' \
+          | head -10
+      Once all 10 lines are "success", remove `continue-on-error: true` from
+      the `webkit-smoke` job block in `.github/workflows/results-explorer-browser.yml`.
+
+  - id: w2
+    summary: "Flip firefox-smoke to a blocking gate after 10 consecutive CI green runs"
+    status: pending
+    notes: |
+      Check the last 10 Firefox job conclusions:
+        gh run list --workflow=results-explorer-browser.yml --repo joeharris76/BenchBox \
+          --limit=15 --json databaseId \
+          | jq -r '.[].databaseId' \
+          | xargs -I{} gh api repos/joeharris76/BenchBox/actions/runs/{}/jobs \
+              --jq '.jobs[] | select(.name=="Firefox (@smoke, non-blocking)") | .conclusion' \
+          | head -10
+      Once all 10 lines are "success", remove `continue-on-error: true` from
+      the `firefox-smoke` job block. Apply independently of w1.
+
+must_preserve:
+  - "The Chromium blocking gate is unaffected by either change."
+  - "Each browser is assessed independently - do not block one promotion on the other."
+
+anti_patterns:
+  - "DO NOT flip on a calendar or release schedule - because promoting before the run is stable will make the gate unreliable and erode trust in CI - gate strictly on the 10-consecutive-green criterion."
+  - "DO NOT flip both browsers in a single commit if their thresholds are reached at different times - because batching obscures which browser caused any subsequent regression - flip each in its own commit."
+
+verification:
+  - description: "Last 10 WebKit job conclusions are all success"
+    command: "gh run list --workflow=results-explorer-browser.yml --repo joeharris76/BenchBox --limit=15 --json databaseId | jq -r '.[].databaseId' | xargs -I{} gh api repos/joeharris76/BenchBox/actions/runs/{}/jobs --jq '.jobs[] | select(.name==\"WebKit (@smoke, non-blocking)\") | .conclusion' | head -10"
+    expected_output: "10 lines of \"success\""
+  - description: "Last 10 Firefox job conclusions are all success"
+    command: "gh run list --workflow=results-explorer-browser.yml --repo joeharris76/BenchBox --limit=15 --json databaseId | jq -r '.[].databaseId' | xargs -I{} gh api repos/joeharris76/BenchBox/actions/runs/{}/jobs --jq '.jobs[] | select(.name==\"Firefox (@smoke, non-blocking)\") | .conclusion' | head -10"
+    expected_output: "10 lines of \"success\""
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/results-explorer-browser.yml"
+  do_not_modify:
+    - "results-explorer/src/"
+    - "results-explorer/playwright.config.ts"
+
+metadata:
+  tags:
+    - "results"
+    - "explorer"
+    - "testing"
+    - "browser"
+    - "ci"
+    - "webkit"
+    - "firefox"
+  estimated_effort: "Trivial"
+  created_date: "2026-04-19"
+
+impact:
+  business_value: |
+    Closes the cross-browser coverage story - Safari and Firefox
+    regressions become release-blocking, not advisory.
+  technical_debt: |
+    Removes two `continue-on-error` workarounds from the CI matrix.

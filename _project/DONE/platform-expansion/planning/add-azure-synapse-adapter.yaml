@@ -1,0 +1,133 @@
+id: add-azure-synapse-adapter
+title: Add Azure Synapse Adapter
+worktree: platform-expansion
+priority: Medium
+status: Completed
+description: Build an adapter for Azure Synapse Dedicated SQL Pools to complete coverage of the major cloud data warehouses.
+context_sections:
+- name: Azure Gap
+  summary: Microsoft-focused organisations require Synapse benchmarks to compare against Snowflake, Databricks, and Redshift.
+impact: Unlocks Azure-centric evaluations, enabling BenchBox for enterprises standardised on the Microsoft ecosystem.
+research_value: Document Synapse-specific staging (PolyBase) and concurrency behaviours for reproducible benchmarking.
+tasks:
+- phase: '"Environment & Access Research"'
+  items:
+  - summary: Map authentication flows (service principal, managed identity, SQL auth) and required Azure resources.
+    done: false
+  - summary: Prototype bulk data staging via ADLS/Blob storage and confirm required firewall/network rules.
+    done: false
+- phase: '"Schema & Dialect Review"'
+  items:
+  - summary: Audit SQL dialect differences (hash distribution keys, clustered columnstore indexes, temporary tables).
+    done: false
+  - summary: Define Synapse-specific configuration (DWU sizing, resource classes) for benchmarks.
+    done: false
+- phase: Adapter Implementation
+  items:
+  - summary: Implement SynapsePlatformAdapter using appropriate client libraries with resilient job polling.
+    done: false
+  - summary: Handle PolyBase or COPY INTO data ingestion from staging storage with retry logic.
+    done: false
+- phase: '"Integration & Docs"'
+  items:
+  - summary: Register platform in CLI, dependency checks, and add configuration samples for infrastructure-as-code setups.
+    done: false
+  - summary: Publish onboarding guide covering workspace creation, security, and cost controls.
+    done: false
+- phase: '"Testing & Validation"'
+  items:
+  - summary: Add integration tests exercising data generation, load, and power runs against dedicated SQL pool SKUs.
+    done: false
+  - summary: Verify benchmark outputs match expected row counts and numeric tolerances.
+    done: false
+- phase: Performance Benchmarking
+  items:
+  - summary: Produce baseline throughput/cost comparisons versus Snowflake and Redshift for documentation.
+    done: false
+technical_requirements:
+- category: '"Authentication & Security"'
+  items:
+  - Support service principals, managed identities, and SQL logins with secure secret handling.
+- category: Data Staging
+  items:
+  - Integrate with ADLS Gen2/Blob storage for PolyBase-friendly staging and cleanup.
+- category: Dialect Support
+  items:
+  - Translate benchmark DDL/DML to Synapse T-SQL, including distribution styles and index hints.
+- category: Telemetry
+  items:
+  - Capture DWU usage, query stats, and cost insights for result exports.
+files_affected:
+  modified:
+  - benchbox/platforms/azure_synapse.py
+  - docs/platforms/azure-synapse.md
+  - benchbox/platforms/__init__.py
+  - benchbox/utils/dependencies.py
+  - docs/platforms/platform-selection-guide.md
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '"@benchbox-maintainers"'
+  tags:
+  - platform
+  - azure
+completion:
+  date: '2025-11-29'
+  commits:
+  - 911e5aea: 'feat: add Azure Synapse Analytics platform adapter with COPY INTO loading'
+  implementation_notes: 'Implemented full AzureSynapseAdapter with:
+
+
+    Core Features:
+
+    - Connection management with SQL auth, AAD password, and Managed Identity
+
+    - COPY INTO-based bulk data loading via Azure Blob Storage
+
+    - EXPLAIN for query plan capture
+
+    - Database creation/drop with proper identifier handling
+
+    - Distribution key and clustered columnstore index optimization
+
+    - Result cache control for accurate benchmarking
+
+
+    Platform Integration:
+
+    - Added AzureSynapseAdapter to platform registry and auto-registration
+
+    - Added synapse to platform_mapping and requirements
+
+    - Added synapse metadata to PlatformRegistry
+
+    - Added synapse extra to pyproject.toml
+
+    - Added synapse DependencyInfo in dependencies.py
+
+    - Registered config builder and platform options
+
+
+    Tests: 27 unit tests covering:
+
+    - Initialization and configuration
+
+    - Connection string generation for different auth methods
+
+    - Database existence checking and management
+
+    - Query execution and plan capture
+
+    - Data loading with COPY INTO and direct INSERT fallback
+
+    - SQL identifier extraction and table optimization
+
+
+    Files Created:
+
+    - benchbox/platforms/azure_synapse.py (main adapter)
+
+    - tests/unit/platforms/test_azure_synapse_adapter.py (27 tests)
+
+    '

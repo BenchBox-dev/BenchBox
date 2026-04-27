@@ -1,0 +1,122 @@
+# Apache Doris All-in-One Docker Compose
+# Uses the official all-in-one image (FE + BE in a single container)
+#
+# Usage:
+#   docker compose -f docker-compose.yml up -d
+#   DORIS_HOST=localhost DORIS_PORT=19031 DORIS_HTTP_PORT=18030 \
+#     benchbox run --platform doris --benchmark tpch --scale 0.01
+#
+# Ports:
+#   19031 (default host) -> 9030 - MySQL protocol (query interface)
+#   18030 (default host) -> 8030 - HTTP API (Stream Load, Web UI)
+#
+# Default credentials:
+#   Username: root
+#   Password: (empty)
+
+services:
+  doris:
+    image: apache/doris:4.0.3-all-slim
+    # Patch memory config before starting Doris processes:
+    #   - FE default heap is -Xmx8192m which exhausts a shared container;
+    #     cap it at 1536m (FE only manages metadata, not query execution).
+    #   - BE mem_limit: cap at 8g and raise load percent limits so
+    #     MemTableMemoryLimiter does not throttle stream loads early.
+    # The bootstrap helper rewrites existing values in place or appends them if
+    # missing, so restarts converge on the intended config instead of keeping
+    # stale values from previous container runs.
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        set_conf() {
+          local file="$$1"
+          local key="$$2"
+          local value="$$3"
+          if grep -Eq "^[[:space:]]*$${key}[[:space:]]*=" "$$file"; then
+            sed -i -E "s|^[[:space:]]*$${key}[[:space:]]*=.*$$|$${key} = $${value}|" "$$file"
+          else
+            printf '%s = %s\n' "$$key" "$$value" >> "$$file"
+          fi
+        }
+
+        detect_java_home() {
+          local java_bin
+          java_bin="$$(command -v java)"
+          if [ -z "$$java_bin" ]; then
+            echo "ERROR: java not found on PATH inside Doris container" >&2
+            exit 1
+          fi
+          java_bin="$$(readlink -f "$$java_bin" 2>/dev/null || printf '%s\n' "$$java_bin")"
+          dirname "$$(dirname "$$java_bin")"
+        }
+
+        # Doris BE 4.x requires vm.max_map_count > 2000000 for memory-mapped files.
+        # Docker Desktop on macOS doesn't support vm.* via container sysctls (not
+        # namespaced), so this wrapper checks the current value first and only
+        # needs DORIS_PRIVILEGED=true when the Docker VM still needs help.
+        current_map_count="$$(cat /proc/sys/vm/max_map_count 2>/dev/null || echo 0)"
+        if [ "$$current_map_count" -lt 2000000 ]; then
+          if ! sysctl -w vm.max_map_count=2000000 >/dev/null 2>&1; then
+            echo "ERROR: vm.max_map_count=$$current_map_count is below Doris' required minimum of 2000000." >&2
+            echo "Either start with DORIS_PRIVILEGED=true or preconfigure the Docker VM once with vm.max_map_count=2000000." >&2
+            exit 1
+          fi
+        fi
+        current_nofile="$$(ulimit -n 2>/dev/null || echo 0)"
+        if [ "$$current_nofile" -lt 60000 ]; then
+          echo "ERROR: ulimit -n=$$current_nofile is below Doris' required minimum of 60000." >&2
+          echo "Increase the container nofile limit before starting BenchBox's Doris stack." >&2
+          exit 1
+        fi
+        if command -v swapon >/dev/null 2>&1 && [ "$$(swapon -s 2>/dev/null | wc -l)" -gt 1 ]; then
+          echo "WARNING: swap is enabled inside the Docker VM; Doris upstream recommends disabling it for benchmark stability." >&2
+        fi
+        # 4.0.3-all-slim does not pre-set JAVA_HOME; start_be.sh exports uppercase
+        # be.conf vars before checking JAVA_HOME, so we detect the bundled JDK
+        # path dynamically instead of hard-coding an architecture-specific path.
+        set_conf /opt/apache-doris/be/conf/be.conf JAVA_HOME "$$(detect_java_home)"
+        set_conf /opt/apache-doris/be/conf/be.conf mem_limit 8g
+        # Raise load memory limits so MemTableMemoryLimiter does not throttle
+        # stream loads before process RSS approaches the actual mem_limit.
+        # Default 50% soft limit fires at 4 GB on an 8 GB BE; raising to 90%
+        # gives 7.2 GB headroom, well above normal resident usage (~2 GB).
+        set_conf /opt/apache-doris/be/conf/be.conf load_process_max_memory_limit_percent 90
+        set_conf /opt/apache-doris/be/conf/be.conf load_process_soft_mem_limit_percent 80
+        sed -i -E 's/-Xmx[0-9]+[mMgG]/-Xmx1536m/g; s/-Xms[0-9]+[mMgG]/-Xms1536m/g' /opt/apache-doris/fe/conf/fe.conf
+        grep -q 'Xmx1536m' /opt/apache-doris/fe/conf/fe.conf ||
+          echo "WARNING: FE heap max cap not applied - fe.conf uses a non-standard JVM option string" >&2
+        grep -q 'Xms1536m' /opt/apache-doris/fe/conf/fe.conf ||
+          echo "WARNING: FE heap min cap not applied - fe.conf uses a non-standard JVM option string" >&2
+        exec bash /usr/local/bin/entry_point.sh
+    ports:
+      - "${DORIS_HOST_PORT:-19031}:9030"
+      - "${DORIS_HTTP_PORT:-18030}:8030"
+      - "${DORIS_BE_HTTP_PORT:-18040}:8040"
+    environment:
+      # Default true for Docker Desktop, which cannot satisfy Doris' swap check.
+      # The wrapper above still enforces vm.max_map_count and ulimit -n explicitly.
+      SKIP_CHECK_ULIMIT: "${DORIS_SKIP_CHECK_ULIMIT:-true}"
+    privileged: ${DORIS_PRIVILEGED:-false}
+    volumes:
+      - doris-fe-meta:/opt/apache-doris/fe/doris-meta
+      - doris-be-storage:/opt/apache-doris/be/storage
+    healthcheck:
+      test: >
+        mysql -h127.0.0.1 -P9030 -uroot -N -s -e "SELECT COUNT(*) FROM frontends() WHERE \`join\` AND alive"
+        | grep -qx '1'
+        && mysql -h127.0.0.1 -P9030 -uroot -N -s -e "SELECT COUNT(*) FROM backends() WHERE alive"
+        | grep -qx '1'
+        || exit 1
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  doris-fe-meta:
+    driver: local
+  doris-be-storage:
+    driver: local

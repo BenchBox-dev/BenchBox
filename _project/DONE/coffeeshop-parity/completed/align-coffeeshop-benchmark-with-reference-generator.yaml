@@ -1,0 +1,24 @@
+id: align-coffeeshop-benchmark-with-reference-generator
+title: ✅ Align CoffeeShop Benchmark with Reference Generator
+worktree: coffeeshop-parity
+category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+status: Completed
+priority: High
+impact: CoffeeShop now mirrors the upstream reference generator with the Dim_Locations, Dim_Products, and order_lines schema,
+  enabling parity across docs, CLI, and examples.
+sections:
+  Summary: Replaced the six-table CoffeeShop implementation with the reference three-table model, rebuilt the generator with
+    deterministic weighting and order-line explosion, refreshed the query suite, and updated docs/CLI/examples accordingly.
+  Key Changes: '- Rewrote schema, generator, benchmark wrapper, and query manager for the new order_lines fact table and vendored
+    seed integration.
+
+    - Added seed loader utilities, refreshed CoffeeShop CLI metadata, and published a DuckDB quick-start example.
+
+    - Updated documentation, changelog, and CoffeeShop tests to cover scale-factor mapping, distribution logic, and query
+    coverage.'
+  Testing: 'uv run -- python -m pytest tests/unit/test_coffeeshop.py
+
+    uv run -- python -m pytest (fails on pre-existing integration suites that require optional TPC binaries/platform credentials;
+    CoffeeShop unit coverage passes)'
+description: Replaced the six-table CoffeeShop implementation with the reference three-table model, rebuilt the generator
+  with deterministic weighting and order-line explosion, refreshed the query suite, and updated docs/CLI/examples accordingly.

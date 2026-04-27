@@ -1,0 +1,172 @@
+id: pyspark-sql-tests
+title: Add comprehensive tests for PySpark SQL adapter
+worktree: dataframe-expansion
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Create unit and integration tests for PySpark SQL adapter,
+  mirroring the structure of existing PySpark DataFrame tests.
+
+  Test coverage requirements:
+  - Session management (singleton, configuration, shutdown)
+  - Schema creation (DDL translation, constraint handling)
+  - Data loading (CSV, Parquet, TBL formats)
+  - Query execution (timing, result collection)
+  - Integration with TPC-H SF=0.01
+
+  All tests must include Java version skip logic since
+  PySpark 4.x is incompatible with Java 23+.
+
+context_sections:
+  "Test Structure": |
+    ```
+    tests/unit/platforms/pyspark/
+    ├── __init__.py
+    ├── test_session_manager.py    # SparkSessionManager tests
+    └── test_pyspark_sql.py        # PySparkSQLAdapter tests
+
+    tests/integration/platforms/
+    └── test_pyspark_sql_tpch.py   # TPC-H integration tests
+    ```
+
+  "Java Version Skip Pattern": |
+    ```python
+    import subprocess
+
+    def _get_java_major_version() -> int | None:
+        try:
+            result = subprocess.run(
+                ["java", "-version"],
+                capture_output=True,
+                text=True
+            )
+            # Parse version from stderr
+            version_line = result.stderr.split('\n')[0]
+            # Extract major version (17, 21, 23, etc.)
+            ...
+        except Exception:
+            return None
+
+    def _should_skip_pyspark() -> bool:
+        version = _get_java_major_version()
+        if version is None:
+            return True  # No Java
+        if version >= 23:
+            return True  # Incompatible
+        return False
+
+    _SKIP_PYSPARK = _should_skip_pyspark()
+    _SKIP_REASON = "PySpark requires Java 17 or 21 (Java 23+ incompatible)"
+
+    @pytest.mark.skipif(_SKIP_PYSPARK, reason=_SKIP_REASON)
+    class TestPySparkSQLAdapter:
+        ...
+    ```
+
+  "Key Test Cases": |
+    Unit Tests:
+    - test_session_singleton: Verify only one SparkSession created
+    - test_session_configuration: Verify memory/executor settings applied
+    - test_session_close: Verify graceful shutdown
+    - test_create_connection: Verify SparkSession returned
+    - test_get_target_dialect: Verify returns "spark"
+    - test_execute_query_simple: SELECT 1
+    - test_schema_translation: DDL conversion
+    - test_schema_removes_check_constraints: CHECK stripped
+    - test_load_csv: CSV file loading
+    - test_load_parquet: Parquet file loading
+    - test_load_tbl: TPC .tbl format loading
+
+    Integration Tests:
+    - test_tpch_q1: Run TPC-H Q1 with SF=0.01
+    - test_tpch_q6: Run TPC-H Q6 with SF=0.01
+    - test_full_benchmark_run: Complete power run
+
+tasks:
+  phases:
+  - phase: "Phase 1: Test Infrastructure"
+    done: false
+    items:
+    - summary: Create tests/unit/platforms/pyspark/ directory
+      done: false
+    - summary: Add __init__.py and conftest.py
+      done: false
+    - summary: Implement Java version detection and skip logic
+      done: false
+    - summary: Create test fixtures for SparkSession
+      done: false
+
+  - phase: "Phase 2: Unit Tests"
+    done: false
+    items:
+    - summary: Create test_session_manager.py
+      done: false
+    - summary: Test singleton pattern
+      done: false
+    - summary: Test configuration application
+      done: false
+    - summary: Create test_pyspark_sql.py
+      done: false
+    - summary: Test connection creation
+      done: false
+    - summary: Test dialect translation
+      done: false
+    - summary: Test schema creation
+      done: false
+    - summary: Test data loading methods
+      done: false
+    - summary: Test query execution and timing
+      done: false
+
+  - phase: "Phase 3: Integration Tests"
+    done: false
+    items:
+    - summary: Create test_pyspark_sql_tpch.py
+      done: false
+    - summary: Test TPC-H Q1 execution
+      done: false
+    - summary: Test TPC-H Q6 execution
+      done: false
+    - summary: Test full benchmark run with SF=0.01
+      done: false
+    - summary: Add pytest markers (integration, pyspark, tpch)
+      done: false
+
+files_affected:
+  added:
+  - tests/unit/platforms/pyspark/__init__.py
+  - tests/unit/platforms/pyspark/conftest.py
+  - tests/unit/platforms/pyspark/test_session_manager.py
+  - tests/unit/platforms/pyspark/test_pyspark_sql.py
+  - tests/integration/platforms/test_pyspark_sql_tpch.py
+
+metadata:
+  owners:
+  - "@benchbox-maintainers"
+  tags:
+  - pyspark
+  - sql
+  - tests
+  - unit-tests
+  - integration-tests
+  - tpch
+  estimated_effort: Medium
+  created_date: "2025-12-07"
+
+success_metrics:
+- Unit tests for session management pass
+- Unit tests for schema creation pass
+- Unit tests for data loading pass
+- Unit tests for query execution pass
+- Integration test with TPC-H SF=0.01 (Q1, Q6) passes
+- Java version skip logic works (skips on Java 23+)
+- Tests run successfully in CI
+- Code coverage >= 80%
+
+dependencies:
+  blocked_by:
+  - dataframe-expansion/planning/pyspark-sql-registry-integration.yaml
+  blocks:
+  - dataframe-expansion/planning/pyspark-sql-documentation.yaml

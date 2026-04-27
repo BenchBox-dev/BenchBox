@@ -1,0 +1,91 @@
+id: harden-unified-runner-cli-parsing
+title: ✅ Harden Unified Runner CLI Parsing
+worktree: docs-experience
+category: Project Lifecycle Management
+priority: High
+status: Completed
+description: '"Brought the example CLI in line with the real `benchbox` interface so common invocation patterns and quiet
+  mode behave correctly."'
+sections:
+  Summary: Enabled equals-style option parsing, deferred required-argument checks until after parsing, and restored quiet-state
+    cleanup to keep follow-on runs verbose.
+  Completed Tasks: '- ✅ Platform argument extraction
+
+    - ✅ Post-parse validation
+
+    - ✅ Quiet mode restoration'
+  Testing: '"`uv run -- python -m pytest tests/examples/test_getting_started_examples.py` (pass).
+
+    Full `uv run -- python -m pytest` still fails on pre-existing optional-dependency suites that require pandas (TPC-DI and
+    verbosity rollout tests) in this worktree.
+
+    "'
+  Files Affected: '- examples/getting_started/local/duckdb_tpch_power.py (new)
+
+    - examples/getting_started/local/duckdb_tpcds_power.py (new)
+
+    - examples/getting_started/intermediate/duckdb_tpch_query_subset.py (new)
+
+    - examples/getting_started/cloud/databricks_tpch_power.py (new)
+
+    - examples/getting_started/cloud/bigquery_tpch_dry_run.py (new)
+
+    - examples/getting_started/README.md (new)
+
+    - benchbox/examples/__init__.py (new)
+
+    - benchbox/examples/dryrun_utils.py (new)
+
+    - benchbox/core/results/display.py
+
+    - examples/unified_runner.py
+
+    - README.md
+
+    - docs/usage/examples.md
+
+    - examples/dry_run_samples/README.md (new)
+
+    - examples/dry_run_samples/duckdb_tpch_power.json (new)
+
+    - examples/dry_run_samples/duckdb_tpch_power.yaml (new)
+
+    - examples/dry_run_samples/databricks_tpch_power.json (new)
+
+    - examples/dry_run_samples/databricks_tpch_power.yaml (new)
+
+    - tests/examples/test_getting_started_examples.py (new)
+
+    - tests/examples/test_unified_runner_smoke.py
+
+    - tests/unit/examples/test_unified_runner.py
+
+    - "✅ **GitHub Actions CI/CD Setup**: Created modern automated testing pipeline"
+
+    - "✅ **Release Automation**: Set up automated PyPI publishing with trusted publishing"
+
+    - "✅ **Repository Templates**: Created professional issue and PR templates"
+
+    - "✅ **Infrastructure Testing**: Created comprehensive test suite for release infrastructure"'
+  Technical Results: '- "**CHANGELOG**: Professional changelog documenting complete feature set and alpha status"
+
+    - "**CI/CD**: Modern GitHub Actions workflows using uv, trusted publishing, cross-platform testing"
+
+    - "**Templates**: Professional issue/PR templates for community engagement"
+
+    - "**Testing**: 20 tests validating release infrastructure integrity"
+
+    - "**URLs**: All repository references corrected and verified"'
+  Files Created: '- "**Created**: `CHANGELOG.md` (comprehensive initial release documentation)"
+
+    - "**Created**: `.github/workflows/test.yml` (modern CI/CD pipeline)"
+
+    - "**Updated**: `.github/workflows/release.yml` (comprehensive release automation)"
+
+    - "**Created**: `.github/ISSUE_TEMPLATE/` (bug reports, feature requests, platform support)"
+
+    - "**Created**: `.github/PULL_REQUEST_TEMPLATE.md` (comprehensive PR checklist)"
+
+    - "**Fixed**: `benchbox/cli/exceptions.py` (corrected GitHub issue URL)"
+
+    - "**Created**: `tests/unit/test_release_infrastructure.py` (infrastructure validation)"'

@@ -1,0 +1,48 @@
+# Auto-generated Makefile for TPC-H compilation
+# Platform: darwin
+CC = gcc
+# Let config.h handle most definitions to avoid redefinition warnings
+# Enable EOL_HANDLING to prevent trailing column separators
+CFLAGS = -O2 -DDBNAME=\"dss\" -DLINUX -DTPCH -DRNG_TEST -D_FILE_OFFSET_BITS=64 \
+         -DEOL_HANDLING -DORACLE -DMACOS_COMPAT -I.
+
+# macOS-specific compiler adjustments
+ifeq ($(shell uname),Darwin)
+    CFLAGS += -Dmalloc=malloc -D_DARWIN_C_SOURCE
+    # Suppress getopt warnings on macOS by using system getopt
+    CFLAGS += -DUSE_SYSTEM_GETOPT
+endif
+
+# Object files for dbgen
+DBGEN_OBJECTS = build.o driver.o bm_utils.o rnd.o print.o load_stub.o bcd2.o speed_seed.o text.o permute.o rng64.o
+
+# Object files for qgen
+QGEN_OBJECTS = build.o bm_utils.o qgen.o rnd.o varsub.o text.o bcd2.o permute.o rng64.o speed_seed.o
+
+all: dbgen qgen
+
+dbgen: $(DBGEN_OBJECTS)
+	$(CC) $(CFLAGS) -o dbgen $(DBGEN_OBJECTS) -lm
+
+qgen: $(QGEN_OBJECTS)
+	$(CC) $(CFLAGS) -o qgen $(QGEN_OBJECTS) -lm
+
+# Special compilation rules for macOS compatibility
+%.o: %.c
+	@if [ "$$(uname)" = "Darwin" ]; then \
+		$(CC) $(CFLAGS) -c $< -o $@ 2>/dev/null || \
+		$(CC) $(CFLAGS) -include stdlib.h -Dmalloc_h_included=1 -c $< -o $@; \
+	else \
+		$(CC) $(CFLAGS) -c $< -o $@; \
+	fi
+
+clean:
+	rm -f *.o dbgen qgen
+
+.PHONY: all clean dbgen qgen
+
+# Debug target to show configuration
+debug:
+	@echo "Platform: darwin"
+	@echo "Machine flag: LINUX"
+	@echo "CFLAGS: $(CFLAGS)"

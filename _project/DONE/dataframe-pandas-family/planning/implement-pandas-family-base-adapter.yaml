@@ -1,0 +1,127 @@
+id: implement-pandas-family-base-adapter
+title: Implement Pandas Family Base Adapter
+worktree: dataframe-pandas-family
+category: Core Functionality
+priority: Critical
+status: Completed
+description: 'Implement PandasFamilyAdapter base class that provides shared functionality
+
+  for all Pandas-like libraries (Pandas, Modin, cuDF, Vaex, Dask). This single
+
+  implementation will serve 5 platforms with 95%+ code reuse.
+
+  '
+context_sections:
+- name: Family Members
+  summary: 'Pandas (reference), Modin (distributed), cuDF (GPU), Vaex (out-of-core),
+
+    Dask (lazy distributed). All share 95%+ API compatibility.
+
+    '
+- name: Shared Characteristics
+  summary: 'String-based column access, boolean indexing, dict aggregation, eager
+
+    execution (except Dask which adds .compute()).
+
+    '
+impact: 'HIGH - Single implementation serves 5 platforms. Enables Pandas ecosystem
+
+  benchmarking with minimal per-platform code.
+
+  '
+tasks:
+- phase: 'Phase 2.1: Base Adapter Class'
+  description: Implement abstract base class for Pandas family
+  items:
+  - summary: Create benchbox/platforms/dataframe/__init__.py
+    done: true
+  - summary: Implement PandasFamilyAdapter in benchbox/platforms/dataframe/pandas_family.py
+    done: true
+    details: 'Abstract methods:
+
+      - read_csv(path) -> platform df
+
+      - read_parquet(path) -> platform df
+
+      - to_datetime(series) -> datetime series
+
+      - timedelta(days) -> timedelta object
+
+
+      Concrete methods:
+
+      - execute_query(query) - runs pandas_impl
+
+      - create_context() - creates context with tables
+
+      - register_table(name, df) - adds table
+
+      - load_benchmark_data(benchmark) - loads all tables
+
+      '
+  - summary: Add Pandas-specific helper methods
+    done: true
+    details: '- ensure_datetime(df, column) - type conversion
+
+      - validate_dataframe(df) - integrity checks
+
+      '
+  - summary: Implement table loading with DataSourceResolver integration
+    done: true
+  - summary: Add dry-run mode support
+    done: false
+    notes: Deferred - will be implemented with CLI integration
+  - summary: Create unit tests (tests/dataframe/test_pandas_family_adapter.py)
+    done: true
+    notes: Created in tests/unit/platforms/dataframe/
+- phase: 'Phase 2.2: Pandas Reference Implementation'
+  description: Concrete Pandas adapter as reference
+  items:
+  - summary: Create PandasAdapter in benchbox/platforms/dataframe/pandas.py
+    done: true
+    notes: Implemented as PandasDataFrameAdapter in pandas_df.py
+    details: '- Inherits from PandasFamilyAdapter
+
+      - Implements read_csv using pd.read_csv
+
+      - Implements read_parquet using pd.read_parquet
+
+      - Implements to_datetime using pd.to_datetime
+
+      - All type conversions
+
+      '
+  - summary: Add CLI registration for Pandas dataframe mode
+    done: false
+    notes: Deferred - will be implemented with CLI integration
+  - summary: Create comprehensive tests (tests/dataframe/test_pandas_adapter.py)
+    done: true
+    notes: Created as test_pandas_df.py with 43 tests
+    details: '- Test CSV loading
+
+      - Test Parquet loading
+
+      - Test type conversions
+
+      - Test query execution
+
+      - Integration test with sample data
+
+      '
+files_affected:
+  modified:
+  - benchbox/platforms/dataframe/__init__.py
+  - benchbox/platforms/dataframe/pandas_family.py
+  - benchbox/platforms/dataframe/pandas.py
+  - tests/dataframe/test_pandas_family_adapter.py
+  - tests/dataframe/test_pandas_adapter.py
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - dataframe
+  - pandas
+  - adapter
+  estimated_effort: 3 days

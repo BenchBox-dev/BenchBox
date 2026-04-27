@@ -1,0 +1,98 @@
+id: implement-pandas-family-platform-adapters
+title: Implement Pandas Family Platform Adapters
+worktree: dataframe-pandas-platforms
+category: Core Functionality
+priority: High
+status: Completed
+description: 'Implement thin adapters for Modin, cuDF, and Dask that inherit 95%+ from
+
+  PandasFamilyAdapter, only overriding I/O and type conversion methods.
+
+  '
+tasks:
+- phase: 'Phase 2.3: Modin Adapter'
+  description: Distributed pandas implementation
+  items:
+  - summary: Create ModinAdapter in benchbox/platforms/dataframe/modin.py
+    done: false
+    details: '- Inherits from PandasFamilyAdapter (95% code reuse)
+
+      - Override read_csv: modin.read_csv
+
+      - Override to_datetime: uses pd.to_datetime
+
+      - ~100 LOC total
+
+      '
+  - summary: Add CLI registration
+    done: false
+  - summary: Create tests (tests/dataframe/test_modin_adapter.py)
+    done: false
+- phase: 'Phase 2.4: cuDF Adapter'
+  description: GPU-accelerated pandas
+  items:
+  - summary: Create CuDFAdapter in benchbox/platforms/dataframe/cudf.py
+    done: false
+    details: '- Inherits from PandasFamilyAdapter (98% code reuse)
+
+      - Override read_csv: cudf.read_csv
+
+      - Override to_datetime: cudf.to_datetime
+
+      - Handle GPU memory management
+
+      - ~150 LOC total
+
+      '
+  - summary: Add optional dependency handling (require CUDA)
+    done: false
+  - summary: Create tests with GPU availability check
+    done: false
+- phase: 'Phase 2.5: Dask Adapter'
+  description: Lazy distributed pandas
+  items:
+  - summary: Create DaskAdapter in benchbox/platforms/dataframe/dask.py
+    done: false
+    details: '- Inherits from PandasFamilyAdapter (100% query code reuse)
+
+      - Override read_csv: dd.read_csv with partitioning
+
+      - Override execute_query: add .compute() to trigger execution
+
+      - Support distributed client configuration
+
+      - ~100 LOC total
+
+      '
+  - summary: Add partitioning configuration options
+    done: false
+  - summary: Support both local and distributed execution modes
+    done: false
+  - summary: Create tests for lazy evaluation and compute
+    done: false
+- phase: 'Phase 2.6: Vaex Adapter (Future)'
+  description: Out-of-core dataframes (deferred to later phase)
+  items:
+  - summary: Create VaexAdapter (deferred to Phase 2)
+    done: false
+    details: Lower priority - defer until after core platforms
+files_affected:
+  modified:
+  - benchbox/platforms/dataframe/modin.py
+  - benchbox/platforms/dataframe/cudf.py
+  - benchbox/platforms/dataframe/dask.py
+  - tests/dataframe/test_modin_adapter.py
+  - tests/dataframe/test_cudf_adapter.py
+  - tests/dataframe/test_dask_adapter.py
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - dataframe
+  - pandas-family
+  - modin
+  - cudf
+  - dask
+  estimated_effort: 3 days total (1 day per adapter)

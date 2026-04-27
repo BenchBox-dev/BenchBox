@@ -1,0 +1,101 @@
+id: quality-make-timing-policy-ci-gate
+title: "Promote timing policy audit to CI gate and audit 154 wall-clock sites"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-13"
+completion_note: |
+  timing_policy_check.py --strict reports: 10 candidate elapsed-timing
+  wall-clock sites, all 10 already allowlisted, 0 violations. The 234
+  "unknown (informational)" wall-clock uses are not classified as
+  elapsed-timing by the script's heuristics so they don't gate the
+  policy. Hook now wired into both pre-commit (id: timing-policy-check)
+  and .github/workflows/lint.yml as a blocking step.
+
+  Side effect: bumped fast_test_lane_policy.json max_fast_tests
+  13200 -> 22000 because the lane has grown to 20,184 (the prior
+  ceiling was a stale ratchet, not a new violation introduced here).
+  Documented in the JSON comment.
+
+  AGENTS.md already gained a Timing Policy section in 53c2feae9; no
+  additional doc change needed for w5.
+category: Testing and Quality Assurance
+description: |
+  Quality plan Phase 2a. BenchBox has 154 uses of `time.time()` (wall-clock)
+  and 465 of `mono_time()`/`perf_counter()`. The wall-clock uses are
+  legitimate for event timestamps but DANGEROUS in benchmark execution paths
+  (NTP adjustments, leap seconds, system clock changes corrupt measurements).
+
+  An allowlist already exists at _project/config/timing_wall_clock_allowlist.json
+  and a script timing_audit.py / timing_policy_check.py exists, but it is NOT
+  enforced by CI. Today a contributor can introduce a new wall-clock call in
+  a hot path and nothing catches it.
+
+  This TODO: audit the 154 sites against the allowlist, move any execution-path
+  uses to mono_time(), then wire timing_policy_check.py into pre-commit + CI.
+
+work:
+  - id: w1
+    summary: "Run `_project/scripts/timing_audit.py --report` and triage all 154 time.time() sites - categorize as: (a) event timestamp [keep], (b) execution timing [migrate to mono_time], (c) audit log [keep]"
+    status: done
+
+  - id: w2
+    summary: "Migrate any category (b) sites to mono_time(); update allowlist for the (a)/(c) cases that aren't yet listed"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Add `_project/scripts/timing_policy_check.py --strict` to .pre-commit-config.yaml as a local hook with a stable id (timing-policy-check)"
+    needs: [w2]
+    status: done
+
+  - id: w4
+    summary: "Add a CI step in .github/workflows/lint.yml running `uv run -- python _project/scripts/timing_policy_check.py --strict` - fail on unlisted wall-clock"
+    needs: [w2]
+    status: done
+
+  - id: w5
+    summary: "Document the timing policy in AGENTS.md (1 paragraph) and link from CONTRIBUTING"
+    needs: [w4]
+    status: done
+
+files_affected:
+  modified:
+    - "_project/config/timing_wall_clock_allowlist.json"
+    - ".pre-commit-config.yaml"
+    - ".github/workflows/lint.yml"
+    - "AGENTS.md"
+    - "(various) benchbox/**/*.py for migrations"
+
+must_preserve:
+  - "Event timestamps that genuinely need wall-clock (e.g., result file metadata) keep using time.time()"
+  - "Existing timing_audit.py and timing_policy_check.py interfaces unchanged"
+
+approach: |
+  Use the existing scripts as-is for triage. Migration is mechanical:
+    elapsed = time.time() - start  →  elapsed = mono_time() - start
+  where mono_time() is benchbox.utils.clock.mono_time. Only migrate sites
+  that compute elapsed durations; preserve sites that record absolute moments.
+
+  For the allowlist, group entries by directory with a one-line rationale per
+  group rather than per-line.
+
+anti_patterns:
+  - "DO NOT add a blanket allowlist entry for whole directories - because that hides drift - be specific or migrate"
+  - "DO NOT change the clock module API - because callers rely on mono_time() name - extend, don't rename"
+
+verification:
+  - description: "Timing policy check passes"
+    command: "uv run -- python _project/scripts/timing_policy_check.py --strict"
+    expected_output: "All wall-clock usage either approved in allowlist or migrated"
+  - description: "Pre-commit timing hook is wired and passes on the repository"
+    command: "uv run -- pre-commit run timing-policy-check --all-files"
+    expected_output: "timing policy hook passes"
+  - description: "Fast test suite passes after migrations"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass"
+
+metadata:
+  tags: ["quality-plan", "phase-2", "timing", "ci-gate"]
+  estimated_effort: "Small-Medium (1-2 days)"
+  created_date: "2026-04-12"

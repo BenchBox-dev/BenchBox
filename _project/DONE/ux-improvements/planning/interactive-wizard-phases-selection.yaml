@@ -1,0 +1,75 @@
+id: interactive-wizard-phases-selection
+title: "Add --phases selection to interactive wizard"
+worktree: ux-improvements
+priority: High
+status: Not Started
+description: |
+  The CLI supports flexible phase selection (generate, load, warmup, power, throughput,
+  maintenance) via `--phases`, but the interactive wizard hardcodes the default "power"
+  phase without prompting users.
+
+  Users should be able to:
+  1. Run data generation only (--phases generate)
+  2. Run load only (--phases load)
+  3. Select specific phases for their workflow
+  4. Understand what each phase does
+
+  This is a significant gap because phase selection is fundamental to benchmark workflows.
+
+category: User Experience
+
+tasks:
+  phases:
+  - phase: "Phase 1: Design"
+    done: false
+    items:
+    - summary: "Design phase selection UI (checkboxes vs. presets)"
+      done: false
+    - summary: "Create phase descriptions for user guidance"
+      done: false
+    - summary: "Determine placement in wizard flow (Step 3 or new step)"
+      done: false
+
+  - phase: "Phase 2: Implementation"
+    done: false
+    items:
+    - summary: "Create phase selection prompt with explanations"
+      done: false
+    - summary: "Add preset options (Quick Test, Full Benchmark, Data Only)"
+      done: false
+    - summary: "Wire selected phases to orchestrator execution"
+      done: false
+
+  - phase: "Phase 3: Testing"
+    done: false
+    items:
+    - summary: "Add unit tests for phase selection"
+      done: false
+    - summary: "Test phase combinations work correctly"
+      done: false
+
+metadata:
+  tags:
+  - cli
+  - ux
+  - interactive
+  - phases
+  estimated_effort: "Medium"
+  created_date: "2025-12-21"
+
+impact:
+  user_impact: |
+    Enables flexible benchmark workflows:
+    - Data generation for offline analysis
+    - Iterative development with quick phase runs
+    - Full TPC-compliant benchmark runs
+
+files_affected:
+  modified:
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/cli/benchmarks.py"
+
+success_metrics:
+- "Phase selection available in wizard"
+- "All valid phase combinations work"
+- "Users understand what each phase does"

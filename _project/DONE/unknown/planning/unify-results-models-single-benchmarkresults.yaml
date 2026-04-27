@@ -1,0 +1,22 @@
+id: unify-results-models-single-benchmarkresults
+title: '"✅ Unify Results Models: Single `BenchmarkResults`"'
+category: Project Lifecycle Management
+sections:
+  Status: Completed
+  Description: '"Consolidated the two results models into a single core `BenchmarkResults` that includes optional `execution_phases`
+    and `query_definitions`, along with all summary metrics and metadata. Removed `EnhancedBenchmarkResults` and updated code
+    to use the unified model throughout core, platforms, and CLI."'
+  Key Changes: '- "Core: `benchbox/core/results/models.py` now defines `BenchmarkResults` with detailed phase support and
+    nested models. Removed the separate `EnhancedBenchmarkResults` class."
+
+    - "Refactors: Updated imports/usages in `benchbox/base.py`, `benchbox/core/base_benchmark.py`, `benchbox/platforms/base.py`,
+    `benchbox/cli/orchestrator.py`, and `benchbox/cli/output.py` to construct and consume the unified `BenchmarkResults`."
+
+    - "Tests: Migrated tests to import and construct `BenchmarkResults` from core."'
+  Acceptance: '- "No occurrences of `EnhancedBenchmarkResults` remain in code or tests."
+
+    - CLI exporter and console formatter handle the unified model and still emit comprehensive JSON/results summaries.'
+worktree: unknown
+priority: Medium
+status: Completed
+description: 'Archived DONE item for: "✅ Unify Results Models: Single `BenchmarkResults`"'

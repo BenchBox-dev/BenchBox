@@ -1,0 +1,29 @@
+id: implement-core-verbosity-and-quiet-modes-v-vv-and-q
+title: ✅ Implement Core Verbosity and Quiet Modes (-v/-vv and -q)
+category: Project Lifecycle Management
+sections:
+  Status: Completed
+  Description: Centralized verbosity handling for core modules and aligned behavior with platforms. Added shared utilities
+    to ensure identical semantics for -v, -vv, and -q across platforms and core code. Core benchmarks can now emit controlled
+    progress info under -v/-vv and remain silent under -q.
+  Key Changes: '- "Shared utilities: `benchbox/utils/verbosity.py` providing `compute_verbosity()` and `VerbosityMixin` (`log_verbose`,
+    `log_very_verbose`, `log_operation_start`, `log_operation_complete`)."
+
+    - "Platforms: `benchbox/platforms/base.py` now inherits `VerbosityMixin` and delegates its log helpers to the shared mixin;
+    respects `quiet` from config."
+
+    - "Core Base: `benchbox/base.py` (BaseBenchmark) now derives verbosity and quiet via `compute_verbosity()` and exposes
+    `log_*` helpers through `VerbosityMixin`."
+
+    - "Core Example: `benchbox/core/joinorder/benchmark.py` updated to use `self.log_verbose(...)` instead of direct `print()`
+    and to accept an int/boolean `verbose` parameter."'
+  Tests: '- "`tests/unit/core/test_core_verbosity.py`: validates INFO/DEBUG handling via logger under -v/-vv."
+
+    - "`tests/unit/core/test_core_quiet.py`: ensures `quiet=True` suppresses logs and stdout."'
+  Acceptance: '- Core and platforms share the same logging helpers; no duplication.
+
+    - Quiet overrides verbose and results in no output on success paths.'
+worktree: unknown
+priority: Medium
+status: Completed
+description: 'Archived DONE item for: ✅ Implement Core Verbosity and Quiet Modes (-v/-vv and -q)'

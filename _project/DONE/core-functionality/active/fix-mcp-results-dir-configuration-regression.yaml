@@ -1,0 +1,155 @@
+id: fix-mcp-results-dir-configuration-regression
+title: "Fix MCP results-dir regression with core-centralized path resolution"
+worktree: core-functionality
+priority: High
+status: Completed
+completed_date: "2026-02-21"
+category: Core Functionality
+description: |
+  MCP benchmark execution currently ignores runtime configuration for result
+  directories. `benchbox-mcp --results-dir <path>` is not parsed, and MCP
+  read/write tools default to hard-coded `benchmark_runs/results` paths.
+
+  This creates a behavioral regression against expected MCP configurability and
+  contradicts docs that describe `BENCHBOX_RESULTS_DIR` support.
+
+  Constraints from review:
+  - MCP and CLI remain separate interfaces (no CLI flag coupling).
+  - Path-resolution logic must be centralized in core and reused by both MCP
+    internals and CLI internals.
+  - MCP write path (benchmark export) and MCP read paths (results/analytics/
+    visualization/resources) must use the same resolved directory.
+
+approach: |
+  Introduce a core runtime-path resolver module that encapsulates precedence
+  and normalization rules (explicit override > environment > default). Keep MCP
+  argument parsing in MCP-specific CLI code, then pass resolved paths into MCP
+  server/tool registration (dependency injection) instead of module-level
+  constants.
+
+  Update CLI internals to consume the same core resolver for default benchmark
+  runs roots/results paths while preserving CLI command surface.
+
+  Validate with targeted MCP + CLI regression tests and docs synchronization.
+
+work:
+- id: w1
+  summary: "Add core runtime path resolver for benchmark_runs/results/charts defaults"
+  status: done
+
+- id: w2
+  summary: "Refactor CLI internals to use core resolver without changing CLI interface"
+  needs: [w1]
+  status: done
+
+- id: w3
+  summary: "Add MCP-specific CLI arg parsing (--results-dir, --charts-dir, --log-level) and env fallback"
+  needs: [w1]
+  status: done
+
+- id: w4
+  summary: "Inject resolved directories into MCP server registration instead of module constants"
+  needs: [w3]
+  status: done
+
+- id: w5
+  summary: "Route MCP benchmark export writes through configured results_dir"
+  needs: [w4]
+  status: done
+
+- id: w6
+  summary: "Align MCP traversal/safe-root checks with configured results_dir"
+  needs: [w4]
+  status: done
+
+- id: w7
+  summary: "Add/adjust unit tests for precedence, MCP write/read parity, and CLI compatibility"
+  needs: [w2, w5, w6]
+  status: done
+
+- id: w8
+  summary: "Update MCP docs to reflect actual configuration behavior and precedence"
+  needs: [w3, w4, w5]
+  status: done
+
+- id: w9
+  summary: "Run verification commands and close regression with evidence"
+  needs: [w7, w8]
+  status: done
+
+deferred:
+- summary: "Add a CLI run flag named --results-dir"
+  reason: "Out of scope by design; MCP and CLI remain separate interfaces."
+
+files_affected:
+  modified:
+  - "benchbox/core/results/exporter.py"
+  - "benchbox/cli/config.py"
+  - "benchbox/mcp/__init__.py"
+  - "benchbox/mcp/__main__.py"
+  - "benchbox/mcp/server.py"
+  - "benchbox/mcp/tools/benchmark.py"
+  - "benchbox/mcp/tools/results.py"
+  - "benchbox/mcp/tools/analytics.py"
+  - "benchbox/mcp/tools/visualization.py"
+  - "benchbox/mcp/resources/registry.py"
+  - "pyproject.toml"
+  - "docs/reference/mcp.md"
+  - "docs/guides/mcp-integration.md"
+  - "tests/unit/mcp/test_mcp_main_module.py"
+  - "tests/unit/mcp/test_benchmark_tools.py"
+  - "tests/unit/mcp/test_mcp_results_and_analytics.py"
+  - "tests/unit/mcp/test_visualization_tools.py"
+  - "tests/unit/cli/test_run_export_consistency.py"
+  added:
+  - "benchbox/core/runtime_paths.py"
+  - "benchbox/mcp/cli.py"
+
+must_preserve:
+- "benchbox run CLI behavior and interface remain unchanged (no new/repurposed --results-dir flag)."
+- "MCP tools continue to block path traversal outside the configured results root."
+- "MCP benchmark responses preserve existing schema fields, including mcp_metadata.result_file."
+- "Default behavior remains benchmark_runs/results when no override is provided."
+
+anti_patterns:
+- "DO NOT couple MCP flags into benchbox run CLI -- because MCP and CLI are separate interfaces -- keep parsing isolated in
+  MCP CLI entrypoint."
+- "DO NOT duplicate env/path precedence logic across modules -- because drift will reintroduce inconsistency -- centralize
+  in core resolver and reuse."
+- "DO NOT keep module-level hard-coded DEFAULT_RESULTS_DIR in MCP tools -- because write/read paths must stay in sync -- inject
+  resolved roots at registration time."
+
+verification:
+- description: "MCP CLI advertises options and does not silently ignore args"
+  command: "UV_CACHE_DIR=/tmp/uv-cache uv run benchbox-mcp --help"
+  expected_output: "Help output includes --results-dir and exits without starting server."
+- description: "MCP unit tests for configured directories and result path parity pass"
+  command: "uv run -- python -m pytest tests/unit/mcp/test_mcp_main_module.py tests/unit/mcp/test_benchmark_tools.py tests/unit/mcp/test_mcp_results_and_analytics.py
+    tests/unit/mcp/test_visualization_tools.py -q"
+  expected_output: "All selected tests pass."
+- description: "CLI compatibility tests pass after core path resolver integration"
+  command: "uv run -- python -m pytest tests/unit/cli/test_run_export_consistency.py tests/unit/cli/test_config_coverage.py
+    -q"
+  expected_output: "All selected tests pass."
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/"
+  - "benchbox/cli/config.py"
+  - "benchbox/mcp/"
+  - "tests/unit/mcp/"
+  - "tests/unit/cli/test_run_export_consistency.py"
+  - "tests/unit/cli/test_config_coverage.py"
+  - "docs/reference/mcp.md"
+  - "docs/guides/mcp-integration.md"
+  - "pyproject.toml"
+
+metadata:
+  tags:
+  - mcp
+  - configuration
+  - regression
+  - path-resolution
+  - code-quality
+  estimated_effort: "1-2 days"
+  created_date: "2026-02-21"

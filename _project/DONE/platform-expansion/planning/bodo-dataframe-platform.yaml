@@ -1,0 +1,208 @@
+id: bodo-dataframe-platform
+title: "Bodo DataFrame Platform Adapter"
+worktree: platform-expansion
+priority: Medium
+status: Completed
+completed_date: "2026-02-09"
+category: Platform Expansion
+description: |
+  Implement Bodo as a new DataFrame platform adapter in the Pandas family.
+  Bodo is a high-performance computing engine that provides automatic
+  parallelization and optimization of Python/Pandas code using Numba JIT
+  compilation. It enables distributed execution of Pandas workloads across
+  multiple cores and nodes without requiring code changes.
+
+  The adapter should extend PandasFamilyAdapter, following the same pattern
+  used by Modin, Dask, and cuDF adapters. Since Bodo provides a Pandas-compatible
+  API, the majority of functionality is inherited from the base class, with
+  overrides needed primarily for I/O operations and distributed initialization.
+
+context_sections:
+  "Background and Motivation": |
+    Bodo represents a distinct approach to DataFrame acceleration:
+    - Compiles Pandas code to optimized MPI-parallel binaries via Numba
+    - Achieves near-native performance without API changes
+    - Targets HPC-style parallelism (multi-core, multi-node)
+    - Useful benchmark comparison point against Polars, Dask, and Modin
+
+    Adding Bodo enables users to compare JIT-compiled Pandas performance
+    against other parallelization strategies (Ray/Modin, task graphs/Dask,
+    Rust-native/Polars) on identical benchmark workloads.
+
+  "Technical Context": |
+    Bodo uses a decorator-based JIT compilation model:
+    - Functions decorated with @bodo.jit are compiled and parallelized
+    - Pandas I/O functions (read_csv, read_parquet) are intercepted for
+      distributed reads
+    - Data is automatically partitioned across MPI ranks
+    - Results are gathered on rank 0 for output
+
+    Key differences from plain Pandas:
+    - I/O must go through Bodo-aware functions for parallelism
+    - Not all Pandas operations are supported (subset coverage)
+    - Requires MPI runtime (mpi4py) for multi-process execution
+    - Type inference happens at compile time (stricter than Pandas)
+
+work:
+  - id: w1
+    summary: "Create BodoDataFrameAdapter in benchbox/platforms/dataframe/bodo_df.py"
+    status: done
+    notes: >
+      Extend PandasFamilyAdapter. Override read_csv and read_parquet with
+      Bodo-compatible implementations. Implement platform_name, get_platform_info,
+      and BODO_AVAILABLE flag. Handle Bodo-specific type conversions and limitations.
+      Use modin_df.py as the closest reference implementation.
+
+  - id: w2
+    summary: "Register Bodo in adapter_factory, platform_registry, and platform_checker"
+    needs: [w1]
+    status: done
+    notes: >
+      Add to dataframe __init__.py exports, adapter_factory.py mapping,
+      platform_registry.py metadata, and platform_checker.py DATAFRAME_PLATFORMS.
+
+  - id: w3
+    summary: "Create unit tests in tests/unit/platforms/dataframe/test_bodo_df.py"
+    needs: [w1]
+    status: done
+    notes: >
+      Test import availability check, adapter instantiation (mocked),
+      data loading methods (mocked), platform info and metadata.
+      Verify existing dataframe tests still pass.
+
+  - id: w4
+    summary: "Create platform spec documentation in _project/specs/platforms/bodo.md"
+    needs: [w1, w2, w3]
+    status: done
+    notes: "Document Bodo-specific requirements, limitations, and usage."
+
+deferred:
+  - summary: "@bodo.jit compilation of query functions"
+    reason: >
+      JIT compilation is Bodo's main value proposition but adds significant complexity.
+      Start with Bodo's Pandas-compatible I/O only; add JIT support as a follow-up
+      once the basic adapter is validated.
+  - summary: "MPI multi-node distributed execution"
+    reason: >
+      Multi-node execution requires mpiexec launch and cluster setup.
+      Initial adapter targets single-node multi-core parallelism only.
+
+metadata:
+  tags:
+    - platform-adapter
+    - dataframe
+    - bodo
+    - pandas-family
+    - parallel-computing
+  estimated_effort: "2-3 days"
+  created_date: "2026-02-09"
+  last_updated: "2026-02-09T00:00:00"
+
+impact:
+  business_value: |
+    Enables benchmarking of JIT-compiled Pandas workloads, filling a gap
+    in the DataFrame platform comparison matrix. Bodo represents a unique
+    approach (Numba JIT + MPI) distinct from Dask (task graphs), Modin (Ray),
+    and Polars (Rust native), making it valuable for comprehensive DataFrame
+    performance analysis.
+  user_impact: |
+    Users evaluating DataFrame acceleration strategies can compare Bodo
+    against other platforms on identical TPC-H workloads. Particularly
+    relevant for HPC-oriented teams considering Bodo for production
+    Pandas workloads.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/dataframe/__init__.py"
+    - "benchbox/platforms/adapter_factory.py"
+    - "benchbox/core/platform_registry.py"
+    - "benchbox/platforms/dataframe/platform_checker.py"
+  added:
+    - "benchbox/platforms/dataframe/bodo_df.py"
+    - "tests/unit/platforms/dataframe/test_bodo_df.py"
+    - "_project/specs/platforms/bodo.md"
+  removed: []
+
+must_preserve:
+  - "PandasFamilyAdapter base class interface and all existing method signatures unchanged"
+  - "Existing Pandas-family adapters (pandas_df, modin_df, dask_df, cudf_df) continue to pass their test suites"
+  - "adapter_factory.py mapping for existing platforms returns same adapter classes"
+  - "Platform registry backward compatible with existing platform names"
+
+approach: |
+  Follow the pattern established by ModinDataFrameAdapter in
+  benchbox/platforms/dataframe/modin_df.py (~500 lines). These are thin
+  adapters that:
+  1. Extend PandasFamilyAdapter with platform-specific I/O overrides
+  2. Use try/except import for availability detection (BODO_AVAILABLE flag)
+  3. Override read_csv, read_parquet, to_datetime, and timedelta_days
+  4. Inherit all query execution, aggregation, and validation from the base class
+
+  Start with modin_df.py as the closest reference since Modin also provides
+  a Pandas-compatible API with a different execution backend.
+
+anti_patterns:
+  - "DO NOT modify PandasFamilyAdapter - because Bodo is just another consumer of the base class - keep all Bodo-specific code in bodo_df.py"
+  - "DO NOT require Bodo installation for unit tests - because Bodo has heavy dependencies (MPI, Numba) not available in CI - mock bodo imports in tests"
+  - "DO NOT add @bodo.jit decorators directly in adapter methods - because the adapter must work with or without JIT - handle JIT compilation optionally"
+  - "DO NOT add bodo as a required project dependency - because it is an optional platform - use conditional imports with BODO_AVAILABLE flag"
+
+verification:
+  - description: "Bodo adapter imports correctly when bodo is available"
+    command: "uv run -- python -c \"from benchbox.platforms.dataframe.bodo_df import BodoDataFrameAdapter; print('import OK')\""
+    expected_output: "import OK (or ImportError if bodo not installed)"
+  - description: "Bodo recognized as a DataFrame platform"
+    command: "uv run -- python -c \"from benchbox.platforms import is_dataframe_platform; print(is_dataframe_platform('bodo-df'))\""
+    expected_output: "True"
+  - description: "Bodo appears in available platform list"
+    command: "uv run -- python -c \"from benchbox.platforms import list_available_dataframe_platforms; print('bodo-df' in list_available_dataframe_platforms())\""
+    expected_output: "True"
+  - description: "Unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/test_bodo_df.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Existing dataframe tests unaffected"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/ -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/dataframe/bodo_df.py"
+    - "benchbox/platforms/dataframe/__init__.py"
+    - "benchbox/platforms/__init__.py"
+    - "benchbox/platforms/adapter_factory.py"
+    - "benchbox/core/platform_registry.py"
+    - "benchbox/platforms/dataframe/platform_checker.py"
+    - "tests/unit/platforms/dataframe/test_bodo_df.py"
+    - "_project/specs/platforms/bodo.md"
+  do_not_modify:
+    - "benchbox/platforms/dataframe/pandas_family.py"
+    - "benchbox/platforms/dataframe/expression_family.py"
+    - "benchbox/platforms/dataframe/pandas_df.py"
+    - "benchbox/platforms/dataframe/modin_df.py"
+    - "benchbox/platforms/dataframe/dask_df.py"
+
+deps:
+  needs:
+    - "implement-dataframe-benchmarks"
+
+technical_requirements:
+  dependencies:
+    - "bodo (optional, not a project dependency)"
+    - "mpi4py (transitive dependency of bodo)"
+  constraints:
+    - "Bodo requires MPI runtime for multi-process execution"
+    - "Not all Pandas operations are supported by Bodo's JIT compiler"
+    - "Type inference is stricter than standard Pandas"
+    - "Bodo is a commercial product - community edition has limitations"
+
+success_metrics:
+  - "BodoDataFrameAdapter class implemented and importable"
+  - "Platform registered in adapter factory and platform registry"
+  - "Unit tests pass with mocked bodo imports"
+  - "Adapter follows PandasFamilyAdapter contract"
+  - "No regressions in existing dataframe platform tests"
+
+open_questions:
+  - "Which Bodo edition to target - community (free) or enterprise? Community edition may have scale or feature limitations."
+  - "Should the adapter support @bodo.jit compilation of query functions, or only use Bodo's Pandas-compatible I/O? JIT compilation adds complexity but is Bodo's main value proposition."
+  - "How to handle MPI initialization in the adapter - should the adapter manage mpi4py setup, or require the user to launch with mpiexec?"

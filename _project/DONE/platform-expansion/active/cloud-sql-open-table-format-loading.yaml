@@ -1,0 +1,105 @@
+id: cloud-sql-open-table-format-loading
+title: "Finish Delta loading closure for Redshift and BigQuery adapters"
+worktree: main
+priority: Medium
+status: Completed
+description: |
+  Redshift and BigQuery both support Delta Lake on the platform but their BenchBox
+  adapters only load parquet/CSV.  These platforms were removed from DELTA_CAPABILITY
+  in format_capabilities.py (commit 9be7d5b70) to prevent the fail-fast check from
+  passing when loading would fail.
+
+  Platform mechanisms:
+  - Redshift: Delta via Redshift Spectrum + AWS Lake Formation.  Requires Glue catalog
+    integration to register Delta tables as external tables.
+  - BigQuery: Delta via BigLake external tables (GA since mid-2024).  Requires BigLake
+    connection + external table definition pointing to GCS Delta directory.
+
+  Completed closure:
+  - BenchBox now uses mode-aware format selection so native/default flows remain
+    conservative.
+  - BigQuery Delta is only advertised when the run includes the required BigLake
+    connection configuration.
+  - Redshift Delta is only advertised when the run includes the required Spectrum/IAM
+    configuration.
+
+category: Platform Expansion
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Keep Redshift external Delta registration path and tests green"
+    status: done
+    details: |
+      Redshift has a prototype Spectrum-oriented Delta registration path.  Preserve the
+      implementation while the remaining selection/capability work is resolved.
+
+  - id: w2
+    summary: "Keep BigQuery BigLake Delta registration path and tests green"
+    status: done
+    details: |
+      BigQuery has a prototype BigLake Delta registration path.  Preserve the
+      implementation while the remaining selection/capability work is resolved.
+
+  - id: w3
+    summary: "Add mode-aware format selection before re-registering Redshift and BigQuery"
+    needs: [w1, w2]
+    status: done
+    details: |
+      BenchBox should only advertise Delta for Redshift and BigQuery when the selected
+      execution mode and adapter configuration can actually use the external-table path.
+      Until then, keep capability registration conservative.
+
+  - id: w4
+    summary: "Expand tests to cover final closure criteria for format selection"
+    needs: [w1, w2]
+    status: done
+    details: |
+      Preserve current mock-based Delta registration tests and add coverage for the
+      final mode-aware selection / capability behavior that will determine whether the
+      format can be safely exposed to users.
+
+deferred:
+  - id: d1
+    summary: "Integration tests with real Redshift/BigQuery instances"
+    reason: "Requires cloud credentials and running instances"
+  - id: d2
+    summary: "Iceberg support for Redshift (via Spectrum) and BigQuery (via BigLake)"
+    reason: "Lower priority than Delta; both platforms have evolving Iceberg support"
+
+must_preserve:
+  - "Redshift parquet/CSV COPY loading path must remain unchanged"
+  - "BigQuery parquet GCS load job path must remain unchanged"
+  - "format_capabilities.py fail-fast check: only re-register after loading code works"
+
+approach: |
+  Redshift Delta: Register Delta table in AWS Glue catalog, then create Redshift
+  Spectrum external table referencing the Glue table.  Requires IAM role with Glue
+  and S3 permissions.
+
+  BigQuery Delta: Create BigLake external table with Delta format.  Requires BigLake
+  connection resource and GCS bucket access.
+
+  Both implementations are cloud-specific and require careful credential/permission
+  handling.
+
+anti_patterns:
+  - "DO NOT register platforms in format_capabilities.py before loading code is tested -- because the fail-fast check will pass but load will fail at runtime -- implement and test first"
+  - "DO NOT hardcode cloud credentials or ARNs -- because these vary per deployment -- use adapter config/credentials pattern"
+
+verification:
+  - description: "Redshift and BigQuery adapter tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v -k 'redshift or bigquery' --no-header -q"
+    expected_output: "All tests pass"
+  - description: "Format capabilities tests pass with re-registered platforms"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/test_format_capabilities.py -v --no-header -q"
+    expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/bigquery.py"
+    - "benchbox/platforms/base/format_capabilities.py"
+    - "tests/unit/platforms/"

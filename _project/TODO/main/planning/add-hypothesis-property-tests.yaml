@@ -1,0 +1,189 @@
+id: add-hypothesis-property-tests
+title: "Add Hypothesis property-based tests for pure-function invariants"
+worktree: main
+priority: Medium-High
+status: Not Started
+description: |
+  Analysis of the full test suite (~16,800 test functions) identified ~20 tests
+  across 5 categories where property-based testing would genuinely add value by
+  replacing or augmenting manual parametrize lists with generated inputs.
+
+  These are pure-function tests asserting PROPERTIES (invariants that hold for
+  any valid input), not specific behaviors (exact output for exact input). The
+  remaining ~98% of the suite tests exact SQL strings, mock call sequences,
+  golden-file snapshots, or integration paths - none of which benefit from
+  Hypothesis.
+
+  Estimated impact: ~400 lines of manual test code replaced or augmented,
+  with significantly better edge-case coverage on those specific paths.
+
+  This is a quality enhancement, not a gap. The suite already has 1,352+
+  error-path tests and 161 parametrized test sets covering similar ground
+  manually.
+
+category: Testing & Quality
+
+metadata:
+  tags:
+    - testing
+    - quality
+    - property-based
+    - hypothesis
+  estimated_effort: "Medium"
+  created_date: "2026-03-27"
+  source_review: "Alpha-to-Beta readiness evaluation conversation"
+
+impact:
+  user_impact: |
+    None - testing-only change. No behavior or API changes.
+  maintainer_impact: |
+    New dev dependency (hypothesis). Developers working on these specific
+    modules get better regression coverage from fewer hand-written cases.
+  regression_risk: |
+    Very low. Hypothesis tests supplement existing tests; no existing tests
+    are deleted until the property-based replacement is proven equivalent.
+
+justification: |
+  Property-based testing finds edge cases humans miss (boundary values,
+  Unicode, extreme floats, empty inputs). The 5 candidate areas involve
+  string normalization, type mapping, serialization roundtrips, numeric
+  scaling, and parameter isolation - all classic Hypothesis sweet spots
+  where a single @given decorator replaces 10-20 manual parametrize cases.
+
+cost_benefit_analysis:
+  expected_benefits: |
+    Better edge-case coverage on normalization, type mapping, roundtrip
+    serialization, and numeric computation paths. Shrinks ~400 lines of
+    manual test cases into ~150 lines of property definitions.
+  expected_costs: |
+    New dev dependency. Hypothesis default (100 examples/test) adds ~2-3s
+    per property test. Team needs basic familiarity with strategies.
+  recommendation: |
+    Implement when convenient. Not blocking for any release. Start with
+    w1 (normalization) as a proof-of-concept to validate the approach
+    before committing to all 5 work units.
+
+work:
+  - id: w1
+    summary: "Add Hypothesis dependency and benchmark-ID normalization properties"
+    status: pending
+    needs: []
+    description: |
+      Add hypothesis to [project.optional-dependencies] dev extra.
+      Replace the 22-case parametrize in test_builder.py:test_normalize_benchmark_id
+      with property-based tests:
+      - Idempotency: normalize(normalize(x)) == normalize(x)
+      - Case insensitivity: normalize(upper(x)) == normalize(lower(x))
+      - Whitespace tolerance: normalize("  x  ") == normalize("x")
+      - Known inputs: normalize("TPC-H") == "tpch" (retain a few anchors)
+      Keep 3-4 explicit parametrize cases as regression anchors; replace the
+      remaining 18 with @given(st.text()).
+    files:
+      - pyproject.toml
+      - tests/unit/core/results/test_builder.py
+
+  - id: w2
+    summary: "Add type-mapping property tests for Redshift adapter"
+    status: pending
+    needs: [w1]
+    description: |
+      Replace the 16-case parametrize in test_redshift_adapter.py:test_type_mapping
+      and the 11-case test_map_external_column_type with property-based tests:
+      - Unknown types always map to VARCHAR(65535) fallback
+      - Known types are identity-mapped (pass-through property)
+      - Whitespace/case normalization is consistent
+      Generate random SQL type strings via st.from_regex or st.text and verify
+      the mapping function never crashes and always returns a valid SQL type.
+    files:
+      - tests/unit/platforms/test_redshift_adapter.py
+
+  - id: w3
+    summary: "Add config and credential roundtrip property tests"
+    status: pending
+    needs: [w1]
+    description: |
+      Add roundtrip property tests for serialization paths:
+      - Credential save/load: load(save(creds)) == creds
+      - Config YAML/JSON: load_config(write_config(data)) == data
+      Build Hypothesis strategies for credential dicts (st.fixed_dictionaries
+      with host/username/password fields) and config dicts (nested structures
+      matching ConfigManager schema). Verify roundtrip identity for any valid
+      input, not just the 2-3 manual examples currently tested.
+    files:
+      - tests/unit/platforms/credentials/test_credential_files.py
+      - tests/unit/core/test_config_utils.py
+
+  - id: w4
+    summary: "Add scale-factor arithmetic and parameter-isolation properties"
+    status: pending
+    needs: [w1]
+    description: |
+      Property tests for numeric computation:
+      - row_count(table, sf) == base_count * sf for all valid scale factors
+      - row_count is monotonically increasing in sf
+      - Parameter override isolation: override(Q_n) doesn't affect Q_m (n != m)
+      - Parameter merge: override(defaults, patch) preserves all non-patched keys
+      Use st.floats(min_value=0.01, max_value=10000) for scale factors and
+      st.integers(min_value=1, max_value=22) for query IDs.
+    files:
+      - tests/unit/core/tpch/test_tpch_generator.py
+      - tests/unit/core/test_parameter_parity.py
+
+  - id: w5
+    summary: "Add platform-capability consistency properties"
+    status: pending
+    needs: [w1]
+    description: |
+      Property tests for DataFrame platform capabilities:
+      - All registered platforms return valid capabilities (no crashes)
+      - max_recommended_sf is always positive
+      - Memory estimation is monotonically increasing in scale factor
+      - Case normalization: capabilities("polars") == capabilities("POLARS")
+      Use st.sampled_from(registered_platforms) for platform names and
+      st.floats for scale factors.
+    files:
+      - tests/unit/core/dataframe/test_dataframe_capabilities.py
+
+must_preserve:
+  - "All existing parametrize test cases still pass (keep 3-4 anchors per property)"
+  - "No existing test files deleted - only augmented"
+  - "CI test time increase < 15 seconds total across all new property tests"
+
+approach: |
+  Add hypothesis as dev-only dependency. Start with w1 as proof-of-concept.
+  Each work unit keeps a few explicit parametrize anchors alongside the new
+  @given tests so that specific known-good cases remain as regression tests.
+  Use hypothesis profiles: ci (100 examples), dev (10 examples) for speed.
+
+anti_patterns:
+  - "DO NOT replace exact-output tests with properties - only replace tests that assert invariants (idempotency, roundtrip, monotonicity, case-insensitivity)"
+  - "DO NOT add Hypothesis to mock-heavy or integration tests - it adds no value for call-sequence verification or real I/O"
+  - "DO NOT remove all parametrize anchors - keep 3-4 explicit cases per property as readable regression documentation"
+
+verification:
+  - description: "All existing tests still pass after adding Hypothesis"
+    command: "uv run -- python -m pytest tests/unit/core/results/test_builder.py tests/unit/platforms/test_redshift_adapter.py -q"
+    expected_output: "All tests pass"
+  - description: "Hypothesis tests discover no counterexamples"
+    command: "uv run -- python -m pytest -m hypothesis -q"
+    expected_output: "All property tests pass"
+  - description: "CI time impact is acceptable"
+    command: "uv run -- python -m pytest -m hypothesis --hypothesis-seed=0 -q --durations=10"
+    expected_output: "Total < 15 seconds"
+
+scope_limit:
+  only_modify:
+    - "pyproject.toml (dev dependency only)"
+    - "tests/unit/core/results/test_builder.py"
+    - "tests/unit/platforms/test_redshift_adapter.py"
+    - "tests/unit/platforms/credentials/test_credential_files.py"
+    - "tests/unit/core/test_config_utils.py"
+    - "tests/unit/core/tpch/test_tpch_generator.py"
+    - "tests/unit/core/test_parameter_parity.py"
+    - "tests/unit/core/dataframe/test_dataframe_capabilities.py"
+  do_not_touch:
+    - "Golden-file/snapshot tests"
+    - "Mock-heavy adapter tests"
+    - "Integration and E2E tests"
+    - "SQL exact-match tests"
+    - "Production source code"

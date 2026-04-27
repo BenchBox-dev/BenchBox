@@ -1,0 +1,329 @@
+id: github-archive-benchmark
+title: GitHub Archive Benchmark - Developer Activity Analytics Workload
+worktree: benchmark-expansion
+category: Benchmark Development
+priority: Low
+status: Not Started
+description: |
+  Implement a GitHub Archive benchmark using the GH Archive dataset, which records
+  the public GitHub timeline since 2011. This benchmark provides a realistic
+  event-driven analytics workload with nested JSON structures, enabling performance
+  testing of aggregations, trend analysis, and semi-structured data processing.
+
+  GitHub Archive is excellent for benchmarking because:
+  - Massive scale: 7.5+ billion events, continuously growing
+  - Real developer activity with natural distributions
+  - Event-driven schema with nested JSON payloads
+  - Multiple access methods (BigQuery, ClickHouse, direct download)
+  - Rich analytical patterns: trending repos, developer metrics, language trends
+
+  Use cases covered:
+  - Repository trending and popularity analysis
+  - Developer activity and contribution metrics
+  - Programming language ecosystem trends
+  - Open source project health metrics
+  - Event-based time-series analysis
+
+context_sections:
+- name: Data Sources
+  summary: |
+    **Primary Sources:**
+    | Source | Access | Update | Cost | Scale |
+    |--------|--------|--------|------|-------|
+    | gharchive.org | HTTP download | Hourly | Free | Full history |
+    | BigQuery | SQL query | Hourly | Free 1TB/mo | Full history |
+    | ClickHouse Demo | Pre-loaded | Hourly | Free | 3.1B+ events |
+
+    **Download Pattern:**
+    ```
+    https://data.gharchive.org/YYYY-MM-DD-H.json.gz
+    Example: https://data.gharchive.org/2025-01-12-15.json.gz
+    ```
+
+    **Recommended for BenchBox:**
+    - Direct download for reproducible benchmarks
+    - BigQuery for development/testing
+    - ClickHouse demo for query pattern reference
+
+- name: Schema Structure
+  summary: |
+    **Core Event Schema:**
+    | Field | Type | Description |
+    |-------|------|-------------|
+    | id | STRING | Unique event ID |
+    | type | STRING | Event type (22+ types) |
+    | actor | STRUCT | User performing action |
+    | repo | STRUCT | Target repository |
+    | payload | JSON | Event-specific data (nested) |
+    | public | BOOLEAN | Always true (public events) |
+    | created_at | TIMESTAMP | Event timestamp |
+
+    **Actor Structure:**
+    - id, login, display_login, gravatar_id, url, avatar_url
+
+    **Repo Structure:**
+    - id, name (owner/repo), url
+
+    **Payload Structure (varies by event type):**
+    - PushEvent: commits[], size, distinct_size, ref, head, before
+    - PullRequestEvent: action, number, pull_request{}
+    - IssuesEvent: action, issue{}
+    - WatchEvent: action (always "started" = star)
+
+- name: Event Types
+  summary: |
+    **22+ Event Types:**
+
+    | Category | Events | Description |
+    |----------|--------|-------------|
+    | Code | PushEvent, CreateEvent, DeleteEvent | Code changes |
+    | PRs | PullRequestEvent, PullRequestReviewEvent | Code review |
+    | Issues | IssuesEvent, IssueCommentEvent | Issue tracking |
+    | Social | WatchEvent, ForkEvent, MemberEvent | Engagement |
+    | Releases | ReleaseEvent | Version publishing |
+    | Wiki | GollumEvent | Documentation |
+    | Comments | CommitCommentEvent | Code discussion |
+
+    **Event Distribution (typical):**
+    - PushEvent: ~50% of all events
+    - WatchEvent: ~15%
+    - PullRequestEvent: ~10%
+    - IssuesEvent: ~5%
+    - Others: ~20%
+
+- name: Data Volumes
+  summary: |
+    **Historical Scale:**
+    | Metric | Value |
+    |--------|-------|
+    | Total events | 7.5+ billion |
+    | Monthly volume | ~30 million events |
+    | Unique repos | 164 million |
+    | Unique users | 34 million |
+    | Download size | 75 GB (compressed) |
+    | Loaded size | 200+ GB |
+
+    **Time-Based Scale Factors:**
+    | Period | Events | Compressed | Loaded |
+    |--------|--------|------------|--------|
+    | 1 day | 1-2M | 10-20 MB | 50-100 MB |
+    | 1 week | 7-14M | 70-140 MB | 350-700 MB |
+    | 1 month | 30M | 300 MB | 1-2 GB |
+    | 1 year | 360M+ | 3.6 GB | 15-20 GB |
+    | Full history | 7.5B+ | 75+ GB | 200+ GB |
+
+- name: Query Workload Categories
+  summary: |
+    **Repository Trends (5+ queries):**
+    - Trending repos by star growth
+    - Most-starred repositories
+    - Fastest growing projects
+    - Fork rate analysis
+    - Activity by programming language
+
+    **Developer Activity (4+ queries):**
+    - Top contributors by commits
+    - Active developers by repo
+    - Collaboration patterns
+    - Geographic/timezone distribution
+
+    **Language Ecosystem (4+ queries):**
+    - Language popularity trends
+    - Framework adoption rates
+    - Ecosystem health metrics
+    - Language migration patterns
+
+    **Project Health (4+ queries):**
+    - PR merge rates
+    - Issue response time
+    - Release frequency
+    - Community engagement
+
+    **Time-Series Analysis (4+ queries):**
+    - Activity by hour/day/week
+    - Seasonal patterns
+    - Event type distribution over time
+    - Growth trends
+
+- name: Scale Factor Design
+  summary: |
+    **TPC-aligned scale factors (SF=1 ≈ 1GB raw data):**
+
+    GitHub generates ~30M events/month (~1-2 GB). Scale factors use
+    time-based subsetting to maintain event coherence.
+
+    | Scale | Period | Events | Size (Raw) | Use Case |
+    |-------|--------|--------|------------|----------|
+    | 0.01 | ~6 hours | ~500K | ~10 MB | CI/testing |
+    | 0.1 | ~2 days | ~4M | ~100 MB | Development |
+    | 1.0 | ~2 weeks | ~15M | ~1 GB | Standard |
+    | 10.0 | ~5 months | ~150M | ~10 GB | Large scale |
+    | 100.0 | ~4 years | ~1.5B | ~100 GB | Extended |
+    | Full | All (2015+) | ~7.5B+ | ~200+ GB | Maximum |
+
+    **Scaling Strategy:**
+    - Time-based (contiguous periods) for trend analysis
+    - Recent data preferred for relevance
+    - Hourly files allow fine-grained control
+    - Post-2015 data only (Events API format)
+
+files_affected:
+- change_type: New
+  paths:
+  - benchbox/core/gharchive/__init__.py
+  - benchbox/core/gharchive/schema.py
+  - benchbox/core/gharchive/downloader.py
+  - benchbox/core/gharchive/queries.py
+  - benchbox/core/gharchive/benchmark.py
+  - tests/unit/core/gharchive/
+  - tests/integration/test_gharchive_duckdb.py
+
+- change_type: Modified
+  paths:
+  - benchbox/core/__init__.py
+  - benchbox/core/platform_registry.py
+
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - benchmark
+  - real-world
+  - github
+  - event-driven
+  - json
+  - semi-structured
+  estimated_effort: 3-4 weeks
+  created_date: "2026-01-12"
+  dependencies:
+  - Existing NYC Taxi benchmark pattern (benchbox/core/nyctaxi/) for downloader design
+  - BaseBenchmark class (benchbox/core/base.py) for benchmark integration
+  - ClickBench benchmark (benchbox/core/clickbench/) for JSON handling patterns
+  notes: |
+    - Data continuously updated hourly
+    - JSON payload handling is key design decision
+    - ClickHouse demo provides query pattern reference
+    - Consider bot filtering (many automated events)
+    - Schema changed in March 2015 (Timeline API -> Events API)
+    - Initial implementation targets post-2015 data only (Events API format)
+
+  migration_review_required: true
+must_preserve:
+- "Existing ClickBench JSON handling patterns unchanged"
+- "BaseBenchmark interface contract unchanged"
+
+anti_patterns:
+- "DO NOT implement pre-2015 Timeline API format - because the schema is incompatible with post-2015 and adds complexity with
+  no benefit - document as out-of-scope"
+- "DO NOT download from gharchive.org in unit tests - because the service rate-limits and files are 50MB+ per hour - use synthetic
+  test fixtures"
+
+verification:
+- description: "GitHub Archive benchmark module imports"
+  command: "uv run -- python -c \"from benchbox.core.github_archive import GitHubArchiveBenchmark; print('OK')\""
+  expected_output: "OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/github_archive/ -v --tb=short"
+  expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/github_archive/"
+  - "tests/unit/core/github_archive/"
+  do_not_modify:
+  - "benchbox/core/clickbench/"
+  - "benchbox/core/runner.py"
+
+success_metrics:
+- Hourly file download and parsing working
+- 20+ analytical queries covering all categories
+- Scale factors from 0.01 (~10MB) to 100.0 (~100GB) working
+- JSON payload extraction efficient on DuckDB
+- Trend queries under 30 seconds for SF=1.0 (~1GB, ~15M events)
+work:
+- id: w1
+  summary: Design data acquisition approach
+  status: pending
+  notes: "- Implement hourly file downloader from gharchive.org\n- Support date range specification\n- Handle gzip decompression\n\
+    - Convert NDJSON to Parquet for efficiency\n"
+- id: w2
+  summary: Create gharchive module structure
+  status: pending
+  notes: "- benchbox/core/gharchive/__init__.py\n- benchbox/core/gharchive/schema.py\n- benchbox/core/gharchive/downloader.py\n\
+    - benchbox/core/gharchive/queries.py\n- benchbox/core/gharchive/benchmark.py\n"
+- id: w3
+  summary: Implement schema definitions
+  status: pending
+  notes: "- Events table with JSON payload column\n- OR flattened table with sparse columns per event type\n- Consider ClickHouse
+    approach (flattened for performance)\n"
+- id: w4
+  summary: Design payload extraction strategy
+  status: pending
+  notes: "Options:\nA) Keep payload as JSON, extract at query time\nB) Pre-extract common fields into separate columns\nC)
+    Create separate tables per event type\n\nTrade-offs: A is flexible but slower, B/C are faster but more complex\n"
+- id: w5
+  summary: Handle 2015 schema change (Timeline API → Events API)
+  status: pending
+  notes: "GitHub Archive changed schema in March 2015:\n- Pre-2015: Timeline API format (different event structure)\n- Post-2015:
+    Events API format (current structure)\n\nOptions:\nA) Only support post-2015 data (simpler, recommended for MVP)\nB) Create
+    schema adapter for pre-2015 events\nC) Document limitation and allow future extension\n\nRecommendation: Option A for
+    initial implementation, document\npre-2015 as out-of-scope with future enhancement path\n"
+- id: w6
+  summary: Implement hourly file downloader
+  status: pending
+  notes: "- Download from gharchive.org\n- Support date range: YYYY-MM-DD to YYYY-MM-DD\n- Parallel downloads for efficiency\n\
+    - Resume capability for large ranges\n"
+- id: w7
+  summary: Implement NDJSON to Parquet conversion
+  status: pending
+  notes: "- Parse nested JSON structures\n- Flatten actor and repo structures\n- Handle payload as JSON column or extract\n\
+    - Partition by date for efficient queries\n"
+- id: w8
+  summary: Implement platform data loading
+  status: pending
+  notes: "- DuckDB: read_json_auto or Parquet\n- ClickHouse: JSONEachRow format\n- PostgreSQL: JSONB column for payload\n\
+    - Snowflake: VARIANT type for payload\n"
+- id: w9
+  summary: Implement repository trend queries
+  status: pending
+  notes: "- gh_trending_repos: Stars gained in period\n- gh_top_starred: All-time most starred\n- gh_fastest_growing: Growth
+    rate ranking\n- gh_fork_rate: Fork to star ratio\n- gh_language_popularity: Events by language\n"
+- id: w10
+  summary: Implement developer activity queries
+  status: pending
+  notes: "- gh_top_contributors: By push count\n- gh_active_developers: Unique actors per repo\n- gh_collaboration: Co-contributor
+    patterns\n- gh_developer_retention: Return rate analysis\n"
+- id: w11
+  summary: Implement language ecosystem queries
+  status: pending
+  notes: "- gh_language_trends: Popularity over time\n- gh_framework_adoption: Library/framework events\n- gh_ecosystem_health:
+    Activity distribution\n- gh_language_migration: Developer transitions\n"
+- id: w12
+  summary: Implement project health queries
+  status: pending
+  notes: "- gh_pr_merge_rate: PRs merged vs opened\n- gh_issue_response: Time to first comment\n- gh_release_frequency: Releases
+    per month\n- gh_community_engagement: Stars, forks, comments\n"
+- id: w13
+  summary: Implement time-series queries
+  status: pending
+  notes: "- gh_hourly_activity: Events by hour\n- gh_weekly_patterns: Day-of-week distribution\n- gh_event_distribution: Type
+    breakdown over time\n- gh_growth_trends: YoY comparison\n"
+- id: w14
+  summary: Implement GitHubArchiveBenchmark class
+  status: pending
+  notes: "- Inherit from BaseBenchmark\n- Handle JSON/semi-structured data\n- Implement standard phases\n"
+- id: w15
+  summary: Register benchmark with CLI
+  status: pending
+  notes: "- Add to platform_registry.py\n- Add to benchbox run --benchmark gharchive\n"
+- id: w16
+  summary: Add platform-specific variants
+  status: pending
+  notes: "- JSON extraction syntax differences\n- Timestamp handling variations\n- String pattern matching for repo names\n"
+- id: w17
+  summary: Create unit and integration tests
+  status: pending
+- id: w18
+  summary: Document benchmark usage
+  status: pending
+  notes: "- Scale factor recommendations\n- Query catalog reference\n- JSON handling patterns\n"

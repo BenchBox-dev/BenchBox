@@ -1,0 +1,274 @@
+# MCP Visualization Tools - Expose BenchBox charting capabilities to AI agents
+#
+# Location: _project/TODO/mcp-integration/active/mcp-visualization-tools.yaml
+
+id: mcp-visualization-tools
+title: "Add visualization tools to MCP server"
+worktree: mcp-integration
+priority: Medium-High
+status: Completed
+completed_date: "2026-01-28"
+category: Core Functionality
+
+description: |
+  Expose BenchBox's existing visualization infrastructure through the MCP server,
+  enabling AI agents to generate charts and visualizations from benchmark results.
+
+  Currently, the MCP server provides data-only tools (get_results, compare_results,
+  get_performance_trends) but cannot generate visual outputs. The visualization
+  module at benchbox/core/visualization/ has mature Plotly-based charting
+  capabilities that should be accessible via MCP.
+
+  This enables AI agents to:
+  - Generate performance comparison charts from benchmark results
+  - Create trend visualizations for regression analysis
+  - Export publication-ready charts in multiple formats
+  - Use pre-defined templates for common visualization patterns
+
+tasks:
+  phases:
+  - phase: "Phase 1: Tool Design and Scaffolding"
+    done: true
+    items:
+    - summary: "Create benchbox/mcp/tools/visualization.py module"
+      done: true
+      subtasks:
+      - summary: "Define tool annotations (readOnlyHint=False since it creates files)"
+        done: true
+      - summary: "Import visualization module components"
+        done: true
+      - summary: "Add register_visualization_tools(mcp) function"
+        done: true
+
+    - summary: "Design tool interfaces and return schemas"
+      done: true
+      subtasks:
+      - summary: "list_chart_templates() - returns available templates with descriptions"
+        done: true
+      - summary: "generate_chart() - single chart from result data"
+        done: true
+      - summary: "generate_chart_set() - multiple charts using a template"
+        done: true
+      - summary: "compare_results_chart() - comparison chart from multiple results"
+        done: true
+
+  - phase: "Phase 2: Core Tool Implementation"
+    done: true
+    items:
+    - summary: "Implement list_chart_templates tool"
+      done: true
+      subtasks:
+      - summary: "Return template name, description, chart_types, formats"
+        done: true
+      - summary: "Include chart type descriptions (performance_bar, distribution_box, etc.)"
+        done: true
+
+    - summary: "Implement generate_chart tool"
+      done: true
+      subtasks:
+      - summary: "Accept result_file parameter"
+        done: true
+      - summary: "Support chart_type parameter (performance_bar, time_series, cost_scatter, distribution_box, query_heatmap)"
+        done: true
+      - summary: "Support format parameter (png, svg, pdf, html)"
+        done: true
+      - summary: "Support optional title, output_dir parameters"
+        done: true
+      - summary: "Return file path and base64-encoded data via include_data parameter"
+        done: true
+      - summary: "Handle missing visualization dependencies gracefully"
+        done: true
+
+    - summary: "Implement generate_chart_set tool"
+      done: true
+      subtasks:
+      - summary: "Accept comma-separated result_files and template name"
+        done: true
+      - summary: "Use ResultPlotter to generate all charts in template"
+        done: true
+      - summary: "Return list of generated file paths"
+        done: true
+
+    - summary: "Implement compare_results_chart tool"
+      done: true
+      subtasks:
+      - summary: "Accept two or more result_files (comma-separated)"
+        done: true
+      - summary: "Generate head-to-head or multi-platform comparison chart"
+        done: true
+      - summary: "Return platforms_compared in response"
+        done: true
+
+  - phase: "Phase 3: Integration and Registration"
+    done: true
+    items:
+    - summary: "Register visualization tools in server.py"
+      done: true
+      subtasks:
+      - summary: "Import register_visualization_tools"
+        done: true
+      - summary: "Add registration call with logging"
+        done: true
+      - summary: "Update server instructions to mention visualization"
+        done: true
+
+    - summary: "Handle optional dependencies"
+      done: true
+      subtasks:
+      - summary: "Check for plotly/kaleido availability"
+        done: true
+      - summary: "Return helpful error with installation instructions if missing"
+        done: true
+      - summary: "Graceful degradation (HTML-only if kaleido missing)"
+        done: true
+
+    - summary: "Define output directory strategy"
+      done: true
+      subtasks:
+      - summary: "Default to benchmark_runs/charts/"
+        done: true
+      - summary: "Support custom output_dir parameter"
+        done: true
+      - summary: "Consistent naming via ResultPlotter slug generation"
+        done: true
+
+  - phase: "Phase 4: Testing"
+    done: true
+    items:
+    - summary: "Unit tests for visualization tools"
+      done: true
+      subtasks:
+      - summary: "Test list_chart_templates returns valid data"
+        done: true
+      - summary: "Test dependency checking helpers"
+        done: true
+      - summary: "Test error handling for missing dependencies"
+        done: true
+      - summary: "Test error handling for invalid chart types"
+        done: true
+      - summary: "Test path resolution and base64 encoding"
+        done: true
+
+    - summary: "Integration tests (deferred)"
+      done: true
+      subtasks:
+      - summary: "Deferred - requires generated benchmark results"
+        done: true
+
+  - phase: "Phase 5: Documentation"
+    done: true
+    items:
+    - summary: "Update MCP server documentation"
+      done: true
+      subtasks:
+      - summary: "Tool docstrings serve as primary documentation"
+        done: true
+      - summary: "Server instructions updated to mention visualization"
+        done: true
+
+metadata:
+  owners:
+  - joe
+  tags:
+  - mcp
+  - visualization
+  - ai-agents
+  - plotly
+  estimated_effort: "3-5 days"
+  created_date: "2026-01-28"
+
+impact:
+  business_value: |
+    Enables AI agents to provide complete benchmark analysis workflows including
+    visual outputs. Users can request "run TPC-H on DuckDB and show me a chart"
+    without manual intervention.
+  user_impact: |
+    AI assistants can generate publication-ready charts directly, eliminating
+    the need to manually run CLI commands or write visualization code.
+  technical_debt: |
+    Low - leverages existing visualization infrastructure without duplication.
+    Adds thin MCP wrapper around proven components.
+
+files_affected:
+  added:
+  - benchbox/mcp/tools/visualization.py
+  - tests/unit/mcp/test_visualization_tools.py
+  modified:
+  - benchbox/mcp/server.py
+  - benchbox/mcp/tools/__init__.py
+
+commits:
+- "9568f901"
+
+context_sections:
+  "Existing Visualization Infrastructure": |
+    BenchBox has a complete visualization module at benchbox/core/visualization/:
+
+    Chart Types (charts.py):
+    - PerformanceBarChart: Multi-platform performance comparison
+    - TimeSeriesLineChart: Trend analysis over time
+    - CostPerformanceScatterPlot: Cost vs performance analysis
+    - DistributionBoxPlot: Query timing distribution
+    - QueryVarianceHeatmap: Query performance patterns
+
+    Templates (templates.py):
+    - "default": Single run baseline (bar + box + heatmap)
+    - "flagship": Eight-platform comparison with heatmap and cost frontier
+    - "head_to_head": Two-platform comparison with win/loss emphasis
+    - "trends": Multi-period performance trend lines
+    - "cost_optimization": Cost breakdown and price/performance frontier
+
+    Export Formats (exporters.py):
+    - PNG (requires kaleido)
+    - SVG (requires kaleido)
+    - PDF (requires kaleido)
+    - HTML (always available)
+
+    High-Level API (result_plotter.py):
+    - ResultPlotter class loads results from JSON or BenchmarkResults
+    - Supports theme customization via ThemeSettings
+    - Generates multiple charts per template
+
+  "MCP Tool Design Considerations": |
+    Return Value Strategy:
+    - Return file path for generated chart
+    - Optionally include base64-encoded image data for immediate display
+    - Include metadata (dimensions, format, chart_type)
+
+    Dependency Handling:
+    - Plotly is required for all charts
+    - Kaleido is required for PNG/SVG/PDF export
+    - HTML export works without kaleido
+    - Tools should check dependencies and return helpful errors
+
+    Integration with Existing Tools:
+    - generate_chart can accept result_id from get_results/list_recent_runs
+    - compare_results_chart parallels compare_results but produces visual output
+    - generate_chart_set uses same result_id pattern
+
+technical_requirements:
+  dependencies:
+  - "plotly>=5.24.0 (required)"
+  - "kaleido>=0.2.1 (optional, for PNG/SVG/PDF)"
+  constraints:
+  - "Must handle missing optional dependencies gracefully"
+  - "Must not break MCP server startup if visualization deps missing"
+  - "Chart files must be written to accessible location"
+  compatibility: |
+    - Python 3.10+ (MCP server requirement)
+    - Compatible with existing result file format
+    - Works with both local and cloud benchmark results
+
+success_metrics:
+- "list_chart_templates returns all 5 templates with accurate descriptions"
+- "generate_chart produces valid PNG/HTML for all 5 chart types"
+- "generate_chart_set produces complete chart sets matching template specs"
+- "compare_results_chart generates meaningful comparison visualizations"
+- "All tools return helpful errors when dependencies are missing"
+- "Unit test coverage >= 80% for new code"
+
+open_questions:
+- "Should we support streaming/progressive chart generation for large datasets?"
+- "Should chart tools return base64 data by default or only on request?"
+- "Should we add a get_chart_preview tool for low-res previews?"
+- "How should we handle theme customization - expose full ThemeSettings or use presets?"

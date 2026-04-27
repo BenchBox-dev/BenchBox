@@ -1,0 +1,56 @@
+id: review-dependency-upper-bounds-quarterly
+title: "Quarterly review of dependency upper bounds"
+worktree: main
+priority: Low
+status: Not Started
+category: Code Quality and Technical Debt
+description: |
+  Quarterly maintenance reminder. Upper-bounds policy (see AGENTS.md
+  "Dependency Upper Bounds") caps the highest-risk deps to catch breaking
+  majors in CI rather than silently in `uv sync`. This item exists so the
+  bounds don't rot and quietly block legitimate upgrades.
+
+  Run every quarter:
+    1. `uv run -- python scripts/check_dependency_bounds.py --report-only`
+       - single source of truth for bounds health (same script the release
+       gate uses; see quality-gate-dependency-bounds-in-release-automation).
+    2. `uv lock --upgrade --dry-run` to see what would resolve without caps.
+    3. For each capped dep flagged ceiling-minus-one: check the upstream
+       changelog for the next major; decide bump vs hold.
+    4. Bump bounds ONLY after validating on the new major (fast suite +
+       standards suite). Never reactively.
+    5. Remove bounds that no longer protect against real risk (e.g. a dep
+       has stabilized its API).
+
+work:
+  - id: w1
+    summary: "Run `uv run -- python scripts/check_dependency_bounds.py --report-only` and `uv lock --upgrade --dry-run` - capture what the release gate will see and what would move without caps"
+    status: pending
+  - id: w2
+    summary: "For each capped dep flagged ceiling-minus-one, check upstream changelog for breaking changes in the next major"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Decide bump/hold/remove per dep; if bumping, run full fast + standards suite on new major before changing pyproject.toml"
+    needs: [w2]
+    status: pending
+
+files_affected:
+  modified:
+    - "pyproject.toml"
+    - "uv.lock"
+
+must_preserve:
+  - "Fast test suite still green after any bound change"
+  - "Bounds policy (cap only high-risk, document rationale) unchanged"
+
+approach: |
+  This is a low-priority maintenance checkpoint, not a deliverable. Close
+  with a short note in the commit message: which bounds reviewed, which
+  bumped, which held, why.
+
+metadata:
+  tags: ["quality-plan", "maintenance", "supply-chain", "deps"]
+  estimated_effort: "Small (1-2 hours per quarter)"
+  created_date: "2026-04-13"
+  recurrence: "quarterly"

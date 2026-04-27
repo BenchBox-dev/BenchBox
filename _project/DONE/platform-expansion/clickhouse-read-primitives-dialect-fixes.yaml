@@ -1,0 +1,145 @@
+id: clickhouse-read-primitives-dialect-fixes
+title: "Fix ClickHouse read_primitives failures - dialect overrides, expected_failures, and error capture"
+worktree: platform-expansion
+category: Platform Expansion
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-12"
+description: |
+  64/450 query failures across 22 unique queries in read_primitives on ClickHouse.
+  These break into several categories:
+
+  Dialect fixes needed:
+  - any_value_simple, any_value_with_filter: WHERE x = ANY(subquery) → WHERE x IN (subquery) (Pattern F)
+  - array_length: LENGTH(array_col) mistranslated to lengthUTF8() → should use length()
+  - statistical_percentiles, intrinsic_appx_median: PERCENTILE_CONT WITHIN GROUP → quantile() (Pattern C)
+  - statistical_correlation: likely CORR() function differences
+  - timeseries_trend_analysis, window_moving_frame, window_multiple_orderings: window function syntax differences
+  - qualify_cume_dist: QUALIFY clause not supported in ClickHouse
+
+  Expected failures (not fixable as dialect issues):
+  - aggregation_groupby_large: Timeout (907s vs 300s limit)
+  - fulltext_boolean_search, fulltext_phrase_search, fulltext_simple_search: full-text search syntax not portable
+
+  Secondary bug: The result JSON shows no error messages for most failures. The ClickHouse
+  adapter is capturing failure status but swallowing the exception message (Pattern G).
+
+work:
+  - id: w1
+    summary: "Fix ANY(subquery) → IN (subquery) for any_value_simple and any_value_with_filter queries"
+    status: done
+
+  - id: w2
+    summary: "Fix array_length LENGTH() → length() (not lengthUTF8) for array columns"
+    status: done
+
+  - id: w3
+    summary: "Add PERCENTILE_CONT → quantile() overrides for statistical_percentiles and intrinsic_appx_median"
+    status: done
+
+  - id: w4
+    summary: "Keep working fulltext_* ClickHouse variants enabled and document aggregation_groupby_large as a timeout-risk query without hard-skipping it"
+    status: done
+
+  - id: w5
+    summary: "Fix window function syntax failures: timeseries_trend_analysis, window_moving_frame, window_multiple_orderings - adjust frame specs and ORDER BY for ClickHouse"
+    needs: [w1, w2, w3]
+    status: done
+
+  - id: w6
+    summary: "Fix QUALIFY clause failures: qualify_cume_dist - rewrite as subquery with WHERE on window result"
+    needs: [w1, w2, w3]
+    status: done
+
+  - id: w7
+    summary: "Fix statistical function failures: statistical_correlation - investigate CORR() syntax differences"
+    needs: [w1, w2, w3]
+    status: done
+
+  - id: w8
+    summary: "Verify all overrides and expected_failure markers"
+    needs: [w4, w5, w6, w7]
+    status: done
+
+deferred:
+  - summary: "Fix ClickHouse adapter error message capture (Pattern G)"
+    reason: "Tracked separately in clickhouse-error-message-capture TODO"
+
+files_affected:
+  modified:
+    - "benchbox/core/read_primitives/benchmark.py"
+    - "benchbox/core/read_primitives/queries.py"
+    - "benchbox/core/read_primitives/catalog/queries.yaml"
+
+resolution_notes: |
+  Root cause: get_queries(dialect=...) applied sqlglot postgres→clickhouse to
+  every query including ones that already had a clickhouse variant, so
+  native ClickHouse syntax in the variants (length(array), quantile(p)(col),
+  toDate(...), etc.) was mangled before execution. Fixed by adding
+  ReadPrimitivesQueryManager.has_variant and routing variants through
+  get_queries() without re-translation.
+
+  With the foundation fix, these variants - several already present in the
+  catalog - now survive to the adapter: any_value_simple/_with_filter (any()),
+  array_length (length()), intrinsic_appx_median/statistical_percentiles
+  (quantile()), statistical_correlation (corr/covarPop/covarSamp),
+  timeseries_trend_analysis (toStartOfMonth + manual slope),
+  window_moving_frame (ROWS frame), qualify_cume_dist (subquery+WHERE),
+  fulltext_* (LIKE fallback).
+
+  Added: window_multiple_orderings clickhouse variant (subquery wrapper
+  to avoid alias + NULLS FIRST conflict).
+
+  aggregation_groupby_large remains runnable on ClickHouse. The observed
+  ~900s runtime is a default-timeout issue, not a dialect incompatibility,
+  so it was not converted into skip_on or an expected failure marker.
+
+  Fulltext queries were not marked expected_failure because working
+  LIKE-based ClickHouse variants already exist - the anti_pattern guidance
+  prefers dialect overrides over skipping when the query is fixable.
+
+  Error-capture work deferred to clickhouse-error-message-capture TODO.
+
+must_preserve:
+  - "Base read_primitives query files unchanged - other platforms use standard SQL"
+  - "Override queries return identical column names, types, and row semantics"
+  - "Existing ClickHouse read_primitives results for passing queries unaffected"
+
+anti_patterns:
+  - "DO NOT modify base query files - because other platforms depend on standard SQL - create clickhouse_sql/ overrides instead"
+  - "DO NOT mark fixable queries as expected_failure - because dialect overrides are preferred over skipping"
+  - "DO NOT use skip_on for runtime-only timeout risk - reserve skip_on for queries that are genuinely unsupported on that dialect"
+
+scope_limit:
+  include:
+    - "benchbox/core/read_primitives/queries/"
+  exclude:
+    - "benchbox/platforms/clickhouse/adapter.py - error capture tracked in clickhouse-error-message-capture"
+
+approach: |
+  Categorize each of the 22 failing queries into: fixable (dialect override),
+  expected_failure (platform limitation), or needs-investigation. Work through
+  fixable queries first using ClickHouse override patterns. Window function and
+  QUALIFY fixes may require subquery rewrites rather than simple function substitutions.
+
+verification:
+  - description: "ClickHouse read_primitives overrides load and pass"
+    command: "uv run -- python -m pytest tests/ -v -k 'read_primitives and clickhouse'"
+    expected_output: "Tests pass confirming IN-subquery, length(), quantile(), window, and QUALIFY overrides"
+  - description: "Timeout-only ClickHouse query remains selectable"
+    command: "uv run -- python -m pytest tests/unit/core/read_primitives/test_benchmark_variants.py -k aggregation_groupby_large"
+    expected_output: "aggregation_groupby_large still appears in clickhouse get_queries() output"
+
+metadata:
+  tags:
+    - clickhouse
+    - read-primitives
+    - dialect-override
+    - sf1-failures
+  created_date: "2026-04-08"
+  estimated_effort: "2-3 days"
+
+impact:
+  business_value: |
+    Fixes majority of 64 query failures. read_primitives success rate improves
+    from 85.8% toward 95%+ after dialect fixes and expected_failure markers.

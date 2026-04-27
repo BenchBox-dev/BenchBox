@@ -45,8 +45,10 @@ dependencies = [
     "pyarrow>=21.0.0,<25.0.0",
     "numpy>=1.24.0",
     "zstandard>=0.20.0",
-    "grpcio>=1.48.1",
-    "grpcio-status>=1.48.1",
+    # grpcio / grpcio-status are NOT declared at the core level. They are
+    # pulled in transitively by optional cloud / connectivity extras
+    # (e.g. influxdb3-python, snowflake, databricks-sdk, pyspark[connect]).
+    # Users without those extras don't pay the grpc weight.
 ]
 
 [tool.setuptools]
@@ -58,9 +60,6 @@ include = ["benchbox*"]
 exclude = [
     "benchmark_runs",
     "benchmark_runs.*",
-    # benchbox.release contains internal release tooling — never ship in the default wheel.
-    "benchbox.release",
-    "benchbox.release.*",
     # benchbox.experimental is intentionally INCLUDED in the default wheel (Option A, Beta contract).
     # It is an explicitly unsupported namespace with no CLI/registry integration.
     # See README.md "Beta Software" section for the documented support boundary.

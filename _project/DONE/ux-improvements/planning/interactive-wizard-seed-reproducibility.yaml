@@ -1,0 +1,64 @@
+id: interactive-wizard-seed-reproducibility
+title: "Add --seed option to interactive wizard for reproducibility"
+worktree: ux-improvements
+priority: High
+status: Not Started
+description: |
+  The CLI supports `--seed <int>` for reproducible query parameter generation, which
+  is critical for:
+  1. Reproducible benchmark runs
+  2. Official TPC-compliant benchmarks
+  3. Performance regression testing
+  4. Comparing results across different runs
+
+  The interactive wizard passes seed=None, making benchmark results non-reproducible.
+
+category: User Experience
+
+tasks:
+  phases:
+  - phase: "Phase 1: Implementation"
+    done: false
+    items:
+    - summary: "Add optional seed prompt in advanced configuration"
+      done: false
+    - summary: "Generate random seed suggestion for user convenience"
+      done: false
+    - summary: "Display seed in configuration summary"
+      done: false
+    - summary: "Wire seed to benchmark options"
+      done: false
+
+  - phase: "Phase 2: Testing"
+    done: false
+    items:
+    - summary: "Verify same seed produces same query parameters"
+      done: false
+    - summary: "Test seed validation (positive integers)"
+      done: false
+
+metadata:
+  tags:
+  - cli
+  - ux
+  - interactive
+  - reproducibility
+  estimated_effort: "Small"
+  created_date: "2025-12-21"
+
+impact:
+  user_impact: |
+    Enables reproducible benchmarks:
+    - Compare runs with identical parameters
+    - Debug performance regressions
+    - Share reproducible configurations
+
+files_affected:
+  modified:
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/cli/benchmarks.py"
+
+success_metrics:
+- "Seed option available in wizard"
+- "Same seed produces identical query parameters"
+- "Seed displayed in result metadata"

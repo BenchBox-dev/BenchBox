@@ -1,0 +1,133 @@
+id: define-phase-3-promotion-metrics
+title: "Define Phase 3 promotion metrics, dashboard, and review cadence"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+deps:
+  needs:
+  - implement-pr-based-result-submission-workflow
+
+description: |
+  The strategy doc explicitly defers Phase 3 (hosted submission API) until
+  Phase 2 PR volume justifies the operational cost. It cites indicators
+  ("submission volume exceeds ~50/month sustained", "maintainer review
+  becomes a sustained bottleneck", etc.) but no one is currently measuring
+  those indicators, and there is no decision moment where someone is asked
+  to look.
+
+  Without measurement and a forcing function, the Phase 3 promotion
+  decision will be made by whoever feels frustrated first - which is
+  exactly the kind of ad-hoc engineering decision the strategy doc is
+  trying to prevent. This item operationalizes the trigger: pick the
+  metrics, build the cheapest possible dashboard, and put a review on
+  someone's calendar.
+
+work:
+- id: w1
+  summary: "Pick concrete promotion metrics and thresholds"
+  status: pending
+  notes: |
+    From the strategy doc indicators, choose 4-6 measurable signals.
+    Suggested starting set:
+      - Merged community submissions / month (threshold 50 sustained)
+      - Median PR review latency in hours (threshold 72h)
+      - PR backlog (open >7 days) (threshold 5 sustained)
+      - Requests for private/unlisted results (threshold 3 distinct
+        requests)
+      - Submissions blocked by maintainer-only constraints (threshold 5)
+      - Org-account / team-space requests (threshold 3 distinct)
+    Document each metric with: query/source, threshold, what it implies
+    if breached. Save as
+    `_project/analysis/phase-3-promotion-metrics.md`.
+
+- id: w2
+  summary: "Build a minimal `scripts/phase2_metrics.py` that computes the metrics"
+  needs: [w1]
+  status: pending
+  notes: |
+    Inputs:
+      - GitHub API (PRs against `published-results`, labels, merge dates,
+        review timestamps) via `gh` CLI subprocess or PyGithub.
+      - Optional: user-feedback file `_project/notes/phase-2-requests.md`
+        for the qualitative metrics.
+    Output: markdown report to stdout (or `--output FILE`), one section
+    per metric, current value vs threshold, simple Y/N "breached?" flag.
+    Read-only; no API writes; no auth beyond `gh auth status`.
+
+- id: w3
+  summary: "Schedule a quarterly review and document the promotion procedure"
+  needs: [w2]
+  status: pending
+  notes: |
+    Add to `_project/analysis/phase-3-promotion-metrics.md`:
+      - Review cadence: quarterly (first Monday of each quarter).
+      - Owner: BenchBox maintainer rotation.
+      - Procedure: run `phase2_metrics.py`, paste output to handoff file
+        `_project/handoffs/phase-3-review-<date>.md`, decide whether any
+        threshold breach justifies promoting
+        `design-results-ingest-storage-and-derived-read-model` and
+        `integrate-benchbox-cli-submit-and-service-auth` to Active.
+    Add a calendar reminder (or repo-level reminder issue) for the next
+    review date. Calendar = source of truth; this TODO doesn't try to
+    invent a scheduler.
+
+- id: w4
+  summary: "Run the first baseline review and capture the starting state"
+  needs: [w3]
+  status: pending
+  notes: |
+    Run the script today against the (currently small) Phase 2 dataset
+    and commit the baseline report to
+    `_project/handoffs/phase-3-review-baseline-<date>.md`. Even if all
+    thresholds are far from breached, the baseline shows the trajectory
+    over time.
+
+verification:
+- description: "Promotion metrics doc exists with concrete thresholds"
+  command: "test -f _project/analysis/phase-3-promotion-metrics.md && grep -c 'threshold' _project/analysis/phase-3-promotion-metrics.md"
+  expected_output: ">= 4"
+- description: "Metrics script runs and produces a report"
+  command: "uv run python scripts/phase2_metrics.py"
+  expected_output: "exit 0, markdown output with one section per metric"
+
+must_preserve:
+- Strategy doc's deferral of Phase 3 - this TODO measures the trigger, doesn't pull it.
+- Existing Phase 3 planning TODOs (`design-results-ingest-storage-and-derived-read-model`, `integrate-benchbox-cli-submit-and-service-auth`, `operate-results-platform-security-observability-and-abuse-controls`) remain Not Started until a review explicitly promotes them.
+
+anti_patterns:
+- DO NOT start any Phase 3 implementation work as part of this TODO - because that defeats the deferral the strategy doc explicitly requires; this is measurement and decision plumbing only.
+- DO NOT pick metrics that can't be measured cheaply - because a dashboard nobody can build is the same as no dashboard; favor `gh` CLI queries and a flat notes file over building a metrics service.
+- DO NOT set the thresholds so low that they trip on noise - because false promotion of Phase 3 wastes the largest engineering investment in the project.
+
+scope_limit:
+  only_modify:
+  - _project/analysis/phase-3-promotion-metrics.md
+  - scripts/phase2_metrics.py
+  - _project/handoffs/phase-3-review-baseline-*.md
+  - _project/notes/phase-2-requests.md  # qualitative request log
+  do_not_touch:
+  - benchbox/
+  - results-explorer/
+  - _project/TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+  - _project/TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+  - _project/TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+
+metadata:
+  tags:
+  - results
+  - phase-3
+  - metrics
+  - governance
+  estimated_effort: "Small"
+  created_date: "2026-04-12"
+
+impact:
+  business_value: |
+    Converts the strategy doc's "only build Phase 3 if demand warrants"
+    from a vibe into a measurable decision. Avoids both premature
+    investment and silently outgrowing Phase 2.
+  user_impact: |
+    Indirect: users get Phase 3 features (private results, hosted API,
+    org spaces) at the right moment instead of too early or too late.

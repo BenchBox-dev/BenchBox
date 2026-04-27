@@ -1,0 +1,636 @@
+id: dataframe-tuning-configuration-support
+title: DataFrame Tuning Configuration Support
+worktree: dataframe-tuning
+category: Platform Enhancement
+priority: High
+status: Not Started
+description: 'Implement a tuning configuration framework for DataFrame adapters that parallels the
+
+  SQL tuning system. Unlike SQL adapters where tuning affects schema and table creation,
+
+  DataFrame tuning focuses on runtime execution parameters, memory management, and
+
+  parallelism settings.
+
+
+  Current State:
+
+  - DataFrame adapters have ZERO tuning framework integration
+
+  - SQL adapters use UnifiedTuningConfiguration with 13 TuningType options
+
+  - DataFrame adapters only accept constructor parameters for basic settings
+
+  - No way to load/save DataFrame tuning configs from YAML
+
+  - No validation or platform compatibility checking
+
+
+  This TODO implements a parallel tuning system designed for DataFrame semantics.
+
+  '
+context_sections:
+- name: Research Summary - DataFrame Tuning Capabilities
+  summary: 'Based on comprehensive research of official documentation and best practices:
+
+
+    **Polars**:
+
+    - POLARS_MAX_THREADS: Thread pool size (must set before import)
+
+    - pl.Config.set_streaming_chunk_size(): Chunk size for streaming mode
+
+    - pl.Config.set_engine_affinity(): New streaming engine vs legacy
+
+    - StringCache: Global string interning for categoricals
+
+    - streaming=True in collect(): Enable streaming execution
+
+    - rechunk=True: Optimize memory layout after operations
+
+
+    **Pandas**:
+
+    - dtype_backend: ''numpy'', ''numpy_nullable'', or ''pyarrow''
+
+    - chunksize: Read files in chunks
+
+    - category dtype: Memory-efficient string handling
+
+    - usecols: Only load needed columns
+
+    - inplace operations: Reduce memory copies
+
+
+    **Dask**:
+
+    - n_workers: Number of worker processes
+
+    - threads_per_worker: Threads per worker
+
+    - memory_limit: Per-worker memory limit
+
+    - scheduler: ''synchronous'', ''threads'', ''processes'', ''distributed''
+
+    - use_distributed: Enable distributed scheduler with dashboard
+
+    - blocksize: Partition size for file reading
+
+
+    **Modin**:
+
+    - engine: ''ray'' or ''dask'' backend
+
+    - NPartitions: Number of partitions (default 8)
+
+    - MODIN_CPUS: CPU limit
+
+
+    **cuDF**:
+
+    - device_id: CUDA device selection
+
+    - spill_to_host: Spill GPU memory to host RAM
+
+    - RMM pool configuration (advanced)
+
+
+    **PyArrow** (backend for many platforms):
+
+    - ARROW_DEFAULT_MEMORY_POOL: jemalloc, mimalloc, or system
+
+    - jemalloc_set_decay_ms(): Memory release timing
+
+    - use_threads, memory_map, pre_buffer for I/O
+
+    '
+- name: Architectural Decision - Separate from SQL Tuning
+  summary: "**Decision**: Create a PARALLEL tuning system (DataFrameTuningConfiguration) rather\nthan extending UnifiedTuningConfiguration.\n\
+    \n**Rationale**:\n1. **Different Semantics**: SQL tuning affects schema/DDL; DataFrame tuning affects runtime\n2. **No\
+    \ Schema Concepts**: DataFrames don't have partitioning, clustering, or constraints\n   in the SQL sense - these are replaced\
+    \ by execution settings\n3. **When Applied**: SQL tuning at table creation; DataFrame tuning at adapter init/query time\n\
+    4. **Validation Rules**: Completely different compatibility matrices\n5. **Configuration Source**: SQL tuning from DDL\
+    \ analysis; DataFrame from execution profiling\n\n**Alternative Rejected**: Extending TuningType enum with DataFrame options\n\
+    - Would pollute SQL tuning with inapplicable options\n- Validation logic would become complex\n- is_compatible_with_platform()\
+    \ would need overhaul\n"
+- name: Platform Compatibility Matrix
+  summary: '| Setting Category | Polars | Pandas | Dask | Modin | cuDF |
+
+    |------------------|--------|--------|------|-------|------|
+
+    | **Parallelism** | | | | | |
+
+    | - thread_count | yes | no | yes | yes | no |
+
+    | - worker_count | no | no | yes | yes | no |
+
+    | **Memory** | | | | | |
+
+    | - memory_limit | no | no | yes | no | no |
+
+    | - spill_to_disk | no | no | yes | no | yes |
+
+    | - chunk_size | yes | yes | yes | no | no |
+
+    | **Execution** | | | | | |
+
+    | - streaming_mode | yes | no | native | no | no |
+
+    | - engine_affinity | yes | no | no | yes | no |
+
+    | - rechunk | yes | no | no | no | no |
+
+    | **Data Types** | | | | | |
+
+    | - dtype_backend | no | yes | yes | yes | no |
+
+    | - string_cache | yes | yes(cat) | no | yes | yes |
+
+    | **I/O** | | | | | |
+
+    | - memory_pool | indirect | indirect | indirect | indirect | no |
+
+    | - memory_map | indirect | yes | yes | yes | no |
+
+    | **GPU** | | | | | |
+
+    | - device_id | no | no | no | no | yes |
+
+    '
+tasks:
+- phase: 'Phase 1: Core Schema Design'
+  items:
+  - summary: Create DataFrameTuningType enum
+    done: false
+    details: "Location: benchbox/core/dataframe/tuning/types.py\n\nDefine tuning categories:\n```python\nclass DataFrameTuningType(Enum):\n\
+      \    # Parallelism\n    THREAD_COUNT = \"thread_count\"\n    WORKER_COUNT = \"worker_count\"\n\n    # Memory Management\n\
+      \    MEMORY_LIMIT = \"memory_limit\"\n    CHUNK_SIZE = \"chunk_size\"\n    SPILL_TO_DISK = \"spill_to_disk\"\n    RECHUNK\
+      \ = \"rechunk\"\n\n    # Execution Mode\n    STREAMING_MODE = \"streaming_mode\"\n    ENGINE_AFFINITY = \"engine_affinity\"\
+      \n    LAZY_EVALUATION = \"lazy_evaluation\"\n\n    # Data Types\n    DTYPE_BACKEND = \"dtype_backend\"\n    STRING_CACHE\
+      \ = \"string_cache\"\n\n    # I/O Optimization\n    MEMORY_POOL = \"memory_pool\"\n    MEMORY_MAP = \"memory_map\"\n\
+      \    PRE_BUFFER = \"pre_buffer\"\n\n    # GPU (cuDF)\n    GPU_DEVICE = \"gpu_device\"\n    GPU_SPILL_TO_HOST = \"gpu_spill_to_host\"\
+      \n\n    def is_compatible_with_platform(self, platform: str) -> bool:\n        \"\"\"Check compatibility with DataFrame\
+      \ platform.\"\"\"\n        # Implementation with platform-specific matrix\n```\n"
+  - summary: Create DataFrameTuningConfiguration dataclass
+    done: false
+    details: "Location: benchbox/core/dataframe/tuning/interface.py\n\nMain configuration class:\n```python\n@dataclass\n\
+      class DataFrameTuningConfiguration:\n    \"\"\"Configuration for DataFrame adapter tuning.\"\"\"\n\n    # Parallelism\
+      \ settings\n    parallelism: ParallelismConfiguration = field(default_factory=ParallelismConfiguration)\n\n    # Memory\
+      \ settings\n    memory: MemoryConfiguration = field(default_factory=MemoryConfiguration)\n\n    # Execution settings\n\
+      \    execution: ExecutionConfiguration = field(default_factory=ExecutionConfiguration)\n\n    # Data type settings\n\
+      \    data_types: DataTypeConfiguration = field(default_factory=DataTypeConfiguration)\n\n    # I/O settings\n    io:\
+      \ IOConfiguration = field(default_factory=IOConfiguration)\n\n    # GPU settings (cuDF only)\n    gpu: GPUConfiguration\
+      \ = field(default_factory=GPUConfiguration)\n\n    def validate_for_platform(self, platform: str) -> list[ValidationIssue]:\n\
+      \        \"\"\"Validate configuration for specific DataFrame platform.\"\"\"\n\n    def to_dict(self) -> dict:\n   \
+      \     \"\"\"Serialize to dictionary for YAML export.\"\"\"\n\n    @classmethod\n    def from_dict(cls, data: dict) ->\
+      \ \"DataFrameTuningConfiguration\":\n        \"\"\"Deserialize from dictionary.\"\"\"\n\n    def get_enabled_settings(self)\
+      \ -> set[DataFrameTuningType]:\n        \"\"\"Return set of non-default settings.\"\"\"\n\n    def apply_to_adapter_config(self,\
+      \ config: dict) -> dict:\n        \"\"\"Apply tuning to adapter constructor kwargs.\"\"\"\n```\n"
+  - summary: Create sub-configuration dataclasses
+    done: false
+    details: "Location: benchbox/core/dataframe/tuning/interface.py\n\n```python\n@dataclass\nclass ParallelismConfiguration:\n\
+      \    thread_count: int | None = None  # None = use default\n    worker_count: int | None = None  # Dask/Modin\n    threads_per_worker:\
+      \ int = 1  # Dask\n\n@dataclass\nclass MemoryConfiguration:\n    memory_limit: str | None = None  # e.g., \"4GB\"\n\
+      \    chunk_size: int | None = None  # Streaming chunk size\n    spill_to_disk: bool = False\n    spill_directory: Path\
+      \ | None = None\n    rechunk_after_filter: bool = True  # Polars\n\n@dataclass\nclass ExecutionConfiguration:\n    streaming_mode:\
+      \ bool = False\n    engine_affinity: str | None = None  # \"streaming\", \"in-memory\"\n    lazy_evaluation: bool =\
+      \ True  # Default for expression-family\n    collect_timeout: int | None = None  # Seconds\n\n@dataclass\nclass DataTypeConfiguration:\n\
+      \    dtype_backend: str = \"numpy_nullable\"  # numpy, numpy_nullable, pyarrow\n    enable_string_cache: bool = False\n\
+      \    auto_categorize_strings: bool = False\n    categorical_threshold: float = 0.5  # Unique ratio below which to categorize\n\
+      \n@dataclass\nclass IOConfiguration:\n    memory_pool: str = \"default\"  # default, jemalloc, mimalloc, system\n  \
+      \  memory_map: bool = False\n    pre_buffer: bool = True\n    row_group_size: int | None = None  # Parquet writing\n\
+      \n@dataclass\nclass GPUConfiguration:\n    enabled: bool = False\n    device_id: int = 0\n    spill_to_host: bool =\
+      \ True\n    pool_type: str = \"default\"  # default, managed, pool\n```\n"
+- phase: 'Phase 2: YAML Schema and Loading'
+  items:
+  - summary: Define YAML schema for DataFrame tuning
+    done: false
+    details: "Location: examples/tunings/dataframe/schema.yaml (reference)\n\nExample structure:\n```yaml\n# DataFrame Tuning\
+      \ Configuration\n# Platform: polars, pandas, dask, modin, cudf\n\nparallelism:\n  thread_count: 8\n  worker_count: 4\
+      \  # Dask/Modin only\n  threads_per_worker: 1  # Dask only\n\nmemory:\n  memory_limit: \"8GB\"  # Dask only\n  chunk_size:\
+      \ 1000000  # Streaming chunk\n  spill_to_disk: false\n  rechunk_after_filter: true  # Polars\n\nexecution:\n  streaming_mode:\
+      \ true\n  engine_affinity: \"streaming\"  # Polars: streaming|in-memory\n  lazy_evaluation: true\n  collect_timeout:\
+      \ 300  # seconds\n\ndata_types:\n  dtype_backend: \"pyarrow\"  # numpy|numpy_nullable|pyarrow\n  enable_string_cache:\
+      \ true\n  auto_categorize_strings: false\n\nio:\n  memory_pool: \"jemalloc\"\n  memory_map: true\n  pre_buffer: true\n\
+      \ngpu:\n  enabled: true  # cuDF only\n  device_id: 0\n  spill_to_host: true\n\n_metadata:\n  version: \"1.0\"\n  format:\
+      \ \"dataframe_tuning\"\n  platform: \"polars\"\n  description: \"Optimized Polars config for TPC-H SF100\"\n```\n"
+  - summary: Implement DataFrameTuningLoader class
+    done: false
+    details: "Location: benchbox/core/dataframe/tuning/loader.py\n\n```python\nclass DataFrameTuningLoader:\n    \"\"\"Load\
+      \ and validate DataFrame tuning configurations.\"\"\"\n\n    def load_config(\n        self,\n        path: Path | str,\n\
+      \        platform: str | None = None\n    ) -> DataFrameTuningConfiguration:\n        \"\"\"Load configuration from\
+      \ YAML/JSON file.\"\"\"\n\n    def save_config(\n        self,\n        config: DataFrameTuningConfiguration,\n    \
+      \    path: Path | str,\n        platform: str | None = None\n    ) -> None:\n        \"\"\"Save configuration to file.\"\
+      \"\"\n\n    def get_template(self, platform: str) -> DataFrameTuningConfiguration:\n        \"\"\"Get platform-specific\
+      \ template with recommended defaults.\"\"\"\n\n    def merge_configs(\n        self,\n        base: DataFrameTuningConfiguration,\n\
+      \        override: DataFrameTuningConfiguration\n    ) -> DataFrameTuningConfiguration:\n        \"\"\"Merge configurations\
+      \ with override precedence.\"\"\"\n```\n"
+  - summary: Create example tuning configs for each platform
+    done: false
+    details: 'Create examples/tunings/dataframe/{platform}_{profile}.yaml:
+
+
+      For each platform (polars, pandas, dask, modin, cudf):
+
+      - {platform}_default.yaml - Minimal configuration
+
+      - {platform}_optimized.yaml - Performance-tuned settings
+
+      - {platform}_memory_constrained.yaml - Low-memory environment
+
+      - {platform}_large_scale.yaml - For datasets >memory
+
+
+      Special configs:
+
+      - dask_distributed.yaml - Cluster configuration
+
+      - cudf_multi_gpu.yaml - Multi-GPU setup
+
+      '
+- phase: 'Phase 3: Validation System'
+  items:
+  - summary: Implement platform compatibility validation
+    done: false
+    details: "Location: benchbox/core/dataframe/tuning/validation.py\n\n```python\ndef validate_dataframe_tuning(\n    config:\
+      \ DataFrameTuningConfiguration,\n    platform: str\n) -> list[ValidationIssue]:\n    \"\"\"Validate tuning configuration\
+      \ for platform.\"\"\"\n    issues = []\n\n    # Check unsupported settings\n    for setting in config.get_enabled_settings():\n\
+      \        if not setting.is_compatible_with_platform(platform):\n            issues.append(ValidationIssue(\n       \
+      \         level=ValidationLevel.WARNING,\n                message=f\"{setting.value} not supported on {platform}\",\n\
+      \                suggestion=f\"This setting will be ignored on {platform}\"\n            ))\n\n    # Platform-specific\
+      \ validations\n    if platform == \"polars\":\n        issues.extend(_validate_polars(config))\n    elif platform ==\
+      \ \"pandas\":\n        issues.extend(_validate_pandas(config))\n    # ...\n\n    return issues\n\ndef _validate_polars(config:\
+      \ DataFrameTuningConfiguration) -> list[ValidationIssue]:\n    issues = []\n\n    # Warn if streaming_mode=True but\
+      \ chunk_size not set\n    if config.execution.streaming_mode and config.memory.chunk_size is None:\n        issues.append(ValidationIssue(\n\
+      \            level=ValidationLevel.INFO,\n            message=\"Streaming mode enabled without explicit chunk_size\"\
+      ,\n            suggestion=\"Consider setting chunk_size for large string columns\"\n        ))\n\n    # Error if engine_affinity\
+      \ invalid\n    valid_engines = {\"streaming\", \"in-memory\", None}\n    if config.execution.engine_affinity not in\
+      \ valid_engines:\n        issues.append(ValidationIssue(\n            level=ValidationLevel.ERROR,\n            message=f\"\
+      Invalid engine_affinity: {config.execution.engine_affinity}\",\n            suggestion=f\"Use one of: {valid_engines}\"\
+      \n        ))\n\n    return issues\n```\n"
+  - summary: Implement smart defaults based on system profile
+    done: false
+    details: "Location: benchbox/core/dataframe/tuning/defaults.py\n\n```python\ndef get_smart_defaults(\n    platform: str,\n\
+      \    system_profile: SystemProfile | None = None\n) -> DataFrameTuningConfiguration:\n    \"\"\"Generate recommended\
+      \ defaults based on system capabilities.\"\"\"\n\n    if system_profile is None:\n        system_profile = detect_system_profile()\n\
+      \n    config = DataFrameTuningConfiguration()\n\n    # CPU-based recommendations\n    config.parallelism.thread_count\
+      \ = min(\n        system_profile.cpu_cores,\n        16  # Cap for diminishing returns\n    )\n\n    # Memory-based\
+      \ recommendations\n    available_memory = system_profile.available_memory_gb\n    if available_memory < 8:\n       \
+      \ config.execution.streaming_mode = True\n        config.memory.chunk_size = 100_000\n    elif available_memory < 32:\n\
+      \        config.memory.chunk_size = 500_000\n\n    # Platform-specific adjustments\n    if platform == \"polars\":\n\
+      \        if available_memory > 64:\n            config.execution.engine_affinity = \"in-memory\"\n        else:\n  \
+      \          config.execution.engine_affinity = \"streaming\"\n    elif platform == \"dask\":\n        config.parallelism.worker_count\
+      \ = max(1, system_profile.cpu_cores // 4)\n        config.parallelism.threads_per_worker = 2\n        config.memory.memory_limit\
+      \ = f\"{available_memory // config.parallelism.worker_count}GB\"\n\n    return config\n```\n"
+- phase: 'Phase 4: Adapter Integration'
+  items:
+  - summary: Add tuning support to base DataFrame adapter
+    done: false
+    details: "Modify: benchbox/platforms/dataframe/expression_family.py\nModify: benchbox/platforms/dataframe/pandas_family.py\n\
+      \nAdd to base classes:\n```python\nclass ExpressionFamilyAdapter(ABC, Generic[DF, LazyDF, Expr]):\n    def __init__(\n\
+      \        self,\n        working_dir: str | Path | None = None,\n        verbose: bool = False,\n        tuning_config:\
+      \ DataFrameTuningConfiguration | None = None,\n        tuning_config_path: Path | str | None = None,\n        **kwargs\n\
+      \    ):\n        # Load tuning config if path provided\n        if tuning_config_path:\n            loader = DataFrameTuningLoader()\n\
+      \            self._tuning_config = loader.load_config(\n                tuning_config_path,\n                platform=self.platform_name\n\
+      \            )\n        else:\n            self._tuning_config = tuning_config or DataFrameTuningConfiguration()\n\n\
+      \        # Validate for platform\n        issues = validate_dataframe_tuning(self._tuning_config, self.platform_name)\n\
+      \        for issue in issues:\n            if issue.level == ValidationLevel.ERROR:\n                raise TuningValidationError(issue.message)\n\
+      \            elif issue.level == ValidationLevel.WARNING:\n                logger.warning(f\"Tuning: {issue.message}\"\
+      )\n\n        # Apply tuning settings\n        self._apply_tuning()\n\n    @abstractmethod\n    def _apply_tuning(self)\
+      \ -> None:\n        \"\"\"Apply tuning configuration. Platform-specific implementation.\"\"\"\n\n    @property\n   \
+      \ def tuning_config(self) -> DataFrameTuningConfiguration:\n        \"\"\"Get active tuning configuration.\"\"\"\n \
+      \       return self._tuning_config\n\n    def get_tuning_summary(self) -> dict:\n        \"\"\"Get summary of applied\
+      \ tuning settings.\"\"\"\n```\n"
+  - summary: Implement Polars tuning application
+    done: false
+    details: "Modify: benchbox/platforms/dataframe/polars_df.py\n\n```python\ndef _apply_tuning(self) -> None:\n    \"\"\"\
+      Apply Polars-specific tuning settings.\"\"\"\n    config = self._tuning_config\n\n    # Thread count (must be set via\
+      \ env var before import)\n    # We can warn if different from current\n    current_threads = pl.threadpool_size()\n\
+      \    if config.parallelism.thread_count and current_threads != config.parallelism.thread_count:\n        logger.warning(\n\
+      \            f\"Cannot change Polars thread count at runtime. \"\n            f\"Set POLARS_MAX_THREADS={config.parallelism.thread_count}\
+      \ before import.\"\n        )\n\n    # Streaming chunk size\n    if config.memory.chunk_size:\n        pl.Config.set_streaming_chunk_size(config.memory.chunk_size)\n\
+      \n    # Engine affinity (Polars 1.0+)\n    if config.execution.engine_affinity:\n        try:\n            pl.Config.set_engine_affinity(engine=config.execution.engine_affinity)\n\
+      \        except AttributeError:\n            logger.warning(\"Engine affinity requires Polars 1.0+\")\n\n    # String\
+      \ cache\n    if config.data_types.enable_string_cache:\n        pl.enable_string_cache()\n\n    # Store streaming mode\
+      \ for collect()\n    self._streaming_mode = config.execution.streaming_mode\n    self._rechunk = config.memory.rechunk_after_filter\n\
+      \ndef collect(self, lazy_frame: pl.LazyFrame) -> pl.DataFrame:\n    \"\"\"Collect lazy frame with tuning-aware settings.\"\
+      \"\"\n    kwargs = {}\n    if self._streaming_mode:\n        kwargs[\"engine\"] = \"streaming\"\n\n    result = lazy_frame.collect(**kwargs)\n\
+      \n    if self._rechunk:\n        result = result.rechunk()\n\n    return result\n```\n"
+  - summary: Implement Dask tuning application
+    done: false
+    details: "Modify: benchbox/platforms/dataframe/dask_df.py\n\n```python\ndef _apply_tuning(self) -> None:\n    \"\"\"Apply\
+      \ Dask-specific tuning settings.\"\"\"\n    config = self._tuning_config\n\n    # Override constructor params with tuning\
+      \ config\n    if config.parallelism.worker_count:\n        self.n_workers = config.parallelism.worker_count\n    if\
+      \ config.parallelism.threads_per_worker:\n        self.threads_per_worker = config.parallelism.threads_per_worker\n\
+      \    if config.memory.memory_limit:\n        self.memory_limit = config.memory.memory_limit\n    if config.memory.spill_to_disk:\n\
+      \        self.local_directory = config.memory.spill_directory or \"/tmp/dask-worker-space\"\n\n    # Setup distributed\
+      \ client if configured\n    if config.execution.streaming_mode or self.use_distributed:\n        self._setup_distributed_client()\n\
+      \ndef _setup_distributed_client(self) -> None:\n    \"\"\"Initialize Dask distributed client with tuning settings.\"\
+      \"\"\n    config = self._tuning_config\n\n    cluster_kwargs = {\n        \"n_workers\": self.n_workers,\n        \"\
+      threads_per_worker\": self.threads_per_worker,\n    }\n    if config.memory.memory_limit:\n        cluster_kwargs[\"\
+      memory_limit\"] = config.memory.memory_limit\n    if config.memory.spill_to_disk:\n        cluster_kwargs[\"local_directory\"\
+      ] = str(self.local_directory)\n\n    self._cluster = LocalCluster(**cluster_kwargs)\n    self._client = Client(self._cluster)\n\
+      ```\n"
+  - summary: Implement Pandas/Modin/cuDF tuning application
+    done: false
+    details: 'Similar patterns for remaining adapters:
+
+
+      **Pandas** (benchbox/platforms/dataframe/pandas_df.py):
+
+      - dtype_backend setting for read operations
+
+      - Categorical string optimization
+
+      - Memory-efficient loading with usecols/dtype specs
+
+
+      **Modin** (benchbox/platforms/dataframe/modin_df.py):
+
+      - Engine selection (ray/dask)
+
+      - NPartitions configuration
+
+      - CPU limits via MODIN_CPUS
+
+
+      **cuDF** (benchbox/platforms/dataframe/cudf_df.py):
+
+      - GPU device selection
+
+      - Spill-to-host configuration
+
+      - RMM pool settings
+
+      '
+- phase: 'Phase 5: CLI Integration'
+  items:
+  - summary: Add --df-tuning flag to benchbox run
+    done: false
+    details: "Modify: benchbox/cli/commands/run.py\n\nAdd new CLI option parallel to --tuning-mode:\n```python\n@click.option(\n\
+      \    \"--df-tuning\",\n    type=click.Path(exists=True),\n    help=\"Path to DataFrame tuning configuration YAML file\"\
+      \n)\n@click.option(\n    \"--df-tuning-mode\",\n    type=click.Choice([\"default\", \"optimized\", \"memory-constrained\"\
+      ]),\n    default=\"default\",\n    help=\"Built-in DataFrame tuning profile\"\n)\n```\n\nIntegration with adapter creation:\n\
+      ```python\n# For DataFrame platforms\nif is_dataframe_platform(platform):\n    if df_tuning:\n        overrides[\"tuning_config_path\"\
+      ] = df_tuning\n    elif df_tuning_mode != \"default\":\n        # Load built-in profile\n        profile_path = get_builtin_df_tuning_profile(platform,\
+      \ df_tuning_mode)\n        overrides[\"tuning_config_path\"] = profile_path\n```\n"
+  - summary: Create benchbox df-tuning subcommand
+    done: false
+    details: 'New file: benchbox/cli/commands/df_tuning.py
+
+
+      Commands:
+
+      - `benchbox df-tuning create` - Interactive config creation
+
+      - `benchbox df-tuning show <platform>` - Show platform capabilities
+
+      - `benchbox df-tuning validate <config> [--platform]` - Validate config
+
+      - `benchbox df-tuning recommend <platform>` - Show recommended settings
+
+
+      Example usage:
+
+      ```bash
+
+      # Create tuning config interactively
+
+      benchbox df-tuning create --platform polars --output polars_tuned.yaml
+
+
+      # Show what''s tunable for a platform
+
+      benchbox df-tuning show polars
+
+
+      # Validate a config
+
+      benchbox df-tuning validate my_config.yaml --platform dask
+
+
+      # Get recommendations based on system
+
+      benchbox df-tuning recommend polars
+
+      ```
+
+      '
+  - summary: Add tuning wizard for DataFrame
+    done: false
+    details: 'Extend: benchbox/cli/tuning.py or new df_tuning_wizard.py
+
+
+      Interactive wizard similar to SQL tuning wizard:
+
+      1. Detect system capabilities (CPU, RAM, GPU)
+
+      2. Ask about workload characteristics (small/medium/large data)
+
+      3. Ask about priorities (speed vs memory efficiency)
+
+      4. Generate recommended configuration
+
+      5. Allow fine-tuning individual settings
+
+      6. Save to YAML file
+
+      '
+- phase: 'Phase 6: Testing'
+  items:
+  - summary: Unit tests for tuning configuration classes
+    done: false
+    details: 'New file: tests/unit/core/dataframe/tuning/test_interface.py
+
+
+      Test cases:
+
+      - Serialization round-trip (to_dict / from_dict)
+
+      - Validation for each platform
+
+      - Smart defaults generation
+
+      - Configuration merging
+
+      - Invalid value handling
+
+      '
+  - summary: Unit tests for tuning loader
+    done: false
+    details: 'New file: tests/unit/core/dataframe/tuning/test_loader.py
+
+
+      Test cases:
+
+      - YAML loading
+
+      - JSON loading
+
+      - Template generation
+
+      - File not found handling
+
+      - Invalid YAML handling
+
+      - Schema validation
+
+      '
+  - summary: Integration tests for tuning application
+    done: false
+    details: 'New file: tests/integration/dataframe/test_tuning_application.py
+
+
+      Test cases:
+
+      - Polars: Verify streaming mode activation
+
+      - Polars: Verify chunk size setting
+
+      - Dask: Verify worker count applied
+
+      - Dask: Verify distributed client creation
+
+      - All platforms: Verify warning for unsupported settings
+
+
+      Use pytest.mark.parametrize for cross-platform testing
+
+      '
+  - summary: End-to-end CLI tests
+    done: false
+    details: 'Extend: tests/integration/test_cli_run.py
+
+
+      Test cases:
+
+      - benchbox run with --df-tuning flag
+
+      - benchbox df-tuning create (mock inputs)
+
+      - benchbox df-tuning validate
+
+      - benchbox df-tuning recommend
+
+      '
+- phase: 'Phase 7: Documentation'
+  items:
+  - summary: Document DataFrame tuning configuration format
+    done: false
+    details: 'Add to existing docs or README:
+
+      - Complete YAML schema reference
+
+      - Platform compatibility matrix
+
+      - Examples for each platform
+
+      - Migration from constructor params to tuning config
+
+      '
+  - summary: Add tuning recommendations to platform docs
+    done: false
+    details: 'For each DataFrame platform adapter doc:
+
+      - When to use tuning vs defaults
+
+      - Recommended settings for common scenarios
+
+      - Performance impact of different settings
+
+      - Troubleshooting (e.g., "why is streaming slower?")
+
+      '
+files_affected:
+  modified:
+  - benchbox/core/dataframe/tuning/__init__.py
+  - benchbox/core/dataframe/tuning/types.py
+  - benchbox/core/dataframe/tuning/interface.py
+  - benchbox/core/dataframe/tuning/loader.py
+  - benchbox/core/dataframe/tuning/validation.py
+  - benchbox/core/dataframe/tuning/defaults.py
+  - benchbox/cli/commands/df_tuning.py
+  - tests/unit/core/dataframe/tuning/test_interface.py
+  - tests/unit/core/dataframe/tuning/test_loader.py
+  - tests/unit/core/dataframe/tuning/test_validation.py
+  - tests/integration/dataframe/test_tuning_application.py
+  - examples/tunings/dataframe/polars_default.yaml
+  - examples/tunings/dataframe/polars_optimized.yaml
+  - examples/tunings/dataframe/pandas_default.yaml
+  - examples/tunings/dataframe/pandas_optimized.yaml
+  - examples/tunings/dataframe/dask_default.yaml
+  - examples/tunings/dataframe/dask_distributed.yaml
+  - examples/tunings/dataframe/modin_default.yaml
+  - examples/tunings/dataframe/cudf_default.yaml
+  - benchbox/platforms/dataframe/expression_family.py (add tuning support)
+  - benchbox/platforms/dataframe/pandas_family.py (add tuning support)
+  - benchbox/platforms/dataframe/polars_df.py (implement _apply_tuning)
+  - benchbox/platforms/dataframe/pandas_df.py (implement _apply_tuning)
+  - benchbox/platforms/dataframe/dask_df.py (implement _apply_tuning)
+  - benchbox/platforms/dataframe/modin_df.py (implement _apply_tuning)
+  - benchbox/platforms/dataframe/cudf_df.py (implement _apply_tuning)
+  - benchbox/cli/commands/run.py (add --df-tuning options)
+  - benchbox/cli/__init__.py (register df-tuning command group)
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - dataframe
+  - tuning
+  - configuration
+  - polars
+  - pandas
+  - dask
+  - modin
+  - cudf
+  - performance
+  estimated_effort: 2-3 weeks
+  dependencies:
+  - Existing DataFrame adapters (polars_df, pandas_df, dask_df, modin_df, cudf_df)
+  - Core tuning system (reference patterns from SQL tuning)
+  related_todos:
+  - dataframe-performance/planning/dataframe-performance-optimization-and-analysis.yaml
+  - dataframe-release/planning/dataframe-support-release-preparation.yaml
+  notes: 'Key design decisions:
+
+    1. Separate from SQL tuning (DataFrameTuningConfiguration vs UnifiedTuningConfiguration)
+
+    2. Runtime-focused rather than schema-focused
+
+    3. Platform-specific validation with graceful degradation (warn, don''t error)
+
+    4. Smart defaults based on system profile
+
+    5. CLI integration parallel to SQL tuning (--df-tuning, benchbox df-tuning)
+
+
+    Implementation order recommendation:
+
+    1. Core schema (Phase 1) - foundation
+
+    2. Polars implementation (Phase 4 partial) - reference implementation
+
+    3. Validation (Phase 3) - catch issues early
+
+    4. Other adapters (Phase 4) - extend
+
+    5. CLI (Phase 5) - user interface
+
+    6. Testing + docs (Phase 6-7) - quality
+
+
+    References:
+
+    - Polars docs: https://docs.pola.rs/
+
+    - Polars config: https://docs.pola.rs/api/python/stable/reference/config.html
+
+    - Dask docs: https://docs.dask.org/
+
+    - DuckDB performance: https://duckdb.org/docs/stable/guides/performance/overview
+
+    - PyArrow memory: https://arrow.apache.org/docs/python/memory.html
+
+    '

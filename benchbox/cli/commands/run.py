@@ -67,6 +67,7 @@ from benchbox.core.schemas import ExecutionContext
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
 from benchbox.utils.cloud_storage import is_cloud_path
 from benchbox.utils.compression import CompressionManager
+from benchbox.utils.input_validation import MAX_QUERY_ID_LENGTH
 from benchbox.utils.output_path import normalize_output_root
 from benchbox.utils.verbosity import VerbositySettings
 
@@ -647,16 +648,15 @@ def _parse_queries_list(s: types.SimpleNamespace) -> None:
         s.ctx.exit(1)
 
     max_queries = 100
-    max_query_id_len = 20
     if len(queries_to_run) > max_queries:
         console.print(f"[red]❌ Too many queries: {len(queries_to_run)} (max {max_queries})[/red]")
         if s.logger:
             s.logger.error(f"Query list too long: {len(queries_to_run)} exceeds limit of {max_queries}")
         s.ctx.exit(1)
 
-    if any(len(q) > max_query_id_len for q in queries_to_run):
-        too_long = [q for q in queries_to_run if len(q) > max_query_id_len]
-        console.print(f"[red]❌ Query ID too long (max {max_query_id_len} chars): {', '.join(too_long[:3])}[/red]")
+    if any(len(q) > MAX_QUERY_ID_LENGTH for q in queries_to_run):
+        too_long = [q for q in queries_to_run if len(q) > MAX_QUERY_ID_LENGTH]
+        console.print(f"[red]❌ Query ID too long (max {MAX_QUERY_ID_LENGTH} chars): {', '.join(too_long[:3])}[/red]")
         if s.logger:
             s.logger.error(f"Query IDs exceed length limit: {too_long}")
         s.ctx.exit(1)

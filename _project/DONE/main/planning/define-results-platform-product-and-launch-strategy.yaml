@@ -1,0 +1,114 @@
+id: define-results-platform-product-and-launch-strategy
+title: "Define BenchBox results platform product boundary and launch strategy"
+worktree: main
+priority: Critical
+status: Completed
+completed_date: "2026-03-29"
+completed_note: "Strategy document exists at _project/analysis/benchbox-results-platform-strategy.md"
+category: Core Functionality
+description: |
+  BenchBox currently blurs together three different concerns:
+  1) local/cloud artifact publication,
+  2) hosted result submission,
+  3) public result browsing and analysis on benchbox.dev.
+
+  That ambiguity makes the existing publishing TODO too large and too vague to
+  execute safely. This item defines the product boundary between those concerns,
+  chooses the initial site topology, and sequences the launch so BenchBox does
+  not jump directly from local result files to an open public submission portal.
+
+  The target output is a high-confidence strategy that distinguishes
+  `benchbox publish`, `benchbox submit`, and `benchbox.dev/results/`, plus a
+  delivery sequence the rest of the TODO cluster can depend on.
+
+  **Phase assignment:** This is a prerequisite planning item. Must complete before
+  any Phase 1 implementation begins. The refined strategy memo at
+  `_project/analysis/benchbox-results-platform-strategy.md` contains the current
+  recommended phasing: Phase 1 (static explorer MVP with repo-local
+  `results-data/`), Phase 2 (PR-based community contributions against that
+  corpus), Phase 3 (hosted API, only if demand warrants).
+
+work:
+- id: w1
+  summary: "Audit current BenchBox result export, results CLI, and public-site constraints"
+  status: done
+  notes: |
+    Capture the current canonical result path, static-site deployment model,
+    and any pre-existing hints of hosted service design.
+
+- id: w2
+  summary: "Build a reference matrix from Geekbench, CloudSpecs, OpenBenchmarking, and ASV"
+  needs: [w1]
+  status: done
+  notes: |
+    Classify what each reference teaches BenchBox about submission, browsing,
+    comparison, static hosting, and trust labels.
+
+- id: w3
+  summary: "Define personas, workflows, trust levels, and phase-by-phase success metrics"
+  needs: [w2]
+  status: done
+  notes: |
+    Cover at least maintainers/curators, result submitters, and result readers.
+
+- id: w4
+  summary: "Choose the initial topology and command boundary for publish vs submit"
+  needs: [w3]
+  status: done
+  notes: |
+    Confirm the launch topology: explorer at `/results/`, seed corpus stored
+    under repo-local `results-data/`, and a single GitHub Pages workflow for
+    deployment. Explicitly separate local/cloud publication from hosted
+    submission. A dedicated data repo is a later optimization, not the default.
+
+- id: w5
+  summary: "Publish the strategy artifact and update companion TODO dependencies"
+  needs: [w4]
+  status: done
+
+metadata:
+  tags:
+  - results
+  - website
+  - submission
+  - product-strategy
+  - architecture
+  estimated_effort: "Medium"
+  created_date: "2026-03-29"
+
+impact:
+  business_value: |
+    Turns an underspecified feature idea into a staged product program that can
+    actually be staffed, prioritized, and reviewed.
+  user_impact: |
+    Prevents BenchBox from shipping a confusing mix of local publishing and
+    hosted results behavior under one overloaded command or page.
+  technical_debt: |
+    Removes ambiguity before API, frontend, and storage choices harden around
+    the wrong product boundary.
+
+must_preserve:
+- "The schema-v2 result bundle remains the single canonical artifact for all downstream publishing and submission flows"
+- "The existing static GitHub Pages deployment for landing/docs/blog remains a valid baseline during planning"
+
+approach: |
+  Start with product shape, not implementation. The result explorer, hosted
+  API, and local artifact publishing should each have a separate contract and
+  success metric. Use the existing BenchBox export path as the anchor, then map
+  external reference patterns onto the repo's real deployment constraints.
+
+anti_patterns:
+- "DO NOT collapse local artifact publication and hosted submission into one command surface -- because the storage contract and service contract differ materially -- define `publish` and `submit` separately"
+- "DO NOT assume the static docs stack can absorb a rich results explorer unchanged -- because interactive compare/search/auth workflows have different needs -- choose the site topology explicitly"
+
+files_affected:
+  added:
+  - "_project/analysis/benchbox-results-platform-strategy.md"
+  modified:
+  - "_project/TODO/main/planning/productize-result-publishing-and-artifact-sharing.yaml"
+  - "_project/TODO/main/planning/"
+
+scope_limit:
+  only_modify:
+  - "_project/analysis/"
+  - "_project/TODO/"

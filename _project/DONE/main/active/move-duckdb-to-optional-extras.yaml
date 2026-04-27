@@ -1,0 +1,139 @@
+id: move-duckdb-to-optional-extras
+title: "Move duckdb from core dependency to optional extras to avoid uv.lock version enforcement"
+worktree: main
+priority: Medium
+status: Completed
+description: |
+  DuckDB is currently a core (required) dependency in pyproject.toml at line 40:
+    "duckdb>=1.4.0"
+
+  Because it's required, uv.lock pins it to an exact version (currently 1.4.3). When a
+  user runs `uv run benchbox run`, uv syncs the environment against uv.lock BEFORE Python
+  starts, silently reverting any manually installed version (e.g., duckdb==1.5.0.dev307)
+  back to 1.4.3. The user has no visibility into this until they check the result JSON.
+
+  Moving duckdb to an optional extras group removes it from the lock-enforced core set.
+  uv would no longer revert it - whatever the user has installed survives. Users who want
+  DuckDB can install it via `pip install benchbox[duckdb]` or the existing `all` extra.
+
+  Design decisions to resolve during implementation:
+    1. Minimum version for the optional duckdb extra - keep >=1.4.0 or relax to >=1.0.0?
+       Relaxing to >=1.0.0 gives users maximum flexibility (they can test any version),
+       though some BenchBox features may require newer APIs.
+    2. Backward compatibility - `pip install benchbox` currently installs duckdb; removing
+       it from core will break existing installs. Options:
+         a. Add duckdb to a "local" or "embedded" extras group and update install docs.
+         b. Add duckdb to the existing `all` meta-extra and mark it as the recommended install.
+         c. Keep a minimal >=1.0.0 pin in core (so something is installed) but remove the
+            tight lock on a specific version by using a pre-release-tolerant spec.
+    3. The `dev` extras group at line 66 also includes "duckdb>=1.4.0" - must be updated
+       to match whatever approach is chosen.
+    4. CI must still work - the CI install likely uses `pip install -e .[dev]` or similar.
+
+  The primary goal is: after `pip install benchbox` (or `uv add benchbox`), a user who
+  then runs `uv pip install "duckdb==X.Y.Z"` should have that version respected by
+  `uv run benchbox run` without being silently reverted.
+
+category: Core Functionality
+
+work:
+  - id: w1
+    summary:
+      "Decide min version and install-surface strategy (review pyproject.toml lines 39-116); record decision as comment
+      above new duckdb stanza"
+    status: done
+
+  - id: w2
+    summary:
+      "Remove duckdb from core dependencies (pyproject.toml line 40), add to an optional extras group (e.g., 'duckdb'
+      or 'local'), and update 'dev' and 'all' meta-extras accordingly"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Run uv lock to regenerate uv.lock and verify duckdb is no longer pinned in the core dependency set"
+    needs: [w2]
+    status: done
+
+  - id: w4
+    summary: "Update CI workflows and install commands to include the duckdb extra (e.g., pip install -e .[dev,duckdb] or equivalent)"
+    needs: [w3]
+    status: done
+
+  - id: w5
+    summary: "Update README and getting-started docs to reflect new install instructions (pip install benchbox[duckdb] or benchbox[all])"
+    needs: [w3]
+    status: done
+
+  - id: w6
+    summary: "Run fast test suite to confirm no breakage from dependency change"
+    needs: [w4]
+    status: done
+
+deferred:
+  - summary: "Consider whether other core drivers (polars, clickhouse-connect, psycopg2-binary) should similarly be made optional"
+    reason:
+      "Out of scope for this item - focus only on duckdb, which is the platform with the most active version-testing use
+      case"
+
+metadata:
+  created_date: "2026-02-23"
+  estimated_effort: "Small-Medium (2-4 hours including CI update)"
+  tags:
+    - packaging
+    - driver-versioning
+    - uv
+
+impact:
+  user_impact: |
+    Users who install a specific DuckDB version (including dev/pre-release builds) via
+    uv pip install will have that version respected by uv run. Eliminates the silent
+    version-revert problem that makes it impossible to test non-locked DuckDB versions
+    without modifying the lock file.
+  technical_debt: |
+    Tightens the relationship between BenchBox's packaging and its testing story.
+    uv.lock remains meaningful for reproducibility but no longer acts as an invisible
+    veto on the DuckDB version a user chooses to test.
+
+must_preserve:
+  - "pip install benchbox still results in a working DuckDB benchmark after install (either via an auto-included extra or clear
+    documentation)"
+  - "uv run -- python -m pytest -m fast -q continues to pass (no missing duckdb import)"
+  - "All existing platform adapters continue to load correctly"
+  - "The 'all' extra still installs duckdb"
+
+approach: |
+  Review pyproject.toml lines 39-46 (core deps) and 59-116 (optional extras).
+  The minimal change: remove line 40 from [project.dependencies] and add a new stanza
+  to [project.optional-dependencies]:
+    duckdb = ["duckdb>=1.0.0"]
+  Then add "duckdb" (or the extras spec) to the `dev`, `all`, and `local` groups.
+  Regenerate uv.lock with `uv lock` and verify the pin is gone from the core set.
+
+anti_patterns:
+  - "DO NOT remove duckdb from the 'dev' extras group without replacing it - because CI tests import duckdb directly - update
+    dev group at the same time as core"
+  - "DO NOT set an upper bound on the optional duckdb extra (e.g., duckdb>=1.0.0,<2.0) - because that defeats the purpose of
+    allowing dev/future versions - use only a lower bound"
+  - "DO NOT skip updating the install docs - because users will get ImportError with no explanation - update README and getting-started
+    in the same PR"
+
+verification:
+  - description: "After removing from core, uv.lock no longer enforces exact duckdb version"
+    command: 'grep -A3 ''^name = "duckdb"'' uv.lock'
+    expected_output: "duckdb entry exists in lock but is no longer in the [package] required set"
+  - description: "Full dev install still includes duckdb"
+    command: "uv pip show duckdb"
+    expected_output: "duckdb is installed (version may vary)"
+  - description: "Fast test suite passes after dependency change"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "All tests pass with 0 failures"
+
+scope_limit:
+  only_modify:
+    - "pyproject.toml"
+    - "uv.lock"
+    - "README.md"
+    - "docs/"
+    - ".github/"
+completed_date: "2026-02-23"

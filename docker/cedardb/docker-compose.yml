@@ -1,0 +1,40 @@
+# CedarDB Docker Compose - DEVELOPMENT/TEST ONLY
+# CedarDB (formerly Umbra) - high-performance OLAP/OLTP with PostgreSQL wire protocol
+# Plaintext credentials below are for local testing only - do not use in production
+#
+# Usage:
+#   docker compose -f docker-compose.yml up -d
+#   benchbox run --platform cedardb --benchmark tpch --scale 0.01 \
+#     --platform-option host=localhost --platform-option port=5435 \
+#     --platform-option username=benchbox --platform-option password=benchbox
+#
+# Ports:
+#   5435 - PostgreSQL wire protocol (host port; avoids conflict with postgresql/pg-duckdb on 5432)
+#
+# Default credentials:
+#   Username: benchbox (CEDAR_USER)
+#   Password: benchbox (CEDAR_PASSWORD)
+#   Database: benchbox_test (created at startup)
+
+services:
+  cedardb:
+    image: cedardb/cedardb:latest
+    ports:
+      - "5435:5432"
+    environment:
+      CEDAR_USER: benchbox
+      CEDAR_PASSWORD: benchbox
+      CEDAR_DB: benchbox_test
+    volumes:
+      - cedardb-data:/var/lib/cedardb/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U benchbox -d benchbox_test || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  cedardb-data:
+    driver: local

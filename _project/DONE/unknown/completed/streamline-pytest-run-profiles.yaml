@@ -1,0 +1,35 @@
+id: streamline-pytest-run-profiles
+title: ✅ Streamline Pytest Run Profiles
+category: Test Infrastructure
+status: Completed
+priority: High
+impact: Fast local feedback loops while preserving full CI instrumentation.
+sections:
+  Summary: Split the pytest configuration into lightweight local defaults and a CI-focused profile with coverage, reports,
+    and logging so day-to-day development no longer pays the instrumentation cost.
+  Completed Tasks: '- ✅ Local profile optimised for speed
+
+    - ✅ Dedicated CI profile
+
+    - ✅ Contributor guidance and safeguards'
+  Testing: '"- \"`uv run -- python -m pytest tests/unit/test_pytest_profiles.py`\"
+
+    - \"`uv run -- python -m pytest -c pytest-ci.ini tests/unit/test_pytest_profiles.py::test_ci_profile_includes_full_instrumentation`\"
+
+    - \"`uv run -- python -m pytest` (fails on pre-existing optional dependency gaps like `pandas` for TPC-DI suites)\"
+
+    "'
+  Files Affected: '- pytest.ini
+
+    - pytest-ci.ini (new)
+
+    - Makefile
+
+    - CONTRIBUTING.md
+
+    - README.md
+
+    - tests/unit/test_pytest_profiles.py (new)'
+worktree: unknown
+description: Split the pytest configuration into lightweight local defaults and a CI-focused profile with coverage, reports,
+  and logging so day-to-day development no longer pays the instrumentation cost.

@@ -1,0 +1,343 @@
+id: phase-7-parser-resilience
+title: 'Query Plan Remediation - Phase 7: Parser Resilience'
+worktree: query-plan-remediation
+category: Reliability
+priority: Medium
+status: Completed
+description: 'Improve parser robustness and resilience against format changes across platform
+
+  versions. Add fallback mechanisms, version-specific parser selection, and
+
+  multi-format support to handle EXPLAIN output variations gracefully.
+
+
+  **Problems Addressed**:
+
+  - DuckDB parser depends on Unicode box-drawing characters (fragile)
+
+  - No fallback when text parsing fails
+
+  - No version-specific parser selection
+
+  - Format changes break parsing with cryptic errors
+
+  '
+context_sections:
+- name: DuckDB Parser Fragility
+  summary: 'Current DuckDB parser relies on exact Unicode box-drawing characters:
+
+    - "┌", "┐", "│", "└", "┘" (U+250x codepoints)
+
+    - Breaks if terminal encoding != UTF-8
+
+    - Copy-paste from terminal may corrupt characters
+
+    - DuckDB format changes in new versions break parser
+
+
+    DuckDB also supports EXPLAIN (FORMAT JSON) which is more stable and
+
+    machine-readable, but we don''t use it.
+
+    '
+- name: No Format Fallback
+  summary: 'When text parsing fails, there''s no fallback mechanism:
+
+    - Could try JSON format instead
+
+    - Could attempt alternative parsing strategies
+
+    - Currently just fails with error
+
+    '
+- name: No Version Detection
+  summary: 'Parser doesn''t adapt to platform version:
+
+    - DuckDB 0.9 vs 1.0 may have different formats
+
+    - PostgreSQL 12 vs 16 have format differences
+
+    - No mechanism to select appropriate parser for version
+
+    '
+- name: Testing Gap for Format Variations
+  summary: 'Tests use single fixture per platform:
+
+    - Don''t test multiple platform versions
+
+    - Don''t test format variations
+
+    - Real-world format diversity not covered
+
+    '
+impact: 'MEDIUM - Parser fragility causes failures on format variations that should be
+
+  handleable. Lack of version-awareness means parsers break on upgrades.
+
+
+  - JSON fallback would make DuckDB parser much more robust
+
+  - Version-specific parsers prevent breakage on upgrades
+
+  - Multi-format testing catches compatibility issues early
+
+  '
+research_value: 'Demonstrates pattern for resilient parsing of evolving external formats.
+
+  Shows importance of fallback mechanisms and version-awareness.
+
+  '
+tasks:
+- phase: 'Task 7.1: DuckDB Parser Improvements'
+  description: Add JSON format support and fallback mechanism
+  items:
+  - summary: Implement JSON format parser for DuckDB
+    done: false
+    details: "File: benchbox/parsers/duckdb_parser.py\n\ndef _parse_json_format(self, query_id: str, explain_output: str)\
+      \ -> QueryPlanDAG:\n    \"\"\"Parse DuckDB EXPLAIN (FORMAT JSON) output.\"\"\"\n    data = json.loads(explain_output)\n\
+      \n    # DuckDB JSON format structure:\n    # {\n    #   \"name\": \"QUERY_PLAN\",\n    #   \"timing\": ...,\n    # \
+      \  \"children\": [\n    #     {\n    #       \"name\": \"PROJECTION\",\n    #       \"children\": [...],\n    #    \
+      \   \"extra_info\": \"...\"\n    #     }\n    #   ]\n    # }\n\n    root_node = data[\"children\"][0]  # Top-level operator\n\
+      \    logical_root = self._parse_json_node(root_node)\n\n    return QueryPlanDAG(\n        query_id=query_id,\n     \
+      \   platform=\"duckdb\",\n        logical_root=logical_root,\n        estimated_cost=data.get(\"timing\"),\n       \
+      \ raw_explain_output=explain_output\n    )\n\ndef _parse_json_node(self, node: dict) -> LogicalOperator:\n    \"\"\"\
+      Recursively parse JSON node to LogicalOperator.\"\"\"\n    operator_type = self._map_duckdb_operator(node[\"name\"])\n\
+      \n    properties = {}\n    if \"extra_info\" in node:\n        properties[\"extra_info\"] = node[\"extra_info\"]\n\n\
+      \    children = []\n    for child_node in node.get(\"children\", []):\n        children.append(self._parse_json_node(child_node))\n\
+      \n    return LogicalOperator(\n        operator_type=operator_type,\n        operator_id=self._next_operator_id(),\n\
+      \        properties=properties,\n        children=children\n    )\n"
+  - summary: Implement format detection and fallback
+    done: false
+    details: "File: benchbox/parsers/duckdb_parser.py\n\ndef _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:\n\
+      \    \"\"\"Parse with format detection and fallback.\"\"\"\n\n    # Try to detect format\n    if explain_output.strip().startswith(\"\
+      {\"):\n        # JSON format\n        try:\n            return self._parse_json_format(query_id, explain_output)\n \
+      \       except Exception as e:\n            logger.warning(\"JSON parse failed: %s, trying text\", e)\n            #\
+      \ Fall through to text parser\n\n    # Try text format (box-drawing)\n    try:\n        return self._parse_text_format(query_id,\
+      \ explain_output)\n    except Exception as e:\n        logger.error(\"Text parse failed: %s\", e)\n        raise PlanParseError(\n\
+      \            query_id=query_id,\n            platform=\"duckdb\",\n            error_message=f\"Both JSON and text parsing\
+      \ failed: {e}\"\n        )\n"
+  - summary: Update adapter to prefer JSON format
+    done: false
+    details: "File: benchbox/platforms/duckdb/adapter.py\n\ndef get_query_plan(self, connection, query: str) -> str:\n   \
+      \ \"\"\"Get query plan, preferring JSON format.\"\"\"\n\n    # Try JSON format first (more stable)\n    try:\n     \
+      \   explain_query = f\"EXPLAIN (FORMAT JSON) {query}\"\n        result = connection.execute(explain_query).fetchone()\n\
+      \        return result[0]  # JSON string\n    except Exception as e:\n        logger.debug(\"JSON format not available:\
+      \ %s, using text\", e)\n\n        # Fall back to text format\n        explain_query = f\"EXPLAIN {query}\"\n       \
+      \ result = connection.execute(explain_query).fetchone()\n        return result[0]\n"
+  - summary: Remove Unicode character dependency
+    done: false
+    details: "In text parser, make box-drawing character detection more lenient:\n\n# Instead of exact match:\nif \"┌\" in\
+      \ line and \"┐\" in line:\n\n# Use regex that handles variations:\nimport re\nif re.search(r'[\\u250C\\u252C].*[\\u2510\\\
+      u2524]', line):\n    # Matches various box-drawing chars\n\n# Or use ASCII-safe markers:\nif any(marker in line for\
+      \ marker in [\"┌\", \"+--\", \"╔\"]):\n"
+  - summary: Add tests for both formats
+    done: false
+    details: 'File: tests/parsers/test_duckdb_parser_formats.py
+
+
+      - Test: JSON format parsed correctly
+
+      - Test: Text format parsed correctly
+
+      - Test: Fallback from JSON to text
+
+      - Test: Both formats produce equivalent LogicalOperator trees
+
+      '
+- phase: 'Task 7.2: Version-Specific Parser Registry'
+  description: Select parser based on platform version
+  items:
+  - summary: Create ParserRegistry class
+    done: false
+    details: "File: benchbox/parsers/registry.py\n\nfrom packaging import version\n\nclass ParserRegistry:\n    \"\"\"Registry\
+      \ of parsers by platform and version.\"\"\"\n\n    def __init__(self):\n        self._parsers: dict[str, list[tuple[str,\
+      \ type]]] = {}\n\n    def register(self, platform: str, min_version: str,\n                parser_class: type) -> None:\n\
+      \        \"\"\"Register parser for platform >= min_version.\"\"\"\n        if platform not in self._parsers:\n     \
+      \       self._parsers[platform] = []\n        self._parsers[platform].append((min_version, parser_class))\n\n    def\
+      \ get_parser(self, platform: str, platform_version: str):\n        \"\"\"Get appropriate parser for platform version.\"\
+      \"\"\n        if platform not in self._parsers:\n            return None\n\n        # Find best matching parser (highest\
+      \ version <= platform_version)\n        candidates = self._parsers[platform]\n        suitable = [\n            (v,\
+      \ cls) for v, cls in candidates\n            if version.parse(platform_version) >= version.parse(v)\n        ]\n\n \
+      \       if not suitable:\n            return None\n\n        # Return parser with highest version requirement\n    \
+      \    suitable.sort(key=lambda x: version.parse(x[0]), reverse=True)\n        return suitable[0][1]()\n"
+  - summary: Register DuckDB parsers by version
+    done: false
+    details: "File: benchbox/parsers/duckdb_parser.py\n\n# Legacy text-only parser for old versions\nclass DuckDBTextParser(QueryPlanParser):\n\
+      \    \"\"\"DuckDB parser for versions < 0.10 (text only).\"\"\"\n\n# Modern JSON-capable parser\nclass DuckDBJSONParser(QueryPlanParser):\n\
+      \    \"\"\"DuckDB parser for versions >= 0.10 (JSON + text fallback).\"\"\"\n\n# Register in module init:\n_registry\
+      \ = ParserRegistry()\n_registry.register(\"duckdb\", \"0.0\", DuckDBTextParser)\n_registry.register(\"duckdb\", \"0.10\"\
+      , DuckDBJSONParser)\n"
+  - summary: Update adapter to use registry
+    done: false
+    details: "File: benchbox/platforms/base/adapter.py\n\ndef get_query_plan_parser(self):\n    \"\"\"Get parser from registry\
+      \ based on version.\"\"\"\n    from benchbox.parsers.registry import get_parser_registry\n\n    platform_version = self.get_platform_version(self.connection)\n\
+      \    registry = get_parser_registry()\n\n    parser = registry.get_parser(self.platform_name, platform_version)\n\n\
+      \    if not parser:\n        logger.warning(\n            \"No parser available for %s version %s\",\n            self.platform_name,\
+      \ platform_version\n        )\n\n    return parser\n"
+  - summary: Implement version detection for each platform
+    done: false
+    details: "File: benchbox/platforms/duckdb/adapter.py\n\ndef get_platform_version(self, connection) -> str:\n    \"\"\"\
+      Get DuckDB version string.\"\"\"\n    result = connection.execute(\"SELECT version()\").fetchone()\n    # Parse: \"\
+      v0.10.0 abc123def\" → \"0.10.0\"\n    version_str = result[0].split()[0].lstrip('v')\n    return version_str\n\nSimilar\
+      \ for other platforms (PostgreSQL, Redshift, etc.)\n"
+  - summary: Add tests for registry
+    done: false
+    details: 'File: tests/parsers/test_parser_registry.py
+
+
+      - Test: Parser registration and retrieval
+
+      - Test: Version matching (exact, compatible, incompatible)
+
+      - Test: Multiple parsers for same platform
+
+      - Test: No parser available case
+
+      '
+- phase: 'Task 7.3: Multi-Version Test Fixtures'
+  description: Test parsers against multiple platform versions
+  items:
+  - summary: Collect EXPLAIN outputs from multiple versions
+    done: false
+    details: "File: tests/fixtures/duckdb_plans_by_version.py\n\nDUCKDB_0_9_EXPLAIN = \"\"\"\n┌─────────────────┐\n│   PROJECTION\
+      \    │\n│   ─ ─ ─ ─ ─ ─   │\n│        l_*       │\n└─────────────────┘\n\"\"\"\n\nDUCKDB_0_10_EXPLAIN_TEXT = \"\"\"\
+      ... (text format for 0.10)\"\"\"\n\nDUCKDB_0_10_EXPLAIN_JSON = \"\"\"{\n  \"name\": \"QUERY_PLAN\",\n  \"children\"\
+      : [...]\n}\"\"\"\n\nDUCKDB_1_0_EXPLAIN_JSON = \"\"\"... (JSON for 1.0, may differ)\"\"\"\n"
+  - summary: Create version-parameterized tests
+    done: false
+    details: "File: tests/parsers/test_duckdb_parser_versions.py\n\n@pytest.mark.parametrize(\"version,explain_output\", [\n\
+      \    (\"0.9.0\", DUCKDB_0_9_EXPLAIN),\n    (\"0.10.0\", DUCKDB_0_10_EXPLAIN_TEXT),\n    (\"0.10.0\", DUCKDB_0_10_EXPLAIN_JSON),\n\
+      \    (\"1.0.0\", DUCKDB_1_0_EXPLAIN_JSON),\n])\ndef test_parse_duckdb_version(version, explain_output):\n    \"\"\"\
+      Test parser handles multiple DuckDB versions.\"\"\"\n    registry = ParserRegistry()\n    # ... register parsers\n \
+      \   parser = registry.get_parser(\"duckdb\", version)\n    assert parser is not None\n\n    plan = parser.parse_explain_output(\"\
+      test\", explain_output)\n    assert plan is not None\n    assert plan.logical_root is not None\n"
+  - summary: Add PostgreSQL version fixtures
+    done: false
+    details: 'File: tests/fixtures/postgresql_plans_by_version.py
+
+
+      POSTGRESQL_12_JSON = """..."""
+
+      POSTGRESQL_14_JSON = """..."""
+
+      POSTGRESQL_16_JSON = """..."""
+
+
+      # May have subtle differences in field names, structure
+
+      '
+  - summary: Create CI job to test against multiple versions
+    done: false
+    details: 'File: .github/workflows/parser_compatibility.yml
+
+
+      Run parser tests against:
+
+      - DuckDB: 0.9, 0.10, 1.0, latest
+
+      - PostgreSQL: 12, 14, 16, latest
+
+      - DataFusion: 35, 40, latest
+
+
+      Use docker containers with specific versions.
+
+      '
+- phase: 'Task 7.4: Enhanced Error Recovery'
+  description: Improve error messages and recovery strategies
+  items:
+  - summary: Detect common format change patterns
+    done: false
+    details: "File: benchbox/parsers/error_detection.py\n\ndef detect_format_issues(explain_output: str, platform: str) ->\
+      \ list[str]:\n    \"\"\"Detect common reasons for parse failures.\"\"\"\n    issues = []\n\n    if platform == \"duckdb\"\
+      :\n        # Check for expected markers\n        if \"┌\" not in explain_output and \"{\" not in explain_output:\n \
+      \           issues.append(\n                \"No recognized format markers found. \"\n                \"DuckDB EXPLAIN\
+      \ format may have changed.\"\n            )\n\n        # Check encoding issues\n        if any(ord(c) > 127 for c in\
+      \ explain_output):\n            try:\n                explain_output.encode('ascii')\n            except UnicodeEncodeError:\n\
+      \                issues.append(\n                    \"Non-ASCII characters detected. \"\n                    \"Encoding\
+      \ issues may cause parse failures.\"\n                )\n\n    return issues\n"
+  - summary: Add format change guidance to errors
+    done: false
+    details: "When parse fails, include actionable guidance:\n\nraise PlanParseError(\n    query_id=query_id,\n    platform=platform,\n\
+      \    error_message=(\n        f\"Parse failed: {original_error}\\n\\n\"\n        f\"Possible causes:\\n\"\n        f\"\
+      1. Platform version changed EXPLAIN format\\n\"\n        f\"2. Encoding issues with Unicode characters\\n\"\n      \
+      \  f\"3. Parser needs update for new version\\n\\n\"\n        f\"Actions:\\n\"\n        f\"- Check platform version:\
+      \ {platform_version}\\n\"\n        f\"- Try --plan-format json if available\\n\"\n        f\"- Report issue with EXPLAIN\
+      \ sample\"\n    )\n)\n"
+  - summary: Implement parser diagnostics command
+    done: false
+    details: "File: benchbox/cli/commands/diagnose_parser.py\n\n@click.command(\"diagnose-parser\")\n@click.option(\"--platform\"\
+      , required=True)\n@click.option(\"--explain-file\", required=True)\ndef diagnose_parser(platform, explain_file):\n \
+      \   \"\"\"Diagnose why parser is failing on EXPLAIN output.\"\"\"\n\n    explain_output = Path(explain_file).read_text()\n\
+      \n    print(f\"Diagnosing parser for {platform}\")\n    print(\"=\" * 50)\n\n    # Detect format\n    if explain_output.strip().startswith(\"\
+      {\"):\n        print(\"✓ Format detected: JSON\")\n    elif \"┌\" in explain_output:\n        print(\"✓ Format detected:\
+      \ Text (box-drawing)\")\n    else:\n        print(\"✗ Format not recognized\")\n\n    # Check encoding\n    try:\n \
+      \       explain_output.encode('ascii')\n        print(\"✓ Encoding: ASCII-safe\")\n    except UnicodeEncodeError:\n\
+      \        print(\"⚠  Encoding: Contains non-ASCII characters\")\n\n    # Try parsing\n    try:\n        parser = get_parser_for_platform(platform)\n\
+      \        plan = parser.parse_explain_output(\"diagnostic\", explain_output)\n        print(f\"✓ Parse successful: {len(collect_operators(plan))}\
+      \ operators\")\n    except Exception as e:\n        print(f\"✗ Parse failed: {e}\")\n\n        # Detailed diagnosis\n\
+      \        issues = detect_format_issues(explain_output, platform)\n        if issues:\n            print(\"\\nDetected\
+      \ issues:\")\n            for issue in issues:\n                print(f\"  - {issue}\")\n"
+  - summary: Add parser health checks
+    done: false
+    details: "File: tests/parsers/test_parser_health.py\n\n@pytest.mark.health\nclass TestParserHealth:\n    \"\"\"Health\
+      \ checks for parser robustness.\"\"\"\n\n    def test_parser_handles_empty_output(self):\n        \"\"\"Parser handles\
+      \ empty EXPLAIN gracefully.\"\"\"\n        parser = DuckDBQueryPlanParser()\n        with pytest.raises(PlanParseError,\
+      \ match=\"empty\"):\n            parser.parse_explain_output(\"test\", \"\")\n\n    def test_parser_handles_malformed_json(self):\n\
+      \        \"\"\"Parser handles malformed JSON gracefully.\"\"\"\n        parser = DuckDBQueryPlanParser()\n        with\
+      \ pytest.raises(PlanParseError, match=\"JSON\"):\n            parser.parse_explain_output(\"test\", \"{invalid json\"\
+      )\n\n    def test_parser_handles_partial_output(self):\n        \"\"\"Parser handles truncated output gracefully.\"\"\
+      \"\n        partial = DUCKDB_EXPLAIN[:100]  # Truncated\n        parser = DuckDBQueryPlanParser()\n        with pytest.raises(PlanParseError):\n\
+      \            parser.parse_explain_output(\"test\", partial)\n"
+technical_requirements:
+- category: Format Support
+  items:
+  - DuckDB parser supports both text and JSON formats
+  - JSON format preferred, text as fallback
+  - Format detection is automatic
+- category: Version Awareness
+  items:
+  - Parser registry selects based on platform version
+  - Multiple parsers per platform supported
+  - Version detection implemented for all platforms
+- category: Testing
+  items:
+  - Tests cover multiple platform versions
+  - Fixtures represent real-world format variations
+  - CI tests against multiple versions
+- category: Error Handling
+  items:
+  - Format issues detected and reported
+  - Error messages include actionable guidance
+  - Diagnostic tools available
+files_affected:
+  modified:
+  - benchbox/parsers/duckdb_parser.py
+  - benchbox/platforms/duckdb/adapter.py
+  - benchbox/platforms/base/adapter.py
+  - benchbox/parsers/registry.py
+  - benchbox/parsers/error_detection.py
+  - benchbox/cli/commands/diagnose_parser.py
+  - tests/parsers/test_duckdb_parser_formats.py
+  - tests/parsers/test_duckdb_parser_versions.py
+  - tests/parsers/test_parser_registry.py
+  - tests/parsers/test_parser_health.py
+  - tests/fixtures/duckdb_plans_by_version.py
+  - tests/fixtures/postgresql_plans_by_version.py
+  - .github/workflows/parser_compatibility.yml
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - parsers
+  - resilience
+  - compatibility
+  - p2
+  dependencies:
+  - phase-3-robustness-validation.yaml (error handling)
+  - phase-4-platform-coverage.yaml (multiple parsers)
+  estimated_effort: 1 week
+  lines_of_code: ~700 LOC (JSON parser + registry + error detection + tests)

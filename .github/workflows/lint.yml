@@ -2,9 +2,14 @@ name: Lint
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - develop
+      - 'v*'
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - develop
 
 jobs:
   lint:
@@ -36,5 +41,11 @@ jobs:
       - name: Validate test marker annotations
         run: make lint-markers
 
+      - name: Timing policy (wall-clock allowlist)
+        run: uv run -- python _project/scripts/timing_policy_check.py --strict
+
       - name: Compatibility docs drift check
         run: make compat-docs-check
+
+      - name: Dependency audit (no unused declarations)
+        run: make audit-deps

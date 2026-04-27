@@ -1,0 +1,232 @@
+id: unified-platform-comparison-cli
+title: Unified Platform Comparison CLI
+worktree: platform-comparison
+category: Performance and Efficiency
+priority: Medium
+status: Completed
+completed_date: "2025-12-14"
+description: |
+  Extend existing `benchbox compare` command to support running benchmarks
+  across multiple platforms, unifying SQL and DataFrame comparison.
+
+  Problem:
+  - Currently have: benchbox compare (result files only), benchbox compare-dataframes
+  - Adding compare-sql would create 3 comparison commands
+  - SQL and DataFrame comparisons share 80% of the same options
+  - User confusion about which command to use
+
+  Solution: Extend `benchbox compare` with --run mode:
+  - benchbox compare results/*.json                    # Existing: compare files
+  - benchbox compare --run -p duckdb -p clickhouse     # NEW: run & compare SQL
+  - benchbox compare --run -p polars-df -p pandas-df   # NEW: run & compare DataFrame
+  - benchbox compare --run --type sql -p duckdb -p sqlite  # Explicit type
+
+  Benefits:
+  - Single `compare` command (no new commands)
+  - Backwards compatible with existing file comparison
+  - Shared codebase for visualization, reporting
+  - Unified documentation
+  - Deprecate compare-dataframes (alias to compare --run --type dataframe)
+
+context_sections:
+  "Current CLI State":
+    summary: |
+      Existing commands:
+      - benchbox compare [FILES] - Compare result files (post-hoc)
+      - benchbox compare-dataframes - Run & compare DataFrame platforms
+      - benchbox compare-plans - Compare query plans
+
+  "Unified Architecture":
+    summary: |
+      Extend existing compare command:
+      - benchbox/cli/commands/compare.py - Add --run mode with platform options
+      - benchbox/core/comparison/ - Shared comparison infrastructure
+        - benchmark_suite.py - Unified BenchmarkSuite (SQL + DataFrame)
+        - plotter.py - Unified visualization
+      - Deprecate compare-dataframes (alias to compare --run --type dataframe)
+
+  "Existing Infrastructure":
+    summary: |
+      Leverage existing code:
+      - benchbox/core/analysis/comparison.py - PlatformComparison class
+      - benchbox/core/dataframe/benchmark_suite.py - DataFrameBenchmarkSuite
+      - benchbox/core/visualization/ - Chart framework
+
+tasks:
+- phase: "Phase 1: Core Unification"
+  done: true
+  items:
+  - summary: "Create unified comparison module"
+    done: true
+    details: |
+      Create benchbox/core/comparison/ with:
+      - __init__.py - Exports
+      - types.py - Shared types (PlatformType enum: SQL, DATAFRAME)
+      - suite.py - UnifiedBenchmarkSuite
+      - plotter.py - UnifiedComparisonPlotter
+  - summary: "Refactor DataFrameBenchmarkSuite"
+    done: true
+    details: |
+      - Extract common logic to base class
+      - SQLBenchmarkSuite and DataFrameBenchmarkSuite extend base
+      - Shared: result collection, statistics, visualization hooks
+      - Platform-specific: how to run benchmarks, platform discovery
+  - summary: "Integrate with PlatformComparison"
+    done: true
+    details: |
+      Use benchbox/core/analysis/comparison.py for:
+      - Result file comparison (--from-results mode)
+      - Statistical analysis
+      - Insight generation
+
+- phase: "Phase 2: Extend benchbox compare Command"
+  done: true
+  items:
+  - summary: "Add --run mode to benchbox compare"
+    done: true
+    details: |
+      Extend benchbox/cli/commands/compare.py with new options:
+
+      Mode selection:
+      - [FILES...]              # Existing: compare result files
+      - --run                   # NEW: run benchmarks then compare
+
+      Platform options (with --run):
+      - -p/--platforms TEXT     # Platforms to compare (repeatable)
+      - --type [sql|dataframe|auto]  # auto-detect from platform names
+      - --list-platforms        # Show available platforms
+
+      Benchmark options (with --run):
+      - -b/--benchmark [tpch|tpcds|ssb|clickbench]
+      - -s/--scale FLOAT
+      - -q/--queries TEXT
+      - --warmup INT
+      - --iterations INT
+      - --parallel              # Run platforms in parallel
+
+      Output options (all modes):
+      - -o/--output PATH
+      - --format [text|json|markdown|html]
+      - --generate-charts
+      - --theme [light|dark]
+  - summary: "Add platform type auto-detection"
+    done: true
+    details: |
+      Detect type from platform names:
+      - *-df suffix → dataframe type
+      - Known SQL platforms → sql type
+      - Mixed → error with helpful message
+  - summary: "Deprecate compare-dataframes"
+    done: true
+    details: |
+      Keep compare-dataframes as alias for backwards compatibility:
+      compare-dataframes → compare --run --type dataframe
+      Add deprecation warning pointing to new usage
+
+- phase: "Phase 3: Unified Visualization"
+  done: true
+  items:
+  - summary: "Create UnifiedComparisonPlotter"
+    done: true
+    details: |
+      Single plotter class that works with both:
+      - SQL comparison results
+      - DataFrame comparison results
+      - Mixed (SQL vs DataFrame) comparisons
+
+      Output types:
+      - Bar charts (platform comparison)
+      - Box plots (distribution)
+      - Heatmaps (query breakdown)
+      - Scatter plots (cost vs performance)
+  - summary: "Refactor DataFrameComparisonPlotter"
+    done: true
+    details: |
+      Extract common visualization logic to UnifiedComparisonPlotter
+      DataFrameComparisonPlotter becomes thin wrapper (if needed)
+
+- phase: "Phase 4: Documentation"
+  done: true
+  items:
+  - summary: "Create docs/guides/platform-comparison.md"
+    done: true
+    details: |
+      Unified documentation covering:
+      - Quick start for SQL platforms
+      - Quick start for DataFrame platforms
+      - All CLI options
+      - Programmatic API
+      - Interpreting results
+  - summary: "Update existing docs"
+    done: true
+    details: |
+      - Update docs/guides/dataframe-comparison.md to point to unified guide
+      - Add migration notes if deprecating compare-dataframes
+      - Update CLI help examples
+  - summary: "Add comparison examples"
+    done: false
+    notes: "Deferred - examples can be added separately"
+    details: |
+      Create examples/comparison/:
+      - sql_platform_comparison.py
+      - dataframe_platform_comparison.py
+      - mixed_comparison.py (SQL vs DataFrame)
+
+files_affected:
+  added:
+  - benchbox/core/comparison/__init__.py
+  - benchbox/core/comparison/types.py
+  - benchbox/core/comparison/suite.py
+  - benchbox/core/comparison/plotter.py
+  - tests/unit/comparison/test_unified_suite.py
+  - tests/unit/cli/test_compare_run_mode.py
+  - docs/guides/platform-comparison.md
+  - examples/comparison/sql_platform_comparison.py
+  - examples/comparison/dataframe_platform_comparison.py
+  modified:
+  - benchbox/cli/commands/compare.py
+  - benchbox/cli/commands/compare_dataframes.py
+  - benchbox/core/dataframe/benchmark_suite.py
+  - docs/guides/dataframe-comparison.md
+
+dependencies:
+  supersedes:
+  - _project/TODO/platform-comparison/planning/sql-cross-platform-benchmark-suite.yaml
+  related:
+  - _project/DONE/dataframe-performance/planning/cross-platform-benchmark-suite.yaml
+
+metadata:
+  owners:
+  - "@benchbox-maintainers"
+  tags:
+  - sql
+  - dataframe
+  - performance
+  - benchmarking
+  - comparison
+  - cli
+  - unification
+  estimated_effort: Medium
+  created_date: "2025-12-14"
+
+impact:
+  business_value: |
+    Single command for all platform comparisons simplifies user experience.
+    Unified codebase reduces maintenance burden.
+    Consistent visualization and reporting across all comparisons.
+  user_impact: |
+    Users learn one command instead of three.
+    Consistent experience whether comparing SQL or DataFrame platforms.
+    Clear documentation with single source of truth.
+
+success_metrics:
+- Single `benchbox compare` command with --run handles SQL, DataFrame, and mixed
+- 80%+ code reuse between SQL and DataFrame comparison paths
+- Unified documentation in one guide
+- Backwards compatibility with existing compare-dataframes workflows
+- All visualization types work for both SQL and DataFrame
+
+open_questions:
+- Should compare --run support comparing SQL vs DataFrame directly?
+- Should --type be required or always auto-detected?
+- How long to keep compare-dataframes alias before full deprecation?

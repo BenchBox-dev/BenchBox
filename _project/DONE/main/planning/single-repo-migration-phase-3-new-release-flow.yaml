@@ -1,0 +1,159 @@
+id: single-repo-migration-phase-3-new-release-flow
+title: "Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow"
+worktree: main
+priority: High
+status: Completed
+completed_date: 2026-04-27
+category: Release Tooling
+
+deps:
+  needs:
+  - single-repo-migration-phase-1-wheel-hygiene
+  - single-repo-migration-phase-2-continuous-ci
+
+description: |
+  Build the replacement release tooling that supersedes automate_release.py.
+  The new flow has three pieces:
+
+  1. Makefile release target: bumps version, generates changelog, opens a
+     release PR. Maintainer reviews, edits changelog, squash-merges.
+  2. GitHub Actions release workflow: triggered by tag push, runs final
+     CI, builds wheel and sdist, publishes to PyPI via trusted publisher.
+  3. Standalone changelog generator extracted from automate_release.py,
+     keeping the Claude-summarisation fallback.
+
+  automate_release.py and the rest of the old machinery still exist during
+  this phase as a fallback. They are deleted in Phase 6.
+
+  Under Option B, these artefacts are added on private (current dev locus)
+  and land on public via the Phase 4 final sync. The Makefile target uses
+  `origin` from the start; when invoked from the public clone post-Phase 5,
+  origin is the canonical repo. Do NOT invoke `make release` from the
+  private clone — its `origin` remote does not exist (private has `private`
+  and `public` remotes today).
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 3).
+
+work:
+- id: w1
+  summary: "Extract scripts/generate_changelog_entry.py from automate_release.py"
+  status: done
+  notes: |
+    Lift functions automate_release.py:_build_raw_changelog,
+    _summarize_changelog_with_claude, and generate_changelog_entry
+    (lines 156-414) into a standalone script with its own argparse.
+    Args: --version, --release-date, --since-tag (optional, defaults
+    to most recent v* tag), --output (default CHANGELOG.md).
+    Keep the Claude CLI summarisation fallback exactly as-is. Reuse
+    update_version.py for version bumping (do not duplicate).
+
+- id: w2
+  summary: "Add Makefile release target"
+  needs: [w1]
+  status: done
+  notes: |
+    Append to Makefile:
+      release:
+          @test -n "$(VERSION)" || (echo "Usage: make release VERSION=X.Y.Z" && exit 1)
+          uv run python scripts/update_version.py --version $(VERSION)
+          uv run python scripts/generate_changelog_entry.py --version $(VERSION)
+          git checkout -b release/v$(VERSION)
+          git add CHANGELOG.md benchbox/__init__.py pyproject.toml docs/ landing/ benchbox/_metadata.py 2>/dev/null || true
+          git commit -m "Release v$(VERSION)"
+          git push origin release/v$(VERSION)
+          gh pr create --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
+    Note: under Option B, `origin` is the canonical remote in the public
+    clone (~/Developer/benchbox-public). The Makefile is intended to run
+    from there post-Phase 5. Add a comment in the Makefile explaining
+    this so it is not invoked accidentally from the private clone before
+    dev-locus migration.
+
+- id: w3
+  summary: "Add .github/RELEASE_PR_TEMPLATE.md"
+  needs: [w2]
+  status: done
+  notes: |
+    Short template with a checklist:
+      ## Release vX.Y.Z
+      - [ ] Reviewed the auto-generated changelog
+      - [ ] Edited any unclear bullets
+      - [ ] Confirmed version bump in benchbox/__init__.py, pyproject.toml,
+            docs/index.rst landing pages
+      After merge: git tag vX.Y.Z && git push origin vX.Y.Z. The
+      release.yml workflow handles the rest.
+
+- id: w4
+  summary: "Add .github/workflows/release.yml triggered by v* tag push"
+  needs: [w1]
+  status: done
+  notes: |
+    Triggers: push tags v*.
+    Jobs:
+      - checkout with fetch-depth 0 (need history for SOURCE_DATE_EPOCH)
+      - setup uv (astral-sh/setup-uv@v3)
+      - compute SOURCE_DATE_EPOCH from the tag's commit timestamp:
+        echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct ${GITHUB_REF_NAME})" >> $GITHUB_ENV
+      - run final pytest -m fast as a sanity check
+      - uv run python -m build
+      - verify the wheel: pip install dist/*.whl in a fresh venv,
+        assert benchbox.__version__ == GITHUB_REF_NAME without v prefix
+      - publish via pypa/gh-action-pypi-publish@release/v1
+        (trusted publisher already configured per CHANGELOG)
+    Permissions: id-token: write (PyPI), contents: read.
+
+- id: w5
+  summary: "(Optional) Dry-run with v0.0.0-test on a sandbox branch"
+  needs: [w2, w3, w4]
+  status: done
+  notes: |
+    Optional. Under Option B, the new flow gets exercised on real public
+    main in Phase 4; most issues will surface there. Skip this work unit
+    if you would rather catch issues during the actual v0.3.0 cut and
+    iterate.
+    If running:
+      git checkout -b sandbox-release-flow
+      make release VERSION=0.0.0-test
+      Review the resulting PR. Close without merging. No PyPI publish
+      because no tag was pushed.
+    Note: requires a public clone with origin set, since the Makefile
+    pushes to origin. From private clone this will fail.
+
+verification:
+- description: "scripts/generate_changelog_entry.py exists and is importable as a CLI"
+  command: "uv run python scripts/generate_changelog_entry.py --help"
+  expected_output: "exit 0, usage line printed"
+- description: "Makefile has a release target"
+  command: "make -n release VERSION=0.0.0 2>&1 | head -1"
+  expected_output: "shows the bump command"
+- description: ".github/workflows/release.yml exists and triggers on tag push"
+  command: "grep -A2 'on:' .github/workflows/release.yml | grep -E 'tags:|v\\*'"
+  expected_output: "tags: ['v*']"
+- description: "Sandbox dry-run produces a release PR"
+  command: "gh pr list --head 'sandbox-release-flow' --json title --jq '.[0].title'"
+  expected_output: "Release v0.0.0-test (or similar)"
+
+must_preserve:
+- automate_release.py and friends still work end-to-end during this phase. The new flow runs alongside, not in place of,
+  the old one.
+- The PyPI trusted-publisher configuration remains unchanged - the new workflow uses the same publisher as the old one
+  would have.
+- update_version.py is reused as-is, not duplicated.
+
+anti_patterns:
+- DO NOT publish to real PyPI from a sandbox/test workflow run - because PyPI rejects re-uploads of the same version; a
+  botched test burns the version number forever.
+- DO NOT skip the SOURCE_DATE_EPOCH computation - because reproducible builds were the one piece of the old apparatus
+  worth keeping (D7); computing it from the tag commit preserves that property cheaply.
+- DO NOT bake secrets or tokens into release.yml - because trusted publisher uses OIDC and needs no static tokens; if
+  you find yourself reaching for a PYPI_API_TOKEN, you are doing it wrong.
+
+scope_limit:
+  only_modify:
+  - Makefile
+  - scripts/generate_changelog_entry.py  # new file
+  - .github/workflows/release.yml  # new file
+  - .github/RELEASE_PR_TEMPLATE.md  # new file
+  notes: |
+    Do NOT modify automate_release.py, prepare_release.py, or any other
+    existing release script. They remain as a fallback. Phase 6 deletes
+    them.

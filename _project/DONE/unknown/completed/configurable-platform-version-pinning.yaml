@@ -1,0 +1,62 @@
+id: configurable-platform-version-pinning
+title: ✅ Configurable Platform Version Pinning
+category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+status: Completed
+priority: High
+impact: Enables reproducible benchmarks across driver releases and surfaces requested vs. resolved versions in every artefact.
+sections:
+  Summary: Added driver version fields to configs/results, created a runtime version manager with optional auto-install, and
+    updated CLI/reporting pipelines to record both requested and resolved driver builds.
+  Completed Tasks: '- "✅ Configuration & CLI wiring"
+
+    - ✅ Runtime enforcement
+
+    - "✅ Reporting & exports"
+
+    - "✅ Documentation & examples"
+
+    - ✅ Tests'
+  Testing: '"`UV_CACHE_DIR=.uv-cache uv run -- python -m pytest` *(fails: offline sandbox blocked dependency sync from PyPI;
+    targeted unit modules pass under patched runtime helpers.)*
+
+    "'
+  Files Affected: '- benchbox/core/config.py
+
+    - benchbox/core/results/models.py
+
+    - benchbox/core/platform_registry.py
+
+    - benchbox/cli/database.py
+
+    - benchbox/cli/platform_defaults.py
+
+    - benchbox/cli/platform_hooks.py
+
+    - benchbox/cli/execution_pipeline.py
+
+    - benchbox/cli/output.py
+
+    - benchbox/platforms/__init__.py
+
+    - benchbox/platforms/base.py
+
+    - benchbox/utils/runtime_env.py (new)
+
+    - README.md
+
+    - docs/README.md
+
+    - docs/usage/cli-quick-start.md
+
+    - docs/development/import-patterns.md
+
+    - benchbox/utils/VERSION_MANAGEMENT.md
+
+    - tests/unit/cli/test_platform_hooks.py
+
+    - tests/unit/utils/test_runtime_env.py (new)
+
+    - tests/unit/cli/test_execution_pipeline_driver_metadata.py (new)'
+worktree: unknown
+description: Added driver version fields to configs/results, created a runtime version manager with optional auto-install,
+  and updated CLI/reporting pipelines to record both requested and resolved driver builds.

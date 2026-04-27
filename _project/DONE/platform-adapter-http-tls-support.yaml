@@ -1,0 +1,95 @@
+id: platform-adapter-http-tls-support
+title: "Add TLS/HTTPS option for HTTP-based data loading endpoints"
+worktree: platform-expansion
+priority: Medium
+status: Not Started
+description: |
+  Three platform adapters use HTTP APIs for bulk data loading but hardcode http://
+  with no option for HTTPS:
+
+  1. **QuestDB** (PR #28): REST API for /imp endpoint - questdb.py:348, 382
+  2. **Doris** (PR #30): Stream Load API - doris.py:418, 443-448
+     Also sends credentials via HTTP Basic Auth in plaintext.
+  3. **Databend** (PR #29): DSN construction - databend/adapter.py:256-258
+     Password not URL-encoded either (separate issue).
+
+  For localhost/Docker development, HTTP is fine. But for remote or cloud deployments,
+  credentials and data are transmitted in cleartext. This is a security concern for
+  production use.
+
+  The fix should add a use_tls or http_scheme configuration option to each adapter,
+  defaulting to http:// for backward compatibility but allowing https:// for remote
+  deployments.
+
+category: Platform Expansion
+
+work:
+  - id: w1
+    summary: "Add use_tls config option to QuestDB adapter"
+    status: done
+    notes: "questdb.py - add config param, use https:// when enabled"
+
+  - id: w2
+    summary: "Add use_tls config option to Doris Stream Load"
+    status: done
+    notes: "doris.py - add config param, use https:// when enabled"
+
+  - id: w3
+    summary: "Fix Databend password URL-encoding in DSN construction"
+    status: done
+    notes: "databend/adapter.py:256-258 - use urllib.parse.quote(self.password, safe='')"
+
+  - id: w4
+    summary: "Add use_tls config option to Databend adapter"
+    needs: [w3]
+    status: done
+    notes: "databend/adapter.py - add config param for databend:// vs databends:// DSN scheme"
+
+  - id: w5
+    summary: "Add CLI arguments for TLS options"
+    needs: [w1, w2, w4]
+    status: done
+
+  - id: w6
+    summary: "Add tests for TLS URL construction"
+    needs: [w1, w2, w3, w4]
+    status: done
+
+deferred:
+  - summary: "Certificate validation options (verify_ssl, ca_cert_path)"
+    reason: "Add if users request it - keep initial implementation simple"
+
+metadata:
+  tags:
+    - security
+    - tls
+    - https
+    - data-loading
+    - credentials
+    - code-review-finding
+  estimated_effort: 1-2 days
+  created_date: "2026-02-15"
+  owners:
+    - joe
+
+must_preserve:
+  - "Default behavior unchanged - http:// by default for backward compatibility"
+  - "All existing adapter tests pass without modification"
+  - "Data loading still works for localhost/Docker setups"
+
+verification:
+  - description: "All platform adapter tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+    expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/questdb.py"
+    - "benchbox/platforms/doris.py"
+    - "benchbox/platforms/databend/adapter.py"
+    - "tests/unit/platforms/test_questdb_adapter.py"
+    - "tests/unit/platforms/test_doris_adapter.py"
+    - "tests/unit/platforms/test_databend_adapter.py"
+  do_not_modify:
+    - "benchbox/core/"
+    - "benchbox/platforms/duckdb.py"

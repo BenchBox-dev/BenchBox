@@ -1,0 +1,44 @@
+id: stabilize-optional-dependency-adapter-tests
+title: Stabilize Optional-Dependency Adapter Tests
+worktree: observability-quality
+category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+priority: High
+status: Identified
+description: Ensure pytest’s default run succeeds without optional database connectors by isolating or skipping adapter suites
+  that hard-fail when cloud drivers are absent.
+context_sections:
+- name: Failing Suites
+  summary: tests/unit/platforms/test_bigquery_adapter.py, test_clickhouse_adapter.py, and test_databricks_adapter.py currently
+    raise errors when their vendor SDKs are not installed.
+- name: Default Developer Workflow
+  summary: '"Contributors expect `uv run -- python -m pytest` to be green after a fresh clone without provisioning cloud credentials."'
+impact: Prevents first-time contributors from hitting red test suites and establishes a reliable core CI baseline.
+tasks:
+- phase: Failure Inventory
+  description: Catalog which tests require optional packages and why.
+  done: false
+  items:
+  - summary: Map adapter tests to their dependency/import requirements.
+  - summary: '"Decide whether to gate with `pytest.importorskip`, feature flags, or test doubles."'
+- phase: Test Restructuring
+  description: Reorganize or mark tests so the default environment passes.
+  done: false
+  items:
+  - summary: '"Move heavy adapter suites behind dedicated markers (e.g., `@pytest.mark.requires_bigquery`)."'
+  - summary: Introduce shim fixtures or dependency injection for adapters that only need interface validation.
+- phase: CI Alignment
+  description: Update CI/test docs to explain how to run the optional suites with extras installed.
+  done: false
+  items:
+  - summary: Add command snippets for enabling cloud adapters locally.
+  - summary: Ensure tox/Make targets respect the new markers.
+files_affected:
+  modified:
+  - tests/unit/platforms/test_bigquery_adapter.py
+  - tests/unit/platforms/test_clickhouse_adapter.py
+  - tests/unit/platforms/test_databricks_adapter.py
+  - pytest.ini
+  - docs/development/adding-new-platforms.md
+  - README.md
+  added: []
+  removed: []

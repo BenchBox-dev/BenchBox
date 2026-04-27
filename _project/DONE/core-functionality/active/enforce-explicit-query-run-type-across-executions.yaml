@@ -1,0 +1,153 @@
+id: enforce-explicit-query-run-type-across-executions
+title: "Enforce explicit query run_type tagging across SQL and DataFrame execution paths"
+worktree: core-functionality
+priority: High
+status: Completed
+category: Core Functionality
+description: |
+  Query result rows currently rely on fallback inference for `run_type` in several
+  paths (especially SQL `standard` execution), while other paths set run_type
+  explicitly (`warmup`/`measurement`, and DataFrame metadata/summary rows).
+
+  This creates ambiguity and repeated fallback logic in normalization/schema code,
+  and can cause inconsistent downstream analytics semantics when producer paths
+  omit run_type.
+
+  This TODO defines canonical run_type semantics and ensures all producer paths
+  explicitly stamp run_type before result building/export. It also aligns
+  enhanced execution-phase objects and adds contract tests so missing run_type
+  cannot regress silently.
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - results
+    - query-normalization
+    - sql
+    - dataframe
+    - run-type
+  estimated_effort: Medium
+  created_date: "2026-02-18"
+
+impact:
+  business_value: |
+    Produces stable, explicit execution metadata across modes, reducing analytics
+    ambiguity and improving trust in benchmark outputs used for comparisons.
+  technical_debt: |
+    Removes scattered fallback assumptions and establishes a single contract for
+    run_type semantics at producer boundaries.
+
+files_affected:
+  modified:
+    - benchbox/platforms/base/adapter.py
+    - benchbox/platforms/dataframe/benchmark_mixin.py
+    - benchbox/core/results/query_normalizer.py
+    - benchbox/core/results/schema.py
+    - benchbox/core/results/models.py
+    - tests/unit/platforms/
+    - tests/unit/core/results/
+
+must_preserve:
+  - "`test_execution_type` continues to represent run mode (`standard|power|throughput|maintenance|combined`) and is NOT replaced
+    by run_type"
+  - "Existing power/throughput behavior where warmup rows are excluded from primary timing metrics remains unchanged"
+  - "Backward compatibility for loading historical results without explicit run_type remains intact via normalization fallback"
+  - "DataFrame metadata/summary synthetic rows keep their current run_type values (`metadata`/`summary`)"
+
+approach: |
+  1) Define and document canonical run_type vocabulary for query rows and
+  synthetic rows.
+  2) Add explicit producer-side stamping in SQL standard/throughput/maintenance
+  paths so run_type is present before normalization.
+  3) Propagate run_type into enhanced QueryExecution phase objects.
+  4) Keep fallback inference as compatibility-only safety net (not primary path).
+  5) Add contract tests that fail if any producer emits query rows without run_type.
+
+anti_patterns:
+  - "DO NOT reinterpret run_type as execution mode (`power|throughput|maintenance`) - because run mode is already carried by
+    `test_execution_type` - keep run_type as per-row execution role"
+  - "DO NOT remove fallback inference in query normalization immediately - because historical artifacts may lack run_type -
+    retain compatibility while enforcing explicit tagging for new producer output"
+  - "DO NOT change timing metric filters (measurement-only) as part of tagging cleanup - because this TODO is metadata-contract
+    hardening, not metric-policy redesign"
+
+verification:
+  - description: "SQL adapter paths stamp run_type explicitly across execution types"
+    command:
+      "uv run -- python -m pytest tests/unit/platforms -k 'run_type and (standard or throughput or maintenance or power)'
+      -q"
+    expected_output: "selected tests pass; run_type present assertions succeed"
+  - description: "Result-layer contract tests enforce explicit run_type and compatibility fallback"
+    command: "uv run -- python -m pytest tests/unit/core/results -k 'run_type or query_normalizer or schema' -q"
+    expected_output: "selected tests pass; no missing run_type regressions"
+  - description: "MCP and result export behavior remains stable"
+    command: "uv run -- python -m pytest tests/unit/mcp/test_mcp_results_and_analytics.py -k RunBenchmark -q"
+    expected_output: "selected run_benchmark MCP tests pass"
+
+scope_limit:
+  only_modify:
+    - benchbox/platforms/base/adapter.py
+    - benchbox/platforms/base/models.py
+    - benchbox/platforms/dataframe/benchmark_mixin.py
+    - benchbox/core/results/query_normalizer.py
+    - benchbox/core/results/schema.py
+    - benchbox/core/results/models.py
+    - tests/unit/platforms/
+    - tests/unit/core/results/
+    - tests/unit/mcp/
+  do_not_modify:
+    - benchbox/core/tpch/
+    - benchbox/core/tpcds/
+    - benchbox/cli/
+
+success_metrics:
+  - "All newly produced query rows include explicit run_type without relying on fallback"
+  - "Enhanced execution phase objects preserve run_type values"
+  - "Historical result loading without run_type continues to succeed"
+  - "No SQL/DataFrame parity regressions in run_type-dependent summaries"
+
+work:
+  - id: w1
+    summary: "Define canonical run_type semantics and allowed values in a shared results-layer location"
+    status: done
+
+  - id: w2
+    summary: "Add SQL producer-side run_type stamping for standard execution outputs"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Ensure throughput/maintenance and fallback combined paths also emit explicit run_type for query rows"
+    needs: [w1]
+    status: done
+
+  - id: w4
+    summary: "Propagate run_type into `_create_standard_execution_phase()` QueryExecution objects"
+    needs: [w2]
+    status: done
+
+  - id: w5
+    summary: "Retain normalization/schema run_type fallback as compatibility-only path with clarifying comments"
+    needs: [w1]
+    status: done
+
+  - id: w6
+    summary: "Add platform adapter unit tests asserting run_type presence across execution types"
+    needs: [w2, w3]
+    status: done
+
+  - id: w7
+    summary: "Add results-layer contract tests for explicit run_type and fallback compatibility"
+    needs: [w5]
+    status: done
+
+  - id: w8
+    summary: "Add MCP/result export regression tests to verify run_type continuity in payloads"
+    needs: [w6, w7]
+    status: done
+
+  - id: w9
+    summary: "Run focused verification suite and document any residual edge cases"
+    needs: [w8]
+    status: done

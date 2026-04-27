@@ -1,0 +1,16 @@
+id: multi-region-performance-testing
+title: Multi-Region Performance Testing
+worktree: enterprise-ops-multi-region
+category: Enterprise Operations
+priority: Medium
+status: Completed
+description: 'Multi-region deployment support with cross-region latency measurement
+
+  and data transfer cost tracking.
+
+  '
+metadata:
+  estimated_effort: 3 weeks (0.75 FTE)
+  budget: $17K-22K
+  due_date: '2027-03-01'
+  blocking_posts: 'Week 94: Network Performance ($340)'

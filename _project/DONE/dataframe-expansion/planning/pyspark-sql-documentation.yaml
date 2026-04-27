@@ -1,0 +1,141 @@
+id: pyspark-sql-documentation
+title: Document PySpark SQL mode usage
+worktree: dataframe-expansion
+priority: Medium
+status: Not Started
+category: Documentation
+
+description: |
+  Update platform documentation to cover PySpark SQL mode,
+  including usage examples and Java requirements.
+
+  Documentation should cover:
+  - Dual-mode platform concept (SQL vs DataFrame)
+  - CLI usage with --mode flag
+  - Java version requirements (17/21 required, 23+ incompatible)
+  - Configuration options
+  - Performance considerations
+  - Comparison between SQL and DataFrame modes
+
+context_sections:
+  "Documentation Outline": |
+    # PySpark Platform
+
+    ## Overview
+    PySpark is a dual-mode platform supporting both SQL and DataFrame execution.
+
+    ## Modes
+    - **DataFrame mode** (default): Uses PySpark DataFrame API
+    - **SQL mode**: Uses Spark SQL with SQLGlot translation
+
+    ## Requirements
+    - Python 3.10+
+    - Java 17 or 21 (Java 23+ not supported)
+    - pyspark>=3.5.0
+
+    ## Installation
+    ```bash
+    uv add pyspark
+    # or
+    benchbox platforms install pyspark
+    ```
+
+    ## Usage
+
+    ### DataFrame Mode (default)
+    ```bash
+    benchbox run --platform pyspark --benchmark tpch --scale 1
+    # Equivalent to:
+    benchbox run --platform pyspark --mode dataframe --benchmark tpch --scale 1
+    ```
+
+    ### SQL Mode
+    ```bash
+    benchbox run --platform pyspark --mode sql --benchmark tpch --scale 1
+    ```
+
+    ## Java Version
+    PySpark 4.x requires Java 17 or 21. Java 23+ is not supported due to
+    deprecated javax.security.auth.Subject API.
+
+    Check your Java version:
+    ```bash
+    java -version
+    ```
+
+    Set JAVA_HOME if needed:
+    ```bash
+    export JAVA_HOME=/path/to/java-17
+    ```
+
+  "Mode Comparison Table": |
+    | Aspect | DataFrame Mode | SQL Mode |
+    |--------|---------------|----------|
+    | Execution | Native DataFrame API | Spark SQL |
+    | Query source | DataFrame expressions | Translated SQL |
+    | TPC compliance | Non-compliant (not SQL) | Compliant |
+    | Tuning | DataFrame-level | SQL hints, EXPLAIN |
+    | Performance | Often faster | Standard SQL |
+    | Use case | DataFrame benchmarking | SQL benchmarking |
+
+tasks:
+  phases:
+  - phase: "Phase 1: Update Existing Docs"
+    done: false
+    items:
+    - summary: Update docs/platforms/pyspark-dataframe.md title and intro
+      done: false
+    - summary: Add SQL mode section
+      done: false
+    - summary: Document --mode flag usage
+      done: false
+    - summary: Add mode comparison table
+      done: false
+
+  - phase: "Phase 2: Add Configuration Docs"
+    done: false
+    items:
+    - summary: Document Java version requirements
+      done: false
+    - summary: Document memory configuration options
+      done: false
+    - summary: Document Spark configuration options
+      done: false
+    - summary: Add troubleshooting section
+      done: false
+
+  - phase: "Phase 3: Add Examples"
+    done: false
+    items:
+    - summary: Add CLI examples for SQL mode
+      done: false
+    - summary: Add Python API examples
+      done: false
+    - summary: Add tuning examples
+      done: false
+
+files_affected:
+  modified:
+  - docs/platforms/pyspark-dataframe.md
+
+metadata:
+  owners:
+  - "@benchbox-maintainers"
+  tags:
+  - pyspark
+  - sql
+  - docs
+  - documentation
+  estimated_effort: Small
+  created_date: "2025-12-07"
+
+success_metrics:
+- docs/platforms/pyspark-dataframe.md updated with SQL mode section
+- CLI examples for --mode sql documented
+- Java version requirements clearly documented
+- Mode comparison table included
+- Troubleshooting section added
+
+dependencies:
+  blocked_by:
+  - dataframe-expansion/planning/pyspark-sql-tests.yaml

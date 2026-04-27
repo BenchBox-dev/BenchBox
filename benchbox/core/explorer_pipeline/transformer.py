@@ -1,0 +1,712 @@
+"""Bundle-to-read-model transformer for the explorer static build pipeline.
+
+Reads schema-v2 result bundle JSON files and converts them into the
+ManifestEntry and DetailResult shapes consumed by the explorer frontend.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import math
+import re
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from benchbox.core.explorer_pipeline.models import (
+    ComparabilityWarning,
+    ComparisonArtifact,
+    ComparisonQueryCell,
+    ComparisonRow,
+    DetailResult,
+    ManifestEntry,
+    PercentileStats,
+    QueryDisplayTiming,
+    QueryTiming,
+    _platform_id,
+    get_ranking_config,
+)
+from benchbox.core.labels import disambiguate_platform_labels
+
+logger = logging.getLogger(__name__)
+
+# Status values that are considered passing for the query timing status field.
+_PASS_STATUSES = {"SUCCESS", "PASS", "pass", "success"}
+
+
+def _load_bundle(bundle_path: Path) -> tuple[dict[str, Any], bytes]:
+    """Load and parse a bundle JSON file.
+
+    Returns both the parsed dict and the raw bytes so callers can compute
+    a content hash without a second file read.
+    """
+    raw = bundle_path.read_bytes()
+    return json.loads(raw), raw
+
+
+def _sha256_prefix(raw: bytes, length: int = 8) -> str:
+    """Return the first *length* hex chars of the SHA-256 of *raw* bytes."""
+    return hashlib.sha256(raw).hexdigest()[:length]
+
+
+def _run_date_from_timestamp(timestamp: str) -> str:
+    """Extract YYYYMMDD from an ISO timestamp string."""
+    # Timestamp may be "2026-01-15T12:00:00" or "2026-01-15T12:00:00.123456"
+    date_part = timestamp[:10]  # "YYYY-MM-DD"
+    return date_part.replace("-", "")
+
+
+def _driver_version(data: dict[str, Any]) -> str | None:
+    """Extract driver version from schema-v2 bundle, preferring actual over requested."""
+    execution = data.get("execution", {})
+    if not isinstance(execution, dict):
+        return None
+    for key in ("driver_actual_version", "driver_resolved_version", "driver_requested_version"):
+        val = execution.get(key)
+        if val and isinstance(val, str):
+            return val
+    return None
+
+
+def _power_score(data: dict[str, Any]) -> float | None:
+    """Extract TPC power@size metric from a schema-v2 bundle."""
+    summary = data.get("summary", {})
+    tpc = summary.get("tpc_metrics", {}) if isinstance(summary, dict) else {}
+    if isinstance(tpc, dict):
+        for key in ("power_at_size", "qphh_at_size", "qphds_at_size"):
+            val = tpc.get(key)
+            if val is not None:
+                try:
+                    return float(val)
+                except (TypeError, ValueError):
+                    pass
+    return None
+
+
+def _geomean_ms(data: dict[str, Any]) -> float | None:
+    """Compute geometric mean of measurement-query execution times in milliseconds.
+
+    Uses only queries with run_type="measurement" (or all when run_type is absent).
+    Returns None if no valid positive timings exist.
+    """
+    raw_queries: list[dict[str, Any]] = data.get("queries", [])
+    values: list[float] = []
+    for q in raw_queries:
+        if not isinstance(q, dict):
+            continue
+        run_type = q.get("run_type")
+        if run_type is not None and run_type != "measurement":
+            continue
+        ms_raw = q.get("ms")
+        duration_ms_raw = ms_raw if ms_raw is not None else q.get("execution_time_ms")
+        if duration_ms_raw is None:
+            continue
+        try:
+            ms = float(duration_ms_raw)
+        except (TypeError, ValueError):
+            continue
+        if ms > 0:
+            values.append(ms)
+    if not values:
+        return None
+    return math.exp(sum(math.log(v) for v in values) / len(values))
+
+
+def _platform_version(data: dict[str, Any]) -> str | None:
+    """Extract platform version from schema-v2 bundle."""
+    platform = data.get("platform", {})
+    if not isinstance(platform, dict):
+        return None
+    val = platform.get("version")
+    return str(val) if val and val != "unknown" else None
+
+
+def _execution_mode(data: dict[str, Any]) -> str | None:
+    """Extract execution mode (sql/dataframe) from schema-v2 bundle."""
+    config = data.get("config", {})
+    if isinstance(config, dict):
+        val = config.get("execution_mode")
+        if val:
+            return str(val)
+    execution = data.get("execution", {})
+    if isinstance(execution, dict):
+        val = execution.get("execution_mode")
+        if val:
+            return str(val)
+    return None
+
+
+def _tuning_mode(data: dict[str, Any]) -> str | None:
+    """Extract tuning mode from schema-v2 bundle config block."""
+    config = data.get("config", {})
+    if not isinstance(config, dict):
+        return None
+    val = config.get("tuning_mode")
+    return str(val) if val else None
+
+
+def _tuning_hash(data: dict[str, Any]) -> str | None:
+    """Compute a stable 8-char hash of the tuning configuration.
+
+    Combines tuning_mode and any tuning config dict so that two runs with
+    identical tuning produce the same hash. Returns None when no tuning info present.
+    """
+    config = data.get("config", {})
+    if not isinstance(config, dict):
+        return None
+    mode = config.get("tuning_mode")
+    tuning_detail = config.get("tuning_config") or config.get("tuning")
+    if not mode and not tuning_detail:
+        return None
+    payload = json.dumps({"mode": mode, "detail": tuning_detail}, sort_keys=True)
+    return hashlib.sha256(payload.encode()).hexdigest()[:8]
+
+
+def _test_type(data: dict[str, Any]) -> str | None:
+    """Extract test type (power/throughput) from schema-v2 bundle."""
+    benchmark = data.get("benchmark", {})
+    if isinstance(benchmark, dict):
+        val = benchmark.get("test_type")
+        if val:
+            return str(val)
+    phases = data.get("phases", {})
+    if isinstance(phases, dict):
+        if phases.get("power_test"):
+            return "power"
+        if phases.get("throughput_test"):
+            return "throughput"
+    return None
+
+
+def _validation_status(data: dict[str, Any]) -> str | None:
+    """Extract validation status from schema-v2 bundle summary.
+
+    Handles both string (``"passed"``) and dict (``{"status": "passed", ...}``)
+    forms of ``summary.validation``.
+    """
+    summary = data.get("summary", {})
+    if not isinstance(summary, dict):
+        return None
+    val = summary.get("validation")
+    if isinstance(val, str):
+        return val.lower() if val else None
+    if isinstance(val, dict):
+        s = val.get("status")
+        return str(s).lower() if s else None
+    return None
+
+
+def _cost_usd(data: dict[str, Any]) -> float | None:
+    """Extract total cost in USD from schema-v2 bundle cost block."""
+    cost = data.get("cost", {})
+    if not isinstance(cost, dict):
+        return None
+    val = cost.get("total_usd")
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _compliance_class(data: dict[str, Any]) -> str | None:
+    """Extract compliance class from the benchmark block of a schema-v2 bundle."""
+    benchmark = data.get("benchmark", {})
+    if not isinstance(benchmark, dict):
+        return None
+    val = benchmark.get("compliance_class")
+    return str(val) if val is not None else None
+
+
+def _phase_durations(data: dict[str, Any]) -> dict[str, float] | None:
+    """Extract per-phase durations (seconds) from a schema-v2 bundle phases block.
+
+    Returns a dict keyed by phase name (e.g. "data_loading", "power_test") with
+    values in seconds.  Returns None when no phase data is present.
+    """
+    phases = data.get("phases", {})
+    if not isinstance(phases, dict):
+        return None
+    result: dict[str, float] = {}
+    for phase_name, phase_data in phases.items():
+        if isinstance(phase_data, dict):
+            duration_ms = phase_data.get("duration_ms")
+            if duration_ms is not None:
+                try:
+                    result[str(phase_name)] = float(duration_ms) / 1000.0
+                except (TypeError, ValueError):
+                    pass
+    return result if result else None
+
+
+def _compute_percentile(values: list[float], p: float) -> float:
+    """Compute the p-th percentile using linear interpolation.
+
+    Mirrors ``textcharts.percentile_ladder.compute_percentile`` exactly so
+    that pipeline-emitted values match CLI chart output within floating-point
+    precision.
+
+    Args:
+        values: Non-empty list of numeric values (will be sorted internally).
+        p:      Percentile in range [0, 100].
+    """
+    sorted_vals = sorted(values)
+    n = len(sorted_vals)
+    if n == 1:
+        return sorted_vals[0]
+    k = (p / 100.0) * (n - 1)
+    f = int(math.floor(k))
+    c = int(math.ceil(k))
+    if f == c:
+        return sorted_vals[int(k)]
+    return sorted_vals[f] * (c - k) + sorted_vals[c] * (k - f)
+
+
+def _platform_percentile_stats(display_timings: list[QueryDisplayTiming]) -> PercentileStats | None:
+    """Compute P50/P90/P95/P99 over the per-query display_ms medians.
+
+    Returns None when fewer than 1 non-null display_ms value is available.
+    """
+    # Exclude zero values: sub-millisecond queries round to 0 in some runners
+    # and 0ms is not a valid timing (would skew percentiles); genuine sub-ms
+    # timings appear as a small non-zero display_ms from the rounding formula.
+    values = [dt.display_ms for dt in display_timings if dt.display_ms is not None and dt.display_ms > 0]
+    if not values:
+        return None
+    return PercentileStats(
+        p50=_compute_percentile(values, 50),
+        p90=_compute_percentile(values, 90),
+        p95=_compute_percentile(values, 95),
+        p99=_compute_percentile(values, 99),
+    )
+
+
+def _query_timings(data: dict[str, Any]) -> list[QueryTiming]:
+    """Extract per-query timings from the queries list in a schema-v2 bundle.
+
+    Includes measurement-run-type queries (or those without a run_type).
+    Preserves run_type, iter, and stream fields for provenance.
+    """
+    raw_queries: list[dict[str, Any]] = data.get("queries", [])
+    timings: list[QueryTiming] = []
+    for q in raw_queries:
+        if not isinstance(q, dict):
+            continue
+        run_type = q.get("run_type")
+        if run_type is not None and run_type != "measurement":
+            continue
+        query_id = q.get("id") or q.get("query_id", "")
+        ms_raw = q.get("ms")
+        duration_ms_raw = ms_raw if ms_raw is not None else (q.get("execution_time_ms") or 0.0)
+        try:
+            duration_ms = float(duration_ms_raw)
+        except (TypeError, ValueError):
+            duration_ms = 0.0
+        raw_status = q.get("status", "pass")
+        status = "pass" if raw_status in _PASS_STATUSES else "fail"
+        iter_val = q.get("iter")
+        stream_val = q.get("stream")
+        timings.append(
+            QueryTiming(
+                query_id=str(query_id),
+                duration_ms=duration_ms,
+                status=status,
+                run_type=run_type,
+                iter=int(iter_val) if iter_val is not None else None,
+                stream=int(stream_val) if stream_val is not None else None,
+            )
+        )
+    return timings
+
+
+def _query_display_ms(query_timings: list[QueryTiming]) -> tuple[float | None, int]:
+    """Compute canonical display value and sample count for a single logical query.
+
+    ``query_timings`` must be pre-filtered to a single query_id.
+
+    ``query_timings`` is expected to be pre-filtered to a single query_id by
+    the caller (as ``_build_display_timings`` does via ``_query_timings``).
+
+    Algorithm:
+      1. Filter to passing (status == "pass") rows.
+      2. Prefer run_type == "measurement" rows; fall back to all passing rows
+         when no passing row has run_type == "measurement".
+      3. Return (median duration_ms, sample_count).
+      4. Return (None, 0) when no passing rows exist.
+
+    Median is chosen over mean so that a single cold-cache outlier (common in
+    power-test runs that include one warmup iteration) does not dominate.
+    """
+    passing = [t for t in query_timings if t.status == "pass"]
+    if not passing:
+        return None, 0
+    measurement = [t for t in passing if t.run_type == "measurement"]
+    candidates = measurement if measurement else passing
+    durations = sorted(t.duration_ms for t in candidates)
+    mid = len(durations) // 2
+    if len(durations) % 2 == 1:
+        return durations[mid], len(candidates)
+    return (durations[mid - 1] + durations[mid]) / 2.0, len(candidates)
+
+
+def _build_display_timings(timings: list[QueryTiming]) -> list[QueryDisplayTiming]:
+    """Build per-query canonical display timings from all QueryTiming rows."""
+    seen: dict[str, list[QueryTiming]] = {}
+    for t in timings:
+        seen.setdefault(t.query_id, []).append(t)
+    result: list[QueryDisplayTiming] = []
+    for qid, qid_timings in seen.items():
+        display_ms, sample_count = _query_display_ms(qid_timings)
+        result.append(QueryDisplayTiming(query_id=qid, display_ms=display_ms, sample_count=sample_count))
+    return result
+
+
+def _display_geomean_ms(display_timings: list[QueryDisplayTiming]) -> float | None:
+    """Compute geometric mean of non-None display_ms values across all queries."""
+    values = [dt.display_ms for dt in display_timings if dt.display_ms is not None and dt.display_ms > 0]
+    if not values:
+        return None
+    return math.exp(sum(math.log(v) for v in values) / len(values))
+
+
+class BundleTransformer:
+    """Transforms a schema-v2 result bundle into explorer read model artifacts."""
+
+    def load_bundle(self, bundle_path: Path) -> dict[str, Any]:
+        """Load a schema-v2 bundle from disk, returning parsed data only."""
+        data, _ = _load_bundle(bundle_path)
+        return data
+
+    def load_bundle_full(self, bundle_path: Path) -> tuple[dict[str, Any], bytes]:
+        """Load a bundle and return ``(parsed_data, raw_bytes)``.
+
+        Use this in pipelines that need both the parsed data and a content
+        hash without incurring a second file read.
+        """
+        return _load_bundle(bundle_path)
+
+    def result_id_from_bundle(
+        self,
+        bundle_path: Path,
+        data: dict[str, Any] | None = None,
+        *,
+        raw: bytes | None = None,
+    ) -> str:
+        """Generate a stable result_id from bundle content.
+
+        Format: ``{benchmark}-{platform}-sf{scale_factor}-{yyyymmdd}-{sha8}``
+
+        Args:
+            bundle_path: Path to the bundle file (used to load data/raw if not provided).
+            data: Pre-loaded parsed bundle dict.  If omitted, the file is read.
+            raw: Pre-read raw file bytes for SHA computation.  When both *data*
+                and *raw* are supplied, no file I/O occurs (zero disk reads).
+        """
+        if data is not None and raw is not None:
+            bundle_data, file_raw = data, raw
+        elif data is not None:
+            bundle_data, file_raw = data, bundle_path.read_bytes()
+        else:
+            bundle_data, file_raw = _load_bundle(bundle_path)
+
+        benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
+        platform = str(bundle_data.get("platform", {}).get("name", "unknown")).lower().replace(" ", "-")
+        scale_factor = bundle_data.get("benchmark", {}).get("scale_factor", 0.0)
+        timestamp = bundle_data.get("run", {}).get("timestamp", "19700101T000000")
+        run_date = _run_date_from_timestamp(timestamp)
+        sha_prefix = _sha256_prefix(file_raw)
+        return f"{benchmark}-{platform}-sf{scale_factor}-{run_date}-{sha_prefix}"
+
+    def to_manifest_entry(
+        self,
+        bundle_path: Path,
+        *,
+        trust_label: str = "maintainer-run",
+        visibility: str = "public-curated",
+        result_id: str | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> ManifestEntry:
+        """Extract manifest entry from a result bundle JSON file."""
+        bundle_data = data if data is not None else self.load_bundle(bundle_path)
+        rid = result_id or self.result_id_from_bundle(bundle_path, data=bundle_data)
+
+        benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
+        scale_factor = float(bundle_data.get("benchmark", {}).get("scale_factor", 0.0))
+        platform = str(bundle_data.get("platform", {}).get("name", "unknown"))
+        timestamp = bundle_data.get("run", {}).get("timestamp", "1970-01-01T00:00:00")
+        run_date = timestamp[:10]
+        total_duration_ms = bundle_data.get("run", {}).get("total_duration_ms", 0.0)
+        total_duration_s = float(total_duration_ms) / 1000.0
+
+        summary = bundle_data.get("summary", {})
+        query_count = summary.get("queries", {}).get("total", 0) if isinstance(summary, dict) else 0
+
+        # Same _query_timings → _build_display_timings pass also runs in
+        # to_detail_result; a shared intermediate could halve the work for
+        # large bundles (≤99 queries makes this negligible today).
+        timings = _query_timings(bundle_data)
+        display_timings = _build_display_timings(timings)
+        return ManifestEntry(
+            result_id=rid,
+            benchmark=benchmark,
+            scale_factor=scale_factor,
+            platform=platform,
+            platform_id=_platform_id(platform),
+            driver_version=_driver_version(bundle_data),
+            run_date=run_date,
+            power_score=_power_score(bundle_data),
+            total_duration_s=total_duration_s,
+            geomean_ms=_geomean_ms(bundle_data),
+            display_geomean_ms=_display_geomean_ms(display_timings),
+            query_count=int(query_count),
+            trust_label=trust_label,
+            visibility=visibility,
+            platform_version=_platform_version(bundle_data),
+            execution_mode=_execution_mode(bundle_data),
+            tuning_mode=_tuning_mode(bundle_data),
+            tuning_hash=_tuning_hash(bundle_data),
+            test_type=_test_type(bundle_data),
+            validation_status=_validation_status(bundle_data),
+            cost_usd=_cost_usd(bundle_data),
+            compliance_class=_compliance_class(bundle_data),
+        )
+
+    def to_detail_result(
+        self,
+        bundle_path: Path,
+        result_id: str,
+        *,
+        trust_label: str = "maintainer-run",
+        visibility: str = "public-curated",
+        bundle_download_url: str = "",
+        data: dict[str, Any] | None = None,
+    ) -> DetailResult:
+        """Extract full detail from a result bundle JSON file."""
+        bundle_data = data if data is not None else self.load_bundle(bundle_path)
+
+        benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
+        scale_factor = float(bundle_data.get("benchmark", {}).get("scale_factor", 0.0))
+        platform = str(bundle_data.get("platform", {}).get("name", "unknown"))
+        timestamp = bundle_data.get("run", {}).get("timestamp", "1970-01-01T00:00:00")
+        run_date = timestamp[:10]
+        total_duration_ms = bundle_data.get("run", {}).get("total_duration_ms", 0.0)
+        total_duration_s = float(total_duration_ms) / 1000.0
+
+        environment: dict[str, Any] = {}
+        if isinstance(bundle_data.get("environment"), dict):
+            environment = bundle_data["environment"]
+
+        # Detect companion files relative to bundle
+        stem = bundle_path.stem
+        has_plans = bundle_path.with_name(f"{stem}.plans.json").exists()
+        has_tuning = bundle_path.with_name(f"{stem}.tuning.json").exists()
+
+        timings = _query_timings(bundle_data)
+        display_timings = _build_display_timings(timings)
+        return DetailResult(
+            result_id=result_id,
+            benchmark=benchmark,
+            scale_factor=scale_factor,
+            platform=platform,
+            platform_id=_platform_id(platform),
+            driver_version=_driver_version(bundle_data),
+            run_date=run_date,
+            total_duration_s=total_duration_s,
+            geomean_ms=_geomean_ms(bundle_data),
+            display_geomean_ms=_display_geomean_ms(display_timings),
+            power_score=_power_score(bundle_data),
+            environment=environment,
+            queries=timings,
+            display_timings=display_timings,
+            has_plans=has_plans,
+            has_tuning=has_tuning,
+            bundle_download_url=bundle_download_url,
+            trust_label=trust_label,
+            visibility=visibility,
+            platform_version=_platform_version(bundle_data),
+            execution_mode=_execution_mode(bundle_data),
+            tuning_mode=_tuning_mode(bundle_data),
+            tuning_hash=_tuning_hash(bundle_data),
+            test_type=_test_type(bundle_data),
+            validation_status=_validation_status(bundle_data),
+            cost_usd=_cost_usd(bundle_data),
+            compliance_class=_compliance_class(bundle_data),
+            phase_durations=_phase_durations(bundle_data),
+        )
+
+
+def _comparability_warnings(details: list[DetailResult]) -> list[ComparabilityWarning]:
+    """Build comparability warnings for a set of DetailResults.
+
+    Mirrors the TypeScript ``buildComparabilityWarnings`` in
+    ``ComparabilityBanner.tsx`` - the artifact ships the same
+    ``{dimension, values, message}`` shape and the same first-occurrence
+    value ordering (TS uses ``[...new Set(arr)]``), so the explorer
+    renders artifact-path and fallback-path warnings identically.
+    """
+    warnings: list[ComparabilityWarning] = []
+    if len(details) < 2:
+        return warnings
+
+    # dict.fromkeys preserves input order while deduplicating - matches
+    # the TypeScript `[...new Set(...)]` semantics exactly.
+    modes = list(dict.fromkeys(d.execution_mode for d in details if d.execution_mode))
+    if len(modes) > 1:
+        warnings.append(
+            ComparabilityWarning(
+                dimension="Execution mode",
+                values=modes,
+                message=(
+                    "results may not reflect platform SQL performance differences - "
+                    "compare sql vs sql or dataframe vs dataframe for a fair comparison"
+                ),
+            )
+        )
+
+    tunings = list(dict.fromkeys(d.tuning_mode for d in details if d.tuning_mode))
+    if len(tunings) > 1:
+        warnings.append(
+            ComparabilityWarning(
+                dimension="Tuning config",
+                values=tunings,
+                message=(
+                    "tuning differences can dominate platform differences - "
+                    "consider comparing results with the same tuning mode"
+                ),
+            )
+        )
+
+    test_types = list(dict.fromkeys(d.test_type for d in details if d.test_type))
+    if len(test_types) > 1:
+        warnings.append(
+            ComparabilityWarning(
+                dimension="Test type",
+                values=test_types,
+                message="power and throughput tests measure different workloads and are not directly comparable",
+            )
+        )
+
+    counts = list(dict.fromkeys(len({dt.query_id for dt in d.display_timings}) for d in details))
+    if len(counts) > 1:
+        warnings.append(
+            ComparabilityWarning(
+                dimension="Query scope",
+                values=[str(c) for c in counts],
+                message="results cover different numbers of queries - geomean is comparable only when the same query set is used",
+            )
+        )
+
+    return warnings
+
+
+def comparison_artifact_hash(result_ids: list[str]) -> str:
+    """Compute the 16-char deterministic hash used to locate a comparison artifact.
+
+    Algorithm: ``sha256(sorted_result_ids_csv)[:16]``.  Shared by the CLI
+    subcommand, the pipeline pre-emit step, and the browser frontend so all
+    three compute the same path.
+    """
+    sorted_csv = ",".join(sorted(result_ids))
+    return hashlib.sha256(sorted_csv.encode()).hexdigest()[:16]
+
+
+def _natural_query_id_key(s: str) -> list[int | str]:
+    """Natural sort key for query IDs (e.g. Q1, Q2, ..., Q10 instead of lex Q1, Q10, Q2)."""
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", s)]
+
+
+def build_comparison_artifact(details: list[DetailResult]) -> ComparisonArtifact:
+    """Build a ComparisonArtifact from an ordered list of DetailResults.
+
+    Pure function - no I/O.  The caller writes the JSON.
+
+    Raises:
+        ValueError: if results span different benchmarks or scale factors.
+    """
+    if not details:
+        raise ValueError("Cannot build comparison artifact from empty result list")
+
+    benchmarks = {d.benchmark for d in details}
+    if len(benchmarks) > 1:
+        raise ValueError(f"All results must share the same benchmark; got {benchmarks}")
+
+    scale_factors = {d.scale_factor for d in details}
+    if len(scale_factors) > 1:
+        raise ValueError(f"All results must share the same scale factor; got {scale_factors}")
+
+    benchmark = details[0].benchmark
+    scale_factor = details[0].scale_factor
+    ranking = get_ranking_config(benchmark)
+
+    display_labels = disambiguate_platform_labels(details)  # type: ignore[arg-type]
+
+    rows = [
+        ComparisonRow(
+            result_id=d.result_id,
+            platform=d.platform,
+            display_label=display_labels[i],
+            platform_id=d.platform_id,
+            driver_version=d.driver_version,
+            trust_label=d.trust_label,
+            run_date=d.run_date,
+            display_geomean_ms=d.display_geomean_ms,
+            geomean_ms=d.geomean_ms,
+            power_score=d.power_score,
+            total_duration_s=d.total_duration_s,
+            execution_mode=d.execution_mode,
+            tuning_mode=d.tuning_mode,
+            test_type=d.test_type,
+            compliance_class=d.compliance_class,
+            query_count=len({dt.query_id for dt in d.display_timings}),
+        )
+        for i, d in enumerate(details)
+    ]
+
+    all_query_ids = sorted(
+        {dt.query_id for d in details for dt in d.display_timings},
+        key=_natural_query_id_key,
+    )
+
+    timing_maps = [{dt.query_id: dt for dt in d.display_timings} for d in details]
+    query_cells: list[ComparisonQueryCell] = []
+    for qid in all_query_ids:
+        ms_per_row: list[float | None] = []
+        for tm in timing_maps:
+            timing = tm.get(qid)
+            ms = timing.display_ms if timing is not None else None
+            # Filter zero/negative to None so downstream ratios can't divide by zero.
+            ms_per_row.append(ms if ms is not None and ms > 0 else None)
+
+        valid = [v for v in ms_per_row if v is not None]
+        fastest_ms = min(valid) if valid else None
+        slowest_ms = max(valid) if valid else None
+
+        speedup_vs_slowest: list[float | None] = [
+            (slowest_ms / ms) if (ms is not None and slowest_ms is not None and ms > 0) else None for ms in ms_per_row
+        ]
+
+        query_cells.append(
+            ComparisonQueryCell(
+                query_id=qid,
+                display_ms_per_row=ms_per_row,
+                fastest_ms=fastest_ms,
+                slowest_ms=slowest_ms,
+                speedup_vs_slowest_per_row=speedup_vs_slowest,
+            )
+        )
+
+    return ComparisonArtifact(
+        benchmark=benchmark,
+        scale_factor=scale_factor,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        rows=rows,
+        query_cells=query_cells,
+        comparability_warnings=_comparability_warnings(details),
+        ranking_primary_metric=ranking.primary_metric,
+    )
+
+
+__all__ = ["BundleTransformer", "build_comparison_artifact", "comparison_artifact_hash"]

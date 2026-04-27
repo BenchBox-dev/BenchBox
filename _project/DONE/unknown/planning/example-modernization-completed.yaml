@@ -1,0 +1,31 @@
+id: example-modernization-completed
+title: Example Modernization ✅ COMPLETED
+category: New Feature Requests
+sections:
+  Notes: '- "**Priority**: Medium"
+
+    - "**Status**: ✅ Completed"
+
+    - "**Description**: Modernize DuckDB benchmark examples to use the 3-line adapter pattern"
+
+    - "**Tasks**:"
+
+    - "**Files Affected**: `examples/duckdb_tpch*.py`, `examples/duckdb_tpcds.py`"
+
+    - "**Impact**: ✅ Eliminates outdated anti-patterns, demonstrates correct framework usage, reduces maintenance overhead
+    by 85%, and provides clear guidance for new users on the modern adapter pattern approach."'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Priority**: Medium"
+
+  - "**Status**: ✅ Completed"
+
+  - "**Description**: Modernize DuckDB benchmark examples to use the 3-line adapter pattern"
+
+  - "**Tasks**:"
+
+  - "**Files Affected**: `examples/duckdb_tpch*.py`, `examples/duckdb_tpcds.py`"
+
+  - "**Impact**: ✅ Eliminates outdated anti-patterns, demonstrates correct framework usage, reduces maintenance overhead by
+  85%, and provides clear guidance for new users on the modern adapter pattern approach."'

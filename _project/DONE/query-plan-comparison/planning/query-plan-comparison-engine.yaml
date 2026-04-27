@@ -1,0 +1,215 @@
+id: query-plan-comparison-engine
+title: Query Plan Comparison Engine
+worktree: query-plan-comparison
+category: Core Functionality
+priority: High
+status: Completed
+completed_date: '2025-11-23'
+completion_notes: 'Core comparison engine fully implemented and tested. Includes:
+
+  - PlanComparison, SimilarityScore, OperatorDiff dataclasses
+
+  - QueryPlanComparator with BFS-based tree comparison
+
+  - Multi-dimensional similarity scoring (structural, operator, property)
+
+  - Property comparison for all operator types
+
+  - 14 comprehensive tests (all passing)
+
+  - Cross-platform comparison support
+
+
+  Advanced features (batch operations, Zhang-Shasha tree edit distance,
+
+  cross-run regression detection) deferred for future implementation.
+
+  Current implementation provides solid foundation for basic comparison needs.
+
+  '
+description: 'Implement algorithms for comparing query plans across platforms, runs, and
+
+  queries. Includes logical plan comparison (tree diff), physical plan comparison,
+
+  and similarity scoring (tree edit distance). Supports three comparison scenarios:
+
+  cross-platform, cross-run, and cross-query.
+
+
+  **Comparison Scenarios**:
+
+  1. Cross-platform: Compare DuckDB vs DataFusion for same query
+
+  2. Cross-run: Detect plan regressions between benchmark runs
+
+  3. Cross-query: Find structurally similar queries
+
+  '
+context_sections:
+- name: Algorithms
+  summary: '- Tree Diff: Recursive tree traversal with operator matching (O(n×m))
+
+    - Similarity Score: Zhang-Shasha tree edit distance (O(n²×m²), pruned)
+
+    - Physical Comparison: Property-based diff (O(n))
+
+    '
+- name: Comparison Metrics
+  summary: '- Structural similarity (0.0-1.0): % of matching operators
+
+    - Logical differences: Missing/added/changed operators
+
+    - Physical differences: Cost estimate changes, operator type changes
+
+    - Plan fingerprint equality: Fast exact match check
+
+    '
+impact: 'HIGH - Core value proposition of the feature. Enables meaningful analysis of
+
+  query plans across different contexts. Comparison engine is independent of
+
+  capture mechanism.
+
+  '
+dependencies:
+- workstream: Query Plan Core Infrastructure (Models & Storage)
+  reason: Requires QueryPlanDAG model and plan fingerprints
+tasks:
+- phase: 'Phase 4.1: Comparison Framework'
+  description: Base classes and comparison result models
+  items:
+  - summary: Create benchbox/core/query_plans/comparison.py
+    done: true
+  - summary: Define PlanComparison dataclass
+    done: true
+  - summary: Define SimilarityScore dataclass
+    done: true
+  - summary: Define OperatorDiff dataclass
+    done: true
+  - summary: Create QueryPlanComparator class
+    done: true
+- phase: 'Phase 4.2: Logical Plan Comparison (Tree Diff)'
+  description: Compare logical operator trees
+  items:
+  - summary: Implement tree traversal algorithm
+    done: true
+    details: BFS traversal comparing operators at each level
+  - summary: Implement operator matching logic
+    done: true
+    details: Match operators by operator_type, table_name, join_type, etc.
+  - summary: Detect type mismatches
+    done: true
+    details: Different operator types at same position
+  - summary: Detect property mismatches
+    done: true
+    details: Same type but different properties
+  - summary: Detect structure mismatches
+    done: true
+    details: Different numbers of children
+  - summary: Generate human-readable difference summaries
+    done: true
+  - summary: Create tests with synthetic plan pairs
+    done: true
+- phase: 'Phase 4.3: Property Comparison'
+  description: Compare operator-specific properties
+  items:
+  - summary: Compare table names for Scan operators
+    done: true
+  - summary: Compare join types for Join operators
+    done: true
+  - summary: Compare filter expressions for Filter operators
+    done: true
+  - summary: Compare aggregation functions for Aggregate operators
+    done: true
+  - summary: Compare sort keys for Sort operators
+    done: true
+  - summary: Compare generic properties dictionary
+    done: true
+- phase: 'Phase 4.4: Similarity Scoring'
+  description: Compute multi-dimensional similarity scores
+  items:
+  - summary: Implement structural similarity calculation
+    done: true
+    details: Based on tree structure matching
+  - summary: Implement operator similarity calculation
+    done: true
+    details: Based on operator type matching
+  - summary: Implement property similarity calculation
+    done: true
+    details: Based on property matching when types match
+  - summary: Implement overall similarity (weighted average)
+    done: true
+    details: 40% structural, 40% operator, 20% property
+  - summary: Create tests for similarity calculations
+    done: true
+- phase: 'Phase 4.5: Testing & Validation'
+  description: Comprehensive testing of comparison logic
+  items:
+  - summary: Create tests/unit/core/query_plans/test_comparison.py
+    done: true
+  - summary: Test identical plan comparison
+    done: true
+  - summary: Test different table names
+    done: true
+  - summary: Test different join types
+    done: true
+  - summary: Test different operator types
+    done: true
+  - summary: Test complex plan comparison
+    done: true
+  - summary: Test similarity score calculation
+    done: true
+  - summary: Test structure mismatch detection
+    done: true
+  - summary: Test filter expression comparison
+    done: true
+  - summary: Test aggregation function comparison
+    done: true
+  - summary: Test summary generation
+    done: true
+  - summary: Test comparator reusability
+    done: true
+  - summary: Test cross-platform comparison
+    done: true
+  - summary: Test empty children handling
+    done: true
+  - summary: Test unequal children count
+    done: true
+technical_requirements:
+- category: Algorithms
+  items:
+  - BFS tree traversal for comparison
+  - Deterministic comparison results
+  - Handling of tree structure variations
+- category: Performance
+  items:
+  - Fast path for identical plans (fingerprint comparison)
+  - O(n×m) full comparison for typical plans
+  - < 10ms comparison time for typical plans (<100 operators)
+- category: Accuracy
+  items:
+  - Multi-dimensional similarity scoring
+  - Property-specific comparison logic
+  - Order-independent set comparison for filters/aggregations
+files_affected:
+  modified:
+  - benchbox/core/query_plans/comparison.py (424 LOC)
+  - benchbox/core/results/query_plan_models.py (enhanced fingerprinting)
+  - tests/unit/core/query_plans/test_comparison.py (14 tests)
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - comparison
+  - algorithms
+  depends_on:
+  - Query Plan Core Infrastructure (Models & Storage)
+  blocks:
+  - Query Plan CLI & Visualization
+  estimated_effort: 1-2 weeks (complex algorithms)
+  lines_of_code: ~600 LOC (comparison engine + tests)
+  actual_effort: 1 day
+  actual_lines_of_code: 892 LOC (comparison.py + tests + fingerprint enhancements)

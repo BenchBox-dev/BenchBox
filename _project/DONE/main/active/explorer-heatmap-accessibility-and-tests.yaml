@@ -1,0 +1,148 @@
+id: explorer-heatmap-accessibility-and-tests
+title: "Accessibility hardening and snapshot test coverage for matrix leaderboard"
+worktree: main
+priority: Medium
+status: Completed
+category: Testing and Quality Assurance
+
+description: |
+  The 2026-04-15 review flagged that the matrix leaderboard relies heavily
+  on color to convey information - a known accessibility hazard. Color is
+  invisible to screen readers and insufficient for users with color vision
+  deficiencies. The heatmap must remain readable without color.
+
+  This TODO:
+
+  1. Ensures each heat cell carries a descriptive `aria-label` with the
+     numeric timing and the relative ratio ("18ms, 1.6× fastest").
+
+  2. Adds a "reduced color" visual mode that falls back to monochrome
+     lightness steps, controlled by the user's
+     `prefers-contrast: more` media query and an explicit toggle.
+
+  3. Adds keyboard navigation: tab reaches platform checkboxes,
+     arrow keys navigate cells with an `aria-live` announcement.
+
+  4. Backfills snapshot tests for the filter bar, empty states, and the
+     integration between BenchmarkIndex and QueryHeatmap - the prior TODO
+     only specified QueryHeatmap itself.
+
+  5. Runs axe-core against the rendered matrix in the test suite and
+     fails the build on any serious or critical violations.
+
+deps:
+  needs:
+  - explorer-matrix-leaderboard-view
+
+work:
+- id: w1
+  summary: "Enhance QueryHeatmap cells, headers, and checkboxes with descriptive aria labels"
+  status: done
+  notes: |
+    Cell: aria-label='${ms}ms, ${ratio}× fastest in column' (or
+    'no data' for null cells). Column headers: aria-sort='none'.
+    Row checkboxes: aria-label='Select ${platform} for comparison'.
+
+- id: w2
+  summary: "Implement reduced-color mode via CSS class + custom properties"
+  needs: [w1]
+  status: done
+  notes: |
+    Activates when prefers-contrast: more matches OR the user toggles
+    'High contrast' in the filter bar. Cells use grayscale lightness
+    (0-100%) instead of hsl hue. Numeric text remains primary signal.
+
+- id: w3
+  summary: "Add keyboard navigation (roving tabindex) and visible focus outlines"
+  needs: [w1]
+  status: done
+  notes: |
+    Arrow keys within the matrix move focus between cells; focused
+    cell announces itself via aria-live. Tab exits the grid to the
+    next filter control. Focus outline is visible (not just color).
+
+- id: w4
+  summary: "Write integration snapshot tests at src/pages/__tests__/BenchmarkIndex.test.tsx"
+  needs: [w1]
+  status: done
+  notes: |
+    Cases: (a) filter changes re-fetch correct artifact URL;
+    (b) empty state renders when artifact has no platforms;
+    (c) list-view toggle switches rendered component;
+    (d) trust filter removes rows without refetch.
+
+- id: w5
+  summary: "Integrate axe-core into the test suite; fail on serious/critical violations"
+  needs: [w1, w2, w3]
+  status: done
+  notes: |
+    Add helper `expectNoAxeViolations(container)` and call it in
+    QueryHeatmap, BenchmarkIndex, Compare, and Home page tests.
+    Warn on minor; fail only on serious/critical.
+
+files_affected:
+  added:
+  - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+  - "results-explorer/src/testing/axe-helper.ts"
+  modified:
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/package.json (add axe-core dev dep)"
+
+must_preserve:
+- "Existing behavior of the matrix - accessibility is additive layering, not a rewrite"
+- "Current default color mode - high-contrast is an opt-in, not a default swap"
+- "Snapshot tests from explorer-matrix-leaderboard-view - this TODO extends, does not replace them"
+
+approach: |
+  Accessibility work is most reliably driven by the tests themselves.
+  Add axe-core first, watch the existing tests fail, then fix
+  violations in priority order (keyboard → aria-label → contrast →
+  focus visibility).
+
+  For the reduced-color mode: do not build a separate component tree.
+  Flip a CSS class on the grid root; cell colors read from CSS custom
+  properties that switch value based on the class. This keeps the
+  render path single and the switch cost zero.
+
+  Keyboard nav is the trickiest part. Use a roving tabindex pattern
+  (only one cell has tabindex=0 at a time; arrow keys move it).
+  Reference pattern: WAI-ARIA Authoring Practices grid pattern.
+
+anti_patterns:
+- "DO NOT rely on color alone - because 4% of users have color vision deficiencies and screen readers ignore color entirely
+  - include text and aria-label on every data-bearing element"
+- "DO NOT duplicate the component for high-contrast mode - because two components drift out of sync - use CSS custom properties
+  that switch on a class"
+- "DO NOT use tabindex=0 on every cell - because that makes keyboard nav painful (tab through 22×8 cells) - use roving tabindex
+  so tab exits the grid quickly"
+- "DO NOT fail the build on minor axe violations - because minor issues include color-contrast edge cases we may accept -
+  fail only on serious/critical"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+  - "results-explorer/src/testing/axe-helper.ts"
+  - "results-explorer/package.json"
+
+verification:
+- description: "axe-core runs clean on the matrix page (no serious/critical violations)"
+  command: "cd results-explorer && npm test -- --testPathPattern='(QueryHeatmap|BenchmarkIndex|Compare|Home)'"
+  expected_output: "all tests pass"
+- description: "Heat cells have aria-label with numeric content"
+  command: "grep -n 'aria-label' results-explorer/src/components/QueryHeatmap.tsx"
+  expected_output: "aria-label present on cell"
+- description: "Reduced-color mode is CSS-class driven, not a separate component"
+  command: "grep -nE 'high-contrast|reduced-color' results-explorer/src/components/QueryHeatmap.tsx"
+  expected_output: "mode is a class modifier"
+- description: "TypeScript compiles"
+  command: "cd results-explorer && npm run typecheck"
+  expected_output: "no errors"
+
+metadata:
+  tags: ["results", "explorer", "accessibility", "testing", "a11y"]
+  estimated_effort: "Medium (1-2 days)"
+  created_date: "2026-04-15"
+  completed_date: "2026-04-15"

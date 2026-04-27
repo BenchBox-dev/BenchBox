@@ -1,0 +1,233 @@
+# CTAS Sort - Local SQL Platform Implementations
+#
+# Location: _project/TODO/physical-tuning/planning/ctas-sort-local-sql-platforms.yaml
+
+id: ctas-sort-local-sql-platforms
+title: "Implement _build_ctas_sort_sql for local SQL platforms (DataFusion, PostgreSQL, StarRocks, SQLite)"
+worktree: physical-tuning
+priority: Medium-High
+status: Completed
+completed_date: "2026-02-19"
+description: |
+  With the centralized apply_ctas_sort() in PlatformAdapter (ctas-sort-dataloader-connectivity),
+  each local SQL platform needs only to override _build_ctas_sort_sql(table_name, sort_columns)
+  to gain CTAS-based sorted loading. This item implements those overrides.
+
+  Platforms in scope (MotherDuck is handled in ctas-sort-dataloader-connectivity as it shares
+  DuckDB's SQL syntax):
+
+  DataFusion
+    DataFusion's SQL dialect supports CREATE OR REPLACE TABLE ... AS SELECT ... ORDER BY ...
+    (same pattern as DuckDB). Verify the exact syntax against DataFusion's SQL reference and
+    implement the hook.
+
+  PostgreSQL
+    PostgreSQL does not support CREATE OR REPLACE TABLE ... AS SELECT. The closest equivalent is:
+      CREATE TABLE {t}_sorted AS SELECT * FROM {t} ORDER BY col;
+      DROP TABLE {t};
+      ALTER TABLE {t}_sorted RENAME TO {t};
+    This is safe within a single connection but requires the table to exist first (post-load).
+    Wrap in a transaction to keep it atomic.
+
+  StarRocks
+    StarRocks supports CREATE TABLE ... AS SELECT (CTAS) with ORDER BY via its sort keys.
+    However, StarRocks sorts are defined at table-creation time (via ORDER BY in CREATE TABLE),
+    not on a post-load CTAS. Investigate whether a post-load CTAS reorders physical data or
+    just creates an unsorted replica. If CTAS does not physically sort: return None and document
+    as unsupported; the correct path for StarRocks is to define ORDER BY in CREATE TABLE DDL.
+
+  SQLite
+    SQLite has no efficient physical sort; INSERT ORDER determines storage order. A CTAS pattern
+    (CREATE TABLE t2 AS SELECT * FROM t1 ORDER BY col; DROP TABLE t1; ALTER TABLE t2 RENAME TO t1)
+    is syntactically valid but requires recreating indexes and constraints. Given SQLite's use
+    as a development/testing platform (not production), assess whether the overhead is justified.
+    If not: _build_ctas_sort_sql returns None with a logged debug message.
+
+category: Core Functionality
+
+deps:
+  needs:
+  - ctas-sort-dataloader-connectivity
+
+work:
+- id: w1
+  summary: "Research DataFusion CTAS sort syntax; verify CREATE OR REPLACE TABLE ... AS SELECT ... ORDER BY"
+  status: done
+  notes: |
+    Check benchbox/platforms/datafusion.py and DataFusion SQL docs. Specifically verify:
+    - Does DataFusion support CREATE OR REPLACE TABLE?
+    - Does ORDER BY in CTAS physically sort the stored data?
+    - What is the exact SQL for a registered in-memory or on-disk table?
+
+- id: w2
+  summary: "Implement DataFusionAdapter._build_ctas_sort_sql override"
+  needs: [w1]
+  status: done
+  notes: |
+    If DataFusion supports CREATE OR REPLACE TABLE t AS SELECT * FROM t ORDER BY col:
+      return f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM {table_name} ORDER BY {order_by};"
+    If not, return None and document in code why DataFusion is unsupported.
+
+- id: w3
+  summary: "Research PostgreSQL DROP+CTAS sort pattern; assess transaction safety"
+  status: done
+  notes: |
+    PostgreSQL post-load sort strategy:
+      BEGIN;
+      CREATE TABLE {t}_ctas_sort AS SELECT * FROM {t} ORDER BY col;
+      DROP TABLE {t};
+      ALTER TABLE {t}_ctas_sort RENAME TO {t};
+      COMMIT;
+    Verify: does this preserve indexes/constraints created by schema setup? Likely not -
+    the DROP removes the table and its constraints. The base class apply_ctas_sort runs
+    after data load but the schema (CREATE TABLE + indexes) was applied earlier in the
+    run. Determine whether constraints must be re-applied or if COPY-based loading makes
+    them unnecessary for benchmark purposes.
+
+- id: w4
+  summary: "Implement PostgreSQLAdapter._build_ctas_sort_sql"
+  needs: [w3]
+  status: done
+  notes: |
+    Return a multi-statement SQL string (or list[str]) for the DROP+CTAS pattern.
+    The base class apply_ctas_sort must handle list[str] (execute each statement in order).
+    If apply_ctas_sort currently only handles str, extend it to handle list[str] as well.
+    Alternatively, wrap all statements in a DO $$ ... $$ block if the connection supports it.
+
+- id: w5
+  summary: "Research StarRocks CTAS sort - does post-load CTAS physically reorder data?"
+  status: done
+  notes: |
+    StarRocks uses a Duplicate Key / Sort Key model defined at table creation.
+    Key questions:
+    - Does CREATE TABLE t2 AS SELECT * FROM t1 ORDER BY col in StarRocks physically sort
+      the output table's tablets?
+    - Or is the ORDER BY hint advisory only?
+    Reference: StarRocks docs on CTAS, sort key behavior.
+
+- id: w6
+  summary: "Implement StarRocksAdapter._build_ctas_sort_sql or document as unsupported"
+  needs: [w5]
+  status: done
+  notes: |
+    If CTAS physically sorts: implement override returning:
+      CREATE TABLE {t}_sorted AS SELECT * FROM {t} ORDER BY col;
+      (+ DROP+RENAME steps)
+    If CTAS does NOT physically sort, return None and add a log message explaining that
+    StarRocks sort keys must be defined in CREATE TABLE DDL (pre-load, not post-load).
+
+- id: w7
+  summary: "Determine SQLite stance: implement trivial CTAS sort or document as intentionally unsupported"
+  status: done
+  notes: |
+    SQLite CTAS sort requires DROP + RENAME which loses indexes/constraints, same as PG.
+    Given SQLite is a dev/testing platform (not production performance target), the cost
+    likely outweighs the benefit. Decision: return None with log_debug(
+    "SQLite CTAS sort skipped - physical sort not beneficial for testing platform").
+    Document the decision in code comments so future maintainers understand it was deliberate.
+
+- id: w8
+  summary: "Unit tests for DataFusion, PostgreSQL, StarRocks, SQLite _build_ctas_sort_sql"
+  needs: [w2, w4, w6, w7]
+  status: done
+  notes: |
+    Each platform test verifies:
+    - Correct SQL returned when sort columns are present
+    - None returned (or correct skip) when platform doesn't support it
+    - SQL contains correct column ordering (sorted by TuningColumn.order)
+    For PostgreSQL multi-statement path: verify all statements are returned and in order.
+
+- id: w9
+  summary: "Integration test: DataFusion actual sortedness after load with tuning config"
+  needs: [w2]
+  status: done
+  notes: |
+    Mirror tests/unit/platforms/test_duckdb_sorted_loading.py::TestCtasSortIntegration
+    for DataFusion: load a small table, apply CTAS sort, verify row order matches sort columns.
+
+metadata:
+  tags:
+  - tuning
+  - datafusion
+  - postgresql
+  - starrocks
+  - sqlite
+  - data-loading
+  - zone-maps
+  estimated_effort: "Medium"
+  created_date: "2026-02-18"
+
+impact:
+  business_value: |
+    Extends sorted-data zone map pruning benefits beyond DuckDB to DataFusion and
+    potentially PostgreSQL, enabling users running local-SQL benchmarks to achieve
+    comparable query speedups for selective workloads.
+  user_impact: |
+    DataFusion users gain 5-28x speedups for selective queries with minimal config change.
+    PostgreSQL users gain physical sorting during load phase without manual post-load steps.
+  technical_debt: |
+    Each platform override is 3-8 lines; the centralized base class absorbs all boilerplate.
+    The research work units (w1, w3, w5) prevent incorrect assumptions from being coded in.
+
+files_affected:
+  modified:
+  - "benchbox/platforms/datafusion.py"
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/starrocks/workload.py"
+  - "benchbox/platforms/sqlite.py"
+  - "benchbox/platforms/base/adapter.py"
+  added:
+  - "tests/unit/platforms/test_local_platform_ctas_sort.py"
+
+must_preserve:
+- "DataFusion load_data() produces identical row counts after adding _build_ctas_sort_sql"
+- "PostgreSQL COPY-based loading path is unmodified; only the post-load sort step is added"
+- "StarRocks DataLoader INSERT INTO path unchanged if CTAS sort is determined unsupported"
+- "SQLite DataLoader INSERT INTO path unchanged (CTAS sort returns None)"
+- "PlatformAdapter.apply_ctas_sort remains backward-compatible for existing str/None hook returns while optionally supporting
+  list[str]"
+- "All existing DataFusion, PostgreSQL, StarRocks, SQLite unit tests pass"
+
+approach: |
+  Work research units (w1, w3, w5, w7) first in parallel - they are read-only and independent.
+  Then implement based on findings (w2, w4, w6 depend on their research units).
+  For PostgreSQL, if the multi-statement list[str] return type is needed, extend apply_ctas_sort
+  in the base class to handle it before implementing the PostgreSQL override.
+
+  For DataFusion, check the existing _load_table_parquet() and _load_table_csv() methods to
+  understand how the table is registered - CTAS sort requires the table to exist as a
+  named relation that can be self-joined in SELECT * FROM {table_name}.
+
+anti_patterns:
+- "DO NOT assume DataFusion CTAS behavior matches DuckDB without verification - because DataFusion's table registration model
+  (external tables vs in-memory) differs - verify that SELECT * FROM {table_name} is valid post-load before generating CTAS
+  SQL"
+- "DO NOT execute DROP TABLE without a preceding BEGIN transaction in PostgreSQL - because a crash between DROP and RENAME
+  would leave the table destroyed - always wrap in a BEGIN/COMMIT block"
+- "DO NOT skip the research work units (w1, w3, w5) to save time - because incorrect CTAS assumptions could silently produce
+  unsorted data or corrupt the table - confirm physical sort behavior before coding"
+
+verification:
+- description: "Local SQL platform unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_local_platform_ctas_sort.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Existing platform tests unaffected"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "0 failures"
+- description: "DataFusion integration: sorted table row order matches sort key"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_local_platform_ctas_sort.py -k integration -v"
+  expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/datafusion.py"
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/starrocks/workload.py"
+  - "benchbox/platforms/sqlite.py"
+  - "benchbox/platforms/base/adapter.py"
+  - "tests/unit/platforms/test_local_platform_ctas_sort.py"
+
+open_questions:
+- "Does DataFusion's CREATE OR REPLACE TABLE physically reorder on-disk Parquet files?"
+- "Can the PostgreSQL DROP+CTAS be wrapped in a single DO $$ $$ block to avoid list[str] in the API?"
+- "Does StarRocks CTAS with ORDER BY physically sort data in tablets or is it advisory?"

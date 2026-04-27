@@ -1,0 +1,96 @@
+id: synapse-spark-platform
+title: "Azure Synapse Spark Platform"
+worktree: platform-expansion
+priority: Medium
+status: "Completed"
+category: Platform Expansion
+
+description: |
+  Add Azure Synapse Spark platform adapter. Synapse Spark is used by existing
+  enterprise deployments and provides integrated analytics with Synapse SQL pools.
+
+  Implementation shares 70% code with Fabric Spark adapter (authentication,
+  staging, Livy protocol).
+
+tasks:
+  phases:
+  - phase: "Phase 1: Adapter Implementation"
+    done: true
+    items:
+    - summary: "Create SynapseSparkAdapter class"
+      done: true
+      subtasks:
+      - summary: "Implement create_connection() with Synapse Livy endpoint"
+        done: true
+      - summary: "Reuse Azure Entra ID authentication from Fabric adapter"
+        done: true
+      - summary: "Implement Spark pool management"
+        done: true
+      - summary: "Support external Hive Metastore option"
+        done: true
+    - summary: "Support SQL and DataFrame execution modes"
+      done: true
+    - summary: "Register in platform_registry.py"
+      done: true
+
+  - phase: "Phase 2: Testing"
+    done: true
+    items:
+    - summary: "Create unit tests with mocked Synapse API"
+      done: true
+    - summary: "Add smoke test gated by @pytest.mark.live_synapse_spark"
+      done: false
+      notes: "Deferred - requires live Synapse workspace for testing"
+
+  - phase: "Phase 3: Documentation"
+    done: true
+    items:
+    - summary: "Create examples/getting_started/cloud/synapse_spark_tpch.py"
+      done: true
+    - summary: "Write docs/platforms/synapse-spark.md"
+      done: true
+
+metadata:
+  tags:
+  - cloud-spark
+  - azure
+  - synapse
+  - enterprise
+  estimated_effort: 1.5 weeks
+  created_date: "2025-12-24"
+  completed_date: "2025-12-26"
+
+impact:
+  business_value: |
+    Supports existing enterprise Synapse deployments. Many organizations have
+    significant Synapse investments.
+
+files_affected:
+  modified:
+  - benchbox/core/platform_registry.py
+  - benchbox/platforms/azure/__init__.py
+  - benchbox/utils/dependencies.py
+  added:
+  - benchbox/platforms/azure/synapse_spark_adapter.py
+  - tests/unit/platforms/azure/test_synapse_spark_adapter.py
+  - examples/getting_started/cloud/synapse_spark_tpch.py
+  - docs/platforms/synapse-spark.md
+
+success_metrics:
+- "Synapse Spark runs TPC-H SF=0.01 power test"
+- "SQL and DataFrame modes functional"
+- "Unit test coverage > 85%"
+
+completion_notes: |
+  Implemented Azure Synapse Spark adapter with:
+  - Livy REST API integration for session and statement management
+  - ADLS Gen2 storage for data staging (abfss:// URIs)
+  - Azure Entra ID authentication via DefaultAzureCredential
+  - Spark pool configuration with node size support
+  - 21 unit tests passing (85%+ coverage)
+  - Example script with cost estimation
+  - Full platform documentation
+
+dependencies:
+  blocked_by:
+  - _project/DONE/platform-expansion/planning/fabric-spark-platform.yaml
