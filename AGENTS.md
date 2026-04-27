@@ -66,6 +66,7 @@ No credentials in repo; use env vars or `.env` (gitignored); redact secrets in l
 
 ## Commits & PRs
 Conventional Commits (feat:, fix:, docs:, test:). PRs link issues, include tests + docs. CI: ruff + typecheck + tests via `make test-ci`.
+Single repo (`origin` → `joeharris76/BenchBox`); two long-lived branches: `develop` (dev work) and `main` (release-only). Dev PRs target `develop`, squash-merge. Releases go through the version-branch flow (`make release-prepare VERSION=X.Y.Z` cuts `vX.Y.Z` from develop, squash-merge to main, tag, then `make release-rebase-develop`). Full runbook: `docs/operations/release-guide.md`.
 
 ## Planning & TODOs
 Layout: `_project/TODO/{worktree}/{phase}/{item}.yaml`; completed → `_project/DONE/`. Stable `id` = filename slug.

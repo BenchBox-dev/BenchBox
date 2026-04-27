@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T12:47:44.998133'
-total_items: 35
+generated_at: '2026-04-27T14:52:31.167801'
+total_items: 34
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 32
+    count: 31
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -127,11 +127,6 @@ statuses:
       title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'
       priority: Medium-High
       category: Release Tooling
-    - id: single-repo-migration-phase-7-docs-cleanup
-      file: TODO/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
-      title: 'Single-repo migration phase 7: docs and meta-files reflect the new workflow'
-      priority: Medium-High
-      category: Documentation
     - id: single-repo-migration-phase-8-first-post-migration-release
       file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
       title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
