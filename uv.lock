@@ -318,8 +318,6 @@ version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
-    { name = "grpcio" },
-    { name = "grpcio-status" },
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "packaging" },
@@ -764,8 +762,6 @@ requires-dist = [
     { name = "google-cloud-storage", marker = "extra == 'cloud'", specifier = ">=2.0.0" },
     { name = "google-cloud-storage", marker = "extra == 'cloud-spark'", specifier = ">=2.0.0" },
     { name = "google-cloud-storage", marker = "extra == 'cloud-spark-gcp'", specifier = ">=2.0.0" },
-    { name = "grpcio", specifier = ">=1.48.1" },
-    { name = "grpcio-status", specifier = ">=1.48.1" },
     { name = "influxdb3-python", marker = "extra == 'all'", specifier = ">=0.10.0" },
     { name = "influxdb3-python", marker = "extra == 'influxdb'", specifier = ">=0.10.0" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.2.0" },

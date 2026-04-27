@@ -159,50 +159,6 @@ class TestGetSyncableFiles:
         db_files = [p for p in result if "databases" in str(p)]
         assert len(db_files) == 0, f"Found database files: {db_files}"
 
-    @pytest.mark.skip(
-        reason=(
-            "Obsolete under the two-branch single-repo migration: benchbox/release/ "
-            "and benchbox/core/explorer_pipeline are no longer in HOLD_BACK_PATHS — "
-            "they live on develop and on main (just curated out of the wheel). "
-            "Removed entirely in Phase 6."
-        )
-    )
-    def test_excludes_hold_back_paths_across_repo_roots(self, tmp_path: Path):
-        """Explorer hold-backs should be excluded from syncable files everywhere."""
-        (tmp_path / "benchbox/release").mkdir(parents=True)
-        (tmp_path / "benchbox/release/sync.py").write_text("# private\n")
-        (tmp_path / "benchbox/core/explorer_pipeline").mkdir(parents=True)
-        (tmp_path / "benchbox/core/explorer_pipeline/__init__.py").write_text("# private\n")
-        (tmp_path / "benchbox/cli/commands").mkdir(parents=True)
-        (tmp_path / "benchbox/cli/commands/explorer.py").write_text("# private\n")
-        (tmp_path / "scripts").mkdir()
-        (tmp_path / "scripts/prepare_release.py").write_text("# private\n")
-        (tmp_path / "tests/unit/core/explorer_pipeline").mkdir(parents=True)
-        (tmp_path / "tests/unit/core/explorer_pipeline/test_private.py").write_text("# private\n")
-        (tmp_path / "tests/unit/release").mkdir(parents=True)
-        (tmp_path / "tests/unit/release/test_workflow.py").write_text("# private\n")
-        (tmp_path / "tests/unit/test_xdist_safety.py").write_text("# private\n")
-        (tmp_path / "docs/development").mkdir(parents=True)
-        (tmp_path / "docs/development/results-explorer-brand-ownership.md").write_text("# private\n")
-        (tmp_path / "docs/development/results-explorer-browser-testing.md").write_text("# private\n")
-        (tmp_path / ".github/workflows").mkdir(parents=True)
-        (tmp_path / ".github/workflows/results-explorer-browser.yml").write_text("name: explorer\n")
-        (tmp_path / "README.md").write_text("# public\n")
-
-        result = get_syncable_files(tmp_path)
-
-        assert Path("README.md") in result
-        assert Path("benchbox/release/sync.py") not in result
-        assert Path("benchbox/core/explorer_pipeline/__init__.py") not in result
-        assert Path("benchbox/cli/commands/explorer.py") not in result
-        assert Path("scripts/prepare_release.py") not in result
-        assert Path("tests/unit/core/explorer_pipeline/test_private.py") not in result
-        assert Path("tests/unit/release/test_workflow.py") not in result
-        assert Path("tests/unit/test_xdist_safety.py") not in result
-        assert Path("docs/development/results-explorer-brand-ownership.md") not in result
-        assert Path("docs/development/results-explorer-browser-testing.md") not in result
-        assert Path(".github/workflows/results-explorer-browser.yml") not in result
-
 
 class TestCompareRepos:
     """Test compare_repos() function."""
@@ -741,21 +697,21 @@ class TestExclusionConstants:
         """Test that DOCS_DIR_EXCLUDES includes _build."""
         assert "_build" in DOCS_DIR_EXCLUDES
 
-    @pytest.mark.skip(
-        reason=(
-            "Obsolete under the two-branch single-repo migration: CLAUDE.md / "
-            "AGENTS.md / GEMINI.md are project-shared agent instructions on develop "
-            "(curated out at release time, but still in ALLOWED_ROOT_FILES so the "
-            "develop-tree sync includes them). Per-user agent state under .claude/ "
-            ".codex/ .gemini/ stays excluded via HOLD_BACK_PATHS. Removed in Phase 6."
-        )
-    )
-    def test_claude_and_codex_not_in_allowed_roots(self):
-        """Test that .claude, .codex, CLAUDE.md, AGENTS.md are excluded from public release."""
-        assert ".claude" not in ALLOWED_ROOT_FILES
-        assert ".codex" not in ALLOWED_ROOT_FILES
-        assert "CLAUDE.md" not in ALLOWED_ROOT_FILES
-        assert "AGENTS.md" not in ALLOWED_ROOT_FILES
+    def test_per_user_agent_dirs_in_hold_back(self):
+        """HOLD_BACK_PATHS must keep per-user agent config dirs (.claude, .codex, .gemini) off public.
+
+        Replaces the legacy invariant that asserted .claude / .codex / CLAUDE.md
+        were absent from ALLOWED_ROOT_FILES. Under the two-branch migration,
+        CLAUDE.md / AGENTS.md / GEMINI.md are project-shared agent instructions
+        on develop (curated out at release time but tracked on develop), while
+        .claude/ / .codex/ / .gemini/ are per-user state and stay in
+        HOLD_BACK_PATHS so the curated public tree never includes them.
+        """
+        from benchbox.release.workflow import HOLD_BACK_PATHS
+
+        assert ".claude" in HOLD_BACK_PATHS
+        assert ".codex" in HOLD_BACK_PATHS
+        assert ".gemini" in HOLD_BACK_PATHS
 
     def test_forbidden_patterns_includes_data_files(self):
         """Test that FORBIDDEN_PATTERNS includes data file extensions."""

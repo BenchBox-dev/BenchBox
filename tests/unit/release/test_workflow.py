@@ -102,93 +102,13 @@ jobs:
     return tmp_path
 
 
-@pytest.mark.skip(
-    reason=(
-        "Obsolete under the two-branch single-repo migration: HOLD_BACK_PATHS no "
-        "longer contains benchbox/release/ etc.; those live on develop and main "
-        "and are curated out of the wheel via pyproject + MANIFEST.in instead of "
-        "via prepare_public_release(). Removed in Phase 6."
-    )
-)
-def test_prepare_public_release_strips_holdbacks(temp_source: Path, tmp_path: Path) -> None:
-    target = tmp_path / "public"
-
-    prepare_public_release(
-        source=temp_source,
-        target=target,
-        version="0.1.0",
-        clean=True,
-        init_git=False,
-    )
-
-    # ensure benchbox copied
-    assert (target / "benchbox/__init__.py").exists()
-    # ensure hold back paths removed
-    assert not (target / "benchbox/release").exists()
-    assert not (target / "benchbox/core/explorer_pipeline").exists()
-    assert not (target / "benchbox/cli/commands/explorer.py").exists()
-    assert not (target / "scripts/prepare_release.py").exists()
-    assert not (target / "tests/unit/core/explorer_pipeline").exists()
-    assert not (target / "tests/unit/release").exists()
-    assert not (target / "tests/unit/test_xdist_safety.py").exists()
-    assert not (target / ".github/workflows/results-explorer-browser.yml").exists()
-    assert not (target / "docs/development/results-explorer-brand-ownership.md").exists()
-    assert not (target / "docs/development/results-explorer-browser-testing.md").exists()
-
-    # Note: README no longer sanitized - public releases use the full README
-    # Only pyproject is sanitized
-    assert (target / "README.md").read_text(encoding="utf-8") == "Private README\n"
-    assert (target / "pyproject.toml").read_text(encoding="utf-8") == "[project]\nname='benchbox'\n"
-    cli_init = (target / "benchbox/cli/commands/__init__.py").read_text(encoding="utf-8")
-    assert "explorer_group" not in cli_init
-    test_workflow = (target / ".github/workflows/test.yml").read_text(encoding="utf-8")
-    assert "hashFiles('results-explorer/package.json')" in test_workflow
-    assert "_benchbox_pytest_xdist_safety" not in (target / "pytest.ini").read_text(encoding="utf-8")
-    assert "_benchbox_pytest_xdist_safety" not in (target / "pytest-ci.ini").read_text(encoding="utf-8")
-
-    # gitignore written
-    assert (target / ".gitignore").exists()
-
-    # timestamps normalized (file exists implies utime run)
-    assert (target / "RELEASE_VERSION").read_text(encoding="utf-8").strip() == "0.1.0"
-
-
-@pytest.mark.skip(
-    reason=(
-        "Obsolete under the two-branch single-repo migration: "
-        "_benchbox_pytest_xdist_safety.py is now in ALLOWED_ROOT_FILES (dev tooling "
-        "ships on develop). Removed in Phase 6."
-    )
-)
-def test_prepare_public_release_no_clean(temp_source: Path, tmp_path: Path) -> None:
-    target = tmp_path / "public"
-    target.mkdir()
-    (target / "old.txt").write_text("remove me\n", encoding="utf-8")
-    (target / "_benchbox_pytest_xdist_safety.py").write_text("stale helper\n", encoding="utf-8")
-    (target / "results-explorer").mkdir()
-    (target / "results-explorer/package.json").write_text("{}\n", encoding="utf-8")
-    (target / "dist").mkdir()
-    (target / "dist/existing.whl").write_text("wheel\n", encoding="utf-8")
-    (target / "build").mkdir()
-    (target / "build/artifact.txt").write_text("artifact\n", encoding="utf-8")
-    (target / "benchbox.egg-info").mkdir()
-    (target / "benchbox.egg-info/PKG-INFO").write_text("metadata\n", encoding="utf-8")
-
-    prepare_public_release(
-        source=temp_source,
-        target=target,
-        version="0.1.0",
-        clean=False,
-    )
-
-    # stale root files should be removed, but expected build artifacts preserved
-    assert not (target / "old.txt").exists()
-    assert not (target / "_benchbox_pytest_xdist_safety.py").exists()
-    assert not (target / "results-explorer").exists()
-    assert (target / "dist/existing.whl").exists()
-    assert (target / "build/artifact.txt").exists()
-    assert (target / "benchbox.egg-info/PKG-INFO").exists()
-    assert (target / "benchbox").exists()
+# Tests for prepare_public_release()'s old "strip hold-backs" semantics were
+# removed in 2026-04 as part of the two-branch single-repo migration. Under
+# the new architecture HOLD_BACK_PATHS only excludes per-user agent configs
+# (.claude / .codex / .gemini); maintainer-only paths like benchbox/release/
+# live on develop and on main, with wheel/sdist exclusions handled by
+# pyproject.toml + MANIFEST.in instead. The release-prepare flow uses git rm
+# directly on the version branch (see Makefile release-prepare target).
 
 
 def test_prepare_public_release_includes_extra_files(temp_source: Path, tmp_path: Path) -> None:

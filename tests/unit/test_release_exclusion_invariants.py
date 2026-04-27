@@ -89,33 +89,6 @@ def _pattern_to_path(pattern: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Layer A: HOLD_BACK_PATHS
-# ---------------------------------------------------------------------------
-class TestHoldBackPaths:
-    """Validate HOLD_BACK_PATHS entries in workflow.py."""
-
-    @pytest.mark.skip(
-        reason=(
-            "Obsolete under the two-branch single-repo migration: HOLD_BACK_PATHS now "
-            "lists per-user agent configs that are tracked on private but absent on "
-            "develop. The path-existence invariant no longer holds across branches. "
-            "Removed entirely in Phase 6."
-        )
-    )
-    def test_hold_back_paths_target_existing_paths(self):
-        """Every HOLD_BACK_PATHS entry must resolve to a real file or directory."""
-        from benchbox.release.workflow import HOLD_BACK_PATHS
-
-        for rel_path in HOLD_BACK_PATHS:
-            candidates = [REPO_ROOT / rel_path]
-            if "/" not in rel_path:
-                candidates.append(BENCHBOX_DIR / rel_path)
-            assert any(path.exists() for path in candidates), (
-                f"HOLD_BACK_PATHS entry '{rel_path}' does not exist. Remove or update it."
-            )
-
-
-# ---------------------------------------------------------------------------
 # Layer B: pyproject.toml [tool.setuptools.packages.find] exclude
 # ---------------------------------------------------------------------------
 class TestPyprojectExcludes:
@@ -144,30 +117,6 @@ class TestPyprojectExcludes:
                     f"Setuptools package excludes only work on packages (directories). "
                     f"Use MANIFEST.in 'exclude' for individual files."
                 )
-
-
-# ---------------------------------------------------------------------------
-# Layer C: MANIFEST.in prune directives
-# ---------------------------------------------------------------------------
-class TestManifestPrunes:
-    """Validate MANIFEST.in prune directives."""
-
-    @pytest.mark.skip(
-        reason=(
-            "Obsolete under the two-branch single-repo migration: MANIFEST.in carries "
-            "defence-in-depth prunes for paths that exist on private (e.g. .claude/, "
-            "_project/) but are curated out of develop or main. The 'must exist' "
-            "invariant no longer holds. Removed entirely in Phase 6."
-        )
-    )
-    def test_prune_targets_are_existing_directories(self):
-        """Every MANIFEST.in 'prune' target must be a real directory."""
-        for prune_path in _load_manifest_prunes():
-            full_path = REPO_ROOT / prune_path
-            assert full_path.is_dir(), (
-                f"MANIFEST.in 'prune {prune_path}' targets a path that is not a "
-                f"directory (or doesn't exist). Remove or update it."
-            )
 
 
 # ---------------------------------------------------------------------------
