@@ -42,3 +42,21 @@ cupy:
 cuml:
   reason: "CUDA ML library; used in RAPIDS paths. Not declared in pyproject.toml; pulled transitively via cudf."
   extras_group: "extras:cudf"
+
+# --------------------------------------------------------------------------
+# gRPC stack - declared in core dependencies for cloud SDK compatibility
+# (databricks-sdk, snowflake-connector-python, google-cloud-* SDKs use grpc
+# transitively). Pinning grpcio/grpcio-status at the top level avoids ABI
+# mismatch when those SDKs lazily import grpc.
+#
+# TODO: revisit during dependency cleanup - if no cloud SDK in the install
+# matrix actually requires these pins anymore, remove them from
+# pyproject.toml dependencies.
+# --------------------------------------------------------------------------
+grpcio:
+  reason: "Top-level pin for ABI compatibility with cloud SDKs (databricks-sdk, snowflake, gcs) that use grpc transitively. No direct benchbox/ import site."
+  extras_group: "core"
+
+grpcio-status:
+  reason: "Companion to grpcio for SDK status-code handling. No direct benchbox/ import site; required transitively by cloud SDKs."
+  extras_group: "core"
