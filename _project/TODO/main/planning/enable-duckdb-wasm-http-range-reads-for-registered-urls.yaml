@@ -92,6 +92,12 @@ work:
       added to range-read-budget.spec.ts under `test.skip` so it
       auto-enables when the runtime starts issuing 206s.
 
+      Update 2026-04-27: also verified against `@duckdb/duckdb-wasm@
+      1.33.1-dev53.0` (the latest dev pre-release). Same behavior —
+      whole-file GET on ATTACH, zero 206 responses, byte-budget
+      exceeded by 10x. Upstream has not addressed this in any 1.33.x
+      build to date. Reverted to 1.32.0.
+
   - id: w2
     summary: "Pick an unblock path and prototype it"
     needs: [w1]
