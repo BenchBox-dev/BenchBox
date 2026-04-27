@@ -122,7 +122,7 @@ class TestQueryProfileContext:
         ctx._start_time = time.perf_counter()
 
         ctx.start_planning()
-        time.sleep(0.01)  # 10ms
+        time.sleep(0.05)  # 50ms — 5× margin for Windows timer resolution
         ctx.end_planning()
 
         assert ctx._planning_time >= 10.0
@@ -134,7 +134,7 @@ class TestQueryProfileContext:
         ctx._start_time = time.perf_counter()
 
         ctx.start_collect()
-        time.sleep(0.01)  # 10ms
+        time.sleep(0.05)  # 50ms — 5× margin for Windows timer resolution
         ctx.end_collect()
 
         assert ctx._collect_time >= 10.0
@@ -170,7 +170,7 @@ class TestQueryProfileContext:
         ctx._start_time = time.perf_counter()
 
         ctx.set_rows(100)
-        time.sleep(0.01)
+        time.sleep(0.05)  # 50ms — 5× margin for Windows timer resolution
 
         profile = ctx.get_profile()
 
