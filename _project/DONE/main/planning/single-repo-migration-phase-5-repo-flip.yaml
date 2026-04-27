@@ -12,10 +12,12 @@ amendment_2026-04-27: |
 
   Outcome:
   - joeharris76/benchbox-private archived (read-only on GitHub).
-  - /Users/joe/Developer/BenchBox renamed to BenchBox.retired-20260427/;
-    a symlink at /Users/joe/Developer/BenchBox now points at
-    ~/Developer/benchbox-public for shell-muscle-memory continuity (w6
-    option-b chosen).
+  - /Users/joe/Developer/BenchBox renamed to BenchBox.retired-20260427/.
+    Initially a symlink at /Users/joe/Developer/BenchBox pointed at
+    ~/Developer/benchbox-public (w6 option-b). Later on 2026-04-27 the
+    symlink was removed and ~/Developer/benchbox-public was renamed to
+    /Users/joe/Developer/BenchBox (w6 option-a) so the canonical path
+    is now a real directory, not a symlink.
   - Mirror backup at /tmp/benchbox-private-backup-20260427.git (147 MB)
     retained per the 60-day soak.
   - Three rulesets applied to joeharris76/BenchBox via gh api:
