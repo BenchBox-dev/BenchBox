@@ -2,7 +2,7 @@ id: single-repo-migration-decisions-gate
 title: "Single-repo migration: decisions gate (D1-D8) before any code or repo changes"
 worktree: main
 priority: Critical
-status: Not Started
+status: In Progress
 category: Release Tooling
 
 description: |
@@ -64,7 +64,7 @@ description: |
 work:
 - id: w1
   summary: "Read /Users/joe/.claude/plans/single-repo-migration.md fully and the rationale tables"
-  status: pending
+  status: done
   notes: |
     The plan covers each decision with the recommendation and trade-off.
     Spend time on D2/D2a (history strategy) and D4 (drafts location) as
@@ -95,22 +95,16 @@ verification:
   expected_output: "8"
 
 must_preserve:
-- This item is a gate, not a refactor. Nothing changes in the codebase
-  except the new decisions doc.
-- The plan file remains the source of truth for the migration; the
-  decisions doc only records the per-decision answers.
+- This item is a gate, not a refactor. Nothing changes in the codebase except the new decisions doc.
+- The plan file remains the source of truth for the migration; the decisions doc only records the per-decision answers.
 
 anti_patterns:
-- DO NOT skip D1 reconfirmation - because Option B (current public stays
-  canonical) is the load-bearing assumption of the entire plan; if this
-  decision flips back to Option A (rename + flip), the plan and 10 other
-  TODOs need rewriting.
-- DO NOT skip D2a (TODO/DONE history) - because it determines whether
-  Phase 4 includes a filter-merge step or whether _project/** is just
-  working-tree synced. The mechanics differ substantially.
-- DO NOT defer the decisions doc until after Phase 0 - because then there
-  is no gate; the audit happens with implicit assumptions instead of
-  explicit choices.
+- DO NOT skip D1 reconfirmation - because Option B (current public stays canonical) is the load-bearing assumption of
+  the entire plan; if this decision flips back to Option A (rename + flip), the plan and 10 other TODOs need rewriting.
+- DO NOT skip D2a (TODO/DONE history) - because it determines whether Phase 4 includes a filter-merge step or whether
+  _project/** is just working-tree synced. The mechanics differ substantially.
+- DO NOT defer the decisions doc until after Phase 0 - because then there is no gate; the audit happens with implicit
+  assumptions instead of explicit choices.
 
 scope_limit:
   only_modify:

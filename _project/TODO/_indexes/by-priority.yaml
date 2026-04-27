@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T21:04:10.415080'
+generated_at: '2026-04-26T21:16:01.218293'
 total_items: 41
 priorities:
   Critical:
@@ -16,10 +16,10 @@ priorities:
       category: Release Tooling
       status: Not Started
     - id: single-repo-migration-decisions-gate
-      file: TODO/main/planning/single-repo-migration-decisions-gate.yaml
+      file: TODO/main/active/single-repo-migration-decisions-gate.yaml
       title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'
       category: Release Tooling
-      status: Not Started
+      status: In Progress
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

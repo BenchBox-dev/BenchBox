@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T21:04:10.415057'
+generated_at: '2026-04-26T21:16:01.218276'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -188,10 +188,10 @@ categories:
       priority: Low
       status: Not Started
     - id: single-repo-migration-decisions-gate
-      file: TODO/main/planning/single-repo-migration-decisions-gate.yaml
+      file: TODO/main/active/single-repo-migration-decisions-gate.yaml
       title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'
       priority: Critical
-      status: Not Started
+      status: In Progress
   Repository Maintenance:
     count: 1
     items:

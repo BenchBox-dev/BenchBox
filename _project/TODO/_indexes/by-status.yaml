@@ -1,16 +1,21 @@
-generated_at: '2026-04-26T21:04:10.415092'
+generated_at: '2026-04-26T21:16:01.218308'
 total_items: 41
 statuses:
   In Progress:
-    count: 1
+    count: 2
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Medium
       category: Testing & Quality
+    - id: single-repo-migration-decisions-gate
+      file: TODO/main/active/single-repo-migration-decisions-gate.yaml
+      title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'
+      priority: Critical
+      category: Release Tooling
   Not Started:
-    count: 39
+    count: 38
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -168,11 +173,6 @@ statuses:
       title: 'Single-repo migration phase 9: decommission archived benchbox-private and retired private clone after 60-90
         day soak'
       priority: Low
-      category: Release Tooling
-    - id: single-repo-migration-decisions-gate
-      file: TODO/main/planning/single-repo-migration-decisions-gate.yaml
-      title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'
-      priority: Critical
       category: Release Tooling
     - id: singlestore-non-tpc-csv-null-marker
       file: TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml
