@@ -1,0 +1,235 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "6c7d3792",
+    "timestamp": "2026-04-27T19:53:43.848466",
+    "total_duration_ms": 850,
+    "query_time_ms": 35,
+    "iterations": 3,
+    "streams": 3
+  },
+  "benchmark": {
+    "id": "tpch",
+    "name": "TPC-H",
+    "scale_factor": 0.01,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "DuckDB",
+    "version": "1.4.4",
+    "client_version": "1.4.4",
+    "config": {
+      "execution_mode": "sql",
+      "connection_mode": "file",
+      "database_path": "/Users/joe/Developer/BenchBox/.claude/worktrees/results-explorer-todos/benchmark_runs/databases/tpch_sf001/tpch_sf001_notuning_noconstraints.duckdb",
+      "memory_limit": "12GB",
+      "enable_progress_bar": false,
+      "result_cache_enabled": false,
+      "driver_version_actual": "1.4.4",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_resolved": "1.4.4",
+      "driver_package": "duckdb",
+      "driver_runtime_python_executable": "/Users/joe/.local/share/uv/tools/benchbox/bin/python3"
+    },
+    "driver_actual_version": "1.4.4",
+    "driver_package": "duckdb",
+    "driver_resolved_version": "1.4.4",
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "power"
+    ],
+    "query_subset": [
+      "1",
+      "6"
+    ],
+    "mode": "sql"
+  },
+  "summary": {
+    "queries": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0
+    },
+    "timing": {
+      "total_ms": 35,
+      "avg_ms": 5.8,
+      "min_ms": 4,
+      "max_ms": 7,
+      "geometric_mean_ms": 5.7,
+      "stdev_ms": 1.2
+    },
+    "data": {
+      "rows_loaded": 86805,
+      "load_time_ms": 578.7
+    },
+    "validation": "passed",
+    "tpc_metrics": {
+      "power_at_size": 6197.138145869273
+    }
+  },
+  "phases": {
+    "data_generation": {
+      "status": "SUCCESS",
+      "duration_ms": 0
+    },
+    "schema_creation": {
+      "status": "SUCCESS",
+      "duration_ms": 2
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 578
+    },
+    "validation": {
+      "status": "PASSED",
+      "duration_ms": 50
+    },
+    "power_test": {
+      "status": "COMPLETED",
+      "duration_ms": 65
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [
+    {
+      "id": "1",
+      "ms": 22,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 6,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 7,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 5,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 7,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 6,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 6,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 4,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    }
+  ],
+  "tables": {
+    "customer": {
+      "rows": 1500
+    },
+    "lineitem": {
+      "rows": 60175
+    },
+    "nation": {
+      "rows": 25
+    },
+    "orders": {
+      "rows": 15000
+    },
+    "part": {
+      "rows": 2000
+    },
+    "partsupp": {
+      "rows": 8000
+    },
+    "region": {
+      "rows": 5
+    },
+    "supplier": {
+      "rows": 100
+    }
+  },
+  "cost": {
+    "total_usd": 0,
+    "model": "actual"
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-04-27T19:53:42.969663",
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_package": "duckdb",
+    "driver_version_resolved": "1.4.4",
+    "driver_version_actual": "1.4.4",
+    "driver_runtime_strategy": "current-process",
+    "driver_runtime_python_executable": "/Users/joe/.local/share/uv/tools/benchbox/bin/python3",
+    "query_subset": [
+      "1",
+      "6"
+    ]
+  },
+  "environment": {
+    "os": "Darwin 25.4.0",
+    "arch": "arm64",
+    "python": "3.12.11",
+    "cpu_count": 10,
+    "memory_gb": 16,
+    "machine_id": "machine_45d1a3ef31a1728d"
+  },
+  "export": {
+    "timestamp": "2026-04-27T19:53:43.922898",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}
