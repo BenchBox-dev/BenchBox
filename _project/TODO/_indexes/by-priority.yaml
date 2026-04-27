@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T19:02:46.567156'
+generated_at: '2026-04-27T19:06:04.815813'
 total_items: 29
 priorities:
   Critical:
@@ -16,7 +16,7 @@ priorities:
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

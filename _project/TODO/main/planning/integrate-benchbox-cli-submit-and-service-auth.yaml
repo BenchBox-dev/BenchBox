@@ -2,7 +2,7 @@ id: integrate-benchbox-cli-submit-and-service-auth
 title: "Integrate BenchBox CLI submission flow and service authentication"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 deps:
   needs:
@@ -28,33 +28,47 @@ description: |
 work:
   - id: w1
     summary: "Sketch the CLI surface: draft `benchbox submit --help` output and config key names"
-    status: pending
+    status: done
     notes: |
-      Write the full --help text before any code is written. Define all flags
-      (--last, --bundle, --dry-run), config keys (service.url, service.token),
-      and the explicit distinction from `benchbox publish`. Reconcile with
-      existing service_url placeholder. Output: submit-cli-surface.md under
-      _project/research/.
+      Output landed at `_project/research/submit-cli-surface.md`
+      (2026-04-27). Full --help text for the extended command with
+      --service and --output as auto-selecting modes (preserves v0.2.x
+      behavior exactly). Two new config sections (service, submission)
+      with a deprecated-alias migration plan for the existing
+      submit_to_service / service_url placeholders. Separate
+      `benchbox auth` command tree for token management; keychain-first
+      storage with encrypted-file fallback. --dry-run semantics for both
+      modes documented. Out-of-scope-for-launch list (--watch, web UI,
+      OAuth) explicit.
 
   - id: w2
     summary: "Map submit to existing result export surfaces - identify reuse points in exporter and results CLI"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Read benchbox/cli/commands/results.py and benchbox/core/results/exporter.py.
-      Identify which existing code is reused (export path resolution, bundle
-      validation) vs. net-new (network layer, auth). Document the composition
-      seam before writing any implementation.
+      Output landed at `_project/research/submit-reuse-points.md`
+      (2026-04-27). Reuse table covers bundle loading, manifest
+      construction, companion resolution, history persistence — all
+      from Phase 2's existing surfaces. The canonical schema-v2 bundle
+      is what the service receives; no second wire format. Net-new
+      modules enumerated (HTTP transport, idempotency-key persistence,
+      auth store, auth CLI, service-mode submit handler). Composition
+      seam: existing `benchbox submit` entry point dispatches to
+      PR-packaging or hosted-service path based on flags / config.
 
   - id: w3
     summary: "Implement `benchbox submit` command skeleton with --dry-run and local validation"
     needs: [w1, w2]
     status: pending
     notes: |
-      Create benchbox/cli/commands/submit.py. Wire into CLI entrypoint.
-      --dry-run must work without credentials - just validates the bundle and
-      prints what would be uploaded. Passes `benchbox submit --help` and
-      `benchbox submit --dry-run <path>` smoke tests before w4 begins.
+      Deferred until the Phase 3 ingest API exists (per the promotion
+      rule in `_project/analysis/phase-3-promotion-metrics.md` —
+      currently 0/6 thresholds breached). Implementation order is
+      fixed by `submit-cli-surface.md` once unblocked.
+
+      Existing `benchbox/cli/commands/submit.py` (Phase 2 PR mode)
+      stays unchanged; w3 adds the `--service` dispatch path inside
+      the existing command, not a new one.
 
   - id: w4
     summary: "Implement authentication: token fetch, local keychain storage, and refresh flow"

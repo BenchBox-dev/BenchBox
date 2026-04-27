@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T19:02:46.567110'
+generated_at: '2026-04-27T19:06:04.815766'
 total_items: 29
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -26,7 +26,7 @@ items:
   worktree: main
   category: Core Functionality
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - results
   - cli
@@ -35,7 +35,7 @@ items:
   - api
   estimated_effort: Large
   work_total: 8
-  work_done: 0
+  work_done: 2
   work_ready: 1
   needs:
   - define-results-platform-product-and-launch-strategy
