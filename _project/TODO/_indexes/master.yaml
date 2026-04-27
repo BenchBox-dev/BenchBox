@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T08:54:32.034893'
-total_items: 39
+generated_at: '2026-04-27T09:00:33.658492'
+total_items: 38
 items:
 - id: single-repo-migration-phase-5-repo-flip
   file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
@@ -109,18 +109,6 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
-- id: single-repo-migration-phase-1-wheel-hygiene
-  file: TODO/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
-  title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'
-  worktree: main
-  category: Release Tooling
-  priority: High
-  status: Not Started
-  work_total: 6
-  work_done: 0
-  work_ready: 1
-  needs:
-  - single-repo-migration-phase-0-audit
 - id: single-repo-migration-phase-2-continuous-ci
   file: TODO/main/planning/single-repo-migration-phase-2-continuous-ci.yaml
   title: 'Single-repo migration phase 2: continuous CI on push to main and every PR'

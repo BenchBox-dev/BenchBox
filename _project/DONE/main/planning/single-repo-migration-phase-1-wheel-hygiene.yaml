@@ -2,7 +2,8 @@ id: single-repo-migration-phase-1-wheel-hygiene
 title: "Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: 2026-04-27
 category: Release Tooling
 
 deps:
@@ -29,7 +30,7 @@ description: |
 work:
 - id: w1
   summary: "Read current pyproject.toml and MANIFEST.in to see what is already excluded"
-  status: pending
+  status: done
   notes: |
     pyproject.toml lines 57-68 already exclude benchbox.release in the
     setuptools config. MANIFEST.in already prunes benchbox/release, tests,
@@ -40,7 +41,7 @@ work:
 - id: w2
   summary: "Add hatch wheel/sdist excludes for HOLD_BACK_PATHS content not already covered"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Edit pyproject.toml. Add to [tool.hatch.build.targets.wheel] (or
     setuptools equivalent depending on what build backend is in use):
@@ -65,7 +66,7 @@ work:
 - id: w3
   summary: "Update MANIFEST.in to mirror the sdist excludes"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Use prune and recursive-exclude directives. Result must match the
     pyproject.toml sdist exclude list (sdist contents are determined
@@ -75,7 +76,7 @@ work:
 - id: w4
   summary: "Build wheel and sdist locally, inspect contents"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     uv run python -m build
     unzip -l dist/benchbox-*.whl    # inspect wheel
@@ -87,7 +88,7 @@ work:
 - id: w5
   summary: "Smoke test: install the wheel in a clean venv and import"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     python -m venv /tmp/wheel-test
     /tmp/wheel-test/bin/pip install dist/benchbox-*.whl
@@ -98,7 +99,7 @@ work:
 - id: w6
   summary: "Run existing wheel-content tests"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     uv run -- python -m pytest tests/unit/test_release_size_check.py \
       tests/unit/test_release_exclusion_invariants.py
@@ -118,22 +119,19 @@ verification:
   expected_output: "exit 0"
 
 must_preserve:
-- The actual benchbox package contents inside the wheel (everything under
-  benchbox/) is unchanged. Only what is alongside it (release scripts,
-  _project, etc.) is now excluded.
-- Existing release-time CI (automate_release.py) continues to work
-  unchanged - this phase does not touch the release flow.
+- The actual benchbox package contents inside the wheel (everything under benchbox/) is unchanged. Only what is
+  alongside it (release scripts, _project, etc.) is now excluded.
+- Existing release-time CI (automate_release.py) continues to work unchanged - this phase does not touch the release
+  flow.
 - Existing tests continue to pass unchanged.
 
 anti_patterns:
-- DO NOT delete any source files in this phase - because file deletion
-  is Phase 6; this phase only adjusts what gets packaged.
-- DO NOT change the build backend (e.g., setuptools to hatch) as part
-  of this phase - because that is a separate decision and would mask
-  whether the exclude changes are working correctly.
-- DO NOT skip the smoke test (w5) - because exclude config errors can
-  produce wheels that build but fail to import (e.g., excluding a
-  package __init__.py); only an actual install proves correctness.
+- DO NOT delete any source files in this phase - because file deletion is Phase 6; this phase only adjusts what gets
+  packaged.
+- DO NOT change the build backend (e.g., setuptools to hatch) as part of this phase - because that is a separate
+  decision and would mask whether the exclude changes are working correctly.
+- DO NOT skip the smoke test (w5) - because exclude config errors can produce wheels that build but fail to import
+  (e.g., excluding a package __init__.py); only an actual install proves correctness.
 
 scope_limit:
   only_modify:

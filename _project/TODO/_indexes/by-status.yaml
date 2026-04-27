@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T08:54:32.034954'
-total_items: 39
+generated_at: '2026-04-27T09:00:33.658563'
+total_items: 38
 statuses:
   In Progress:
     count: 1
@@ -10,7 +10,7 @@ statuses:
       priority: Medium
       category: Testing & Quality
   Not Started:
-    count: 37
+    count: 36
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -117,11 +117,6 @@ statuses:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       category: Core Functionality
-    - id: single-repo-migration-phase-1-wheel-hygiene
-      file: TODO/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
-      title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'
-      priority: High
-      category: Release Tooling
     - id: single-repo-migration-phase-2-continuous-ci
       file: TODO/main/planning/single-repo-migration-phase-2-continuous-ci.yaml
       title: 'Single-repo migration phase 2: continuous CI on push to main and every PR'

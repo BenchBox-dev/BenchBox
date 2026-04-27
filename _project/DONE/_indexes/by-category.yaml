@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T08:54:33.888206'
+generated_at: '2026-04-27T09:00:35.830035'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -3495,13 +3495,18 @@ categories:
       priority: Critical
       status: Completed
   Release Tooling:
-    count: 4
+    count: 5
     items:
     - id: single-repo-migration-phase-0-audit
       file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
       title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
         check)'
       priority: Critical
+      status: Completed
+    - id: single-repo-migration-phase-1-wheel-hygiene
+      file: DONE/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
+      title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'
+      priority: High
       status: Completed
     - id: single-repo-migration-decisions-gate
       file: DONE/main/planning/single-repo-migration-decisions-gate.yaml

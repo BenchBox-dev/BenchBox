@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T08:54:33.887836'
-total_items: 774
+generated_at: '2026-04-27T09:00:35.829696'
+total_items: 775
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -3989,6 +3989,19 @@ items:
   work_ready: 0
   needs:
   - explorer-emit-benchmark-summary-artifact
+- id: single-repo-migration-phase-1-wheel-hygiene
+  file: DONE/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
+  title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Completed
+  completed_date: 2026-04-27
+  work_total: 6
+  work_done: 6
+  work_ready: 0
+  needs:
+  - single-repo-migration-phase-0-audit
 - id: first-class-clickhouse-local-server-cloud-platforms
   file: DONE/platform-expansion/planning/first-class-clickhouse-local-server-cloud-platforms.yaml
   title: Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms

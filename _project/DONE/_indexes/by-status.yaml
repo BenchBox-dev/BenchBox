@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T08:54:33.888571'
-total_items: 774
+generated_at: '2026-04-27T09:00:35.830381'
+total_items: 775
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 723
+    count: 724
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3190,6 +3190,11 @@ statuses:
       title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
         check)'
       priority: Critical
+      category: Release Tooling
+    - id: single-repo-migration-phase-1-wheel-hygiene
+      file: DONE/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
+      title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'
+      priority: High
       category: Release Tooling
     - id: single-repo-migration-decisions-gate
       file: DONE/main/planning/single-repo-migration-decisions-gate.yaml
