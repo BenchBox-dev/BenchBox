@@ -7,8 +7,9 @@
 ## Git workflow
 
 Single repo, single remote (`origin` → `joeharris76/BenchBox`). Working
-clone: `~/Developer/benchbox-public` (canonical path
-`/Users/joe/Developer/BenchBox` is a symlink).
+clone: `/Users/joe/Developer/BenchBox` (the canonical path; the old
+private clone was retired to `BenchBox.retired-20260427/` alongside it
+during the single-repo migration).
 
 - **Branches**: `develop` is the long-lived dev branch; `main` is
   release-only.
