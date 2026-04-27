@@ -102,6 +102,14 @@ jobs:
     return tmp_path
 
 
+@pytest.mark.skip(
+    reason=(
+        "Obsolete under the two-branch single-repo migration: HOLD_BACK_PATHS no "
+        "longer contains benchbox/release/ etc.; those live on develop and main "
+        "and are curated out of the wheel via pyproject + MANIFEST.in instead of "
+        "via prepare_public_release(). Removed in Phase 6."
+    )
+)
 def test_prepare_public_release_strips_holdbacks(temp_source: Path, tmp_path: Path) -> None:
     target = tmp_path / "public"
 
@@ -145,6 +153,13 @@ def test_prepare_public_release_strips_holdbacks(temp_source: Path, tmp_path: Pa
     assert (target / "RELEASE_VERSION").read_text(encoding="utf-8").strip() == "0.1.0"
 
 
+@pytest.mark.skip(
+    reason=(
+        "Obsolete under the two-branch single-repo migration: "
+        "_benchbox_pytest_xdist_safety.py is now in ALLOWED_ROOT_FILES (dev tooling "
+        "ships on develop). Removed in Phase 6."
+    )
+)
 def test_prepare_public_release_no_clean(temp_source: Path, tmp_path: Path) -> None:
     target = tmp_path / "public"
     target.mkdir()

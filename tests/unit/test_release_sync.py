@@ -159,6 +159,14 @@ class TestGetSyncableFiles:
         db_files = [p for p in result if "databases" in str(p)]
         assert len(db_files) == 0, f"Found database files: {db_files}"
 
+    @pytest.mark.skip(
+        reason=(
+            "Obsolete under the two-branch single-repo migration: benchbox/release/ "
+            "and benchbox/core/explorer_pipeline are no longer in HOLD_BACK_PATHS — "
+            "they live on develop and on main (just curated out of the wheel). "
+            "Removed entirely in Phase 6."
+        )
+    )
     def test_excludes_hold_back_paths_across_repo_roots(self, tmp_path: Path):
         """Explorer hold-backs should be excluded from syncable files everywhere."""
         (tmp_path / "benchbox/release").mkdir(parents=True)
@@ -733,6 +741,15 @@ class TestExclusionConstants:
         """Test that DOCS_DIR_EXCLUDES includes _build."""
         assert "_build" in DOCS_DIR_EXCLUDES
 
+    @pytest.mark.skip(
+        reason=(
+            "Obsolete under the two-branch single-repo migration: CLAUDE.md / "
+            "AGENTS.md / GEMINI.md are project-shared agent instructions on develop "
+            "(curated out at release time, but still in ALLOWED_ROOT_FILES so the "
+            "develop-tree sync includes them). Per-user agent state under .claude/ "
+            ".codex/ .gemini/ stays excluded via HOLD_BACK_PATHS. Removed in Phase 6."
+        )
+    )
     def test_claude_and_codex_not_in_allowed_roots(self):
         """Test that .claude, .codex, CLAUDE.md, AGENTS.md are excluded from public release."""
         assert ".claude" not in ALLOWED_ROOT_FILES

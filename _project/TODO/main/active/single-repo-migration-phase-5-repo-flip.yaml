@@ -37,7 +37,7 @@ description: |
 work:
 - id: w1
   summary: "Create local mirror backup of benchbox-private before archival"
-  status: pending
+  status: done
   notes: |
     git clone --mirror git@github.com:joeharris76/benchbox-private.git \
       /tmp/benchbox-private-backup-$(date +%Y%m%d).git
@@ -47,7 +47,7 @@ work:
 - id: w2
   summary: "Confirm pre-conditions: clean public clone, no in-flight private branches with valuable work"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     cd ~/Developer/benchbox-public
     git status                     # must be clean
@@ -66,7 +66,7 @@ work:
 - id: w3
   summary: "Verify the public clone is fully functional as the new dev locus"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     cd ~/Developer/benchbox-public
     uv sync     # set up venv if not already
@@ -189,35 +189,24 @@ verification:
   expected_output: "0"
 
 must_preserve:
-- All git history on joeharris76/BenchBox is preserved untouched (no
-  rewrites, no force-pushes).
-- All git history on joeharris76/benchbox-private is preserved (archive
-  is read-only but full history accessible).
-- The _project/** filter-merge from Phase 4 remains intact (the merge
-  commit and its preserved sub-commits).
-- The mirror backup from w1 is retained for at least 90 days as the
-  ultimate fallback.
-- PyPI wheels for previously-published versions remain installable (PyPI
-  is independent of repo state).
+- All git history on joeharris76/BenchBox is preserved untouched (no rewrites, no force-pushes).
+- All git history on joeharris76/benchbox-private is preserved (archive is read-only but full history accessible).
+- The _project/** filter-merge from Phase 4 remains intact (the merge commit and its preserved sub-commits).
+- The mirror backup from w1 is retained for at least 90 days as the ultimate fallback.
+- PyPI wheels for previously-published versions remain installable (PyPI is independent of repo state).
 
 anti_patterns:
-- DO NOT delete benchbox-private from GitHub at the end of this phase -
-  because external links, forks, and stars (if any) point to it; archiving
-  preserves them with read-only access. Deletion is Phase 9 (optional).
-- DO NOT delete the renamed local clone (BenchBox.retired-YYYYMMDD/) at
-  the end of this phase - because it is the ultimate "did I lose any
-  in-flight work" reference for 60+ days.
-- DO NOT enable branch-protection's linear-history rule before Phase 4 w6
-  lands - because that merge commit is a non-linear one-time event; the
-  rule applies from-this-point-forward, not retroactively.
-- DO NOT push commits to public main from the retired private clone
-  after w5 - because the retired clone has stale knowledge of public's
-  history (curated mirror, before the migration commits) and any push
-  from there would create divergent history. Only push from
-  ~/Developer/benchbox-public going forward.
-- DO NOT change the canonical repo URL or rename joeharris76/BenchBox -
-  because that triggers an irreversible visibility-event chain that
-  Option B specifically avoided (vs. Option A which did rename).
+- DO NOT delete benchbox-private from GitHub at the end of this phase - because external links, forks, and stars (if 
+  any) point to it; archiving preserves them with read-only access. Deletion is Phase 9 (optional).
+- DO NOT delete the renamed local clone (BenchBox.retired-YYYYMMDD/) at the end of this phase - because it is the 
+  ultimate "did I lose any in-flight work" reference for 60+ days.
+- DO NOT enable branch-protection's linear-history rule before Phase 4 w6 lands - because that merge commit is a 
+  non-linear one-time event; the rule applies from-this-point-forward, not retroactively.
+- DO NOT push commits to public main from the retired private clone after w5 - because the retired clone has stale 
+  knowledge of public's history (curated mirror, before the migration commits) and any push from there would create 
+  divergent history. Only push from ~/Developer/benchbox-public going forward.
+- DO NOT change the canonical repo URL or rename joeharris76/BenchBox - because that triggers an irreversible 
+  visibility-event chain that Option B specifically avoided (vs. Option A which did rename).
 
 scope_limit:
   only_modify:

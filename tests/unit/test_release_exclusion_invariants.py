@@ -94,6 +94,14 @@ def _pattern_to_path(pattern: str) -> str:
 class TestHoldBackPaths:
     """Validate HOLD_BACK_PATHS entries in workflow.py."""
 
+    @pytest.mark.skip(
+        reason=(
+            "Obsolete under the two-branch single-repo migration: HOLD_BACK_PATHS now "
+            "lists per-user agent configs that are tracked on private but absent on "
+            "develop. The path-existence invariant no longer holds across branches. "
+            "Removed entirely in Phase 6."
+        )
+    )
     def test_hold_back_paths_target_existing_paths(self):
         """Every HOLD_BACK_PATHS entry must resolve to a real file or directory."""
         from benchbox.release.workflow import HOLD_BACK_PATHS
@@ -144,6 +152,14 @@ class TestPyprojectExcludes:
 class TestManifestPrunes:
     """Validate MANIFEST.in prune directives."""
 
+    @pytest.mark.skip(
+        reason=(
+            "Obsolete under the two-branch single-repo migration: MANIFEST.in carries "
+            "defence-in-depth prunes for paths that exist on private (e.g. .claude/, "
+            "_project/) but are curated out of develop or main. The 'must exist' "
+            "invariant no longer holds. Removed entirely in Phase 6."
+        )
+    )
     def test_prune_targets_are_existing_directories(self):
         """Every MANIFEST.in 'prune' target must be a real directory."""
         for prune_path in _load_manifest_prunes():
