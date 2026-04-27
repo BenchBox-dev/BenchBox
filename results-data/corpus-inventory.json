@@ -1,6 +1,6 @@
 {
   "schema_version": "2.2",
-  "generated_at": "2026-04-12T12:35:34.598945+00:00",
+  "generated_at": "2026-04-27T23:56:09.655275+00:00",
   "bundles": [
     {
       "file": "star_schema_sf001_datafusion_20260403_093817_adf0920e.json",
@@ -11,7 +11,7 @@
       "scale_factor": 0.01,
       "timestamp": "2026-04-03T09:38:17.113904",
       "query_count": 52,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "d9a0f377678ed9bfc486a40e49ea621cb12a98d56e8c58b1b5fbeb36b9bf5875"
     },
     {
@@ -23,7 +23,7 @@
       "scale_factor": 0.1,
       "timestamp": "2026-04-04T19:18:27.851837",
       "query_count": 39,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "4650fc65c9a2e1e0962cde765699e63c27d3e48e09e03ac86b278bce770918d1"
     },
     {
@@ -35,7 +35,7 @@
       "scale_factor": 0.01,
       "timestamp": "2026-04-03T09:38:09.093147",
       "query_count": 52,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "ac3ed9a9e58090d938af25776d4da3e31fc22a2b79c6497530b62aab75067497"
     },
     {
@@ -47,7 +47,7 @@
       "scale_factor": 0.1,
       "timestamp": "2026-04-04T19:18:19.606115",
       "query_count": 39,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "808e51ab189f274481aa86d0cb505ab4f704757b8aba1d629a7d50828f69f43f"
     },
     {
@@ -59,7 +59,7 @@
       "scale_factor": 0.01,
       "timestamp": "2026-04-03T09:39:02.697816",
       "query_count": 52,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "cb13f61af2f7bce9470c5f3965109f3dc0ff2f71e3f8d010543475e121c0cff8"
     },
     {
@@ -71,7 +71,7 @@
       "scale_factor": 0.1,
       "timestamp": "2026-04-04T19:18:55.010121",
       "query_count": 39,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "931d438b7459cd2e2c789d21f9aa921c6a9b5cad5a643a0a4e658c91c311cbca"
     },
     {
@@ -83,7 +83,7 @@
       "scale_factor": 0.01,
       "timestamp": "2026-04-03T09:37:31.892124",
       "query_count": 88,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "c0d4f3d9da58cb8e0209202ccb608fcb408a3987031c50d57e9e82325f7ba826"
     },
     {
@@ -95,7 +95,7 @@
       "scale_factor": 0.1,
       "timestamp": "2026-04-04T19:18:14.925342",
       "query_count": 66,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "c2e26b9539851290031be841e44b2279a09e2022cda1f84c36ed5100bb48c523"
     },
     {
@@ -107,8 +107,20 @@
       "scale_factor": 0.01,
       "timestamp": "2026-04-03T09:36:53.773505",
       "query_count": 88,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "7fe93365ec69e65bc872f7278dde50eb9849478e50ca44c5ef00c0734a76d24b"
+    },
+    {
+      "file": "tpch_sf001_duckdb_sql_20260427_195343_6c7d3792.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DuckDB",
+      "platform_version": "1.4.4",
+      "scale_factor": 0.01,
+      "timestamp": "2026-04-27T19:53:43.848466",
+      "query_count": 6,
+      "trust_label": "community-submission",
+      "bundle_sha256": "27a76d36b0189a2b3a24eafb603ff7eadd06df83dec4c6adc4d4969a26cad054"
     },
     {
       "file": "tpch_sf01_duckdb_sql_20260404_191803_a4f37225.json",
@@ -119,7 +131,7 @@
       "scale_factor": 0.1,
       "timestamp": "2026-04-04T19:18:03.752203",
       "query_count": 66,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "2c1585b9e8a027f22652e2118966504f3ecba6292fe40646e53209b4f7a2954e"
     },
     {
@@ -131,7 +143,7 @@
       "scale_factor": 0.01,
       "timestamp": "2026-04-03T09:37:41.437051",
       "query_count": 88,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "39bb1a7b7c91874098e1e0ee14ea0340815395413e1a4d3c83250ef3f3f5c6f9"
     },
     {
@@ -143,7 +155,7 @@
       "scale_factor": 0.1,
       "timestamp": "2026-04-04T19:17:27.711283",
       "query_count": 66,
-      "trust_label": "maintainer-run",
+      "trust_label": "community-submission",
       "bundle_sha256": "43f93efd4cac31ebbf2e0ecae3f2a4a455ae4e744cbeafe27e9d2e088ad3864a"
     }
   ],
@@ -170,19 +182,19 @@
     ]
   },
   "summary": {
-    "total_bundles": 12,
+    "total_bundles": 13,
     "by_benchmark": {
       "star_schema": 6,
-      "tpch": 6
+      "tpch": 7
     },
     "by_platform": {
       "DataFusion": 4,
-      "DuckDB": 4,
+      "DuckDB": 5,
       "Polars": 2,
       "SQLite": 2
     },
     "by_trust_label": {
-      "maintainer-run": 12
+      "community-submission": 13
     }
   }
 }
