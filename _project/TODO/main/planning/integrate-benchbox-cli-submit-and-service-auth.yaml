@@ -1,7 +1,7 @@
 id: integrate-benchbox-cli-submit-and-service-auth
 title: "Integrate BenchBox CLI submission flow and service authentication"
 worktree: main
-priority: High
+priority: Medium
 status: Not Started
 category: Core Functionality
 deps:

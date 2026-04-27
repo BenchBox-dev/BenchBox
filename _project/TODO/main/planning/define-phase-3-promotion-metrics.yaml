@@ -1,7 +1,7 @@
 id: define-phase-3-promotion-metrics
 title: "Define Phase 3 promotion metrics, dashboard, and review cadence"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 

@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T16:07:39.829960'
+generated_at: '2026-04-27T16:08:47.741859'
 total_items: 33
 priorities:
   Critical:
@@ -10,16 +10,11 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 5
+    count: 4
     items:
-    - id: design-results-ingest-storage-and-derived-read-model
-      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
-      title: Design results ingest, storage, and derived read-model architecture
-      category: Core Functionality
-      status: Not Started
-    - id: integrate-benchbox-cli-submit-and-service-auth
-      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
-      title: Integrate BenchBox CLI submission flow and service authentication
+    - id: add-third-benchmark-cohort-to-corpus
+      file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
+      title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       category: Core Functionality
       status: Not Started
     - id: motherduck-cloud-features
@@ -45,9 +40,9 @@ priorities:
       title: Add Hypothesis property-based tests for pure-function invariants
       category: Testing & Quality
       status: Not Started
-    - id: add-third-benchmark-cohort-to-corpus
-      file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
-      title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
+    - id: define-phase-3-promotion-metrics
+      file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
+      title: Define Phase 3 promotion metrics, dashboard, and review cadence
       category: Core Functionality
       status: Not Started
     - id: graduate-browser-smoke-to-blocking-gates
@@ -56,7 +51,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium:
-    count: 8
+    count: 9
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -68,9 +63,9 @@ priorities:
       title: Address follow-up findings from timing-policy pre-commit split review
       category: Testing & Quality
       status: In Progress
-    - id: define-phase-3-promotion-metrics
-      file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
-      title: Define Phase 3 promotion metrics, dashboard, and review cadence
+    - id: design-results-ingest-storage-and-derived-read-model
+      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+      title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Not Started
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
@@ -78,6 +73,11 @@ priorities:
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       category: Performance
       status: Identified
+    - id: integrate-benchbox-cli-submit-and-service-auth
+      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+      title: Integrate BenchBox CLI submission flow and service authentication
+      category: Core Functionality
+      status: Not Started
     - id: operate-results-platform-security-observability-and-abuse-controls
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls

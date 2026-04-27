@@ -1,7 +1,7 @@
 id: add-third-benchmark-cohort-to-corpus
 title: "Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus"
 worktree: main
-priority: Medium-High
+priority: High
 status: Not Started
 category: Core Functionality
 
