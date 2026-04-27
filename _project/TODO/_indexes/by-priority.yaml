@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T17:03:35.577027'
-total_items: 32
+generated_at: '2026-04-27T17:20:45.619676'
+total_items: 31
 priorities:
   Critical:
     count: 1
@@ -94,7 +94,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Low:
-    count: 15
+    count: 14
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -140,11 +140,6 @@ priorities:
       file: TODO/main/planning/fix-git-author-history-rewrite.yaml
       title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
       category: Repository Maintenance
-      status: Not Started
-    - id: evaluate-results-data-repo-extraction-checkpoint
-      file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
-      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
-      category: Core Functionality
       status: Not Started
     - id: single-repo-migration-phase-9-decommission-archive
       file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml

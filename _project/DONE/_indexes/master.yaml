@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T17:03:37.489763'
-total_items: 781
+generated_at: '2026-04-27T17:20:47.447628'
+total_items: 782
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5254,6 +5254,27 @@ items:
   owners:
   - '@benchbox-maintainers'
   estimated_effort: Small
+- id: evaluate-results-data-repo-extraction-checkpoint
+  file: DONE/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+  title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Completed
+  tags:
+  - results
+  - architecture
+  - adr
+  - governance
+  - checkpoint
+  estimated_effort: Small
+  completed_date: '2026-04-27'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - implement-pr-based-result-submission-workflow
+  - define-phase-3-promotion-metrics
 - id: starburst-platform-adapter
   file: DONE/platform-expansion/planning/starburst-platform-adapter.yaml
   title: Starburst Platform Adapter

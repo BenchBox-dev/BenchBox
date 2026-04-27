@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T17:03:35.577008'
+generated_at: '2026-04-27T17:20:45.619659'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 5
+    count: 4
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -67,11 +67,6 @@ categories:
       file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
       title: Operate results platform security, observability, and abuse controls
       priority: Medium
-      status: Not Started
-    - id: evaluate-results-data-repo-extraction-checkpoint
-      file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
-      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
-      priority: Low
       status: Not Started
   Performance:
     count: 1

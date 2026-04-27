@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T17:03:37.490288'
-total_items: 781
+generated_at: '2026-04-27T17:20:47.448116'
+total_items: 782
 priorities:
   Critical:
     count: 45
@@ -3708,7 +3708,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 44
+    count: 45
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3909,6 +3909,11 @@ priorities:
       file: DONE/platform-comparison/planning/sql-cross-platform-benchmark-suite.yaml
       title: SQL Cross-Platform Benchmark Suite
       category: Performance and Efficiency
+      status: Completed
+    - id: evaluate-results-data-repo-extraction-checkpoint
+      file: DONE/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+      category: Core Functionality
       status: Completed
     - id: starburst-platform-adapter
       file: DONE/platform-expansion/planning/starburst-platform-adapter.yaml

@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T17:03:37.490103'
+generated_at: '2026-04-27T17:20:47.447941'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -701,7 +701,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 265
+    count: 266
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1914,6 +1914,11 @@ categories:
       file: DONE/main/planning/scaffold-results-explorer-frontend.yaml
       title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
       priority: High
+      status: Completed
+    - id: evaluate-results-data-repo-extraction-checkpoint
+      file: DONE/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+      priority: Low
       status: Completed
     - id: explorer-align-ranking-metric-with-tpc-standards
       file: DONE/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml

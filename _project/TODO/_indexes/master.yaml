@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T17:03:35.576977'
-total_items: 32
+generated_at: '2026-04-27T17:20:45.619631'
+total_items: 31
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -251,26 +251,6 @@ items:
   work_total: 10
   work_done: 0
   work_ready: 1
-- id: evaluate-results-data-repo-extraction-checkpoint
-  file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
-  title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
-  worktree: main
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - results
-  - architecture
-  - adr
-  - governance
-  - checkpoint
-  estimated_effort: Small
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - implement-pr-based-result-submission-workflow
-  - define-phase-3-promotion-metrics
 - id: single-repo-migration-phase-9-decommission-archive
   file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml
   title: 'Single-repo migration phase 9: decommission archived benchbox-private and retired private clone after 60-90 day
@@ -408,7 +388,7 @@ items:
   - http-range
   estimated_effort: Small
   work_total: 3
-  work_done: 0
+  work_done: 1
   work_ready: 1
   needs:
   - implement-results-explorer-browser-functional-tests

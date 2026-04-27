@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T17:03:37.490471'
-total_items: 781
+generated_at: '2026-04-27T17:20:47.448282'
+total_items: 782
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 730
+    count: 731
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3144,6 +3144,11 @@ statuses:
       file: DONE/main/planning/scaffold-results-explorer-frontend.yaml
       title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
       priority: High
+      category: Core Functionality
+    - id: evaluate-results-data-repo-extraction-checkpoint
+      file: DONE/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+      priority: Low
       category: Core Functionality
     - id: schema-evolution-backward-compatibility-management
       file: DONE/infrastructure-schema/planning/schema-evolution-backward-compatibility-management.yaml
