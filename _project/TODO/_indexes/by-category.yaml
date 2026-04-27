@@ -1,4 +1,4 @@
-generated_at: '2026-04-26T21:16:01.218276'
+generated_at: '2026-04-27T08:21:20.404774'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -138,7 +138,7 @@ categories:
       priority: Low
       status: Not Started
   Release Tooling:
-    count: 10
+    count: 9
     items:
     - id: single-repo-migration-phase-0-audit
       file: TODO/main/planning/single-repo-migration-phase-0-audit.yaml
@@ -187,11 +187,6 @@ categories:
         day soak'
       priority: Low
       status: Not Started
-    - id: single-repo-migration-decisions-gate
-      file: TODO/main/active/single-repo-migration-decisions-gate.yaml
-      title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'
-      priority: Critical
-      status: In Progress
   Repository Maintenance:
     count: 1
     items:

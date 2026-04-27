@@ -1,5 +1,5 @@
-generated_at: '2026-04-26T21:16:03.103943'
-total_items: 772
+generated_at: '2026-04-27T08:21:22.269620'
+total_items: 773
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 721
+    count: 722
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3185,6 +3185,11 @@ statuses:
       title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'
       priority: Medium-High
       category: Developer Experience
+    - id: single-repo-migration-decisions-gate
+      file: DONE/main/planning/single-repo-migration-decisions-gate.yaml
+      title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'
+      priority: Critical
+      category: Release Tooling
     - id: slim-release-distributions
       file: DONE/release-readiness/planning/slim-release-distributions.yaml
       title: Slim Release Distributions

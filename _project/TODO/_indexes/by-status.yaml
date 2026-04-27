@@ -1,19 +1,14 @@
-generated_at: '2026-04-26T21:16:01.218308'
-total_items: 41
+generated_at: '2026-04-27T08:21:20.404803'
+total_items: 40
 statuses:
   In Progress:
-    count: 2
+    count: 1
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Medium
       category: Testing & Quality
-    - id: single-repo-migration-decisions-gate
-      file: TODO/main/active/single-repo-migration-decisions-gate.yaml
-      title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'
-      priority: Critical
-      category: Release Tooling
   Not Started:
     count: 38
     items:

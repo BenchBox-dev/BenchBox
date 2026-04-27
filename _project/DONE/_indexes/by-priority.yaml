@@ -1,8 +1,8 @@
-generated_at: '2026-04-26T21:16:03.103770'
-total_items: 772
+generated_at: '2026-04-27T08:21:22.269455'
+total_items: 773
 priorities:
   Critical:
-    count: 42
+    count: 43
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -178,6 +178,11 @@ priorities:
       file: DONE/main/active/remove-alpha-backward-compatibility-surface.yaml
       title: Remove alpha-stage backward compatibility surface across BenchBox
       category: Core Functionality
+      status: Completed
+    - id: single-repo-migration-decisions-gate
+      file: DONE/main/planning/single-repo-migration-decisions-gate.yaml
+      title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'
+      category: Release Tooling
       status: Completed
     - id: unify-tpcdi-sql-dataframe-execution-contract
       file: DONE/dataframe-benchmarks/active/unify-tpcdi-sql-dataframe-execution-contract.yaml

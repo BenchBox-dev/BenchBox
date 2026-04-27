@@ -2,7 +2,8 @@ id: single-repo-migration-decisions-gate
 title: "Single-repo migration: decisions gate (D1-D8) before any code or repo changes"
 worktree: main
 priority: Critical
-status: In Progress
+status: Completed
+completed_date: 2026-04-27
 category: Release Tooling
 
 description: |
@@ -73,7 +74,7 @@ work:
 - id: w2
   summary: "Write the decisions doc at _project/decisions/single-repo-migration.md"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Format: one paragraph context, then a table with columns
     (ID, Decision, Choice, Reason). Keep under one page.
@@ -83,7 +84,7 @@ work:
 - id: w3
   summary: "Commit decisions doc on a feature branch, open PR, self-review, merge"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Lands on private via the curated flow (since dev locus is still on
     private at this point). It will arrive on public as part of the
