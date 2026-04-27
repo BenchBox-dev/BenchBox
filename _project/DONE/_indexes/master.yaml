@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:31:22.158803'
-total_items: 785
+generated_at: '2026-04-27T19:43:40.070203'
+total_items: 786
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -10017,6 +10017,25 @@ items:
   completed_date: '2026-02-22'
   work_total: 7
   work_done: 7
+  work_ready: 0
+- id: fix-chromium-result-detail-sort-flake
+  file: DONE/main/planning/fix-chromium-result-detail-sort-flake.yaml
+  title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium-High
+  status: Completed
+  tags:
+  - results
+  - explorer
+  - browser
+  - ci
+  - flake
+  - chromium
+  estimated_effort: Small
+  completed_date: '2026-04-27'
+  work_total: 3
+  work_done: 3
   work_ready: 0
 - id: clickhouse-tpchavoc-q6-decimal-bug
   file: DONE/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml

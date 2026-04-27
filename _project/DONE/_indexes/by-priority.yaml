@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:31:22.159336'
-total_items: 785
+generated_at: '2026-04-27T19:43:40.070694'
+total_items: 786
 priorities:
   Critical:
     count: 46
@@ -1582,7 +1582,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 128
+    count: 129
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1904,6 +1904,11 @@ priorities:
       file: DONE/core-functionality/active/complexity-field-extraction-w14.yaml
       title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
       category: Core Functionality
+      status: Completed
+    - id: fix-chromium-result-detail-sort-flake
+      file: DONE/main/planning/fix-chromium-result-detail-sort-flake.yaml
+      title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
+      category: Testing and Quality Assurance
       status: Completed
     - id: clickhouse-tpchavoc-q6-decimal-bug
       file: DONE/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml

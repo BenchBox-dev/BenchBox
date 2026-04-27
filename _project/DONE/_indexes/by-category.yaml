@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T19:31:22.159147'
+generated_at: '2026-04-27T19:43:40.070519'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -3756,7 +3756,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 46
+    count: 47
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3853,6 +3853,11 @@ categories:
       file: DONE/main/active/explorer-establish-cli-explorer-parity-tests.yaml
       title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
       priority: Critical
+      status: Completed
+    - id: fix-chromium-result-detail-sort-flake
+      file: DONE/main/planning/fix-chromium-result-detail-sort-flake.yaml
+      title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
+      priority: Medium-High
       status: Completed
     - id: fix-ci-critical-issues
       file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml

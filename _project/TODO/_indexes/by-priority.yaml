@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:31:20.276989'
-total_items: 30
+generated_at: '2026-04-27T19:43:38.178198'
+total_items: 29
 priorities:
   Critical:
     count: 1
@@ -33,7 +33,7 @@ priorities:
       category: Release Tooling
       status: In Progress
   Medium-High:
-    count: 4
+    count: 3
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -45,11 +45,6 @@ priorities:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       category: Core Functionality
       status: Not Started
-    - id: fix-chromium-result-detail-sort-flake
-      file: TODO/main/planning/fix-chromium-result-detail-sort-flake.yaml
-      title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
-      category: Testing and Quality Assurance
-      status: Identified
     - id: graduate-browser-smoke-to-blocking-gates
       file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates

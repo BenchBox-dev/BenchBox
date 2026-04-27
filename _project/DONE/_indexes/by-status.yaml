@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:31:22.159510'
-total_items: 785
+generated_at: '2026-04-27T19:43:40.070861'
+total_items: 786
 statuses:
   In Progress:
     count: 2
@@ -271,7 +271,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 733
+    count: 734
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1843,6 +1843,11 @@ statuses:
       title: Fix CLI Power/Throughput Test Execution and Tuning Configuration Issues
       priority: Medium
       category: Core Functionality
+    - id: fix-chromium-result-detail-sort-flake
+      file: DONE/main/planning/fix-chromium-result-detail-sort-flake.yaml
+      title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
+      priority: Medium-High
+      category: Testing and Quality Assurance
     - id: clickhouse-join-memory-tuning
       file: DONE/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
       title: Fix ClickHouse JOIN memory limit - restore max_bytes_in_join to 50% and verify grace_hash

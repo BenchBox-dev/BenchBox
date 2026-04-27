@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:31:20.276999'
-total_items: 30
+generated_at: '2026-04-27T19:43:38.178207'
+total_items: 29
 statuses:
   In Progress:
     count: 3
@@ -144,18 +144,13 @@ statuses:
       priority: Low
       category: Benchmark Development
   Identified:
-    count: 3
+    count: 2
     items:
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       priority: Medium
       category: Performance
-    - id: fix-chromium-result-detail-sort-flake
-      file: TODO/main/planning/fix-chromium-result-detail-sort-flake.yaml
-      title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
-      priority: Medium-High
-      category: Testing and Quality Assurance
     - id: fix-submission-hash-mismatch-vs-validator-directory-scope
       file: TODO/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
       title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission

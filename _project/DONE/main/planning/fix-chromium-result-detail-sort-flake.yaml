@@ -2,7 +2,8 @@ id: fix-chromium-result-detail-sort-flake
 title: "Fix Chromium e2e flake: ResultDetail median-table sort indicator times out"
 worktree: main
 priority: Medium-High
-status: Identified
+completed_date: "2026-04-27"
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -28,7 +29,7 @@ description: |
 work:
   - id: w1
     summary: "Reproduce locally and capture the flake signal"
-    status: pending
+    status: done
     notes: |
       Run `cd results-explorer && npm run test:e2e:chromium -- --grep
       "sorting the median table"` in a loop (10x). Capture which retries
@@ -39,7 +40,7 @@ work:
   - id: w2
     summary: "Determine whether the locator or the data load is the cause"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Two hypotheses:
       (a) The `getByRole('columnheader')` matches before DuckDB has
@@ -54,7 +55,7 @@ work:
   - id: w3
     summary: "Land a focused fix; add a deterministic data-load gate"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Likely fix: gate the click on a stable readiness signal. Either a
       `data-loaded="true"` attribute on the table, or
