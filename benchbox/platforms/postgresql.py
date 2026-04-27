@@ -12,11 +12,11 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import io
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
@@ -33,18 +33,23 @@ from ..utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
 )
-from ..utils.file_format import get_delimiter_for_file, is_tpc_format
-from .base import DriverIsolationCapability, PlatformAdapter
+from ..utils.file_format import get_data_extension
+from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin
+from .base.data_loading import (
+    DataSourceResolver,
+    normalize_table_paths,
+    prepare_local_load_file,
+    resolve_csv_dialect,
+)
 from .base.sql_execution import execute_sql_query
 
 # PostgreSQL dialect for SQLGlot
 POSTGRES_DIALECT = "postgres"
 
 try:
-    import psycopg2
-    import psycopg2.extras
+    import psycopg
 except ImportError:
-    psycopg2 = None
+    psycopg = None
 
 
 def _add_postgres_compatible_arguments(
@@ -54,7 +59,17 @@ def _add_postgres_compatible_arguments(
     platform_label: str,
     include_timescale_toggle: bool = False,
 ) -> None:
-    """Register shared PostgreSQL-compatible CLI arguments."""
+    """Register shared PostgreSQL-compatible CLI arguments.
+
+    These legacy ``--<prefix>-host`` / ``--<prefix>-port`` / … flags are
+    registered on the adapter for setup-wizard use (``benchbox platforms setup``).
+    The ``benchbox run`` flow does NOT invoke ``add_cli_arguments``; it relies
+    on ``register_option_specs`` + ``--platform-option key=value`` exclusively.
+
+    Maintenance note: whenever a field is added or removed from
+    ``PlatformHookRegistry.register_option_specs`` for a PG-family platform,
+    update this helper and vice-versa so the two registrations stay in sync.
+    """
     option_prefix = prefix.strip("-")
 
     parser.add_argument(
@@ -113,11 +128,62 @@ def _add_postgres_compatible_arguments(
         )
 
 
-class PostgreSQLAdapter(PlatformAdapter):
+def _build_postgres_connection_kwargs(config: dict[str, Any], *, default_port: int = 5432) -> dict[str, Any]:
+    """Build the common connection kwargs shared by all PG-family from_config methods.
+
+    Extracts host/port/credentials/sslmode, derives the database name from
+    benchmark+scale_factor when no explicit database is given, and copies
+    through the common GUC and pool settings.  Adapter-specific keys (e.g.
+    chunk_interval for TimescaleDB) should be added by the caller after this
+    helper returns.
+
+    Args:
+        config: Unified config dict passed to from_config.
+        default_port: Override default port (e.g. CedarDB uses 5432 by default
+            but may differ per deployment; pass ``CEDARDB_DEFAULT_PORT`` here).
+
+    Returns:
+        Partial adapter_config dict ready to pass to the adapter constructor.
+    """
+    from benchbox.utils.scale_factor import format_benchmark_name
+
+    result: dict[str, Any] = {
+        "host": config.get("host", "localhost"),
+        "port": config.get("port", default_port),
+        "username": config.get("username", "postgres"),
+        "password": config.get("password"),
+        "schema": config.get("schema", "public"),
+        "sslmode": config.get("sslmode", "prefer"),
+        "admin_database": config.get("admin_database", "postgres"),
+        "work_mem": config.get("work_mem", "256MB"),
+        "maintenance_work_mem": config.get("maintenance_work_mem", "512MB"),
+        "effective_cache_size": config.get("effective_cache_size", "1GB"),
+        "max_parallel_workers_per_gather": config.get("max_parallel_workers_per_gather", 2),
+        "connect_timeout": config.get("connect_timeout", 10),
+        "statement_timeout": config.get("statement_timeout", 0),
+        "force_recreate": config.get("force", False),
+    }
+
+    if config.get("database"):
+        result["database"] = config["database"]
+    elif config.get("benchmark") and config.get("scale_factor") is not None:
+        benchmark_name = format_benchmark_name(config["benchmark"], config["scale_factor"])
+        result["database"] = f"benchbox_{benchmark_name}".lower().replace("-", "_")
+    else:
+        result["database"] = "benchbox"
+
+    for key in ("tuning_config", "verbose_enabled", "very_verbose"):
+        if key in config:
+            result[key] = config[key]
+
+    return result
+
+
+class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
     """PostgreSQL platform adapter with COPY-based data loading.
 
     Supports PostgreSQL 12+ and optional TimescaleDB extensions.
-    Uses psycopg2 for database connectivity with efficient COPY loading.
+    Uses psycopg for database connectivity with efficient COPY loading.
     """
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
@@ -148,58 +214,15 @@ class PostgreSQLAdapter(PlatformAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> PostgreSQLAdapter:
         """Create PostgreSQL adapter from unified configuration."""
-        adapter_config = {}
-
-        # Connection parameters
-        adapter_config["host"] = config.get("host", "localhost")
-        adapter_config["port"] = config.get("port", 5432)
-        adapter_config["username"] = config.get("username", "postgres")
-        adapter_config["password"] = config.get("password")
-        adapter_config["schema"] = config.get("schema", "public")
-        adapter_config["sslmode"] = config.get("sslmode", "prefer")
-
-        # Database name - use provided or generate from benchmark config
-        if config.get("database"):
-            adapter_config["database"] = config["database"]
-        elif config.get("benchmark") and config.get("scale_factor") is not None:
-            from benchbox.utils.scale_factor import format_benchmark_name
-
-            benchmark_name = format_benchmark_name(config["benchmark"], config["scale_factor"])
-            adapter_config["database"] = f"benchbox_{benchmark_name}".lower().replace("-", "_")
-        else:
-            adapter_config["database"] = "benchbox"
-
-        # Admin database for CREATE/DROP DATABASE operations
-        adapter_config["admin_database"] = config.get("admin_database", "postgres")
-
-        # Performance settings
-        adapter_config["work_mem"] = config.get("work_mem", "256MB")
-        adapter_config["maintenance_work_mem"] = config.get("maintenance_work_mem", "512MB")
-        adapter_config["effective_cache_size"] = config.get("effective_cache_size", "1GB")
-        adapter_config["max_parallel_workers_per_gather"] = config.get("max_parallel_workers_per_gather", 2)
-
-        # Connection pool settings
-        adapter_config["connect_timeout"] = config.get("connect_timeout", 10)
-        adapter_config["statement_timeout"] = config.get("statement_timeout", 0)  # 0 = no timeout
-
-        # TimescaleDB support
+        adapter_config = _build_postgres_connection_kwargs(config)
         adapter_config["enable_timescale"] = config.get("enable_timescale", False)
-
-        # Force recreate
-        adapter_config["force_recreate"] = config.get("force", False)
-
-        # Pass through other config
-        for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
-            if key in config:
-                adapter_config[key] = config[key]
-
         return cls(**adapter_config)
 
     def __init__(self, **config):
         super().__init__(**config)
 
         # Check dependencies
-        if psycopg2 is None:
+        if psycopg is None:
             available, missing = check_platform_dependencies("postgresql")
             if not available:
                 error_msg = get_dependency_error_message("postgresql", missing)
@@ -233,7 +256,7 @@ class PostgreSQLAdapter(PlatformAdapter):
         self.enable_timescale = config.get("enable_timescale", False)
 
     def _get_connection_params(self, database: str | None = None) -> dict[str, Any]:
-        """Build psycopg2 connection parameters."""
+        """Build psycopg connection parameters."""
         params = {
             "host": self.host,
             "port": self.port,
@@ -252,21 +275,12 @@ class PostgreSQLAdapter(PlatformAdapter):
         # Remove None values
         return {k: v for k, v in params.items() if v is not None}
 
-    def _validate_identifier(self, identifier: str) -> bool:
-        """Validate SQL identifier to prevent injection."""
-        if not identifier or not isinstance(identifier, str):
-            return False
-        if len(identifier) > 63:  # PostgreSQL identifier limit
-            return False
-        # Allow alphanumeric, underscore, and must start with letter/underscore
-        pattern = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
-        return bool(re.match(pattern, identifier))
-
     def check_server_database_exists(
         self,
         schema: str | None = None,
         catalog: str | None = None,
         database: str | None = None,
+        **_: object,
     ) -> bool:
         """Check if a database exists on the PostgreSQL server."""
         db_name = database or self.database
@@ -274,7 +288,7 @@ class PostgreSQLAdapter(PlatformAdapter):
         try:
             # Connect to admin database to check for target database
             params = self._get_connection_params(database=self.admin_database)
-            conn = psycopg2.connect(**params)
+            conn = psycopg.connect(**params)
             conn.autocommit = True
             cursor = conn.cursor()
 
@@ -297,6 +311,7 @@ class PostgreSQLAdapter(PlatformAdapter):
         schema: str | None = None,
         catalog: str | None = None,
         database: str | None = None,
+        **_: object,
     ) -> None:
         """Drop a database from PostgreSQL server."""
         db_name = database or self.database
@@ -307,7 +322,7 @@ class PostgreSQLAdapter(PlatformAdapter):
         try:
             # Connect to admin database
             params = self._get_connection_params(database=self.admin_database)
-            conn = psycopg2.connect(**params)
+            conn = psycopg.connect(**params)
             conn.autocommit = True
             cursor = conn.cursor()
 
@@ -340,7 +355,7 @@ class PostgreSQLAdapter(PlatformAdapter):
 
         try:
             params = self._get_connection_params(database=self.admin_database)
-            conn = psycopg2.connect(**params)
+            conn = psycopg.connect(**params)
             conn.autocommit = True
             cursor = conn.cursor()
 
@@ -374,35 +389,34 @@ class PostgreSQLAdapter(PlatformAdapter):
 
         # Connect to target database
         params = self._get_connection_params()
-        conn = psycopg2.connect(**params)
+        conn = psycopg.connect(**params)
 
         # Apply session settings
         cursor = conn.cursor()
         settings_applied = []
 
-        try:
-            cursor.execute(f"SET work_mem = '{self.work_mem}'")
-            settings_applied.append(f"work_mem={self.work_mem}")
-        except Exception as e:
-            self.logger.debug(f"Could not set work_mem: {e}")
-
-        try:
-            cursor.execute(f"SET maintenance_work_mem = '{self.maintenance_work_mem}'")
-            settings_applied.append(f"maintenance_work_mem={self.maintenance_work_mem}")
-        except Exception as e:
-            self.logger.debug(f"Could not set maintenance_work_mem: {e}")
-
-        try:
-            cursor.execute(f"SET effective_cache_size = '{self.effective_cache_size}'")
-            settings_applied.append(f"effective_cache_size={self.effective_cache_size}")
-        except Exception as e:
-            self.logger.debug(f"Could not set effective_cache_size: {e}")
-
-        try:
-            cursor.execute(f"SET max_parallel_workers_per_gather = {self.max_parallel_workers_per_gather}")
-            settings_applied.append(f"max_parallel_workers_per_gather={self.max_parallel_workers_per_gather}")
-        except Exception as e:
-            self.logger.debug(f"Could not set max_parallel_workers_per_gather: {e}")
+        guc_statements = [
+            (f"SET work_mem = '{self.work_mem}'", f"work_mem={self.work_mem}"),
+            (
+                f"SET maintenance_work_mem = '{self.maintenance_work_mem}'",
+                f"maintenance_work_mem={self.maintenance_work_mem}",
+            ),
+            (
+                f"SET effective_cache_size = '{self.effective_cache_size}'",
+                f"effective_cache_size={self.effective_cache_size}",
+            ),
+            (
+                f"SET max_parallel_workers_per_gather = {self.max_parallel_workers_per_gather}",
+                f"max_parallel_workers_per_gather={self.max_parallel_workers_per_gather}",
+            ),
+        ]
+        for sql, label in guc_statements:
+            try:
+                cursor.execute(sql)
+                settings_applied.append(label)
+            except Exception as e:
+                conn.rollback()
+                self.logger.debug(f"Could not set {label}: {e}")
 
         # Create schema if needed
         # Safety: self.schema validated by _validate_identifier() before use in f-string
@@ -435,14 +449,29 @@ class PostgreSQLAdapter(PlatformAdapter):
 
         cursor = connection.cursor()
 
-        # Execute each statement separately
+        # Execute each statement separately; on failure rollback and retry without FK constraints
         statements = [s.strip() for s in schema_sql.split(";") if s.strip()]
         for stmt in statements:
             try:
-                cursor.execute(stmt)
+                cursor.execute(self._transform_create_statement(stmt))
             except Exception as e:
+                connection.rollback()
                 self.logger.warning(f"Schema statement failed: {e}")
-                # Continue with other statements
+                # For CREATE TABLE failures, retry after stripping FOREIGN KEY constraints.
+                # Some servers (e.g. CedarDB) reject self-referential FKs at definition time.
+                if re.search(r"\bCREATE\s+TABLE\b", stmt, re.IGNORECASE) and "FOREIGN" in stmt.upper():
+                    stripped = strip_foreign_keys(stmt)
+                    if stripped != stmt:
+                        try:
+                            cursor.execute(self._transform_create_statement(stripped))
+                        except Exception as e2:
+                            connection.rollback()
+                            self.logger.error(f"Schema statement failed even without FK constraints: {e2}")
+                            raise
+                    else:
+                        raise
+                else:
+                    raise
 
         connection.commit()
         cursor.close()
@@ -450,6 +479,15 @@ class PostgreSQLAdapter(PlatformAdapter):
         duration = elapsed_seconds(start_time)
         self.log_operation_complete("Schema creation", duration, "Schema and tables created")
         return duration
+
+    def _transform_create_statement(self, stmt: str) -> str:
+        """Transform a CREATE TABLE statement before execution.
+
+        PostgreSQL itself executes the generated DDL unchanged. Subclasses
+        with storage-specific DDL variants can override this hook while
+        keeping the standard create_schema contract and error handling.
+        """
+        return stmt
 
     def load_data(
         self,
@@ -464,9 +502,22 @@ class PostgreSQLAdapter(PlatformAdapter):
         self.log_operation_start("Data loading", f"source: {data_dir}")
         effective_tuning = self.unified_tuning_configuration if self.tuning_enabled else None
 
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
+        data_source = resolver.resolve(benchmark, data_dir)
+        if not data_source or not data_source.tables:
+            self.logger.warning("No data files found. Ensure benchmark.generate_data() was called first.")
+            loading_time = elapsed_seconds(start_time)
+            self.log_operation_complete("Data loading", loading_time, "Loaded 0 total rows")
+            return {}, loading_time, None
+
         cursor = connection.cursor()
 
-        for table_name, table_path in benchmark.tables.items():
+        for table_name, table_path in data_source.tables.items():
             table_name_lower = table_name.lower()
 
             if not self._validate_identifier(table_name_lower):
@@ -474,48 +525,64 @@ class PostgreSQLAdapter(PlatformAdapter):
                 table_stats[table_name_lower] = 0
                 continue
 
-            data_file = Path(table_path)
-            if not data_file.exists():
-                self.logger.warning(f"Data file not found: {data_file}")
+            data_files = [f for f in normalize_table_paths(table_path) if f.exists()]
+            if not data_files:
+                self.logger.warning(f"Data file(s) not found for table: {table_name}")
                 table_stats[table_name_lower] = 0
                 continue
 
-            # Determine delimiter based on file format (handles compression)
-            delimiter = get_delimiter_for_file(data_file)
+            qualified_table = (
+                f'"{self.schema}"."{table_name_lower}"' if self.schema != "public" else f'"{table_name_lower}"'
+            )
+
+            load_failed = False
+            for data_file in data_files:
+                if get_data_extension(data_file) == ".parquet":
+                    self.logger.error(
+                        f"Cannot load {data_file.name}: Parquet is not supported by PostgreSQL COPY. "
+                        "For tpcds_obt use --benchmark-option output_format=dat to generate pipe-delimited data."
+                    )
+                    load_failed = True
+                    break
+
+                dialect = resolve_csv_dialect(data_source, table_name, data_file, benchmark)
+                strip_trailing_delim = get_data_extension(data_file) in (".tbl", ".dat")
+                try:
+                    with prepare_local_load_file(
+                        data_file, dialect=dialect, strip_trailing_delim=strip_trailing_delim
+                    ) as load_path:
+                        with open(load_path, encoding="utf-8") as f:
+                            escaped_delim = dialect.delimiter.replace("'", "''")
+                            if dialect.null_marker is not None:
+                                # TPC-style files: FORMAT text avoids CSV quote-parsing issues
+                                # with pipe delimiter (rejected by CedarDB and others under FORMAT csv).
+                                escaped_null = dialect.null_marker.replace("'", "''")
+                                with cursor.copy(
+                                    f"COPY {qualified_table} FROM STDIN"
+                                    f" WITH (FORMAT text, DELIMITER '{escaped_delim}', NULL '{escaped_null}')"
+                                ) as copy:
+                                    while chunk := f.read(65536):
+                                        copy.write(chunk)
+                            else:
+                                header_clause = ", HEADER true" if dialect.has_header else ""
+                                with cursor.copy(
+                                    f"COPY {qualified_table} FROM STDIN"
+                                    f" WITH (FORMAT csv, DELIMITER '{escaped_delim}'{header_clause})"
+                                ) as copy:
+                                    while chunk := f.read(65536):
+                                        copy.write(chunk)
+                    connection.commit()
+                except Exception as e:
+                    self.logger.error(f"Failed to load {table_name_lower} chunk {data_file.name}: {e}")
+                    connection.rollback()
+                    load_failed = True
+                    break
+
+            if load_failed:
+                table_stats[table_name_lower] = 0
+                continue
 
             try:
-                # Use COPY FROM for efficient bulk loading
-                qualified_table = (
-                    f'"{self.schema}"."{table_name_lower}"' if self.schema != "public" else f'"{table_name_lower}"'
-                )
-
-                with open(data_file) as f:
-                    # For TPC format files (.tbl, .dat), remove trailing delimiter
-                    if is_tpc_format(data_file):
-                        # Read and preprocess data
-                        lines = f.readlines()
-                        cleaned_lines = []
-                        for line in lines:
-                            # Remove trailing pipe if present
-                            if line.rstrip().endswith("|"):
-                                line = line.rstrip()[:-1] + "\n"
-                            cleaned_lines.append(line)
-
-                        # Create StringIO for COPY
-                        data_buffer = io.StringIO("".join(cleaned_lines))
-                        cursor.copy_expert(
-                            f"COPY {qualified_table} FROM STDIN WITH (FORMAT csv, DELIMITER '{delimiter}')",
-                            data_buffer,
-                        )
-                    else:
-                        cursor.copy_expert(
-                            f"COPY {qualified_table} FROM STDIN WITH (FORMAT csv, DELIMITER '{delimiter}')",
-                            f,
-                        )
-
-                connection.commit()
-
-                # Get row count
                 cursor.execute(f"SELECT COUNT(*) FROM {qualified_table}")
                 row_count = cursor.fetchone()[0]
                 table_stats[table_name_lower] = row_count
@@ -524,9 +591,8 @@ class PostgreSQLAdapter(PlatformAdapter):
                     self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
 
                 self.log_verbose(f"Loaded {row_count:,} rows into {table_name_lower}")
-
             except Exception as e:
-                self.logger.error(f"Failed to load {table_name_lower}: {e}")
+                self.logger.error(f"Failed to count rows for {table_name_lower}: {e}")
                 connection.rollback()
                 table_stats[table_name_lower] = 0
 
@@ -636,14 +702,6 @@ class PostgreSQLAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
-    def close_connection(self, connection: Any) -> None:
-        """Close PostgreSQL connection."""
-        if connection:
-            try:
-                connection.close()
-            except Exception as e:
-                self.logger.debug(f"Error closing connection: {e}")
-
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get PostgreSQL platform information."""
         platform_info = {
@@ -698,8 +756,8 @@ class PostgreSQLAdapter(PlatformAdapter):
                 self.logger.debug(f"Error getting platform info: {e}")
 
         # Add client library version
-        if psycopg2:
-            platform_info["client_library_version"] = psycopg2.__version__
+        if psycopg:
+            platform_info["client_library_version"] = psycopg.__version__
 
         return platform_info
 
@@ -707,7 +765,7 @@ class PostgreSQLAdapter(PlatformAdapter):
         """Test if connection can be established."""
         try:
             params = self._get_connection_params()
-            conn = psycopg2.connect(**params)
+            conn = psycopg.connect(**params)
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
             cursor.fetchone()
@@ -717,25 +775,6 @@ class PostgreSQLAdapter(PlatformAdapter):
         except Exception as e:
             self.logger.debug(f"Connection test failed: {e}")
             return False
-
-    def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables in the database."""
-        try:
-            cursor = connection.cursor()
-            cursor.execute(
-                """
-                SELECT table_name
-                FROM information_schema.tables
-                WHERE table_schema = %s AND table_type = 'BASE TABLE'
-                """,
-                (self.schema,),
-            )
-            result = cursor.fetchall()
-            cursor.close()
-            return [row[0].lower() for row in result]
-        except Exception as e:
-            self.logger.debug(f"Failed to get existing tables: {e}")
-            return []
 
     def apply_table_tunings(self, table_tuning: TableTuning, connection: Any) -> None:
         """Apply tuning configurations to PostgreSQL tables."""
@@ -782,21 +821,22 @@ class PostgreSQLAdapter(PlatformAdapter):
         errors = []
         warnings = []
 
-        # Check if psycopg2 is available
-        if psycopg2 is None:
-            errors.append("psycopg2 library not available - install with 'pip install psycopg2-binary'")
+        # Check if psycopg is available
+        if psycopg is None:
+            errors.append("psycopg library not available - install with 'pip install psycopg[binary]'")
         else:
-            # Check psycopg2 version
+            # Check psycopg version
             try:
-                version = psycopg2.__version__
-                # Warn if using very old versions (< 2.8)
+                version = psycopg.__version__
+                # Warn if using versions older than psycopg3
                 version_parts = version.split(".")
                 major = int(version_parts[0])
-                minor = int(version_parts[1]) if len(version_parts) > 1 else 0
-                if major < 2 or (major == 2 and minor < 8):
-                    warnings.append(f"psycopg2 version {version} is older - consider upgrading for better performance")
+                if major < 3:
+                    warnings.append(
+                        f"psycopg version {version} is older - consider upgrading to 3.1+ for better performance"
+                    )
             except (AttributeError, ValueError, IndexError):
-                warnings.append("Could not determine psycopg2 version")
+                warnings.append("Could not determine psycopg version")
 
         # Check work_mem configuration
         if hasattr(self, "work_mem") and self.work_mem:
@@ -822,7 +862,7 @@ class PostgreSQLAdapter(PlatformAdapter):
             "platform": self.platform_name,
             "benchmark_type": benchmark_type,
             "dry_run_mode": self.dry_run_mode,
-            "psycopg2_available": psycopg2 is not None,
+            "psycopg_available": psycopg is not None,
             "host": getattr(self, "host", None),
             "port": getattr(self, "port", None),
             "database": getattr(self, "database", None),
@@ -830,8 +870,8 @@ class PostgreSQLAdapter(PlatformAdapter):
             "work_mem": getattr(self, "work_mem", None),
         }
 
-        if psycopg2:
-            platform_info["psycopg2_version"] = getattr(psycopg2, "__version__", "unknown")
+        if psycopg:
+            platform_info["psycopg_version"] = getattr(psycopg, "__version__", "unknown")
 
         # Import ValidationResult here to avoid circular imports
         try:
@@ -945,29 +985,56 @@ class PostgreSQLAdapter(PlatformAdapter):
             return False
 
 
-def _build_postgresql_config(benchmark_config: dict, platform_options: dict) -> dict:
-    """Build PostgreSQL configuration from benchmark and platform options.
+def _build_postgresql_config(
+    platform: str,
+    options: dict[str, Any],
+    overrides: dict[str, Any],
+    info: Any,
+) -> Any:
+    """Build PostgreSQL database configuration with credential loading.
 
     This function is registered with PlatformHookRegistry to provide
     PostgreSQL-specific configuration handling.
     """
-    config = {
-        "host": platform_options.get("host", "localhost"),
-        "port": platform_options.get("port", 5432),
-        "username": platform_options.get("username", "postgres"),
-        "password": platform_options.get("password"),
-        "schema": platform_options.get("schema", "public"),
-        "database": platform_options.get("database"),
-        "admin_database": platform_options.get("admin_database", "postgres"),
-        "sslmode": platform_options.get("sslmode", "prefer"),
-        "work_mem": platform_options.get("work_mem", "256MB"),
-        "maintenance_work_mem": platform_options.get("maintenance_work_mem", "512MB"),
-        "effective_cache_size": platform_options.get("effective_cache_size", "1GB"),
-        "max_parallel_workers_per_gather": platform_options.get("max_parallel_workers_per_gather", 2),
-        "enable_timescale": platform_options.get("enable_timescale", False),
+    from benchbox.core.schemas import DatabaseConfig
+    from benchbox.security.credentials import CredentialManager
+
+    cred_manager = CredentialManager()
+    saved_creds = cred_manager.get_platform_credentials("postgresql") or {}
+
+    explicit_options = overrides.get("_explicit_platform_options", {})
+
+    merged_options: dict[str, Any] = {"schema": "public"}
+    merged_options.update(options)  # registered defaults (lowest priority)
+    merged_options.update(saved_creds)  # saved credentials win over defaults
+    merged_options.update(explicit_options)  # explicit CLI flags win over credentials
+    merged_options.update(overrides)  # runtime overrides (highest priority)
+
+    name = info.display_name if info else "PostgreSQL"
+    driver_package = info.driver_package if info else "psycopg"
+
+    config_dict = {
+        "type": "postgresql",
+        "name": name,
+        "options": merged_options or {},
+        "driver_package": driver_package,
+        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
+        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
+        "host": merged_options.get("host", "localhost"),
+        "port": merged_options.get("port", 5432),
+        "username": merged_options.get("username", "postgres"),
+        "password": merged_options.get("password"),
+        "database": merged_options.get("database"),
+        "admin_database": merged_options.get("admin_database", "postgres"),
+        "sslmode": merged_options.get("sslmode", "prefer"),
+        "work_mem": merged_options.get("work_mem", "256MB"),
+        "maintenance_work_mem": merged_options.get("maintenance_work_mem", "512MB"),
+        "effective_cache_size": merged_options.get("effective_cache_size", "1GB"),
+        "max_parallel_workers_per_gather": merged_options.get("max_parallel_workers_per_gather", 2),
+        "enable_timescale": merged_options.get("enable_timescale", False),
+        "benchmark": overrides.get("benchmark"),
+        "scale_factor": overrides.get("scale_factor"),
+        "tuning_config": overrides.get("tuning_config"),
     }
 
-    # Merge benchmark configuration
-    config.update(benchmark_config)
-
-    return config
+    return DatabaseConfig(**config_dict)

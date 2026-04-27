@@ -17,7 +17,7 @@ The auto-compilation system supports the following TPC binary tools:
 - **dbgen**: Data generation tool for TPC-H benchmark
 - **qgen**: Query generation tool for TPC-H benchmark
 
-### TPC-DS Tools  
+### TPC-DS Tools
 - **dsdgen**: Data generation tool for TPC-DS benchmark
 - **dsqgen**: Query generation tool for TPC-DS benchmark
 
@@ -158,7 +158,7 @@ for binary, info in report['binaries'].items():
 #### 2. Compilation Timeout
 **Error**: "Compilation timed out after X minutes"
 
-**Solution**: 
+**Solution**:
 - Check system resources (CPU, memory)
 - Try compiling manually to diagnose issues
 - Increase timeout if needed (contact support)
@@ -179,7 +179,7 @@ for binary, info in report['binaries'].items():
 - On Unix systems, verify execute permissions: `chmod +x binary_name`
 
 #### 5. Platform-Specific Compilation Issues
-**macOS**: 
+**macOS**:
 - Install Xcode Command Line Tools: `xcode-select --install`
 - For M1/M2 Macs, ensure ARM64 compatibility
 
@@ -268,7 +268,7 @@ if not deps_available:
 - Automatic MinGW integer literal compatibility fixes applied during compilation
 - Binaries: `dbgen.exe`, `qgen.exe`, and support files
 
-### TPC-DS Windows Support  
+### TPC-DS Windows Support
 - **Partial support** due to cross-compilation limitations
 - Wine emulation used for `mkheader.exe` tool during build process
 - Data files (`tpcds.dst`) and query templates successfully compiled
@@ -308,10 +308,39 @@ cd _sources/tpc-ds
 patch -p1 < stdout-support.patch
 ```
 
-### Cross-Platform Compilation
+### Updating bundled binaries
 
-The `compile-all-platforms.sh` script builds binaries for all supported platforms
-using Docker for cross-compilation:
+BenchBox ships pre-compiled binaries inside the Python package at
+`benchbox/_binaries/tpc-{h,ds}/{platform}/`.  These are the binaries used
+at runtime (priority-1 path in `ensure_tpc_binaries()`).
+
+Whenever the patched sources in `_sources/tpc-ds/tools/` or
+`_sources/tpc-h/dbgen/` change, the bundled binaries must be rebuilt and
+committed.  **Always use the automation** - manual copies are error-prone
+(this is how `dsqgen` was once shipped unpatched while `dsdgen` was patched).
+
+#### Rebuild and deploy for the current platform (no Docker required)
+
+```bash
+make compile-tpcds-binaries
+```
+
+This calls `compile-all-platforms.sh --native`, which:
+
+1. Compiles `dsdgen`, `dsqgen`, `tpcds.dst`, `tpcds.idx` from the patched
+   sources in `_sources/tpc-ds/tools/`
+2. Writes build artefacts to `_binaries/tpc-ds/darwin-arm64/` (untracked)
+3. **Deploys the four files to `benchbox/_binaries/tpc-ds/darwin-arm64/`
+   and regenerates `checksums.md5`** (this is the tracked, shipped location)
+
+After running the command, commit the changed files in `benchbox/_binaries/`:
+
+```bash
+git add benchbox/_binaries/tpc-ds/darwin-arm64/
+git commit -m "fix(tpcds): rebuild darwin-arm64 binaries from patched sources"
+```
+
+#### Rebuild for all platforms (requires Docker)
 
 ```bash
 cd _sources/compilation/scripts
@@ -328,6 +357,11 @@ cd _sources/compilation/scripts
 | linux | arm64 | Docker |
 | windows | x86_64 | Docker + MinGW |
 | windows | arm64 | Docker + MinGW |
+
+> **Note:** The full Docker build currently only deploys to `_binaries/`
+> (untracked).  After running it, manually copy the updated binaries into
+> `benchbox/_binaries/{platform}/` and regenerate `checksums.md5` there
+> before committing.
 
 ### Detailed Source Documentation
 
@@ -357,7 +391,7 @@ Main class for TPC binary compilation management.
 
 **Methods**:
 - `is_binary_available(binary_name: str) -> bool`
-- `needs_compilation(binary_name: str) -> bool` 
+- `needs_compilation(binary_name: str) -> bool`
 - `compile_binary(binary_name: str) -> CompilationResult`
 - `compile_all_needed() -> Dict[str, CompilationResult]`
 - `get_status_report() -> Dict[str, Any]`
@@ -399,11 +433,11 @@ from benchbox.utils.tpc_compilation import ensure_tpc_binaries
 def initialize_tpc_h():
     # Ensure TPC-H binaries are available
     results = ensure_tpc_binaries(["dbgen", "qgen"])
-    
+
     for binary, result in results.items():
         if result.status.value not in ["success", "not_needed"]:
             raise RuntimeError(f"TPC-H {binary} not available: {result.error_message}")
-    
+
     return results
 ```
 
@@ -413,13 +447,13 @@ from benchbox.utils.tpc_compilation import get_tpc_compiler
 
 def check_tpc_status():
     compiler = get_tpc_compiler()
-    
+
     if not compiler.tpc_h_source:
         print("TPC-H source not found")
-    
+
     if not compiler.tpc_ds_source:
         print("TPC-DS source not found")
-        
+
     # Check each binary
     for binary in ["dbgen", "qgen", "dsdgen", "dsqgen"]:
         if binary in compiler.binaries:

@@ -78,7 +78,7 @@ def test_ensure_driver_version_rejects_requested_version_without_package():
 
 
 def test_dataframe_adapter_rejects_requested_version_for_non_package_platform():
-    # pandas-df has driver_package=None — version pinning should be rejected with a clear error.
+    # pandas-df has driver_package=None - version pinning should be rejected with a clear error.
     # (polars-df previously had driver_package=None but now has driver_package="polars".)
     with pytest.raises(RuntimeError, match="does not declare a driver package"):
         get_adapter(
@@ -92,7 +92,7 @@ def test_sql_adapter_contract_propagates_runtime_metadata(monkeypatch):
         driver_isolation_capability = DriverIsolationCapability.SUPPORTED
 
         def __init__(self, **config):
-            self.config = dict(config)
+            self.platform_config = dict(config)
 
         @classmethod
         def from_config(cls, config):
@@ -109,13 +109,13 @@ def test_sql_adapter_contract_propagates_runtime_metadata(monkeypatch):
     assert adapter.driver_runtime_strategy == "isolated-site-packages"
     assert adapter.driver_runtime_path == "/tmp/dummy-runtime"
     assert adapter.driver_runtime_python_executable == "/tmp/dummy-runtime/bin/python"
-    assert adapter.config["driver_runtime_strategy"] == "isolated-site-packages"
+    assert adapter.platform_config["driver_runtime_strategy"] == "isolated-site-packages"
 
 
 def test_sql_adapter_contract_rejects_isolated_runtime_without_binding_support(monkeypatch):
     class DummyAdapter:
         def __init__(self, **config):
-            self.config = dict(config)
+            self.platform_config = dict(config)
 
         @classmethod
         def from_config(cls, config):
@@ -130,7 +130,7 @@ def test_sql_adapter_contract_rejects_isolated_runtime_without_binding_support(m
 def test_sql_adapter_contract_does_not_infer_requested_version(monkeypatch):
     class DummyAdapter:
         def __init__(self, **config):
-            self.config = dict(config)
+            self.platform_config = dict(config)
 
         @classmethod
         def from_config(cls, config):
@@ -164,7 +164,7 @@ def _mock_dataframe_registry(monkeypatch, adapter_cls, *, runtime_strategy="curr
 def test_dataframe_adapter_contract_does_not_infer_requested_version(monkeypatch):
     class DummyDataFrameAdapter:
         def __init__(self, **config):
-            self.config = dict(config)
+            self.platform_config = dict(config)
 
     _mock_dataframe_registry(monkeypatch, DummyDataFrameAdapter)
 
@@ -178,7 +178,7 @@ def test_dataframe_adapter_contract_does_not_infer_requested_version(monkeypatch
 def test_dataframe_adapter_contract_rejects_isolated_runtime_without_binding_support(monkeypatch):
     class DummyDataFrameAdapter:
         def __init__(self, **config):
-            self.config = dict(config)
+            self.platform_config = dict(config)
 
     _mock_dataframe_registry(monkeypatch, DummyDataFrameAdapter, runtime_strategy="isolated-site-packages")
 

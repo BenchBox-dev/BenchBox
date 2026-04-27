@@ -5,10 +5,54 @@ from __future__ import annotations
 import contextlib
 import csv
 import logging
-
-from benchbox.utils.dependencies import get_package_install_message
+import re
 
 logger = logging.getLogger(__name__)
+
+
+class _ResultProxy:
+    """Cursor-like wrapper around a list of rows returned by chDB.
+
+    Lets benchmarks call .fetchone() / .fetchall() without knowing whether
+    the underlying driver returned a cursor or a plain list.
+    """
+
+    def __init__(self, rows: list) -> None:
+        self._rows = rows
+        self._pos = 0
+
+    def fetchone(self):
+        if self._pos < len(self._rows):
+            row = self._rows[self._pos]
+            self._pos += 1
+            return row
+        return None
+
+    def fetchall(self):
+        remaining = self._rows[self._pos :]
+        self._pos = len(self._rows)
+        return remaining
+
+    # Allow direct indexing / iteration so existing code that treats the
+    # result as a list (e.g. `result[0][0]`) continues to work.
+    def __getitem__(self, idx):
+        return self._rows[idx]
+
+    def __iter__(self):
+        return iter(self._rows)
+
+    def __len__(self):
+        return len(self._rows)
+
+    def __bool__(self):
+        return bool(self._rows)
+
+    def __eq__(self, other):
+        if isinstance(other, _ResultProxy):
+            return self._rows == other._rows
+        if isinstance(other, list):
+            return self._rows == other
+        return NotImplemented
 
 
 class ClickHouseLocalClient:
@@ -54,8 +98,8 @@ class ClickHouseLocalClient:
                             # Enhanced CSV parsing
                             row = self._parse_csv_line(line)
                             rows.append(row)
-                    return rows
-            return []
+                    return _ResultProxy(rows)
+            return _ResultProxy([])
 
         except Exception as e:
             # Re-raise with more context
@@ -100,14 +144,14 @@ class ClickHouseLocalClient:
                 self._conn.query(full_query)
             else:
                 self._conn.query(full_query, format="CSV")
-            return []  # INSERT typically doesn't return data
+            return _ResultProxy([])  # INSERT typically doesn't return data
         else:
             # Regular query execution
             if self._is_persistent:
                 self._conn.query(query)
             else:
                 self._conn.query(query, format="CSV")
-            return []
+            return _ResultProxy([])
 
     def _parse_csv_line(self, line: str) -> tuple:
         """Parse a CSV line into a tuple with proper type conversion."""
@@ -146,6 +190,42 @@ class ClickHouseLocalClient:
             return True
         except ValueError:
             return False
+
+    def executemany(self, query: str, params: list) -> _ResultProxy:
+        """Execute a parameterized INSERT for multiple rows.
+
+        Generic file-loading paths pass an INSERT...VALUES(?,?,...) template
+        plus a list of row tuples.  ClickHouse doesn't support ? placeholders,
+        so we build a single VALUES clause and execute it directly.
+        """
+        if not params:
+            return _ResultProxy([])
+
+        # Strip the placeholder VALUES(...) suffix from the template and
+        # rebuild with concrete rows so ClickHouse accepts the statement.
+        parts = re.split(r"\sVALUES\s", query, maxsplit=1, flags=re.IGNORECASE)
+        base_query = parts[0]
+
+        values_list = []
+        for row in params:
+            formatted_values = []
+            for val in row:
+                if isinstance(val, str):
+                    # Escape backslashes first, then single quotes
+                    escaped = val.replace("\\", "\\\\").replace("'", "''")
+                    formatted_values.append(f"'{escaped}'")
+                elif val is None:
+                    formatted_values.append("NULL")
+                else:
+                    formatted_values.append(str(val))
+            values_list.append(f"({', '.join(formatted_values)})")
+
+        full_query = f"{base_query} VALUES {', '.join(values_list)}"
+        if self._is_persistent:
+            self._conn.query(full_query)
+        else:
+            self._conn.query(full_query, format="CSV")
+        return _ResultProxy([])
 
     def disconnect(self):
         """Local mode doesn't need explicit disconnect."""
@@ -193,8 +273,8 @@ class ClickHouseCloudClient:
 
         if clickhouse_connect is None:
             raise ImportError(
-                "ClickHouse Cloud mode requires clickhouse-connect but it is not installed.\n"
-                + get_package_install_message("clickhouse-connect", "")
+                "ClickHouse Cloud mode requires the clickhouse-connect package.\n"
+                "Install with: uv add benchbox --extra clickhouse-cloud\n"
             )
 
         self._host = host
@@ -210,7 +290,7 @@ class ClickHouseCloudClient:
         }
 
         if access_token:
-            # OAuth/bearer token authentication — pass via clickhouse-connect's access_token parameter
+            # OAuth/bearer token authentication - pass via clickhouse-connect's access_token parameter
             connect_kwargs["access_token"] = access_token
             logger.info("Using OAuth/bearer token authentication for ClickHouse Cloud")
         else:

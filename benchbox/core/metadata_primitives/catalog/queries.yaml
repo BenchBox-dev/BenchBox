@@ -1399,7 +1399,7 @@ queries:
       AND tc.table_schema = kcu.table_schema
     WHERE tc.table_name LIKE 'benchbox_fk_%'
     ORDER BY child_table;
-  skip_on: [clickhouse, bigquery, duckdb]
+  skip_on: [clickhouse, bigquery, duckdb, starrocks]
 
 - id: constraint_summary
   category: constraint
@@ -1787,7 +1787,7 @@ queries:
     WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
     GROUP BY table_schema, table_name
     ORDER BY total_grants DESC;
-  skip_on: [sqlite, datafusion, spark, polars, athena]
+  skip_on: [sqlite, datafusion, spark, polars, athena, starrocks]
   variants:
     duckdb: |2
       -- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result
@@ -1938,7 +1938,7 @@ queries:
     FROM pg_roles
     WHERE rolname NOT LIKE 'pg_%'
     ORDER BY rolname;
-  skip_on: [sqlite, datafusion, spark, polars, athena, bigquery, trino, presto]
+  skip_on: [sqlite, datafusion, spark, polars, athena, bigquery, trino, presto, starrocks]
   variants:
     duckdb: |2
       -- DuckDB lacks role introspection; return empty result
@@ -2026,7 +2026,7 @@ queries:
     JOIN pg_roles m ON am.member = m.oid
     WHERE r.rolname NOT LIKE 'pg_%'
     ORDER BY r.rolname, m.rolname;
-  skip_on: [duckdb, sqlite, datafusion, spark, polars, athena, bigquery, trino, presto, firebolt, snowflake]
+  skip_on: [duckdb, sqlite, datafusion, spark, polars, athena, bigquery, trino, presto, firebolt, snowflake, starrocks]
   variants:
     clickhouse: |2
       SELECT

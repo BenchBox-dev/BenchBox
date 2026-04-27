@@ -298,7 +298,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.dry_run:
         lines = [
-            "pg_duckdb vs DuckDB Comparison — Dry Run",
+            "pg_duckdb vs DuckDB Comparison - Dry Run",
             f"  Benchmark:    {args.benchmark}",
             f"  Scale factor: {args.scale_factor}",
             "",

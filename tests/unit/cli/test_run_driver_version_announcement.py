@@ -9,6 +9,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import sys
+import sys as _sys
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -16,6 +17,15 @@ from click.testing import CliRunner
 
 from benchbox.cli.main import cli
 from benchbox.core.schemas import DatabaseConfig
+
+# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
+# same name as the run submodule.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
+# the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.run")
+_run_module = _sys.modules["benchbox.cli.commands.run"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -66,14 +76,14 @@ def _invoke_run(platform="duckdb", database_config=None):
 
     runner = CliRunner()
     with (
-        patch("benchbox.cli.commands.run.DatabaseManager", return_value=mock_db_manager),
-        patch("benchbox.cli.commands.run.BenchmarkManager", return_value=mock_bench_manager),
-        patch("benchbox.cli.commands.run.BenchmarkOrchestrator", return_value=mock_orchestrator),
-        patch("benchbox.cli.commands.run.SystemProfiler") as mock_profiler_cls,
+        patch.object(_run_module, "DatabaseManager", return_value=mock_db_manager),
+        patch.object(_run_module, "BenchmarkManager", return_value=mock_bench_manager),
+        patch.object(_run_module, "BenchmarkOrchestrator", return_value=mock_orchestrator),
+        patch.object(_run_module, "SystemProfiler") as mock_profiler_cls,
         patch("benchbox.cli.main.get_config_manager") as mock_cfg,
-        patch("benchbox.cli.commands.run._execute_orchestrated_run", return_value=mock_result),
-        patch("benchbox.cli.commands.run._export_orchestrated_result", return_value={"json": "/tmp/t.json"}),
-        patch("benchbox.cli.commands.run._render_post_run_charts"),
+        patch.object(_run_module, "_execute_orchestrated_run", return_value=mock_result),
+        patch.object(_run_module, "_export_orchestrated_result", return_value={"json": "/tmp/t.json"}),
+        patch.object(_run_module, "_render_post_run_charts"),
         patch("benchbox.cli.preferences.save_last_run_config"),
     ):
         mock_profiler_cls.return_value.get_system_profile.return_value = Mock()

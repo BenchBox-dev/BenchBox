@@ -285,6 +285,7 @@ class TestTPCHInterface:
         with pytest.raises(RuntimeError, match="TPC-H dbgen tool not found"):
             _ = tpch._impl.data_generator.dbgen_exe
 
+    @pytest.mark.skipif(os.name == "nt", reason="POSIX os.access chmod semantics not available on Windows")
     @mock.patch("os.access")
     @mock.patch("benchbox.core.tpch.generator.Path.exists")
     def test_executable_permission_error(

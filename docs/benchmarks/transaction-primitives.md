@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, transaction-primitives, custom-benchmark
 ```
 
-> **CLI name:** `transaction_primitives` — use `benchbox run --benchmark transaction_primitives`
+> **CLI name:** `transaction_primitives` - use `benchbox run --benchmark transaction_primitives`
 
 ## Overview
 
@@ -272,11 +272,16 @@ Run multiple operations.
 
 **`get_all_operations() -> Dict[str, Operation]`**
 
-Get all available operations (8 total).
+Get all available operations (23 total).
 
 **`get_operation(operation_id) -> Operation`**
 
 Get specific operation by ID.
+
+**`get_operations_by_category(category) -> Dict[str, Operation]`**
+
+Get operations filtered by category string (e.g., `"transaction"`). Returns a dict
+keyed by operation ID, containing only operations whose `category` matches.
 
 **`get_operation_categories() -> List[str]`**
 
@@ -285,6 +290,14 @@ Get list of available categories (returns `["transaction"]`).
 **`get_schema(dialect="standard") -> Dict[str, Dict]`**
 
 Get staging table schema definitions.
+
+#### Cleanup Methods
+
+**`cleanup_auxiliary_files() -> None`**
+
+Remove any auxiliary files (logs, temp exports) produced during benchmark execution.
+Call after `teardown()` to ensure the working directory is clean. Safe to call even
+when no auxiliary files were produced.
 
 ### OperationResult
 
@@ -516,7 +529,7 @@ Transaction Primitives was split from Write Primitives v2 to separate concerns:
 - **Focus**: Multi-statement transactions and ACID guarantees
 - **Platform support**: Narrow (requires full ACID support)
 - **Transaction requirements**: Required, tests transaction semantics
-- **Operations**: 8 operations focused on transaction behavior
+- **Operations**: 23 operations focused on transaction behavior
 
 **Use both benchmarks together** for comprehensive database testing:
 - Write Primitives for individual operation performance

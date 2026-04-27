@@ -347,8 +347,8 @@ def generate_create_table_sql(
             pk_columns.append(col.name)
 
     # Add primary key constraint if applicable
-    # Skip for ClickHouse which uses different PK syntax
-    if pk_columns and dialect.lower() not in ("clickhouse",):
+    # Skip for ClickHouse (different PK syntax) and Doris (OLAP table model handles keys)
+    if pk_columns and dialect.lower() not in ("clickhouse", "doris"):
         pk_constraint = f"    PRIMARY KEY ({', '.join(pk_columns)})"
         col_defs.append(pk_constraint)
 
@@ -580,7 +580,7 @@ def supports_acl(dialect: str) -> bool:
         True if GRANT/REVOKE statements are supported
     """
     # Tier 4 platforms (no ACL support)
-    no_acl = {"sqlite", "datafusion", "spark", "polars"}
+    no_acl = {"sqlite", "datafusion", "spark", "polars", "duckdb"}
     return dialect.lower() not in no_acl
 
 

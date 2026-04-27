@@ -72,13 +72,13 @@ class StreamingGenerationMixin:
                 # Check if compression is actually needed (avoid copying file to itself)
                 if dat_file.resolve() == compressed_path.resolve():
                     # No compression needed - just count rows and update manifest
-                    with open(dat_file) as src:
+                    with open(dat_file, encoding="utf-8") as src:
                         for line in src:
                             row_count += 1
                 else:
                     # Compression needed - copy and compress
                     with (
-                        open(dat_file) as src,
+                        open(dat_file, encoding="utf-8") as src,
                         self.open_output_file(compressed_path, mode="wt") as dst,
                     ):
                         for line in src:
@@ -106,9 +106,9 @@ class StreamingGenerationMixin:
                 if self.verbose:
                     emit(f"○ Skipped {table_name} (no data at scale factor {self.scale_factor})")
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to generate TPC-DS table {table_name} with exit code {e.returncode}")
+            raise RuntimeError(f"Failed to generate TPC-DS table {table_name} with exit code {e.returncode}") from e
         except Exception as e:
-            raise RuntimeError(f"Failed to generate TPC-DS table {table_name}: {e}")
+            raise RuntimeError(f"Failed to generate TPC-DS table {table_name}: {e}") from e
 
     def _generate_parent_table_with_children(
         self, output_dir: Path, parent_table: str, child_tables: list[str]
@@ -168,7 +168,7 @@ class StreamingGenerationMixin:
                     row_count = 0
                     try:
                         with (
-                            open(dat_file) as src,
+                            open(dat_file, encoding="utf-8") as src,
                             self.open_output_file(compressed_path, mode="wt") as dst,
                         ):
                             for line in src:
@@ -189,7 +189,7 @@ class StreamingGenerationMixin:
                                 }
                             )
                     except Exception as e:
-                        raise RuntimeError(f"Failed to compress {dat_file.name}: {e}")
+                        raise RuntimeError(f"Failed to compress {dat_file.name}: {e}") from e
                 elif self.verbose and dat_file.exists():
                     dat_file.unlink()
                     emit(f"○ Skipped {table_name} (no data at scale factor {self.scale_factor})")
@@ -203,9 +203,9 @@ class StreamingGenerationMixin:
             error_msg = f"Failed to generate TPC-DS table {parent_table} with exit code {e.returncode}"
             if e.stderr:
                 error_msg += f": {e.stderr.decode() if isinstance(e.stderr, bytes) else e.stderr}"
-            raise RuntimeError(error_msg)
+            raise RuntimeError(error_msg) from e
         except Exception as e:
-            raise RuntimeError(f"Failed to generate TPC-DS table {parent_table}: {e}")
+            raise RuntimeError(f"Failed to generate TPC-DS table {parent_table}: {e}") from e
 
     def _generate_single_table_chunk_streaming(self, output_dir: Path, table_name: str, chunk_id: int) -> None:
         """Generate a single table chunk with direct streaming compression.
@@ -272,9 +272,9 @@ class StreamingGenerationMixin:
             error_msg = f"Failed to generate TPC-DS table {table_name} chunk {chunk_id} with exit code {e.returncode}"
             if e.stderr:
                 error_msg += f": {e.stderr.decode() if isinstance(e.stderr, bytes) else e.stderr}"
-            raise RuntimeError(error_msg)
+            raise RuntimeError(error_msg) from e
         except Exception as e:
-            raise RuntimeError(f"Failed to generate TPC-DS table {table_name} chunk {chunk_id}: {e}")
+            raise RuntimeError(f"Failed to generate TPC-DS table {table_name} chunk {chunk_id}: {e}") from e
 
     def _stream_process_output(self, process, output_file: Path) -> tuple[int, int]:
         """Stream dsdgen stdout into a compressed output file.
@@ -474,9 +474,9 @@ class StreamingGenerationMixin:
             error_msg = f"Failed to generate TPC-DS table {parent_table} chunk {chunk_id} with exit code {e.returncode}"
             if e.stderr:
                 error_msg += f": {e.stderr.decode() if isinstance(e.stderr, bytes) else e.stderr}"
-            raise RuntimeError(error_msg)
+            raise RuntimeError(error_msg) from e
         except Exception as e:
-            raise RuntimeError(f"Failed to generate TPC-DS table {parent_table} chunk {chunk_id}: {e}")
+            raise RuntimeError(f"Failed to generate TPC-DS table {parent_table} chunk {chunk_id}: {e}") from e
 
 
 __all__ = ["StreamingGenerationMixin"]

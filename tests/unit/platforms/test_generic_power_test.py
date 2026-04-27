@@ -31,7 +31,6 @@ class TestGenericPowerTest:
     def mock_benchmark(self):
         """Create a mock benchmark instance."""
         benchmark = MagicMock()
-        benchmark._name = "ClickBench"
         benchmark.scale_factor = 1.0
         return benchmark
 
@@ -44,6 +43,7 @@ class TestGenericPowerTest:
         """Test that warmup results are tagged with run_type='warmup' for filtering."""
         # Configure warmup + measurement runs
         run_config = {
+            "benchmark_name": "clickbench",
             "iterations": 2,
             "warm_up_iterations": 1,
             "scale_factor": 1.0,
@@ -80,6 +80,7 @@ class TestGenericPowerTest:
     def test_iteration_tagging(self, mock_adapter, mock_benchmark, mock_connection):
         """Test that measurement results are tagged with iteration number."""
         run_config = {
+            "benchmark_name": "clickbench",
             "iterations": 3,
             "warm_up_iterations": 0,
             "scale_factor": 1.0,
@@ -113,6 +114,7 @@ class TestGenericPowerTest:
     def test_no_warmup_runs(self, mock_adapter, mock_benchmark, mock_connection):
         """Test behavior when warm_up_iterations is 0."""
         run_config = {
+            "benchmark_name": "clickbench",
             "iterations": 2,
             "warm_up_iterations": 0,
             "scale_factor": 1.0,
@@ -133,6 +135,7 @@ class TestGenericPowerTest:
     def test_default_iterations_value(self, mock_adapter, mock_benchmark, mock_connection):
         """Test that iterations defaults to 3 when not specified."""
         run_config = {
+            "benchmark_name": "clickbench",
             "warm_up_iterations": 0,
             "scale_factor": 1.0,
         }
@@ -152,6 +155,7 @@ class TestGenericPowerTest:
     def test_multiple_queries_per_iteration(self, mock_adapter, mock_benchmark, mock_connection):
         """Test behavior with multiple queries per iteration."""
         run_config = {
+            "benchmark_name": "clickbench",
             "iterations": 2,
             "warm_up_iterations": 1,
             "scale_factor": 1.0,
@@ -186,12 +190,13 @@ class TestGenericPowerTest:
         assert q1_results[0]["iteration"] == 1
         assert q1_results[1]["iteration"] == 2
 
-    @patch("benchbox.platforms.base.adapter.quiet_console")
+    @patch("benchbox.platforms.base.execution.quiet_console")
     def test_console_output_displays_warmup_and_measurement(
         self, mock_console, mock_adapter, mock_benchmark, mock_connection
     ):
         """Test that console prints warmup and measurement run labels."""
         run_config = {
+            "benchmark_name": "clickbench",
             "iterations": 2,
             "warm_up_iterations": 1,
             "scale_factor": 1.0,
@@ -225,6 +230,7 @@ class TestGenericPowerTest:
     def test_failed_queries_included_in_results(self, mock_adapter, mock_benchmark, mock_connection):
         """Test that failed queries are still included with iteration tags."""
         run_config = {
+            "benchmark_name": "clickbench",
             "iterations": 2,
             "warm_up_iterations": 0,
             "scale_factor": 1.0,

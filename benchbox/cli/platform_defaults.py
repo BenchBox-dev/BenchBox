@@ -119,6 +119,107 @@ def _register_clickhouse() -> None:
     PlatformHookRegistry.register_config_builder("clickhouse", _builder)
 
 
+def _register_clickhouse_local() -> None:
+    """Register CLI option specs for the ``clickhouse-local`` first-class platform."""
+    PlatformHookRegistry.register_option_specs(
+        "clickhouse-local",
+        PlatformOptionSpec(
+            name="data_path",
+            parser=str,
+            default=None,
+            help="Path to chDB database directory for persistent local storage (optional).",
+        ),
+    )
+
+    def _local_builder(
+        platform: str,
+        options: dict[str, Any],
+        overrides: dict[str, Any],
+        info: PlatformInfo | None,
+    ) -> DatabaseConfig:
+        name = info.display_name if info else "ClickHouse Local"
+        if not options.get("data_path"):
+            db_dir = Path.cwd() / "benchmark_runs" / "databases"
+            db_dir.mkdir(parents=True, exist_ok=True)
+            options["data_path"] = str(db_dir / "clickhouse_local.chdb")
+        driver_package = info.driver_package if info else "chdb"
+        driver_version = overrides.get("driver_version") or options.get("driver_version")
+        auto_install = overrides.get("driver_auto_install")
+        if auto_install is None:
+            auto_install = options.get("driver_auto_install", False)
+        return DatabaseConfig(
+            type=platform,
+            name=name,
+            options=options,
+            driver_package=driver_package,
+            driver_version=driver_version,
+            driver_auto_install=bool(auto_install),
+        )
+
+    PlatformHookRegistry.register_config_builder("clickhouse-local", _local_builder)
+
+
+def _register_clickhouse_server() -> None:
+    """Register CLI option specs for the ``clickhouse-server`` first-class platform."""
+    PlatformHookRegistry.register_option_specs(
+        "clickhouse-server",
+        PlatformOptionSpec(
+            name="host",
+            parser=str,
+            default="localhost",
+            help="ClickHouse server hostname.",
+        ),
+        PlatformOptionSpec(
+            name="port",
+            parser=_parse_int,
+            default=9000,
+            help="ClickHouse native protocol port.",
+        ),
+        PlatformOptionSpec(
+            name="username",
+            parser=str,
+            default="default",
+            help="ClickHouse username for authentication.",
+            aliases=("user",),
+        ),
+        PlatformOptionSpec(
+            name="password",
+            parser=str,
+            default="",
+            help="ClickHouse password for authentication.",
+        ),
+        PlatformOptionSpec(
+            name="secure",
+            parser=parse_bool,
+            default=False,
+            help="Enable TLS for ClickHouse server connections.",
+        ),
+    )
+
+    def _server_builder(
+        platform: str,
+        options: dict[str, Any],
+        overrides: dict[str, Any],
+        info: PlatformInfo | None,
+    ) -> DatabaseConfig:
+        name = info.display_name if info else "ClickHouse Server"
+        driver_package = info.driver_package if info else "clickhouse-driver"
+        driver_version = overrides.get("driver_version") or options.get("driver_version")
+        auto_install = overrides.get("driver_auto_install")
+        if auto_install is None:
+            auto_install = options.get("driver_auto_install", False)
+        return DatabaseConfig(
+            type=platform,
+            name=name,
+            options=options,
+            driver_package=driver_package,
+            driver_version=driver_version,
+            driver_auto_install=bool(auto_install),
+        )
+
+    PlatformHookRegistry.register_config_builder("clickhouse-server", _server_builder)
+
+
 def _register_duckdb() -> None:
     PlatformHookRegistry.register_option_specs(
         "duckdb",
@@ -208,6 +309,8 @@ def _register_sqlite() -> None:
 
 
 _register_clickhouse()
+_register_clickhouse_local()
+_register_clickhouse_server()
 _register_duckdb()
 _register_sqlite()
 

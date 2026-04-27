@@ -60,120 +60,87 @@ def run_dataframe_query(query, ctx) -> tuple[float, int]:
     return elapsed, len(result)
 
 
-def main() -> int:
-    """Run SQL vs DataFrame comparison."""
-    print("=" * 70)
-    print("SQL vs DataFrame Comparison")
-    print("=" * 70)
+TPCH_TABLES = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]
 
-    if not has_duckdb and not has_polars:
-        print("\nError: Need at least DuckDB or Polars installed.")
-        print("Run: pip install duckdb polars")
-        return 1
+Q1_SQL = """
+SELECT
+    l_returnflag,
+    l_linestatus,
+    SUM(l_quantity) AS sum_qty,
+    SUM(l_extendedprice) AS sum_base_price,
+    SUM(l_extendedprice * (1 - l_discount)) AS sum_disc_price,
+    SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
+    AVG(l_quantity) AS avg_qty,
+    AVG(l_extendedprice) AS avg_price,
+    AVG(l_discount) AS avg_disc,
+    COUNT(*) AS count_order
+FROM lineitem
+WHERE l_shipdate <= DATE '1998-09-02'
+GROUP BY l_returnflag, l_linestatus
+ORDER BY l_returnflag, l_linestatus
+"""
 
-    # Check data availability
-    data_dir = Path("benchmark_runs/tpch/sf0.01/data")
-    parquet_dir = data_dir / "parquet"
+Q6_SQL = """
+SELECT SUM(l_extendedprice * l_discount) AS revenue
+FROM lineitem
+WHERE l_shipdate >= DATE '1994-01-01'
+  AND l_shipdate < DATE '1995-01-01'
+  AND l_discount BETWEEN 0.05 AND 0.07
+  AND l_quantity < 24
+"""
 
-    if not parquet_dir.exists():
-        print(f"\nWarning: Data directory not found: {parquet_dir}")
-        print("Generate data first with:")
-        print("  benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases load")
-        return 1
 
-    results = {}
+def _run_sql_mode(parquet_dir: Path, results: dict) -> None:
+    print("\n" + "-" * 70)
+    print("SQL Mode (DuckDB)")
+    print("-" * 70)
 
-    # SQL Mode (DuckDB)
-    if has_duckdb:
-        print("\n" + "-" * 70)
-        print("SQL Mode (DuckDB)")
-        print("-" * 70)
+    conn = duckdb.connect()
+    for table in TPCH_TABLES:
+        table_path = parquet_dir / f"{table}.parquet"
+        if table_path.exists():
+            conn.execute(f"CREATE VIEW {table} AS SELECT * FROM '{table_path}'")
 
-        conn = duckdb.connect()
+    for qid, sql in {"Q1": Q1_SQL, "Q6": Q6_SQL}.items():
+        try:
+            elapsed, row_count = run_sql_query(conn, sql)
+            results[f"SQL-{qid}"] = {"time": elapsed, "rows": row_count}
+            print(f"  {qid}: {elapsed:.4f}s ({row_count} rows)")
+        except Exception as e:
+            print(f"  {qid}: Error - {e}")
 
-        # Load tables
-        tables = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]
-        for table in tables:
-            table_path = parquet_dir / f"{table}.parquet"
-            if table_path.exists():
-                conn.execute(f"CREATE VIEW {table} AS SELECT * FROM '{table_path}'")
+    conn.close()
 
-        # TPC-H Q1 SQL
-        q1_sql = """
-        SELECT
-            l_returnflag,
-            l_linestatus,
-            SUM(l_quantity) AS sum_qty,
-            SUM(l_extendedprice) AS sum_base_price,
-            SUM(l_extendedprice * (1 - l_discount)) AS sum_disc_price,
-            SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
-            AVG(l_quantity) AS avg_qty,
-            AVG(l_extendedprice) AS avg_price,
-            AVG(l_discount) AS avg_disc,
-            COUNT(*) AS count_order
-        FROM lineitem
-        WHERE l_shipdate <= DATE '1998-09-02'
-        GROUP BY l_returnflag, l_linestatus
-        ORDER BY l_returnflag, l_linestatus
-        """
 
-        # TPC-H Q6 SQL
-        q6_sql = """
-        SELECT SUM(l_extendedprice * l_discount) AS revenue
-        FROM lineitem
-        WHERE l_shipdate >= DATE '1994-01-01'
-          AND l_shipdate < DATE '1995-01-01'
-          AND l_discount BETWEEN 0.05 AND 0.07
-          AND l_quantity < 24
-        """
+def _run_dataframe_mode(parquet_dir: Path, results: dict) -> None:
+    from benchbox.core.dataframe.context import PolarsDataFrameContext
+    from benchbox.core.tpch.dataframe_queries import get_tpch_query
 
-        sql_queries = {"Q1": q1_sql, "Q6": q6_sql}
+    print("\n" + "-" * 70)
+    print("DataFrame Mode (Polars)")
+    print("-" * 70)
 
-        for qid, sql in sql_queries.items():
-            try:
-                elapsed, row_count = run_sql_query(conn, sql)
-                results[f"SQL-{qid}"] = {"time": elapsed, "rows": row_count}
-                print(f"  {qid}: {elapsed:.4f}s ({row_count} rows)")
-            except Exception as e:
-                print(f"  {qid}: Error - {e}")
+    ctx = PolarsDataFrameContext()
+    for table in TPCH_TABLES:
+        table_path = parquet_dir / f"{table}.parquet"
+        if table_path.exists():
+            df = pl.scan_parquet(str(table_path))
+            ctx.register_table(table, df)
 
-        conn.close()
+    for qid in ["Q1", "Q6"]:
+        query = get_tpch_query(qid)
+        if query is None:
+            print(f"  {qid}: Query not found")
+            continue
+        try:
+            elapsed, row_count = run_dataframe_query(query, ctx)
+            results[f"DF-{qid}"] = {"time": elapsed, "rows": row_count}
+            print(f"  {qid}: {elapsed:.4f}s ({row_count} rows)")
+        except Exception as e:
+            print(f"  {qid}: Error - {e}")
 
-    # DataFrame Mode (Polars)
-    if has_polars:
-        from benchbox.core.dataframe.context import PolarsDataFrameContext
-        from benchbox.core.tpch.dataframe_queries import get_tpch_query
 
-        print("\n" + "-" * 70)
-        print("DataFrame Mode (Polars)")
-        print("-" * 70)
-
-        ctx = PolarsDataFrameContext()
-
-        # Load tables
-        tables = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]
-        for table in tables:
-            table_path = parquet_dir / f"{table}.parquet"
-            if table_path.exists():
-                df = pl.scan_parquet(str(table_path))
-                ctx.register_table(table, df)
-
-        df_queries = ["Q1", "Q6"]
-
-        for qid in df_queries:
-            query = get_tpch_query(qid)
-            if query is None:
-                print(f"  {qid}: Query not found")
-                continue
-
-            try:
-                elapsed, row_count = run_dataframe_query(query, ctx)
-                results[f"DF-{qid}"] = {"time": elapsed, "rows": row_count}
-                print(f"  {qid}: {elapsed:.4f}s ({row_count} rows)")
-            except Exception as e:
-                print(f"  {qid}: Error - {e}")
-
-    # Summary
+def _print_results_summary(results: dict) -> None:
     print("\n" + "=" * 70)
     print("Comparison Summary")
     print("=" * 70)
@@ -186,7 +153,6 @@ def main() -> int:
         mode_name = "SQL" if mode == "SQL" else "DataFrame"
         print(f"{qid:<12}{mode_name:<12}{data['time']:<12.4f}{data['rows']:<10}")
 
-    # Calculate speedups if both modes available
     if has_duckdb and has_polars:
         print("\n" + "-" * 46)
         print("Performance Comparison:")
@@ -207,6 +173,32 @@ def main() -> int:
     print("but with different APIs (SQL strings vs method chains).")
     print("=" * 70)
 
+
+def main() -> int:
+    """Run SQL vs DataFrame comparison."""
+    print("=" * 70)
+    print("SQL vs DataFrame Comparison")
+    print("=" * 70)
+
+    if not has_duckdb and not has_polars:
+        print("\nError: Need at least DuckDB or Polars installed.")
+        print("Run: pip install duckdb polars")
+        return 1
+
+    parquet_dir = Path("benchmark_runs/tpch/sf0.01/data") / "parquet"
+    if not parquet_dir.exists():
+        print(f"\nWarning: Data directory not found: {parquet_dir}")
+        print("Generate data first with:")
+        print("  benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases load")
+        return 1
+
+    results: dict = {}
+    if has_duckdb:
+        _run_sql_mode(parquet_dir, results)
+    if has_polars:
+        _run_dataframe_mode(parquet_dir, results)
+
+    _print_results_summary(results)
     return 0
 
 

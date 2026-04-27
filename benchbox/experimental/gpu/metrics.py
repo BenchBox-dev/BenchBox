@@ -370,7 +370,8 @@ class GPUMemoryTracker:
             mem_info = cupy.cuda.Device(self.device_index).mem_info
             free_mem, total_mem = mem_info
             return (total_mem - free_mem) // (1024 * 1024)
-        except Exception:
+        except Exception as cupy_err:
+            logger.debug(f"cupy memory probe failed, trying nvidia-smi fallback: {cupy_err}")
             # Try nvidia-smi fallback
             try:
                 result = subprocess.run(
@@ -386,6 +387,6 @@ class GPUMemoryTracker:
                 )
                 if result.returncode == 0:
                     return int(float(result.stdout.strip()))
-            except Exception:
-                pass
+            except Exception as smi_err:
+                logger.debug(f"nvidia-smi memory fallback failed: {smi_err}")
         return 0

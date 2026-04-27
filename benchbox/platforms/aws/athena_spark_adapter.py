@@ -52,6 +52,7 @@ from benchbox.platforms.base.cloud_spark import (
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
+from benchbox.platforms.base.phase_tracking import _resolve_benchmark_table_names
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
@@ -383,13 +384,15 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapte
 
         raise ConfigurationError(f"Session startup timed out after {timeout_seconds}s")
 
-    def create_schema(self, schema_name: str | None = None) -> None:
+    def create_schema(self, benchmark, connection: Any) -> float:
         """Create Glue database if it doesn't exist.
 
         Args:
-            schema_name: Database name (uses self.database if not provided).
+            benchmark: Benchmark instance.
+            connection: Active connection/session metadata; not used by Athena Spark.
         """
-        database = schema_name or self.database
+        start_time = mono_time()
+        database = self.database
         glue_client = self._get_glue_client()
 
         try:
@@ -406,6 +409,7 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapte
                 }
             )
             logger.info(f"Created database '{database}'")
+        return elapsed_seconds(start_time)
 
     def _submit_calculation(
         self,
@@ -551,30 +555,32 @@ result.show(100, truncate=False)
 
     def load_data(
         self,
-        tables: list[str],
-        source_dir: Path | str,
-        file_format: str = "parquet",
-        **kwargs: Any,
-    ) -> dict[str, str]:
+        benchmark,
+        connection: Any,
+        data_dir: Path,
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Upload benchmark data to S3 and create Hive tables.
 
         Args:
-            tables: List of table names to load.
-            source_dir: Local directory containing table data files.
-            file_format: Data file format (default: parquet).
-            **kwargs: Additional options.
+            benchmark: Benchmark instance.
+            connection: Active connection/session metadata; not used by Athena Spark.
+            data_dir: Local directory containing table data files.
 
         Returns:
-            Dict mapping table names to S3 URIs.
+            Tuple of table row-count placeholders, elapsed seconds, and table URI metadata.
         """
-        source_path = Path(source_dir)
+        start_time = mono_time()
+        source_path = Path(data_dir)
+        tables = _resolve_benchmark_table_names(benchmark)
+        file_format = self.requested_table_format or self.table_format
         if not source_path.exists():
-            raise ConfigurationError(f"Source directory not found: {source_dir}")
+            raise ConfigurationError(f"Source directory not found: {data_dir}")
 
         # Check if tables already exist in S3
         if self._staging and self._staging.tables_exist(tables):
             logger.info("Tables already exist in S3 staging, skipping upload")
-            return {table: self._staging.get_table_uri(table) for table in tables}
+            table_uris = {table: self._staging.get_table_uri(table) for table in tables}
+            return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
         # Upload using cloud-spark staging infrastructure
         if self._staging:
@@ -599,36 +605,56 @@ result.show(100, truncate=False)
             self._submit_calculation(create_table_sql, code_type="SQL", wait_for_completion=True)
             logger.info(f"Created table {self.database}.{table}")
 
-        return table_uris
+        return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
     def execute_query(
         self,
+        connection: Any,
         query: str,
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
         """Execute a SQL query on Athena Spark.
 
         Args:
+            connection: Active connection/session metadata; not used by Athena Spark.
             query: SQL query to execute.
-            **kwargs: Additional query options.
+            query_id: Query identifier.
 
         Returns:
-            Query results as list of dicts.
+            Standard query result dictionary.
         """
         start_time = mono_time()
-
-        calculation_id, state = self._submit_calculation(query, code_type="SQL", wait_for_completion=True)
-
-        elapsed = elapsed_seconds(start_time)
-        self._query_count += 1
-        self._total_execution_time_seconds += elapsed
-
-        if state not in AthenaSparkCalculationState.SUCCESS_STATES:
-            raise RuntimeError(f"Athena Spark calculation failed with state: {state}")
-
-        # Retrieve results
-        results = self._get_calculation_result(calculation_id)
-        return results
+        try:
+            calculation_id, state = self._submit_calculation(query, code_type="SQL", wait_for_completion=True)
+            elapsed = elapsed_seconds(start_time)
+            self._query_count += 1
+            self._total_execution_time_seconds += elapsed
+            if state not in AthenaSparkCalculationState.SUCCESS_STATES:
+                raise RuntimeError(f"Athena Spark calculation failed with state: {state}")
+            results = self._get_calculation_result(calculation_id)
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "SUCCESS",
+                "execution_time_seconds": elapsed,
+                "rows_returned": len(results),
+                "results": results,
+                "error": None,
+            }
+        except Exception as e:
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "FAILED",
+                "execution_time_seconds": elapsed_seconds(start_time),
+                "rows_returned": 0,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
 
     def close(self) -> None:
         """Terminate the Athena Spark session."""

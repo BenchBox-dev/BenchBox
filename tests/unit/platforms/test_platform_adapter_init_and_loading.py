@@ -496,14 +496,14 @@ class TestDataSourceResolver:
         assert len(manifest_sources) == 1
         assert manifest_sources[0]._platform_name == "datafusion"
 
-    def test_platform_name_default_is_none(self):
-        """Test that without platform_name, ManifestFileSource has no _platform_name override."""
+    def test_platform_name_default_is_duckdb(self):
+        """Test that without platform_name, ManifestFileSource defaults to 'duckdb'."""
         from benchbox.platforms.base.data_loading import DataSourceResolver, ManifestFileSource
 
         resolver = DataSourceResolver()
         manifest_sources = [p for p in resolver.providers if isinstance(p, ManifestFileSource)]
         assert len(manifest_sources) == 1
-        assert not hasattr(manifest_sources[0], "_platform_name") or manifest_sources[0]._platform_name is None
+        assert manifest_sources[0]._platform_name == "duckdb"
 
 
 class TestGzipHandler:

@@ -18,7 +18,7 @@ QuestDB is designed for time-series and event-driven workloads, with features li
 - **Time-series optimized** - Designated timestamps, partitioning by time, SYMBOL type
 - **Autocommit mode** - PG wire protocol operates in autocommit mode (required by QuestDB)
 - **TPC file normalization** - Automatic handling of pipe-delimited `.tbl` files with trailing delimiter removal
-- **Fallback loading** - REST API import with automatic fallback to COPY via PG wire protocol
+- **Chunked parquet loading** - Large parquet inputs are streamed through `/imp` as CSV chunks, with `parquet_chunk_rows` controlling the row budget per request
 - **TLS support** - Optional HTTPS for REST API endpoints via `--questdb-use-tls`
 
 ## Quick Start
@@ -75,10 +75,11 @@ benchbox run --platform questdb --benchmark tpch --scale 0.01
 | `database` | `--questdb-database` | - | `qdb` | QuestDB database name |
 | `use_tls` | `--questdb-use-tls` | - | `false` | Use HTTPS for REST API endpoints |
 | `connect_timeout` | - | - | `10` | Connection timeout in seconds |
+| `parquet_chunk_rows` | `--platform-option parquet_chunk_rows=<N>` | - | `200000` | Rows per parquet batch when streaming wide tables through `/imp` |
 
 ## Data Loading
 
-BenchBox loads data into QuestDB using the REST API `/imp` endpoint for bulk CSV import. If the REST API is unavailable, the adapter falls back to `COPY` via the PG wire protocol.
+BenchBox loads data into QuestDB using the REST API `/imp` endpoint for bulk CSV import. For parquet inputs, the adapter converts each pyarrow batch into CSV and streams it through `/imp`; there is no `COPY FROM STDIN` fallback in the current adapter.
 
 ### Loading Process
 
@@ -86,8 +87,8 @@ BenchBox loads data into QuestDB using the REST API `/imp` endpoint for bulk CSV
 2. **Foreign key removal** - FK constraints are stripped (QuestDB does not support foreign keys)
 3. **DROP TABLE adaptation** - `IF EXISTS` is added to DROP TABLE statements for idempotent schema creation
 4. **TPC file normalization** - Pipe-delimited `.tbl` files are streamed through a normalizer that removes trailing delimiters
-5. **REST API import** - CSV data is uploaded to the `/imp` endpoint with table name, delimiter, and durability settings
-6. **Fallback to COPY** - If REST API import fails, data is loaded via `COPY FROM STDIN` over PG wire protocol
+5. **REST API import** - CSV data is uploaded to the `/imp` endpoint with table name, delimiter, durability settings, and `forceHeader=true` for chunked parquet uploads
+6. **Chunk sizing for wide parquet tables** - `--platform-option parquet_chunk_rows=<N>` lowers the number of rows per `/imp` request when a denormalized parquet file would otherwise exceed QuestDB's HTTP receive budget
 
 ### REST API Import (`/imp`)
 
@@ -95,17 +96,10 @@ The primary data loading mechanism uses QuestDB's REST API:
 
 - **Endpoint**: `http://<host>:<http_port>/imp`
 - **Method**: HTTP POST with multipart file upload
-- **Parameters**: `name` (table), `delimiter`, `overwrite`, `durable`
+- **Parameters**: `name` (table), `delimiter`, `overwrite`, `durable` and `forceHeader=true` for chunked parquet uploads
 - **Format**: CSV with configurable delimiter (auto-detected for TPC `.tbl` files)
 - **Throughput**: Significantly higher than row-by-row INSERT for bulk datasets
-
-### COPY via PG Wire Protocol (Fallback)
-
-When the REST API is unavailable, the adapter uses psycopg2's `copy_expert`:
-
-```sql
-COPY "table_name" FROM STDIN WITH (FORMAT csv, DELIMITER '|')
-```
+- **Wide parquet tuning**: lower `--platform-option parquet_chunk_rows=50000` (or smaller) when a very wide table would make each CSV chunk too large for a single HTTP request
 
 ### InfluxDB Line Protocol (ILP)
 
@@ -158,6 +152,10 @@ benchbox run --platform questdb --benchmark tpch --scale 1.0 \
 benchbox run --platform questdb --benchmark tpch --scale 1.0 \
     --questdb-host questdb.example.com \
     --questdb-use-tls
+
+# Lower parquet chunk size for wide denormalized tables such as tpcds_obt
+benchbox run --platform questdb --benchmark tpcds_obt --scale 0.01 \
+    --platform-option parquet_chunk_rows=50000
 ```
 
 ### Dry Run (Preview)
@@ -188,11 +186,11 @@ QuestDBAdapter
     +-- PG Wire Protocol (psycopg2) --> QuestDB (port 8812)
     |       - Schema DDL (CREATE TABLE, DROP TABLE)
     |       - Query execution (SELECT, EXPLAIN)
-    |       - COPY FROM STDIN fallback loading
     |       - Autocommit mode required
     |
     +-- REST API (requests) --> QuestDB (port 9000)
             - /imp endpoint for bulk CSV import
+            - Chunked parquet → CSV uploads via /imp
             - /exec endpoint for row count verification
             - Optional TLS (HTTPS) support
 ```
@@ -292,14 +290,15 @@ Error: Missing dependencies for questdb platform: psycopg2
 ### REST API Import Failures
 
 ```
-Warning: REST API import failed, falling back to COPY
+Error: REST API import failed
 ```
 
 **Solutions:**
 1. Verify the REST API is accessible on the HTTP port (default: 9000)
 2. Check that `requests` is installed: `uv add requests`
 3. Test the REST API directly: `curl http://<host>:9000/exec?query=SELECT%201`
-4. If using TLS, ensure `--questdb-use-tls` is set and certificates are valid
+4. Lower `--platform-option parquet_chunk_rows=<N>` for very wide parquet tables
+5. If using TLS, ensure `--questdb-use-tls` is set and certificates are valid
 
 ### Schema Creation Failures
 

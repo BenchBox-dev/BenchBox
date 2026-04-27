@@ -174,7 +174,7 @@ class UnifiedTestRunner:
 
         return sorted(set(test_files))
 
-    def build_pytest_command(
+    def build_pytest_command(  # noqa: C901
         self,
         test_files: list[Path],
         config: UnifiedRunnerConfig,

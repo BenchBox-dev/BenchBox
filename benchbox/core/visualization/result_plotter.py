@@ -10,11 +10,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.labels import disambiguate_platform_labels
 from benchbox.core.results.loader import find_latest_result
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.normalizer import normalize_result_dict
 from benchbox.core.visualization.exceptions import VisualizationError
-from benchbox.utils.scale_factor import format_scale_factor
 
 logger = logging.getLogger(__name__)
 
@@ -44,108 +44,62 @@ class NormalizedResult:
     power_at_size: float | None = None
 
 
+class _NormalizedResultAdapter:
+    """Adapts NormalizedResult to the _DisambiguatableResult protocol for label disambiguation."""
+
+    __slots__ = ("_result",)
+
+    def __init__(self, result: NormalizedResult) -> None:
+        self._result = result
+
+    @property
+    def platform(self) -> str:
+        return self._result.platform
+
+    @property
+    def platform_id(self) -> str:
+        # NormalizedResult has no canonical ID; display name is already normalizer-produced
+        return self._result.platform
+
+    @property
+    def driver_version(self) -> str | None:
+        raw = self._result.raw or {}
+        block = raw.get("platform") or raw.get("platform_info") or {}
+        if isinstance(block, dict):
+            return block.get("version")
+        return None
+
+    @property
+    def execution_mode(self) -> str | None:
+        return self._result.execution_mode
+
+    @property
+    def scale_factor(self) -> float:
+        sf = self._result.scale_factor
+        try:
+            return float(sf)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return 0.0
+
+    @property
+    def run_date(self) -> str:
+        ts = self._result.timestamp
+        return ts.strftime("%Y-%m-%d") if ts else ""
+
+
 class ResultPlotter:
     """Load and normalize benchmark results for ASCII chart generation."""
-
-    # Abbreviated execution mode labels for display
-    MODE_ABBREVIATIONS: dict[str, str] = {
-        "dataframe": "df",
-        "sql": "sql",
-        "datagen": "datagen",
-        "data_only": "data_only",
-    }
 
     def __init__(self, results: Sequence[NormalizedResult], theme: str = "light"):
         if not results:
             raise VisualizationError("No results provided for visualization.")
         self.results = list(results)
-        self._disambiguate_platforms()
-        self._disambiguate_modes()
-        self._disambiguate_versions()
+        adapters = [_NormalizedResultAdapter(r) for r in self.results]
+        labels = disambiguate_platform_labels(adapters)  # type: ignore[arg-type]
+        for result, label in zip(self.results, labels):
+            result.platform = label
         self._sort_results_by_version()
         self.theme = theme
-
-    def _disambiguate_platforms(self) -> None:
-        """Append scale factor to platform labels when needed to avoid duplicates."""
-        from collections import Counter
-
-        platform_counts = Counter(r.platform for r in self.results)
-        duplicated_platforms = {p for p, count in platform_counts.items() if count > 1}
-        if not duplicated_platforms:
-            return
-
-        for platform in duplicated_platforms:
-            matching = [r for r in self.results if r.platform == platform]
-            scale_factors = {r.scale_factor for r in matching}
-            if len(scale_factors) > 1:
-                for result in matching:
-                    sf_label = format_scale_factor(result.scale_factor)
-                    object.__setattr__(result, "platform", f"{result.platform} SF={sf_label}")
-
-    def _disambiguate_modes(self) -> None:
-        """Ensure symmetric mode suffixes when same platform appears with different modes.
-
-        When two results share the same base platform name but differ by execution mode,
-        both get their mode suffix appended. Uses abbreviated labels: "df" not "dataframe".
-        Single-result or single-mode cases keep the bare platform name.
-        """
-        from collections import Counter
-
-        platform_counts = Counter(r.platform for r in self.results)
-        duplicated_platforms = {p for p, count in platform_counts.items() if count > 1}
-        if not duplicated_platforms:
-            return
-
-        for platform in duplicated_platforms:
-            matching = [r for r in self.results if r.platform == platform]
-            # Check execution_mode differences
-            modes: dict[int, str] = {}
-            for r in matching:
-                mode = r.execution_mode or "sql"
-                modes[id(r)] = mode
-
-            unique_modes = set(modes.values())
-            if len(unique_modes) <= 1:
-                continue
-
-            # Multiple modes for same platform — append abbreviated mode to each
-            for result in matching:
-                mode = modes[id(result)]
-                abbrev = self.MODE_ABBREVIATIONS.get(mode, mode)
-                object.__setattr__(result, "platform", f"{result.platform} ({abbrev})")
-
-    def _disambiguate_versions(self) -> None:
-        """Append driver version to platform labels when platforms are still duplicated.
-
-        Runs after scale-factor and mode disambiguation. When two results share the
-        same platform label but have different driver versions, both labels get the
-        version appended so charts can distinguish them (e.g. "DuckDB 1.0.0" vs
-        "DuckDB 1.4.3").
-        """
-        from collections import Counter
-
-        platform_counts = Counter(r.platform for r in self.results)
-        duplicated_platforms = {p for p, count in platform_counts.items() if count > 1}
-        if not duplicated_platforms:
-            return
-
-        for platform in duplicated_platforms:
-            matching = [r for r in self.results if r.platform == platform]
-            versions: dict[int, str | None] = {}
-            for r in matching:
-                raw = r.raw or {}
-                platform_block = raw.get("platform") or raw.get("platform_info") or {}
-                version = platform_block.get("version") if isinstance(platform_block, dict) else None
-                versions[id(r)] = version
-
-            unique_versions = {v for v in versions.values() if v is not None}
-            if len(unique_versions) <= 1:
-                continue
-
-            for result in matching:
-                v = versions[id(result)]
-                if v:
-                    object.__setattr__(result, "platform", f"{result.platform} {v}")
 
     def _sort_results_by_version(self) -> None:
         """Sort results by semantic version extracted from the platform label.

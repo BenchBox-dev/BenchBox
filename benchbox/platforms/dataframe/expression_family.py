@@ -39,6 +39,10 @@ from benchbox.core.dataframe.profiling import (
 )
 from benchbox.core.dataframe.query import DataFrameQuery
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
+from benchbox.platforms.dataframe._result_helpers import (
+    build_failure_result_dict,
+    build_success_result_dict,
+)
 from benchbox.platforms.dataframe.benchmark_mixin import BenchmarkExecutionMixin
 from benchbox.platforms.dataframe.tuning_mixin import TuningConfigurableMixin
 from benchbox.platforms.dataframe.unified_frame import UnifiedExpr, UnifiedLazyFrame, UnifiedWhen
@@ -512,7 +516,7 @@ class ExpressionFamilyContext(DataFrameContextImpl[DF], Generic[DF, Expr]):
 
         if column:
             return UnifiedExpr(pl.count(column))
-        return UnifiedExpr(pl.count())
+        return UnifiedExpr(pl.len())
 
     def len(self) -> UnifiedExpr:
         """Create a LEN/COUNT(*) expression for row count.
@@ -808,6 +812,10 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         self.working_dir = Path(working_dir) if working_dir else Path.cwd()
         self.verbose = verbose
         self.very_verbose = very_verbose
+        # Shared loading routes through DataSourceResolver, which expects the
+        # same basic platform contract used by SQL adapters.
+        self.table_mode = "native"
+        self.platform_config: dict[str, Any] = {}
         self._context: ExpressionFamilyContext[DF, Expr] | None = None
 
         # Initialize tuning configuration (from mixin)
@@ -926,6 +934,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         delimiter: str = ",",
         has_header: bool = True,
         column_names: list[str] | None = None,
+        null_marker: str | None = None,
     ) -> LazyDF:
         """Read a CSV file into a DataFrame.
 
@@ -934,6 +943,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             delimiter: Field delimiter
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
+            null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
 
         Returns:
             LazyFrame/DataFrame with the file contents
@@ -1180,6 +1190,10 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         file_paths: list[Path],
         column_names: list[str] | None = None,
         delimiter: str | None = None,
+        format_hint: str | None = None,
+        *,
+        data_source: Any | None = None,
+        benchmark: Any | None = None,
     ) -> int:
         """Load a table from data files.
 
@@ -1192,6 +1206,9 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             file_paths: List of file paths to load
             column_names: Optional column names for headerless files
             delimiter: Optional CSV delimiter override (e.g. "|" for pipe-delimited CSV)
+            format_hint: Optional format hint from manifest (e.g. "parquet", "csv", "tbl")
+            data_source: Optional DataSource for manifest-aware CSV dialect resolution.
+            benchmark: Optional benchmark instance for CSV dialect resolution.
 
         Returns:
             Number of rows loaded
@@ -1199,23 +1216,47 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         if not file_paths:
             raise ValueError(f"No files provided for table '{table_name}'")
 
-        # Detect format from first file
+        # Use manifest hint when available; fall back to extension detection
         first_file = file_paths[0]
-        format_type = self._detect_format(first_file)
+        if format_hint == "parquet":
+            format_type = "parquet"
+        elif format_hint in ("tbl", "csv"):
+            format_type = format_hint
+        elif format_hint:
+            raise ValueError(f"Unknown format_hint '{format_hint}'; expected 'parquet', 'csv', or 'tbl'")
+        else:
+            format_type = self._detect_format(first_file)
 
         self._log_verbose(f"Loading table {table_name} from {len(file_paths)} file(s), format: {format_type}")
 
         if format_type == "parquet":
             df = self._load_parquet_files(file_paths)
         else:
-            # CSV or TBL — use explicit delimiter if provided, else infer from format
+            # CSV or TBL - use explicit delimiter if provided, else infer from format
             effective_delimiter = delimiter or ("|" if format_type == "tbl" else ",")
             has_header = format_type == "csv" and delimiter is None
+
+            # Resolve null_marker for trailing-delimiter probing via the resolver when a
+            # DataSource is available (manifest path).  Without one, derive from format_type
+            # so .tbl files (format_type=="tbl") keep their existing trailing-delimiter behaviour.
+            # When benchmark=None, NO_BENCHMARK is used: path (a) wins when table_metadata is
+            # present; otherwise path (c) of resolve_csv_dialect derives null_marker from the
+            # file extension (.tbl/.dat → "", everything else → None), which is correct.
+            if data_source is not None:
+                from benchbox.platforms.base.data_loading import NO_BENCHMARK, resolve_csv_dialect
+
+                bm = benchmark if benchmark is not None else NO_BENCHMARK
+                _dialect = resolve_csv_dialect(data_source, table_name, first_file, bm)
+                null_marker: str | None = _dialect.null_marker
+            else:
+                null_marker = "" if format_type == "tbl" else None
+
             df = self._load_csv_files(
                 file_paths,
                 delimiter=effective_delimiter,
                 has_header=has_header,
                 column_names=column_names,
+                null_marker=null_marker,
             )
 
         # Register table
@@ -1303,25 +1344,23 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
 
             self._log_verbose(f"Query {qid} completed in {execution_time:.3f}s, returned {row_count} rows")
 
-            return {
-                "query_id": qid,
-                "status": "SUCCESS",
-                "execution_time_seconds": execution_time,
-                "rows_returned": row_count,
-                "first_row": first_row,
-            }
+            return build_success_result_dict(
+                query_id=qid,
+                execution_time_seconds=execution_time,
+                row_count=row_count,
+                first_row=first_row,
+            )
 
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             error_msg = str(e)
             logger.error(f"Query {qid} failed: {error_msg}")
 
-            return {
-                "query_id": qid,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "error": error_msg,
-            }
+            return build_failure_result_dict(
+                query_id=qid,
+                execution_time_seconds=execution_time,
+                error_message=error_msg,
+            )
 
     def execute_query_profiled(
         self,
@@ -1431,13 +1470,12 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 f"rows={row_count}"
             )
 
-            result_dict = {
-                "query_id": qid,
-                "status": "SUCCESS",
-                "execution_time_seconds": execution_time,
-                "rows_returned": row_count,
-                "first_row": first_row,
-            }
+            result_dict = build_success_result_dict(
+                query_id=qid,
+                execution_time_seconds=execution_time,
+                row_count=row_count,
+                first_row=first_row,
+            )
 
             return result_dict, profile
 
@@ -1452,12 +1490,11 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             error_msg = str(e)
             logger.error(f"Query {qid} failed: {error_msg}")
 
-            result_dict = {
-                "query_id": qid,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "error": error_msg,
-            }
+            result_dict = build_failure_result_dict(
+                query_id=qid,
+                execution_time_seconds=execution_time,
+                error_message=error_msg,
+            )
 
             return result_dict, profile
 
@@ -1504,6 +1541,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
         delimiter: str,
         has_header: bool,
         column_names: list[str] | None,
+        null_marker: str | None = None,
     ) -> LazyDF:
         """Load CSV/TBL files.
 
@@ -1512,6 +1550,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
             delimiter: Field delimiter
             has_header: Whether files have headers
             column_names: Optional column names
+            null_marker: Passed through to read_csv for trailing-delimiter probing.
 
         Returns:
             Combined DataFrame
@@ -1522,6 +1561,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 delimiter=delimiter,
                 has_header=has_header,
                 column_names=column_names,
+                null_marker=null_marker,
             )
 
         # Multiple files - load and concatenate
@@ -1531,6 +1571,7 @@ class ExpressionFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, 
                 delimiter=delimiter,
                 has_header=has_header,
                 column_names=column_names,
+                null_marker=null_marker,
             )
             for f in file_paths
         ]

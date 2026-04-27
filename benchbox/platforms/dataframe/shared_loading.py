@@ -3,11 +3,36 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class LoadableAdapter(Protocol):
+    """Contract required by :func:`load_tables_from_data_source_impl`.
+
+    Both DataFrame family base classes and the SQL
+    :class:`~benchbox.platforms.base.adapter.PlatformAdapter` satisfy this
+    protocol.
+    """
+
+    platform_name: str
+    table_mode: str
+    platform_config: dict[str, Any]
+
+    def load_table(
+        self,
+        ctx: Any,
+        table_name: str,
+        files: list[Path],
+        column_names: list[str] | None = None,
+        *,
+        format_hint: str | None = None,
+    ) -> int: ...
+    def _log_verbose(self, msg: str) -> None: ...
 
 
 def load_tables_from_data_source_impl(
-    adapter: Any,
+    adapter: LoadableAdapter,
     ctx: Any,
     data_dir: Path,
     schema_info: dict[str, dict] | None = None,
@@ -19,8 +44,7 @@ def load_tables_from_data_source_impl(
     adapter delegates with a single call.
 
     Args:
-        adapter: The adapter instance (must expose ``load_table`` and
-            ``_log_verbose``).
+        adapter: The adapter instance (must satisfy :class:`LoadableAdapter`).
         ctx: The family-specific context with registered tables.
         data_dir: Directory containing data files.
         schema_info: Optional schema information with column names.
@@ -28,9 +52,14 @@ def load_tables_from_data_source_impl(
     Returns:
         Dictionary mapping table name to row count.
     """
-    from benchbox.platforms.base.data_loading import DataSourceResolver
+    from benchbox.platforms.base.data_loading import DataSource, DataSourceResolver
 
-    resolver = DataSourceResolver()
+    resolver = DataSourceResolver(
+        platform_name=adapter.platform_name,
+        table_mode=adapter.table_mode,
+        platform_config=adapter.platform_config,
+        requested_format=getattr(adapter, "requested_table_format", None),
+    )
 
     class MinimalBenchmark:
         tables: dict = {}
@@ -55,7 +84,22 @@ def load_tables_from_data_source_impl(
             columns = schema_info[table_name.lower()].get("columns", [])
             column_names = [col["name"] for col in columns if "name" in col]
 
-        row_count = adapter.load_table(ctx, table_name.lower(), valid_files, column_names)
+        table_formats = getattr(data_source, "table_formats", {}) or {}
+        format_hint = table_formats.get(table_name) or table_formats.get(table_name.lower())
+        # Only pass a proper DataSource so load_table can call resolve_csv_dialect safely.
+        # No real benchmark is available here; NO_BENCHMARK is used inside load_table() as a
+        # fallback.  That is intentional: when table_metadata is absent, resolve_csv_dialect()
+        # falls through to path (c) which derives the correct null_marker from the file extension
+        # (.tbl/.dat → null_marker="", everything else → None).
+        typed_ds = data_source if isinstance(data_source, DataSource) else None
+        row_count = adapter.load_table(
+            ctx,
+            table_name.lower(),
+            valid_files,
+            column_names,
+            format_hint=format_hint,
+            data_source=typed_ds,
+        )
         table_stats[table_name.lower()] = row_count
 
     return table_stats

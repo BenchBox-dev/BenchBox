@@ -699,4 +699,4 @@ See Also
 - :doc:`result-analysis` - Result analysis and comparison utilities
 - :doc:`/advanced/performance-optimization` - Performance optimization guide
 - :doc:`/advanced/ci-cd-integration` - CI/CD integration guide
-- :doc:`/TROUBLESHOOTING` - Troubleshooting guide
+- :doc:`/usage/troubleshooting` - Troubleshooting guide

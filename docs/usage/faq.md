@@ -17,7 +17,7 @@ BenchBox is a benchmarking toolbox that makes it simple to benchmark analytical 
 
 BenchBox is currently **Beta software**. Core functionality is stable (TPC-H, TPC-DS with DuckDB and major cloud platforms). APIs may still change before 1.0. We recommend thorough testing before using BenchBox in production. See the main README for details on Beta status.
 
-The default wheel includes a `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency). This namespace is **not part of the supported Beta surface** — it has no stability guarantees and is not integrated with the benchmark registry or CLI. Use it at your own risk.
+The default wheel includes a `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency). This namespace is **not part of the supported Beta surface** - it has no stability guarantees and is not integrated with the benchmark registry or CLI. Use it at your own risk.
 
 ### Which databases does BenchBox support?
 
@@ -80,7 +80,7 @@ No. BenchBox includes pre-compiled TPC-H and TPC-DS data generation tools (`dbge
 
 ### Can I run BenchBox without any database installed?
 
-Yes! Install BenchBox with the `[duckdb]` extra and you can run benchmarks immediately — DuckDB creates databases in-process with no server setup.
+Yes! Install BenchBox with the `[duckdb]` extra and you can run benchmarks immediately - DuckDB creates databases in-process with no server setup.
 
 ```bash
 uv add benchbox --extra duckdb

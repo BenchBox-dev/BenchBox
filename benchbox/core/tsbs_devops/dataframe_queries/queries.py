@@ -105,7 +105,7 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q3_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q3: Max CPU across all hosts — 1 hour."""
+    """Q3: Max CPU across all hosts - 1 hour."""
     params = get_parameters("Q3")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -126,7 +126,7 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q3_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q3: Max CPU across all hosts — 1 hour."""
+    """Q3: Max CPU across all hosts - 1 hour."""
     params = get_parameters("Q3")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -141,7 +141,7 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q4_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q4: Max CPU across all hosts — 8 hours (with iowait)."""
+    """Q4: Max CPU across all hosts - 8 hours (with iowait)."""
     params = get_parameters("Q4")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -163,7 +163,7 @@ def q4_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q4_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q4: Max CPU across all hosts — 8 hours (with iowait)."""
+    """Q4: Max CPU across all hosts - 8 hours (with iowait)."""
     params = get_parameters("Q4")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -183,7 +183,7 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q5_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Double GROUP BY — hostname + minute bucket."""
+    """Q5: Double GROUP BY - hostname + minute bucket."""
     params = get_parameters("Q5")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -205,7 +205,7 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q5_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Double GROUP BY — hostname + minute bucket."""
+    """Q5: Double GROUP BY - hostname + minute bucket."""
     params = get_parameters("Q5")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -221,7 +221,7 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q6_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q6: Double GROUP BY — hostname + second bucket (5-min window)."""
+    """Q6: Double GROUP BY - hostname + second bucket (5-min window)."""
     params = get_parameters("Q6")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -243,7 +243,7 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q6_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q6: Double GROUP BY — hostname + second bucket (5-min window)."""
+    """Q6: Double GROUP BY - hostname + second bucket (5-min window)."""
     params = get_parameters("Q6")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -264,7 +264,7 @@ def q6_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q7_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q7: Hosts with CPU > 90% — DISTINCT."""
+    """Q7: Hosts with CPU > 90% - DISTINCT."""
     params = get_parameters("Q7")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -281,7 +281,7 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q7_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q7: Hosts with CPU > 90% — DISTINCT."""
+    """Q7: Hosts with CPU > 90% - DISTINCT."""
     params = get_parameters("Q7")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -292,7 +292,7 @@ def q7_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q8_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q8: Hosts with sustained high CPU — HAVING COUNT > 10."""
+    """Q8: Hosts with sustained high CPU - HAVING COUNT > 10."""
     params = get_parameters("Q8")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -311,7 +311,7 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q8_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q8: Hosts with sustained high CPU — HAVING COUNT > 10."""
+    """Q8: Hosts with sustained high CPU - HAVING COUNT > 10."""
     params = get_parameters("Q8")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -328,7 +328,7 @@ def q8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q9_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q9: Memory stats per host — AVG, MAX, MIN."""
+    """Q9: Memory stats per host - AVG, MAX, MIN."""
     params = get_parameters("Q9")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -350,7 +350,7 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q9_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q9: Memory stats per host — AVG, MAX, MIN."""
+    """Q9: Memory stats per host - AVG, MAX, MIN."""
     params = get_parameters("Q9")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -369,7 +369,7 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q10_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q10: Low memory hosts — HAVING MIN < 10."""
+    """Q10: Low memory hosts - HAVING MIN < 10."""
     params = get_parameters("Q10")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -388,7 +388,7 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q10_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q10: Low memory hosts — HAVING MIN < 10."""
+    """Q10: Low memory hosts - HAVING MIN < 10."""
     params = get_parameters("Q10")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -441,7 +441,7 @@ def q11_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q12_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q12: Disk latency — CASE WHEN for safe division."""
+    """Q12: Disk latency - CASE WHEN for safe division."""
     params = get_parameters("Q12")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -472,7 +472,7 @@ def q12_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q12_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q12: Disk latency — CASE WHEN for safe division."""
+    """Q12: Disk latency - CASE WHEN for safe division."""
     import numpy as np
 
     params = get_parameters("Q12")
@@ -536,7 +536,7 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q14_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q14: Network errors — HAVING SUM > 0."""
+    """Q14: Network errors - HAVING SUM > 0."""
     params = get_parameters("Q14")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -558,7 +558,7 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q14: Network errors — HAVING SUM > 0."""
+    """Q14: Network errors - HAVING SUM > 0."""
     params = get_parameters("Q14")
     start_time = params.get("start_time")
     end_time = params.get("end_time")
@@ -579,7 +579,7 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q15_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q15: Resource utilization — JOIN cpu+mem on hostname and minute.
+    """Q15: Resource utilization - JOIN cpu+mem on hostname and minute.
 
     Uses two-stage aggregation: mean per (hostname, minute), then mean of
     minute-level means per hostname.  This matches the TSBS benchmark
@@ -620,7 +620,7 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q15_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q15: Resource utilization — JOIN cpu+mem on hostname and minute.
+    """Q15: Resource utilization - JOIN cpu+mem on hostname and minute.
 
     Uses two-stage aggregation: mean per (hostname, minute), then mean of
     minute-level means per hostname.  See expression_impl docstring for
@@ -656,7 +656,7 @@ def q15_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q16_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q16: Last point per host — subquery pattern."""
+    """Q16: Last point per host - subquery pattern."""
     params = get_parameters("Q16")
     start_time = params.get("start_time")
 
@@ -678,7 +678,7 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q16_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q16: Last point per host — subquery pattern."""
+    """Q16: Last point per host - subquery pattern."""
     params = get_parameters("Q16")
     start_time = params.get("start_time")
 

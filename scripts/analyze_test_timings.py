@@ -153,7 +153,7 @@ def parse_timing_report(report_path: Path) -> list[TestTiming]:
     timings = []
     in_durations_section = False
 
-    with open(report_path) as f:
+    with open(report_path, encoding="utf-8") as f:
         for line in f:
             # Detect start of durations section
             if "slowest" in line.lower() and "durations" in line.lower():

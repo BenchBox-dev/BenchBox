@@ -136,7 +136,7 @@ class PlatformComparison:
                 raise FileNotFoundError(f"Result file not found: {path}")
 
             try:
-                with open(path) as f:
+                with open(path, encoding="utf-8") as f:
                     data = json.load(f)
                 result = _dict_to_benchmark_results(data)
                 results.append(result)

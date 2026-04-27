@@ -118,7 +118,7 @@ def test_datafusion_list_operations(datafusion_frame):
     assert result_dict["has_four"] == [False, True]
     assert result_dict["arr_len"] == [3, 2]
     assert result_dict["second"] == [1, 4]
-    assert result_dict["unique_vals"] == [[1, 3], [2, 4]]
+    assert [sorted(v) for v in result_dict["unique_vals"]] == [[1, 3], [2, 4]]
     assert result_dict["min_val"] == [1, 2]
     assert result_dict["max_val"] == [3, 4]
     assert result_dict["sorted_vals"] == [[1, 3, 3], [2, 4]]

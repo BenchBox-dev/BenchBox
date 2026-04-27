@@ -175,14 +175,23 @@ class TestScaleAdjustedExpectations:
 
     def test_tpcds_fixed_tables_at_different_scale(self):
         v = BenchmarkDataValidator("tpcds", scale_factor=0.5)
-        # call_center, reason, ship_mode, warehouse, income_band, store, time_dim are fixed
+        # At sf=0.5 (unofficial subscale), "fixed" TPC-DS tables scale proportionally
+        # with max(1, floor(sf1_baseline * sf)). See _sources/tpcds-subscale-contract.md.
+        assert v.table_expectations["call_center"].expected_rows == max(1, int(6 * 0.5))  # 3
+        assert v.table_expectations["ship_mode"].expected_rows == max(1, int(20 * 0.5))  # 10
+        assert v.table_expectations["warehouse"].expected_rows == max(1, int(5 * 0.5))  # 2 (floor -> 2? no: int(2.5)=2)
+        assert v.table_expectations["time_dim"].expected_rows == max(1, int(86400 * 0.5))  # 43200
+        # catalog_sales scales the same way
+        expected_cs = max(1, int(1441548 * 0.5))
+        assert v.table_expectations["catalog_sales"].expected_rows == expected_cs
+
+    def test_tpcds_fixed_tables_at_official_scale(self):
+        v = BenchmarkDataValidator("tpcds", scale_factor=1.0)
+        # At sf=1.0 (official scale), "fixed" TPC-DS tables use their baseline row counts
         assert v.table_expectations["call_center"].expected_rows == 6
         assert v.table_expectations["ship_mode"].expected_rows == 20
         assert v.table_expectations["warehouse"].expected_rows == 5
         assert v.table_expectations["time_dim"].expected_rows == 86400
-        # catalog_sales should be scaled
-        expected_cs = int(1441548 * 0.5)
-        assert v.table_expectations["catalog_sales"].expected_rows == expected_cs
 
 
 # ---------------------------------------------------------------------------

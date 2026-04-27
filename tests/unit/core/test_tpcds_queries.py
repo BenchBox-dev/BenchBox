@@ -83,6 +83,36 @@ def test_get_all_queries_skips_failures_and_collects():
     assert 3 not in res and 4 not in res
 
 
+def test_get_all_queries_raises_when_all_zero_queries_generated():
+    """get_all_queries must raise RuntimeError when dsqgen fails for every query."""
+    mgr = TPCDSQueryManager()
+    mgr.dsqgen = FakeDSQGen()
+
+    # Monkey-patch generate to always raise TPCDSError
+    def always_fail(qid, **kwargs):
+        raise TPCDSError("dsqgen binary not found")
+
+    mgr.dsqgen.generate = always_fail
+    with pytest.raises(RuntimeError, match="dsqgen failed for all"):
+        mgr.get_all_queries(scale_factor=1.0)
+
+
+def test_get_all_queries_logs_warnings_for_individual_failures(caplog):
+    """get_all_queries must emit warning logs for each dsqgen failure."""
+    import logging
+
+    mgr = make_manager_with_fake()
+
+    # Override generate so Q3 and Q4 fail (already the case in FakeDSQGen).
+    with caplog.at_level(logging.WARNING, logger="benchbox.core.tpcds.queries"):
+        result = mgr.get_all_queries(scale_factor=1.0)
+
+    # Queries 3 and 4 fail in FakeDSQGen - at least one warning must be logged.
+    assert any("dsqgen failed for query" in r.message for r in caplog.records)
+    # Successful queries still returned.
+    assert 1 in result and 2 in result
+
+
 def test_variations_validate_and_params_delegate():
     mgr = make_manager_with_fake()
     vars_ = mgr.get_query_variations(14)

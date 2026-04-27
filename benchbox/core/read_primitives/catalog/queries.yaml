@@ -449,6 +449,15 @@ queries:
         PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l_quantity) as median_quantity
     FROM lineitem
     GROUP BY l_shipmode;
+  variants:
+    clickhouse: |2
+
+      -- ClickHouse uses quantile(0.5)(col) instead of PERCENTILE_CONT WITHIN GROUP
+      SELECT
+          l_shipmode,
+          quantile(0.5)(l_quantity) as median_quantity
+      FROM lineitem
+      GROUP BY l_shipmode;
 - id: intrinsic_to_date
   category: intrinsic
   sql: |2
@@ -812,6 +821,26 @@ queries:
     FROM lineitem
     WHERE l_orderkey <= 10000
     ORDER BY l_orderkey, price_rank;
+  variants:
+    clickhouse: |2
+
+      -- ClickHouse rejects aliases in ORDER BY when the sqlglot-rewritten
+      -- source query injects NULLS FIRST; wrap in a subquery so the outer
+      -- ORDER BY references a materialized column.
+      SELECT *
+      FROM (
+          SELECT
+              l_orderkey,
+              l_partkey,
+              l_quantity,
+              l_extendedprice,
+              DENSE_RANK() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice DESC) as price_rank,
+              PERCENT_RANK() OVER (PARTITION BY l_orderkey ORDER BY l_quantity) as quantity_percentile,
+              CUME_DIST() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice) as price_distribution
+          FROM lineitem
+          WHERE l_orderkey <= 10000
+      ) t
+      ORDER BY l_orderkey, price_rank;
 - id: window_moving_frame
   category: window
   sql: |2
@@ -835,6 +864,26 @@ queries:
     WHERE o_orderdate >= DATE '1995-01-01'
       AND o_orderdate < DATE '1996-01-01'
     ORDER BY o_orderdate;
+  variants:
+    clickhouse: |2
+
+      -- ClickHouse does not support RANGE BETWEEN INTERVAL ... PRECEDING; use ROWS BETWEEN instead
+      SELECT
+          o_orderkey,
+          o_orderdate,
+          o_totalprice,
+          AVG(o_totalprice) OVER (
+              ORDER BY o_orderdate
+              ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
+          ) as moving_avg_6_orders,
+          SUM(o_totalprice) OVER (
+              ORDER BY o_orderdate
+              ROWS BETWEEN 30 PRECEDING AND CURRENT ROW
+          ) as monthly_running_total
+      FROM orders
+      WHERE o_orderdate >= toDate('1995-01-01')
+        AND o_orderdate < toDate('1996-01-01')
+      ORDER BY o_orderdate;
   skip_on: [redshift]
 - id: window_unbounded_frame
   category: window
@@ -961,6 +1010,18 @@ queries:
       WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
          OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
       LIMIT 100;
+    clickhouse: |2
+
+      -- ClickHouse doesn't support MATCH...AGAINST, use LIKE instead
+      SELECT
+          p_partkey,
+          p_name,
+          p_mfgr,
+          p_comment
+      FROM part
+      WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
+         OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
+      LIMIT 100;
 - id: fulltext_boolean_search
   category: fulltext
   sql: |2
@@ -1000,6 +1061,17 @@ queries:
     redshift: |2
 
       -- Redshift doesn't support MATCH...AGAINST, use LIKE with AND/NOT logic
+      SELECT
+          c_custkey,
+          c_name,
+          c_comment
+      FROM customer
+      WHERE c_comment LIKE '%BUILDING%'
+        AND c_comment NOT LIKE '%FURNITURE%'
+      LIMIT 50;
+    clickhouse: |2
+
+      -- ClickHouse doesn't support MATCH...AGAINST, use LIKE with AND/NOT logic
       SELECT
           c_custkey,
           c_name,
@@ -1051,6 +1123,16 @@ queries:
       FROM supplier
       WHERE s_comment LIKE '%Customer Complaints%'
       ORDER BY s_suppkey;
+    clickhouse: |2
+
+      -- ClickHouse doesn't support MATCH...AGAINST, use LIKE with exact phrase
+      SELECT
+          s_suppkey,
+          s_name,
+          s_comment
+      FROM supplier
+      WHERE s_comment LIKE '%Customer Complaints%'
+      ORDER BY s_suppkey;
 - id: statistical_percentiles
   category: statistical
   sql: |2
@@ -1067,6 +1149,19 @@ queries:
     FROM lineitem
     GROUP BY l_returnflag, l_linestatus;
   variants:
+    clickhouse: |2
+
+      -- ClickHouse uses quantile(p)(col) instead of PERCENTILE_CONT WITHIN GROUP
+      SELECT
+          l_returnflag,
+          l_linestatus,
+          COUNT(*) as record_count,
+          quantile(0.25)(l_quantity) as quantity_q1,
+          quantile(0.5)(l_quantity) as quantity_median,
+          quantile(0.75)(l_quantity) as quantity_q3,
+          quantile(0.95)(l_extendedprice) as price_p95
+      FROM lineitem
+      GROUP BY l_returnflag, l_linestatus;
     redshift: |2
 
       -- Redshift supports PERCENTILE_CONT only as a window function, not aggregate
@@ -1111,6 +1206,21 @@ queries:
     FROM lineitem
     WHERE l_shipdate >= DATE '1995-01-01'
       AND l_shipdate < DATE '1996-01-01';
+  variants:
+    clickhouse: |2
+
+      -- ClickHouse native aggregate functions for correlation and covariance.
+      -- REGR_SLOPE/INTERCEPT/R2 not available; compute manually from corr() and stddevSamp().
+      SELECT
+          corr(l_quantity, l_extendedprice) as qty_price_correlation,
+          covarPop(l_quantity, l_discount) as qty_discount_covariance,
+          covarSamp(l_tax, l_extendedprice) as tax_price_covariance,
+          corr(l_extendedprice, l_quantity) * stddevSamp(l_extendedprice) / nullif(stddevSamp(l_quantity), 0) as price_qty_slope,
+          avg(l_extendedprice) - corr(l_extendedprice, l_quantity) * stddevSamp(l_extendedprice) / nullif(stddevSamp(l_quantity), 0) * avg(l_quantity) as price_qty_intercept,
+          pow(corr(l_extendedprice, l_quantity), 2) as regression_r_squared
+      FROM lineitem
+      WHERE l_shipdate >= toDate('1995-01-01')
+        AND l_shipdate < toDate('1996-01-01');
 - id: olap_cube_analysis
   category: olap
   sql: |2
@@ -1209,6 +1319,42 @@ queries:
         REGR_SLOPE(monthly_revenue, month_epoch) OVER () as revenue_trend_slope,
         prev_month_revenue,
         (monthly_revenue - prev_month_revenue) / NULLIF(prev_month_revenue, 0) * 100 as mom_growth_pct
+      FROM monthly_with_lag
+      ORDER BY order_month;
+    clickhouse: |2
+
+      -- ClickHouse: use toStartOfMonth for DATE_TRUNC, toUnixTimestamp for EPOCH.
+      -- REGR_SLOPE not available; compute slope manually from corr/stddev over the CTE.
+      WITH monthly_totals AS (
+        SELECT
+          toStartOfMonth(o_orderdate) as order_month,
+          COUNT(*) as order_count,
+          SUM(o_totalprice) as monthly_revenue,
+          AVG(o_totalprice) as avg_order_value,
+          toUnixTimestamp(toStartOfMonth(o_orderdate)) as month_epoch
+        FROM orders
+        WHERE o_orderdate >= toDate('1995-01-01')
+          AND o_orderdate < toDate('1997-01-01')
+        GROUP BY toStartOfMonth(o_orderdate)
+      ),
+      monthly_with_lag AS (
+        SELECT
+          order_month,
+          order_count,
+          monthly_revenue,
+          avg_order_value,
+          month_epoch,
+          LAG(monthly_revenue, 1) OVER (ORDER BY order_month) as prev_month_revenue
+        FROM monthly_totals
+      )
+      SELECT
+        order_month,
+        order_count,
+        monthly_revenue,
+        avg_order_value,
+        corr(monthly_revenue, month_epoch) OVER () * stddevSamp(monthly_revenue) OVER () / nullif(stddevSamp(toFloat64(month_epoch)) OVER (), 0) as revenue_trend_slope,
+        prev_month_revenue,
+        (monthly_revenue - prev_month_revenue) / nullif(prev_month_revenue, 0) * 100 as mom_growth_pct
       FROM monthly_with_lag
       ORDER BY order_month;
     datafusion: |2
@@ -1688,6 +1834,24 @@ queries:
       AND l_shipdate < DATE '1996-01-01'
     QUALIFY CUME_DIST() OVER (PARTITION BY l_shipdate ORDER BY l_quantity) >= 0.95
     ORDER BY l_shipdate, l_quantity DESC;
+  variants:
+    clickhouse: |2
+
+      -- ClickHouse does not support QUALIFY; rewrite using subquery WHERE filter
+      SELECT l_shipdate, l_orderkey, l_linenumber, l_quantity, quantity_cumulative_dist
+      FROM (
+        SELECT
+            l_shipdate,
+            l_orderkey,
+            l_linenumber,
+            l_quantity,
+            CUME_DIST() OVER (PARTITION BY l_shipdate ORDER BY l_quantity) as quantity_cumulative_dist
+        FROM lineitem
+        WHERE l_shipdate >= toDate('1995-01-01')
+          AND l_shipdate < toDate('1996-01-01')
+      ) t
+      WHERE quantity_cumulative_dist >= 0.95
+      ORDER BY l_shipdate, l_quantity DESC;
 - id: qualify_lag_lead
   category: qualify
   sql: |2
@@ -1959,6 +2123,24 @@ queries:
       AND l.l_quantity > 20
     ORDER BY l.l_extendedprice DESC
     LIMIT 1000;
+- id: optimizer_groupjoin
+  category: optimizer
+  sql: |2
+
+    -- Test group-join (join+aggregate fusion) optimization
+    -- Good optimizers fuse the JOIN and GROUP BY into a single grouped-join pass,
+    -- avoiding full intermediate materialization of all lineitem rows per order
+    SELECT
+        o.o_orderkey,
+        o.o_custkey,
+        o.o_orderdate,
+        COUNT(l.l_linenumber) AS line_count,
+        SUM(l.l_extendedprice * (1 - l.l_discount)) AS revenue
+    FROM orders o
+    JOIN lineitem l ON o.o_orderkey = l.l_orderkey
+    GROUP BY o.o_orderkey, o.o_custkey, o.o_orderdate
+    ORDER BY revenue DESC
+    LIMIT 100;
 # ============================================================================
 # Modern SQL Features - Added December 2025
 # Features below are supported by multiple leading OLAP platforms

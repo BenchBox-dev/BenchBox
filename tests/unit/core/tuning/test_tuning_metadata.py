@@ -55,7 +55,7 @@ class _Conn:
 class _Adapter:
     def __init__(self, platform_name: str = "duckdb"):
         self.platform_name = platform_name
-        self.config = {}
+        self.platform_config = {}
         self.connections: list[_Conn] = []
 
     def create_connection(self, **_kwargs):

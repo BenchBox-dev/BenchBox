@@ -192,7 +192,7 @@ flowchart TD
 
 ### Platform Configuration
 
-**Docs:** `docs/platforms.md` - Platform-specific setup guides
+**Docs:** `docs/platforms/index.md` - Platform-specific setup guides
 
 **Examples:**
 - `examples/tunings/platforms/` - Complete configuration files

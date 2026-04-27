@@ -53,6 +53,8 @@ from benchbox.platforms.base.cloud_spark import (
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
+from benchbox.platforms.base.phase_tracking import _resolve_benchmark_table_names
+from benchbox.platforms.gcp._gcs_path import parse_gcs_staging_dir
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
@@ -160,20 +162,13 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, Platfor
         if not project_id:
             raise ConfigurationError("project_id is required for Dataproc Serverless adapter")
 
-        if not gcs_staging_dir:
-            raise ConfigurationError("gcs_staging_dir is required (e.g., gs://bucket/path)")
-
-        if not gcs_staging_dir.startswith("gs://"):
-            raise ConfigurationError(f"Invalid GCS path: {gcs_staging_dir}. Must start with gs://")
-
-        # Parse GCS path
-        gcs_parts = gcs_staging_dir[5:].split("/", 1)
-        self.gcs_bucket = gcs_parts[0]
-        self.gcs_prefix = gcs_parts[1] if len(gcs_parts) > 1 else ""
+        parsed = parse_gcs_staging_dir(gcs_staging_dir)
+        self.gcs_bucket = parsed.bucket
+        self.gcs_prefix = parsed.prefix
 
         self.project_id = project_id
         self.region = region
-        self.gcs_staging_dir = gcs_staging_dir.rstrip("/")
+        self.gcs_staging_dir = parsed.uri
         self.database = database or "benchbox"
         self.runtime_version = runtime_version
         self.service_account = service_account
@@ -269,18 +264,21 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, Platfor
         except Exception as e:
             raise ConfigurationError(f"Failed to connect to Dataproc Serverless: {e}") from e
 
-    def create_schema(self, schema_name: str | None = None) -> None:
+    def create_schema(self, benchmark, connection: Any) -> float:
         """Create Hive database if it doesn't exist.
 
         Args:
-            schema_name: Database name (uses self.database if not provided).
+            benchmark: Benchmark instance.
+            connection: Active connection metadata; not used by Dataproc Serverless.
         """
-        database = schema_name or self.database
+        start_time = mono_time()
+        database = self.database
 
         # Create database via a Spark SQL batch
         create_db_query = f"CREATE DATABASE IF NOT EXISTS {database}"
         self._submit_spark_sql_batch(create_db_query, wait_for_completion=True)
         logger.info(f"Database '{database}' created or already exists")
+        return elapsed_seconds(start_time)
 
     def _submit_spark_sql_batch(
         self,
@@ -413,30 +411,32 @@ spark.stop()
 
     def load_data(
         self,
-        tables: list[str],
-        source_dir: Path | str,
-        file_format: str = "parquet",
-        **kwargs: Any,
-    ) -> dict[str, str]:
+        benchmark,
+        connection: Any,
+        data_dir: Path,
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Upload benchmark data to GCS and create Hive tables.
 
         Args:
-            tables: List of table names to load.
-            source_dir: Local directory containing table data files.
-            file_format: Data file format (default: parquet).
-            **kwargs: Additional options.
+            benchmark: Benchmark instance.
+            connection: Active connection metadata; not used by Dataproc Serverless.
+            data_dir: Local directory containing table data files.
 
         Returns:
-            Dict mapping table names to GCS URIs.
+            Tuple of table row-count placeholders, elapsed seconds, and table URI metadata.
         """
-        source_path = Path(source_dir)
+        start_time = mono_time()
+        source_path = Path(data_dir)
+        tables = _resolve_benchmark_table_names(benchmark)
+        file_format = self.requested_table_format or self.table_format
         if not source_path.exists():
-            raise ConfigurationError(f"Source directory not found: {source_dir}")
+            raise ConfigurationError(f"Source directory not found: {data_dir}")
 
         # Check if tables already exist in GCS
         if self._staging and self._staging.tables_exist(tables):
             logger.info("Tables already exist in GCS staging, skipping upload")
-            return {table: self._staging.get_table_uri(table) for table in tables}
+            table_uris = {table: self._staging.get_table_uri(table) for table in tables}
+            return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
         # Upload using cloud-spark staging infrastructure
         if self._staging:
@@ -461,35 +461,56 @@ spark.stop()
             self._submit_spark_sql_batch(create_table_query, wait_for_completion=True)
             logger.info(f"Created table {self.database}.{table}")
 
-        return table_uris
+        return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
     def execute_query(
         self,
+        connection: Any,
         query: str,
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
         """Execute a SQL query on Dataproc Serverless.
 
         Args:
+            connection: Active connection metadata; not used by Dataproc Serverless.
             query: SQL query to execute.
-            **kwargs: Additional query options.
+            query_id: Query identifier.
 
         Returns:
-            Query results as list of dicts.
+            Standard query result dictionary.
         """
         start_time = mono_time()
-        batch_id, state = self._submit_spark_sql_batch(query, wait_for_completion=True)
-        elapsed = elapsed_seconds(start_time)
-
-        self._query_count += 1
-        self._total_batch_time_seconds += elapsed
-
-        if state not in DataprocBatchState.SUCCESS_STATES:
-            raise RuntimeError(f"Dataproc Serverless batch failed with state: {state}")
-
-        # Retrieve results from GCS
-        results = self._retrieve_results(batch_id)
-        return results
+        try:
+            batch_id, state = self._submit_spark_sql_batch(query, wait_for_completion=True)
+            elapsed = elapsed_seconds(start_time)
+            self._query_count += 1
+            self._total_batch_time_seconds += elapsed
+            if state not in DataprocBatchState.SUCCESS_STATES:
+                raise RuntimeError(f"Dataproc Serverless batch failed with state: {state}")
+            results = self._retrieve_results(batch_id)
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "SUCCESS",
+                "execution_time_seconds": elapsed,
+                "rows_returned": len(results),
+                "results": results,
+                "error": None,
+            }
+        except Exception as e:
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "FAILED",
+                "execution_time_seconds": elapsed_seconds(start_time),
+                "rows_returned": 0,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
 
     def close(self) -> None:
         """Clean up resources."""

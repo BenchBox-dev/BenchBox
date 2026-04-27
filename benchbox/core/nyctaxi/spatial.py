@@ -15,6 +15,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from typing import Any
 
+from benchbox.sql_compat.local_exemptions import compat_local
+
 # NYC Taxi Zone centroids (representative points for each zone)
 # Source: NYC TLC Zone Shapefiles processed to centroids
 # Format: (location_id, longitude, latitude)
@@ -693,7 +695,7 @@ def get_spatial_queries(platform: str) -> dict[str, dict[str, Any]]:
         return DUCKDB_SPATIAL_QUERIES
     elif platform_lower in ("postgres", "postgresql", "postgis"):
         return POSTGIS_SPATIAL_QUERIES
-    elif platform_lower == "clickhouse":
+    elif platform_lower in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
         return CLICKHOUSE_SPATIAL_QUERIES
     else:
         return {}
@@ -712,6 +714,16 @@ def get_all_spatial_queries() -> dict[str, dict[str, dict[str, Any]]]:
     }
 
 
+@compat_local(
+    kind="storage_layout",
+    platform_specific=True,
+    reason=(
+        "Returns a wholly different DDL body per dialect: DuckDB uses standard types+PK, "
+        "PostgreSQL/PostGIS adds a GEOMETRY generated column + GIST index, "
+        "ClickHouse uses MergeTree with ClickHouse-native types. "
+        "Each dialect requires a distinct table definition - not a policy decision."
+    ),
+)
 def get_spatial_create_table_sql(dialect: str = "duckdb") -> str:
     """Generate CREATE TABLE SQL for the spatial zones table.
 
@@ -812,7 +824,7 @@ def check_spatial_support(platform: str) -> dict[str, bool]:
             "h3": False,  # Requires extension
             "geography": True,
         }
-    elif platform_lower == "clickhouse":
+    elif platform_lower in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
         return {
             "basic_spatial": True,
             "geo_distance": True,

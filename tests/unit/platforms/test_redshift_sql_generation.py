@@ -1,4 +1,4 @@
-"""Tests for Redshift SQL generation branches — coverage extension.
+"""Tests for Redshift SQL generation branches - coverage extension.
 
 Targets: COPY SQL content, DISTSTYLE/DISTKEY/SORTKEY clauses, connection config,
 session cache control, _build_ctas_sort_sql error path.

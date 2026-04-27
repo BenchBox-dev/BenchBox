@@ -77,7 +77,7 @@ def test_get_actual_row_counts_happy_path_and_approximate():
     class FakeAdapter:
         def __init__(self, platform="clickhouse"):
             self.platform_name = platform
-            self.config = {}
+            self.platform_config = {}
 
         def create_connection(self, **_):
             return FakeConn(12345678)
@@ -153,7 +153,7 @@ def test_get_table_exists_status_and_integrity_checks():
     class FakeAdapter:
         def __init__(self):
             self.platform_name = "duckdb"
-            self.config = {}
+            self.platform_config = {}
             self._conns = []
 
         def create_connection(self, **_):
@@ -252,7 +252,7 @@ def test_validate_row_counts_uses_monotonic_elapsed_time():
 
     class FakeAdapter:
         platform_name = "duckdb"
-        config = {}
+        platform_config = {}
 
         def create_connection(self, **_):
             return FakeConn()

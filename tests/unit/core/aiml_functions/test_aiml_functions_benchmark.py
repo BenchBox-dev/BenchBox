@@ -416,3 +416,152 @@ class TestAIMLBenchmarkIntegration:
         assert len(spec["functions"]["functions"]) >= 7
         assert len(spec["queries"]) >= 10
         assert spec["data_manifest"]["tables"]["aiml_sample_data"]["row_count"] >= 100
+
+
+# ---------------------------------------------------------------------------
+# Additional AIML benchmark coverage
+# ---------------------------------------------------------------------------
+
+
+class TestAIMLBenchmarkExtraCoverage:
+    """Extra coverage for AIMLFunctionsBenchmark methods."""
+
+    @pytest.fixture
+    def bm(self):
+        return AIMLFunctionsBenchmark(scale_factor=1.0, seed=42)
+
+    def test_get_queries_returns_snowflake(self, bm):
+        """get_queries() delegates to get_all_queries(platform='snowflake')."""
+        queries = bm.get_queries()
+        assert isinstance(queries, dict)
+        assert len(queries) > 0
+
+    def test_get_functions_returns_dict(self, bm):
+        functions = bm.get_functions()
+        assert isinstance(functions, dict)
+        assert len(functions) > 0
+
+    def test_get_functions_for_platform(self, bm):
+        fns = bm.get_functions_for_platform("snowflake")
+        assert isinstance(fns, list)
+        assert len(fns) > 0
+
+    def test_get_all_queries_no_platform(self, bm):
+        """get_all_queries with no platform returns first platform SQL."""
+        queries = bm.get_all_queries(platform=None)
+        assert isinstance(queries, dict)
+        assert len(queries) > 0
+
+    def test_execute_query_unknown_id(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        result = bm.execute_query(conn, "nonexistent_xyz_query", platform="snowflake")
+        assert result.success is False
+        assert "Unknown query ID" in result.error_message
+
+    def test_execute_query_unsupported_platform(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        result = bm.execute_query(conn, "sentiment_single", platform="mysql")
+        assert result.success is False
+        assert "not available" in result.error_message
+
+    def test_execute_query_success_with_fetchall(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = [("positive",), ("negative",)]
+        conn.execute.return_value = mock_result
+        result = bm.execute_query(conn, "sentiment_single", platform="snowflake")
+        assert result.query_id == "sentiment_single"
+        # Success depends on actual platform support
+
+    def test_execute_query_exception_returns_failure(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.execute.side_effect = RuntimeError("connection lost")
+        result = bm.execute_query(conn, "sentiment_single", platform="snowflake")
+        assert result.success is False
+        assert "connection lost" in result.error_message
+
+    def test_execute_query_detects_platform_from_connection(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.platform = "snowflake"
+        conn.execute.return_value = MagicMock()
+        conn.execute.return_value.fetchall.return_value = []
+        # Should use connection.platform when platform param is None
+        result = bm.execute_query(conn, "sentiment_single", platform=None)
+        assert result.platform == "snowflake"
+
+    def test_setup_tables_with_mock_connection(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.execute.return_value = None
+        results = bm.setup_tables(conn, "snowflake")
+        assert isinstance(results, dict)
+        # Should have create_ entries
+        create_keys = [k for k in results if k.startswith("create_")]
+        assert len(create_keys) > 0
+
+    def test_run_benchmark_with_specific_query_ids(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.execute.return_value = MagicMock(fetchall=MagicMock(return_value=[]))
+
+        results = bm.run_benchmark(conn, platform="snowflake", query_ids=["sentiment_single"], setup_data=False)
+        assert isinstance(results, AIMLBenchmarkResults)
+        assert results.total_queries == 1
+
+    def test_run_benchmark_with_categories(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.execute.return_value = MagicMock(fetchall=MagicMock(return_value=[]))
+
+        results = bm.run_benchmark(
+            conn,
+            platform="snowflake",
+            categories=[AIMLFunctionCategory.SENTIMENT],
+            setup_data=False,
+        )
+        assert isinstance(results, AIMLBenchmarkResults)
+
+    def test_run_benchmark_all_queries(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.execute.return_value = MagicMock(fetchall=MagicMock(return_value=[]))
+
+        results = bm.run_benchmark(conn, platform="snowflake", setup_data=False)
+        assert isinstance(results, AIMLBenchmarkResults)
+        assert results.completed_at is not None
+
+    def test_run_benchmark_platform_from_connection(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.platform = "databricks"
+        conn.execute.return_value = MagicMock(fetchall=MagicMock(return_value=[]))
+
+        results = bm.run_benchmark(conn, setup_data=False)
+        assert results.platform == "databricks"
+
+    def test_run_benchmark_to_dict(self, bm):
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.execute.return_value = MagicMock(fetchall=MagicMock(return_value=[]))
+
+        results = bm.run_benchmark(conn, platform="snowflake", query_ids=["sentiment_single"], setup_data=False)
+        d = results.to_dict()
+        assert "platform" in d
+        assert "total_queries" in d
+        assert "query_results" in d

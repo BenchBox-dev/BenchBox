@@ -22,7 +22,7 @@ def test_clickhouse_smoke_server_mode(monkeypatch, tmp_path):
     from benchbox.platforms.clickhouse import ClickHouseAdapter
 
     adapter = ClickHouseAdapter(
-        mode="server",
+        deployment_mode="server",
         host=state.host,
         port=state.port,
         database="benchbox_smoke",

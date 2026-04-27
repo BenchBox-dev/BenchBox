@@ -37,7 +37,7 @@ class ReadPrimitivesQueryManager(BaseQueryCatalogMixin):
 
         return self._catalog_version
 
-    # get_query() is inherited from BaseQueryCatalogMixin
+    # get_query() and has_variant() are inherited from BaseQueryCatalogMixin
 
     def get_all_queries(self) -> dict[str, str]:
         """Get all Read Primitives queries.

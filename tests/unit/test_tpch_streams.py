@@ -30,7 +30,7 @@ class TestTPCHStreamRunner:
     @pytest.fixture
     def mock_stream_file(self):
         """Create a mock stream file for testing."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False, encoding="utf-8") as f:
             f.write("""-- TPC-H Stream 0
 -- Scale Factor: 0.01
 -- RNG Seed: 1
@@ -119,7 +119,7 @@ ORDER BY S_ACCTBAL DESC, N_NAME, S_NAME, P_PARTKEY;
         # Create multiple mock stream files
         stream_files = []
         for i in range(2):
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False, encoding="utf-8") as f:
                 f.write(f"""-- TPC-H Stream {i}
 -- Query 1 (Stream {i}, Position 1)
 SELECT * FROM REGION LIMIT 1;

@@ -7,7 +7,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -200,9 +201,10 @@ class TestAWSGlueAdapterSchema:
                 adapter = AWSGlueAdapter(
                     s3_staging_dir="s3://my-bucket/data",
                     job_role="arn:aws:iam::123456789012:role/GlueRole",
+                    database="tpch_sf1",
                 )
 
-                adapter.create_schema("tpch_sf1")
+                adapter.create_schema(None, None)
 
                 mock_glue_client.create_database.assert_called_once()
                 call_args = mock_glue_client.create_database.call_args
@@ -228,7 +230,7 @@ class TestAWSGlueAdapterSchema:
                 job_role="arn:aws:iam::123456789012:role/GlueRole",
             )
 
-            adapter.create_schema("existing_db")
+            adapter.create_schema(None, None)
 
             # Should not try to create database
             mock_glue_client.create_database.assert_not_called()
@@ -254,11 +256,12 @@ class TestAWSGlueAdapterDataLoading:
                 job_role="arn:aws:iam::123456789012:role/GlueRole",
             )
 
+            mock_benchmark = SimpleNamespace(tables=["lineitem", "orders"])
             with tempfile.TemporaryDirectory() as tmpdir:
-                result = adapter.load_data(["lineitem", "orders"], tmpdir)
+                result_dict, _, _ = adapter.load_data(mock_benchmark, None, tmpdir)
 
-            assert "lineitem" in result
-            assert "orders" in result
+            assert "lineitem" in result_dict
+            assert "orders" in result_dict
             mock_staging_instance.upload_tables.assert_not_called()
 
     def test_load_data_new_tables(self):
@@ -287,15 +290,16 @@ class TestAWSGlueAdapterDataLoading:
                 job_role="arn:aws:iam::123456789012:role/GlueRole",
             )
 
+            mock_benchmark = SimpleNamespace(tables=["lineitem", "orders"])
             with tempfile.TemporaryDirectory() as tmpdir:
                 source_dir = Path(tmpdir)
                 (source_dir / "lineitem.parquet").write_text("data")
                 (source_dir / "orders.parquet").write_text("data")
 
-                result = adapter.load_data(["lineitem", "orders"], source_dir)
+                result_dict, _, _ = adapter.load_data(mock_benchmark, None, source_dir)
 
-            assert "lineitem" in result
-            assert "orders" in result
+            assert "lineitem" in result_dict
+            assert "orders" in result_dict
             mock_staging_instance.upload_tables.assert_called_once()
 
 

@@ -60,7 +60,7 @@ def generate_benchmark_documentation(benchmark_name: str, output_dir: str = "./d
 
     # Load results and generate markdown
     print("  2. Analyzing results...")
-    with open(Path(dry_run_dir) / "summary.json") as f:
+    with open(Path(dry_run_dir) / "summary.json", encoding="utf-8") as f:
         summary = json.load(f)
 
     doc_content = [

@@ -24,6 +24,43 @@ def _restore_group_order_by_all_keyword(query: str) -> str:
     )
 
 
+def _fix_sqlite_unsupported_syntax(query: str) -> str:
+    """Rewrite SQLGlot output that SQLite cannot execute."""
+
+    def replace_date_interval(match: re.Match[str]) -> str:
+        date_literal = match.group("date")
+        sign = match.group("op")
+        value = match.group("value")
+        unit = match.group("unit").lower()
+        return f"DATE('{date_literal}', '{sign}{value} {unit}')"
+
+    query = re.sub(
+        r"\bDATE\s*\(\s*'(?P<date>\d{4}-\d{2}-\d{2})'\s*\)\s*"
+        r"(?P<op>[+-])\s*INTERVAL\s+'(?P<value>\d+)'\s+(?P<unit>DAY|MONTH|YEAR)\b",
+        replace_date_interval,
+        query,
+        flags=re.IGNORECASE,
+    )
+
+    date_parts = {
+        "DAY": "%d",
+        "MONTH": "%m",
+        "YEAR": "%Y",
+    }
+
+    def replace_extract(match: re.Match[str]) -> str:
+        part = match.group("part").upper()
+        expression = match.group("expression").strip()
+        return f"CAST(STRFTIME('{date_parts[part]}', {expression}) AS INTEGER)"
+
+    return re.sub(
+        r"\bEXTRACT\s*\(\s*(?P<part>DAY|MONTH|YEAR)\s+FROM\s+(?P<expression>[^()]+?)\s*\)",
+        replace_extract,
+        query,
+        flags=re.IGNORECASE,
+    )
+
+
 def normalize_dialect_for_sqlglot(dialect: str) -> str:
     """Normalize dialect names for SQLGlot compatibility.
 
@@ -143,6 +180,8 @@ def translate_sql_query(
         # but DuckDB expects ALL as a keyword in these clauses.
         if tgt == "duckdb" and _query_has_group_or_order_by_all(query):
             translated = _restore_group_order_by_all_keyword(translated)
+        elif tgt == "sqlite":
+            translated = _fix_sqlite_unsupported_syntax(translated)
 
         # Apply post-processors (e.g., TPC-DS Query 58 ambiguity fix)
         if post_processors:

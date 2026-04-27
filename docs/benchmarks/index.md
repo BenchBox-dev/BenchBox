@@ -12,7 +12,7 @@ This section provides systematic documentation for each benchmark implementation
 ### Roadmap & Research
 
 #### [Development Roadmap](../development/roadmap.md)
-Planned platform and benchmark additions, including NYC Taxi expansion, Flight Data benchmark, DataFrame support expansion, and more.
+Planned platform and benchmark additions, including DataFrame support expansion and upcoming workloads.
 
 ### TPC Standards
 *Official industry standards for comparing databases*
@@ -72,7 +72,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 **AMPLab Big Data Benchmark**
 - **CLI name**: `amplab`
 - **Purpose**: Big data processing and analytics performance
-- **Queries**: Web analytics and user behavior queries
+- **Queries**: 8 web analytics and user behavior queries
 - **Schema**: Web analytics data model
 - **Scale**: Large-scale data processing focused
 - **Use Cases**: Big data performance, distributed computing, web analytics
@@ -81,7 +81,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 **Join Order Optimization Benchmark**
 - **CLI name**: `joinorder`
 - **Purpose**: Query optimizer join order evaluation
-- **Queries**: 13 complex multi-table join queries
+- **Queries**: 113 complex multi-table join queries
 - **Schema**: 21 tables modeling IMDB movie database
 - **Scale**: Complex join patterns with realistic cardinalities
 - **Use Cases**: Query optimizer testing, join algorithm evaluation, cardinality estimation
@@ -102,10 +102,22 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 **H2O Database Benchmark**
 - **CLI name**: `h2odb`
 - **Purpose**: Data science and machine learning workloads
-- **Queries**: Aggregation and groupby operations
+- **Queries**: 10 aggregation and groupby operations
 - **Schema**: Data science oriented tables
 - **Scale**: Memory and computation intensive
 - **Use Cases**: Data science performance, in-memory analytics, aggregation optimization
+
+#### [CoffeeShop](coffeeshop.md)
+**CoffeeShop Point-of-Sale Benchmark**
+- **CLI name**: `coffeeshop`
+- **Purpose**: Real-world transactional and analytical workloads
+- **Queries**: 11 point-of-sale and reporting queries
+- **Schema**: Retail transaction data model
+- **Scale**: Configurable based on business volume
+- **Use Cases**: Hybrid workload testing, real-world performance validation
+
+### Real-World Data
+*Benchmarks built on public real-world datasets*
 
 #### [NYC Taxi](nyctaxi.md)
 **NYC Taxi OLAP Benchmark**
@@ -113,8 +125,20 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 - **Purpose**: Real-world transportation data analytics
 - **Queries**: 25 OLAP queries across 9 categories
 - **Schema**: NYC TLC trip records with taxi zones dimension
-- **Scale**: From 300K to 3B trips
+- **Scale**: From ~96K trips (SF=0.01) to ~96M trips (SF=10 ceiling)
 - **Use Cases**: Geospatial analytics, temporal aggregation, multi-dimensional OLAP
+
+#### [Flight Data](flightdata.md)
+**US Aviation On-Time Performance Benchmark**
+- **CLI name**: `flightdata`
+- **Purpose**: Real-world aviation analytics - delays, routes, carriers, seasonality
+- **Queries**: 20 OLAP queries across 5 categories (ontime, delay, routes, temporal, carriers)
+- **Schema**: BTS On-Time Performance records
+- **Scale**: From 1-month sample (SF=0.01, ~10MB) to full corpus (SF≥10, ~10GB+)
+- **Use Cases**: Temporal analytics, categorical aggregation, carrier comparisons
+
+### Time-Series Benchmarks
+*Workloads built for time-series databases and columnar monitoring engines*
 
 #### [TSBS DevOps](tsbs-devops.md)
 **Time Series Benchmark Suite for DevOps**
@@ -125,15 +149,6 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 - **Scale**: From 10 hosts to thousands, configurable duration
 - **Use Cases**: Time-series database evaluation, monitoring dashboards, alerting queries
 
-#### [CoffeeShop](coffeeshop.md)
-**CoffeeShop Point-of-Sale Benchmark**
-- **CLI name**: `coffeeshop`
-- **Purpose**: Real-world transactional and analytical workloads
-- **Queries**: Point-of-sale operations and reporting
-- **Schema**: Retail transaction data model
-- **Scale**: Configurable based on business volume
-- **Use Cases**: Hybrid workload testing, real-world performance validation
-
 ### BenchBox Primitives
 *Fundamental database operation testing*
 
@@ -141,7 +156,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 **Database Read Primitives Benchmark**
 - **CLI name**: `read_primitives`
 - **Purpose**: Individual database operation testing
-- **Queries**: 109 primitive operation queries across 26 categories
+- **Queries**: 136 primitive operation queries across 26 categories
 - **Schema**: TPC-H schema for familiar data patterns
 - **Scale**: Lightweight focused testing
 - **Use Cases**: Unit testing, regression detection, optimizer sniff tests, development validation
@@ -150,7 +165,7 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 **Database Write Operations Benchmark (v2)**
 - **CLI name**: `write_primitives`
 - **Purpose**: Comprehensive non-transactional write operation testing
-- **Queries**: 109 write operations across 6 categories (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL)
+- **Queries**: 12 write operations across 7 categories (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL, TRANSACTION)
 - **Schema**: TPC-H schema with 16 category-based staging tables
 - **Scale**: Configurable via scale factors
 - **Platform Support**: Broad (ClickHouse, BigQuery, Snowflake, Databricks, Redshift, DuckDB, SQLite)
@@ -160,20 +175,56 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 **Database Transaction Testing Benchmark**
 - **CLI name**: `transaction_primitives`
 - **Purpose**: ACID transaction guarantees and isolation level testing
-- **Queries**: 8 transaction operations (COMMIT, ROLLBACK, SAVEPOINT, isolation levels)
+- **Queries**: 12 transaction operations (COMMIT, ROLLBACK, SAVEPOINT, isolation levels)
 - **Schema**: TPC-H schema with transaction staging tables
 - **Scale**: Configurable via scale factors
 - **Platform Support**: Designed for ACID databases (PostgreSQL, MySQL, SQL Server - adapters planned; currently limited support via DuckDB/SQLite)
 - **Use Cases**: Transaction isolation testing, ACID compliance validation, concurrency testing
 
+#### [Metadata Primitives](metadata-primitives.md)
+**Database Catalog Introspection Benchmark**
+- **CLI name**: `metadata_primitives`
+- **Purpose**: Catalog introspection performance via INFORMATION_SCHEMA, SHOW, DESCRIBE, PRAGMA
+- **Queries**: 62 catalog queries across 10 categories
+- **Schema**: Database catalog (no data generation required)
+- **Scale**: Configurable via wide tables and view hierarchies
+- **Use Cases**: Data catalog integration, BI tool responsiveness, IDE autocomplete, data governance
+
+#### [AI Primitives](ai-primitives.md)
+**SQL-Based AI Functions Benchmark**
+- **CLI name**: `ai_primitives`
+- **Purpose**: Evaluate built-in AI functions in cloud databases
+- **Queries**: 16 queries across 4 categories (generative, nlp, transform, embedding)
+- **Schema**: TPC-H (uses customer/supplier comments as realistic text)
+- **Platform Support**: Snowflake Cortex, BigQuery ML, Databricks AI
+- **Cost Control**: Built-in budget enforcement
+- **Use Cases**: Platform comparison for AI-native analytics, cost modeling
+- **Registry category**: `Primitives` (grouped with the other `*_primitives` benchmarks)
+
+### AI & ML Benchmarks
+*Vector similarity and other AI-shaped analytical workloads*
+
+#### [Vector Search](vector-search.md)
+**Vector Similarity Search Benchmark**
+- **CLI name**: `vector_search`
+- **Purpose**: Exact and approximate similarity search over embedding vectors
+- **Queries**: 6 queries - exact kNN (cosine + L2), filtered kNN, ground truth, ANN, multi-category
+- **Schema**: Synthetic embeddings, 128-dim default (configurable)
+- **Platform Support**: DuckDB (primary), pgvector, ClickHouse, Snowflake, StarRocks, Doris
+- **Use Cases**: Vector database evaluation, ANN recall testing, embedding store comparison
+
 ### BenchBox Experimental
 *Experimental benchmarks for specialized testing*
+
+See also [TPC-H Data Vault](datavault.md) under *Data Modeling Variants* above -
+shipped in the experimental toctree but documented alongside the other TPC-H
+schema variants.
 
 #### [TPC-DS-OBT](tpc-ds-obt.md)
 **TPC-DS One Big Table Benchmark**
 - **CLI name**: `tpcds_obt`
 - **Purpose**: Denormalized wide-table analytical workloads
-- **Queries**: TPC-DS queries adapted for single-table schema
+- **Queries**: 17 TPC-DS queries adapted for single-table schema
 - **Schema**: Single denormalized "One Big Table" with all TPC-DS attributes
 - **Scale**: Same as TPC-DS (1.0 to 100+)
 - **Use Cases**: Wide-table analytics, columnar database testing, denormalization trade-off analysis
@@ -225,7 +276,10 @@ Planned platform and benchmark additions, including NYC Taxi expansion, Flight D
 tpc-standards
 academic-benchmarks
 industry-benchmarks
+real-world-benchmarks
+time-series-benchmarks
 benchbox-primitives
+ai-ml-benchmarks
 benchbox-experimental
 ```
 
@@ -349,11 +403,11 @@ for query_id in regression_queries:
 
 | Benchmark  | Data Size | Working Memory | Peak Memory |
 | ---------- | --------- | -------------- | ----------- |
-| TPC-H      | ~1GB      | ~2GB           | ~4GB        |
-| TPC-DS     | ~3GB      | ~6GB           | ~12GB       |
-| SSB        | ~600MB    | ~1GB           | ~2GB        |
-| Join Order | ~17MB     | ~50MB          | ~100MB      |
-| Primitives | ~1GB      | ~2GB           | ~4GB        |
+| TPC-H      | ~1 GB     | ~2 GB          | ~4 GB       |
+| TPC-DS     | ~3 GB     | ~6 GB          | ~12 GB      |
+| SSB        | ~600 MB   | ~1 GB          | ~2 GB       |
+| Join Order | ~1 GB     | ~2 GB          | ~4 GB       |
+| Primitives | ~1 GB     | ~2 GB          | ~4 GB       |
 
 ## Integration Examples
 

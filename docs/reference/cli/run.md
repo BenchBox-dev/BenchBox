@@ -92,6 +92,45 @@ benchbox run [OPTIONS]
   - `driver_auto_install` - auto-install the requested driver via uv if missing (`true`/`false`)
 - Athena Spark only: `engine_version` - select Spark engine version (e.g. `PySpark engine version 3`); auto-detected on all other cloud platforms
 
+**Benchmark-Specific Configuration:**
+- `--benchmark-option KEY=VALUE`: Benchmark-specific option (can be used multiple times)
+- Run `benchbox run --help-topic benchmarks` to see all available options per benchmark
+- Selected benchmarks and their options:
+
+  | Benchmark | Option | Default | Description |
+  |-----------|--------|---------|-------------|
+  | `nyctaxi` | `taxi_types` | - | Taxi types to load: `yellow`, `green`, `hvfhv` (comma-separated) |
+  | `nyctaxi` | `year` | `2019` | Year of TLC data (2019-2025) |
+  | `nyctaxi` | `months` | - | Months to include, comma-separated (1-12) |
+  | `nyctaxi` | `seed` | - | Random seed for reproducibility |
+  | `nyctaxi` | `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+  | `tpch_skew` | `skew_preset` | `moderate` | Skew distribution: `none`, `light`, `moderate`, `heavy`, `extreme`, `realistic` |
+  | `tpch_skew` | `force_regenerate` | - | Force data regeneration |
+  | `tsbs_devops` | `num_hosts` | - | Number of simulated hosts |
+  | `tsbs_devops` | `duration_days` | - | Duration in days for data generation |
+  | `tsbs_devops` | `interval_seconds` | `10` | Measurement interval in seconds |
+  | `tsbs_devops` | `start_time` | - | Start time ISO format (e.g. `2019-01-01T00:00:00`) |
+  | `tsbs_devops` | `seed` | - | Random seed for reproducibility |
+  | `tsbs_devops` | `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+  | `datavault` | `hash_algorithm` | `md5` | Hash algorithm for hub/link keys: `md5`, `sha256` |
+  | `datavault` | `record_source` | `TPCH` | Record source identifier for audit columns |
+  | `datavault` | `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+  | `flightdata` | `end_year` | latest | Last year of flight data to include |
+  | `flightdata` | `seed` | - | Random seed for reproducibility |
+  | `flightdata` | `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+  | `joinorder` | `queries_dir` | - | Directory containing custom query files |
+  | `joinorder` | `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+  | `tpcdi` | `enable_parallel` | `false` | Enable parallel processing for ETL |
+  | `tpcdi` | `max_workers` | - | Maximum number of parallel workers |
+  | `tpcds_obt` | `dimension_mode` | `full` | OBT dimension mode: `full`, `minimal` |
+  | `tpcds_obt` | `channels` | - | Sales channels: `store`, `web`, `catalog` (comma-separated) |
+  | `tpcds_obt` | `output_format` | `parquet` | Output format: `dat`, `parquet` |
+  | `tpcds_obt` | `tpcds_source_dir` | - | Directory containing TPC-DS source data |
+  | `tpcds_obt` | `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+  | `vector_search` | `dimensions` | `1536` | Embedding vector dimensions |
+
+  Most options also accept a hyphenated alias (e.g. `taxi-types` for `taxi_types`).
+
 **Logging and Output:**
 - `--verbose`, `-v`: Enable verbose logging (use `-vv` for very verbose)
 - `--quiet`, `-q`: Suppress all output (overrides verbose flags)
@@ -100,6 +139,7 @@ benchbox run [OPTIONS]
 - `-h, --help`: Show common options
 - `--help-topic all`: Show all options including advanced
 - `--help-topic examples`: Show categorized usage examples
+- `--help-topic benchmarks`: Show benchmark-specific options (see `--benchmark-option` below)
 
 ## Usage Examples
 
@@ -177,6 +217,36 @@ benchbox run --platform snowflake --benchmark tpcds \
   --phases power --dry-run ./debug --seed 7
 ```
 
+### Benchmark-Specific Options
+
+```bash
+# NYC Taxi: load only yellow and green trips from 2022
+benchbox run --platform duckdb --benchmark nyctaxi \
+  --benchmark-option taxi_types=yellow,green \
+  --benchmark-option year=2022
+
+# TPC-H Skew: use heavy skew distribution
+benchbox run --platform duckdb --benchmark tpch_skew --scale 1 \
+  --benchmark-option skew_preset=heavy
+
+# TSBS Devops: custom host count and interval
+benchbox run --platform duckdb --benchmark tsbs_devops \
+  --benchmark-option num_hosts=100 \
+  --benchmark-option interval_seconds=30
+
+# TPC-DI: enable parallel ETL with 4 workers
+benchbox run --platform duckdb --benchmark tpcdi \
+  --benchmark-option enable_parallel=true \
+  --benchmark-option max_workers=4
+
+# Data Vault: use SHA-256 hashing
+benchbox run --platform duckdb --benchmark datavault \
+  --benchmark-option hash_algorithm=sha256
+
+# List all benchmark options
+benchbox run --help-topic benchmarks
+```
+
 ### Platform-Specific Options
 
 ```bash
@@ -221,7 +291,7 @@ benchbox platforms status clickhouse
 
 ## Cloud Sorted Ingestion Options
 
-These flags control cloud data-organization strategy selection across supported cloud warehouses. They are advanced options — use `--help-topic all` to see them in the CLI help.
+These flags control cloud data-organization strategy selection across supported cloud warehouses. They are advanced options - use `--help-topic all` to see them in the CLI help.
 
 - `--sorted-ingestion-mode [off|auto|force]`: Cloud sorted-ingestion strategy mode
 - `--sorted-ingestion-method [auto|ctas|z_order|hilbert|liquid_clustering|vacuum_sort]`: Override the clustering method used during sorted ingestion
@@ -253,7 +323,7 @@ benchbox run --platform databricks --benchmark tpch --scale 1 \
 
 ## Execution Control Options
 
-These flags control monitoring, progress display, memory handling, and caching behavior. They are advanced options — use `--help-topic all` to see them in the CLI help.
+These flags control monitoring, progress display, memory handling, and caching behavior. They are advanced options - use `--help-topic all` to see them in the CLI help.
 
 - `--mode [sql|dataframe]`: Force execution mode (validates against platform capabilities)
 - `--no-monitoring`: Disable metrics collection during benchmark execution
@@ -266,10 +336,10 @@ These flags control monitoring, progress display, memory handling, and caching b
 - `--plan-config TEXT`: Fine-grained control over query plan capture
   - Format: comma-separated key:value pairs
   - Keys:
-    - `sample:FLOAT` — fraction of queries to capture plans for (e.g., `sample:0.1` for 10%)
-    - `first:INT` — capture plans for the first N queries only
-    - `queries:ID1,ID2,...` — capture plans for specific query IDs
-    - `strict:true|false` — fail if plan capture encounters errors
+    - `sample:FLOAT` - fraction of queries to capture plans for (e.g., `sample:0.1` for 10%)
+    - `first:INT` - capture plans for the first N queries only
+    - `queries:ID1,ID2,...` - capture plans for specific query IDs
+    - `strict:true|false` - fail if plan capture encounters errors
   - Requires `--capture-plans` to also be set
   - Example: `--capture-plans --plan-config "sample:0.1,strict:true"`
   - **Note:** On DuckDB, plan capture uses `EXPLAIN (ANALYZE, FORMAT JSON)` which roughly doubles query execution time. Use `--platform-option analyze_plans=false` for estimated plans without the overhead.

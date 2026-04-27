@@ -229,7 +229,7 @@ export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
 
 ### Getting Help
 
-- [Troubleshooting Guide](../docs/TROUBLESHOOTING.md) - Common errors and solutions
+- [Troubleshooting Guide](../docs/usage/troubleshooting.md) - Common errors and solutions
 - [GitHub Issues](https://github.com/joeharris76/benchbox/issues) - Report bugs or request features
 
 ## Contributing Examples

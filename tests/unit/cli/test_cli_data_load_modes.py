@@ -6,6 +6,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import sys
+import sys as _sys
 from contextlib import ExitStack, contextmanager
 from unittest.mock import Mock, patch
 
@@ -14,6 +15,15 @@ from click.testing import CliRunner
 
 from benchbox.cli.benchmarks import BenchmarkConfig
 from benchbox.cli.main import cli
+
+# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
+# same name as the run submodule.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
+# the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.run")
+_run_module = _sys.modules["benchbox.cli.commands.run"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -30,14 +40,14 @@ def _mock_run_command_components(*, include_db_manager: bool = False):
     """Provide shared run-command mocks with default successful execution behavior."""
     with ExitStack() as stack:
         mocks = {
-            "bench_mgr": stack.enter_context(patch("benchbox.cli.commands.run.BenchmarkManager")),
-            "profiler": stack.enter_context(patch("benchbox.cli.commands.run.SystemProfiler")),
-            "orchestrator": stack.enter_context(patch("benchbox.cli.commands.run.BenchmarkOrchestrator")),
-            "exporter": stack.enter_context(patch("benchbox.cli.commands.run.ResultExporter")),
+            "bench_mgr": stack.enter_context(patch.object(_run_module, "BenchmarkManager")),
+            "profiler": stack.enter_context(patch.object(_run_module, "SystemProfiler")),
+            "orchestrator": stack.enter_context(patch.object(_run_module, "BenchmarkOrchestrator")),
+            "exporter": stack.enter_context(patch.object(_run_module, "ResultExporter")),
             "db_mgr": None,
         }
         if include_db_manager:
-            mocks["db_mgr"] = stack.enter_context(patch("benchbox.cli.commands.run.DatabaseManager"))
+            mocks["db_mgr"] = stack.enter_context(patch.object(_run_module, "DatabaseManager"))
 
         mocks["bench_mgr"].return_value.benchmarks = {
             "tpch": {"display_name": "TPC-H", "estimated_time_range": (2, 10)}
@@ -252,7 +262,7 @@ class TestCLIDataLoadModes:
 
         with (
             _mock_run_command_components(include_db_manager=True) as mocks,
-            patch("benchbox.cli.commands.run.sys", mock_sys),
+            patch.object(_run_module, "sys", mock_sys),
             patch("benchbox.cli.onboarding.check_and_run_first_time_setup", return_value=False),
             patch(
                 "benchbox.cli.preferences.load_last_run_config",
@@ -266,7 +276,7 @@ class TestCLIDataLoadModes:
                 },
             ),
             patch("benchbox.cli.preferences.format_last_run_summary", return_value="saved run"),
-            patch("benchbox.cli.commands.run.Confirm.ask") as mock_confirm_ask,
+            patch.object(_run_module.Confirm, "ask") as mock_confirm_ask,
             patch("benchbox.cli.preferences.save_last_run_config"),
         ):
 
@@ -318,7 +328,7 @@ class TestCLIDataLoadModes:
 
         with (
             _mock_run_command_components(include_db_manager=True) as mocks,
-            patch("benchbox.cli.commands.run.sys", mock_sys),
+            patch.object(_run_module, "sys", mock_sys),
             patch("benchbox.cli.onboarding.check_and_run_first_time_setup", return_value=False),
             patch(
                 "benchbox.cli.preferences.load_last_run_config",
@@ -332,7 +342,7 @@ class TestCLIDataLoadModes:
                 },
             ),
             patch("benchbox.cli.preferences.format_last_run_summary", return_value="saved run"),
-            patch("benchbox.cli.commands.run.Confirm.ask", side_effect=[True]),
+            patch.object(_run_module.Confirm, "ask", side_effect=[True]),
             patch("benchbox.cli.preferences.save_last_run_config"),
         ):
             mock_profile = Mock()

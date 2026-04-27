@@ -340,7 +340,7 @@ class TestQueryBenchmarkResult:
         assert r.p50_time_ms == 0.0
 
     def test_p95_time_ms(self):
-        times = list(range(1, 101))  # 1..100 — 100 values
+        times = list(range(1, 101))  # 1..100 - 100 values
         r = _make_query_result(times=[float(t) for t in times])
         # idx = int(100 * 0.95) = 95, sorted[95] = 96.0
         assert r.p95_time_ms == 96.0
@@ -684,7 +684,7 @@ class TestSQLVsDataFrameSummary:
 
 
 # ===========================================================================
-# DataFrameBenchmarkSuite – init / capability lookup
+# DataFrameBenchmarkSuite - init / capability lookup
 # ===========================================================================
 
 
@@ -721,7 +721,7 @@ class TestDataFrameBenchmarkSuiteInit:
 
 
 # ===========================================================================
-# DataFrameBenchmarkSuite – _build_speedup_matrix
+# DataFrameBenchmarkSuite - _build_speedup_matrix
 # ===========================================================================
 
 
@@ -773,7 +773,7 @@ class TestSpeedupMatrix:
 
 
 # ===========================================================================
-# DataFrameBenchmarkSuite – _find_query_winners
+# DataFrameBenchmarkSuite - _find_query_winners
 # ===========================================================================
 
 
@@ -825,7 +825,7 @@ class TestFindQueryWinners:
 
 
 # ===========================================================================
-# DataFrameBenchmarkSuite – get_summary
+# DataFrameBenchmarkSuite - get_summary
 # ===========================================================================
 
 
@@ -879,7 +879,7 @@ class TestGetSummary:
 
 
 # ===========================================================================
-# DataFrameBenchmarkSuite – export_results
+# DataFrameBenchmarkSuite - export_results
 # ===========================================================================
 
 
@@ -943,7 +943,7 @@ class TestExportResults:
 
 
 # ===========================================================================
-# DataFrameBenchmarkSuite – run_comparison validation
+# DataFrameBenchmarkSuite - run_comparison validation
 # ===========================================================================
 
 
@@ -994,7 +994,7 @@ class TestMarkdownReport:
 
 
 # ===========================================================================
-# DataFrameComparisonPlotter – construction
+# DataFrameComparisonPlotter - construction
 # ===========================================================================
 
 
@@ -1018,7 +1018,7 @@ class TestDataFrameComparisonPlotterInit:
 
 
 # ===========================================================================
-# SQLVsDataFramePlotter – construction
+# SQLVsDataFramePlotter - construction
 # ===========================================================================
 
 
@@ -1060,7 +1060,7 @@ class TestSQLVsDataFramePlotterInit:
 
 
 # ===========================================================================
-# SQLVsDataFrameBenchmark – _build_summary
+# SQLVsDataFrameBenchmark - _build_summary
 # ===========================================================================
 
 
@@ -1151,7 +1151,7 @@ class TestSQLVsDataFrameBenchmarkBuildSummary:
 
 
 # ===========================================================================
-# SQLVsDataFrameBenchmark – execution helpers
+# SQLVsDataFrameBenchmark - execution helpers
 # ===========================================================================
 
 

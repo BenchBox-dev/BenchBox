@@ -136,7 +136,7 @@ def _validate_runtime_abi(site_packages: Path, package_name: str) -> bool:
     """
     pkg_dir = site_packages / package_name.replace("-", "_")
     if not pkg_dir.is_dir():
-        # No package directory — might be a single-file module; accept it.
+        # No package directory - might be a single-file module; accept it.
         return True
 
     current_tag = f"{sys.version_info.major}{sys.version_info.minor}"
@@ -150,7 +150,7 @@ def _validate_runtime_abi(site_packages: Path, package_name: str) -> bool:
             continue
         m = _CPYTHON_ABI_RE.search(name)
         if m is None:
-            # Bare .so, .abi3.so, or .pyd without cpython tag — always compatible.
+            # Bare .so, .abi3.so, or .pyd without cpython tag - always compatible.
             continue
         has_tagged_extension = True
         if m.group(1) == current_tag:
@@ -245,7 +245,7 @@ def load_driver_module(
         if resolution.auto_install_used:
             # Only purge if the already-loaded module doesn't match the requested
             # version.  C extension modules (e.g. DuckDB) cannot be safely
-            # unloaded and reloaded via dlopen within the same process — doing so
+            # unloaded and reloaded via dlopen within the same process - doing so
             # causes SIGSEGV.  If the correct version is already in sys.modules we
             # can skip the purge entirely.
             existing = sys.modules.get(import_name)

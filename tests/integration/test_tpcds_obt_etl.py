@@ -171,7 +171,7 @@ def test_transform_runs_end_to_end_with_duckdb(tmp_path: Path, monkeypatch: pyte
         output_format="dat",
     )
 
-    manifest = json.loads(Path(result["manifest"]).read_text())
+    manifest = json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
 
     assert result["table"].exists()
     assert manifest["rows_total"] == 2

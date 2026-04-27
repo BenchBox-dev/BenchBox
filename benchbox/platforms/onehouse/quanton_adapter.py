@@ -50,6 +50,7 @@ from benchbox.platforms.base.cloud_spark import (
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
+from benchbox.platforms.base.phase_tracking import _resolve_benchmark_table_names
 from benchbox.platforms.onehouse.onehouse_client import (
     ClusterConfig,
     OnehouseClient,
@@ -153,7 +154,7 @@ class QuantonAdapter(
             self._table_format_enum = TableFormat(table_format.lower())
         except ValueError:
             valid_formats = ", ".join(f.value for f in TableFormat)
-            raise ConfigurationError(f"Invalid table_format: {table_format}. Must be one of: {valid_formats}")
+            raise ConfigurationError(f"Invalid table_format: {table_format}. Must be one of: {valid_formats}") from None
 
         # Parse S3 path
         s3_parts = s3_staging_dir[5:].split("/", 1)
@@ -286,13 +287,15 @@ class QuantonAdapter(
         except Exception:
             return False
 
-    def create_schema(self, schema_name: str | None = None) -> None:
+    def create_schema(self, benchmark, connection: Any) -> float:
         """Create database in Quanton metastore if it doesn't exist.
 
         Args:
-            schema_name: Database name (uses self.database if not provided).
+            benchmark: Benchmark instance.
+            connection: Active connection metadata; not used by Quanton.
         """
-        database = schema_name or self.database
+        start_time = mono_time()
+        database = self.database
 
         try:
             # Create database with S3 location
@@ -305,33 +308,36 @@ class QuantonAdapter(
                 logger.info(f"Database '{database}' already exists")
             else:
                 logger.warning(f"Failed to create database: {e}")
+        return elapsed_seconds(start_time)
 
     def load_data(
         self,
-        tables: list[str],
-        source_dir: Path | str,
-        file_format: str = "parquet",
-        **kwargs: Any,
-    ) -> dict[str, str]:
+        benchmark,
+        connection: Any,
+        data_dir: Path,
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Upload benchmark data to S3 and create tables.
 
         Args:
-            tables: List of table names to load.
-            source_dir: Local directory containing table data files.
-            file_format: Data file format (default: parquet).
-            **kwargs: Additional options.
+            benchmark: Benchmark instance.
+            connection: Active connection metadata; not used by Quanton.
+            data_dir: Local directory containing table data files.
 
         Returns:
-            Dict mapping table names to S3 URIs.
+            Tuple of table row-count placeholders, elapsed seconds, and table URI metadata.
         """
-        source_path = Path(source_dir)
+        start_time = mono_time()
+        source_path = Path(data_dir)
+        tables = _resolve_benchmark_table_names(benchmark)
+        file_format = self.requested_table_format or self.table_format_str
         if not source_path.exists():
-            raise ConfigurationError(f"Source directory not found: {source_dir}")
+            raise ConfigurationError(f"Source directory not found: {data_dir}")
 
         # Check if tables already exist in S3
         if self._staging and self._staging.tables_exist(tables):
             logger.info("Tables already exist in S3 staging, skipping upload")
-            return {table: self._staging.get_table_uri(table) for table in tables}
+            table_uris = {table: self._staging.get_table_uri(table) for table in tables}
+            return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
         # Upload using cloud-spark staging infrastructure
         if self._staging:
@@ -357,7 +363,7 @@ class QuantonAdapter(
                 except Exception as e:
                     logger.warning(f"Failed to create table {table}: {e}")
 
-        return table_uris
+        return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
     def _generate_create_table_ddl(self, table: str, location: str) -> str:
         """Generate CREATE TABLE DDL based on table format.
@@ -433,51 +439,65 @@ class QuantonAdapter(
 
     def execute_query(
         self,
+        connection: Any,
         query: str,
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
         """Execute a SQL query on Quanton.
 
         Args:
+            connection: Active connection metadata; not used by Quanton.
             query: SQL query to execute.
-            **kwargs: Additional query options.
+            query_id: Query identifier.
 
         Returns:
-            Query results as list of dicts.
+            Standard query result dictionary.
         """
         start_time = mono_time()
-
-        # Generate unique result location
-        result_id = f"results-{uuid.uuid4().hex[:12]}"
-        output_location = f"{self.s3_staging_dir}/results/{result_id}"
-
-        # Submit SQL job
-        job_id = self._client.submit_sql_job(
-            sql=query,
-            database=self.database,
-            table_format=self._table_format_enum,
-            output_location=output_location,
-            spark_config=self._spark_config,
-        )
-
-        # Wait for completion
-        result = self._client.wait_for_job(job_id, timeout_minutes=self.timeout_minutes)
-        elapsed = elapsed_seconds(start_time)
-
-        # Track metrics
-        self._query_count += 1
-        if result.duration_seconds:
-            self._total_job_duration_seconds += result.duration_seconds
-
-        logger.debug(f"Query completed in {elapsed:.1f}s (job duration: {result.duration_seconds:.1f}s)")
-
-        # Retrieve results
         try:
-            results = self._client.get_job_results(job_id)
-            return results
+            result_id = f"results-{uuid.uuid4().hex[:12]}"
+            output_location = f"{self.s3_staging_dir}/results/{result_id}"
+            job_id = self._client.submit_sql_job(
+                sql=query,
+                database=self.database,
+                table_format=self._table_format_enum,
+                output_location=output_location,
+                spark_config=self._spark_config,
+            )
+            result = self._client.wait_for_job(job_id, timeout_minutes=self.timeout_minutes)
+            elapsed = elapsed_seconds(start_time)
+            self._query_count += 1
+            if result.duration_seconds:
+                self._total_job_duration_seconds += result.duration_seconds
+            logger.debug(f"Query completed in {elapsed:.1f}s (job duration: {result.duration_seconds:.1f}s)")
+            try:
+                results = self._client.get_job_results(job_id)
+            except Exception as e:
+                logger.warning(f"Failed to retrieve results from API, trying S3: {e}")
+                results = self._retrieve_results_from_s3(output_location)
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "SUCCESS",
+                "execution_time_seconds": elapsed,
+                "rows_returned": len(results),
+                "results": results,
+                "error": None,
+            }
         except Exception as e:
-            logger.warning(f"Failed to retrieve results from API, trying S3: {e}")
-            return self._retrieve_results_from_s3(output_location)
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "FAILED",
+                "execution_time_seconds": elapsed_seconds(start_time),
+                "rows_returned": 0,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
 
     def _retrieve_results_from_s3(self, output_location: str) -> list[dict[str, Any]]:
         """Retrieve job results from S3.

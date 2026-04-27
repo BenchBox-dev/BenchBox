@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from benchbox.core.exceptions import ConfigurationError
+from benchbox.platforms.base.data_loading import DataSource
 
 pytestmark = [
     pytest.mark.unit,
@@ -540,6 +543,214 @@ class TestAthenaAdapter:
         mock_s3.upload_file.assert_called_once()
         assert any("CREATE EXTERNAL TABLE" in str(call.args[0]).upper() for call in mock_cursor.execute.call_args_list)
 
+    def test_resolve_data_files_external_prefers_manifest_parquet(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials, tmp_path
+    ):
+        """External mode should replace text benchmark tables with manifest-selected Parquet files."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="data", database="test_db")
+        adapter.table_mode = "external"
+
+        tbl_file = tmp_path / "lineitem.tbl"
+        parquet_file = tmp_path / "lineitem.parquet"
+        tbl_file.write_text("1|x|\n")
+        parquet_file.write_bytes(b"PAR1")
+        (tmp_path / "_datagen_manifest.json").write_text(
+            json.dumps(
+                {
+                    "version": 2,
+                    "benchmark": "tpch",
+                    "scale_factor": 0.01,
+                    "format_preference": ["tbl", "parquet"],
+                    "tables": {
+                        "lineitem": {
+                            "formats": {
+                                "tbl": [{"path": "lineitem.tbl", "size_bytes": 5, "row_count": 1}],
+                                "parquet": [{"path": "lineitem.parquet", "size_bytes": 4, "row_count": 1}],
+                            }
+                        }
+                    },
+                }
+            )
+        )
+        benchmark = SimpleNamespace(tables={"lineitem": tbl_file})
+
+        result = adapter._resolve_data_files(benchmark, tmp_path)
+
+        assert result == {"lineitem": [parquet_file]}
+
+    def test_resolve_data_files_passes_athena_context_to_resolver(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials, tmp_path
+    ):
+        """Resolver construction should include Athena mode and platform config."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="data", database="test_db")
+        adapter.table_mode = "external"
+        data_source = DataSource(source_type="manifest_v2", tables={"lineitem": [tmp_path / "lineitem.parquet"]})
+
+        with patch("benchbox.platforms.athena.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver = MagicMock()
+            mock_resolver.resolve.return_value = data_source
+            mock_resolver_cls.return_value = mock_resolver
+
+            result = adapter._resolve_data_files(SimpleNamespace(), tmp_path)
+
+        call_kwargs = mock_resolver_cls.call_args.kwargs
+        assert call_kwargs["platform_name"] == "Athena"
+        assert call_kwargs["table_mode"] == "external"
+        assert call_kwargs["platform_config"]["s3_bucket"] == "test-bucket"
+        assert call_kwargs["platform_config"]["s3_prefix"] == "data"
+        assert result == {"lineitem": [tmp_path / "lineitem.parquet"]}
+
+    def test_resolve_data_files_external_keeps_benchmark_source_without_manifest_replacement(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials, tmp_path
+    ):
+        """External mode should keep the original source when the manifest has no replacement files."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="data", database="test_db")
+        adapter.table_mode = "external"
+        data_source = DataSource(source_type="benchmark_tables", tables={"lineitem": [tmp_path / "lineitem.tbl"]})
+
+        with patch("benchbox.platforms.athena.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver = MagicMock()
+            mock_resolver.resolve.return_value = data_source
+            mock_resolver._manifest_source.get_data_source.return_value = None
+            mock_resolver_cls.return_value = mock_resolver
+
+            result = adapter._resolve_data_files(SimpleNamespace(), tmp_path)
+
+        assert result == {"lineitem": [tmp_path / "lineitem.tbl"]}
+
+    def test_resolve_data_files_external_manifest_prefers_parquet(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials, tmp_path
+    ):
+        """External mode should select Parquet when falling through directly to the manifest."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="data", database="test_db")
+        adapter.table_mode = "external"
+
+        tbl_file = tmp_path / "lineitem.tbl"
+        parquet_file = tmp_path / "lineitem.parquet"
+        tbl_file.write_text("1|x|\n")
+        parquet_file.write_bytes(b"PAR1")
+        (tmp_path / "_datagen_manifest.json").write_text(
+            json.dumps(
+                {
+                    "version": 2,
+                    "benchmark": "tpch",
+                    "scale_factor": 0.01,
+                    "format_preference": ["tbl", "parquet"],
+                    "tables": {
+                        "lineitem": {
+                            "formats": {
+                                "tbl": [{"path": "lineitem.tbl", "size_bytes": 5, "row_count": 1}],
+                                "parquet": [{"path": "lineitem.parquet", "size_bytes": 4, "row_count": 1}],
+                            }
+                        }
+                    },
+                }
+            )
+        )
+
+        result = adapter._resolve_data_files(SimpleNamespace(), tmp_path)
+
+        assert result == {"lineitem": [parquet_file]}
+
+    def test_resolve_data_files_native_keeps_text_benchmark_tables(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials, tmp_path
+    ):
+        """Native mode should keep benchmark-provided text files instead of forcing manifest Parquet."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="data", database="test_db")
+
+        tbl_file = tmp_path / "lineitem.tbl"
+        parquet_file = tmp_path / "lineitem.parquet"
+        tbl_file.write_text("1|x|\n")
+        parquet_file.write_bytes(b"PAR1")
+        (tmp_path / "_datagen_manifest.json").write_text(
+            json.dumps(
+                {
+                    "version": 2,
+                    "benchmark": "tpch",
+                    "scale_factor": 0.01,
+                    "format_preference": ["parquet", "tbl"],
+                    "tables": {
+                        "lineitem": {
+                            "formats": {
+                                "tbl": [{"path": "lineitem.tbl", "size_bytes": 5, "row_count": 1}],
+                                "parquet": [{"path": "lineitem.parquet", "size_bytes": 4, "row_count": 1}],
+                            }
+                        }
+                    },
+                }
+            )
+        )
+        benchmark = SimpleNamespace(tables={"lineitem": tbl_file})
+
+        result = adapter._resolve_data_files(benchmark, tmp_path)
+
+        assert result == {"lineitem": [tbl_file]}
+
+    def test_resolve_data_files_native_keeps_benchmark_source_when_manifest_prefers_parquet(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials, tmp_path
+    ):
+        """Native mode keeps benchmark-provided text files even when the manifest lists Parquet first.
+
+        BenchmarkTablesSource wins the chain because benchmark.tables is non-empty; the
+        manifest is only consulted for format hints, not to replace the table list.
+        """
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="data", database="test_db")
+
+        tbl_file = tmp_path / "lineitem.tbl"
+        parquet_file = tmp_path / "lineitem.parquet"
+        tbl_file.write_text("1|x|\n")
+        parquet_file.write_bytes(b"PAR1")
+        (tmp_path / "_datagen_manifest.json").write_text(
+            json.dumps(
+                {
+                    "version": 2,
+                    "benchmark": "tpch",
+                    "scale_factor": 0.01,
+                    "format_preference": ["parquet", "tbl"],
+                    "tables": {
+                        "lineitem": {
+                            "formats": {
+                                "tbl": [{"path": "lineitem.tbl", "size_bytes": 5, "row_count": 1}],
+                                "parquet": [{"path": "lineitem.parquet", "size_bytes": 4, "row_count": 1}],
+                            }
+                        }
+                    },
+                }
+            )
+        )
+
+        result = adapter._resolve_data_files(SimpleNamespace(), tmp_path)
+
+        assert result == {"lineitem": [tbl_file]}
+
+    def test_resolve_data_files_raises_when_no_source_found(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials, tmp_path
+    ):
+        """Missing benchmark tables and manifest should raise a clear error."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket", s3_prefix="data", database="test_db")
+
+        with patch("benchbox.platforms.athena.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver = MagicMock()
+            mock_resolver.resolve.return_value = None
+            mock_resolver_cls.return_value = mock_resolver
+
+            with pytest.raises(ValueError, match="No data files found"):
+                adapter._resolve_data_files(SimpleNamespace(), tmp_path)
+
     def test_load_data_parquet_mode_keeps_ctas_conversion(self, mock_boto3, mock_pyathena, mock_aws_credentials):
         """Native parquet mode should continue to use CTAS staging conversion path."""
         from benchbox.platforms.athena import AthenaAdapter
@@ -944,3 +1155,36 @@ class TestAthenaAdapterRegistration:
             adapter = AthenaAdapter.__new__(AthenaAdapter)
             adapter.s3_bucket = "my-bucket"
             adapter.validate_external_table_requirements()  # Should not raise
+
+
+class TestAthenaConfigBuilder:
+    """Tests for the Athena config builder."""
+
+    def test_builder_uses_aws_region_when_region_missing(self):
+        from benchbox.platforms.athena import _build_athena_config
+
+        mock_info = MagicMock(display_name="AWS Athena", driver_package="pyathena")
+
+        with patch("benchbox.security.credentials.CredentialManager") as mock_cm_cls:
+            mock_cm_cls.return_value.get_platform_credentials.return_value = {"aws_region": "eu-west-1"}
+
+            config = _build_athena_config("athena", {}, {}, mock_info)
+
+        assert config.region == "eu-west-1"
+
+    def test_builder_prefers_region_over_aws_region(self):
+        from benchbox.platforms.athena import _build_athena_config
+
+        mock_info = MagicMock(display_name="AWS Athena", driver_package="pyathena")
+
+        with patch("benchbox.security.credentials.CredentialManager") as mock_cm_cls:
+            mock_cm_cls.return_value.get_platform_credentials.return_value = {"aws_region": "eu-west-1"}
+
+            config = _build_athena_config(
+                "athena",
+                {"region": "us-west-2"},
+                {},
+                mock_info,
+            )
+
+        assert config.region == "us-west-2"

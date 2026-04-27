@@ -57,6 +57,63 @@ def test_parse_options_unknown_key_raises():
         PlatformHookRegistry.parse_options("clickhouse", [("unknown", "value")])
 
 
+@pytest.mark.parametrize(
+    ("platform", "expected_defaults"),
+    [
+        (
+            "pg-duckdb",
+            {
+                "admin_database": "postgres",
+                "sslmode": "prefer",
+                "work_mem": "256MB",
+                "maintenance_work_mem": "512MB",
+                "effective_cache_size": "1GB",
+                "max_parallel_workers_per_gather": 2,
+                "compare_native": False,
+            },
+        ),
+        (
+            "pg-mooncake",
+            {
+                "admin_database": "postgres",
+                "sslmode": "prefer",
+                "work_mem": "256MB",
+                "maintenance_work_mem": "512MB",
+                "effective_cache_size": "1GB",
+                "max_parallel_workers_per_gather": 2,
+            },
+        ),
+        (
+            "timescaledb",
+            {
+                "admin_database": "postgres",
+                "sslmode": "prefer",
+                "work_mem": "256MB",
+                "maintenance_work_mem": "512MB",
+                "effective_cache_size": "1GB",
+                "max_parallel_workers_per_gather": 2,
+            },
+        ),
+    ],
+)
+def test_group_c_platform_defaults_cover_load_bearing_builder_fields(platform, expected_defaults):
+    defaults = PlatformHookRegistry.get_default_options(platform)
+    assert {key: defaults[key] for key in expected_defaults} == expected_defaults
+
+
+def test_pg_duckdb_platform_options_parse_group_c_builder_fields():
+    parsed = PlatformHookRegistry.parse_options(
+        "pg-duckdb",
+        [
+            ("compare_native", "true"),
+            ("max_parallel_workers_per_gather", "4"),
+        ],
+    )
+
+    assert parsed["compare_native"] is True
+    assert parsed["max_parallel_workers_per_gather"] == 4
+
+
 def test_database_manager_create_config_merges_options(monkeypatch):
     monkeypatch.setattr(
         "benchbox.cli.database.ensure_driver_version",
@@ -91,6 +148,73 @@ def test_database_manager_create_config_merges_options(monkeypatch):
     assert config.driver_runtime_python_executable == "/tmp/python"
     assert config.options["driver_version_actual"] == "local-dev"
     assert config.options["driver_runtime_strategy"] == "current-process"
+
+
+def test_database_manager_create_config_preserves_saved_credentials_over_defaults(monkeypatch):
+    monkeypatch.setattr(
+        "benchbox.cli.database.ensure_driver_version",
+        lambda package_name, requested_version, auto_install=False, install_hint=None: DriverResolution(
+            package=package_name or "",
+            requested=requested_version,
+            resolved=requested_version or "local-dev",
+            actual=requested_version or "local-dev",
+            auto_install_used=False,
+            runtime_strategy="current-process",
+            runtime_path=None,
+            runtime_python_executable="/tmp/python",
+        ),
+    )
+
+    manager = DatabaseManager()
+
+    with patch("benchbox.security.credentials.CredentialManager") as mock_cm_class:
+        mock_cm_class.return_value.get_platform_credentials.return_value = {
+            "host": "saved-host",
+            "username": "saved-user",
+        }
+
+        config = manager.create_config("pg-duckdb", None, {"benchmark": "tpch", "scale_factor": 1})
+
+    assert config.host == "saved-host"
+    assert config.username == "saved-user"
+    assert config.options["host"] == "saved-host"
+    assert config.options["username"] == "saved-user"
+    assert config.options["schema"] == "public"
+
+
+def test_database_manager_create_config_explicit_options_override_saved_credentials(monkeypatch):
+    monkeypatch.setattr(
+        "benchbox.cli.database.ensure_driver_version",
+        lambda package_name, requested_version, auto_install=False, install_hint=None: DriverResolution(
+            package=package_name or "",
+            requested=requested_version,
+            resolved=requested_version or "local-dev",
+            actual=requested_version or "local-dev",
+            auto_install_used=False,
+            runtime_strategy="current-process",
+            runtime_path=None,
+            runtime_python_executable="/tmp/python",
+        ),
+    )
+
+    manager = DatabaseManager()
+
+    with patch("benchbox.security.credentials.CredentialManager") as mock_cm_class:
+        mock_cm_class.return_value.get_platform_credentials.return_value = {
+            "host": "saved-host",
+            "username": "saved-user",
+        }
+
+        config = manager.create_config(
+            "pg-duckdb",
+            {"host": "cli-host"},
+            {"benchmark": "tpch", "scale_factor": 1},
+        )
+
+    assert config.host == "cli-host"
+    assert config.username == "saved-user"
+    assert config.options["host"] == "cli-host"
+    assert config.options["username"] == "saved-user"
 
 
 class TestPlatformConfigBuilders:
@@ -141,9 +265,9 @@ class TestPlatformConfigBuilders:
         assert config.name == "BigQuery"
         assert config.driver_package == "google-cloud-bigquery"
 
-        # Verify priority: saved < options < overrides
+        # Verify priority: defaults < saved < explicit_options < overrides
         assert config.options["project_id"] == "saved-project"  # from saved (not overridden)
-        assert config.options["dataset_id"] == "cli-dataset"  # from options (overrides saved)
+        assert config.options["dataset_id"] == "saved-dataset"  # saved creds override registered defaults
         assert config.options["location"] == "EU"  # from overrides (highest priority)
         assert config.options["credentials_path"] == "/saved/path/creds.json"  # from saved
 
@@ -208,11 +332,11 @@ class TestPlatformConfigBuilders:
         assert config.name == "Snowflake"
         assert config.driver_package == "snowflake-connector-python"
 
-        # Verify priority: saved < options < overrides
+        # Verify priority: defaults < saved < explicit_options < overrides
         assert config.options["account"] == "saved-account"  # from saved (not overridden)
         assert config.options["username"] == "saved-user"  # from saved (not overridden)
         assert config.options["password"] == "saved-pass"  # from saved (not overridden)
-        assert config.options["warehouse"] == "cli-wh"  # from options (overrides saved)
+        assert config.options["warehouse"] == "saved-wh"  # saved creds override registered defaults
         assert config.options["database"] == "override-db"  # from overrides (highest priority)
 
     def test_snowflake_config_builder_no_saved_credentials(self, mock_credential_manager):
@@ -276,11 +400,11 @@ class TestPlatformConfigBuilders:
         assert config.name == "Redshift"
         assert config.driver_package == "redshift-connector"
 
-        # Verify priority: saved < options < overrides
+        # Verify priority: defaults < saved < explicit_options < overrides
         assert config.options["host"] == "saved-host.redshift.amazonaws.com"  # from saved (not overridden)
         assert config.options["username"] == "saved-user"  # from saved (not overridden)
         assert config.options["password"] == "saved-pass"  # from saved (not overridden)
-        assert config.options["database"] == "cli-db"  # from options (overrides saved)
+        assert config.options["database"] == "saved-db"  # saved creds override registered defaults
         assert config.options["port"] == 5440  # from overrides (highest priority)
 
     def test_redshift_config_builder_no_saved_credentials(self, mock_credential_manager):
@@ -344,11 +468,11 @@ class TestPlatformConfigBuilders:
         assert config.name == "Databricks"
         assert config.driver_package == "databricks-sql-connector"
 
-        # Verify priority: saved < options < overrides
+        # Verify priority: defaults < saved < explicit_options < overrides
         assert config.options["server_hostname"] == "saved-host.databricks.com"  # from saved (not overridden)
         assert config.options["http_path"] == "/sql/1.0/saved"  # from saved (not overridden)
         assert config.options["access_token"] == "saved-token"  # from saved (not overridden)
-        assert config.options["catalog"] == "cli-catalog"  # from options (overrides saved)
+        assert config.options["catalog"] == "saved-catalog"  # saved creds override registered defaults
         assert config.options["schema"] == "override-schema"  # from overrides (highest priority)
 
     def test_databricks_config_builder_no_saved_credentials(self, mock_credential_manager):

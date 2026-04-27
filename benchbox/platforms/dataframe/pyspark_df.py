@@ -67,7 +67,7 @@ from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
 from benchbox.platforms.dataframe.expression_family import (
     ExpressionFamilyAdapter,
 )
-from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter, is_tpc_format
+from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter
 
 if TYPE_CHECKING:
     from pyspark.sql.window import WindowSpec
@@ -442,6 +442,7 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
         delimiter: str = ",",
         has_header: bool = True,
         column_names: list[str] | None = None,
+        null_marker: str | None = None,
     ) -> PySparkLazyDF:
         """Read a CSV file into a PySpark DataFrame.
 
@@ -450,6 +451,7 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
             delimiter: Field delimiter
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
+            null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
 
         Returns:
             PySpark DataFrame with the file contents
@@ -458,8 +460,8 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
 
         reader = self.spark.read.option("delimiter", delimiter).option("header", str(has_header).lower())
 
-        # Handle TPC .tbl/.dat files with trailing delimiter
-        if is_tpc_format(path) and column_names and has_trailing_delimiter(path, delimiter, column_names):
+        # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
+        if null_marker is not None and column_names and has_trailing_delimiter(path, delimiter, column_names):
             extended_names = column_names + [TRAILING_DUMMY_COLUMN]
             schema = self._build_schema(extended_names)
             df = reader.schema(schema).csv(path_str)

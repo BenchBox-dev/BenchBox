@@ -23,12 +23,12 @@ Docker integration tests execute real queries against real database engines runn
 
 | Platform | Docker Image | Ports | Protocol |
 |----------|-------------|-------|----------|
-| ClickHouse | `clickhouse/clickhouse-server:24.8` | 9000, 8123 | Native TCP / HTTP |
-| Trino | `trinodb/trino:439` | 18080 -> 8080 | HTTP (DBAPI) |
-| Presto | `prestodb/presto:0.289` | 18081 -> 8080 | HTTP (DBAPI) |
-| PostgreSQL | `postgres:16` | 5432 | PostgreSQL wire |
-| StarRocks | `starrocks/allin1-ubuntu:3.3.0` | 19030 -> 9030, 18040 -> 8040 | MySQL / HTTP Stream Load |
-| Doris | `apache/doris:doris-all-in-one-2.1.0` | 19031 -> 9030, 18030 -> 8030 | MySQL / HTTP Stream Load |
+| ClickHouse | `clickhouse/clickhouse-server:25.8` | 9000, 8123 | Native TCP / HTTP |
+| Trino | `trinodb/trino:480` | 18080 -> 8080 | HTTP (DBAPI) |
+| Presto | `prestodb/presto:0.297` | 18081 -> 8080 | HTTP (DBAPI) |
+| PostgreSQL | `postgres:18` | 5432 | PostgreSQL wire |
+| StarRocks | `starrocks/allin1-ubuntu:3.5.16` | 19030 -> 9030, 18040 -> 8040 | MySQL / HTTP Stream Load |
+| Doris | `apache/doris:4.0.3-all-slim` | 19031 -> 9030, 18030 -> 8030 | MySQL / HTTP Stream Load |
 | Databend | `datafuselabs/databend` + MinIO | 8000, 19000 -> 9000, 19001 -> 9001 | HTTP/DSN |
 | InfluxDB | `influxdb:3-core` | 8181 | HTTP (FlightSQL) |
 
@@ -115,6 +115,13 @@ This means:
 The Docker test compose files use unique default host ports so `make test-docker-up-all`
 can start every platform together. If you override those defaults and reintroduce a port
 collision, run the affected platforms sequentially.
+
+### Doris Security Defaults
+
+The checked-in Doris stack defaults to `DORIS_PRIVILEGED=false`. Only opt into
+`DORIS_PRIVILEGED=true` when your Docker VM still needs the container to raise
+`vm.max_map_count` at startup; configuring the Docker VM once is the narrower
+alternative.
 
 ### Stack Isolation
 

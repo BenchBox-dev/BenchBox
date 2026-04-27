@@ -322,7 +322,7 @@ def _tpch_partsupp_polars() -> pl.LazyFrame:
     ).lazy()
 
 
-# Pandas equivalents — built directly to preserve date types for pandas_impl comparisons.
+# Pandas equivalents - built directly to preserve date types for pandas_impl comparisons.
 # Using _to_pandas() would convert date columns to datetime64, breaking comparisons
 # with Python date() objects used in the pandas query implementations.
 
@@ -680,6 +680,8 @@ class TestReadPrimitivesRegistry:
             get_skip_for_dataframe,
             get_skip_for_datafusion,
             get_skip_for_expression_family,
+            get_skip_for_polars,
+            get_skip_for_pyspark,
         )
 
         registry = get_dataframe_queries()
@@ -692,11 +694,18 @@ class TestReadPrimitivesRegistry:
 
         # Expression-family skips should reference registered queries
         for skip_id in get_skip_for_expression_family():
+            # Currently empty, but check if we add anything later
             assert skip_id in all_ids, f"{skip_id} is in skip_for_expression_family but not registered"
 
-        # DataFusion skips should reference registered queries
+        # Platform-specific skips should reference registered queries
         for skip_id in get_skip_for_datafusion():
             assert skip_id in all_ids, f"{skip_id} is in skip_for_datafusion but not registered"
+
+        for skip_id in get_skip_for_polars():
+            assert skip_id in all_ids, f"{skip_id} is in skip_for_polars but not registered"
+
+        for skip_id in get_skip_for_pyspark():
+            assert skip_id in all_ids, f"{skip_id} is in skip_for_pyspark but not registered"
 
     def test_query_ids_are_unique(self):
         """Each query_id is unique (no duplicates)."""
@@ -708,7 +717,7 @@ class TestReadPrimitivesRegistry:
 
 
 # =============================================================================
-# Expression-Family (Polars) Execution Tests — Aggregation
+# Expression-Family (Polars) Execution Tests - Aggregation
 # =============================================================================
 
 
@@ -777,7 +786,7 @@ class TestExpressionAggregation:
 
 
 # =============================================================================
-# Expression-Family (Polars) Execution Tests — Filter
+# Expression-Family (Polars) Execution Tests - Filter
 # =============================================================================
 
 
@@ -829,7 +838,7 @@ class TestExpressionFilter:
 
 
 # =============================================================================
-# Expression-Family (Polars) Execution Tests — String Operations
+# Expression-Family (Polars) Execution Tests - String Operations
 # =============================================================================
 
 
@@ -889,7 +898,7 @@ class TestExpressionString:
 
 
 # =============================================================================
-# Expression-Family (Polars) Execution Tests — OrderBy / Sort
+# Expression-Family (Polars) Execution Tests - OrderBy / Sort
 # =============================================================================
 
 
@@ -940,7 +949,7 @@ class TestExpressionOrderBy:
 
 
 # =============================================================================
-# Expression-Family (Polars) Execution Tests — Window Functions
+# Expression-Family (Polars) Execution Tests - Window Functions
 # =============================================================================
 
 
@@ -982,7 +991,7 @@ class TestExpressionWindow:
 
 
 # =============================================================================
-# Expression-Family (Polars) Execution Tests — Join Operations
+# Expression-Family (Polars) Execution Tests - Join Operations
 # =============================================================================
 
 
@@ -1036,7 +1045,7 @@ class TestExpressionJoin:
 
 
 # =============================================================================
-# Expression-Family (Polars) Execution Tests — Decimal Arithmetic
+# Expression-Family (Polars) Execution Tests - Decimal Arithmetic
 # =============================================================================
 
 
@@ -1066,7 +1075,7 @@ class TestExpressionDecimalArithmetic:
 
 
 # =============================================================================
-# Parametrized Expression Execution — Core Operations
+# Parametrized Expression Execution - Core Operations
 # =============================================================================
 
 # Representative queries for each category
@@ -1202,6 +1211,7 @@ CORE_EXPRESSION_QUERIES = [
     "optimizer_common_subexpression",
     "optimizer_constant_folding",
     "optimizer_distinct_elimination",
+    "optimizer_groupjoin",
     "optimizer_join_reordering",
     "optimizer_limit_pushdown",
     "optimizer_predicate_pushdown",
@@ -1269,7 +1279,7 @@ class TestParametrizedExpressionExecution:
 
 
 # =============================================================================
-# Parametrized Pandas Execution — Core Operations
+# Parametrized Pandas Execution - Core Operations
 # =============================================================================
 
 
@@ -1334,7 +1344,7 @@ class TestPandasOnlyAdvancedExecution:
 
 
 # =============================================================================
-# Cross-Family Comparison — Expression vs Pandas
+# Cross-Family Comparison - Expression vs Pandas
 # =============================================================================
 
 # Subset of queries suitable for cross-family comparison
@@ -1347,6 +1357,7 @@ CROSS_FAMILY_QUERIES = [
     "string_like",
     "broadcast_join_two_tables",
     "groupby_bigint_lowndv",
+    "optimizer_groupjoin",
 ]
 
 

@@ -9,6 +9,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import json
 import sys
+import sys as _sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -18,6 +19,15 @@ from click.testing import CliRunner
 
 from benchbox.cli.app import cli
 from tests.fixtures.result_dict_fixtures import make_v2_result_dict
+
+# benchbox.cli.commands.__init__ re-exports `compare` (a Click Command) under
+# the same name as the compare submodule.  On Python 3.10 mock's string-based
+# patch() resolves the target via getattr(benchbox.cli.commands, "compare"),
+# which returns the Command object, not the submodule.  Seeding sys.modules
+# here via __import__ and using patch.object() avoids the ambiguity on all
+# Python versions.
+__import__("benchbox.cli.commands.compare")
+_compare_module = _sys.modules["benchbox.cli.commands.compare"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -69,7 +79,7 @@ class TestCompareCommand:
     def test_compare_requires_two_files(self):
         """Test that compare requires at least 2 files."""
         runner = CliRunner()
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
             json.dump({"test": "data"}, f)
             file_path = f.name
 
@@ -80,8 +90,8 @@ class TestCompareCommand:
         finally:
             Path(file_path).unlink()
 
-    @patch("benchbox.cli.commands.compare.load_result_file")
-    @patch("benchbox.cli.commands.compare.ResultExporter")
+    @patch.object(_compare_module, "load_result_file")
+    @patch.object(_compare_module, "ResultExporter")
     def test_compare_two_files_success(self, mock_exporter_class, mock_load):
         """Test successful comparison of two result files."""
         runner = CliRunner()
@@ -111,8 +121,8 @@ class TestCompareCommand:
             assert result.exit_code == 0
             assert "BENCHMARK COMPARISON REPORT" in result.output
 
-    @patch("benchbox.cli.commands.compare.load_result_file")
-    @patch("benchbox.cli.commands.compare.ResultExporter")
+    @patch.object(_compare_module, "load_result_file")
+    @patch.object(_compare_module, "ResultExporter")
     def test_compare_with_regression_detection(self, mock_exporter_class, mock_load):
         """Test comparison with regression detection and exit code."""
         runner = CliRunner()
@@ -200,9 +210,9 @@ class TestCompareCommand:
         assert "--include-plans" in result.output
         assert "--plan-threshold" in result.output
 
-    @patch("benchbox.cli.commands.compare.load_result_file")
-    @patch("benchbox.cli.commands.compare.ResultExporter")
-    @patch("benchbox.cli.commands.compare._compare_plans")
+    @patch.object(_compare_module, "load_result_file")
+    @patch.object(_compare_module, "ResultExporter")
+    @patch.object(_compare_module, "_compare_plans")
     def test_compare_with_include_plans_flag(self, mock_compare_plans, mock_exporter_class, mock_load):
         """Test comparison with --include-plans flag."""
         runner = CliRunner()
@@ -245,9 +255,9 @@ class TestCompareCommand:
             # Plan analysis section should be in output
             assert "QUERY PLAN ANALYSIS" in result.output
 
-    @patch("benchbox.cli.commands.compare.load_result_file")
-    @patch("benchbox.cli.commands.compare.ResultExporter")
-    @patch("benchbox.cli.commands.compare._compare_plans")
+    @patch.object(_compare_module, "load_result_file")
+    @patch.object(_compare_module, "ResultExporter")
+    @patch.object(_compare_module, "_compare_plans")
     def test_compare_include_plans_no_plans_available(self, mock_compare_plans, mock_exporter_class, mock_load):
         """Test --include-plans when result files have no captured plans."""
         runner = CliRunner()

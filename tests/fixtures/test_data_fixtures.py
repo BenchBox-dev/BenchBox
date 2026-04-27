@@ -38,7 +38,7 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
         ["4", "MIDDLE EAST", "uickly special requests"],
     ]
 
-    with open(region_file, "w", newline="") as f:
+    with open(region_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(region_data)
 
@@ -53,7 +53,7 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
         ["5", "ETHIOPIA", "0", "ven packages wake quickly"],
     ]
 
-    with open(nation_file, "w", newline="") as f:
+    with open(nation_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(nation_data)
 
@@ -112,7 +112,7 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
         ],
     ]
 
-    with open(customer_file, "w", newline="") as f:
+    with open(customer_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(customer_data)
 
@@ -136,7 +136,7 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
         ["5", "5", "F", "144659.20", "1994-07-30", "5-LOW", "Clerk#000000925", "0", "quickly. bold deposits sleep"],
     ]
 
-    with open(orders_file, "w", newline="") as f:
+    with open(orders_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(orders_data)
 
@@ -235,7 +235,7 @@ def tpch_sample_data_session() -> Generator[Path, None, None]:
         ],
     ]
 
-    with open(lineitem_file, "w", newline="") as f:
+    with open(lineitem_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(lineitem_data)
 
@@ -289,7 +289,7 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         ],
     ]
 
-    with open(region_file, "w", newline="") as f:
+    with open(region_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(region_data)
 
@@ -338,7 +338,7 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         ["9", "INDONESIA", "2", "slyly express asymptotes. regular deposits haggle slyly. carefully ironic hockey"],
     ]
 
-    with open(nation_file, "w", newline="") as f:
+    with open(nation_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(nation_data)
 
@@ -392,7 +392,7 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         ],
     ]
 
-    with open(supplier_file, "w", newline="") as f:
+    with open(supplier_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(supplier_data)
 
@@ -456,7 +456,7 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         ],
     ]
 
-    with open(part_file, "w", newline="") as f:
+    with open(part_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(part_data)
 
@@ -565,7 +565,7 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         ],
     ]
 
-    with open(customer_file, "w", newline="") as f:
+    with open(customer_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(customer_data)
 
@@ -684,7 +684,7 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         ],
     ]
 
-    with open(orders_file, "w", newline="") as f:
+    with open(orders_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(orders_data)
 
@@ -701,7 +701,7 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         ["4", "2", "1100", "365.96", "carefully regular deposits. blithely ironic packages"],
     ]
 
-    with open(partsupp_file, "w", newline="") as f:
+    with open(partsupp_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(partsupp_data)
 
@@ -926,7 +926,7 @@ def tpch_detailed_data_session() -> Generator[Path, None, None]:
         ],
     ]
 
-    with open(lineitem_file, "w", newline="") as f:
+    with open(lineitem_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerows(lineitem_data)
 

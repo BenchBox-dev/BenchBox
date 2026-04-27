@@ -20,6 +20,7 @@ import logging
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
+from unittest.mock import DEFAULT
 
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
@@ -56,6 +57,55 @@ from benchbox.utils.verbosity import VerbositySettings
 logger = logging.getLogger(__name__)
 
 console = quiet_console
+
+
+def _benchmark_defines_hook(benchmark_instance: Any | None, hook_name: str) -> bool:
+    """Return True when a benchmark explicitly defines a hook.
+
+    This accepts real class-defined hooks and explicitly configured mock hooks,
+    while rejecting synthetic MagicMock attributes created via ``__getattr__``.
+    """
+    if benchmark_instance is None:
+        return False
+
+    hook = type(benchmark_instance).__dict__.get(hook_name)
+    if callable(hook):
+        return True
+
+    instance_hook = benchmark_instance.__dict__.get(hook_name)
+    if callable(instance_hook):
+        return True
+
+    mock_children = getattr(benchmark_instance, "_mock_children", None)
+    if not isinstance(mock_children, dict):
+        return False
+
+    child = mock_children.get(hook_name)
+    if child is None:
+        return False
+
+    return (
+        getattr(child, "_mock_return_value", DEFAULT) is not DEFAULT
+        or getattr(child, "_mock_side_effect", None) is not None
+        or getattr(child, "_mock_wraps", None) is not None
+    )
+
+
+def _benchmark_manages_dataframe_loading(benchmark_instance: Any | None) -> bool:
+    """Return True when a benchmark explicitly owns DataFrame loading.
+
+    Use class-level hook detection so dynamic test doubles such as MagicMock do
+    not accidentally appear to implement the hook via ``__getattr__``.
+    """
+    if not _benchmark_defines_hook(benchmark_instance, "skip_dataframe_data_loading"):
+        return False
+
+    return bool(benchmark_instance.skip_dataframe_data_loading())
+
+
+def _benchmark_provides_dataframe_queries(benchmark_instance: Any | None) -> bool:
+    """Return True when a benchmark defines a DataFrame query provider hook."""
+    return _benchmark_defines_hook(benchmark_instance, "get_dataframe_queries")
 
 
 @dataclass
@@ -182,8 +232,10 @@ def run_dataframe_benchmark(
         # Create execution context
         ctx = adapter.create_context()
 
+        skip_data_loading = _benchmark_manages_dataframe_loading(benchmark_instance)
+
         # Load phase
-        if phases.load:
+        if phases.load and not skip_data_loading:
             load_start = mono_time()
             table_stats, per_table_stats = _load_dataframe_data(
                 adapter=adapter,
@@ -207,6 +259,8 @@ def run_dataframe_benchmark(
                 )
             builder.set_loading_time(load_time * 1000)
             builder.set_phase_status("data_loading", "COMPLETED", load_time * 1000)
+        elif phases.load and skip_data_loading:
+            builder.set_phase_status("data_loading", "SKIPPED")
 
         # Execute phase
         if phases.execute:
@@ -631,7 +685,7 @@ def _get_queries_for_benchmark(
         return handler(benchmark_config, benchmark_instance, stream_id)
 
     # Try benchmark instance
-    if benchmark_instance and hasattr(benchmark_instance, "get_dataframe_queries"):
+    if _benchmark_provides_dataframe_queries(benchmark_instance):
         return benchmark_instance.get_dataframe_queries()
 
     return []

@@ -45,7 +45,7 @@ class TestTPCDSManifestValidation:
         manifest_path = tmp_path / "_datagen_manifest.json"
         assert manifest_path.exists()
 
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             manifest = json.load(f)
 
         # Check basic structure
@@ -112,7 +112,7 @@ class TestTPCDSManifestValidation:
         generator._write_manifest(tmp_path, table_paths)
 
         manifest_path = tmp_path / "_datagen_manifest.json"
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             manifest = json.load(f)
 
         validation_metadata = manifest["validation_metadata"]
@@ -162,7 +162,7 @@ class TestTPCDSManifestValidation:
             generator._write_manifest(tmp_path, table_paths)
 
             manifest_path = tmp_path / "_datagen_manifest.json"
-            with open(manifest_path) as f:
+            with open(manifest_path, encoding="utf-8") as f:
                 manifest = json.load(f)
 
             # Verify scale factor is recorded correctly
@@ -186,7 +186,7 @@ class TestTPCDSManifestValidation:
         generator._write_manifest(tmp_path, table_paths)
 
         manifest_path = tmp_path / "_datagen_manifest.json"
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             manifest = json.load(f)
 
         # Check compression settings
@@ -215,7 +215,7 @@ class TestTPCDSManifestValidation:
         generator._write_manifest(tmp_path, table_paths)
 
         manifest_path = tmp_path / "_datagen_manifest.json"
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             manifest = json.load(f)
 
         # Check that table data is preserved
@@ -249,7 +249,7 @@ class TestTPCDSManifestValidation:
         generator._write_manifest(tmp_path, table_paths)
 
         manifest_path = tmp_path / "_datagen_manifest.json"
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             manifest = json.load(f)
 
         # Check that all original fields are still present

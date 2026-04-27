@@ -30,7 +30,7 @@ Usage:
   # Dry run (show execution plan)
   uv run -- python scripts/benchmark_mooncake_migration.py --dry-run
 
-Requires: psycopg2 (pip install psycopg2-binary)
+Requires: psycopg (pip install psycopg[binary])
 """
 
 from __future__ import annotations
@@ -173,7 +173,7 @@ _SAFE_TABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 def _validate_table_name(table_name: str) -> str:
     """Validate table name is a safe SQL identifier (alphanumeric + underscore only)."""
     if not _SAFE_TABLE_NAME_RE.match(table_name):
-        raise ValueError(f"Invalid table name: {table_name!r} — must be alphanumeric/underscore only")
+        raise ValueError(f"Invalid table name: {table_name!r} - must be alphanumeric/underscore only")
     return table_name
 
 
@@ -184,9 +184,9 @@ def _convert_table_to_columnstore(cursor, conn, table_name: str) -> TableMigrati
     # Measure heap size before conversion
     heap_size = _get_table_size(cursor, table_name)
 
-    # Convert to columnstore — table_name is validated above as a safe identifier
+    # Convert to columnstore - table_name is validated above as a safe identifier
     start = time.monotonic()
-    from psycopg2 import sql
+    from psycopg import sql
 
     cursor.execute(sql.SQL("ALTER TABLE {} SET ACCESS METHOD columnstore").format(sql.Identifier(table_name)))
     conn.commit()
@@ -557,13 +557,13 @@ def main(argv: list[str] | None = None) -> int:
 
     # Live benchmark run
     try:
-        import psycopg2
+        import psycopg
     except ImportError:
-        print("Error: psycopg2 is required. Install with: pip install psycopg2-binary", file=sys.stderr)
+        print("Error: psycopg is required. Install with: pip install psycopg[binary]", file=sys.stderr)
         return 1
 
     try:
-        conn = psycopg2.connect(
+        conn = psycopg.connect(
             host=args.host,
             port=args.port,
             user=args.user,

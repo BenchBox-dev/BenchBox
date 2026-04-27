@@ -73,8 +73,25 @@ class QueryResult(BaseModel):
 
 
 class RunConfig(BaseModel):
-    """Configuration for benchmark run execution."""
+    """Configuration for benchmark run execution.
 
+    Benchmark identity contract
+    ---------------------------
+    ``benchmark`` carries the canonical benchmark slug (e.g. "tpch", "tpcds")
+    sourced directly from ``BenchmarkConfig.name``.  It must be populated by the
+    runner before ``RunConfig`` is handed to the platform adapter so that the
+    adapter never has to infer benchmark identity from object internals.
+
+    Ownership hierarchy (CLI → persistence):
+    * ``BenchmarkConfig.name``  - authoritative slug supplied by the CLI/orchestrator
+    * ``RunConfig.benchmark``   - propagated copy, carried through SQL execution
+    * ``execution_metadata["benchmark_id"]`` - normalised form written to results
+    * ``display_name`` / wrapper class names - presentation only, never routing inputs
+    """
+
+    # Canonical benchmark slug (e.g. "tpch"). Populated by the runner from
+    # BenchmarkConfig.name so adapters can use it for routing and result
+    # creation without sniffing benchmark object internals.
     benchmark: Optional[str] = None
     database_type: Optional[str] = None
     query_subset: Optional[list[str]] = None
@@ -88,6 +105,7 @@ class RunConfig(BaseModel):
     enable_postload_validation: bool = False
     capture_plans: bool = False
     strict_plan_capture: bool = False
+    # PyPI distribution name (e.g. "psycopg", "duckdb") - no extras markers or version specifiers
     driver_package: Optional[str] = None
     driver_version: Optional[str] = None
     driver_version_resolved: Optional[str] = None
@@ -166,7 +184,7 @@ class RunConfig(BaseModel):
             return v_lower
         return v
 
-    # (attr_name, options_key, expected_type) — populated by populate_driver_metadata.
+    # (attr_name, options_key, expected_type) - populated by populate_driver_metadata.
     _DRIVER_OPTION_FIELDS: ClassVar[list[tuple[str, str, type]]] = [
         ("driver_version", "driver_version", str),
         ("driver_package", "driver_package", str),
@@ -210,8 +228,17 @@ class RunConfig(BaseModel):
 
 
 class BenchmarkConfig(BaseModel):
-    """Benchmark configuration."""
+    """Benchmark configuration.
 
+    ``name`` is the authoritative benchmark slug (e.g. "tpch", "tpcds").  It is
+    the single source of truth for benchmark identity and must be propagated
+    explicitly to ``RunConfig.benchmark``, ``execution_metadata["benchmark_id"]``,
+    and dry-run extraction paths.  Downstream code must NOT re-derive identity
+    from display names, wrapper class names, or benchmark object internals.
+    """
+
+    # Authoritative benchmark slug supplied by the CLI / orchestrator.
+    # This value flows into RunConfig.benchmark and execution_metadata["benchmark_id"].
     name: str
     display_name: str
     scale_factor: float = 0.01
@@ -283,6 +310,7 @@ class DatabaseConfig(BaseModel):
     name: str
     connection_string: Optional[str] = None
     options: dict[str, Any] = Field(default_factory=dict)
+    # PyPI distribution name (e.g. "psycopg", "duckdb") - no extras markers or version specifiers
     driver_package: Optional[str] = None
     driver_version: Optional[str] = None
     driver_version_resolved: Optional[str] = None

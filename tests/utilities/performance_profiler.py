@@ -299,7 +299,7 @@ class PerformanceProfiler:
         """Load performance baselines from disk."""
         if self.baseline_file.exists():
             try:
-                with open(self.baseline_file) as f:
+                with open(self.baseline_file, encoding="utf-8") as f:
                     data = json.load(f)
                     for name, baseline_data in data.items():
                         self.baselines[name] = PerformanceBaseline(**baseline_data)
@@ -320,7 +320,7 @@ class PerformanceProfiler:
                 "tolerance_percent": baseline.tolerance_percent,
             }
 
-        with open(self.baseline_file, "w") as f:
+        with open(self.baseline_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
     @contextmanager

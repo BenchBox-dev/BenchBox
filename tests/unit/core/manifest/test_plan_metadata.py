@@ -185,7 +185,7 @@ class TestManifestV2PlanMetadata:
             write_manifest(manifest, path)
 
             # Verify JSON structure
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 data = json.load(f)
             assert "plan_metadata" in data
             assert data["plan_metadata"]["plan_fingerprints"]["q1"] == "a" * 64
@@ -211,7 +211,7 @@ class TestManifestV2PlanMetadata:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "manifest.json"
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(manifest_data, f)
 
             loaded = load_manifest(path)

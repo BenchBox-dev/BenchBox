@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, join-order, custom-benchmark
 ```
 
-> **CLI name:** `joinorder` — use `benchbox run --benchmark joinorder`
+> **CLI name:** `joinorder` - use `benchbox run --benchmark joinorder`
 
 ## Overview
 
@@ -132,17 +132,17 @@ joinorder = JoinOrder(queries_dir="path/to/join-order-benchmark")
 ### Main Tables
 
 **Dimension Tables:**
-- `title` (2.5M rows @ SF=1.0) - Movies and TV shows
-- `name` (4M rows @ SF=1.0) - People (actors, directors, etc.)
-- `company_name` (300K rows @ SF=1.0) - Production companies
-- `keyword` (120K rows @ SF=1.0) - Movie keywords
-- `char_name` (3M rows @ SF=1.0) - Character names
+- `title` (500K rows @ SF=1.0) - Movies and TV shows
+- `name` (800K rows @ SF=1.0) - People (actors, directors, etc.)
+- `company_name` (60K rows @ SF=1.0) - Production companies
+- `keyword` (24K rows @ SF=1.0) - Movie keywords
+- `char_name` (600K rows @ SF=1.0) - Character names
 
 **Relationship Tables:**
-- `cast_info` (35M rows @ SF=1.0) - Person-movie relationships
-- `movie_companies` (2.6M rows @ SF=1.0) - Movie-company relationships
-- `movie_info` (15M rows @ SF=1.0) - Movie metadata
-- `movie_keyword` (5M rows @ SF=1.0) - Movie-keyword relationships
+- `cast_info` (7M rows @ SF=1.0) - Person-movie relationships
+- `movie_companies` (520K rows @ SF=1.0) - Movie-company relationships
+- `movie_info` (3M rows @ SF=1.0) - Movie metadata
+- `movie_keyword` (1M rows @ SF=1.0) - Movie-keyword relationships
 
 **Lookup Tables:**
 - `kind_type`, `company_type`, `info_type`, `role_type`, etc.
@@ -192,16 +192,33 @@ The schema creates a complex web of relationships:
 - Multiple relationship paths
 - Advanced-level optimization scenarios
 
+## CLI Options (`--benchmark-option`)
+
+Configure Join Order Benchmark via `--benchmark-option KEY=VALUE`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `queries_dir` | - | Directory containing custom query files |
+| `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+
+Accepts hyphenated aliases (e.g. `queries-dir`).
+
+```bash
+# Use custom queries directory
+benchbox run --platform duckdb --benchmark joinorder --scale 0.1 \
+  --benchmark-option queries_dir=/path/to/custom/queries
+```
+
 ## Performance Characteristics
 
 ### Scale Factor Impact
 
 | Scale Factor | Data Size | title rows | cast_info rows | Query Time (avg) |
 | ------------ | --------- | ---------- | -------------- | ---------------- |
-| 0.001        | ~700 KB   | 2,500      | 35,000         | 1-5 ms           |
-| 0.01         | ~17 MB    | 25,000     | 350,000        | 2-10 ms          |
-| 0.1          | ~170 MB   | 250,000    | 3,500,000      | 10-100 ms        |
-| 1.0          | ~1.7 GB   | 2,500,000  | 35,000,000     | 100ms-10s        |
+| 0.001        | ~140 KB   | 500        | 7,000          | 1-5 ms           |
+| 0.01         | ~3.4 MB   | 5,000      | 70,000         | 2-10 ms          |
+| 0.1          | ~34 MB    | 50,000     | 700,000        | 10-100 ms        |
+| 1.0          | ~1 GB     | 500,000    | 7,000,000      | 100ms-10s        |
 
 ### Optimization Opportunities
 

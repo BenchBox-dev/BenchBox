@@ -48,12 +48,14 @@ class DataVaultBenchmark(BaseBenchmark):
         scale_factor: Size multiplier for the benchmark data (1.0 = ~1GB)
         output_dir: Directory for generated data files
         parallel: Number of parallel workers for data generation
-        hash_algorithm: Algorithm for hash keys (only 'md5' currently supported)
+        hash_algorithm: Algorithm for hash keys ('md5' or 'sha256')
         record_source: Source system identifier for audit columns
     """
 
-    # Supported hash algorithms - currently only MD5 due to VARCHAR(32) schema constraints
-    SUPPORTED_HASH_ALGORITHMS = ("md5",)
+    # Canonical source of truth for supported hash algorithms.
+    # All enforcement layers (BenchmarkOptionSpec.choices, transformer validator,
+    # HashAlgorithm Literal) must stay in sync with this tuple.
+    SUPPORTED_HASH_ALGORITHMS = ("md5", "sha256")
 
     def __init__(
         self,
@@ -75,7 +77,7 @@ class DataVaultBenchmark(BaseBenchmark):
             output_dir: Directory for generated Data Vault files
             parallel: Number of parallel workers (for TPC-H generation)
             force_regenerate: Whether to regenerate data even if it exists
-            hash_algorithm: Hash algorithm for keys (currently only 'md5' supported)
+            hash_algorithm: Hash algorithm for keys ('md5' or 'sha256')
             record_source: Source identifier for RECORD_SOURCE columns
             compress_data: Whether to compress generated data files
             compression_type: Type of compression ('none', 'gzip', 'zstd')
@@ -89,8 +91,7 @@ class DataVaultBenchmark(BaseBenchmark):
         if hash_algorithm not in self.SUPPORTED_HASH_ALGORITHMS:
             raise ValueError(
                 f"Unsupported hash algorithm: '{hash_algorithm}'. "
-                f"Currently only {self.SUPPORTED_HASH_ALGORITHMS} supported due to schema constraints "
-                "(hash keys use VARCHAR(32) which matches MD5 output length)."
+                f"Supported algorithms: {self.SUPPORTED_HASH_ALGORITHMS}."
             )
 
         super().__init__(scale_factor=scale_factor, output_dir=output_dir, **kwargs)
@@ -465,3 +466,36 @@ class DataVaultBenchmark(BaseBenchmark):
         if self._tpch_generator is not None and hasattr(self._tpch_generator, "cleanup"):
             self._tpch_generator.cleanup()  # type: ignore[call-non-callable]
         super().cleanup()
+
+
+# ---------------------------------------------------------------------------
+# Register benchmark-specific CLI option specs
+# ---------------------------------------------------------------------------
+
+from benchbox.cli.benchmark_hooks import (  # noqa: E402
+    BenchmarkHookRegistry,
+    BenchmarkOptionSpec,
+)
+
+BenchmarkHookRegistry.register_option_specs(
+    "datavault",
+    BenchmarkOptionSpec(
+        name="hash_algorithm",
+        default="md5",
+        help="Hash algorithm for hub/link keys",
+        choices=DataVaultBenchmark.SUPPORTED_HASH_ALGORITHMS,
+        aliases=("hash-algorithm",),
+    ),
+    BenchmarkOptionSpec(
+        name="record_source",
+        default="TPCH",
+        help="Record source identifier for audit columns",
+        aliases=("record-source",),
+    ),
+    BenchmarkOptionSpec(
+        name="force_regenerate",
+        parser=lambda v: v.strip().lower() in ("true", "1", "yes"),
+        help="Force data regeneration",
+        aliases=("force-regenerate",),
+    ),
+)

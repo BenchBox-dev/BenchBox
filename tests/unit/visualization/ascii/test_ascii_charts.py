@@ -120,7 +120,7 @@ class TestComparisonTemplateIntegration:
 
 
 class TestSeriesNamingSymmetry:
-    """Tests for Phase 1: symmetric mode naming in ResultPlotter."""
+    """Tests for symmetric mode/version naming in ResultPlotter via unified disambiguator."""
 
     def test_disambiguate_modes_both_get_suffix(self):
         """When same platform has SQL and DataFrame modes, both get suffixed."""
@@ -130,50 +130,45 @@ class TestSeriesNamingSymmetry:
             make_normalized_result(platform="DataFusion", execution_mode="sql"),
             make_normalized_result(platform="DataFusion", execution_mode="dataframe"),
         ]
-        plotter = ResultPlotter.__new__(ResultPlotter)
-        plotter.results = results
-        plotter._disambiguate_modes()
+        plotter = ResultPlotter(results)
 
         platforms = [r.platform for r in plotter.results]
         assert "DataFusion (sql)" in platforms
         assert "DataFusion (df)" in platforms
 
     def test_single_result_no_suffix(self):
-        """Single result gets no mode suffix."""
+        """Single result gets no disambiguation suffix."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [make_normalized_result(platform="DuckDB", execution_mode="sql")]
-        plotter = ResultPlotter.__new__(ResultPlotter)
-        plotter.results = results
-        plotter._disambiguate_modes()
+        plotter = ResultPlotter(results)
 
         assert plotter.results[0].platform == "DuckDB"
 
     def test_same_mode_no_suffix(self):
-        """Two results with same mode don't get suffixed."""
+        """Two results with different platforms and same mode are not suffixed."""
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
         results = [
             make_normalized_result(platform="DuckDB", execution_mode="sql"),
             make_normalized_result(platform="Polars", execution_mode="sql"),
         ]
-        plotter = ResultPlotter.__new__(ResultPlotter)
-        plotter.results = results
-        plotter._disambiguate_modes()
+        plotter = ResultPlotter(results)
 
-        assert plotter.results[0].platform == "DuckDB"
-        assert plotter.results[1].platform == "Polars"
+        platforms = [r.platform for r in plotter.results]
+        assert "DuckDB" in platforms
+        assert "Polars" in platforms
 
     def test_mode_abbreviation_dataframe_to_df(self):
-        """'dataframe' mode is abbreviated to 'df'."""
-        from benchbox.core.visualization.result_plotter import ResultPlotter
+        """'dataframe' mode is abbreviated to 'df' in labels."""
+        from benchbox.core.labels import _MODE_ABBREV
 
-        assert ResultPlotter.MODE_ABBREVIATIONS["dataframe"] == "df"
-        assert ResultPlotter.MODE_ABBREVIATIONS.get("sql", "sql") == "sql"
+        assert _MODE_ABBREV["dataframe"] == "df"
+        assert _MODE_ABBREV.get("sql", "sql") == "sql"
 
 
 class TestDisambiguateVersions:
-    """Tests for _disambiguate_versions in ResultPlotter."""
+    """Tests for version-based label disambiguation in ResultPlotter."""
 
     def test_different_versions_appended_to_label(self):
         """When same platform has different driver versions, both labels get version appended."""
@@ -183,13 +178,11 @@ class TestDisambiguateVersions:
             make_normalized_result(platform="DuckDB", platform_version="1.0.0"),
             make_normalized_result(platform="DuckDB", platform_version="1.4.3"),
         ]
-        plotter = ResultPlotter.__new__(ResultPlotter)
-        plotter.results = results
-        plotter._disambiguate_versions()
+        plotter = ResultPlotter(results)
 
         platforms = {r.platform for r in plotter.results}
-        assert "DuckDB 1.0.0" in platforms
-        assert "DuckDB 1.4.3" in platforms
+        assert "DuckDB v1.0.0" in platforms
+        assert "DuckDB v1.4.3" in platforms
 
     def test_same_version_labels_unchanged(self):
         """When both runs share the same version, labels are not modified."""
@@ -199,9 +192,7 @@ class TestDisambiguateVersions:
             make_normalized_result(platform="DuckDB", platform_version="1.4.3"),
             make_normalized_result(platform="DuckDB", platform_version="1.4.3"),
         ]
-        plotter = ResultPlotter.__new__(ResultPlotter)
-        plotter.results = results
-        plotter._disambiguate_versions()
+        plotter = ResultPlotter(results)
 
         for r in plotter.results:
             assert r.platform == "DuckDB"
@@ -214,9 +205,7 @@ class TestDisambiguateVersions:
             make_normalized_result(platform="DuckDB", platform_version="1.0.0"),
             make_normalized_result(platform="Polars", platform_version="0.19.0"),
         ]
-        plotter = ResultPlotter.__new__(ResultPlotter)
-        plotter.results = results
-        plotter._disambiguate_versions()
+        plotter = ResultPlotter(results)
 
         platforms = [r.platform for r in plotter.results]
         assert "DuckDB" in platforms
@@ -230,9 +219,7 @@ class TestDisambiguateVersions:
             make_normalized_result(platform="DuckDB"),
             make_normalized_result(platform="DuckDB"),
         ]
-        plotter = ResultPlotter.__new__(ResultPlotter)
-        plotter.results = results
-        plotter._disambiguate_versions()
+        plotter = ResultPlotter(results)
 
         for r in plotter.results:
             assert r.platform == "DuckDB"

@@ -513,7 +513,7 @@ class TestResultExporter:
         assert json_path.exists()
 
         # Verify JSON content (v2.0 schema)
-        with open(json_path) as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["version"] == "2.1"
@@ -544,7 +544,7 @@ class TestResultExporter:
         assert json_path.exists()
 
         # Verify JSON content (v2.0 schema)
-        with open(json_path) as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["version"] == "2.1"
@@ -596,7 +596,7 @@ class TestResultExporter:
         csv_path = exported["csv"]
 
         # Verify CSV content
-        with open(csv_path, newline="") as f:
+        with open(csv_path, newline="", encoding="utf-8") as f:
             reader = csv.reader(f)
             headers = next(reader)
             rows = list(reader)
@@ -650,7 +650,7 @@ class TestResultExporter:
         assert html_path.exists()
 
         # Verify HTML content
-        with open(html_path) as f:
+        with open(html_path, encoding="utf-8") as f:
             html_content = f.read()
 
         assert "BenchBox Results" in html_content
@@ -709,7 +709,7 @@ class TestResultExporter:
                 exported = anon_exporter.export_result(result, formats=["json"])
 
         json_path = exported["json"]
-        with open(json_path) as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["export"]["anonymized"] is True
@@ -878,7 +878,7 @@ class TestResultExporter:
         assert report_path.suffix == ".html"
 
         # Verify HTML content
-        with open(report_path) as f:
+        with open(report_path, encoding="utf-8") as f:
             html_content = f.read()
 
         assert "Performance Comparison Report" in html_content
@@ -959,7 +959,7 @@ class TestResultExporterErrorHandling:
         """Test listing results with corrupted JSON files."""
         # Create a corrupted JSON file
         corrupted_file = Path(self.temp_dir) / "corrupted.json"
-        with open(corrupted_file, "w") as f:
+        with open(corrupted_file, "w", encoding="utf-8") as f:
             f.write("{ invalid json content")
 
         # The exporter uses logger.debug, not console.print

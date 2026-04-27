@@ -49,6 +49,8 @@ if TYPE_CHECKING:
     )
 
 from benchbox.core.exceptions import ConfigurationError
+from benchbox.platforms.azure._credentials import AzureTokenProvider
+from benchbox.platforms.azure._livy_mixin import LivyStatementMixin
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.cloud_spark import (
     CloudSparkStaging,
@@ -56,6 +58,7 @@ from benchbox.platforms.base.cloud_spark import (
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
+from benchbox.platforms.base.phase_tracking import _resolve_benchmark_table_names
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
@@ -94,7 +97,7 @@ class SynapseLivySessionState:
     SUCCESS = "success"
 
 
-class SynapseSparkAdapter(SparkTuningMixin, PlatformAdapter):
+class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
     """Azure Synapse Spark platform adapter.
 
     Synapse Spark provides enterprise Spark execution within the Azure Synapse
@@ -175,6 +178,7 @@ class SynapseSparkAdapter(SparkTuningMixin, PlatformAdapter):
         self.tenant_id = tenant_id
         self.timeout_minutes = timeout_minutes
         self.table_format = table_format or "parquet"
+        self.database = kwargs.get("database", "default")
         self.user_spark_config = spark_config or {}
 
         # Derive Livy endpoint if not provided
@@ -192,10 +196,12 @@ class SynapseSparkAdapter(SparkTuningMixin, PlatformAdapter):
         except Exception as e:
             logger.warning(f"Failed to initialize ADLS staging: {e}")
 
-        # Credential (lazy initialization)
-        self._credential: Any = None
-        self._access_token: str | None = None
-        self._token_expires_at: float = 0
+        # Credential (lazy initialization) - shared helper owns state.
+        self._token_provider = AzureTokenProvider(
+            scope="https://dev.azuresynapse.net/.default",
+            credential_class=DefaultAzureCredential,
+            tenant_id=self.tenant_id,
+        )
 
         # Session management
         self._session_id: int | None = None
@@ -217,35 +223,13 @@ class SynapseSparkAdapter(SparkTuningMixin, PlatformAdapter):
         # Synapse Livy endpoint format
         return f"https://{self.workspace_name}.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/{self.spark_pool_name}/sessions"
 
-    def _get_credential(self) -> Any:
-        """Get or create Azure credential."""
-        if self._credential is None:
-            kwargs: dict[str, Any] = {}
-            if self.tenant_id:
-                kwargs["additionally_allowed_tenants"] = ["*"]
-            self._credential = DefaultAzureCredential(**kwargs)
-        return self._credential
-
     def _get_access_token(self) -> str:
         """Get a valid access token, refreshing if needed."""
-        current_time = time.time()
-
-        # Refresh token if expired or about to expire (5 minute buffer)
-        if self._access_token is None or current_time >= self._token_expires_at - 300:
-            credential = self._get_credential()
-            # Synapse API scope
-            token = credential.get_token("https://dev.azuresynapse.net/.default")
-            self._access_token = token.token
-            self._token_expires_at = token.expires_on
-
-        return self._access_token
+        return self._token_provider.access_token()
 
     def _get_headers(self) -> dict[str, str]:
         """Get HTTP headers with authentication."""
-        return {
-            "Authorization": f"Bearer {self._get_access_token()}",
-            "Content-Type": "application/json",
-        }
+        return self._token_provider.auth_headers()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Return platform metadata.
@@ -396,66 +380,25 @@ class SynapseSparkAdapter(SparkTuningMixin, PlatformAdapter):
                         # Wait for it to become idle
                         self._wait_for_session_state(self._session_id, [SynapseLivySessionState.IDLE])
                         return self._session_id
+                    # Session is in a terminal state (ERROR, DEAD, KILLED) - close it.
+                    # Aligns Synapse cleanup with Fabric (was a pre-existing leak: the
+                    # falls-through path overwrote _session_id without DELETE-ing the dead one).
+                    logger.warning("Session %s is in state %s, closing", self._session_id, session.get("state"))
+                    try:
+                        requests.delete(session_url, headers=self._get_headers(), timeout=30)
+                    except Exception:
+                        pass
             except Exception as e:
                 logger.warning(f"Session {self._session_id} is invalid: {e}")
-                self._session_id = None
+                try:
+                    requests.delete(session_url, headers=self._get_headers(), timeout=30)
+                except Exception:
+                    pass
+            self._session_id = None
 
         # Create new session
         self._session_id = self._create_session()
         return self._session_id
-
-    def _execute_statement(
-        self,
-        code: str,
-        kind: str = "sql",
-    ) -> dict[str, Any]:
-        """Execute a statement in the Livy session.
-
-        Args:
-            code: The code to execute.
-            kind: Statement kind ('sql', 'spark', 'pyspark').
-
-        Returns:
-            The statement result.
-        """
-        from benchbox.platforms.azure.spark_execution_utils import execute_livy_statement
-
-        session_id = self._ensure_session()
-        result, execution_time = execute_livy_statement(
-            livy_endpoint=self.livy_endpoint,
-            session_id=session_id,
-            code=code,
-            kind=kind,
-            get_headers=self._get_headers,
-            timeout_minutes=self.timeout_minutes,
-        )
-        self._total_statement_time_seconds += execution_time
-        self._query_count += 1
-        return result
-
-    def _wait_for_statement(
-        self,
-        session_id: int,
-        statement_id: int,
-    ) -> dict[str, Any]:
-        """Wait for statement to complete and return result.
-
-        Args:
-            session_id: Session ID.
-            statement_id: Statement ID.
-
-        Returns:
-            The statement result.
-        """
-        from benchbox.platforms.azure.spark_execution_utils import wait_for_livy_statement
-
-        return wait_for_livy_statement(
-            livy_endpoint=self.livy_endpoint,
-            session_id=session_id,
-            statement_id=statement_id,
-            get_headers=self._get_headers,
-            timeout_minutes=self.timeout_minutes,
-        )
 
     def create_connection(self, **kwargs: Any) -> Any:
         """Verify Azure connectivity and workspace access.
@@ -508,15 +451,17 @@ class SynapseSparkAdapter(SparkTuningMixin, PlatformAdapter):
         except requests.exceptions.RequestException as e:
             raise ConfigurationError(f"Failed to connect to Synapse: {e}") from e
 
-    def create_schema(self, schema_name: str | None = None) -> None:
+    def create_schema(self, benchmark, connection: Any) -> float:
         """Create schema/database for benchmark tables.
 
         Synapse Spark uses the Spark catalog for database management.
 
         Args:
-            schema_name: Database/schema name.
+            benchmark: Benchmark instance.
+            connection: Active connection/session metadata; not used by Synapse Spark.
         """
-        database = schema_name or "default"
+        start_time = mono_time()
+        database = self.database
 
         logger.info(f"Using Synapse Spark schema: {database}")
 
@@ -525,28 +470,30 @@ class SynapseSparkAdapter(SparkTuningMixin, PlatformAdapter):
                 f"CREATE DATABASE IF NOT EXISTS {database}",
                 kind="sql",
             )
+        return elapsed_seconds(start_time)
 
     def load_data(
         self,
-        tables: list[str],
-        source_dir: Path | str,
-        file_format: str = "parquet",
-        **kwargs: Any,
-    ) -> dict[str, str]:
+        benchmark,
+        connection: Any,
+        data_dir: Path,
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Upload benchmark data to ADLS Gen2 and create tables.
 
         Args:
-            tables: List of table names to load.
-            source_dir: Local directory containing table data files.
-            file_format: Data file format (default: parquet).
-            **kwargs: Additional options.
+            benchmark: Benchmark instance.
+            connection: Active connection/session metadata; not used by Synapse Spark.
+            data_dir: Local directory containing table data files.
 
         Returns:
-            Dict mapping table names to ADLS URIs.
+            Tuple of table row-count placeholders, elapsed seconds, and table URI metadata.
         """
-        source_path = Path(source_dir)
+        start_time = mono_time()
+        source_path = Path(data_dir)
+        tables = _resolve_benchmark_table_names(benchmark)
+        file_format = self.requested_table_format or self.table_format
         if not source_path.exists():
-            raise ConfigurationError(f"Source directory not found: {source_dir}")
+            raise ConfigurationError(f"Source directory not found: {data_dir}")
 
         # Upload data to ADLS using staging infrastructure
         if self._staging:
@@ -578,39 +525,56 @@ class SynapseSparkAdapter(SparkTuningMixin, PlatformAdapter):
             except Exception as e:
                 logger.warning(f"Failed to create table {table}: {e}")
 
-        return table_uris
+        return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
     def execute_query(
         self,
+        connection: Any,
         query: str,
-        **kwargs: Any,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
     ) -> dict[str, Any]:
         """Execute a SQL query via Livy.
 
         Args:
+            connection: Active connection/session metadata; not used by Synapse Spark.
             query: SQL query to execute.
-            **kwargs: Additional options.
+            query_id: Query identifier.
 
         Returns:
             Dict with query results.
         """
         start_time = mono_time()
 
-        result = self._execute_statement(query, kind="sql")
-
-        execution_time = elapsed_seconds(start_time)
-
-        # Parse result data
-        data = result.get("data", {})
-        schema = data.get("schema", {})
-
-        return {
-            "success": True,
-            "execution_time_seconds": execution_time,
-            "row_count": len(data.get("values", [])),
-            "columns": [f.get("name") for f in schema.get("fields", [])],
-            "data": data.get("values", []),
-        }
+        try:
+            result = self._execute_statement(query, kind="sql")
+            execution_time = elapsed_seconds(start_time)
+            data = result.get("data", {})
+            schema = data.get("schema", {})
+            rows = data.get("values", [])
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "SUCCESS",
+                "execution_time_seconds": execution_time,
+                "rows_returned": len(rows),
+                "columns": [f.get("name") for f in schema.get("fields", [])],
+                "results": rows,
+                "error": None,
+            }
+        except Exception as e:
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "FAILED",
+                "execution_time_seconds": elapsed_seconds(start_time),
+                "rows_returned": 0,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
 
     def close(self) -> None:
         """Clean up resources and close Livy session."""

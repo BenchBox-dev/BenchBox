@@ -28,7 +28,7 @@ BenchBox _loosely_ follows [Semantic Versioning](https://semver.org/) using the 
 - **MINOR** when we add backward-compatible changes _OR significantly expand functionality_.
 - **PATCH** when we make bug fixes or documentation updates, _bug-fixes may not be backward-compatible_.
 
-Current release: v0.2.0. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
+Current release: v0.2.1. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
 
 **For Developers**: See [Release Automation Guide](release/RELEASE_AUTOMATION.md) for the automated release process with reproducible builds and timestamp normalization.
 
@@ -41,11 +41,11 @@ The default wheel ships the `benchbox.experimental` namespace (nl2sql, aiml-func
 ## Features
 
 - **Embedded Benchmarks**: Self-contained benchmark data and queries
-- **Eighteen Benchmarks**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc, SSB, AMPLab, JoinOrder, ClickBench, H2ODB, NYC Taxi, TSBS DevOps, CoffeeShop, TPC-H Data Vault, Read Primitives, Write Primitives, Transaction Primitives
+- **Twenty-Two Benchmarks**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc, SSB, AMPLab, JoinOrder, ClickBench, H2ODB, NYC Taxi, Flight Data, TSBS DevOps, CoffeeShop, TPC-H Data Vault, Vector Search, Read Primitives, Write Primitives, Transaction Primitives, Metadata Primitives, AI Primitives
 - **Cross-Database**: Same benchmarks work on any database platform
 - **DataFrame Mode**: Native DataFrame API benchmarking with Polars, Pandas, and 6 other libraries
-- **SQL Platforms** (29): DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, TimescaleDB, Polars, ClickHouse, Firebolt, InfluxDB, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
-- **DataFrame Platforms** (7): Polars-DF, Pandas-DF, DataFusion-DF, Modin-DF, Dask-DF, cuDF-DF (GPU), PySpark-DF
+- **SQL Platforms** (42): DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, TimescaleDB, ClickHouse (Local, Server, Cloud), CedarDB, Firebolt, Databend, Doris, StarRocks, SingleStore, QuestDB, InfluxDB, pg_duckdb, pg_mooncake, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Microsoft Fabric Lakehouse SQL, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, LakeSail Sail, Apache Gluten + Velox, Onehouse Quanton, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
+- **DataFrame Platforms** (9): DataFusion-DF, Polars-DF, Pandas-DF, Modin-DF, Dask-DF, cuDF-DF (GPU), PySpark-DF, Databricks-DF, LakeSail-DF
 - **Open Table Formats**: Delta Lake, Apache Iceberg, Apache Hudi (via Databricks, Quanton, Trino, Spark platforms)
 - **SQL Translation**: Automatic query conversion between SQL dialects
 - **Self-Contained Python Package**: Core install requires no external database servers or system dependencies; opt-in to extra package installs for cloud platforms when needed.
@@ -61,8 +61,9 @@ The full documentation lives under [`docs/`](docs/README.md) and is published wi
 | DataFrame benchmarking    | [docs/platforms/dataframe.md](docs/platforms/dataframe.md)                                                    |
 | Config and automation     | [docs/usage/configuration.md](docs/usage/configuration.md) & [docs/usage/examples.md](docs/usage/examples.md) |
 | Platform guidance         | [docs/platforms/platform-selection-guide.md](docs/platforms/platform-selection-guide.md)                      |
-| Troubleshooting           | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                            |
-| Developer docs            | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) & [docs/design/README.md](docs/design/README.md)                   |
+| Troubleshooting           | [docs/usage/troubleshooting.md](docs/usage/troubleshooting.md)                                                |
+| Developer docs            | [docs/development/getting-started.rst](docs/development/getting-started.rst) & [docs/design/index.md](docs/design/index.md) |
+| Browse results online     | [benchbox.dev/results/](https://benchbox.dev/results/) - compare benchmark results across platforms            |
 
 Run `uv run -- sphinx-build -b html docs docs/_build/html` to build the local site.
 
@@ -70,10 +71,12 @@ Run `uv run -- sphinx-build -b html docs docs/_build/html` to build the local si
 
 - **TPC Standards**: TPC-H, TPC-DS, TPC-DI
 - **Academic Benchmarks**: SSB, AMPLab, JoinOrder
-- **Industry Benchmarks**: ClickBench, H2ODB, NYC Taxi, TSBS DevOps, CoffeeShop
-- **Data Modeling Variants**: TPC-H Data Vault
-- **BenchBox Primitives**: Read Primitives, Write Primitives, Transaction Primitives
-- **BenchBox Experimental**: TPC-DS-OBT, TPC-Havoc, TPC-H Skew
+- **Industry Benchmarks**: ClickBench, H2ODB, CoffeeShop
+- **Real-World Data**: NYC Taxi, Flight Data
+- **Time-Series Benchmarks**: TSBS DevOps
+- **BenchBox Primitives**: Read Primitives, Write Primitives, Transaction Primitives, Metadata Primitives, AI Primitives
+- **AI & ML Benchmarks**: Vector Search
+- **BenchBox Experimental**: TPC-DS-OBT, TPC-Havoc, TPC-H Skew, TPC-H Data Vault
 
 ## Related Tools
 
@@ -103,7 +106,7 @@ BenchBox and [LakeBench](https://github.com/mwc360/LakeBench) are both Python-ba
 
 LakeBench focuses on **lakehouse compute engines** (Spark, Fabric, Synapse, HDInsight) and evaluates end-to-end ELT workflows - ingestion, transformation, maintenance, and queries - using Delta Lake tables. It offers 4 benchmarks including ELTBench, a custom workflow-oriented benchmark.
 
-BenchBox focuses on the **broad ecosystem of analytic platforms**-from single-node engines like DuckDB, to DataFrame libraries like Polars and Pandas, through to cloud data warehouses like Snowflake, BigQuery, and Redshift. It provides 18 benchmarks including TPC standards, academic workloads like SSB and JoinOrder, and BenchBox-original benchmarks like TPC-Havoc for optimizer stress testing.
+BenchBox focuses on the **broad ecosystem of analytic platforms**-from single-node engines like DuckDB, to DataFrame libraries like Polars and Pandas, through to cloud data warehouses like Snowflake, BigQuery, and Redshift. It provides 22 benchmarks including TPC standards, academic workloads like SSB and JoinOrder, and BenchBox-original benchmarks like TPC-Havoc for optimizer stress testing.
 
 Consider LakeBench when evaluating Spark-based lakehouse engines, testing complete ELT pipeline performance, or working primarily in Microsoft Fabric/Azure environments. Consider BenchBox when benchmarking across the analytic platform spectrum, needing benchmark variety beyond TPC standards, or comparing DataFrame libraries alongside SQL engines.
 
@@ -136,25 +139,27 @@ python -m pip install "benchbox[duckdb]"
 pipx install "benchbox[duckdb]"
 ```
 
-> **Note:** DuckDB is an optional dependency. A plain `uv add benchbox` (no extras) installs the core package with SQLite only — no DuckDB. Use `benchbox[duckdb]` for DuckDB support or `benchbox[all]` for all platforms.
+> **Note:** DuckDB is an optional dependency. A plain `uv add benchbox` (no extras) installs the core package with SQLite only - no DuckDB. Use `benchbox[duckdb]` for DuckDB support or `benchbox[all]` for all platforms.
 
 ### Optional Dependency Groups
 
 Extras unlock connectors and helpers for each platform. Quote the extras specification so shells like zsh do not expand the brackets.
 
-- `[duckdb]` – DuckDB (local analytics, default for most benchmarks)
-- `[polars]` – Polars DataFrame engine (in-memory columnar analytics)
-- `[clickhouse-connect]` – ClickHouse Cloud HTTP connector (`clickhouse-connect`)
-- `[postgresql]` – PostgreSQL (`psycopg2-binary`)
-- `[cloud]` – Databricks, BigQuery, Redshift, Snowflake connectors (recommended starting point)
-- `[cloudstorage]` – Cloud storage helpers (`cloudpathlib`)
-- `[databricks]` – Databricks SQL Warehouses (`databricks-sql-connector`, `cloudpathlib`)
-- `[bigquery]` – Google BigQuery (`google-cloud-bigquery`, `google-cloud-storage`, `cloudpathlib`)
-- `[redshift]` – Amazon Redshift (`redshift-connector`, `boto3`, `cloudpathlib`)
-- `[snowflake]` – Snowflake Data Cloud (`snowflake-connector-python`, `cloudpathlib`)
-- `[clickhouse]` – ClickHouse Analytics (`clickhouse-driver`, TCP binary protocol)
-- `[datafusion]` – Apache DataFusion OLAP Engine (`datafusion`, `pyarrow`)
-- `[all]` – Everything (DuckDB, all connectors, cloud tooling, ClickHouse, and DataFusion)
+- `[duckdb]` - DuckDB (local analytics, default for most benchmarks)
+- `[polars]` - Polars DataFrame engine (in-memory columnar analytics)
+- `[clickhouse-cloud]` - ClickHouse Cloud HTTP connector (`clickhouse-connect`)
+- `[postgresql]` - PostgreSQL (`psycopg2-binary`)
+- `[cloud]` - Databricks, BigQuery, Redshift, Snowflake connectors (recommended starting point)
+- `[cloudstorage]` - Cloud storage helpers (`cloudpathlib`)
+- `[databricks]` - Databricks SQL Warehouses (`databricks-sql-connector`, `cloudpathlib`)
+- `[bigquery]` - Google BigQuery (`google-cloud-bigquery`, `google-cloud-storage`, `cloudpathlib`)
+- `[redshift]` - Amazon Redshift (`redshift-connector`, `boto3`, `cloudpathlib`)
+- `[snowflake]` - Snowflake Data Cloud (`snowflake-connector-python`, `cloudpathlib`)
+- `[clickhouse]` - ClickHouse Analytics (`clickhouse-driver`, TCP binary protocol)
+- `[clickhouse-local]` - ClickHouse Local via chDB (embedded, zero-config)
+- `[clickhouse-server]` - ClickHouse Server (`clickhouse-driver`, TCP binary protocol)
+- `[datafusion]` - Apache DataFusion OLAP Engine (`datafusion`, `pyarrow`)
+- `[all]` - Everything (DuckDB, all connectors, cloud tooling, ClickHouse, and DataFusion)
 
 ### Installation Matrix
 
@@ -176,13 +181,15 @@ Choose the installation that matches your environment and requirements:
 | ------------------- | ----------------------------------- | -------------- | ------------------------------------ | --------------------------------------- |
 | **DuckDB**              | Local analytics, TPC benchmarks          | `[duckdb]`              | `uv add benchbox --extra duckdb`              | `uv pip install "benchbox[duckdb]"`              |
 | **Polars**              | DataFrame engine, in-memory analytics    | `[polars]`              | `uv add benchbox --extra polars`              | `uv pip install "benchbox[polars]"`              |
-| **ClickHouse Cloud**    | ClickHouse Cloud (HTTP connector)        | `[clickhouse-connect]`  | `uv add benchbox --extra clickhouse-connect`  | `uv pip install "benchbox[clickhouse-connect]"`  |
+| **ClickHouse Cloud**    | ClickHouse Cloud (HTTP connector)        | `[clickhouse-cloud]`    | `uv add benchbox --extra clickhouse-cloud`    | `uv pip install "benchbox[clickhouse-cloud]"`    |
 | **PostgreSQL**          | PostgreSQL-compatible databases          | `[postgresql]`          | `uv add benchbox --extra postgresql`          | `uv pip install "benchbox[postgresql]"`          |
 | **Databricks**          | SQL Warehouses, Unity Catalog, DBFS      | `[databricks]`          | `uv add benchbox --extra databricks`          | `uv pip install "benchbox[databricks]"`          |
 | **Google BigQuery**     | BigQuery, Cloud Storage                  | `[bigquery]`            | `uv add benchbox --extra bigquery`            | `uv pip install "benchbox[bigquery]"`            |
 | **Amazon Redshift**     | Redshift, S3 integration                 | `[redshift]`            | `uv add benchbox --extra redshift`            | `uv pip install "benchbox[redshift]"`            |
 | **Snowflake**           | Snowflake Data Cloud                     | `[snowflake]`           | `uv add benchbox --extra snowflake`           | `uv pip install "benchbox[snowflake]"`           |
 | **ClickHouse**          | ClickHouse Analytics (binary protocol)   | `[clickhouse]`          | `uv add benchbox --extra clickhouse`          | `uv pip install "benchbox[clickhouse]"`          |
+| **ClickHouse Local**    | Embedded ClickHouse via chDB             | `[clickhouse-local]`    | `uv add benchbox --extra clickhouse-local`    | `uv pip install "benchbox[clickhouse-local]"`    |
+| **ClickHouse Server**   | Self-hosted ClickHouse (binary protocol) | `[clickhouse-server]`   | `uv add benchbox --extra clickhouse-server`   | `uv pip install "benchbox[clickhouse-server]"`   |
 | **DataFusion**          | Apache DataFusion OLAP Engine            | `[datafusion]`          | `uv add benchbox --extra datafusion`          | `uv pip install "benchbox[datafusion]"`          |
 
 #### Advanced Combinations
@@ -248,21 +255,21 @@ benchbox check-deps --verbose
 #### Common Installation Problems
 
 **Shell and Package Manager Issues:**
-- **Shell quoting errors (`zsh: no matches found`)** – wrap extras in quotes: `"benchbox[cloud]"`
-- **`uv` not installed** – install with `pipx install uv` or use `python -m pip install ...` instead
-- **`pip` cannot find wheels** – upgrade packaging tools: `python -m pip install --upgrade pip setuptools wheel`
-- **Conflicting virtual environments** – remove old installs: `pip uninstall benchbox` before re-installing
+- **Shell quoting errors (`zsh: no matches found`)** - wrap extras in quotes: `"benchbox[cloud]"`
+- **`uv` not installed** - install with `pipx install uv` or use `python -m pip install ...` instead
+- **`pip` cannot find wheels** - upgrade packaging tools: `python -m pip install --upgrade pip setuptools wheel`
+- **Conflicting virtual environments** - remove old installs: `pip uninstall benchbox` before re-installing
 
 **Platform-Specific Compilation Issues:**
-- **macOS SSL errors** – update certificates: `/Applications/Python 3.x/Install Certificates.command`
-- **Windows Visual C++ build tools missing** – install "Desktop development with C++" workload from Visual Studio Installer
-- **Linux missing development packages** – install build tools: `sudo apt-get install build-essential` (Ubuntu/Debian) or `sudo yum groupinstall "Development Tools"` (RHEL/CentOS)
+- **macOS SSL errors** - update certificates: `/Applications/Python 3.x/Install Certificates.command`
+- **Windows Visual C++ build tools missing** - install "Desktop development with C++" workload from Visual Studio Installer
+- **Linux missing development packages** - install build tools: `sudo apt-get install build-essential` (Ubuntu/Debian) or `sudo yum groupinstall "Development Tools"` (RHEL/CentOS)
 
 **Cloud Platform Authentication:**
-- **Databricks connection issues** – verify SQL warehouse is running and accessible
-- **BigQuery authentication errors** – ensure service account credentials or `gcloud auth` is configured
-- **Snowflake connection timeouts** – check network connectivity and account URL format
-- **Redshift SSL errors** – verify cluster security group allows connections
+- **Databricks connection issues** - verify SQL warehouse is running and accessible
+- **BigQuery authentication errors** - ensure service account credentials or `gcloud auth` is configured
+- **Snowflake connection timeouts** - check network connectivity and account URL format
+- **Redshift SSL errors** - verify cluster security group allows connections
 
 #### Installation Verification
 
@@ -315,7 +322,7 @@ uv add benchbox --extra cloud
 # or: uv pip install "benchbox[cloud]"
 ```
 
-For detailed platform-specific setup guides, see [Platform Documentation](docs/platforms.md) and the [Troubleshooting Guide](docs/TROUBLESHOOTING.md).
+For detailed platform-specific setup guides, see [Platform Documentation](docs/platforms/index.md) and the [Troubleshooting Guide](docs/usage/troubleshooting.md).
 
 ### Dependency Overview
 
@@ -325,33 +332,33 @@ BenchBox uses a layered dependency approach: minimal core dependencies for local
 
 These libraries are required for every installation and provide complete local benchmarking functionality:
 
-- **sqlglot** – SQL dialect translation between databases
-- **click** – Command-line interface framework
-- **rich** – Terminal output formatting and progress indicators
-- **psutil** – System resource monitoring
-- **pydantic** – Data validation and configuration models
-- **pyyaml** – YAML configuration file support
-- **pytest libraries** – Testing framework components for built-in validation
+- **sqlglot** - SQL dialect translation between databases
+- **click** - Command-line interface framework
+- **rich** - Terminal output formatting and progress indicators
+- **psutil** - System resource monitoring
+- **pydantic** - Data validation and configuration models
+- **pyyaml** - YAML configuration file support
+- **pytest libraries** - Testing framework components for built-in validation
 
-The core package includes all necessary Python dependencies for running benchmarks. DuckDB is available via `benchbox[duckdb]` — a plain `benchbox` install uses SQLite. No external database servers or system installations are required for basic functionality.
+The core package includes all necessary Python dependencies for running benchmarks. DuckDB is available via `benchbox[duckdb]` - a plain `benchbox` install uses SQLite. No external database servers or system installations are required for basic functionality.
 
 #### Optional Platform Dependencies (installed on demand)
 
 These extras add connectivity to specific platforms and are installed only when needed:
 
 **Cloud Platform SDKs:**
-- `[cloud]` – All major cloud platforms (Databricks, BigQuery, Redshift, Snowflake)
-- `[databricks]` – Databricks SQL Warehouses (`databricks-sql-connector`, `cloudpathlib`)
-- `[bigquery]` – Google BigQuery and Cloud Storage (`google-cloud-bigquery`, `google-cloud-storage`)
-- `[redshift]` – Amazon Redshift (`redshift-connector`, `boto3` for S3)
-- `[snowflake]` – Snowflake Data Cloud (`snowflake-connector-python`)
+- `[cloud]` - All major cloud platforms (Databricks, BigQuery, Redshift, Snowflake)
+- `[databricks]` - Databricks SQL Warehouses (`databricks-sql-connector`, `cloudpathlib`)
+- `[bigquery]` - Google BigQuery and Cloud Storage (`google-cloud-bigquery`, `google-cloud-storage`)
+- `[redshift]` - Amazon Redshift (`redshift-connector`, `boto3` for S3)
+- `[snowflake]` - Snowflake Data Cloud (`snowflake-connector-python`)
 
 **Database-Specific Drivers:**
-- `[clickhouse]` – ClickHouse Analytics (`clickhouse-driver`)
+- `[clickhouse]` - ClickHouse Analytics (`clickhouse-driver`)
 
 **Development Tools:**
-- `[dev]` – Development dependencies (additional testing tools)
-- `[docs]` – Documentation generation tools
+- `[dev]` - Development dependencies (additional testing tools)
+- `[docs]` - Documentation generation tools
 
 #### Why This Architecture?
 
@@ -450,9 +457,8 @@ Same benchmark, same scale factor, different execution paradigm.
 ### Next Steps
 
 **For Cloud Platforms:**
-- See [Platform Documentation](docs/platforms.md) for platform-specific setup
+- See [Platform Documentation](docs/platforms/index.md) for platform-specific setup
 - Start with `examples/getting_started/` for zero-config DuckDB runs and credential-ready cloud samples
-- Use `examples/BENCHMARK_GUIDE.md` for quick reference on running all 11 benchmarks
 - Explore `examples/features/` for capability-specific examples (query subsets, tuning, result analysis, etc.)
 - Check `examples/use_cases/` for real-world patterns (CI/CD regression testing, platform evaluation, cost optimization)
 - See `examples/programmatic/` for Python API usage and integration patterns
@@ -460,7 +466,7 @@ Same benchmark, same scale factor, different execution paradigm.
 - Use `benchbox run` CLI for full benchmark execution
 
 **For Advanced Usage:**
-- Explore all 11 benchmark suites: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, and more
+- Explore all 22 benchmark suites: TPC-H, TPC-DS, TPC-DI, ClickBench, H2ODB, NYC Taxi, Flight Data, Vector Search, and more
 - Scale up with larger datasets (scale factors 1.0, 10.0, 100.0+)
 - Compare performance across different platforms
 - See [examples/INDEX.md](examples/INDEX.md) for complete examples navigation
@@ -676,6 +682,16 @@ For HTML reports, use the export command:
 ```bash
 benchbox export --last --format html
 ```
+
+### Contributing Results
+
+BenchBox also publishes a public results corpus and explorer at `benchbox.dev/results/`.
+If you run BenchBox on a platform you want represented there, package the run with
+`benchbox submit --output ./submission` and open a PR against the `published-results`
+branch of the public repository.
+
+The full contributor workflow, local validation steps, and trust-label rules live in
+[docs/contributing-results.md](docs/contributing-results.md).
 
 **Chart Types Available:**
 - `performance_bar` - Compare total execution time across platforms
@@ -912,19 +928,21 @@ print(normalize_output_root("s3://bucket/prefix", "tpch", 0.01))
 * **CoffeeShop** - Point-of-sale benchmark with regional weighting. 11 analytics queries on retail transaction data.
     * Newly created for BenchBox
 
-### Data Modeling Variants
-* **TPC-H Data Vault** - TPC-H queries adapted for Data Vault 2.0 modeling (Hubs, Links, Satellites). Tests enterprise DWH patterns.
-    * Newly created for BenchBox
-
 ### BenchBox Primitives
-* **Read Primitives** - 90+ queries testing aggregation, joins, filters, window functions, and advanced SQL operations.
+* **Read Primitives** - 136 queries testing aggregation, joins, filters, window functions, and advanced SQL operations.
     * Newly created for BenchBox
-* **Write Primitives** - 117 write operations testing INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL operations.
+* **Write Primitives** - 12 write operations testing INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL, TRANSACTION operations.
     * Newly created for BenchBox
-* **Transaction Primitives** - 8 transaction operations testing ACID compliance, isolation levels, savepoints.
+* **Transaction Primitives** - 12 transaction operations testing ACID compliance, isolation levels, savepoints.
+    * Newly created for BenchBox
+* **Metadata Primitives** - 62 catalog-introspection queries across information_schema, system catalogs, and platform-specific metadata views.
+    * Newly created for BenchBox
+* **AI Primitives** - 16 AI/ML function queries for Snowflake Cortex, BigQuery ML, and Databricks AI (embeddings, classification, summarization).
     * Newly created for BenchBox
 
 ### BenchBox Experimental
+* **TPC-H Data Vault** - TPC-H queries adapted for Data Vault 2.0 modeling (Hubs, Links, Satellites). Tests enterprise DWH patterns.
+    * Newly created for BenchBox
 * **TPC-DS-OBT** - TPC-DS queries adapted for a single denormalized "One Big Table" schema. Tests wide-table analytics.
     * Newly created for BenchBox
 * **TPC-Havoc** - Query optimizer stress testing. 220 query variants (22 TPC-H queries × 10 syntax variants).
@@ -1105,7 +1123,7 @@ make test-integration
 # or
 uv run -- python -m pytest -m "integration and not live_integration"
 
-# With coverage (fast tests only — quick feedback)
+# With coverage (fast tests only - quick feedback)
 make coverage-fast
 # or full suite
 make coverage-all
@@ -1204,7 +1222,6 @@ BenchBox/
 │   │   └── cost_optimization.py    # Cost management
 │   ├── programmatic/               # Python API documentation
 │   │   └── README.md               # API reference and integration examples
-│   ├── BENCHMARK_GUIDE.md          # Quick reference for all 11 benchmarks
 │   ├── INDEX.md                    # Complete examples navigation
 │   └── PATTERNS.md                 # Common workflow patterns
 ├── Makefile                        # Build and test automation

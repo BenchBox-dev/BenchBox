@@ -183,7 +183,7 @@ def test_external_mode_works_on_reused_database(tmp_path):
         verbose=False,
     )
 
-    # Step 1: Run in native mode — creates the database file with native tables.
+    # Step 1: Run in native mode - creates the database file with native tables.
     _run_tpch_duckdb(
         benchmark_instance=benchmark,
         output_dir=native_dir,

@@ -2,33 +2,33 @@ name: Documentation
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'benchbox/**'
-      - 'docs/**'
-      - 'examples/**'
-      - 'landing/**'
-      - 'results-data/**'
-      - 'results-explorer/**'
-      - 'scripts/**'
-      - '.github/workflows/docs.yml'
-      - 'Makefile'
-      - 'README.md'
-      - 'pyproject.toml'
+      - "benchbox/**"
+      - "docs/**"
+      - "examples/**"
+      - "landing/**"
+      - "results-data/**"
+      - "results-explorer/**"
+      - "scripts/**"
+      - ".github/workflows/docs.yml"
+      - "Makefile"
+      - "README.md"
+      - "pyproject.toml"
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'benchbox/**'
-      - 'docs/**'
-      - 'examples/**'
-      - 'landing/**'
-      - 'results-data/**'
-      - 'results-explorer/**'
-      - 'scripts/**'
-      - '.github/workflows/docs.yml'
-      - 'Makefile'
-      - 'README.md'
-      - 'pyproject.toml'
+      - "benchbox/**"
+      - "docs/**"
+      - "examples/**"
+      - "landing/**"
+      - "results-data/**"
+      - "results-explorer/**"
+      - "scripts/**"
+      - ".github/workflows/docs.yml"
+      - "Makefile"
+      - "README.md"
+      - "pyproject.toml"
   workflow_dispatch:
 
 permissions:
@@ -45,67 +45,146 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
 
-    - name: Install dependencies
-      run: uv sync --group dev
+      - name: Install dependencies
+        run: uv sync --group dev
 
-    - name: Cache Sphinx build artifacts
-      uses: actions/cache@v4
-      with:
-        path: |
-          docs/_build
-        key: ${{ runner.os }}-sphinx-${{ hashFiles('docs/**', 'docs/conf.py', 'pyproject.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-sphinx-
+      - name: Cache Sphinx build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            docs/_build
+          key: ${{ runner.os }}-sphinx-${{ hashFiles('docs/**', 'pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-sphinx-
 
-    - name: Build documentation
-      run: |
-        cd docs
-        uv run sphinx-build -b html --keep-going . _build/html
+      - name: Build documentation
+        run: |
+          cd docs
+          uv run sphinx-build -b html --keep-going . _build/html
 
-    - name: Assemble landing page + docs site
-      run: |
-        rm -rf site
-        mkdir -p site/docs site/blog
-        # Copy landing page if it exists, otherwise docs become the root
-        if [ -d "landing" ]; then
-          cp -R landing/* site/
-          # Copy docs excluding blog/ (blog is served at /blog/ not /docs/blog/)
-          rsync -a --exclude='blog/' docs/_build/html/ site/docs/
-        else
-          cp -R docs/_build/html/* site/
-        fi
-        # Copy blog to root-level /blog/ path (ABlog generates in docs/_build/html/blog/)
-        if [ -d "docs/_build/html/blog" ]; then
-          cp -R docs/_build/html/blog/* site/blog/
-        fi
-        # Copy _static and _images assets to site root for blog pages (they reference ../_static/ and ../_images/)
-        cp -R docs/_build/html/_static site/_static
-        if [ -d "docs/_build/html/_images" ]; then
-          cp -R docs/_build/html/_images site/_images
-        fi
-        # Copy CNAME if it exists
-        [ -f docs/CNAME ] && cp docs/CNAME site/CNAME || true
-        touch site/.nojekyll
+      # --- Results Explorer ---
+      # Steps gate on package.json as a sentinel so the workflow degrades
+      # gracefully if the explorer directory is ever removed or renamed.
+      - name: Validate results-explorer lockfile
+        if: hashFiles('results-explorer/package.json') != ''
+        run: |
+          test -f results-explorer/package-lock.json || {
+            echo "results-explorer/package-lock.json is required for npm ci" >&2
+            exit 1
+          }
 
-    - name: Upload HTML artifacts
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: site
+      - name: Set up Node.js
+        if: hashFiles('results-explorer/package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: results-explorer/package-lock.json
 
-    - name: Deploy to GitHub Pages
-      id: deployment
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: actions/deploy-pages@v4
+      - name: Install results-explorer dependencies
+        if: hashFiles('results-explorer/package.json') != ''
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Typecheck results-explorer
+        if: hashFiles('results-explorer/package.json') != ''
+        run: npm run typecheck
+        working-directory: results-explorer
+
+      - name: Build explorer data (static pipeline)
+        if: hashFiles('results-explorer/package.json') != ''
+        run: uv run benchbox explorer build --data-dir results-data/ --output results-explorer/public/data/
+        # Note: results-data/bundles/ may be empty on first deploy; pipeline handles empty gracefully
+        # Note: requires `benchbox explorer` CLI subcommand (added in PR #46)
+
+      - name: Build results-explorer
+        if: hashFiles('results-explorer/package.json') != ''
+        run: npm run build
+        working-directory: results-explorer
+
+      - name: Assemble landing page + docs site
+        run: |
+          rm -rf site
+          mkdir -p site/docs site/blog
+          # Copy landing page if it exists, otherwise docs become the root
+          if [ -d "landing" ]; then
+            cp -R landing/* site/
+            # Copy docs excluding blog/ (blog is served at /blog/ not /docs/blog/)
+            rsync -a --exclude='blog/' docs/_build/html/ site/docs/
+          else
+            cp -R docs/_build/html/* site/
+          fi
+          # Copy blog to root-level /blog/ path (ABlog generates in docs/_build/html/blog/)
+          if [ -d "docs/_build/html/blog" ]; then
+            cp -R docs/_build/html/blog/* site/blog/
+          fi
+          # Copy _static and _images assets to site root for blog pages (they reference ../_static/ and ../_images/)
+          cp -R docs/_build/html/_static site/_static
+          if [ -d "docs/_build/html/_images" ]; then
+            cp -R docs/_build/html/_images site/_images
+          fi
+          # Copy CNAME if it exists
+          [ -f docs/CNAME ] && cp docs/CNAME site/CNAME || true
+          touch site/.nojekyll
+
+      - name: Copy explorer to site
+        if: hashFiles('results-explorer/package.json') != ''
+        run: |
+          mkdir -p site/results
+          cp -r results-explorer/dist/. site/results/
+
+      - name: Add SPA 404 fallback for results-explorer
+        if: hashFiles('results-explorer/package.json') != ''
+        # GitHub Pages only serves a root-level 404.html as the custom error page;
+        # subdirectory 404.html files are treated as regular pages.
+        run: |
+          cat > site/404.html << 'FOUROHFOUR'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>Page Not Found - BenchBox</title>
+            <script>
+              var redirectKey = 'benchbox.results.redirect';
+
+              if (window.location.pathname.startsWith('/results/')) {
+                var originalPath = window.location.pathname + window.location.search + window.location.hash;
+
+                try {
+                  window.sessionStorage.setItem(redirectKey, originalPath);
+                } catch (error) {
+                  // Ignore sessionStorage failures and still redirect to the SPA entrypoint.
+                }
+
+                window.location.replace('/results/');
+              }
+            </script>
+          </head>
+          <body>
+            <p>Page not found. <a href="/">Return to documentation</a>.</p>
+          </body>
+          </html>
+          FOUROHFOUR
+
+      - name: Upload HTML artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/deploy-pages@v4
 
   # Validate example files and documentation references
   # Blocking: failures should fail the workflow
@@ -113,27 +192,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
 
-    - name: Install dependencies
-      run: uv sync --group dev
+      - name: Install dependencies
+        run: uv sync --group dev
 
-    - name: Validate example file references
-      run: uv run python scripts/validate_example_references.py
+      - name: Validate example file references
+        run: uv run python scripts/validate_example_references.py
 
-    - name: Check example file syntax
-      run: uv run python scripts/check_example_syntax.py
+      - name: Check example file syntax
+        run: uv run python scripts/check_example_syntax.py
 
-    - name: Validate visualization screenshot sync
-      run: uv run python scripts/validate_visualization_images.py
+      - name: Validate visualization screenshot sync
+        run: uv run python scripts/validate_visualization_images.py
+
+      - name: Check for unsafe patch() string paths in tests
+        run: uv run python scripts/check_patch_safety.py
 
   # Check for broken links
   # Blocking: curated ignore list handles known flaky hosts
@@ -141,30 +223,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
 
-    - name: Install dependencies
-      run: uv sync --group dev
+      - name: Install dependencies
+        run: uv sync --group dev
 
-    - name: Check documentation links
-      run: |
-        cd docs
-        uv run sphinx-build -b linkcheck . _build/linkcheck
+      - name: Check documentation links
+        run: |
+          cd docs
+          uv run sphinx-build -b linkcheck . _build/linkcheck
 
-    - name: Upload linkcheck report
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: linkcheck-report
-        path: docs/_build/linkcheck
+      - name: Upload linkcheck report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linkcheck-report
+          path: docs/_build/linkcheck
 
   # Spell checking
   # Non-blocking: may have false positives
@@ -173,13 +255,13 @@ jobs:
     continue-on-error: true
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Run codespell
-      uses: codespell-project/actions-codespell@master
-      with:
-        ignore_words_file: .codespell-ignore.txt
-        skip: "*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv"
+      - name: Run codespell
+        uses: codespell-project/actions-codespell@v2
+        with:
+          ignore_words_file: .codespell-ignore.txt
+          skip: "*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv"
 
   # Docstring coverage check
   # Blocking: enforce configured interrogate threshold
@@ -187,23 +269,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install interrogate
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install interrogate
 
-    - name: Check docstring coverage
-      run: |
-        interrogate -c pyproject.toml --fail-under 90 benchbox/
+      - name: Check docstring coverage
+        run: |
+          interrogate -c pyproject.toml --fail-under 90 benchbox/
 
-    - name: Generate docstring coverage badge
-      run: |
-        mkdir -p docs/_static
-        interrogate -c pyproject.toml --generate-badge docs/_static/ benchbox/
+      - name: Generate docstring coverage badge
+        run: |
+          mkdir -p docs/_static
+          interrogate -c pyproject.toml --generate-badge docs/_static/ benchbox/

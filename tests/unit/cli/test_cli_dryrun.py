@@ -500,7 +500,7 @@ class TestDryRunExecutor:
         # Include queries attribute for display - should be dict, not list
         result.queries = {"Q1": "SELECT 1", "Q2": "SELECT 2", "Q3": "SELECT 3"}
 
-        # Display results — should complete without raising
+        # Display results - should complete without raising
         try:
             self.executor.display_dry_run_results(result)
         except Exception as exc:
@@ -534,7 +534,7 @@ class TestDryRunExecutor:
         json_file = saved_files["json"]
         assert Path(json_file).exists()
 
-        with open(json_file) as f:
+        with open(json_file, encoding="utf-8") as f:
             data = json.load(f)
             assert "benchmark_config" in data
             assert "database_config" in data
@@ -640,7 +640,7 @@ class TestDryRunResultHandling:
         json_file = saved_files["json"]
 
         # Verify file can be read back
-        with open(json_file) as f:
+        with open(json_file, encoding="utf-8") as f:
             data = json.load(f)
             assert data["benchmark_config"]["name"] == "tpch"
             assert data["benchmark_config"]["scale_factor"] == 0.01
@@ -1326,6 +1326,7 @@ class TestGenerateCliCommandCompleteness:
     # Params whose Click name differs from the generate_cli_command kwarg name
     CLICK_TO_KWARG_RENAMES = {
         "platform_option_pairs": "platform_options",
+        "benchmark_option_pairs": "benchmark_options",
     }
 
     def test_completeness(self):

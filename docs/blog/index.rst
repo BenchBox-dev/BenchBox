@@ -39,3 +39,5 @@ Browse by:
    2026-03-10-extracting-textcharts
    2026-03-10-v0-1-5-release-summary
    2026-04-01-v0-2-0-release-summary
+   2026-04-26-v0-2-1-release-summary
+   2026-04-26-scale-factor-harmonization

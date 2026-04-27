@@ -117,22 +117,20 @@ class TestEstimateMemoryUsage:
     def test_basic(self):
         bm = MagicMock()
         bm.scale_factor = 0.01
-        bm._name = "tpch"
         sp = MagicMock()
         sp.memory_gb = 16
 
-        result = self.executor._estimate_memory_usage(bm, sp)
+        result = self.executor._estimate_memory_usage(bm, sp, "tpch")
         # data_size = 8 * 0.01 * 100 = 8; memory = min(8*2.5, 16*1024*0.8) = 20
         assert result == pytest.approx(20.0)
 
     def test_capped_by_system_memory(self):
         bm = MagicMock()
         bm.scale_factor = 100.0
-        bm._name = "tpch"
         sp = MagicMock()
         sp.memory_gb = 4
 
-        result = self.executor._estimate_memory_usage(bm, sp)
+        result = self.executor._estimate_memory_usage(bm, sp, "tpch")
         # data_size = 8*100*100 = 80000; capped at 4*1024*0.8 = 3276.8
         assert result == pytest.approx(4 * 1024 * 0.8)
 
@@ -269,7 +267,6 @@ class TestEstimateResources:
 
     def test_basic(self):
         bm = MagicMock()
-        bm._name = "tpch"
         bm.scale_factor = 0.01
         bm.get_all_queries.return_value = {str(i): "" for i in range(22)}
 
@@ -277,7 +274,7 @@ class TestEstimateResources:
         sp.cpu_cores_logical = 8
         sp.memory_gb = 16
 
-        result = self.executor._estimate_resources(bm, sp)
+        result = self.executor._estimate_resources(bm, sp, "tpch")
         assert result["scale_factor"] == 0.01
         assert result["estimated_data_size_mb"] > 0
         assert result["cpu_cores_available"] == 8
@@ -285,11 +282,10 @@ class TestEstimateResources:
 
     def test_with_error(self):
         bm = MagicMock()
-        bm._name = "tpch"
         bm.scale_factor = MagicMock(side_effect=AttributeError("no sf"))
 
         sp = MagicMock()
-        result = self.executor._estimate_resources(bm, sp)
+        result = self.executor._estimate_resources(bm, sp, "tpch")
         assert "error" in result
 
 
@@ -486,7 +482,7 @@ class TestExtractStandardQueries:
 
 
 # ---------------------------------------------------------------------------
-# _generate_schema_sql — external table mode dispatch
+# _generate_schema_sql - external table mode dispatch
 # ---------------------------------------------------------------------------
 
 
@@ -599,7 +595,7 @@ class TestGenerateExternalSchemaSQL:
 
 
 # ---------------------------------------------------------------------------
-# execute_dry_run — dry_run=True injected into platform config
+# execute_dry_run - dry_run=True injected into platform config
 # ---------------------------------------------------------------------------
 
 
@@ -677,3 +673,67 @@ class TestDryRunPlatformConfigInjection:
             )
 
         assert mock_core.call_args[0][2] == "tpch"
+
+
+# ---------------------------------------------------------------------------
+# Benchmark identity contract regression tests (w10 of
+# eliminate-non-data-loading-wrong-layer-compensation)
+# ---------------------------------------------------------------------------
+
+
+class TestDryRunBenchmarkIdentityContract:
+    """_extract_queries must use BenchmarkConfig.name for TPC routing, not
+    benchmark object internals (_name, display_name, class names)."""
+
+    def test_extract_queries_uses_benchmark_config_name_for_tpch_routing(self):
+        """Routing to TPC-H maintenance path uses BenchmarkConfig.name, not _name."""
+        executor = DryRunExecutor()
+        # Benchmark object whose _name does NOT contain "tpch" - would fail old sniffing.
+        benchmark = MagicMock()
+        benchmark._name = "adhoc"
+
+        benchmark_config = MagicMock()
+        benchmark_config.name = "tpch"
+        benchmark_config.test_execution_type = "maintenance"
+
+        with patch.object(executor, "_extract_tpch_maintenance_operations", return_value={"RF1": "..."}) as patched:
+            result = executor._extract_queries(benchmark, benchmark_config)
+
+        patched.assert_called_once()
+        assert result == {"RF1": "..."}
+
+    def test_extract_queries_uses_benchmark_config_name_for_tpcds_routing(self):
+        """Routing to TPC-DS combined path uses BenchmarkConfig.name, not _name."""
+        executor = DryRunExecutor()
+        benchmark = MagicMock()
+        benchmark._name = "custom"
+
+        benchmark_config = MagicMock()
+        benchmark_config.name = "tpcds"
+        benchmark_config.test_execution_type = "combined"
+
+        with (
+            patch.object(executor, "_extract_standard_queries", return_value={"1": "SELECT 1"}) as std,
+            patch.object(executor, "_extract_tpcds_maintenance_operations", return_value={"RF1": "..."}) as maint,
+        ):
+            result = executor._extract_queries(benchmark, benchmark_config)
+
+        std.assert_called_once()
+        maint.assert_called_once()
+        assert "1" in result and "RF1" in result
+
+    def test_extract_queries_via_real_test_execution_uses_benchmark_config_name(self):
+        """_extract_queries_via_real_test_execution routes using BenchmarkConfig.name."""
+        executor = DryRunExecutor()
+        benchmark = MagicMock()
+        benchmark._name = "anything"
+
+        benchmark_config = MagicMock()
+        benchmark_config.name = "tpch"
+        benchmark_config.scale_factor = 0.01
+
+        with patch.object(executor, "_execute_tpch_test_class", return_value={"Q1": "SELECT 1"}) as patched:
+            result = executor._extract_queries_via_real_test_execution(benchmark, benchmark_config, "power")
+
+        patched.assert_called_once()
+        assert result == {"Q1": "SELECT 1"}

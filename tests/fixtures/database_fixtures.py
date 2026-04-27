@@ -99,7 +99,7 @@ def _ensure_test_databases_exist():
             if result.returncode != 0:
                 raise RuntimeError(f"Failed to create test databases: {result.stderr}")
         except Exception as e:
-            raise RuntimeError(f"Error creating test databases: {e}")
+            raise RuntimeError(f"Error creating test databases: {e}") from e
 
 
 def _setup_database_extensions(conn: duckdb.DuckDBPyConnection, extensions: list[str]) -> None:

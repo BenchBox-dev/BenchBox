@@ -30,6 +30,7 @@ except ImportError:
     pl = None
 
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
+from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ class PolarsDataFrameContext:
         return list(self._tables.keys())
 
 
-class PolarsAdapter(PlatformAdapter):
+class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
     """Polars platform adapter with DataFrame API support.
 
     Executes benchmarks using the native Polars DataFrame API with lazy/eager
@@ -370,7 +371,12 @@ class PolarsAdapter(PlatformAdapter):
         self.log_operation_start("Data loading", f"mode: {self.execution_mode}")
 
         # Resolve data source
-        resolver = DataSourceResolver()
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
         data_source = resolver.resolve(benchmark, data_dir)
 
         if not data_source or not data_source.tables:
@@ -393,8 +399,9 @@ class PolarsAdapter(PlatformAdapter):
             # Normalize table name to lowercase
             table_name_lower = table_name.lower()
 
-            # Load the table data
-            row_count = self._load_table(connection, table_name_lower, valid_files, data_dir)
+            # Load the table data, passing any manifest-provided format hint
+            format_hint = data_source.table_formats.get(table_name) or data_source.table_formats.get(table_name_lower)
+            row_count = self._load_table(connection, table_name_lower, valid_files, data_dir, format_hint=format_hint)
 
             table_duration = elapsed_seconds(table_start)
             table_stats[table_name_lower] = row_count
@@ -435,7 +442,12 @@ class PolarsAdapter(PlatformAdapter):
         return format_type, format_info.delimiter
 
     def _load_table(
-        self, connection: PolarsDataFrameContext, table_name: str, file_paths: list[Path], data_dir: Path
+        self,
+        connection: PolarsDataFrameContext,
+        table_name: str,
+        file_paths: list[Path],
+        data_dir: Path,
+        format_hint: str | None = None,
     ) -> int:
         """Load table from data files into Polars.
 
@@ -444,11 +456,19 @@ class PolarsAdapter(PlatformAdapter):
             table_name: Name of the table
             file_paths: List of file paths to load
             data_dir: Base data directory
+            format_hint: Optional format hint from manifest (e.g. "parquet", "csv", "tbl")
 
         Returns:
             Number of rows loaded
         """
-        format_type, delimiter = self._detect_file_format(file_paths)
+        if format_hint == "parquet":
+            format_type, delimiter = "parquet", ","
+        elif format_hint == "tbl":
+            format_type, delimiter = "csv", "|"
+        elif format_hint == "csv":
+            format_type, delimiter = "csv", ","
+        else:
+            format_type, delimiter = self._detect_file_format(file_paths)
 
         # Get schema information for column names
         schema_info = self._table_schemas.get(table_name, {})
@@ -596,35 +616,6 @@ class PolarsAdapter(PlatformAdapter):
             "'duckdb' or 'postgresql' for SQL benchmarks."
         )
 
-    def apply_platform_optimizations(self, platform_config, connection: Any) -> None:
-        """Apply Polars-specific platform optimizations.
-
-        Polars optimizations are primarily handled automatically by its
-        query optimizer. This method logs the optimization configuration.
-        """
-        if not platform_config:
-            self.log_verbose("No platform optimizations configured")
-            return
-
-        self.log_verbose("Polars optimizations handled automatically by query optimizer")
-
-    def apply_constraint_configuration(
-        self,
-        primary_key_config,
-        foreign_key_config,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configuration.
-
-        Note: Polars does not enforce PRIMARY KEY or FOREIGN KEY constraints.
-        This method logs the configuration but does not apply constraints.
-        """
-        if primary_key_config and primary_key_config.enabled:
-            self.log_verbose("Polars does not enforce PRIMARY KEY constraints - configuration noted but not applied")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.log_verbose("Polars does not enforce FOREIGN KEY constraints - configuration noted but not applied")
-
     def check_database_exists(self, **connection_config) -> bool:
         """Check if Polars working directory exists with data."""
         working_dir = Path(connection_config.get("working_dir", self.working_dir))
@@ -642,9 +633,9 @@ class PolarsAdapter(PlatformAdapter):
         working_dir = Path(connection_config.get("working_dir", self.working_dir))
 
         if working_dir.exists():
-            self.log_verbose(f"Removing Polars working directory: {working_dir}")
+            self.logger.warning(f"Removing Polars working directory: {working_dir}")
             shutil.rmtree(working_dir)
-            self.log_verbose("Polars working directory removed")
+            self.logger.warning("Polars working directory removed")
 
     def validate_platform_capabilities(self, benchmark_type: str):
         """Validate Polars-specific capabilities for the benchmark."""

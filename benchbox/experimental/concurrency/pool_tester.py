@@ -287,7 +287,9 @@ class ConnectionPoolTester:
         except Exception as e:
             attempt.end_time = time.time()
             attempt.success = False
-            attempt.error = str(e)
+            # Defensive: some driver errors raise with empty str(e); fall back
+            # so the attempt record always has a non-empty error string.
+            attempt.error = str(e) or repr(e) or type(e).__name__
             attempt.connection_time_ms = (attempt.end_time - attempt.start_time) * 1000
 
         with self._lock:

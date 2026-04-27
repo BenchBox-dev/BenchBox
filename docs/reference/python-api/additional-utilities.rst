@@ -752,4 +752,4 @@ See Also
 - :doc:`data-validation` - Data validation utilities
 - :doc:`performance-monitoring` - Performance monitoring utilities
 - :doc:`utilities` - Core utilities (dialect translation)
-- :doc:`/DEVELOPMENT` - Development guide
+- :doc:`/development/getting-started` - Development guide

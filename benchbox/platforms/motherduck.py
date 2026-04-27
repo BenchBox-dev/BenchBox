@@ -7,7 +7,7 @@ authentication and connection handling.
 
 Authentication:
 - Uses MOTHERDUCK_TOKEN environment variable or config file
-- Token can also be passed via --platform-option token=<token>
+- Token can also be passed via --motherduck-token <token>
 
 Connection:
 - Uses DuckDB's native MotherDuck integration: md:database_name
@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from benchbox.core.config_inheritance import (
     resolve_dialect_for_query_translation,
 )
+from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.dependencies import get_package_install_message
 
 try:
@@ -52,8 +53,8 @@ class MotherDuckAdapter(PlatformAdapter):
     direct comparison with local DuckDB performance.
 
     Authentication:
-        Set MOTHERDUCK_TOKEN environment variable, or provide via config:
-        --platform-option token=<your-motherduck-token>
+        Set MOTHERDUCK_TOKEN environment variable, or provide via CLI flag:
+        --motherduck-token <your-motherduck-token>
 
     Example usage:
         benchbox run --platform motherduck --benchmark tpch --scale 0.01 \\
@@ -90,7 +91,7 @@ class MotherDuckAdapter(PlatformAdapter):
             raise ValueError(
                 "MotherDuck requires authentication token.\n"
                 "Set MOTHERDUCK_TOKEN environment variable, or provide via:\n"
-                "  --platform-option token=<your-token>\n"
+                "  --motherduck-token <your-token>\n"
                 "\nGet your token at: https://app.motherduck.com/token-request"
             )
 
@@ -183,7 +184,7 @@ class MotherDuckAdapter(PlatformAdapter):
             logger.error(f"Failed to connect to MotherDuck: {e}")
             raise ConnectionError(
                 f"Failed to connect to MotherDuck: {e}\nCheck your MOTHERDUCK_TOKEN and network connection."
-            )
+            ) from e
 
     def close_connection(self, connection=None):
         """Close MotherDuck connection."""
@@ -196,30 +197,61 @@ class MotherDuckAdapter(PlatformAdapter):
         if connection is None:
             self.connection = None
 
-    def execute_query(self, query: str, connection=None) -> tuple[Any, float]:
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
         """Execute a query against MotherDuck.
 
         Args:
-            query: SQL query to execute
-            connection: Optional connection to use
+            connection: Active database connection (falls back to self.connection or creates one).
+            query: SQL query to execute.
+            query_id: Query identifier for result tracking.
+            benchmark_type: Benchmark type for optional row-count validation.
+            scale_factor: Scale factor for optional row-count validation.
+            validate_row_count: Whether to validate row count.
+            stream_id: Stream identifier for multi-stream benchmarks.
 
         Returns:
-            Tuple of (result, execution_time_seconds)
+            Dict with query_id, status, execution_time_seconds, rows_returned, etc.
         """
         conn = connection or self.connection
         if conn is None:
             conn = self.create_connection()
 
-        start_time = time.perf_counter()
+        start_time = mono_time()
         try:
             result = conn.execute(query)
             rows = result.fetchall()
-            execution_time = time.perf_counter() - start_time
-            return rows, execution_time
+            execution_time = elapsed_seconds(start_time)
+            logger.debug(f"Query {query_id} completed in {execution_time:.3f}s, returned {len(rows)} rows")
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "SUCCESS",
+                "execution_time_seconds": execution_time,
+                "rows_returned": len(rows),
+                "first_row": rows[0] if rows else None,
+                "error": None,
+            }
         except Exception as e:
-            execution_time = time.perf_counter() - start_time
-            logger.error(f"Query execution failed after {execution_time:.2f}s: {e}")
-            raise
+            execution_time = elapsed_seconds(start_time)
+            logger.error(f"Query {query_id} failed after {execution_time:.2f}s: {e}")
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "FAILED",
+                "execution_time_seconds": execution_time,
+                "rows_returned": 0,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get MotherDuck platform information for results traceability."""

@@ -16,6 +16,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.platforms.base.data_loading import DataSource
 from benchbox.platforms.firebolt import FireboltAdapter
 
 pytestmark = [
@@ -443,7 +444,7 @@ class TestFireboltDataLoading:
         mock_benchmark = Mock()
 
         # Create temporary test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test1\n2,test2\n")
             temp_path = Path(f.name)
 
@@ -481,7 +482,7 @@ class TestFireboltDataLoading:
         mock_benchmark = Mock()
 
         # Create temporary test file with pipe delimiter
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
             f.write("1|test1|\n2|test2|\n")
             temp_path = Path(f.name)
 
@@ -514,7 +515,7 @@ class TestFireboltDataLoading:
         mock_benchmark = Mock()
 
         # Create file with single quotes in data
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test's data\n")
             temp_path = Path(f.name)
 
@@ -1239,3 +1240,89 @@ class TestFireboltFromConfigOptions:
 
         assert adapter.disable_result_cache is True
         assert adapter.strict_validation is True
+
+
+# ---------------------------------------------------------------------------
+# Data loading - _resolve_data_files DataSourceResolver delegation
+# ---------------------------------------------------------------------------
+
+
+class TestFireboltDataLoading:
+    """Tests for _resolve_data_files DataSourceResolver delegation."""
+
+    def test_resolve_data_files_returns_path_mapping(self, tmp_path):
+        """_resolve_data_files delegates to DataSourceResolver and normalizes DataSource paths."""
+        try:
+            adapter = FireboltAdapter()
+        except ImportError:
+            pytest.skip("Firebolt SDK not installed")
+
+        raw_tables = {"orders": [str(tmp_path / "orders.csv")]}
+        resolver_data_source = DataSource(
+            source_type="manifest_v2",
+            tables=raw_tables,
+            table_metadata={"orders": {"csv_delimiter": ","}},
+        )
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = Mock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = resolver_data_source
+
+            result = adapter._resolve_data_files(Mock(), tmp_path)
+
+        assert "orders" in result.tables
+        assert all(isinstance(p, Path) for p in result.tables["orders"])
+        # Manifest metadata must survive Path normalization so resolve_csv_dialect
+        # still sees it on the downstream INSERT/COPY paths.
+        assert result.table_metadata == {"orders": {"csv_delimiter": ","}}
+        # Resolver-owned DataSource must not be mutated.
+        assert all(isinstance(p, str) for p in resolver_data_source.tables["orders"])
+        assert mock_cls.call_args.kwargs.get("platform_name") == adapter.platform_name
+
+    def test_resolve_data_files_raises_when_resolver_returns_none(self, tmp_path):
+        """_resolve_data_files raises ValueError when DataSourceResolver returns None."""
+        try:
+            adapter = FireboltAdapter()
+        except ImportError:
+            pytest.skip("Firebolt SDK not installed")
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = Mock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = None
+
+            with pytest.raises(ValueError, match="No data files found"):
+                adapter._resolve_data_files(Mock(), tmp_path)
+
+    def test_resolve_data_files_raises_when_tables_empty(self, tmp_path):
+        """_resolve_data_files raises ValueError when resolver returns empty tables."""
+        try:
+            adapter = FireboltAdapter()
+        except ImportError:
+            pytest.skip("Firebolt SDK not installed")
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = Mock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = Mock(tables={})
+
+            with pytest.raises(ValueError, match="No data files found"):
+                adapter._resolve_data_files(Mock(), tmp_path)
+
+    def test_resolve_data_files_uses_adapter_platform_name(self, tmp_path):
+        """DataSourceResolver receives self.platform_name from the Firebolt adapter."""
+        try:
+            adapter = FireboltAdapter()
+        except ImportError:
+            pytest.skip("Firebolt SDK not installed")
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = Mock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = DataSource(source_type="manifest_v2", tables={"t": ["f"]})
+
+            adapter._resolve_data_files(Mock(), tmp_path)
+
+        _, kwargs = mock_cls.call_args
+        assert kwargs.get("platform_name") == adapter.platform_name

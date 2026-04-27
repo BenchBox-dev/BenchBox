@@ -293,15 +293,12 @@ class TestCloudStorageIntegration:
                 f"{generator_class.__name__} does not inherit from CloudStorageGeneratorMixin"
             )
 
-    def test_tpcds_minimum_scale_factor_handling(self, temp_dir):
-        """Test that TPC-DS data generator enforces minimum scale factor of 1.0."""
-        # TPC-DS requires scale_factor >= 1.0 because the native dsdgen binary
-        # crashes with fractional scale factors
+    def test_tpcds_subscale_factor_handling(self, temp_dir):
+        """Test that TPC-DS data generator accepts unofficial subscale factors."""
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir, verbose=False)
 
-        # Generator should accept the minimum valid scale factor
+        # Generator should accept the minimum valid official scale factor
         assert generator.scale_factor == 1.0
 
-        # Verify that fractional scale factors are rejected
-        with pytest.raises(ValueError, match="TPC-DS requires scale_factor >= 1.0"):
-            TPCDSDataGenerator(scale_factor=0.5, output_dir=temp_dir, verbose=False)
+        subscale = TPCDSDataGenerator(scale_factor=0.5, output_dir=temp_dir, verbose=False)
+        assert subscale.scale_factor == 0.5

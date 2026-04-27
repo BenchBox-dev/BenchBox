@@ -20,8 +20,16 @@ class FileFormatInfo(NamedTuple):
 def detect_file_format(file_paths: list[Path] | Path) -> FileFormatInfo:
     """Detect file format and delimiter from file paths.
 
-    This is a shared utility for dataframe adapters (Spark, Polars, cuDF)
-    to consistently detect file formats.
+    This is a shared utility for SQL-mode platforms (Spark, Polars SQL, cuDF SQL)
+    that operate without a DataSource or benchmark context at the call site.
+    It is the legitimate no-context fallback — callers cannot supply a DataSource
+    so extension-based detection is the correct behaviour here.
+
+    Do NOT migrate this function to resolve_csv_dialect(): the call sites in
+    spark_execution_mixin, polars_platform, and cudf (SQL mode) have no DataSource
+    to pass.  This is distinct from the DataFrame adapter load_table() path, which
+    does receive a DataSource via shared_loading and uses resolve_csv_dialect()
+    directly in load_table().
 
     Args:
         file_paths: Single Path or list of file paths

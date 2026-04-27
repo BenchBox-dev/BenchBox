@@ -287,11 +287,11 @@ class TestChecksumVerification:
         binary.write_bytes(b"data")
 
         compiler = TPCCompiler(auto_compile=False)
-        # First call – no checksum file, returns True
+        # First call - no checksum file, returns True
         result1 = compiler._verify_checksum(binary)
         assert result1 is True
 
-        # Second call – should use cache
+        # Second call - should use cache
         result2 = compiler._verify_checksum(binary)
         assert result2 is True
 
@@ -757,6 +757,92 @@ class TestGetTPCTemplatesDir:
 # ---------------------------------------------------------------------------
 # Path discovery
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Windows-specific: executable detection with os.name guard
+# ---------------------------------------------------------------------------
+class TestExecutableDetectionWindows:
+    """Verify is_binary_available / is_precompiled_available honour the
+    os.name != 'nt' guard added for Windows.
+
+    On Windows os.access(path, os.X_OK) is always True, so the code now
+    skips that check when os.name == 'nt'.  These tests mock os.name to
+    confirm both the Unix path (checking X_OK) and the Windows path (skipping
+    it) behave correctly.
+    """
+
+    def _make_compiler_with_binary(self, tmp_path, *, use_precompiled: bool):
+        """Helper: build a minimal TPCCompiler wired to a real file on disk."""
+        binary = tmp_path / "dbgen"
+        binary.write_bytes(b"fake binary")
+        # Do NOT chmod +x - tests that mock os.name == 'nt' should still pass.
+
+        with (
+            patch("benchbox.utils.tpc_compilation._discovered_paths", {}),
+            patch("benchbox.utils.tpc_compilation._compiler_cache", {}),
+            patch.object(TPCCompiler, "__init__", lambda self, **kw: None),
+        ):
+            compiler = TPCCompiler.__new__(TPCCompiler)
+            compiler.auto_compile = False
+            compiler.verbose = False
+            compiler.tpc_h_source = None
+            compiler.tpc_ds_source = None
+            compiler.precompiled_base = tmp_path
+            compiler._setup_binary_configs()
+
+        if use_precompiled:
+            compiler.binaries["dbgen"].precompiled_path = binary
+        else:
+            compiler.binaries["dbgen"].binary_path = binary
+
+        return compiler, binary
+
+    @patch("benchbox.utils.tpc_compilation._discovered_paths", {})
+    @patch("benchbox.utils.tpc_compilation._checksum_cache", {})
+    def test_precompiled_unix_requires_executable_bit(self, tmp_path):
+        """On Unix, a file without +x is rejected by is_precompiled_available."""
+        compiler, binary = self._make_compiler_with_binary(tmp_path, use_precompiled=True)
+        # os.access(path, X_OK) always returns True on Windows regardless of file
+        # permissions, so mock it to False to simulate a non-executable Unix file.
+        with patch("benchbox.utils.tpc_compilation.os.name", "posix"):
+            with patch("benchbox.utils.tpc_compilation.os.access", return_value=False):
+                # File exists but is NOT executable → should return False
+                assert compiler.is_precompiled_available("dbgen") is False
+
+    @patch("benchbox.utils.tpc_compilation._discovered_paths", {})
+    @patch("benchbox.utils.tpc_compilation._checksum_cache", {})
+    def test_precompiled_windows_skips_executable_bit(self, tmp_path):
+        """On Windows (os.name == 'nt'), existence is sufficient."""
+        compiler, binary = self._make_compiler_with_binary(tmp_path, use_precompiled=True)
+        with patch("benchbox.utils.tpc_compilation.os.name", "nt"):
+            # File exists; X_OK check is skipped → should return True
+            assert compiler.is_precompiled_available("dbgen") is True
+
+    @patch("benchbox.utils.tpc_compilation._discovered_paths", {})
+    @patch("benchbox.utils.tpc_compilation._compiler_cache", {})
+    def test_source_binary_unix_requires_executable_bit(self, tmp_path):
+        """On Unix, a non-executable source binary is rejected."""
+        compiler, binary = self._make_compiler_with_binary(tmp_path, use_precompiled=False)
+        with patch("benchbox.utils.tpc_compilation.os.name", "posix"):
+            with patch("benchbox.utils.tpc_compilation.os.access", return_value=False):
+                assert compiler.is_binary_available("dbgen") is False
+
+    @patch("benchbox.utils.tpc_compilation._discovered_paths", {})
+    @patch("benchbox.utils.tpc_compilation._compiler_cache", {})
+    def test_source_binary_windows_skips_executable_bit(self, tmp_path):
+        """On Windows, a source binary is accepted if it exists."""
+        compiler, binary = self._make_compiler_with_binary(tmp_path, use_precompiled=False)
+        with patch("benchbox.utils.tpc_compilation.os.name", "nt"):
+            assert compiler.is_binary_available("dbgen") is True
+
+    @patch("benchbox.utils.tpc_compilation._discovered_paths", {})
+    @patch("benchbox.utils.tpc_compilation._compiler_cache", {})
+    def test_get_binary_path_windows(self, tmp_path):
+        """get_binary_path returns the path on Windows without X_OK check."""
+        compiler, binary = self._make_compiler_with_binary(tmp_path, use_precompiled=False)
+        with patch("benchbox.utils.tpc_compilation.os.name", "nt"):
+            assert compiler.get_binary_path("dbgen") == binary
+
+
 class TestDiscoverTPCPaths:
     """Tests for _discover_tpc_paths."""
 

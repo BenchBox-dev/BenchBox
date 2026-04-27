@@ -5,7 +5,7 @@
 ```{tags} advanced, concept, tpc-ds-obt, tpc-ds, experimental
 ```
 
-> **CLI name:** `tpcds_obt` — use `benchbox run --benchmark tpcds_obt`
+> **CLI name:** `tpcds_obt` - use `benchbox run --benchmark tpcds_obt`
 
 ## Overview
 
@@ -16,7 +16,7 @@ The benchmark is ideal for evaluating column pruning efficiency, wide table scan
 ## Key Features
 
 - **Single wide table** - All TPC-DS data flattened into one denormalized table
-- **Same 99 queries** - Standard TPC-DS queries rewritten for flat schema
+- **89 of 99 queries** - TPC-DS queries rewritten for flat schema (10 queries are not OBT-convertible; see below)
 - **No joins required** - Tests pure scan and aggregation performance
 - **Column pruning focus** - Evaluates optimizer column projection efficiency
 - **Modern lakehouse pattern** - Simulates real-world denormalized data models
@@ -82,19 +82,67 @@ The denormalized table contains columns from all TPC-DS dimensions:
 
 ```bash
 # Run TPC-DS-OBT on DuckDB
-benchbox run --platform duckdb --benchmark tpc-ds-obt --scale 1.0
+benchbox run --platform duckdb --benchmark tpcds_obt --scale 1.0
 
 # Run specific queries
-benchbox run --platform duckdb --benchmark tpc-ds-obt --scale 1.0 --queries Q1,Q3,Q7
+benchbox run --platform duckdb --benchmark tpcds_obt --scale 1.0 --queries Q1,Q3,Q7
 
 # Compare with standard TPC-DS
 benchbox run --platform duckdb --benchmark tpcds --scale 1.0
-benchbox run --platform duckdb --benchmark tpc-ds-obt --scale 1.0
+benchbox run --platform duckdb --benchmark tpcds_obt --scale 1.0
 ```
+
+## CLI Options (`--benchmark-option`)
+
+Configure TPC-DS-OBT via `--benchmark-option KEY=VALUE`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `dimension_mode` | `full` | OBT dimension mode: `full`, `minimal` |
+| `channels` | all | Sales channels: `store`, `web`, `catalog` (comma-separated) |
+| `output_format` | `parquet` | Output format: `dat`, `parquet` |
+| `tpcds_source_dir` | - | Directory containing TPC-DS source data |
+| `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+
+Accepts hyphenated aliases (e.g. `dimension-mode`, `output-format`, `tpcds-source-dir`).
+
+```bash
+# Minimal dimensions, store channel only (parquet is the default - no flag needed)
+benchbox run --platform duckdb --benchmark tpcds_obt --scale 1 \
+  --benchmark-option dimension_mode=minimal \
+  --benchmark-option channels=store
+
+# Force the legacy pipe-delimited .dat output (rarely needed):
+benchbox run --platform duckdb --benchmark tpcds_obt --scale 1 \
+  --benchmark-option output_format=dat
+```
+
+### Storage format
+
+Parquet is the default because the OBT is a very wide table (518 columns at `dimension_mode=full`)
+with high null density - store rows carry NULL for all `web_site_*`, `web_page_*`, and
+`call_center_*` columns, and so on per channel. Columnar storage with null suppression
+reduces the SF1 artifact by an order of magnitude vs the 11 GB pipe-delimited `.dat`,
+and makes the DataFrame platforms (DataFusion, Polars, Pandas) viable for SF1+.
+
+Use `--benchmark-option output_format=dat` when you need to reproduce results from runs
+that pre-date this default change, or when feeding a tool that can only read pipe-delimited
+text. Existing `.dat` files on disk are not deleted automatically; BenchBox will regenerate
+as parquet and log the path of the stale `.dat` so you can reclaim disk space manually.
 
 ## Query Adaptations
 
-TPC-DS-OBT rewrites the standard 99 TPC-DS queries to work with the flat schema:
+TPC-DS-OBT provides 89 of the standard 99 TPC-DS queries rewritten to work
+with the flat schema. 10 queries are excluded because they cannot be expressed
+against a single denormalized fact:
+
+| Category | Queries | Reason for exclusion |
+|----------|---------|----------------------|
+| Inventory fact | Q21, Q22, Q37, Q39, Q72, Q82 | Use the inventory fact table, a separate fact domain not included in the OBT denormalization |
+| External customer dimensions | Q46, Q64, Q68, Q84 | Require the customer's *current* address/demographics (independent of the sales fact), which the OBT cannot recover from the single-row grain. Q64 additionally uses a cross-channel self-join that defeats OBT's single-scan design |
+
+Queries 14 and 49 are included but hand-written rather than produced by the
+automatic converter because their semantics require manual rewrites.
 
 ### Example: Query 1
 

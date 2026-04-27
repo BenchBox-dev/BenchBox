@@ -919,148 +919,148 @@ def delete_budget(budget_name: str) -> bool:
 # =============================================================================
 
 
-def list_current_limits(quiet: bool = False) -> list[ServiceLimit]:
-    """List all current service limits."""
-    limits = []
-
-    def log(msg: str) -> None:
-        if not quiet:
-            print(msg)
-
-    # Redshift Serverless
+def _collect_redshift_limits(log) -> list[ServiceLimit]:
     log("\n=== Redshift Serverless ===")
     workgroups = get_redshift_workgroups()
     usage_limits = get_redshift_usage_limits()
+    limits: list[ServiceLimit] = []
 
     if not workgroups:
         log("  No workgroups found")
-    else:
-        for wg in workgroups:
-            wg_name = wg["workgroupName"]
-            wg_arn = wg["workgroupArn"]
+        return limits
 
-            wg_limits = [lim for lim in usage_limits if lim["resourceArn"] == wg_arn]
+    for wg in workgroups:
+        wg_name = wg["workgroupName"]
+        wg_arn = wg["workgroupArn"]
+        wg_limits = [lim for lim in usage_limits if lim["resourceArn"] == wg_arn]
 
-            if wg_limits:
-                for lim in wg_limits:
-                    amount = lim["amount"]
-                    period = lim["period"]
-                    usage_type = lim["usageType"]
-                    breach_action = lim["breachAction"]
-
-                    if usage_type == "serverless-compute":
-                        daily_cost = amount * REDSHIFT_SERVERLESS_RPU_HOUR
-                        log(f"  Workgroup: {wg_name}")
-                        log(f"    Limit: {amount} RPU-hours/{period}")
-                        log(f"    Est. max cost: ${daily_cost:.2f}/{period}")
-                        log(f"    Breach action: {breach_action}")
-
-                        limits.append(
-                            ServiceLimit(
-                                service="redshift-serverless",
-                                resource_name=wg_name,
-                                limit_type=f"RPU-hours/{period}",
-                                current_value=amount,
-                                unit="RPU-hours",
-                                daily_cost_estimate=daily_cost if period == "daily" else None,
-                            )
-                        )
-            else:
-                log(f"  Workgroup: {wg_name}")
-                log("    Limit: NONE (unlimited)")
-                limits.append(
-                    ServiceLimit(
-                        service="redshift-serverless",
-                        resource_name=wg_name,
-                        limit_type="none",
-                        current_value=None,
-                        unit="RPU-hours",
-                        daily_cost_estimate=None,
-                        status="unlimited",
-                    )
+        if not wg_limits:
+            log(f"  Workgroup: {wg_name}")
+            log("    Limit: NONE (unlimited)")
+            limits.append(
+                ServiceLimit(
+                    service="redshift-serverless",
+                    resource_name=wg_name,
+                    limit_type="none",
+                    current_value=None,
+                    unit="RPU-hours",
+                    daily_cost_estimate=None,
+                    status="unlimited",
                 )
+            )
+            continue
 
-    # Athena
+        for lim in wg_limits:
+            if lim["usageType"] != "serverless-compute":
+                continue
+            amount = lim["amount"]
+            period = lim["period"]
+            daily_cost = amount * REDSHIFT_SERVERLESS_RPU_HOUR
+            log(f"  Workgroup: {wg_name}")
+            log(f"    Limit: {amount} RPU-hours/{period}")
+            log(f"    Est. max cost: ${daily_cost:.2f}/{period}")
+            log(f"    Breach action: {lim['breachAction']}")
+            limits.append(
+                ServiceLimit(
+                    service="redshift-serverless",
+                    resource_name=wg_name,
+                    limit_type=f"RPU-hours/{period}",
+                    current_value=amount,
+                    unit="RPU-hours",
+                    daily_cost_estimate=daily_cost if period == "daily" else None,
+                )
+            )
+    return limits
+
+
+def _collect_athena_limits(log) -> list[ServiceLimit]:
     log("\n=== Athena ===")
     athena_workgroups = get_athena_workgroups()
+    limits: list[ServiceLimit] = []
 
     if not athena_workgroups:
         log("  No workgroups found")
-    else:
-        for wg in athena_workgroups:
-            wg_name = wg["Name"]
-            if wg.get("State") == "ENABLED":
-                try:
-                    config = get_athena_workgroup_config(wg_name)
-                    wg_config = config.get("Configuration", {})
-                    bytes_limit = wg_config.get("BytesScannedCutoffPerQuery")
+        return limits
 
-                    log(f"  Workgroup: {wg_name}")
-                    if bytes_limit:
-                        tb_limit = bytes_limit / 1024**4
-                        cost_per_query = tb_limit * ATHENA_TB_SCANNED
-                        log(f"    Per-query limit: {format_bytes(bytes_limit)}")
-                        log(f"    Est. cost per query: ${cost_per_query:.4f}")
+    for wg in athena_workgroups:
+        wg_name = wg["Name"]
+        if wg.get("State") != "ENABLED":
+            continue
+        try:
+            config = get_athena_workgroup_config(wg_name)
+        except ClientError:
+            log(f"  Workgroup: {wg_name} (access denied)")
+            continue
 
-                        limits.append(
-                            ServiceLimit(
-                                service="athena",
-                                resource_name=wg_name,
-                                limit_type="bytes-per-query",
-                                current_value=bytes_limit,
-                                unit="bytes",
-                                daily_cost_estimate=None,
-                            )
-                        )
-                    else:
-                        log("    Per-query limit: NONE (unlimited)")
-                        limits.append(
-                            ServiceLimit(
-                                service="athena",
-                                resource_name=wg_name,
-                                limit_type="none",
-                                current_value=None,
-                                unit="bytes",
-                                daily_cost_estimate=None,
-                                status="unlimited",
-                            )
-                        )
-                except ClientError:
-                    log(f"  Workgroup: {wg_name} (access denied)")
+        wg_config = config.get("Configuration", {})
+        bytes_limit = wg_config.get("BytesScannedCutoffPerQuery")
+        log(f"  Workgroup: {wg_name}")
 
-    # EMR Serverless
+        if bytes_limit:
+            tb_limit = bytes_limit / 1024**4
+            cost_per_query = tb_limit * ATHENA_TB_SCANNED
+            log(f"    Per-query limit: {format_bytes(bytes_limit)}")
+            log(f"    Est. cost per query: ${cost_per_query:.4f}")
+            limits.append(
+                ServiceLimit(
+                    service="athena",
+                    resource_name=wg_name,
+                    limit_type="bytes-per-query",
+                    current_value=bytes_limit,
+                    unit="bytes",
+                    daily_cost_estimate=None,
+                )
+            )
+        else:
+            log("    Per-query limit: NONE (unlimited)")
+            limits.append(
+                ServiceLimit(
+                    service="athena",
+                    resource_name=wg_name,
+                    limit_type="none",
+                    current_value=None,
+                    unit="bytes",
+                    daily_cost_estimate=None,
+                    status="unlimited",
+                )
+            )
+    return limits
+
+
+def _collect_emr_limits(log) -> list[ServiceLimit]:
     log("\n=== EMR Serverless ===")
     emr_apps = get_emr_serverless_applications()
+    limits: list[ServiceLimit] = []
 
     if not emr_apps:
         log("  No applications found")
-    else:
-        for app in emr_apps:
-            app_id = app["id"]
-            app_name = app["name"]
-            app_details = get_emr_serverless_application(app_id)
+        return limits
 
-            if app_details:
-                max_cap = app_details.get("maximumCapacity", {})
-                cpu = max_cap.get("cpu", "unlimited")
-                memory = max_cap.get("memory", "unlimited")
+    for app in emr_apps:
+        app_details = get_emr_serverless_application(app["id"])
+        if not app_details:
+            continue
+        app_name = app["name"]
+        max_cap = app_details.get("maximumCapacity", {})
+        cpu = max_cap.get("cpu", "unlimited")
+        memory = max_cap.get("memory", "unlimited")
+        log(f"  Application: {app_name} ({app_details.get('state', 'unknown')})")
+        log(f"    Max CPU: {cpu}")
+        log(f"    Max Memory: {memory}")
+        limits.append(
+            ServiceLimit(
+                service="emr-serverless",
+                resource_name=app_name,
+                limit_type="max-capacity",
+                current_value=None,
+                unit=f"cpu={cpu}, memory={memory}",
+                daily_cost_estimate=None,
+            )
+        )
+    return limits
 
-                log(f"  Application: {app_name} ({app_details.get('state', 'unknown')})")
-                log(f"    Max CPU: {cpu}")
-                log(f"    Max Memory: {memory}")
 
-                limits.append(
-                    ServiceLimit(
-                        service="emr-serverless",
-                        resource_name=app_name,
-                        limit_type="max-capacity",
-                        current_value=None,  # Complex value
-                        unit=f"cpu={cpu}, memory={memory}",
-                        daily_cost_estimate=None,
-                    )
-                )
-
-    # Lambda
+def _collect_lambda_limits(log) -> list[ServiceLimit]:
     log("\n=== Lambda ===")
     account_limits = get_account_lambda_concurrency_limit()
     if account_limits:
@@ -1068,21 +1068,24 @@ def list_current_limits(quiet: bool = False) -> list[ServiceLimit]:
         log(f"  Unreserved concurrency: {account_limits.get('unreserved', 'unknown')}")
 
     functions = get_lambda_functions()
-    functions_with_limits = []
+    limits: list[ServiceLimit] = []
+    functions_with_limits: list[tuple[str, int]] = []
+
     for fn in functions:
         concurrency = get_lambda_concurrency(fn["FunctionName"])
-        if concurrency is not None:
-            functions_with_limits.append((fn["FunctionName"], concurrency))
-            limits.append(
-                ServiceLimit(
-                    service="lambda",
-                    resource_name=fn["FunctionName"],
-                    limit_type="reserved-concurrency",
-                    current_value=concurrency,
-                    unit="concurrent executions",
-                    daily_cost_estimate=None,
-                )
+        if concurrency is None:
+            continue
+        functions_with_limits.append((fn["FunctionName"], concurrency))
+        limits.append(
+            ServiceLimit(
+                service="lambda",
+                resource_name=fn["FunctionName"],
+                limit_type="reserved-concurrency",
+                current_value=concurrency,
+                unit="concurrent executions",
+                daily_cost_estimate=None,
             )
+        )
 
     if functions_with_limits:
         for fn_name, conc in functions_with_limits:
@@ -1090,56 +1093,77 @@ def list_current_limits(quiet: bool = False) -> list[ServiceLimit]:
             log(f"    Reserved concurrency: {conc}")
     else:
         log(f"  {len(functions)} functions, none with reserved concurrency")
+    return limits
 
-    # EC2 (informational only)
+
+def _log_ec2_instances(log) -> None:
     log("\n=== EC2 (Running Instances) ===")
     instances = get_running_ec2_instances()
-    if instances:
-        total_daily = sum(i["daily_cost"] for i in instances)
-        for inst in instances:
-            log(f"  {inst['name']} ({inst['id']})")
-            log(f"    Type: {inst['type']}, Est. cost: ${inst['daily_cost']:.2f}/day")
-        log(f"  Total EC2 daily cost: ${total_daily:.2f}")
-    else:
+    if not instances:
         log("  No running instances")
+        return
+    total_daily = sum(i["daily_cost"] for i in instances)
+    for inst in instances:
+        log(f"  {inst['name']} ({inst['id']})")
+        log(f"    Type: {inst['type']}, Est. cost: ${inst['daily_cost']:.2f}/day")
+    log(f"  Total EC2 daily cost: ${total_daily:.2f}")
 
-    # Budgets
+
+def _collect_budget_limits(log) -> list[ServiceLimit]:
     log("\n=== AWS Budgets ===")
     budgets = get_budgets()
-    if budgets:
-        for budget in budgets:
-            name = budget["BudgetName"]
-            limit = budget.get("BudgetLimit", {})
-            amount = limit.get("Amount", "unknown")
-            spent = budget.get("CalculatedSpend", {}).get("ActualSpend", {}).get("Amount", "0")
+    limits: list[ServiceLimit] = []
 
-            log(f"  Budget: {name}")
-            log(f"    Limit: ${float(amount):.2f}/month")
-            log(f"    Current spend: ${float(spent):.2f}")
-
-            # Get actions
-            actions = get_budget_actions(name)
-            if actions:
-                log(f"    Actions: {len(actions)}")
-                for action in actions:
-                    action_type = action.get("ActionType", "unknown")
-                    threshold = action.get("ActionThreshold", {}).get("ActionThresholdValue", "?")
-                    status = action.get("Status", "unknown")
-                    log(f"      - {action_type} at {threshold}% ({status})")
-
-            limits.append(
-                ServiceLimit(
-                    service="budget",
-                    resource_name=name,
-                    limit_type="monthly-cost",
-                    current_value=float(amount),
-                    unit="USD/month",
-                    daily_cost_estimate=float(amount) / 30,
-                )
-            )
-    else:
+    if not budgets:
         log("  No budgets configured")
+        return limits
 
+    for budget in budgets:
+        name = budget["BudgetName"]
+        limit = budget.get("BudgetLimit", {})
+        amount = limit.get("Amount", "unknown")
+        spent = budget.get("CalculatedSpend", {}).get("ActualSpend", {}).get("Amount", "0")
+
+        log(f"  Budget: {name}")
+        log(f"    Limit: ${float(amount):.2f}/month")
+        log(f"    Current spend: ${float(spent):.2f}")
+
+        actions = get_budget_actions(name)
+        if actions:
+            log(f"    Actions: {len(actions)}")
+            for action in actions:
+                action_type = action.get("ActionType", "unknown")
+                threshold = action.get("ActionThreshold", {}).get("ActionThresholdValue", "?")
+                status = action.get("Status", "unknown")
+                log(f"      - {action_type} at {threshold}% ({status})")
+
+        limits.append(
+            ServiceLimit(
+                service="budget",
+                resource_name=name,
+                limit_type="monthly-cost",
+                current_value=float(amount),
+                unit="USD/month",
+                daily_cost_estimate=float(amount) / 30,
+            )
+        )
+    return limits
+
+
+def list_current_limits(quiet: bool = False) -> list[ServiceLimit]:
+    """List all current service limits."""
+
+    def log(msg: str) -> None:
+        if not quiet:
+            print(msg)
+
+    limits: list[ServiceLimit] = []
+    limits.extend(_collect_redshift_limits(log))
+    limits.extend(_collect_athena_limits(log))
+    limits.extend(_collect_emr_limits(log))
+    limits.extend(_collect_lambda_limits(log))
+    _log_ec2_instances(log)
+    limits.extend(_collect_budget_limits(log))
     return limits
 
 
@@ -1205,7 +1229,7 @@ def set_all_limits(daily_spend: float) -> None:
 # =============================================================================
 
 
-def set_service_limit(service: str, daily_spend: float, resource_name: str | None = None) -> None:
+def set_service_limit(service: str, daily_spend: float, resource_name: str | None = None) -> None:  # noqa: C901
     """Set limit for a specific service."""
     service = service.lower()
 

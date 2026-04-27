@@ -10,10 +10,20 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import sys as _sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
+# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
+# same name as the run submodule.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
+# the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.run")
+_run_module = _sys.modules["benchbox.cli.commands.run"]
 
 
 @pytest.fixture
@@ -40,13 +50,13 @@ def cli_benchmark_mocks():
         patch("benchbox.cli.main.ConfigManager") as mock_config,
         patch("benchbox.cli.main.get_config_manager") as mock_get_config_manager,
         patch("benchbox.cli.orchestrator.BenchmarkOrchestrator") as mock_orchestrator,
-        patch("benchbox.cli.commands.run.BenchmarkManager") as mock_run_manager,
-        patch("benchbox.cli.commands.run.DatabaseManager") as mock_run_db_manager,
-        patch("benchbox.cli.commands.run.SystemProfiler") as mock_run_profiler,
-        patch("benchbox.cli.commands.run.BenchmarkOrchestrator") as mock_run_orchestrator,
-        patch("benchbox.cli.commands.run._execute_orchestrated_run") as mock_execute_orchestrated_run,
-        patch("benchbox.cli.commands.run._export_orchestrated_result") as mock_export_orchestrated_result,
-        patch("benchbox.cli.commands.run._render_post_run_charts"),
+        patch.object(_run_module, "BenchmarkManager") as mock_run_manager,
+        patch.object(_run_module, "DatabaseManager") as mock_run_db_manager,
+        patch.object(_run_module, "SystemProfiler") as mock_run_profiler,
+        patch.object(_run_module, "BenchmarkOrchestrator") as mock_run_orchestrator,
+        patch.object(_run_module, "_execute_orchestrated_run") as mock_execute_orchestrated_run,
+        patch.object(_run_module, "_export_orchestrated_result") as mock_export_orchestrated_result,
+        patch.object(_run_module, "_render_post_run_charts"),
         patch("benchbox.cli.preferences.save_last_run_config"),
     ):
         # Configure BenchmarkManager

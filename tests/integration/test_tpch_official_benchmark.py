@@ -221,7 +221,9 @@ class TestTPCHOfficialBenchmark:
         )
 
         # Use system temp directory for test files to ensure OS cleanup
-        with tempfile.NamedTemporaryFile(mode="w", suffix="_tpch_audit_trail_test.txt", delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix="_tpch_audit_trail_test.txt", delete=False, encoding="utf-8"
+        ) as tmp_file:
             audit_file = Path(tmp_file.name)
 
         try:

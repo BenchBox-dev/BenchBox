@@ -1,4 +1,4 @@
-"""BenchBox visualization toolkit — ASCII-only charting.
+"""BenchBox visualization toolkit - ASCII-only charting.
 
 Keep visualization package imports lightweight so commands can register without
 eagerly importing ASCII renderer shims and their optional charting dependency.

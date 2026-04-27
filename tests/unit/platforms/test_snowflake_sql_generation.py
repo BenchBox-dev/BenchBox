@@ -1,4 +1,4 @@
-"""Tests for Snowflake SQL generation branches — coverage extension.
+"""Tests for Snowflake SQL generation branches - coverage extension.
 
 Targets: _optimize_table_definition CLUSTER BY injection, generate_tuning_clause
 variants, file format SQL, connection config params.

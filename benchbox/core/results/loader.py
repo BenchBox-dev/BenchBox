@@ -15,7 +15,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from benchbox.core.results.models import BenchmarkResults
+from benchbox.core.results.models import (
+    BenchmarkResults,
+    ExecutionPhases,
+    MigrationPhase,
+    NativeComparison,
+    NativeComparisonEntry,
+    SetupPhase,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +72,7 @@ def find_latest_result(
     candidates: list[tuple[Path, datetime]] = []
     for filepath in result_files:
         try:
-            with open(filepath) as f:
+            with open(filepath, encoding="utf-8") as f:
                 data = json.load(f)
 
             # Only consider v2.0/v2.1 files
@@ -126,7 +133,7 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
         raise FileNotFoundError(f"Result file not found: {filepath}")
 
     try:
-        with open(filepath_obj) as f:
+        with open(filepath_obj, encoding="utf-8") as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         raise ResultLoadError(f"Invalid JSON in result file: {e}") from e
@@ -164,7 +171,7 @@ def _load_companion_file(main_file: Path, suffix: str) -> dict[str, Any] | None:
 
     if companion_path.exists():
         try:
-            with open(companion_path) as f:
+            with open(companion_path, encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError) as e:
             logger.debug(f"Could not load companion file {companion_path}: {e}")
@@ -218,6 +225,9 @@ def reconstruct_benchmark_results(
         for name, stats in tables_section.items()
     }
 
+    execution_phases = _reconstruct_execution_phases(data.get("phases", {}))
+    native_comparison = _reconstruct_native_comparison(data.get("comparisons", {}))
+
     return BenchmarkResults(
         benchmark_name=benchmark_section.get("name", "Unknown"),
         platform=platform_section.get("name", "Unknown"),
@@ -250,7 +260,10 @@ def reconstruct_benchmark_results(
         query_plans_captured=plans_captured,
         plan_capture_failures=plan_failures,
         cost_summary=cost_summary,
+        execution_phases=execution_phases,
+        native_comparison=native_comparison,
         _benchmark_id_override=benchmark_section.get("id"),
+        compliance_class=benchmark_section.get("compliance_class"),
     )
 
 
@@ -409,6 +422,74 @@ def _reconstruct_query_results(
             )
 
     return results
+
+
+def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPhases | None:
+    """Reconstruct ExecutionPhases from the phases block.
+
+    Only summary-level fields (status, duration_ms) are available for most phases.
+    MigrationPhase is reconstructed with full summary fields; per_table_stats
+    cannot be recovered (intentionally excluded from serialization).
+    """
+    if not phases_section:
+        return None
+
+    migration = None
+    mig = phases_section.get("migration")
+    if mig and mig.get("status") != "NOT_RUN":
+        migration = MigrationPhase(
+            duration_ms=mig.get("duration_ms", 0),
+            status=mig.get("status", "UNKNOWN"),
+            tables_migrated=mig.get("tables_migrated", 0),
+            tables_failed=mig.get("tables_failed", 0),
+            storage_before_bytes=mig.get("storage_before_bytes", 0),
+            storage_after_bytes=mig.get("storage_after_bytes", 0),
+            storage_delta_bytes=mig.get("storage_delta_bytes", 0),
+            per_table_stats={},  # Not serialized; summary-level only
+        )
+
+    # Only return ExecutionPhases if we have at least one reconstructable phase.
+    # Setup sub-phases (data_generation, schema_creation, etc.) are serialized as
+    # flat status/duration_ms pairs - insufficient to reconstruct the full dataclass
+    # tree, so we provide a minimal SetupPhase shell for round-trip fidelity.
+    if migration is None and not any(
+        phases_section.get(p, {}).get("status") not in (None, "NOT_RUN") for p in ("power_test", "throughput_test")
+    ):
+        return None
+
+    return ExecutionPhases(
+        setup=SetupPhase(),  # Placeholder; sub-phase detail not recoverable
+        migration=migration,
+    )
+
+
+def _reconstruct_native_comparison(comparisons_section: dict[str, Any]) -> NativeComparison | None:
+    """Reconstruct NativeComparison from the comparisons block."""
+    if not comparisons_section:
+        return None
+
+    nd = comparisons_section.get("native_duckdb")
+    if not nd:
+        return None
+
+    entries = [
+        NativeComparisonEntry(
+            query_id=q.get("id", ""),
+            pg_duckdb_ms=q.get("pg_duckdb_ms", 0.0),
+            duckdb_ms=q.get("duckdb_ms", 0.0),
+            delta_ms=q.get("delta_ms", 0.0),
+        )
+        for q in nd.get("queries", [])
+    ]
+
+    return NativeComparison(
+        generated_at=nd.get("generated_at", ""),
+        scale_factor=nd.get("scale_factor", 0.0),
+        total_queries=nd.get("total_queries", 0),
+        mean_delta_ms=nd.get("mean_delta_ms", 0.0),
+        max_delta_ms=nd.get("max_delta_ms", 0.0),
+        entries=entries,
+    )
 
 
 __all__ = [

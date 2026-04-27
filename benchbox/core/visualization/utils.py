@@ -36,7 +36,7 @@ def build_chart_subtitle(
 
     Args:
         benchmark: Benchmark name (e.g., "tpch"). Uppercased in output.
-        scale_factor: Scale factor — formatted via format_scale_factor if numeric.
+        scale_factor: Scale factor - formatted via format_scale_factor if numeric.
         platform_version: Platform name with version (e.g., "DuckDB 1.2.0").
         tuning: Tuning mode label (e.g., "tuned").
 

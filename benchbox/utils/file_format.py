@@ -13,6 +13,7 @@ Usage:
         is_tpc_format,
         is_parquet_format,
         is_csv_format,
+        get_data_extension,
         get_delimiter_for_file,
         COMPRESSION_EXTENSIONS,
         DATA_FORMAT_EXTENSIONS,
@@ -235,6 +236,52 @@ def strip_compression_suffix(path: Union[str, Path]) -> Path:
         return path.with_suffix("")
 
     return path
+
+
+def get_data_extension(path: Union[str, Path]) -> str | None:
+    """Return the underlying data-format extension, transparent to compression.
+
+    Walks all suffixes right-to-left and returns the first one that is a
+    recognized data format (.tbl, .dat, .csv, .parquet, .vortex), skipping
+    compression extensions (.zst, .gz, .bz2, .xz, .lz4, .snappy) and any other
+    unrecognized suffixes (shard numbers, backup suffixes, etc.).
+
+    Use this when an adapter needs to distinguish *between* TPC formats — e.g.
+    ".tbl" (TPC-H, datavault: empty trailing field is delimiter, not NULL) vs
+    ".dat" (TPC-DS: empty trailing field IS NULL).  detect_data_format()
+    collapses both to "tbl" and is therefore wrong for that distinction.
+
+    Args:
+        path: File path to analyze
+
+    Returns:
+        Lowercase data extension including the leading dot (e.g. ".tbl"), or
+        None if no recognised data extension is present.
+
+    Examples:
+        >>> get_data_extension(Path("lineitem.tbl"))
+        '.tbl'
+        >>> get_data_extension(Path("store_sales.dat.zst"))
+        '.dat'
+        >>> get_data_extension(Path("customer.tbl.7.zst"))
+        '.tbl'
+        >>> get_data_extension(Path("hits.csv.gz.bz2"))
+        '.csv'
+        >>> get_data_extension(Path("data.parquet"))
+        '.parquet'
+        >>> get_data_extension(Path("data.tbl.bak"))
+        '.tbl'
+        >>> get_data_extension(Path("README"))
+    """
+    path = Path(path)
+    for suffix in reversed(path.suffixes):
+        suffix_lower = suffix.lower()
+        if suffix_lower in COMPRESSION_EXTENSIONS:
+            continue
+        if suffix_lower in DATA_FORMAT_EXTENSIONS:
+            return suffix_lower
+        # Unknown suffix (shard numbers, backup suffixes, etc.) — skip and keep walking
+    return None
 
 
 def get_base_name_without_compression(path: Union[str, Path]) -> str:
@@ -494,3 +541,32 @@ def is_csv_format(path: Union[str, Path]) -> bool:
             continue
         return suffix_lower == ".csv"
     return False
+
+
+def validate_tbl_compression_consistency(target_dir: Path, file_extension: str) -> None:
+    """Validate .tbl output directory is consistent with compression enabled.
+
+    Raises ``RuntimeError`` if raw .tbl files exist alongside compressed files
+    or if compressed files are empty. Callers should only invoke this after
+    confirming compression is enabled for the current generator.
+
+    Args:
+        target_dir: Directory containing generated .tbl files.
+        file_extension: Compressor extension (e.g., ``.zst``, ``.gz``).
+
+    Raises:
+        RuntimeError: When the directory fails consistency checks.
+    """
+    raw_tbl = list(target_dir.glob("*.tbl"))
+    if raw_tbl:
+        names = ", ".join(f.name for f in raw_tbl[:5])
+        more = "..." if len(raw_tbl) > 5 else ""
+        raise RuntimeError(
+            f"File format consistency violation: Found raw .tbl files with compression enabled: {names}{more}"
+        )
+    compressed = list(target_dir.glob(f"*.tbl{file_extension}"))
+    empties = [f for f in compressed if f.stat().st_size <= (9 if file_extension == ".zst" else 20)]
+    if empties:
+        names = ", ".join(f.name for f in empties[:5])
+        more = "..." if len(empties) > 5 else ""
+        raise RuntimeError(f"File format consistency violation: Found empty compressed files: {names}{more}")

@@ -60,13 +60,12 @@ class TestTPCDSDataGenerator:
 
     def test_scale_factor_validation(self, temp_dir):
         """Test that scale factor is properly handled."""
-        # TPC-DS requires minimum scale factor of 1.0
-        # Fractional scale factors should raise ValueError
-        with pytest.raises(ValueError, match="requires scale_factor >= 1.0"):
-            TPCDSDataGenerator(scale_factor=0.01, output_dir=temp_dir)
+        # Unofficial subscale factors are allowed for development use.
+        generator_small = TPCDSDataGenerator(scale_factor=0.01, output_dir=temp_dir)
+        assert generator_small.scale_factor == 0.01
 
-        with pytest.raises(ValueError, match="requires scale_factor >= 1.0"):
-            TPCDSDataGenerator(scale_factor=0.5, output_dir=temp_dir)
+        generator_fractional = TPCDSDataGenerator(scale_factor=0.5, output_dir=temp_dir)
+        assert generator_fractional.scale_factor == 0.5
 
         # Valid scale factors should work
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir)
@@ -258,7 +257,7 @@ class TestGeneratorExtended:
             ext = generator.get_expected_file_extension()
             assert ext in [".dat", ".tbl"]
         else:
-            # No get_expected_file_extension method — verify generator initialized correctly
+            # No get_expected_file_extension method - verify generator initialized correctly
             assert generator.scale_factor == 1.0
 
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
@@ -324,7 +323,7 @@ class TestGeneratorExtended:
 
         # Test with compression enabled (default)
         generator = TPCDSDataGenerator(
-            scale_factor=1.0,  # TPC-DS requires SF >= 1.0
+            scale_factor=1.0,  # Keep this path on an official scale to isolate compression behavior
             output_dir=temp_dir,
             parallel=2,  # Use parallel generation to test the problematic path
             compress_data=True,

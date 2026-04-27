@@ -244,7 +244,7 @@ def _ssb_date_pandas() -> pd.DataFrame:
 
 
 # =============================================================================
-# H2ODB Execution Tests — Expression Family (Polars)
+# H2ODB Execution Tests - Expression Family (Polars)
 # =============================================================================
 
 
@@ -328,7 +328,7 @@ class TestH2ODBExpressionExecution:
 
 
 # =============================================================================
-# H2ODB Execution Tests — Pandas Family
+# H2ODB Execution Tests - Pandas Family
 # =============================================================================
 
 
@@ -434,7 +434,7 @@ class TestH2ODBCrossFamilyComparison:
 
 
 # =============================================================================
-# SSB Execution Tests — Cross-Family for Q1.1 (join + filter + scalar agg)
+# SSB Execution Tests - Cross-Family for Q1.1 (join + filter + scalar agg)
 # =============================================================================
 
 

@@ -207,7 +207,7 @@ class TestPlatformInfo:
         """Test creating PlatformInfo."""
         libraries = [
             LibraryInfo(name="duckdb", version="0.9.0", installed=True),
-            LibraryInfo(name="psycopg2", version=None, installed=False),
+            LibraryInfo(name="psycopg", version=None, installed=False),
         ]
 
         info = PlatformInfo(

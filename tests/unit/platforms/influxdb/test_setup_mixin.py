@@ -23,6 +23,8 @@ class _Adapter(InfluxDBSetupMixin):
         self.org = None
         self.database = "benchbox"
         self.ssl = True
+        self.verify_ssl = True
+        self.ca_cert_path = None
         self.mode = "cloud"
 
 

@@ -185,7 +185,7 @@ class TestQueryProfileContext:
         ctx._start_time = time.perf_counter()
 
         ctx.start_planning()
-        time.sleep(0.01)
+        time.sleep(0.05)
         ctx.end_planning()
 
         profile = ctx.get_profile()

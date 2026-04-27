@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, tpc-di
 ```
 
-> **CLI name:** `tpcdi` — use `benchbox run --benchmark tpcdi`
+> **CLI name:** `tpcdi` - use `benchbox run --benchmark tpcdi`
 
 ## Overview
 
@@ -85,6 +85,27 @@ erDiagram
     DimSecurity ||--o{ FactHoldings : security
 ```
 
+## FinWire Source Format
+
+TPC-DI's FinWire feed is a proprietary **fixed-width flat file** format that
+encodes several record types with distinct layouts. BenchBox parses it in
+`benchbox/core/tpcdi/etl/finwire_processor.py`, which recognises four record
+types on the single file:
+
+| Record | Purpose |
+|--------|---------|
+| **CMP** | Company fundamental data (earnings, market cap, S&P rating) |
+| **SEC** | Security master data (symbol changes, splits, dividends) |
+| **FIN** | Daily OHLC market data plus volume and value |
+| **NEWS** | Financial news headlines, analyst ratings, sentiment |
+
+Each record type has a fixed column layout; the processor dispatches on the
+record-type prefix and materialises typed `FinWireRecord` rows for
+downstream ETL. The FinWire parser itself is pure stdlib (no pandas), but
+**pandas is a hard requirement** for the broader TPC-DI ETL pipeline
+(`loader.py`, `etl/backend.py`, `etl/scd_processor.py`, etc.), so the
+benchmark cannot run without it.
+
 ## ETL Process Overview
 
 The TPC-DI benchmark focuses on the complete ETL pipeline rather than just final query performance:
@@ -111,19 +132,20 @@ The TPC-DI benchmark focuses on the complete ETL pipeline rather than just final
 
 ## Query Characteristics
 
-TPC-DI includes validation and analytical queries that test the data integration results:
+TPC-DI ships **38 queries** that exercise the integration output: 8 base
+queries (in `benchbox/core/tpcdi/queries.py`) plus 30 extended queries
+spread across `query_validation.py` (12), `query_analytics.py` (10), and
+`query_etl.py` (8).
 
-### Validation Queries
+### Base Validation Queries (V1-V3)
 
 | Query | Purpose | Validation Focus |
 |-------|---------|------------------|
-| **V1** | Customer Dimension Validation | SCD Type 2 implementation, current flags |
-| **V2** | Account Dimension Validation | Status tracking, effective dates |
-| **V3** | Trade Fact Validation | Data quality, referential integrity |
-| **V4** | Security Dimension Validation | Company relationships, price history |
-| **V5** | Cash Balance Validation | Account balance accuracy |
+| **V1** | Customer Dimension Validation | SCD Type 2 implementation, `IsCurrent` flag counts on `DimCustomer` |
+| **V2** | Account Dimension Validation | Status tracking, current-flag counts on `DimAccount` |
+| **V3** | Trade Fact Validation | Aggregate quality check on `FactTrade` (counts, totals, fees) |
 
-### Analytical Queries
+### Base Analytical Queries (A1-A5)
 
 | Query | Purpose | Business Value |
 |-------|---------|----------------|
@@ -132,17 +154,51 @@ TPC-DI includes validation and analytical queries that test the data integration
 | **A3** | Broker Commission Analysis | Broker performance and commission tracking |
 | **A4** | Portfolio Analysis | Customer portfolio composition and risk |
 | **A5** | Market Trend Analysis | Historical price trends and volatility |
-| **A6** | Customer Lifecycle Analysis | Customer behavior patterns over time |
 
-### Data Quality Queries
+### Extended Data Quality Queries (VQ1-VQ12)
 
-| Query | Purpose | Quality Check |
-|-------|---------|---------------|
-| **DQ1** | Referential Integrity | Foreign key violations |
-| **DQ2** | Temporal Consistency | SCD date range overlaps |
-| **DQ3** | Business Rule Compliance | Financial industry rules |
-| **DQ4** | Data Completeness | Missing critical attributes |
-| **DQ5** | Duplicate Detection | Inappropriate duplicate records |
+12 validation queries covering referential integrity, completeness, SCD
+Type 2 chain checks, cross-dimension consistency, and business-rule
+compliance. See `benchbox/core/tpcdi/query_validation.py`.
+
+### Extended Analytical Queries (AQ1-AQ10)
+
+10 analytical queries covering customer profitability, security
+performance, broker analysis, market trends, and portfolio analysis.
+See `benchbox/core/tpcdi/query_analytics.py`.
+
+### ETL Validation Queries (EQ1-EQ8)
+
+8 queries covering batch processing, incremental loads, transformation
+correctness, and quality scoring. See `benchbox/core/tpcdi/query_etl.py`.
+
+### SCD Type 2 Validation
+
+The data-quality validator (`benchbox/core/tpcdi/validation.py`) treats
+Slowly Changing Dimension Type 2 correctness as a dedicated rule category
+(`category="scd_type2"`). Four dimensions carry the SCD Type 2 trio of
+columns - `IsCurrent` (BOOLEAN), `EffectiveDate` (DATE), and `EndDate`
+(DATE) - defined in `benchbox/core/tpcdi/schema.py`:
+
+- `DimCustomer`
+- `DimAccount`
+- `DimSecurity`
+- `DimCompany`
+
+The validator enforces the **"exactly one current row per business key"**
+invariant by scanning for duplicate `IsCurrent = TRUE` rows:
+
+| Rule | Table | Invariant |
+|------|-------|-----------|
+| `Customer SCD Type 2 Integrity` | `DimCustomer` | `GROUP BY CustomerID HAVING COUNT(*) > 1 WHERE IsCurrent = TRUE` returns zero rows |
+| `Account SCD Type 2 Integrity` | `DimAccount` | `GROUP BY AccountID HAVING COUNT(*) > 1 WHERE IsCurrent = TRUE` returns zero rows |
+
+`DimSecurity` and `DimCompany` carry the same SCD Type 2 columns but do
+not yet have dedicated validation rules registered; register custom rules
+via `TPCDIValidator.add_validation_rule()` if you need to cover them.
+The validator does not (currently) assert date-chain continuity between
+`EffectiveDate` and `EndDate` - extend `validation.py` if you need that
+level of rigour.
 
 ## Usage Examples
 
@@ -184,7 +240,7 @@ transformation_results = tpcdi.run_etl_process(
 
 # Validate ETL results
 validation_results = {}
-for query_id in ["V1", "V2", "V3", "V4", "V5"]:
+for query_id in ["V1", "V2", "V3"]:
     query_sql = tpcdi.get_query(query_id)
     # Execute validation query
     validation_results[query_id] = "PASSED"  # Simplified
@@ -313,15 +369,33 @@ def process_customer_scd_type2(new_customer_data, existing_dim_customer):
 
 **Validation Queries:**
 - **Fast (< 1s)**: V1, V2 - Simple dimension counts and aggregations
-- **Medium (1-10s)**: V3, V4 - Fact table aggregations with joins
-- **Slower (> 10s)**: Complex validation with multiple table joins
+- **Medium (1-10s)**: V3 - Fact table aggregations
+- **Slower (> 10s)**: VQ-series queries with cross-dimension joins
 
 **Analytical Queries:**
 - **Interactive (< 5s)**: A1, A3 - Customer and broker analysis
 - **Reporting (5-30s)**: A2, A4 - Company and portfolio analysis
-- **Analytical (> 30s)**: A5, A6 - Historical trend analysis
+- **Analytical (> 30s)**: A5, AQ-series - Historical trend analysis
 
 ## Configuration Options
+
+### CLI Options (`--benchmark-option`)
+
+Configure TPC-DI via `--benchmark-option KEY=VALUE`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enable_parallel` | `false` | Enable parallel processing for ETL (`true`/`false`) |
+| `max_workers` | - | Maximum number of parallel workers |
+
+Accepts hyphenated aliases (e.g. `enable-parallel`, `max-workers`).
+
+```bash
+# Enable parallel ETL with 4 workers
+benchbox run --platform duckdb --benchmark tpcdi --scale 1 \
+  --benchmark-option enable_parallel=true \
+  --benchmark-option max_workers=4
+```
 
 ### Scale Factor Guidelines
 

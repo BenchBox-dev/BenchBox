@@ -332,7 +332,7 @@ class ErrorRecoveryManager:
         # Error tracking
         self.error_log: list[ErrorRecord] = []
         self.error_counts_by_category: dict[ErrorCategory, int] = {}
-        self.error_lock = threading.Lock()
+        self.error_lock = threading.RLock()
 
         # Recovery tracking
         self.checkpoints: dict[str, RecoveryCheckpoint] = {}
@@ -746,7 +746,7 @@ class ErrorRecoveryManager:
                 }
 
                 # Write to file
-                with open(output_path, "w") as f:
+                with open(output_path, "w", encoding="utf-8") as f:
                     json.dump(report, f, indent=2)
 
                 logger.info(f"Error report exported to {output_path} ({len(error_data)} records)")

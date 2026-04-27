@@ -15,7 +15,7 @@ import importlib
 from typing import Any
 
 # Category ordering for display (most popular first)
-CATEGORY_ORDER = ["TPC", "Primitives", "Industry", "Academic", "Time Series", "Real World", "Experimental"]
+CATEGORY_ORDER = ["TPC", "Primitives", "Industry", "Academic", "Time Series", "Real World", "AI/ML", "Experimental"]
 
 # Benchmark ordering within categories (most popular first)
 BENCHMARK_ORDER = {
@@ -30,7 +30,8 @@ BENCHMARK_ORDER = {
     "Industry": ["clickbench", "h2odb", "coffeeshop"],
     "Academic": ["ssb", "joinorder", "amplab"],
     "Time Series": ["tsbs_devops"],
-    "Real World": ["nyctaxi"],
+    "Real World": ["nyctaxi", "flightdata"],
+    "AI/ML": ["vector_search"],
     "Experimental": ["tpch_skew", "tpchavoc", "tpcds_obt", "datavault"],
 }
 
@@ -55,8 +56,10 @@ BENCHMARK_CLASS_NAMES: dict[str, str] = {
     "tpch_skew": "TPCHSkew",
     "tsbs_devops": "TSBSDevOps",
     "nyctaxi": "NYCTaxi",
+    "flightdata": "FlightData",
     "datavault": "DataVault",
     "tpcds_obt": "TPCDSOBT",
+    "vector_search": "VectorSearch",
 }
 
 # Concrete class names in benchbox.core.<id>.benchmark, derived from BENCHMARK_CLASS_NAMES.
@@ -64,6 +67,7 @@ BENCHMARK_CLASS_NAMES: dict[str, str] = {
 # Override individual entries where the core class name doesn't follow the {wrapper}Benchmark pattern.
 _CORE_CLASS_NAME_OVERRIDES: dict[str, str] = {
     "h2odb": "H2OBenchmark",  # core class is H2OBenchmark, not H2ODBBenchmark
+    "vector_search": "VectorSearchBenchmark",  # core class name differs from wrapper
 }
 CORE_BENCHMARK_CLASS_NAMES: dict[str, str] = {
     bid: _CORE_CLASS_NAME_OVERRIDES.get(bid, f"{name}Benchmark") for bid, name in BENCHMARK_CLASS_NAMES.items()
@@ -95,8 +99,10 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "query_description": "99 analytical queries",
         "supports_streams": True,
         "default_scale": 1.0,
-        "scale_options": [1.0, 10.0, 100.0],
-        "min_scale": 1.0,  # TPC-DS dsdgen binary requires SF >= 1.0 to avoid segfaults
+        "scale_options": [0.01, 0.1, 1.0, 10.0, 100.0],
+        # No min_scale here - TPC-DS scale validation is handled by the compliance
+        # classifier in benchbox/core/tpcds/compliance.py. Sub-SF1 scales are allowed
+        # for development use, but remain unofficial.
         "complexity": "High",
         "estimated_time_range": (10, 60),
         "supports_dataframe": True,
@@ -204,7 +210,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "description": "Database write operations benchmark",
         "category": "Primitives",
         "num_queries": 12,
-        "query_description": "12 write operations (INSERT, UPDATE, DELETE, DDL, TRANSACTION)",
+        "query_description": "12 write operations (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL, TRANSACTION)",
         "supports_streams": False,
         "default_scale": 0.01,
         "scale_options": [0.01, 0.1, 1.0],
@@ -217,29 +223,29 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "Metadata",
         "description": "Database catalog introspection benchmark",
         "category": "Primitives",
-        "num_queries": 28,
-        "query_description": "28 metadata introspection queries (INFORMATION_SCHEMA, SHOW, DESCRIBE)",
+        "num_queries": 62,
+        "query_description": "62 catalog queries in the full SQL catalog; DataFrame mode runs platform-specific metadata operation subsets",
         "supports_streams": False,
         "default_scale": 1.0,
         "scale_options": [1.0],
         "min_scale": 1.0,
         "complexity": "Low",
         "estimated_time_range": (1, 2),
-        "supports_dataframe": False,
+        "supports_dataframe": True,
     },
     "transaction_primitives": {
         "display_name": "Transactions",
         "description": "ACID transaction testing benchmark",
         "category": "Primitives",
-        "num_queries": 8,
-        "query_description": "8 transaction operations",
+        "num_queries": 12,
+        "query_description": "12 transaction operations",
         "supports_streams": False,
         "default_scale": 0.01,
         "scale_options": [0.01, 0.1, 1.0],
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (2, 5),
-        "supports_dataframe": False,
+        "supports_dataframe": True,
     },
     "ai_primitives": {
         "display_name": "AI Primitives",
@@ -267,7 +273,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 1.0,
         "complexity": "High",
         "estimated_time_range": (10, 30),
-        "supports_dataframe": False,
+        "supports_dataframe": True,
     },
     "coffeeshop": {
         "display_name": "CoffeeShop",
@@ -295,7 +301,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "High",
         "estimated_time_range": (15, 60),
-        "supports_dataframe": False,
+        "supports_dataframe": True,
     },
     "tpch_skew": {
         "display_name": "TPC-H Skew",
@@ -339,6 +345,20 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "estimated_time_range": (5, 30),
         "supports_dataframe": True,
     },
+    "flightdata": {
+        "display_name": "Flight Data",
+        "description": "US BTS On-Time Performance data for aviation analytics",
+        "category": "Real World",
+        "num_queries": 20,
+        "query_description": "20 OLAP queries (on-time, delays, routes, temporal, carriers)",
+        "supports_streams": False,
+        "default_scale": 1.0,
+        "scale_options": [0.01, 0.1, 1.0, 10.0, 100.0],
+        "min_scale": 0.01,
+        "complexity": "Medium",
+        "estimated_time_range": (5, 30),
+        "supports_dataframe": True,
+    },
     "datavault": {
         "display_name": "TPC-H Data Vault",
         "description": "TPC-H adapted for Data Vault 2.0 modeling",
@@ -352,6 +372,20 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "complexity": "High",
         "estimated_time_range": (5, 30),
         "supports_dataframe": True,
+    },
+    "vector_search": {
+        "display_name": "Vector Search",
+        "description": "Vector similarity search benchmark (kNN, ANN, filtered)",
+        "category": "AI/ML",
+        "num_queries": 6,
+        "query_description": "6 queries (kNN cosine/L2, filtered, recall@k, ANN, multi-category)",
+        "supports_streams": False,
+        "default_scale": 0.01,
+        "scale_options": [0.01, 0.1, 1.0, 10.0, 100.0],
+        "min_scale": 0.01,
+        "complexity": "Medium",
+        "estimated_time_range": (1, 10),
+        "supports_dataframe": False,
     },
 }
 
@@ -497,8 +531,15 @@ def get_categories() -> list[str]:
     return result
 
 
-def validate_scale_factor(benchmark_id: str, scale_factor: float) -> None:
+def validate_scale_factor(
+    benchmark_id: str,
+    scale_factor: float,
+) -> None:
     """Validate scale factor against benchmark requirements.
+
+    For TPC-DS, validation is delegated to the compliance classifier in
+    ``benchbox.core.tpcds.compliance``.  All other benchmarks use the generic
+    ``min_scale`` metadata key.
 
     Args:
         benchmark_id: The benchmark identifier (e.g., 'tpcds', 'tpch')
@@ -507,13 +548,17 @@ def validate_scale_factor(benchmark_id: str, scale_factor: float) -> None:
     Raises:
         ValueError: If scale factor violates benchmark constraints.
     """
+    if benchmark_id == "tpcds":
+        # TPC-DS uses the shared compliance classifier - not a simple min_scale check.
+        from benchbox.core.tpcds.compliance import validate_tpcds_scale
+
+        validate_tpcds_scale(scale_factor)
+        return
+
     meta = get_benchmark_metadata(benchmark_id)
     if meta is None:
         return  # Unknown benchmark, skip validation
 
     min_scale = meta.get("min_scale")
     if min_scale is not None and scale_factor < min_scale:
-        raise ValueError(
-            f"{benchmark_id.upper()} requires scale_factor >= {min_scale} (got {scale_factor}). "
-            f"The native data generator crashes with fractional scale factors."
-        )
+        raise ValueError(f"{benchmark_id.upper()} requires scale_factor >= {min_scale} (got {scale_factor}).")

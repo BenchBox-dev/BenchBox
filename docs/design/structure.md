@@ -54,7 +54,7 @@ benchbox/
 └── metadata_primitives.py # Metadata Primitives wrapper
 ```
 
-### `core/` — Core Infrastructure (39 subdirectories)
+### `core/` - Core Infrastructure (39 subdirectories)
 
 ```
 benchbox/core/
@@ -117,7 +117,7 @@ benchbox/core/
 └── utils/                 # Core utilities
 ```
 
-### `platforms/` — Database Adapters
+### `platforms/` - Database Adapters
 
 ```
 benchbox/platforms/
@@ -180,7 +180,7 @@ benchbox/platforms/
     └── platform_checker.py #  Platform capability detection
 ```
 
-### `cli/` — Command-Line Interface
+### `cli/` - Command-Line Interface
 
 ```
 benchbox/cli/

@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, h2odb
 ```
 
-> **CLI name:** `h2odb` — use `benchbox run --benchmark h2odb`
+> **CLI name:** `h2odb` - use `benchbox run --benchmark h2odb`
 
 ## Overview
 
@@ -31,7 +31,7 @@ The H2O DB benchmark uses a single table design based on the NYC Taxi & Limousin
 
 | Table | Purpose | Approximate Rows (SF 1) |
 |-------|---------|-------------------------|
-| **TRIPS** | Taxi trip records with fare and location data | 1,000,000 |
+| **TRIPS** | Taxi trip records with fare and location data | 10,000,000 |
 
 ### Schema Details
 
@@ -508,12 +508,12 @@ print(f"\\nTotal preprocessing time: {feature_eng_time + groupby_time + stats_ti
 
 | Scale Factor | Rows | Data Size | Memory Usage | Use Case |
 |-------------|------|-----------|--------------|----------|
-| 0.01 | ~10K | ~1 MB | < 100 MB | Development |
-| 0.1 | ~100K | ~10 MB | < 500 MB | Testing |
-| 1.0 | ~1M | ~100 MB | < 2 GB | Standard benchmark |
-| 10.0 | ~10M | ~1 GB | < 10 GB | Performance testing |
-| 100.0 | ~100M | ~10 GB | < 50 GB | Large-scale testing |
-| 1000.0 | ~1B | ~100 GB | < 200 GB | Production simulation |
+| 0.01 | ~100K | ~10 MB | < 100 MB | Development |
+| 0.1 | ~1M | ~100 MB | < 500 MB | Testing |
+| 1.0 | ~10M | ~1 GB | < 4 GB | Standard benchmark |
+| 10.0 | ~100M | ~10 GB | < 20 GB | Performance testing |
+| 100.0 | ~1B | ~100 GB | < 100 GB | Large-scale testing |
+| 1000.0 | ~10B | ~1 TB | < 500 GB | Production simulation |
 
 ### Advanced-level Configuration
 

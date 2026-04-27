@@ -43,6 +43,8 @@ class InfluxDBSetupMixin:
         self.org = config.get("org")
         self.database = config.get("database", "benchbox")
         self.ssl = config.get("ssl", True)
+        self.verify_ssl = config.get("verify_ssl") if config.get("verify_ssl") is not None else True
+        self.ca_cert_path = config.get("ca_cert_path")
         self.mode = config.get("mode", "cloud")
 
         # Validate token is provided
@@ -70,6 +72,8 @@ class InfluxDBSetupMixin:
         database = connection_config.get("database", self.database)
         ssl = connection_config.get("ssl", self.ssl)
         org = connection_config.get("org", self.org)
+        verify_ssl = connection_config.get("verify_ssl", self.verify_ssl)
+        ca_cert_path = connection_config.get("ca_cert_path", self.ca_cert_path)
 
         try:
             connection = InfluxDBConnection(
@@ -79,6 +83,8 @@ class InfluxDBSetupMixin:
                 port=port,
                 ssl=ssl,
                 org=org,
+                verify_ssl=verify_ssl,
+                ca_cert_path=ca_cert_path,
             )
             connection.connect()
 

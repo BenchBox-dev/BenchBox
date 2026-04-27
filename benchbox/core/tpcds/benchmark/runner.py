@@ -2,6 +2,7 @@
 
 import concurrent.futures
 import logging
+import re
 import time
 from collections.abc import Iterator
 from datetime import datetime
@@ -20,8 +21,10 @@ from benchbox.core.validation import (
 )
 from benchbox.utils.file_format import get_delimiter_for_file
 from benchbox.utils.printing import emit
+from benchbox.utils.sql_parsing import find_matching_parenthesis
 
 from ..c_tools import TPCDSCTools
+from ..compliance import validate_tpcds_scale
 from ..generator import TPCDSDataGenerator
 from ..queries import TPCDSQueryManager
 from ..schema import TABLES
@@ -54,7 +57,7 @@ def _execute_single_stream(stream_id: int, stream_file: Path) -> dict[str, Any]:
         if not stream_file.exists():
             raise FileNotFoundError(f"Stream file {stream_file} not found")
 
-        with open(stream_file) as f:
+        with open(stream_file, encoding="utf-8") as f:
             stream_content = f.read()
 
         query_lines = [
@@ -112,6 +115,21 @@ class TPCDSBenchmark(BaseBenchmark):
         tables: Dictionary mapping table names to paths of generated data files
     """
 
+    _MONTH_ALIASES: tuple[tuple[str, int], ...] = (
+        ("jan", 1),
+        ("feb", 2),
+        ("mar", 3),
+        ("apr", 4),
+        ("may", 5),
+        ("jun", 6),
+        ("jul", 7),
+        ("aug", 8),
+        ("sep", 9),
+        ("oct", 10),
+        ("nov", 11),
+        ("dec", 12),
+    )
+
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -124,7 +142,7 @@ class TPCDSBenchmark(BaseBenchmark):
         """Initialize a TPC-DS benchmark instance.
 
         Args:
-            scale_factor: Scale factor for the benchmark (1.0 = ~1GB)
+            scale_factor: Scale factor for the benchmark (1.0 = ~1GB).
             output_dir: Directory to output generated data files
             verbose: Whether to print verbose output during operations
             parallel: Number of parallel processes for data generation
@@ -132,26 +150,15 @@ class TPCDSBenchmark(BaseBenchmark):
             **kwargs: Additional implementation-specific options
 
         Raises:
-            ValueError: If scale_factor is not positive or parallel is not positive
+            ValueError: If scale_factor is invalid or below the supported
+                subscale floor.
             TypeError: If scale_factor is not a number or parallel is not an integer
         """
-        # Validate scale_factor to match TPC-H patterns
         if not isinstance(scale_factor, (int, float)):
             raise TypeError(f"scale_factor must be a number, got {type(scale_factor).__name__}")
-        if scale_factor <= 0:
-            raise ValueError(f"scale_factor must be positive, got {scale_factor}")
 
-        # TPC-DS requires minimum scale factor of 1.0 (specified in TPC-DS specification)
-        if scale_factor < 1.0:
-            import warnings
-
-            warnings.warn(
-                f"TPC-DS requires minimum scale_factor of 1.0 (representing ~1GB of data). "
-                f"Rounding up from {scale_factor} to 1.0",
-                UserWarning,
-                stacklevel=2,
-            )
-            scale_factor = 1.0
+        # Single shared validator - no silent rounding.
+        self.compliance_class = validate_tpcds_scale(scale_factor)
 
         # Validate parallel parameter
         if not isinstance(parallel, int):
@@ -248,7 +255,8 @@ class TPCDSBenchmark(BaseBenchmark):
         # Always pass through SQLGlot from base to target for consistency
         translated_queries = {}
         for query_id, query_text in base_queries.items():
-            translated_queries[query_id] = self.translate_query_text(query_text, src, tgt)
+            translated = self.translate_query_text(query_text, src, tgt)
+            translated_queries[query_id] = self._apply_target_dialect_overrides(int(query_id), translated, tgt)
         return translated_queries
 
     def get_query(
@@ -297,7 +305,211 @@ class TPCDSBenchmark(BaseBenchmark):
         src = (base_dialect or "netezza").lower()
         tgt = (dialect or src).lower()
         query = self._generate_tpcds_query(query_id, variant, actual_seed, actual_scale_factor, src)
-        return self.translate_query_text(query, src, tgt)
+        translated = self.translate_query_text(query, src, tgt)
+        return self._apply_target_dialect_overrides(query_id, translated, tgt)
+
+    def _apply_target_dialect_overrides(self, query_id: int, query: str, target_dialect: str) -> str:
+        """Apply benchmark-local overrides after dialect translation."""
+        if "clickhouse" not in target_dialect.lower():
+            return query
+
+        if query_id in (47, 57):
+            return self._rewrite_clickhouse_monthly_avg_query(query_id, query)
+        if query_id == 66:
+            return self._rewrite_clickhouse_q66(query)
+        return query
+
+    def _rewrite_clickhouse_monthly_avg_query(self, query_id: int, query: str) -> str:
+        """Rewrite Q47/Q57 to avoid AVG(SUM(...)) OVER (...) under the new analyzer."""
+        if "AVG(SUM(" not in query.upper():
+            return query
+
+        prefix = "WITH v1 AS ("
+        if not query.startswith(prefix):
+            raise ValueError(f"Unsupported ClickHouse Q{query_id} shape: expected leading v1 CTE")
+
+        open_index = len(prefix) - 1
+        close_index = self._find_matching_parenthesis(query, open_index)
+        v1_body = query[open_index + 1 : close_index]
+        suffix = self._alias_clickhouse_rank_neighbor_projections(query[close_index + 1 :])
+
+        pattern = re.compile(
+            r"SELECT (?P<select_dims>.+), SUM\((?P<sum_expr>.+)\) AS sum_sales, "
+            r"AVG\(SUM\((?P=sum_expr)\)\) OVER \(PARTITION BY (?P<avg_partition>.+)\) AS avg_monthly_sales, "
+            r"RANK\(\) OVER \(PARTITION BY (?P<rank_partition>.+) ORDER BY (?P<rank_order>.+)\) AS rn "
+            r"FROM (?P<from_clause>.+) GROUP BY (?P<group_by>.+)",
+            re.IGNORECASE | re.DOTALL,
+        )
+        match = pattern.fullmatch(v1_body)
+        if match is None:
+            raise ValueError(f"Unsupported ClickHouse Q{query_id} monthly aggregate shape")
+
+        groups = match.groupdict()
+        rewritten = (
+            f"WITH v1_monthly AS (SELECT {groups['select_dims']}, SUM({groups['sum_expr']}) AS sum_sales "
+            f"FROM {groups['from_clause']} GROUP BY {groups['group_by']}), "
+            f"v1 AS (SELECT {groups['select_dims']}, sum_sales, "
+            f"AVG(sum_sales) OVER (PARTITION BY {groups['avg_partition']}) AS avg_monthly_sales, "
+            f"RANK() OVER (PARTITION BY {groups['rank_partition']} ORDER BY {groups['rank_order']}) AS rn "
+            f"FROM v1_monthly){suffix}"
+        )
+        if "AVG(SUM(" in rewritten.upper():
+            raise ValueError(f"ClickHouse Q{query_id} rewrite still contains nested aggregate-over-window pattern")
+        return rewritten
+
+    @staticmethod
+    def _alias_clickhouse_rank_neighbor_projections(suffix: str) -> str:
+        """Alias plain v1.<col> projections in the v2 CTE back to bare column names."""
+        pattern = r"(,\s*v2\s+AS\s+\(SELECT\s+)(.*?)(\s+FROM\s+v1,\s+v1\s+AS\s+v1_lag,\s+v1\s+AS\s+v1_lead)"
+
+        def alias_projection(match: re.Match[str]) -> str:
+            aliased_items = []
+            for item in match.group(2).split(","):
+                stripped = item.strip()
+                plain_v1_column = re.fullmatch(r"v1\.([a-zA-Z_][a-zA-Z0-9_]*)", stripped, re.IGNORECASE)
+                if plain_v1_column:
+                    column_name = plain_v1_column.group(1)
+                    aliased_items.append(f"v1.{column_name} AS {column_name}")
+                else:
+                    aliased_items.append(stripped)
+            return f"{match.group(1)}{', '.join(aliased_items)}{match.group(3)}"
+
+        return re.sub(pattern, alias_projection, suffix, flags=re.IGNORECASE | re.DOTALL)
+
+    def _rewrite_clickhouse_q66(self, query: str) -> str:
+        """Rewrite Q66 to aggregate once over a stable UNION ALL relation."""
+        if "SUM(jan_sales)" not in query and "SUM(jan_net)" not in query:
+            return query
+
+        from_marker = " FROM ("
+        outer_from_index = query.find(from_marker)
+        if outer_from_index == -1:
+            raise ValueError("Unsupported ClickHouse Q66 shape: missing derived table")
+
+        outer_select = query[len("SELECT ") : outer_from_index]
+        subquery_open = query.find("(", outer_from_index + len(" FROM "))
+        if subquery_open == -1:
+            raise ValueError("Unsupported ClickHouse Q66 shape: missing derived table body")
+
+        subquery_close = self._find_matching_parenthesis(query, subquery_open)
+        union_body = query[subquery_open + 1 : subquery_close]
+        suffix = query[subquery_close + 1 :]
+
+        outer_match = re.match(
+            r"(?P<dimensions>.+), SUM\(jan_sales\) AS jan_sales, ",
+            outer_select,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if outer_match is None:
+            raise ValueError("Unsupported ClickHouse Q66 shape: missing outer dimension projection")
+
+        suffix_match = re.fullmatch(
+            r"\s+AS x GROUP BY (?P<group_by>.+) ORDER BY (?P<order_by>.+) LIMIT (?P<limit>\d+)",
+            suffix,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if suffix_match is None:
+            raise ValueError("Unsupported ClickHouse Q66 shape: missing outer GROUP BY / ORDER BY / LIMIT")
+
+        branch_a, branch_b = self._split_top_level_union_all(union_body)
+        parsed_a = self._parse_clickhouse_q66_branch(branch_a)
+        parsed_b = self._parse_clickhouse_q66_branch(branch_b)
+
+        dimensions = outer_match.group("dimensions")
+        grouped_columns = suffix_match.group("group_by")
+        order_by = suffix_match.group("order_by")
+        limit = suffix_match.group("limit")
+
+        monthly_sales = ", ".join(
+            f"SUM(CASE WHEN d_moy = {month_num} THEN sales_amount ELSE 0 END) AS {month_name}_sales"
+            for month_name, month_num in self._MONTH_ALIASES
+        )
+        monthly_sales_per_sq_foot = ", ".join(
+            f"SUM(CASE WHEN d_moy = {month_num} THEN sales_amount / w_warehouse_sq_ft ELSE 0 END) "
+            f"AS {month_name}_sales_per_sq_foot"
+            for month_name, month_num in self._MONTH_ALIASES
+        )
+        monthly_net = ", ".join(
+            f"SUM(CASE WHEN d_moy = {month_num} THEN net_amount ELSE 0 END) AS {month_name}_net"
+            for month_name, month_num in self._MONTH_ALIASES
+        )
+
+        rewritten = (
+            "WITH channel_sales AS ("
+            f"SELECT {parsed_a['dimensions']}, {parsed_a['ship_expr']} AS ship_carriers, d_year AS year, d_moy, "
+            f"{parsed_a['sales_expr']} AS sales_amount, {parsed_a['net_expr']} AS net_amount "
+            f"FROM {parsed_a['from_clause']} WHERE {parsed_a['where_clause']} UNION ALL "
+            f"SELECT {parsed_b['dimensions']}, {parsed_b['ship_expr']} AS ship_carriers, d_year AS year, d_moy, "
+            f"{parsed_b['sales_expr']} AS sales_amount, {parsed_b['net_expr']} AS net_amount "
+            f"FROM {parsed_b['from_clause']} WHERE {parsed_b['where_clause']}) "
+            f"SELECT {dimensions}, {monthly_sales}, {monthly_sales_per_sq_foot}, {monthly_net} "
+            f"FROM channel_sales GROUP BY {grouped_columns} ORDER BY {order_by} LIMIT {limit}"
+        )
+        if re.search(r"\bSUM\s*\(\s*jan_(?:sales|net)\b", rewritten, re.IGNORECASE):
+            raise ValueError("ClickHouse Q66 rewrite still contains analyzer-hostile alias aggregation")
+        return rewritten
+
+    def _parse_clickhouse_q66_branch(self, branch: str) -> dict[str, str]:
+        """Parse one side of the Q66 UNION ALL into reusable row-level pieces."""
+        sales_patterns = []
+        net_patterns = []
+        for month_name, month_num in self._MONTH_ALIASES:
+            if month_num == 1:
+                sales_patterns.append(
+                    rf"SUM\(CASE WHEN d_moy = {month_num} THEN (?P<sales_expr>.+?) ELSE 0 END\) AS {month_name}_sales"
+                )
+                net_patterns.append(
+                    rf"SUM\(CASE WHEN d_moy = {month_num} THEN (?P<net_expr>.+?) ELSE 0 END\) AS {month_name}_net"
+                )
+            else:
+                sales_patterns.append(
+                    rf"SUM\(CASE WHEN d_moy = {month_num} THEN (?P=sales_expr) ELSE 0 END\) AS {month_name}_sales"
+                )
+                net_patterns.append(
+                    rf"SUM\(CASE WHEN d_moy = {month_num} THEN (?P=net_expr) ELSE 0 END\) AS {month_name}_net"
+                )
+
+        pattern = re.compile(
+            rf"SELECT (?P<dimensions>.+), (?P<ship_expr>.+) AS ship_carriers, d_year AS year, "
+            rf"{', '.join(sales_patterns)}, {', '.join(net_patterns)} "
+            rf"FROM (?P<from_clause>.+) WHERE (?P<where_clause>.+) GROUP BY (?P<group_by>.+)",
+            re.IGNORECASE | re.DOTALL,
+        )
+        match = pattern.fullmatch(branch)
+        if match is None:
+            raise ValueError("Unsupported ClickHouse Q66 branch shape")
+        return match.groupdict()
+
+    @staticmethod
+    def _find_matching_parenthesis(text: str, open_index: int) -> int:
+        """Return the index of the closing parenthesis paired with open_index."""
+        return find_matching_parenthesis(text, open_index)
+
+    @classmethod
+    def _split_top_level_union_all(cls, query: str) -> tuple[str, str]:
+        """Split a UNION ALL expression at the top SQL nesting level."""
+        marker = " UNION ALL "
+        depth = 0
+        in_single_quote = False
+        index = 0
+
+        while index < len(query):
+            char = query[index]
+            if char == "'":
+                if in_single_quote and index + 1 < len(query) and query[index + 1] == "'":
+                    index += 2
+                    continue
+                in_single_quote = not in_single_quote
+            elif not in_single_quote:
+                if char == "(":
+                    depth += 1
+                elif char == ")":
+                    depth -= 1
+                elif depth == 0 and query.startswith(marker, index):
+                    return query[:index], query[index + len(marker) :]
+            index += 1
+
+        raise ValueError("Expected top-level UNION ALL in ClickHouse Q66")
 
     @staticmethod
     def _validate_get_query_args(
@@ -588,7 +800,7 @@ class TPCDSBenchmark(BaseBenchmark):
         for stream_id, stream_queries in streams.items():
             stream_file = streams_output_dir / f"stream_{stream_id}.sql"
 
-            with open(stream_file, "w") as f:
+            with open(stream_file, "w", encoding="utf-8") as f:
                 f.write(f"-- TPC-DS Stream {stream_id}\n")
                 f.write(f"-- Scale Factor: {self.scale_factor}\n")
                 f.write(f"-- RNG Seed: {rng_seed or 42}\n")
@@ -1140,7 +1352,6 @@ class TPCDSBenchmark(BaseBenchmark):
             ValueError: If parameters are invalid
             RuntimeError: If throughput test fails to execute
         """
-        import random
 
         # Validate parameters
         if num_streams < 1:
@@ -1183,126 +1394,29 @@ class TPCDSBenchmark(BaseBenchmark):
         stream_results = []
         successful_streams = 0
 
-        def execute_stream(stream_id: int) -> dict[str, Any]:
-            """Execute a single query stream."""
-            stream_start = time.time()
-            stream_result = {
-                "stream_id": stream_id,
-                "start_time": stream_start,
-                "end_time": 0.0,
-                "duration": 0.0,
-                "queries_executed": 0,
-                "queries_successful": 0,
-                "queries_failed": 0,
-                "query_results": [],
-                "success": False,
-                "error": None,
-            }
-
-            try:
-                # Create connection for this stream
-                connection = connection_factory()
-
-                # Generate randomized query order for this stream
-                query_ids = list(range(1, 100))  # TPC-DS queries 1-99
-                random.seed(base_seed + stream_id)
-                random.shuffle(query_ids)
-
-                if self.verbose:
-                    logger.info(f"Stream {stream_id}: executing {len(query_ids)} queries")
-
-                for query_id in query_ids:
-                    query_start = time.time()
-                    query_result = {
-                        "query_id": query_id,
-                        "stream_id": stream_id,
-                        "execution_time_seconds": 0.0,
-                        "result_count": 0,
-                        "success": False,
-                        "error": None,
-                    }
-
-                    try:
-                        # Get query with stream-specific seed
-                        query_text = self.get_query(
-                            query_id,
-                            seed=base_seed + stream_id,
-                            scale_factor=self.scale_factor,
-                            dialect=dialect,
-                        )
-
-                        # Execute query
-                        connection.execute(query_text)
-                        results = connection.fetchall()
-
-                        query_end = time.time()
-                        execution_time = query_end - query_start
-
-                        query_result.update(
-                            {
-                                "execution_time_seconds": execution_time,
-                                "result_count": len(results) if results else 0,
-                                "success": True,
-                                "error": None,
-                            }
-                        )
-
-                        stream_result["queries_successful"] += 1
-
-                    except Exception as e:
-                        query_end = time.time()
-                        execution_time = query_end - query_start
-
-                        query_result.update(
-                            {
-                                "execution_time_seconds": execution_time,
-                                "result_count": 0,
-                                "success": False,
-                                "error": str(e),
-                            }
-                        )
-
-                        stream_result["queries_failed"] += 1
-
-                        if self.verbose:
-                            logger.warning(f"Stream {stream_id} Query {query_id} failed: {e}")
-
-                    stream_result["query_results"].append(query_result)
-                    stream_result["queries_executed"] += 1
-
-                stream_result["success"] = stream_result["queries_failed"] == 0
-
-                # connection.close()  # Connection lifecycle managed by platform adapter
-
-            except Exception as e:
-                stream_result["error"] = str(e)
-                if self.verbose:
-                    logger.error(f"Stream {stream_id} failed: {e}")
-
-            finally:
-                stream_result["end_time"] = time.time()
-                stream_result["duration"] = stream_result["end_time"] - stream_result["start_time"]
-
-            return stream_result
-
-        # Execute all streams concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_streams) as executor:
-            futures = [executor.submit(execute_stream, i) for i in range(num_streams)]
-
+            futures = [
+                executor.submit(
+                    self._execute_throughput_stream,
+                    i,
+                    connection_factory,
+                    base_seed,
+                    dialect,
+                    logger,
+                )
+                for i in range(num_streams)
+            ]
             for future in concurrent.futures.as_completed(futures):
                 try:
                     stream_result = future.result()
                     stream_results.append(stream_result)
-
                     if stream_result["success"]:
                         successful_streams += 1
-
                     if self.verbose:
                         logger.info(
                             f"Stream {stream_result['stream_id']}: "
                             f"{stream_result['queries_successful']}/{stream_result['queries_executed']} successful"
                         )
-
                 except Exception as e:
                     if self.verbose:
                         logger.error(f"Stream execution failed: {e}")
@@ -1333,6 +1447,102 @@ class TPCDSBenchmark(BaseBenchmark):
             logger.info(f"Throughput@Size: {throughput_at_size:.2f}")
             logger.info(f"Successful streams: {successful_streams}/{num_streams}")
 
+        return result
+
+    def _execute_throughput_stream(
+        self,
+        stream_id: int,
+        connection_factory,
+        base_seed: int,
+        dialect: str,
+        logger,
+    ) -> dict[str, Any]:
+        """Execute one query stream for the throughput test; returns a stream-result dict."""
+        import random
+
+        stream_start = time.time()
+        stream_result: dict[str, Any] = {
+            "stream_id": stream_id,
+            "start_time": stream_start,
+            "end_time": 0.0,
+            "duration": 0.0,
+            "queries_executed": 0,
+            "queries_successful": 0,
+            "queries_failed": 0,
+            "query_results": [],
+            "success": False,
+            "error": None,
+        }
+        try:
+            connection = connection_factory()
+            query_ids = list(range(1, 100))
+            random.seed(base_seed + stream_id)
+            random.shuffle(query_ids)
+            if self.verbose:
+                logger.info(f"Stream {stream_id}: executing {len(query_ids)} queries")
+            for query_id in query_ids:
+                query_result = self._execute_throughput_query(
+                    connection, query_id, stream_id, base_seed, dialect, logger
+                )
+                stream_result["query_results"].append(query_result)
+                stream_result["queries_executed"] += 1
+                if query_result["success"]:
+                    stream_result["queries_successful"] += 1
+                else:
+                    stream_result["queries_failed"] += 1
+            stream_result["success"] = stream_result["queries_failed"] == 0
+        except Exception as e:
+            stream_result["error"] = str(e)
+            if self.verbose:
+                logger.error(f"Stream {stream_id} failed: {e}")
+        finally:
+            stream_result["end_time"] = time.time()
+            stream_result["duration"] = stream_result["end_time"] - stream_result["start_time"]
+        return stream_result
+
+    def _execute_throughput_query(
+        self,
+        connection: Any,
+        query_id: int,
+        stream_id: int,
+        base_seed: int,
+        dialect: str,
+        logger,
+    ) -> dict[str, Any]:
+        """Execute one query within a throughput stream; returns a query-result dict."""
+        query_start = time.time()
+        result: dict[str, Any] = {
+            "query_id": query_id,
+            "stream_id": stream_id,
+            "execution_time_seconds": 0.0,
+            "result_count": 0,
+            "success": False,
+            "error": None,
+        }
+        try:
+            query_text = self.get_query(
+                query_id, seed=base_seed + stream_id, scale_factor=self.scale_factor, dialect=dialect
+            )
+            connection.execute(query_text)
+            rows = connection.fetchall()
+            query_end = time.time()
+            result.update(
+                {
+                    "execution_time_seconds": query_end - query_start,
+                    "result_count": len(rows) if rows else 0,
+                    "success": True,
+                }
+            )
+        except Exception as e:
+            query_end = time.time()
+            result.update(
+                {
+                    "execution_time_seconds": query_end - query_start,
+                    "error": str(e),
+                }
+            )
+            if self.verbose:
+                logger.warning(f"Stream {stream_id} Query {query_id} failed: {e}")
         return result
 
     def run_power_test(
@@ -1409,83 +1619,20 @@ class TPCDSBenchmark(BaseBenchmark):
             if verbose:
                 logger.info(f"Starting TPC-DS Power Test (scale factor: {self.scale_factor})")
 
-            # Perform warm-up if requested
-            if warm_up and verbose:
-                logger.info("Performing database warm-up...")
-                # Execute a few sample queries to warm up the database
-                for warm_query_id in [1, 19, 42]:
-                    try:
-                        warm_query = self.get_query(warm_query_id, seed=seed, dialect=dialect)
-                        connection.execute(warm_query)
-                        connection.fetchall()  # Consume results
-                    except Exception as e:
-                        if verbose:
-                            logger.warning(f"Warm-up query {warm_query_id} failed: {e}")
+            if warm_up:
+                self._run_power_test_warmup(connection, seed, dialect, verbose, logger)
 
             # Execute all 99 queries sequentially
             test_start_time = time.time()
 
-            for query_id in range(1, 100):  # TPC-DS has 99 queries
+            for query_id in range(1, 100):
                 if verbose:
                     logger.info(f"Executing Query {query_id}...")
-
-                query_start = time.time()
-                query_result = {
-                    "query_id": query_id,
-                    "execution_time_seconds": 0.0,
-                    "result_count": 0,
-                    "status": "failed",
-                    "error": None,
-                }
-
-                try:
-                    # Get query with parameters
-                    query_text = self.get_query(query_id, seed=seed, dialect=dialect)
-
-                    # Execute query
-                    connection.execute(query_text)
-                    query_results = connection.fetchall()
-
-                    query_end = time.time()
-                    execution_time = query_end - query_start
-
-                    # Check timeout
-                    if timeout and execution_time > timeout:
-                        raise RuntimeError(f"Query exceeded timeout ({timeout}s)")
-
-                    query_result.update(
-                        {
-                            "execution_time_seconds": execution_time,
-                            "result_count": len(query_results) if query_results else 0,
-                            "status": "success",
-                            "error": None,
-                        }
-                    )
-
-                    if verbose:
-                        logger.info(
-                            f"Query {query_id} completed in {execution_time:.3f}s ({query_result['result_count']} rows)"
-                        )
-
-                except Exception as e:
-                    query_end = time.time()
-                    execution_time = query_end - query_start
-                    error_msg = str(e)
-
-                    query_result.update(
-                        {
-                            "execution_time_seconds": execution_time,
-                            "result_count": 0,
-                            "status": "failed",
-                            "error": error_msg,
-                        }
-                    )
-
-                    result["errors"].append(f"Query {query_id} failed: {error_msg}")
-
-                    if verbose:
-                        logger.error(f"Query {query_id} failed after {execution_time:.3f}s: {error_msg}")
-
+                query_result = self._execute_power_test_query(
+                    connection, query_id, seed, dialect, timeout, verbose, logger
+                )
+                if query_result["status"] == "failed":
+                    result["errors"].append(f"Query {query_id} failed: {query_result['error']}")
                 result["query_results"][query_id] = query_result
 
             # Calculate total time and metrics
@@ -1525,6 +1672,66 @@ class TPCDSBenchmark(BaseBenchmark):
                     pass  # Connection lifecycle managed by platform adapter
                 except Exception:
                     pass
+
+    def _run_power_test_warmup(self, connection: Any, seed: int, dialect: str, verbose: bool, logger) -> None:
+        """Execute 3 warm-up queries to prime the database before the power test."""
+        if verbose:
+            logger.info("Performing database warm-up...")
+        for warm_query_id in [1, 19, 42]:
+            try:
+                warm_query = self.get_query(warm_query_id, seed=seed, dialect=dialect)
+                connection.execute(warm_query)
+                connection.fetchall()
+            except Exception as e:
+                if verbose:
+                    logger.warning(f"Warm-up query {warm_query_id} failed: {e}")
+
+    def _execute_power_test_query(
+        self,
+        connection: Any,
+        query_id: int,
+        seed: int,
+        dialect: str,
+        timeout: Optional[float],
+        verbose: bool,
+        logger,
+    ) -> dict[str, Any]:
+        """Execute a single query in the power test; returns a query-result dict."""
+        import time
+
+        query_start = time.time()
+        result: dict[str, Any] = {
+            "query_id": query_id,
+            "execution_time_seconds": 0.0,
+            "result_count": 0,
+            "status": "failed",
+            "error": None,
+        }
+        try:
+            query_text = self.get_query(query_id, seed=seed, dialect=dialect)
+            connection.execute(query_text)
+            rows = connection.fetchall()
+            query_end = time.time()
+            execution_time = query_end - query_start
+            if timeout and execution_time > timeout:
+                raise RuntimeError(f"Query exceeded timeout ({timeout}s)")
+            result.update(
+                {
+                    "execution_time_seconds": execution_time,
+                    "result_count": len(rows) if rows else 0,
+                    "status": "success",
+                }
+            )
+            if verbose:
+                logger.info(f"Query {query_id} completed in {execution_time:.3f}s ({result['result_count']} rows)")
+        except Exception as e:
+            query_end = time.time()
+            execution_time = query_end - query_start
+            error_msg = str(e)
+            result.update({"execution_time_seconds": execution_time, "error": error_msg})
+            if verbose:
+                logger.error(f"Query {query_id} failed after {execution_time:.3f}s: {error_msg}")
+        return result
 
     def run_maintenance_test(
         self,

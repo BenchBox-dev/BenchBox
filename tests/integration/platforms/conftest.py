@@ -463,6 +463,35 @@ def live_firebolt_adapter(firebolt_credentials):
 
 
 # ==============================================================================
+# Firebolt Core (Docker) Fixtures
+# ==============================================================================
+
+
+@pytest.fixture(scope="module")
+def live_firebolt_core_adapter():
+    """Create FireboltAdapter connected to a local Firebolt Core Docker instance.
+
+    Requires Firebolt Core running via:
+        make test-docker-up-firebolt
+        # or: docker compose -f docker/firebolt/docker-compose.yml up -d --wait
+
+    Yields:
+        FireboltAdapter instance in Core mode connected to localhost:3473
+    """
+    from benchbox.platforms.firebolt import FireboltAdapter
+
+    host = os.getenv("FIREBOLT_CORE_HOST", "localhost")
+    port = int(os.getenv("FIREBOLT_CORE_PORT", "3473"))
+    skip_unless_docker_service(host, port, platform="Firebolt Core")
+    adapter = FireboltAdapter(
+        url=f"http://{host}:{port}",
+        database=os.getenv("FIREBOLT_CORE_DATABASE", "firebolt"),  # "firebolt" is the built-in default db
+        deployment_mode="core",  # explicit - prevents conflict if FIREBOLT_CLIENT_ID is in env
+    )
+    yield adapter
+
+
+# ==============================================================================
 # Starburst Galaxy (Trino) Fixtures
 # ==============================================================================
 
@@ -586,5 +615,32 @@ def live_pg_mooncake_adapter():
         username=os.getenv("PG_MOONCAKE_USER", "benchbox"),
         password=os.getenv("PG_MOONCAKE_PASSWORD", "benchbox"),
         database=os.getenv("PG_MOONCAKE_DATABASE", "benchbox_test"),
+    )
+    yield adapter
+
+
+# ==============================================================================
+# CedarDB Fixtures
+# ==============================================================================
+
+
+@pytest.fixture(scope="module")
+def live_cedardb_adapter():
+    """Create CedarDB adapter connected to a local Docker instance.
+
+    Yields:
+        CedarDBAdapter instance connected to a running CedarDB server
+    """
+    from benchbox.platforms.cedardb import CedarDBAdapter
+
+    host = os.getenv("CEDARDB_HOST", "localhost")
+    port = int(os.getenv("CEDARDB_PORT", "5435"))
+    skip_unless_docker_service(host, port, platform="CedarDB")
+    adapter = CedarDBAdapter(
+        host=host,
+        port=port,
+        username=os.getenv("CEDARDB_USER", "benchbox"),
+        password=os.getenv("CEDARDB_PASSWORD", "benchbox"),
+        database=os.getenv("CEDARDB_DATABASE", "benchbox_test"),
     )
     yield adapter

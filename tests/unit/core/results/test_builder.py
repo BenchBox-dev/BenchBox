@@ -73,10 +73,10 @@ class TestNormalizeBenchmarkId:
 
     def test_derived_benchmarks_not_confused_with_parents(self) -> None:
         """Derived benchmarks must resolve to their own ID, not the parent's."""
-        # tpcds_obt contains "tpcds" as substring — must NOT resolve to "tpcds"
+        # tpcds_obt contains "tpcds" as substring - must NOT resolve to "tpcds"
         assert normalize_benchmark_id("tpcds_obt") != "tpcds"
         assert normalize_benchmark_id("tpcds_obt") == "tpcds_obt"
-        # tpch_skew contains "tpch" as substring — must NOT resolve to "tpch"
+        # tpch_skew contains "tpch" as substring - must NOT resolve to "tpch"
         assert normalize_benchmark_id("tpch_skew") != "tpch"
         assert normalize_benchmark_id("tpch_skew") == "tpch_skew"
 

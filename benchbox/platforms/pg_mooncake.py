@@ -26,16 +26,23 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+import time
+from typing import TYPE_CHECKING, Any
 
 from .postgresql import POSTGRES_DIALECT, PostgreSQLAdapter
+
+if TYPE_CHECKING:
+    from benchbox.core.platform_registry import PlatformInfo
+    from benchbox.core.schemas import DatabaseConfig
 
 logger = logging.getLogger(__name__)
 
 try:
-    import psycopg2
+    import psycopg
+    from psycopg import sql as psycopg_sql
 except ImportError:
-    psycopg2 = None
+    psycopg = None
+    psycopg_sql = None  # type: ignore[assignment]
 
 
 class PgMooncakeAdapter(PostgreSQLAdapter):
@@ -161,9 +168,11 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
 
             # Configure object storage if in S3 mode
             if self.storage_mode == "s3" and self.mooncake_bucket:
-                # Use psycopg2 escaping to prevent SQL injection via bucket URL
-                escaped_bucket = cursor.mogrify("%s", (self.mooncake_bucket,)).decode()
-                cursor.execute(f"SET mooncake.default_bucket = {escaped_bucket}")
+                cursor.execute(
+                    psycopg_sql.SQL("SET mooncake.default_bucket = {}").format(
+                        psycopg_sql.Literal(self.mooncake_bucket)
+                    )
+                )
                 self.logger.info(f"Set mooncake.default_bucket = {self.mooncake_bucket}")
 
             conn.commit()
@@ -181,21 +190,14 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
 
         return conn
 
-    def create_schema(self, connection: Any, schema_ddl: list[str], **kwargs) -> None:
-        """Create schema with columnstore access method for all tables.
+    def _transform_create_statement(self, stmt: str) -> str:
+        """Transform CREATE TABLE statements to use columnstore storage.
 
-        Overrides PostgreSQL's create_schema to modify CREATE TABLE
-        statements to use the columnstore access method. This is the
-        critical differentiator — all benchmark tables use columnstore
-        storage for Parquet-based columnar data.
+        The parent PostgreSQL create_schema method owns the public
+        ``(benchmark, connection) -> float`` contract and execution flow.
+        pg_mooncake only customizes CREATE TABLE DDL through this hook.
         """
-        modified_ddl = []
-        for stmt in schema_ddl:
-            modified_stmt = self._add_columnstore_access_method(stmt)
-            modified_ddl.append(modified_stmt)
-
-        # Delegate to parent with modified DDL
-        super().create_schema(connection, modified_ddl, **kwargs)
+        return self._add_columnstore_access_method(stmt)
 
     def _add_columnstore_access_method(self, ddl_statement: str) -> str:
         """Add USING columnstore to CREATE TABLE statements.
@@ -207,6 +209,10 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
 
         Only modifies CREATE TABLE statements. Other DDL (CREATE INDEX,
         ALTER TABLE, etc.) is passed through unchanged.
+
+        Note: This parser assumes DDL from BenchBox's schema generators, which
+        produce clean single-statement DDL without embedded comments or extra
+        semicolons. It does not handle arbitrary user-authored SQL.
         """
         stripped = ddl_statement.strip()
         upper = stripped.upper()
@@ -255,6 +261,125 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
 
         return platform_info
 
+    def run_migration_phase(
+        self,
+        connection: Any,
+        table_names: list[str] | None = None,
+    ) -> Any:
+        """Migrate PostgreSQL heap tables to pg_mooncake columnstore format.
+
+        Executes ALTER TABLE ... SET ACCESS METHOD columnar for each table,
+        recording wall time and storage delta. Returns a MigrationPhase result
+        capturing per-table stats and totals, or None if no tables are given.
+
+        This method is safe to call on tables already in columnstore format;
+        ALTER TABLE is a no-op in that case (measured but harmless).
+
+        Args:
+            connection: Active psycopg connection to the benchmark database.
+            table_names: Tables to migrate. When None, discovers all heap tables
+                in the adapter's schema from pg_catalog automatically.
+
+        Returns:
+            MigrationPhase instance, or None if table_names resolves to empty.
+        """
+        from benchbox.core.results.models import MigrationPhase, MigrationTableStats
+
+        cursor = connection.cursor()
+        try:
+            # Discover heap tables when not provided explicitly
+            if table_names is None:
+                cursor.execute(
+                    """
+                    SELECT c.relname
+                    FROM pg_catalog.pg_class c
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relkind = 'r'
+                      AND n.nspname = %s
+                      AND c.relam = (SELECT oid FROM pg_catalog.pg_am WHERE amname = 'heap')
+                    ORDER BY c.relname
+                    """,
+                    (self.schema,),
+                )
+                table_names = [row[0] for row in cursor.fetchall()]
+
+            if not table_names:
+                return None
+
+            def _get_storage_bytes(table: str) -> int:
+                # pg_total_relation_size() accepts a regclass text argument;
+                # build the qualified name with Identifier quoting, then cast.
+                qualified = psycopg_sql.SQL("{}.{}").format(
+                    psycopg_sql.Identifier(self.schema),
+                    psycopg_sql.Identifier(table),
+                )
+                cursor.execute(
+                    psycopg_sql.SQL("SELECT pg_catalog.pg_total_relation_size({}::regclass)").format(qualified),
+                )
+                row = cursor.fetchone()
+                return int(row[0]) if row and row[0] is not None else 0
+
+            per_table: dict[str, MigrationTableStats] = {}
+            phase_start = time.monotonic()
+            tables_migrated = 0
+            tables_failed = 0
+            total_before = 0
+            total_after = 0
+
+            for table in table_names:
+                before_bytes = _get_storage_bytes(table)
+                total_before += before_bytes
+                t0 = time.monotonic()
+                try:
+                    cursor.execute(
+                        psycopg_sql.SQL("ALTER TABLE {}.{} SET ACCESS METHOD columnar").format(
+                            psycopg_sql.Identifier(self.schema),
+                            psycopg_sql.Identifier(table),
+                        )
+                    )
+                    connection.commit()
+                    elapsed_ms = round((time.monotonic() - t0) * 1000)
+                    after_bytes = _get_storage_bytes(table)
+                    total_after += after_bytes
+                    per_table[table] = MigrationTableStats(
+                        duration_ms=elapsed_ms,
+                        status="completed",
+                        storage_before_bytes=before_bytes,
+                        storage_after_bytes=after_bytes,
+                        storage_delta_bytes=after_bytes - before_bytes,
+                    )
+                    tables_migrated += 1
+                    self.logger.info(f"Migrated {table}: {before_bytes} -> {after_bytes} bytes ({elapsed_ms} ms)")
+                except Exception as exc:
+                    connection.rollback()
+                    elapsed_ms = round((time.monotonic() - t0) * 1000)
+                    per_table[table] = MigrationTableStats(
+                        duration_ms=elapsed_ms,
+                        status="failed",
+                        storage_before_bytes=before_bytes,
+                        storage_after_bytes=before_bytes,
+                        storage_delta_bytes=0,
+                        error_message=str(exc),
+                    )
+                    tables_failed += 1
+                    self.logger.warning(f"Migration failed for {table}: {exc}")
+
+            phase_ms = round((time.monotonic() - phase_start) * 1000)
+            status = "completed" if tables_failed == 0 else "partial" if tables_migrated > 0 else "failed"
+
+            return MigrationPhase(
+                duration_ms=phase_ms,
+                status=status,
+                tables_migrated=tables_migrated,
+                tables_failed=tables_failed,
+                storage_before_bytes=total_before,
+                storage_after_bytes=total_after,
+                storage_delta_bytes=total_after - total_before,
+                per_table_stats=per_table,
+            )
+        finally:
+            cursor.close()
+
     def supports_tuning_type(self, tuning_type: Any) -> bool:
         """Check if pg_mooncake supports a specific tuning type.
 
@@ -280,31 +405,44 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
             return False
 
 
-def _build_pg_mooncake_config(benchmark_config: dict, platform_options: dict) -> dict:
-    """Build pg_mooncake configuration from benchmark and platform options.
+def _build_pg_mooncake_config(
+    platform: str,
+    options: dict[str, Any],
+    overrides: dict[str, Any],
+    info: PlatformInfo | None,
+) -> DatabaseConfig:
+    """Build pg_mooncake database configuration with credential loading.
 
     This function is registered with PlatformHookRegistry to provide
     pg_mooncake-specific configuration handling.
     """
-    config = {
-        "host": platform_options.get("host", "localhost"),
-        "port": platform_options.get("port", 5432),
-        "username": platform_options.get("username", "postgres"),
-        "password": platform_options.get("password"),
-        "schema": platform_options.get("schema", "public"),
-        "database": platform_options.get("database"),
-        "admin_database": platform_options.get("admin_database", "postgres"),
-        "sslmode": platform_options.get("sslmode", "prefer"),
-        "work_mem": platform_options.get("work_mem", "256MB"),
-        "maintenance_work_mem": platform_options.get("maintenance_work_mem", "512MB"),
-        "effective_cache_size": platform_options.get("effective_cache_size", "1GB"),
-        "max_parallel_workers_per_gather": platform_options.get("max_parallel_workers_per_gather", 2),
-        # pg_mooncake-specific
-        "storage_mode": platform_options.get("storage_mode", "local"),
-        "mooncake_bucket": platform_options.get("mooncake_bucket"),
-    }
+    from benchbox.platforms.base.config_utils import POSTGRES_FAMILY_BASE_OPTIONS, build_platform_config
 
-    # Merge benchmark configuration
-    config.update(benchmark_config)
-
-    return config
+    return build_platform_config(
+        platform_type="pg-mooncake",
+        credential_key="pg-mooncake",
+        default_display_name="pg_mooncake",
+        default_driver_package="psycopg",
+        base_options={
+            **POSTGRES_FAMILY_BASE_OPTIONS,
+            "storage_mode": "local",
+        },
+        platform_fields=[
+            "host",
+            "port",
+            "username",
+            "password",
+            "database",
+            "admin_database",
+            "sslmode",
+            "work_mem",
+            "maintenance_work_mem",
+            "effective_cache_size",
+            "max_parallel_workers_per_gather",
+            "storage_mode",
+            "mooncake_bucket",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )

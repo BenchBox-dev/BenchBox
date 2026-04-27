@@ -1,4 +1,4 @@
-"""Tests for Databricks SQL generation branches — coverage extension.
+"""Tests for Databricks SQL generation branches - coverage extension.
 
 Targets: catalog.schema.table naming in DDL, TBLPROPERTIES injection,
 _build_ctas_sort_sql variants, vacuum_table SQL, get_target_dialect.

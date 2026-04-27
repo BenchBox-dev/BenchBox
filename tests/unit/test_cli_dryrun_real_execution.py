@@ -108,11 +108,11 @@ class TestDryRunExecutor:
 
         # Create mock benchmark config with standard execution
         benchmark_config = Mock()
+        benchmark_config.name = "test_benchmark"
         benchmark_config.test_execution_type = "standard"
 
         # Create mock benchmark with standard queries
         mock_benchmark = Mock()
-        mock_benchmark._name = "test_benchmark"
         mock_benchmark.get_queries.return_value = {"1": "SELECT 1", "2": "SELECT 2"}
 
         result = executor._extract_queries(mock_benchmark, benchmark_config)
@@ -124,11 +124,11 @@ class TestDryRunExecutor:
 
         # Create mock benchmark config
         benchmark_config = Mock()
+        benchmark_config.name = "tpcds"
         benchmark_config.scale_factor = 0.01
 
         # Create mock benchmark
         mock_benchmark = Mock()
-        mock_benchmark._name = "tpcds"
         mock_benchmark.get_query.return_value = "SELECT 1 as test_query"
 
         # Test should use platform adapter approach
@@ -151,7 +151,6 @@ class TestDryRunExecutorPlatformIntegration:
 
         # Create mock benchmark
         mock_benchmark = Mock()
-        mock_benchmark._name = "tpcds"
         mock_benchmark.get_queries.return_value = {"1": "SELECT 1"}
 
         # Create mock platform adapter
@@ -160,6 +159,7 @@ class TestDryRunExecutorPlatformIntegration:
 
         # Create mock benchmark config
         benchmark_config = Mock()
+        benchmark_config.name = "tpcds"
         benchmark_config.test_execution_type = "standard"
 
         result = executor._extract_queries(mock_benchmark, benchmark_config, mock_adapter)
@@ -173,11 +173,11 @@ class TestDryRunExecutorPlatformIntegration:
 
         # Create mock benchmark
         mock_benchmark = Mock()
-        mock_benchmark._name = "test_benchmark"
         mock_benchmark.get_queries.return_value = {"1": "SELECT 1", "2": "SELECT 2"}
 
         # Create mock benchmark config
         benchmark_config = Mock()
+        benchmark_config.name = "test_benchmark"
         benchmark_config.test_execution_type = "standard"
 
         result = executor._extract_queries(mock_benchmark, benchmark_config)

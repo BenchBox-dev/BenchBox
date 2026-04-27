@@ -28,7 +28,7 @@ from .registry import register_query
 
 # =============================================================================
 # Flight 1: Revenue aggregations (lineorder + date)
-# All compute SUM(lo_extendedprice * lo_discount) AS revenue — scalar result
+# All compute SUM(lo_extendedprice * lo_discount) AS revenue - scalar result
 # =============================================================================
 
 

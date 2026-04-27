@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_DB_PATH = Path.home() / ".benchbox" / "results.db"
 
 # Schema version for migrations
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _RANKING_METRIC_CONFIG = {
     "geometric_mean": ("geometric_mean_ms", "ASC"),
     "power_at_size": ("power_at_size", "DESC"),
@@ -63,10 +63,12 @@ class StoredResult:
     validation_status: str
     config_hash: str
     metadata: dict[str, Any]
+    compliance_class: str | None = None
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> StoredResult:
         """Create StoredResult from database row."""
+        keys = row.keys()
         return cls(
             id=row["id"],
             execution_id=row["execution_id"],
@@ -86,6 +88,7 @@ class StoredResult:
             total_cost=row["total_cost"],
             validation_status=row["validation_status"],
             config_hash=row["config_hash"],
+            compliance_class=row["compliance_class"] if "compliance_class" in keys else None,
             metadata=json.loads(row["metadata_json"]) if row["metadata_json"] else {},
         )
 
@@ -214,14 +217,19 @@ class ResultDatabase:
             current_version = row[0] if row else 0
 
             if current_version < SCHEMA_VERSION:
-                self._create_tables(cursor)
+                if current_version == 0:
+                    self._create_tables(cursor)
+                else:
+                    # Incremental migrations
+                    if current_version < 2:
+                        self._migrate_to_v2(cursor)
                 cursor.execute("DELETE FROM schema_version")
                 cursor.execute(
                     "INSERT INTO schema_version (version) VALUES (?)",
                     (SCHEMA_VERSION,),
                 )
                 conn.commit()
-                logger.info(f"Database schema initialized at version {SCHEMA_VERSION}")
+                logger.info(f"Database schema migrated to version {SCHEMA_VERSION}")
 
     def _create_tables(self, cursor: sqlite3.Cursor) -> None:
         """Create all database tables."""
@@ -247,6 +255,7 @@ class ResultDatabase:
                 total_cost REAL,
                 validation_status TEXT NOT NULL,
                 config_hash TEXT NOT NULL,
+                compliance_class TEXT,
                 metadata_json TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
@@ -296,6 +305,15 @@ class ResultDatabase:
         )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_queries_result ON queries(result_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_queries_query_id ON queries(query_id)")
+
+    def _migrate_to_v2(self, cursor: sqlite3.Cursor) -> None:
+        """Apply schema v2 migration: add compliance_class column to results."""
+        try:
+            cursor.execute("ALTER TABLE results ADD COLUMN compliance_class TEXT")
+            logger.info("Schema v2: added compliance_class column to results table")
+        except sqlite3.OperationalError:
+            # Column already exists - no-op
+            pass
 
     def _compute_config_hash(self, result: BenchmarkResults) -> str:
         """Compute a hash of the configuration for deduplication."""
@@ -356,6 +374,11 @@ class ResultDatabase:
             if result.geometric_mean_execution_time is not None:
                 geometric_mean_ms = result.geometric_mean_execution_time * 1000.0
 
+            # Normalize compliance_class to plain string (enum.value if enum, else as-is)
+            compliance_class = getattr(result, "compliance_class", None)
+            if compliance_class is not None:
+                compliance_class = str(compliance_class)
+
             # Insert result
             cursor.execute(
                 """
@@ -363,8 +386,9 @@ class ResultDatabase:
                     execution_id, platform, platform_version, benchmark, scale_factor,
                     timestamp, duration_seconds, total_queries, successful_queries,
                     failed_queries, geometric_mean_ms, power_at_size, throughput_at_size,
-                    qph_at_size, total_cost, validation_status, config_hash, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    qph_at_size, total_cost, validation_status, config_hash,
+                    compliance_class, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     result.execution_id,
@@ -384,10 +408,11 @@ class ResultDatabase:
                     total_cost,
                     result.validation_status,
                     config_hash,
+                    compliance_class,
                     json.dumps(metadata),
                 ),
             )
-            result_id = cursor.lastrowid
+            result_id = cursor.lastrowid or 0
 
             # Insert query results
             if result.execution_phases and result.execution_phases.power_test:
@@ -629,6 +654,7 @@ class ResultDatabase:
         benchmark: str,
         scale_factor: float,
         config: RankingConfig | None = None,
+        include_unofficial: bool = False,
     ) -> list[PlatformRanking]:
         """Calculate platform rankings for a benchmark.
 
@@ -658,6 +684,12 @@ class ResultDatabase:
             if config.require_success:
                 validation_filter = "AND validation_status = 'PASSED'"
 
+            # By default exclude unofficial TPC-DS results (compliance_class in unofficial set).
+            # NULL compliance_class means a non-TPC-DS result or a legacy file - always included.
+            unofficial_filter = (
+                "" if include_unofficial else "AND (compliance_class = 'official' OR compliance_class IS NULL)"
+            )
+
             # Get current period rankings
             cursor.execute(
                 f"""
@@ -673,6 +705,7 @@ class ResultDatabase:
                     AND timestamp >= ?
                     AND {metric_col} IS NOT NULL
                     {validation_filter}
+                    {unofficial_filter}
                 GROUP BY platform, platform_version
                 HAVING COUNT(*) >= ?
                 ORDER BY avg_score {order}
@@ -696,6 +729,7 @@ class ResultDatabase:
                     AND timestamp < ?
                     AND {metric_col} IS NOT NULL
                     {validation_filter}
+                    {unofficial_filter}
                 GROUP BY platform
             """,
                 (
@@ -945,24 +979,47 @@ class ResultDatabase:
         self,
         directory: Path,
         pattern: str = "**/*.json",
-    ) -> tuple[int, int]:
+        include_unofficial: bool = False,
+    ) -> tuple[int, int, int]:
         """Import results from JSON files in a directory.
 
         Args:
             directory: Directory containing result files
             pattern: Glob pattern for files
+            include_unofficial: If False (default), unofficial TPC-DS results
+                (compliance_class in unofficial_nonstandard, unofficial_subscale)
+                are excluded from the database to prevent contaminating rankings.
 
         Returns:
-            Tuple of (imported_count, skipped_count)
+            Tuple of (imported_count, skipped_count, excluded_count)
         """
         from benchbox.core.results.loader import load_result_file
 
+        _unofficial_classes = {"unofficial_nonstandard", "unofficial_subscale"}
         imported = 0
         skipped = 0
+        excluded = 0
 
         for file_path in directory.glob(pattern):
             try:
                 result, _ = load_result_file(file_path)
+                compliance_class = getattr(result, "compliance_class", None)
+                if not include_unofficial:
+                    if compliance_class in _unofficial_classes:
+                        excluded += 1
+                        continue
+                # Warn when importing a TPC-DS result file that pre-dates the compliance_class
+                # field - it may contain non-official metrics stored without tagging.
+                if compliance_class is None and getattr(result, "benchmark_name", "").lower() in (
+                    "tpc-ds",
+                    "tpcds",
+                ):
+                    logger.warning(
+                        "Importing legacy TPC-DS result %s without compliance_class; "
+                        "it will be treated as official in ranking queries. "
+                        "Re-run the benchmark to generate a tagged result.",
+                        file_path.name,
+                    )
                 self.store_result(result)
                 imported += 1
             except ValueError as e:
@@ -975,4 +1032,4 @@ class ResultDatabase:
                 logger.warning(f"Failed to import {file_path}: {e}")
                 skipped += 1
 
-        return imported, skipped
+        return imported, skipped, excluded

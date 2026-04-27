@@ -121,6 +121,38 @@ class BaseBenchmark(VerbosityMixin, ABC):
             **kwargs,
         )
 
+    @property
+    def tables(self) -> dict:
+        """Table-to-path mappings.
+
+        Delegates to ``_impl.tables`` when a wrapper benchmark holds an
+        implementation object; otherwise returns the instance's own ``_tables``
+        dict (empty dict when unset).
+        """
+        if hasattr(self, "_impl") and hasattr(self._impl, "tables"):
+            return self._impl.tables
+        return getattr(self, "_tables", {})
+
+    @tables.setter
+    def tables(self, value: dict) -> None:
+        if hasattr(self, "_impl"):
+            self._impl.tables = value
+        else:
+            self._tables = value
+
+    @property
+    def csv_delimiter(self) -> "str | None":
+        """CSV delimiter. Delegates to _impl if present."""
+        if hasattr(self, "_impl") and hasattr(self._impl, "csv_delimiter"):
+            return self._impl.csv_delimiter
+        return getattr(self, "_csv_delimiter", None)
+
+    def get_csv_loading_config(self, table_name: str) -> "list[str] | None":
+        """Get CSV loading configuration. Delegates to _impl if present."""
+        if hasattr(self, "_impl") and hasattr(self._impl, "get_csv_loading_config"):
+            return self._impl.get_csv_loading_config(table_name)
+        return None
+
     def _get_benchmark_name(self) -> str:
         """Derive benchmark name from class name.
 
@@ -161,6 +193,8 @@ class BaseBenchmark(VerbosityMixin, ABC):
             "CoffeeShopBenchmark": "coffeeshop",
             "NYCTaxi": "nyctaxi",
             "NYCTaxiBenchmark": "nyctaxi",
+            "FlightData": "flightdata",
+            "FlightDataBenchmark": "flightdata",
             "TSBSDevOps": "tsbs_devops",
             "TSBSDevOpsBenchmark": "tsbs_devops",
         }
@@ -183,8 +217,11 @@ class BaseBenchmark(VerbosityMixin, ABC):
         ``Primitives`` reusing ``TPC-H`` datasets) should override this method and
         return the lower-case identifier of the source benchmark. Benchmarks that
         produce their own data should return ``None`` (default).
-        """
 
+        Delegates to _impl if present and _impl provides this method.
+        """
+        if hasattr(self, "_impl") and hasattr(self._impl, "get_data_source_benchmark"):
+            return self._impl.get_data_source_benchmark()
         return None
 
     @abstractmethod
@@ -570,7 +607,7 @@ class BaseBenchmark(VerbosityMixin, ABC):
             translated = sqlglot.transpile(query, read="postgres", write=normalized_dialect, identify=True)[0]
             return translated
         except (ValueError, AttributeError) as e:
-            raise ValueError(f"Error translating to dialect '{dialect}': {e}")
+            raise ValueError(f"Error translating to dialect '{dialect}': {e}") from e
 
     @property
     def benchmark_name(self) -> str:
@@ -793,6 +830,7 @@ class BaseBenchmark(VerbosityMixin, ABC):
                 test_type=kwargs.get("test_execution_type", "standard"),
                 benchmark_id=benchmark_id,
                 display_name=short_name,
+                compliance_class=getattr(self, "compliance_class", None),
             ),
             platform=platform_input,
             execution_id=kwargs.get("execution_id"),

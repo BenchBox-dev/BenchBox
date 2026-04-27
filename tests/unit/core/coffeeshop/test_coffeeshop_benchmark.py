@@ -1,4 +1,4 @@
-"""Tests for CoffeeShopBenchmark — generate, load, and query cycle with DuckDB.
+"""Tests for CoffeeShopBenchmark - generate, load, and query cycle with DuckDB.
 
 Copyright 2026 Joe Harris / BenchBox Project
 

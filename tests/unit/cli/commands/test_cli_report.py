@@ -254,7 +254,7 @@ class TestReportImport:
             scale_factor=1.0,
         )
 
-        with open(results_dir / "result.json", "w") as f:
+        with open(results_dir / "result.json", "w", encoding="utf-8") as f:
             json.dump(result_data, f)
 
         runner = CliRunner()

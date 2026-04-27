@@ -26,15 +26,21 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import ipaddress
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
+from benchbox.platforms.base.ddl_helpers import strip_with_properties
 from benchbox.platforms.base.external_table_mixin import HiveExternalTableMixin
+from benchbox.platforms.presto_trino_utils import (
+    load_file_batches,
+    normalize_existing_files,
+    resolve_data_files,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
-
-from .base.data_loading import DataSourceResolver, FileFormatRegistry
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
@@ -48,7 +54,6 @@ from ..utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
 )
-from ..utils.file_format import get_delimiter_for_file
 from .base import DriverIsolationCapability, PlatformAdapter
 from .presto_trino_utils import validate_catalog_exists
 
@@ -489,8 +494,6 @@ class PrestoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin,
             return False
         # Allow alphanumeric, underscores, and hyphens (common in Presto identifiers)
         # Must start with letter or underscore
-        import re
-
         pattern = r"^[a-zA-Z_][a-zA-Z0-9_-]*$"
         return bool(re.match(pattern, identifier)) and len(identifier) <= 128
 
@@ -554,7 +557,7 @@ class PrestoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin,
                     if self._validate_identifier(table):
                         try:
                             cursor.execute(f"DROP TABLE IF EXISTS {catalog}.{schema}.{table}")
-                            self.logger.debug(f"Dropped table {table}")
+                            self.logger.info(f"Dropped table {table}")
                         except Exception as table_error:
                             self.logger.warning(f"Failed to drop table {table}: {table_error}")
 
@@ -567,6 +570,44 @@ class PrestoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin,
 
         except Exception as e:
             raise RuntimeError(f"Failed to drop Presto schema {catalog}.{schema}: {e}") from e
+
+    def _is_local_host(self, host: str | None) -> bool:
+        """Return True if the configured host points to the local machine."""
+        if not host:
+            return False
+        normalized = host.strip().lower()
+        if normalized in {"localhost", "127.0.0.1", "::1"}:
+            return True
+        try:
+            addr = ipaddress.ip_address(normalized)
+            return addr.is_loopback
+        except ValueError:
+            return normalized.endswith(".local")
+
+    def _error_indicates_connection_refused(self, exc: Exception) -> bool:
+        message = str(exc).lower()
+        connection_error_markers = [
+            "connection refused",
+            "failed to establish a new connection",
+            "max retries exceeded",
+            "errno 61",
+            "errno 111",
+        ]
+        return any(marker in message for marker in connection_error_markers)
+
+    def _build_friendly_connection_error(self, exc: Exception) -> str | None:
+        if not self._is_local_host(self.host):
+            return None
+        if not self._error_indicates_connection_refused(exc):
+            return None
+
+        host = self.host or "localhost"
+        port = self.port or 8080
+        return (
+            f"Presto is not running on {host}:{port}. Start your local coordinator before "
+            "rerunning BenchBox, or point this benchmark at a running Presto cluster via "
+            "`--platform-option host=<host> --platform-option port=<port>`."
+        )
 
     def create_connection(self, **connection_config) -> Any:
         """Create optimized Presto connection."""
@@ -629,6 +670,11 @@ class PrestoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin,
             return connection
 
         except Exception as e:
+            friendly_message = self._build_friendly_connection_error(e)
+            if friendly_message:
+                self.logger.error(friendly_message)
+                raise RuntimeError(friendly_message) from e
+
             self.logger.error(f"Failed to connect to Presto: {e}")
             raise
 
@@ -645,73 +691,25 @@ class PrestoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin,
             normalize_table_name_in_sql=self._normalize_table_name_in_sql,
             optimize_table_definition=self._optimize_table_definition,
             extract_table_name=self._extract_table_name,
+            log_notice=self.log_notice,
         )
         return elapsed_seconds(start_time)
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> dict[str, Any]:
         """Resolve benchmark data files from benchmark tables or manifest."""
-        resolver = DataSourceResolver()
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source.tables
-
-    @staticmethod
-    def _normalize_existing_files(file_paths: Any) -> list[Path]:
-        """Normalize file inputs to existing, non-empty local paths."""
-        normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
-        valid_files: list[Path] = []
-        for file_path in normalized_paths:
-            path = Path(file_path)
-            if path.exists() and path.stat().st_size > 0:
-                valid_files.append(path)
-        return valid_files
+        return resolve_data_files(
+            benchmark,
+            data_dir,
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
 
     # External table methods (validate, map types, build columns, build location,
     # create_external_tables) are provided by HiveExternalTableMixin.
-
-    def _escape_insert_value(self, value: str) -> str:
-        """Format a CSV field as a Presto literal for INSERT VALUES."""
-        if value == "" or value.lower() == "null":
-            return "NULL"
-        if self._is_date_value(value):
-            return f"DATE '{value}'"
-        try:
-            float(value)
-            return value
-        except ValueError:
-            return "'" + str(value).replace("'", "''") + "'"
-
-    def _load_file_batches(self, cursor: Any, file_path: Path, qualified_table: str) -> int:
-        """Load one file into Presto using batched INSERT statements."""
-        delimiter = get_delimiter_for_file(file_path)
-        compression_handler = FileFormatRegistry.get_compression_handler(file_path)
-        rows_loaded = 0
-
-        with compression_handler.open(file_path) as file_handle:
-            batch_size = 500
-            batch_data: list[str] = []
-
-            for line in file_handle:
-                line = line.strip()
-                if line and line.endswith(delimiter):
-                    line = line[:-1]
-                if not line:
-                    continue
-
-                escaped_values = [self._escape_insert_value(value) for value in line.split(delimiter)]
-                batch_data.append(f"({', '.join(escaped_values)})")
-
-                if len(batch_data) >= batch_size:
-                    cursor.execute(f"INSERT INTO {qualified_table} VALUES " + ", ".join(batch_data))
-                    rows_loaded += len(batch_data)
-                    batch_data = []
-
-            if batch_data:
-                cursor.execute(f"INSERT INTO {qualified_table} VALUES " + ", ".join(batch_data))
-                rows_loaded += len(batch_data)
-
-        return rows_loaded
+    # _normalize_existing_files, _escape_insert_value, and _is_date_value are
+    # thin delegates to benchbox.platforms.presto_trino_utils helpers.
 
     def _load_table_data(
         self,
@@ -722,7 +720,7 @@ class PrestoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin,
         target_schema: str,
     ) -> tuple[int, int] | None:
         """Load one table and return (rows_loaded, valid_file_count)."""
-        valid_files = self._normalize_existing_files(file_paths)
+        valid_files = normalize_existing_files(file_paths)
         table_name_lower = table_name.lower()
 
         if not valid_files:
@@ -739,7 +737,7 @@ class PrestoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin,
         qualified_table = f"{target_catalog}.{target_schema}.{table_name_lower}"
         rows_loaded = 0
         for file_path in valid_files:
-            rows_loaded += self._load_file_batches(cursor, file_path, qualified_table)
+            rows_loaded += load_file_batches(cursor, file_path, qualified_table)
 
         return rows_loaded, len(valid_files)
 
@@ -868,17 +866,6 @@ class PrestoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin,
         finally:
             cursor.close()
 
-    def _is_date_value(self, value: str) -> bool:
-        """Check if a value looks like a date in YYYY-MM-DD format.
-
-        Presto memory catalog requires DATE literal syntax (DATE 'YYYY-MM-DD')
-        for date columns, unlike other databases that auto-cast strings.
-        """
-        import re
-
-        # Match YYYY-MM-DD format (TPC-H standard date format)
-        return bool(re.match(r"^\d{4}-\d{2}-\d{2}$", value))
-
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""
         from benchbox.core.sql_utils import extract_table_name
@@ -904,11 +891,7 @@ class PrestoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin,
 
         if self.table_format == "memory" or self.catalog == "memory":
             # Memory catalog: simple CREATE TABLE without WITH clause or NOT NULL
-            # Remove any existing WITH clause that might be incompatible
-            import re
-
-            statement = re.sub(r"\s+WITH\s*\([^)]*\)", "", statement, flags=re.IGNORECASE)
-            # Memory catalog does not support NOT NULL constraints
+            statement = strip_with_properties(statement)
             statement = re.sub(r"\s+NOT\s+NULL", "", statement, flags=re.IGNORECASE)
 
         elif self.table_format == "hive":
@@ -1105,64 +1088,32 @@ def _build_presto_config(
     overrides: dict[str, Any],
     info: Any,
 ) -> Any:
-    """Build Presto database configuration with credential loading.
+    from benchbox.platforms.base.config_utils import build_platform_config
 
-    Args:
-        platform: Platform name (should be 'presto')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded
-    """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("presto") or {}
-
-    # Build merged options: saved_creds < options < overrides
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "Presto"
-    driver_package = info.driver_package if info else "presto-python-client"
-
-    config_dict = {
-        "type": "presto",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields at top-level
-        "host": merged_options.get("host"),
-        "port": merged_options.get("port"),
-        "catalog": merged_options.get("catalog"),
-        "username": merged_options.get("username"),
-        "password": merged_options.get("password"),
-        "http_scheme": merged_options.get("http_scheme"),
-        "verify_ssl": merged_options.get("verify_ssl"),
-        "ssl_cert_path": merged_options.get("ssl_cert_path"),
-        "session_properties": merged_options.get("session_properties"),
-        "query_timeout": merged_options.get("query_timeout"),
-        "table_format": merged_options.get("table_format"),
-        "staging_root": merged_options.get("staging_root"),
-        # Benchmark context for config-aware schema naming
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    # Only include explicit schema override if provided
-    if "schema" in overrides and overrides["schema"]:
-        config_dict["schema"] = overrides["schema"]
-
-    return DatabaseConfig(**config_dict)
+    return build_platform_config(
+        platform_type="presto",
+        credential_key="presto",
+        default_display_name="Presto",
+        default_driver_package="presto-python-client",
+        platform_fields=[
+            "host",
+            "port",
+            "catalog",
+            "username",
+            "password",
+            "http_scheme",
+            "verify_ssl",
+            "ssl_cert_path",
+            "session_properties",
+            "query_timeout",
+            "table_format",
+            "staging_root",
+            "schema",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 # Register the config builder with the platform hook registry

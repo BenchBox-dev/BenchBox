@@ -36,7 +36,7 @@ from .registry import register_query
 
 
 def q1_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Trips per hour — EXTRACT(HOUR) grouping."""
+    """Q1: Trips per hour - EXTRACT(HOUR) grouping."""
     params = get_parameters("Q1")
     start_date = params.get("start_date", "2019-01-01")
     end_date = params.get("end_date", "2019-01-31")
@@ -55,7 +55,7 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Trips per hour — EXTRACT(HOUR) grouping."""
+    """Q1: Trips per hour - EXTRACT(HOUR) grouping."""
     params = get_parameters("Q1")
     start_date = params.get("start_date", "2019-01-01")
     end_date = params.get("end_date", "2019-01-31")
@@ -67,7 +67,7 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q2_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q2: Trips per day — DATE_TRUNC('day') grouping."""
+    """Q2: Trips per day - DATE_TRUNC('day') grouping."""
     params = get_parameters("Q2")
     start_date = params.get("start_date", "2019-01-01")
     end_date = params.get("end_date", "2019-12-31")
@@ -86,7 +86,7 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q2_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q2: Trips per day — DATE_TRUNC('day') grouping."""
+    """Q2: Trips per day - DATE_TRUNC('day') grouping."""
     params = get_parameters("Q2")
     start_date = params.get("start_date", "2019-01-01")
     end_date = params.get("end_date", "2019-12-31")
@@ -184,7 +184,7 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q5_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Top pickup zones — LEFT JOIN to taxi_zones."""
+    """Q5: Top pickup zones - LEFT JOIN to taxi_zones."""
     params = get_parameters("Q5")
     start_date = params.get("start_date", "2019-01-01")
     end_date = params.get("end_date", "2019-01-31")
@@ -205,7 +205,7 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q5_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Top pickup zones — LEFT JOIN to taxi_zones."""
+    """Q5: Top pickup zones - LEFT JOIN to taxi_zones."""
     params = get_parameters("Q5")
     start_date = params.get("start_date", "2019-01-01")
     end_date = params.get("end_date", "2019-01-31")
@@ -262,7 +262,7 @@ def q6_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q7_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q7: Top routes — double LEFT JOIN to taxi_zones for pickup and dropoff."""
+    """Q7: Top routes - double LEFT JOIN to taxi_zones for pickup and dropoff."""
     params = get_parameters("Q7")
     start_date = params.get("start_date", "2019-01-01")
     end_date = params.get("end_date", "2019-01-31")
@@ -301,7 +301,7 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q7_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q7: Top routes — double LEFT JOIN to taxi_zones."""
+    """Q7: Top routes - double LEFT JOIN to taxi_zones."""
     params = get_parameters("Q7")
     start_date = params.get("start_date", "2019-01-01")
     end_date = params.get("end_date", "2019-01-31")
@@ -945,7 +945,7 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q19_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q19: Hourly zone heatmap — 2D grouping."""
+    """Q19: Hourly zone heatmap - 2D grouping."""
     params = get_parameters("Q19")
     start_date = params.get("start_date", "2019-01-01")
     end_date = params.get("end_date", "2019-01-07")
@@ -964,7 +964,7 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q19_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q19: Hourly zone heatmap — 2D grouping."""
+    """Q19: Hourly zone heatmap - 2D grouping."""
     params = get_parameters("Q19")
     start_date = params.get("start_date", "2019-01-01")
     end_date = params.get("end_date", "2019-01-07")
@@ -1150,7 +1150,7 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q23_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q23: Single-day summary — scalar aggregation."""
+    """Q23: Single-day summary - scalar aggregation."""
     params = get_parameters("Q23")
     start_date = params.get("start_date", "2019-06-15")
     end_date = params.get("end_date", "2019-06-16")
@@ -1171,7 +1171,7 @@ def q23_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q23_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q23: Single-day summary — scalar aggregation."""
+    """Q23: Single-day summary - scalar aggregation."""
     import pandas as pd
 
     params = get_parameters("Q23")
@@ -1246,14 +1246,14 @@ def q24_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q25_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q25: Full scan count — baseline."""
+    """Q25: Full scan count - baseline."""
     trips = ctx.get_table("trips")
     col = ctx.col
     return trips.select(col("trip_id").count().alias("total_trips"))
 
 
 def q25_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q25: Full scan count — baseline."""
+    """Q25: Full scan count - baseline."""
     import pandas as pd
 
     trips = ctx.get_table("trips")

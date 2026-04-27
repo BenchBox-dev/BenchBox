@@ -107,7 +107,7 @@ class PlanHistory:
 
         # Write to storage
         history_file = self.storage_path / f"{run_id}.json"
-        with open(history_file, "w") as f:
+        with open(history_file, "w", encoding="utf-8") as f:
             json.dump(history_entry, f, indent=2)
 
         # Update cache
@@ -131,7 +131,7 @@ class PlanHistory:
                 if run_id in self._cache:
                     entry = self._cache[run_id]
                 else:
-                    with open(entry_file) as f:
+                    with open(entry_file, encoding="utf-8") as f:
                         entry = json.load(f)
                     self._cache[run_id] = entry
 
@@ -231,7 +231,7 @@ class PlanHistory:
                 if run_id in self._cache:
                     entry = self._cache[run_id]
                 else:
-                    with open(entry_file) as f:
+                    with open(entry_file, encoding="utf-8") as f:
                         entry = json.load(f)
                     self._cache[run_id] = entry
 

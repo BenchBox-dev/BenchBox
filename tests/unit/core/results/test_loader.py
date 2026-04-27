@@ -121,7 +121,7 @@ class TestFindLatestResult:
 
         write_v2_result_file(good_result, version="2.0", timestamp="2025-01-01T10:00:00")
 
-        with open(bad_result, "w") as f:
+        with open(bad_result, "w", encoding="utf-8") as f:
             f.write("{ invalid json")
 
         result = find_latest_result(tmp_path)
@@ -144,9 +144,9 @@ class TestFindLatestResult:
         write_v2_result_file(result_file, version="2.0")
 
         # Write companion files (shouldn't be returned)
-        with open(plans_file, "w") as f:
+        with open(plans_file, "w", encoding="utf-8") as f:
             json.dump({"version": "2.0", "plans_captured": 1}, f)
-        with open(tuning_file, "w") as f:
+        with open(tuning_file, "w", encoding="utf-8") as f:
             json.dump({"version": "2.0", "clauses": {}}, f)
 
         result = find_latest_result(tmp_path)
@@ -165,7 +165,7 @@ class TestFindLatestResult:
             "benchmark": {"id": "tpch", "name": "TPC-H"},
             "execution": {"platform": "DuckDB", "timestamp": "2025-01-02T10:00:00"},
         }
-        with open(v1_result, "w") as f:
+        with open(v1_result, "w", encoding="utf-8") as f:
             json.dump(v1_data, f)
 
         result = find_latest_result(tmp_path)
@@ -203,7 +203,7 @@ class TestLoadResultFile:
         """Test loading invalid JSON raises ResultLoadError."""
         result_file = tmp_path / "invalid.json"
 
-        with open(result_file, "w") as f:
+        with open(result_file, "w", encoding="utf-8") as f:
             f.write("{ invalid json")
 
         with pytest.raises(ResultLoadError, match="Invalid JSON"):
@@ -219,7 +219,7 @@ class TestLoadResultFile:
             "execution": {"platform": "DuckDB"},
         }
 
-        with open(result_file, "w") as f:
+        with open(result_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
         with pytest.raises(UnsupportedSchemaError, match="Unsupported schema version"):
@@ -234,7 +234,7 @@ class TestLoadResultFile:
             "benchmark": {"id": "tpch", "name": "TPC-H"},
         }
 
-        with open(result_file, "w") as f:
+        with open(result_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
         with pytest.raises(UnsupportedSchemaError, match="Unsupported schema version"):

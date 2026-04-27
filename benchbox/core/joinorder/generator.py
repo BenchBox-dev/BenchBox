@@ -79,7 +79,8 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         self.very_verbose = self.verbose_level >= 2 and not quiet
         self.quiet = bool(quiet)
 
-        # Base row counts (approximate for scale factor 1.0)
+        # Base row counts preserve the synthetic IMDB-like proportions while
+        # bringing SF=1 closer to BenchBox's ~1GB baseline.
         self.base_row_counts = {
             # Reference tables (small, relatively static)
             "kind_type": 7,
@@ -89,23 +90,23 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             "comp_cast_type": 4,
             "link_type": 18,
             # Main dimension tables
-            "title": 2_500_000,  # Movies/TV shows
-            "name": 4_000_000,  # People
-            "company_name": 300_000,  # Companies
-            "keyword": 120_000,  # Keywords
-            "char_name": 3_000_000,  # Character names
+            "title": 500_000,  # Movies/TV shows
+            "name": 800_000,  # People
+            "company_name": 60_000,  # Companies
+            "keyword": 24_000,  # Keywords
+            "char_name": 600_000,  # Character names
             # Large relationship tables
-            "cast_info": 35_000_000,  # Person-movie relationships
-            "movie_companies": 2_600_000,  # Movie-company relationships
-            "movie_info": 15_000_000,  # Movie metadata
-            "movie_info_idx": 1_400_000,  # Movie ratings/rankings
-            "movie_keyword": 5_000_000,  # Movie-keyword relationships
+            "cast_info": 7_000_000,  # Person-movie relationships
+            "movie_companies": 520_000,  # Movie-company relationships
+            "movie_info": 3_000_000,  # Movie metadata
+            "movie_info_idx": 280_000,  # Movie ratings/rankings
+            "movie_keyword": 1_000_000,  # Movie-keyword relationships
             # Smaller relationship tables
-            "movie_link": 30_000,  # Movie-movie relationships
-            "person_info": 3_000_000,  # Person metadata
-            "complete_cast": 150_000,  # Cast completion info
-            "aka_name": 900_000,  # Alternative names
-            "aka_title": 400_000,  # Alternative titles
+            "movie_link": 6_000,  # Movie-movie relationships
+            "person_info": 600_000,  # Person metadata
+            "complete_cast": 30_000,  # Cast completion info
+            "aka_name": 180_000,  # Alternative names
+            "aka_title": 80_000,  # Alternative titles
         }
 
         # Track per-table row counts for manifest output
@@ -334,6 +335,26 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         # Generate movie_keyword
         mk_count = int(self.base_row_counts["movie_keyword"] * self.scale_factor)
         data["movie_keyword"] = self._generate_movie_keyword(mk_count, max_title_id, max_keyword_id)
+
+        # Generate movie_link (movie-movie relationships)
+        ml_count = int(self.base_row_counts["movie_link"] * self.scale_factor)
+        data["movie_link"] = self._generate_movie_link(ml_count, max_title_id)
+
+        # Generate person_info (person metadata)
+        pi_count = int(self.base_row_counts["person_info"] * self.scale_factor)
+        data["person_info"] = self._generate_person_info(pi_count, max_name_id)
+
+        # Generate complete_cast (cast completeness info)
+        cc_count = int(self.base_row_counts["complete_cast"] * self.scale_factor)
+        data["complete_cast"] = self._generate_complete_cast(cc_count, max_title_id)
+
+        # Generate aka_name (alternative person names)
+        an_count = int(self.base_row_counts["aka_name"] * self.scale_factor)
+        data["aka_name"] = self._generate_aka_name(an_count, max_name_id)
+
+        # Generate aka_title (alternative movie titles)
+        at_count = int(self.base_row_counts["aka_title"] * self.scale_factor)
+        data["aka_title"] = self._generate_aka_title(at_count, max_title_id)
 
         return data
 
@@ -601,6 +622,72 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
         return movie_keyword
 
+    def _generate_movie_link(self, count: int, max_title_id: int) -> list[tuple]:
+        """Generate movie_link data (movie-movie relationships)."""
+        # 18 link types hardcoded in lookup data
+        max_link_type_id = 18
+        movie_link = []
+        for i in range(1, count + 1):
+            movie_id = random.randint(1, max_title_id)
+            linked_movie_id = random.randint(1, max_title_id)
+            link_type_id = random.randint(1, max_link_type_id)
+            movie_link.append((i, movie_id, linked_movie_id, link_type_id))
+        return movie_link
+
+    def _generate_person_info(self, count: int, max_name_id: int) -> list[tuple]:
+        """Generate person_info data (biographical metadata for people)."""
+        # 113 info types hardcoded in lookup data
+        max_info_type_id = 113
+        info_samples = ["Born in USA", "Studied at university", "Award winner", "Director known for drama", None]
+        person_info = []
+        for i in range(1, count + 1):
+            person_id = random.randint(1, max_name_id)
+            info_type_id = random.randint(1, max_info_type_id)
+            info = f"Info text {i % 1000}"
+            note = random.choice(info_samples)
+            person_info.append((i, person_id, info_type_id, info, note))
+        return person_info
+
+    def _generate_complete_cast(self, count: int, max_title_id: int) -> list[tuple]:
+        """Generate complete_cast data (cast completeness records)."""
+        # 4 comp_cast_type values
+        max_cast_type_id = 4
+        complete_cast = []
+        for i in range(1, count + 1):
+            movie_id = random.randint(1, max_title_id)
+            subject_id = random.randint(1, max_cast_type_id)
+            status_id = random.randint(1, max_cast_type_id)
+            complete_cast.append((i, movie_id, subject_id, status_id))
+        return complete_cast
+
+    def _generate_aka_name(self, count: int, max_name_id: int) -> list[tuple]:
+        """Generate aka_name data (alternative person names)."""
+        first_names = ["Al", "Bob", "Chris", "Dan", "Ed", "Frank", "George", "Hank"]
+        last_names = ["Anderson", "Baker", "Clark", "Davis", "Evans", "Foster", "Green"]
+        aka_name = []
+        for i in range(1, count + 1):
+            person_id = random.randint(1, max_name_id)
+            first = random.choice(first_names)
+            last = random.choice(last_names)
+            name = f"{first} {last}"
+            aka_name.append((i, person_id, name, None, None, None, None, None))
+        return aka_name
+
+    def _generate_aka_title(self, count: int, max_title_id: int) -> list[tuple]:
+        """Generate aka_title data (alternative movie titles)."""
+        # 7 kind_type values
+        max_kind_id = 7
+        title_words = ["Journey", "Return", "Rise", "Fall", "Dawn", "Dusk", "Storm"]
+        aka_title = []
+        for i in range(1, count + 1):
+            movie_id = random.randint(1, max_title_id)
+            word = random.choice(title_words)
+            title = f"Alternative {word} {i % 10000}"
+            kind_id = random.randint(1, max_kind_id)
+            production_year = random.randint(1950, 2023) if random.random() > 0.1 else None
+            aka_title.append((i, movie_id, title, None, kind_id, production_year, None, None, None, None, None, None))
+        return aka_title
+
     def _write_table_data(self, table_name: str, data: list[tuple]) -> PathLike:
         """Write table data to CSV file.
 
@@ -634,7 +721,13 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
         """Write manifest describing generated Join Order dataset."""
-        write_generator_manifest(self, "joinorder", table_paths, self._manifest_row_counts)
+        write_generator_manifest(
+            self,
+            "joinorder",
+            table_paths,
+            self._manifest_row_counts,
+            metadata={"csv_delimiter": ",", "csv_null_marker": ""},
+        )
 
     def get_table_row_count(self, table_name: str) -> int:
         """Get expected row count for a table.

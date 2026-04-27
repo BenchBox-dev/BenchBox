@@ -34,7 +34,7 @@ class TestDataFrameTuningLoader:
             "parallelism": {"thread_count": 8},
             "execution": {"streaming_mode": True},
         }
-        with open(config_path, "w") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f)
 
         loader = DataFrameTuningLoader()
@@ -51,7 +51,7 @@ class TestDataFrameTuningLoader:
         config_content = {
             "parallelism": {"worker_count": 4},
         }
-        with open(config_path, "w") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config_content, f)
 
         loader = DataFrameTuningLoader()
@@ -68,7 +68,7 @@ class TestDataFrameTuningLoader:
     def test_load_config_invalid_yaml(self, tmp_path):
         """Test that invalid YAML raises error."""
         config_path = tmp_path / "invalid.yaml"
-        with open(config_path, "w") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             f.write("invalid: yaml: content: [")
 
         loader = DataFrameTuningLoader()
@@ -86,7 +86,7 @@ class TestDataFrameTuningLoader:
         loader.save_config(config, config_path)
 
         assert config_path.exists()
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         assert data["parallelism"]["thread_count"] == 8
 
@@ -103,7 +103,7 @@ class TestDataFrameTuningLoader:
         loader.save_config(config, config_path)
 
         assert config_path.exists()
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             data = json.load(f)
         assert data["execution"]["streaming_mode"] is True
 
@@ -149,7 +149,7 @@ class TestModuleFunctions:
     def test_load_dataframe_tuning(self, tmp_path):
         """Test load_dataframe_tuning() function."""
         config_path = tmp_path / "config.yaml"
-        with open(config_path, "w") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump({"parallelism": {"thread_count": 16}}, f)
 
         config = load_dataframe_tuning(config_path)
@@ -183,7 +183,7 @@ class TestConfigWithMetadata:
             },
             "parallelism": {"thread_count": 8},
         }
-        with open(config_path, "w") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config_content, f)
 
         config = load_dataframe_tuning(config_path)

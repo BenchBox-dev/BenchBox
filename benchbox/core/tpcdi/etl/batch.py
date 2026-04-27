@@ -451,7 +451,7 @@ class ExtractOperation(BatchOperation):
         try:
             return pd.read_csv(file_path, low_memory=False)
         except Exception as e:
-            raise RuntimeError(f"Failed to read CSV file {file_path}: {str(e)}")
+            raise RuntimeError(f"Failed to read CSV file {file_path}: {str(e)}") from e
 
     def _extract_xml(self, file_path: Path, table_name: str) -> pd.DataFrame:
         """Extract data from XML file."""
@@ -469,14 +469,14 @@ class ExtractOperation(BatchOperation):
             return pd.DataFrame(records)
 
         except Exception as e:
-            raise RuntimeError(f"Failed to read XML file {file_path}: {str(e)}")
+            raise RuntimeError(f"Failed to read XML file {file_path}: {str(e)}") from e
 
     def _extract_pipe_delimited(self, file_path: Path) -> pd.DataFrame:
         """Extract data from pipe-delimited file."""
         try:
             return pd.read_csv(file_path, delimiter="|", low_memory=False)
         except Exception as e:
-            raise RuntimeError(f"Failed to read pipe-delimited file {file_path}: {str(e)}")
+            raise RuntimeError(f"Failed to read pipe-delimited file {file_path}: {str(e)}") from e
 
     def _calculate_checksum(self, df: pd.DataFrame) -> str:
         """Calculate checksum for data lineage."""
@@ -2353,7 +2353,6 @@ class BatchProcessor:
         try:
             self.logger.info(f"Starting parallel pipeline execution with {self.parallel_config.max_workers} workers")
 
-            # Group operations by type for parallel execution
             operation_groups = {
                 "extract": [op for op in self.operations if isinstance(op, ExtractOperation)],
                 "transform": [op for op in self.operations if isinstance(op, TransformOperation)],
@@ -2361,105 +2360,118 @@ class BatchProcessor:
                 "validate": [op for op in self.operations if isinstance(op, ValidationOperation)],
             }
 
-            # Execute each group sequentially, but operations within group in parallel
             for group_name, operations in operation_groups.items():
                 if not operations:
                     continue
+                if not self._run_parallel_group(group_name, operations, batch_data, batch_status, context):
+                    return False
 
-                self.logger.info(f"Executing {len(operations)} {group_name} operations in parallel")
-
-                # Determine appropriate executor
-                executor = self._get_executor_for_operation_type(group_name)
-
-                if not executor:
-                    # Fallback to sequential execution
-                    for operation in operations:
-                        success = self._execute_single_operation(operation, batch_data, batch_status, context)
-                        if not success:
-                            return False
-                    continue
-
-                # Execute operations in parallel
-                futures = {}
-                worker_id_counter = 0
-
-                for operation in operations:
-                    worker_id = f"{group_name}_worker_{worker_id_counter}"
-                    worker_id_counter += 1
-
-                    if self.parallel_processing and hasattr(self, "execution_context"):
-                        self.execution_context.add_worker(worker_id)
-
-                    future = executor.submit(
-                        self._execute_operation_with_monitoring,
-                        operation,
-                        batch_data,
-                        batch_status.batch_id,
-                        context,
-                        worker_id,
-                    )
-                    futures[future] = (operation, worker_id)
-
-                # Wait for completion with timeout
-                for future in as_completed(futures, timeout=self.parallel_config.worker_timeout):
-                    operation, worker_id = futures[future]
-                    operation_name = type(operation).__name__
-
-                    if self.parallel_processing and hasattr(self, "execution_context"):
-                        self.execution_context.remove_worker(worker_id)
-
-                    try:
-                        result = future.result()
-
-                        if result.get("success", False):
-                            # Track performance metrics
-                            if "processing_time" in result:
-                                metric_type = f"{group_name}_times"
-                                if hasattr(self, "execution_context"):
-                                    self.execution_context.add_performance_metric(
-                                        metric_type, result["processing_time"]
-                                    )
-                                else:
-                                    self.performance_metrics.get(metric_type, []).append(result["processing_time"])
-
-                            if hasattr(self, "execution_context"):
-                                self.execution_context.increment_completed()
-
-                            self.logger.info(f"{operation_name} completed in {result.get('processing_time', 0):.2f}s")
-                        else:
-                            error_msg = f"{operation_name} failed: {result.get('errors', [])}"
-                            batch_status.error_messages.extend(result.get("errors", []))
-
-                            if hasattr(self, "execution_context"):
-                                self.execution_context.increment_failed()
-
-                            self.logger.error(error_msg)
-                            return False
-
-                    except Exception as e:
-                        error_msg = f"{operation_name} failed with exception: {str(e)}"
-                        batch_status.error_messages.append(error_msg)
-
-                        if hasattr(self, "execution_context"):
-                            self.execution_context.increment_failed()
-
-                        self.logger.error(error_msg)
-                        return False
-
-            # Calculate parallel efficiency
-            if hasattr(self, "execution_context"):
-                task_summary = self.execution_context.get_task_summary()
-                total_tasks = task_summary["completed"] + task_summary["failed"]
-                if total_tasks > 0:
-                    efficiency = task_summary["completed"] / total_tasks
-                    self.execution_context.add_performance_metric("parallel_efficiency", efficiency)
-
+            self._record_parallel_efficiency()
             self.logger.info("Parallel pipeline execution completed")
             return True
 
         except Exception as e:
             self.logger.error(f"Parallel pipeline execution failed: {str(e)}")
             return False
+
+    def _run_parallel_group(
+        self,
+        group_name: str,
+        operations: list,
+        batch_data: dict[str, pd.DataFrame],
+        batch_status: BatchStatus,
+        context: dict[str, Any],
+    ) -> bool:
+        """Run one operation group; return False on any failure."""
+        self.logger.info(f"Executing {len(operations)} {group_name} operations in parallel")
+
+        executor = self._get_executor_for_operation_type(group_name)
+        if not executor:
+            for operation in operations:
+                if not self._execute_single_operation(operation, batch_data, batch_status, context):
+                    return False
+            return True
+
+        futures = self._submit_parallel_operations(group_name, operations, executor, batch_data, batch_status, context)
+        return self._wait_parallel_group(group_name, futures, batch_status)
+
+    def _submit_parallel_operations(
+        self,
+        group_name: str,
+        operations: list,
+        executor,
+        batch_data: dict[str, pd.DataFrame],
+        batch_status: BatchStatus,
+        context: dict[str, Any],
+    ) -> dict:
+        futures: dict = {}
+        for idx, operation in enumerate(operations):
+            worker_id = f"{group_name}_worker_{idx}"
+            if self.parallel_processing and hasattr(self, "execution_context"):
+                self.execution_context.add_worker(worker_id)
+            future = executor.submit(
+                self._execute_operation_with_monitoring,
+                operation,
+                batch_data,
+                batch_status.batch_id,
+                context,
+                worker_id,
+            )
+            futures[future] = (operation, worker_id)
+        return futures
+
+    def _wait_parallel_group(self, group_name: str, futures: dict, batch_status: BatchStatus) -> bool:
+        for future in as_completed(futures, timeout=self.parallel_config.worker_timeout):
+            operation, worker_id = futures[future]
+            operation_name = type(operation).__name__
+
+            if self.parallel_processing and hasattr(self, "execution_context"):
+                self.execution_context.remove_worker(worker_id)
+
+            try:
+                result = future.result()
+            except Exception as e:
+                batch_status.error_messages.append(f"{operation_name} failed with exception: {str(e)}")
+                if hasattr(self, "execution_context"):
+                    self.execution_context.increment_failed()
+                self.logger.error(f"{operation_name} failed with exception: {str(e)}")
+                return False
+
+            if not self._record_parallel_operation_result(group_name, operation_name, result, batch_status):
+                return False
+        return True
+
+    def _record_parallel_operation_result(
+        self, group_name: str, operation_name: str, result: dict, batch_status: BatchStatus
+    ) -> bool:
+        """Record a single future's result; return False if the operation failed."""
+        if not result.get("success", False):
+            batch_status.error_messages.extend(result.get("errors", []))
+            if hasattr(self, "execution_context"):
+                self.execution_context.increment_failed()
+            self.logger.error(f"{operation_name} failed: {result.get('errors', [])}")
+            return False
+
+        if "processing_time" in result:
+            metric_type = f"{group_name}_times"
+            if hasattr(self, "execution_context"):
+                self.execution_context.add_performance_metric(metric_type, result["processing_time"])
+            else:
+                self.performance_metrics.get(metric_type, []).append(result["processing_time"])
+
+        if hasattr(self, "execution_context"):
+            self.execution_context.increment_completed()
+        self.logger.info(f"{operation_name} completed in {result.get('processing_time', 0):.2f}s")
+        return True
+
+    def _record_parallel_efficiency(self) -> None:
+        if not hasattr(self, "execution_context"):
+            return
+        task_summary = self.execution_context.get_task_summary()
+        total_tasks = task_summary["completed"] + task_summary["failed"]
+        if total_tasks > 0:
+            efficiency = task_summary["completed"] / total_tasks
+            self.execution_context.add_performance_metric("parallel_efficiency", efficiency)
 
     def _should_use_parallel_processing(self, operation_type: str) -> bool:
         """Check if operation should use parallel processing."""

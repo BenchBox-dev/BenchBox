@@ -1,11 +1,11 @@
 # ClickHouse Local Mode
 
-```{tags} intermediate, guide, clickhouse, embedded-platform
+```{tags} intermediate, guide, clickhouse, local-platform
 ```
 
-BenchBox supports ClickHouse in two deployment modes, plus a separate first-class cloud platform:
+BenchBox supports ClickHouse in two deployment targets, plus a separate first-class cloud platform:
 
-- **Local Mode**: Uses chDB for in-process ClickHouse engine (default)
+- **Local Mode**: Uses chDB for in-process ClickHouse execution
 - **Server Mode**: Connects to an external ClickHouse server
 - **ClickHouse Cloud**: Separate first-class platform → see [ClickHouse Cloud](clickhouse-cloud.md)
 
@@ -15,7 +15,7 @@ BenchBox supports ClickHouse in two deployment modes, plus a separate first-clas
 
 ## Overview
 
-ClickHouse Local Mode uses [chDB](https://github.com/chdb-io/chdb), the official embedded ClickHouse engine, to run ClickHouse queries directly in Python without requiring a separate ClickHouse server installation.
+ClickHouse Local Mode uses [chDB](https://github.com/chdb-io/chdb), the official in-process ClickHouse engine, to run ClickHouse queries directly in Python without requiring a separate ClickHouse server installation.
 
 ### Key Benefits
 
@@ -23,7 +23,7 @@ ClickHouse Local Mode uses [chDB](https://github.com/chdb-io/chdb), the official
 - **Native Performance**: In-process execution eliminates IPC overhead
 - **Development Friendly**: Perfect for testing, development, and quick analysis
 - **Same SQL Compatibility**: Full ClickHouse SQL dialect support
-- **Easy Installation**: Single `pip install chdb` command
+- **Easy Installation**: Single `uv add chdb` command
 
 ## Installation
 
@@ -35,11 +35,11 @@ ClickHouse Local Mode uses [chDB](https://github.com/chdb-io/chdb), the official
 ### Install chDB
 
 ```bash
-# Install chDB for embedded mode support
-pip install chdb
+# Install chDB for ClickHouse local mode support
+uv add chdb
 
 # Verify installation
-python -c "import chdb; print(chdb.chdb_version())"
+uv run -- python -c "import chdb; print(chdb.chdb_version())"
 ```
 
 ### Install BenchBox with ClickHouse Support
@@ -48,8 +48,8 @@ python -c "import chdb; print(chdb.chdb_version())"
 # Install BenchBox (if not already installed)
 uv add benchbox
 
-# Or with pip
-pip install benchbox
+# Sync project dependencies
+uv sync --group dev
 ```
 
 ## Usage
@@ -57,35 +57,43 @@ pip install benchbox
 ### Basic Usage
 
 ```bash
-# Run TPC-H benchmark in embedded mode
-benchbox run tpch --platform=clickhouse --mode=local --scale-factor=0.01
+# Run TPC-H benchmark in ClickHouse local mode
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 
 # Run with custom data path
-benchbox run tpch --platform=clickhouse --mode=local --data-path=/tmp/benchmark_data
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01 \
+  --platform-option data_path=/tmp/benchmark_data
 
 # Compare with server mode
-benchbox run tpch --platform=clickhouse --mode=server --host=localhost --port=9000
+benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
+  --platform-option host=localhost \
+  --platform-option port=9000
 ```
 
 ### CLI Arguments
 
-#### Mode Selection
-- `--mode=local` - Use embedded ClickHouse via chDB
-- `--mode=server` - Use ClickHouse server (default)
+#### Platform Selection
+- `--platform clickhouse-local` - Use ClickHouse local mode via chDB
+- `--platform clickhouse-server` - Use ClickHouse server (see [ClickHouse Server](clickhouse-server.md))
+- `--platform clickhouse-cloud` - Use ClickHouse Cloud (see [ClickHouse Cloud](clickhouse-cloud.md))
 
-#### Embedded Mode Specific Arguments
-- `--data-path=PATH` - Optional data path for file operations
+```{deprecated} v0.2.0
+The legacy colon syntax (`clickhouse:local`, `clickhouse:server`) and bare `clickhouse` selector still work but emit deprecation warnings. Use the first-class names above. See [Migration Guide](clickhouse-migration.md).
+```
 
-#### Server Mode Arguments (not used in embedded mode)
-- `--host=HOST` - ClickHouse server host
-- `--port=PORT` - ClickHouse server port
-- `--user=USER` - Username for server authentication
-- `--password=PASS` - Password for server authentication
-- `--secure` - Use TLS connection
+#### Local Mode Specific Arguments
+- `--platform-option data_path=PATH` - Optional data path for file operations
+
+#### Server Mode Arguments
+- `--platform-option host=HOST` - ClickHouse server host
+- `--platform-option port=PORT` - ClickHouse server port
+- `--platform-option username=USER` - Username for server authentication
+- `--platform-option password=PASS` - Password for server authentication
+- `--platform-option secure=true` - Use TLS connection
 
 ## Performance Characteristics
 
-### Embedded Mode
+### Local Mode
 - **Memory Usage**: Lower baseline memory (~50-200MB)
 - **Startup Time**: No network connection setup required
 - **Query Execution**: Columnar engine for analytical workloads
@@ -101,7 +109,7 @@ benchbox run tpch --platform=clickhouse --mode=server --host=localhost --port=90
 
 ## When to Use Each Mode
 
-### Use Embedded Mode When:
+### Use Local Mode When:
 - **Development & Testing**: Quick benchmark development and validation
 - **CI/CD Pipelines**: Automated testing without infrastructure setup
 - **Data Analysis**: Interactive data exploration and analysis
@@ -123,26 +131,23 @@ benchbox run tpch --platform=clickhouse --mode=server --host=localhost --port=90
 ### TPC-H Benchmark
 ```bash
 # Small scale for development
-benchbox run tpch --platform=clickhouse --mode=local --scale-factor=0.01
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 
 # Medium scale for testing
-benchbox run tpch --platform=clickhouse --mode=local --scale-factor=1.0
+benchbox run --platform clickhouse-local --benchmark tpch --scale 1.0
 ```
 
 ### ClickBench Benchmark
 ```bash
 # Run ClickBench analytical queries
-benchbox run clickbench --platform=clickhouse --mode=local
+benchbox run --platform clickhouse-local --benchmark clickbench
 ```
 
 ### Custom Data Directory
 ```bash
 # Use specific directory for generated data
-benchbox run tpch \
-  --platform=clickhouse \
-  --mode=local \
-  --scale-factor=0.1 \
-  --data-path=/path/to/benchmark/data
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1 \
+  --platform-option data_path=/path/to/benchmark/data
 ```
 
 ## Troubleshooting
@@ -156,7 +161,7 @@ Error: ClickHouse local mode requires chDB but it is not installed.
 
 **Solution:**
 ```bash
-pip install chdb
+uv add chdb
 ```
 
 #### 2. Platform Not Supported
@@ -166,8 +171,8 @@ Error: chDB installation failed or not compatible with your platform
 
 **Solution:**
 - Ensure you're on macOS or Linux (x86_64/ARM64)
-- Try upgrading pip: `pip install --upgrade pip`
-- Check Python version: `python --version` (3.8+ required)
+- Ensure your environment is synced with `uv sync --group dev`
+- Check Python version: `uv run -- python --version` (3.10+ required)
 
 #### 3. Memory Issues with Large Datasets
 ```
@@ -181,11 +186,11 @@ Error: Memory limit exceeded or system running out of memory
 
 #### 4. Query Performance Issues
 ```
-Queries running slower than expected in embedded mode
+Queries running slower than expected in local mode
 ```
 
 **Solution:**
-- Embedded mode is optimized for small-medium datasets
+- Local mode is optimized for small-medium datasets
 - For large datasets or maximum performance, use server mode
 - Consider data partitioning or smaller scale factors
 
@@ -193,32 +198,32 @@ Queries running slower than expected in embedded mode
 
 1. **Check Installation**: Verify chDB is properly installed
    ```bash
-   python -c "import chdb; print('chDB version:', chdb.chdb_version())"
+   uv run -- python -c "import chdb; print('chDB version:', chdb.chdb_version())"
    ```
 
 2. **Verbose Output**: Run with verbose logging
    ```bash
-   benchbox run tpch --platform=clickhouse --mode=local --verbose
+   benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01 -v
    ```
 
-3. **Compare Modes**: Test both modes to isolate issues
+3. **Compare Deployments**: Test both platforms to isolate issues
    ```bash
-   # Test embedded mode
-   benchbox run tpch --platform=clickhouse --mode=local --scale-factor=0.01
+   # Test local mode
+   benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 
    # Test server mode (if available)
-   benchbox run tpch --platform=clickhouse --mode=server --scale-factor=0.01
+   benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01
    ```
 
 ## Advanced Usage
 
 ### Performance Tuning
 
-While embedded mode has fewer tuning options than server mode, you can optimize performance:
+While local mode has fewer tuning options than server mode, you can optimize performance:
 
 ```bash
 # Use appropriate scale factors
-benchbox run tpch --platform=clickhouse --mode=local --scale-factor=0.1
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 
 # Monitor memory usage during execution
 top -p $(pgrep -f benchbox)
@@ -228,12 +233,12 @@ top -p $(pgrep -f benchbox)
 
 ```bash
 # Export results for analysis
-benchbox run tpch --platform=clickhouse --mode=local --output=json > results.json
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01 --output results.json
 
 # Run multiple benchmarks
 for benchmark in tpch tpcds ssb; do
   echo "Running $benchmark..."
-  benchbox run $benchmark --platform=clickhouse --mode=local --scale-factor=0.01
+  benchbox run --platform clickhouse-local --benchmark "$benchmark" --scale 0.01
 done
 ```
 
@@ -249,7 +254,7 @@ done
 
 ### File Formats
 
-Embedded mode supports all standard formats:
+Local mode supports all standard formats:
 - CSV, TSV (tab-separated)
 - Parquet (future enhancement)
 - JSON (future enhancement)
@@ -261,46 +266,52 @@ Embedded mode supports all standard formats:
 - **No Clustering**: Single-node execution only
 - **No Replication**: No built-in data redundancy
 
-## Migration Guide
+## Switching Between Platforms
 
-### From Server to Embedded Mode
+### From Server to Local
 
 ```bash
-# Old server mode command
-benchbox run tpch --platform=clickhouse --host=localhost --port=9000
+# Server mode command
+benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
+  --platform-option host=localhost \
+  --platform-option port=9000
 
-# New embedded mode equivalent
-benchbox run tpch --platform=clickhouse --mode=local
+# Local mode equivalent
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 ```
 
-### From Embedded to Server Mode
+### From Local to Server
 
 ```bash
-# Current embedded mode command
-benchbox run tpch --platform=clickhouse --mode=local
+# Current local mode command
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 
 # Server mode equivalent (requires ClickHouse server)
-benchbox run tpch --platform=clickhouse --mode=server --host=localhost --port=9000
+benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
+  --platform-option host=localhost \
+  --platform-option port=9000
 ```
+
+For full migration details from the legacy `clickhouse` selector, see the [Migration Guide](clickhouse-migration.md).
 
 ## Contributing
 
 To contribute to ClickHouse local mode support:
 
-1. **Testing**: Run the embedded mode test suite
+1. **Testing**: Run the ClickHouse local mode test suite
    ```bash
-   pytest tests/unit/platforms/test_clickhouse_local.py -v
+   uv run -- python -m pytest tests/unit/platforms/test_clickhouse_local.py -q
    ```
 
 2. **Development**: Set up development environment
    ```bash
-   pip install -e .[dev]
-   pip install chdb
+   uv sync --group dev
+   uv add chdb
    ```
 
 3. **Bug Reports**: Include system information and chDB version
    ```bash
-   python -c "import chdb, platform; print(f'chDB: {chdb.chdb_version()}, Platform: {platform.platform()}')"
+   uv run -- python -c "import chdb, platform; print(f'chDB: {chdb.chdb_version()}, Platform: {platform.platform()}')"
    ```
 
 ## References

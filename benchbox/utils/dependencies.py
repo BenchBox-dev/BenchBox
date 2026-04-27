@@ -51,7 +51,7 @@ def is_uv_tool_environment() -> bool:
 
 # Map platform names to their pyproject.toml extra names
 PLATFORM_TO_EXTRA: dict[str, str] = {
-    # DataFrame platforms — plain-name extras (dataframe-* aliases also exist)
+    # DataFrame platforms - plain-name extras (dataframe-* aliases also exist)
     "polars": "polars",
     "polars-df": "polars",
     "modin": "modin",
@@ -66,6 +66,8 @@ PLATFORM_TO_EXTRA: dict[str, str] = {
     "pyspark-df": "pyspark",
     "spark": "spark",
     "lakesail": "lakesail",
+    "velox": "velox",
+    "gluten-velox": "velox",
     "datafusion": "datafusion",
     "datafusion-df": "datafusion",
     # Cloud/SQL platforms
@@ -84,10 +86,13 @@ PLATFORM_TO_EXTRA: dict[str, str] = {
     "presto": "presto",
     "clickhouse": "clickhouse",
     "clickhouse-local": "clickhouse-local",
+    "clickhouse-server": "clickhouse-server",
+    "clickhouse-cloud": "clickhouse-cloud",
     "firebolt": "firebolt",
     "databend": "databend",
     "influxdb": "influxdb",
     "doris": "doris",
+    "singlestore": "singlestore",
     "postgresql": "postgresql",
     "postgres": "postgresql",
     "questdb": "questdb",
@@ -323,11 +328,35 @@ DATAFRAME_DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
 DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
     "clickhouse": DependencyInfo(
         name="clickhouse",
-        description="ClickHouse analytical database driver",
+        description="ClickHouse server driver (clickhouse-driver TCP protocol)",
         packages=["clickhouse-driver"],
         install_command="uv add benchbox --extra clickhouse",
-        use_cases=["Columnar analytics", "High-performance aggregation", "Real-time analytics"],
-        platforms=["ClickHouse Server", "ClickHouse Local"],
+        use_cases=["Columnar analytics", "High-performance aggregation", "Self-hosted ClickHouse"],
+        platforms=["ClickHouse Server (clickhouse-server)"],
+    ),
+    "clickhouse-local": DependencyInfo(
+        name="clickhouse-local",
+        description="Embedded ClickHouse via chDB (in-process, no server required)",
+        packages=["chdb"],
+        install_command="uv add benchbox --extra clickhouse-local",
+        use_cases=["Embedded ClickHouse", "Local analytics", "Zero-infrastructure benchmarking"],
+        platforms=["ClickHouse Local (clickhouse-local)"],
+    ),
+    "clickhouse-server": DependencyInfo(
+        name="clickhouse-server",
+        description="Self-hosted ClickHouse server driver (clickhouse-driver TCP protocol)",
+        packages=["clickhouse-driver"],
+        install_command="uv add benchbox --extra clickhouse-server",
+        use_cases=["Self-hosted ClickHouse", "Docker ClickHouse", "High-performance columnar analytics"],
+        platforms=["ClickHouse Server (clickhouse-server)"],
+    ),
+    "clickhouse-cloud": DependencyInfo(
+        name="clickhouse-cloud",
+        description="ClickHouse Cloud via HTTP connector (clickhouse-connect)",
+        packages=["clickhouse-connect"],
+        install_command="uv add benchbox --extra clickhouse-cloud",
+        use_cases=["Managed ClickHouse", "Serverless analytics", "Cloud OLAP"],
+        platforms=["ClickHouse Cloud (clickhouse-cloud)"],
     ),
     "databricks": DependencyInfo(
         name="databricks",
@@ -433,10 +462,18 @@ DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
         use_cases=["Columnar analytics", "Fast OLAP queries", "Distributed MPP"],
         platforms=["StarRocks"],
     ),
+    "singlestore": DependencyInfo(
+        name="singlestore",
+        description="SingleStore distributed SQL database (Helios + self-managed)",
+        packages=["singlestoredb"],
+        install_command="uv add benchbox --extra singlestore",
+        use_cases=["Real-time analytics", "HTAP workloads", "Distributed OLAP", "MySQL-compatible analytics"],
+        platforms=["SingleStore Helios", "SingleStore Self-Managed"],
+    ),
     "postgresql": DependencyInfo(
         name="postgresql",
         description="PostgreSQL open-source relational database connector",
-        packages=["psycopg2-binary"],
+        packages=["psycopg"],
         install_command="uv add benchbox --extra postgresql",
         use_cases=["Row-store baseline", "OLTP benchmarks", "TimescaleDB time-series"],
         platforms=["PostgreSQL", "TimescaleDB"],
@@ -444,7 +481,7 @@ DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
     "questdb": DependencyInfo(
         name="questdb",
         description="QuestDB time-series database connector (via PostgreSQL wire protocol)",
-        packages=["psycopg2-binary", "requests"],
+        packages=["psycopg", "requests"],
         install_command="uv add benchbox --extra questdb",
         use_cases=["Time-series analytics", "High-throughput ingestion", "Columnar OLAP"],
         platforms=["QuestDB"],
@@ -545,6 +582,19 @@ DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
         use_cases=["Spark-compatible SQL", "High-performance analytics", "DataFusion-based"],
         platforms=["LakeSail Sail"],
     ),
+    "velox": DependencyInfo(
+        name="velox",
+        description="Apache Gluten + Velox Spark acceleration (native C++ engine via Gluten plugin)",
+        packages=["pyspark"],
+        install_command="uv add benchbox --extra velox",
+        use_cases=[
+            "Spark-compatible SQL",
+            "Native C++ acceleration",
+            "TPC-H/TPC-DS benchmarking",
+            "Accelerated-Spark tier comparison",
+        ],
+        platforms=["Apache Gluten + Velox"],
+    ),
     "snowpark-connect": DependencyInfo(
         name="snowpark-connect",
         description="Snowpark Connect PySpark-compatible API on Snowflake",
@@ -608,7 +658,7 @@ DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
             "snowflake-snowpark-python",  # Snowpark Connect
             "trino",
             "presto-python-client",
-            "psycopg2-binary",
+            "psycopg",
             "pyodbc",
             "pyathena",
             "pyspark",
@@ -621,10 +671,15 @@ DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
             # InfluxDB 3.0
             "influxdb3-python",
             "pyarrow",  # For InfluxDB and DataFusion
+            # ClickHouse Local (chDB embedded) & Cloud (clickhouse-connect)
+            "chdb",
+            "clickhouse-connect",
             # Databend
             "databend-driver",
             # MySQL-protocol platforms (StarRocks, Doris)
             "pymysql",
+            # SingleStore
+            "singlestoredb",
         ],
         install_command="uv add benchbox --extra all",
         use_cases=["Complete platform coverage", "Testing all adapters", "Maximum flexibility"],

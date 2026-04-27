@@ -11,7 +11,9 @@ Copyright 2026 Joe Harris / BenchBox Project
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -143,6 +145,7 @@ class MockExpressionAdapter(ExpressionFamilyAdapter[dict, dict, str]):
         delimiter: str = ",",
         has_header: bool = True,
         column_names: list[str] | None = None,
+        null_marker: str | None = None,
     ) -> dict:
         return {"type": "csv", "path": str(path), "delimiter": delimiter}
 
@@ -266,6 +269,8 @@ class TestExpressionFamilyAdapter:
         assert adapter.platform_name == "MockExpression"
         assert adapter.family == "expression"
         assert adapter.verbose is False
+        assert adapter.table_mode == "native"
+        assert adapter.platform_config == {}
 
     def test_adapter_initialization_with_options(self):
         """Test adapter initialization with options."""
@@ -441,6 +446,28 @@ class TestExpressionFamilyAdapter:
 
         with pytest.raises(ValueError, match="No files provided"):
             adapter.load_table(ctx, "orders", [])
+
+    def test_load_tables_from_data_source_uses_default_loading_contract(self, tmp_path):
+        """Shared loading should work for plain expression-family subclasses."""
+        adapter = MockExpressionAdapter()
+        ctx = adapter.create_context()
+        data_file = tmp_path / "orders.tbl"
+        data_file.write_text("1|2|\n")
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = MagicMock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = SimpleNamespace(tables={"orders": [data_file]}, table_formats={})
+
+            stats = adapter.load_tables_from_data_source(ctx, tmp_path)
+
+        assert stats == {"orders": 10}
+        assert mock_cls.call_args.kwargs == {
+            "platform_name": "MockExpression",
+            "table_mode": "native",
+            "platform_config": {},
+            "requested_format": None,
+        }
 
 
 class TestExpressionFamilyAdapterAbstract:

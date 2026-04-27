@@ -111,7 +111,7 @@ def test_show_sample_queries_handles_empty_query_registry(monkeypatch: pytest.Mo
     console, stream = _capture_console()
     monkeypatch.setattr(bench_mod, "console", console)
 
-    class _Benchmark:
+    class _Benchmark:  # noqa: B903 - test stub, not domain model
         queries: dict[str, str] = {}
 
         def __init__(self, scale_factor: float):
@@ -128,7 +128,7 @@ def test_show_sample_queries_truncates_long_sql(monkeypatch: pytest.MonkeyPatch,
     console, stream = _capture_console()
     monkeypatch.setattr(bench_mod, "console", console)
 
-    class _Benchmark:
+    class _Benchmark:  # noqa: B903 - test stub, not domain model
         queries = {"Q1": "SELECT 1\n" * 200}
 
         def __init__(self, scale_factor: float):
@@ -189,7 +189,6 @@ def test_configure_benchmark_builds_config_from_prompted_values(
     monkeypatch.setattr(manager, "_prompt_scale", lambda *_args: 0.1)
     monkeypatch.setattr(manager, "_prompt_concurrency", lambda *_args: 2)
     monkeypatch.setattr(manager, "_prompt_compression", lambda: (True, "gzip", 6))
-    monkeypatch.setattr(manager, "_prompt_execution_type", lambda *_args: "power")
     monkeypatch.setattr(manager, "_display_configuration_summary", lambda *_args, **_kwargs: None)
 
     config = manager._configure_benchmark("tpch", manager.benchmarks["tpch"])
@@ -200,7 +199,9 @@ def test_configure_benchmark_builds_config_from_prompted_values(
     assert config.compress_data is True
     assert config.compression_type == "gzip"
     assert config.compression_level == 6
-    assert config.test_execution_type == "power"
+    # test_execution_type is now derived from phases in run.py, not the wizard;
+    # the BenchmarkConfig default ("standard") is expected here.
+    assert config.test_execution_type == "standard"
     assert config.options["recommended_scale"] == 0.1
 
 
@@ -279,17 +280,15 @@ def test_prompt_compression_gzip_prompts_for_level(monkeypatch: pytest.MonkeyPat
     assert compression_level == 6
 
 
-def test_prompt_execution_type_uses_tpc_choices(monkeypatch: pytest.MonkeyPatch, manager: BenchmarkManager):
-    monkeypatch.setattr(bench_mod.IntPrompt, "ask", lambda *_args, **_kwargs: 2)
+def test_prompt_execution_type_method_removed(manager: BenchmarkManager):
+    """The dead 'Test Execution Type' wizard step has been removed.
 
-    execution_type = manager._prompt_execution_type("tpch", manager.benchmarks["tpch"])
-
-    assert execution_type == "power"
-
-
-def test_prompt_execution_type_defaults_for_non_tpc(manager: BenchmarkManager):
-    execution_type = manager._prompt_execution_type("clickbench", manager.benchmarks["clickbench"])
-    assert execution_type == "standard"
+    Execution type is derived from phases in the CLI flow (see run.py
+    `_derive_execution_type`); the BenchmarkManager no longer exposes a
+    prompt for it.
+    """
+    assert not hasattr(manager, "_prompt_execution_type")
+    assert not hasattr(type(manager), "TPC_EXECUTION_TYPES")
 
 
 def test_display_configuration_summary_includes_subset_and_compression(
@@ -307,7 +306,6 @@ def test_display_configuration_summary_includes_subset_and_compression(
         compress_data=True,
         compression_type="zstd",
         compression_level=3,
-        test_execution_type="power",
     )
 
     output = stream.getvalue()
@@ -315,6 +313,8 @@ def test_display_configuration_summary_includes_subset_and_compression(
     assert "2 of 22 (subset)" in output
     assert "zstd (level 3)" in output
     assert "~0.1GB" in output
+    # Execution type is no longer displayed here - derived later from phases.
+    assert "Execution Type" not in output
 
 
 def test_get_system_profile_falls_back_when_profiler_errors(monkeypatch: pytest.MonkeyPatch, manager: BenchmarkManager):
@@ -342,6 +342,14 @@ def test_get_system_profile_falls_back_when_profiler_errors(monkeypatch: pytest.
 def test_get_recommended_scale_uses_memory_tiers(manager: BenchmarkManager, memory_gb: int, expected: float):
     benchmark_info = manager.benchmarks["tpch"]
     assert manager._get_recommended_scale(benchmark_info, {"memory_gb": memory_gb}) == expected
+
+
+@pytest.mark.parametrize("memory_gb", [8, 16, 24, 64])
+def test_get_recommended_scale_returns_value_in_options(manager: BenchmarkManager, memory_gb: int):
+    """Recommendation must always be a member of scale_options, even when min scale > 0.1 (e.g. TPC-DS)."""
+    benchmark_info = {"scale_options": [1.0, 10.0, 100.0]}
+    recommended = manager._get_recommended_scale(benchmark_info, {"memory_gb": memory_gb})
+    assert recommended in benchmark_info["scale_options"]
 
 
 def test_validate_scale_choice_rejects_below_minimum(monkeypatch: pytest.MonkeyPatch, manager: BenchmarkManager):

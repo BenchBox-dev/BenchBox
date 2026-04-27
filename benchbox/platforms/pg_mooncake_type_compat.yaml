@@ -1,0 +1,238 @@
+# pg_mooncake Column Type Compatibility Matrix
+#
+# Documents which PostgreSQL column types are supported for columnstore tables
+# in pg_mooncake. Columnstore tables store data as Parquet files with Iceberg
+# metadata via DuckDB. Type support is therefore bounded by what DuckDB can
+# represent in Parquet.
+#
+# Version tagging:
+#   The Docker image (mooncakelabs/pg_mooncake:latest) does not pin a version.
+#   This matrix was compiled from the pg_mooncake 0.1.x release notes and
+#   GitHub issues as of 2026-02. To verify live against the installed extension
+#   version, run:
+#     SELECT extversion FROM pg_extension WHERE extname = 'pg_mooncake';
+#   Then compare with https://github.com/Mooncake-Labs/pg_mooncake/releases
+#
+# Status values:
+#   supported   - Works as expected; no known caveats
+#   partial     - Works with caveats; see notes
+#   unsupported - Not representable in the columnstore (DuckDB/Parquet)
+#
+# Parquet mapping column shows the physical Parquet/DuckDB type used for storage.
+# Precision loss or semantic changes are noted where applicable.
+
+pg_mooncake_version_range: "0.1.x"
+generated_from: "pg_mooncake release notes, GitHub issues, and DuckDB Parquet type mapping"
+generated_date: "2026-02-18"
+note: >
+  Re-verify type support after each pg_mooncake release. Use the live query
+  above to confirm the installed version before relying on this matrix.
+
+types:
+  # ── Numeric types ──────────────────────────────────────────────────────────
+
+  - pg_type: boolean
+    aliases: [bool]
+    status: supported
+    parquet_mapping: BOOLEAN
+
+  - pg_type: smallint
+    aliases: [int2]
+    status: supported
+    parquet_mapping: INT32 (bit_width=16)
+
+  - pg_type: integer
+    aliases: [int4, int]
+    status: supported
+    parquet_mapping: INT32
+
+  - pg_type: bigint
+    aliases: [int8]
+    status: supported
+    parquet_mapping: INT64
+
+  - pg_type: real
+    aliases: [float4]
+    status: supported
+    parquet_mapping: FLOAT
+
+  - pg_type: double precision
+    aliases: [float8]
+    status: supported
+    parquet_mapping: DOUBLE
+
+  - pg_type: "numeric / decimal"
+    aliases: [numeric, decimal]
+    status: partial
+    parquet_mapping: DOUBLE
+    notes: >
+      Stored as DOUBLE (64-bit float). Precision/scale declarations are accepted
+      but not enforced at the storage layer. Values with more than ~15 significant
+      digits may lose precision. Use double precision directly if exact decimal
+      semantics are not required.
+
+  # ── Character types ────────────────────────────────────────────────────────
+
+  - pg_type: text
+    status: supported
+    parquet_mapping: BYTE_ARRAY (STRING logical type)
+
+  - pg_type: "character varying"
+    aliases: [varchar]
+    status: supported
+    parquet_mapping: BYTE_ARRAY (STRING logical type)
+    notes: Length limit is accepted but not enforced at the columnstore layer.
+
+  - pg_type: character
+    aliases: [char, bpchar]
+    status: partial
+    parquet_mapping: BYTE_ARRAY (STRING logical type)
+    notes: >
+      Stored as variable-length string. Fixed-length padding semantics are not
+      preserved at the columnstore layer; trailing spaces may be stripped.
+
+  - pg_type: "\"char\""
+    status: unsupported
+    notes: Internal single-byte pseudo-type. Not mappable to Parquet.
+
+  # ── Binary types ───────────────────────────────────────────────────────────
+
+  - pg_type: bytea
+    status: supported
+    parquet_mapping: BYTE_ARRAY
+
+  # ── Date/time types ────────────────────────────────────────────────────────
+
+  - pg_type: date
+    status: supported
+    parquet_mapping: INT32 (DATE logical type)
+
+  - pg_type: "timestamp without time zone"
+    aliases: [timestamp]
+    status: supported
+    parquet_mapping: INT64 (TIMESTAMP_MICROS, isAdjustedToUTC=false)
+
+  - pg_type: "timestamp with time zone"
+    aliases: [timestamptz]
+    status: supported
+    parquet_mapping: INT64 (TIMESTAMP_MICROS, isAdjustedToUTC=true)
+    notes: Stored as UTC; timezone offset is not preserved, only the instant.
+
+  - pg_type: "time without time zone"
+    aliases: [time]
+    status: partial
+    parquet_mapping: INT64 (TIME_MICROS)
+    notes: Works for most values; sub-microsecond precision is not preserved.
+
+  - pg_type: "time with time zone"
+    aliases: [timetz]
+    status: unsupported
+    notes: Timezone-aware time is not representable in Parquet without loss.
+
+  - pg_type: interval
+    status: unsupported
+    notes: >
+      Parquet has no native interval type. pg_mooncake does not currently
+      provide a serialization path for PostgreSQL interval values.
+
+  # ── Other supported types ──────────────────────────────────────────────────
+
+  - pg_type: uuid
+    status: supported
+    parquet_mapping: FIXED_LEN_BYTE_ARRAY(16) (UUID logical type)
+
+  - pg_type: json
+    status: partial
+    parquet_mapping: BYTE_ARRAY (STRING logical type)
+    notes: Stored as raw JSON text. JSON operators work via DuckDB's JSON extension.
+
+  # ── Unsupported types ──────────────────────────────────────────────────────
+
+  - pg_type: jsonb
+    status: unsupported
+    notes: >
+      No native Parquet representation. jsonb values are not automatically
+      serialized; use json (text) or extract scalar fields into typed columns.
+
+  - pg_type: "array types"
+    examples: ["integer[]", "text[]", "boolean[]"]
+    status: unsupported
+    notes: >
+      Parquet LIST type is not wired to PostgreSQL array types in pg_mooncake 0.1.x.
+      Tracked upstream.
+
+  - pg_type: hstore
+    status: unsupported
+    notes: Extension type with no Parquet mapping.
+
+  - pg_type: xml
+    status: unsupported
+    notes: Stored as text in PostgreSQL but not exposed as a Parquet-compatible type.
+
+  - pg_type: money
+    status: unsupported
+    notes: PostgreSQL money type; no Parquet mapping.
+
+  - pg_type: bit
+    status: unsupported
+    notes: Fixed-width bit string; no Parquet mapping.
+
+  - pg_type: "bit varying"
+    aliases: [varbit]
+    status: unsupported
+    notes: Variable-width bit string; no Parquet mapping.
+
+  - pg_type: cidr
+    status: unsupported
+    notes: Network address type; no Parquet mapping.
+
+  - pg_type: inet
+    status: unsupported
+    notes: Network address type; no Parquet mapping.
+
+  - pg_type: macaddr
+    status: unsupported
+    notes: MAC address type; no Parquet mapping.
+
+  - pg_type: macaddr8
+    status: unsupported
+    notes: EUI-64 MAC address; no Parquet mapping.
+
+  - pg_type: tsvector
+    status: unsupported
+    notes: Full-text search type; not Parquet-representable.
+
+  - pg_type: tsquery
+    status: unsupported
+    notes: Full-text query type; not Parquet-representable.
+
+  - pg_type: "geometric types"
+    examples: [point, line, lseg, box, path, polygon, circle]
+    status: unsupported
+    notes: PostgreSQL geometric primitives; no Parquet mapping.
+
+  - pg_type: "user-defined types (UDTs)"
+    status: unsupported
+    notes: >
+      Custom composite and enum types are not currently supported in the
+      columnstore. Use scalar equivalents (e.g., text for enum labels).
+
+  - pg_type: "domain types"
+    status: partial
+    notes: >
+      Domains over supported base types (e.g., a domain over integer) may work
+      but the domain constraint is not enforced at the columnstore layer.
+      Test each domain type individually.
+
+  - pg_type: "composite types"
+    status: unsupported
+    notes: Struct/row types; no Parquet mapping in pg_mooncake 0.1.x.
+
+  - pg_type: oid
+    status: unsupported
+    notes: PostgreSQL internal object identifier; not meaningful in columnstore.
+
+  - pg_type: "range types"
+    examples: [int4range, tsrange, daterange]
+    status: unsupported
+    notes: Range types have no Parquet representation.

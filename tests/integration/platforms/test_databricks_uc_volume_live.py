@@ -126,7 +126,7 @@ def test_uc_volume_single_file_upload_and_download(
         download_path = f"/Volumes/{databricks_adapter.uc_catalog}/{databricks_adapter.uc_schema}/{databricks_adapter.uc_volume}/customer.tbl.zst"
 
         # Read back the uploaded content
-        with workspace.files.download(download_path) as download_response:  # type: ignore[invalid-context-manager]
+        with workspace.files.download(download_path) as download_response:  # ty: ignore[invalid-context-manager]
             downloaded_content = download_response.contents.read()
 
         # Verify content matches
@@ -197,12 +197,12 @@ def test_uc_volume_sharded_files_upload_and_download(
 
         # Download shard 1
         shard1_path = f"/Volumes/{databricks_adapter.uc_catalog}/{databricks_adapter.uc_schema}/{databricks_adapter.uc_volume}/orders.tbl.1.zst"
-        with workspace.files.download(shard1_path) as download_response:  # type: ignore[invalid-context-manager]
+        with workspace.files.download(shard1_path) as download_response:  # ty: ignore[invalid-context-manager]
             downloaded_shard1 = download_response.contents.read()
 
         # Download shard 2
         shard2_path = f"/Volumes/{databricks_adapter.uc_catalog}/{databricks_adapter.uc_schema}/{databricks_adapter.uc_volume}/orders.tbl.2.zst"
-        with workspace.files.download(shard2_path) as download_response:  # type: ignore[invalid-context-manager]
+        with workspace.files.download(shard2_path) as download_response:  # ty: ignore[invalid-context-manager]
             downloaded_shard2 = download_response.contents.read()
 
         # Verify contents match
@@ -339,7 +339,7 @@ def test_uc_volume_nonexistent_file_is_skipped(databricks_adapter: DatabricksAda
         )
 
         customer_path = f"/Volumes/{databricks_adapter.uc_catalog}/{databricks_adapter.uc_schema}/{databricks_adapter.uc_volume}/customer.tbl.zst"
-        with workspace.files.download(customer_path) as download_response:  # type: ignore[invalid-context-manager]
+        with workspace.files.download(customer_path) as download_response:  # ty: ignore[invalid-context-manager]
             downloaded_content = download_response.contents.read()
 
         assert downloaded_content == valid_content

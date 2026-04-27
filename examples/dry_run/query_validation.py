@@ -43,7 +43,7 @@ def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb")
     valid_queries = 0
 
     for query_file in query_files:
-        with open(query_file) as f:
+        with open(query_file, encoding="utf-8") as f:
             content = f.read()
 
         # Basic checks

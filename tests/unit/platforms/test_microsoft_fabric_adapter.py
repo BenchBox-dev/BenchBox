@@ -448,3 +448,161 @@ class TestLifecycle:
 
         # Should not raise
         fabric_adapter.close_connection(mock_connection)
+
+
+# ---------------------------------------------------------------------------
+# _get_access_token auth method branching
+# ---------------------------------------------------------------------------
+
+
+class TestGetAccessToken:
+    """Test _get_access_token branches for each auth method."""
+
+    def test_service_principal_uses_client_secret_credential(self, fabric_adapter):
+        mock_csc = Mock()
+        mock_csc.get_token.return_value = Mock(token="sp-token")
+
+        mock_identity = Mock()
+        mock_identity.ClientSecretCredential.return_value = mock_csc
+        mock_identity.DefaultAzureCredential = Mock()
+        mock_identity.InteractiveBrowserCredential = Mock()
+
+        with patch.dict("sys.modules", {"azure.identity": mock_identity}):
+            token = fabric_adapter._get_access_token()
+
+        assert token == "sp-token"
+        mock_identity.ClientSecretCredential.assert_called_once_with(
+            tenant_id="test-tenant-id",
+            client_id="test-client-id",
+            client_secret="test-client-secret",
+        )
+
+    def test_default_credential_path(self, fabric_stubs):
+        adapter = FabricWarehouseAdapter(
+            workspace="wsp",
+            database="db",
+            auth_method="default_credential",
+        )
+
+        mock_cred = Mock()
+        mock_cred.get_token.return_value = Mock(token="default-token")
+
+        mock_identity = Mock()
+        mock_identity.ClientSecretCredential = Mock()
+        mock_identity.DefaultAzureCredential.return_value = mock_cred
+        mock_identity.InteractiveBrowserCredential = Mock()
+
+        with patch.dict("sys.modules", {"azure.identity": mock_identity}):
+            token = adapter._get_access_token()
+
+        assert token == "default-token"
+        mock_identity.DefaultAzureCredential.assert_called_once()
+
+    def test_import_error_raises_helpful_message(self, fabric_adapter):
+        with patch.dict("sys.modules", {"azure.identity": None}):
+            with pytest.raises(ImportError):
+                fabric_adapter._get_access_token()
+
+
+# ---------------------------------------------------------------------------
+# configure_for_benchmark
+# ---------------------------------------------------------------------------
+
+
+class TestConfigureForBenchmark:
+    """Test configure_for_benchmark applies expected SQL."""
+
+    def test_olap_benchmark_sets_ansi_and_clears_cache(self, fabric_adapter):
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        fabric_adapter.configure_for_benchmark(mock_connection, benchmark_type="tpch")
+
+        executed = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        assert any("ANSI_NULLS" in sql for sql in executed)
+        assert any("ANSI_PADDING" in sql for sql in executed)
+        assert any("ANSI_WARNINGS" in sql for sql in executed)
+
+    def test_non_olap_benchmark_skips_query_store(self, fabric_adapter):
+        """Non-OLAP benchmark type should not call QUERY_STORE CLEAR."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        fabric_adapter.configure_for_benchmark(mock_connection, benchmark_type="write")
+
+        executed = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        assert not any("QUERY_STORE" in sql for sql in executed)
+
+
+# ---------------------------------------------------------------------------
+# get_platform_info basic fields
+# ---------------------------------------------------------------------------
+
+
+class TestGetPlatformInfoFabric:
+    """Test get_platform_info without a live connection."""
+
+    def test_basic_fields_present(self, fabric_adapter, fabric_stubs):
+        fabric_stubs.connect.side_effect = Exception("no connection in test")
+
+        info = fabric_adapter.get_platform_info()
+
+        assert info["platform"] == "Fabric Warehouse"
+        assert info["dialect"] == FABRIC_DIALECT
+        assert info["server"] == "test-workspace-guid.datawarehouse.fabric.microsoft.com"
+        assert info["database"] == "test_warehouse"
+        assert info["auth_method"] == "service_principal"
+        assert info["supported_item_type"] == "Warehouse"
+
+
+# ---------------------------------------------------------------------------
+# Item type warning for unsupported types
+# ---------------------------------------------------------------------------
+
+
+class TestItemTypeWarning:
+    """Test that non-Warehouse item types emit a warning."""
+
+    def test_lakehouse_item_type_emits_warning(self, fabric_stubs):
+        with pytest.warns(UserWarning, match="only supports Warehouse items"):
+            FabricWarehouseAdapter(
+                workspace="wsp",
+                database="db",
+                auth_method="default_credential",
+                item_type="Lakehouse",
+            )
+
+
+# ---------------------------------------------------------------------------
+# add_cli_arguments
+# ---------------------------------------------------------------------------
+
+
+class TestFabricAddCliArguments:
+    """Test add_cli_arguments registers expected flags."""
+
+    def test_workspace_arg(self):
+        import argparse
+
+        parser = argparse.ArgumentParser()
+        FabricWarehouseAdapter.add_cli_arguments(parser)
+        args = parser.parse_args(["--workspace", "my-workspace-guid"])
+        assert args.workspace == "my-workspace-guid"
+
+    def test_auth_method_default(self):
+        import argparse
+
+        parser = argparse.ArgumentParser()
+        FabricWarehouseAdapter.add_cli_arguments(parser)
+        args = parser.parse_args([])
+        assert args.auth_method == "default_credential"
+
+    def test_staging_path_default(self):
+        import argparse
+
+        parser = argparse.ArgumentParser()
+        FabricWarehouseAdapter.add_cli_arguments(parser)
+        args = parser.parse_args([])
+        assert args.staging_path == "benchbox-staging"

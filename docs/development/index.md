@@ -40,6 +40,10 @@ Documentation for contributors and developers working on BenchBox.
 - [Testing Index](../testing/index.md) - Test documentation overview
 - [Live Integration Tests](../testing/live-integration-tests.md) - Running tests against live databases
 
+## Results & Validation
+
+- [Result Integrity Validation](result-integrity-validation.md) - Three-tier validator: structural, completeness, and believability checks for result JSON files
+
 ## Reference
 
 - [Read Primitives Catalog](read-primitives-catalog.md) - Catalog of primitive read operations
@@ -72,5 +76,6 @@ data-sharing
 dependency-compatibility
 db-api-2
 test-quality-guidelines
+result-integrity-validation
 ../platform-config-audit
 ```

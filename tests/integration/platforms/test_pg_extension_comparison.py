@@ -10,7 +10,7 @@ results, and produces a comparison report. Requires both Docker services running
 
     make test-docker-up-pg-extensions
 
-These tests are intentionally slow and serial — each benchmark run creates real
+These tests are intentionally slow and serial - each benchmark run creates real
 tables, loads data, and executes queries against live PostgreSQL instances.
 """
 
@@ -137,7 +137,7 @@ def _run_benchmark_via_adapter(
             )
     finally:
         try:
-            # Drop tables by unqualified name — relies on the adapter landing tables
+            # Drop tables by unqualified name - relies on the adapter landing tables
             # in the default search_path (public).  No schema is set before create_schema,
             # so the DROP will find the tables as long as that invariant holds.
             cursor = connection.cursor()

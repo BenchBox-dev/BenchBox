@@ -53,8 +53,6 @@ LakeSail Sail is a Rust-based, drop-in replacement for Apache Spark built on Dat
 
 ---
 
----
-
 ### Medium-High Priority
 
 #### Apache Doris (MPP OLAP Engine)
@@ -87,10 +85,6 @@ Linux Foundation project with 11,000+ GitHub stars, used by Airbnb, Alibaba, Coi
 
 ---
 
----
-
----
-
 #### ClickHouse Cloud & Firebolt Cloud
 
 **Status**: Not Started | **Effort**: Small
@@ -116,8 +110,6 @@ High-performance time-series database optimized for real-time analytics.
 - InfluxDB line protocol support
 - SQL interface with time-series extensions
 - Columnar storage with time-based partitioning
-
----
 
 ---
 

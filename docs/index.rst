@@ -34,7 +34,10 @@ BenchBox is a comprehensive database benchmarking toolkit supporting TPC-H, TPC-
    benchmarks/tpc-standards
    benchmarks/academic-benchmarks
    benchmarks/industry-benchmarks
+   benchmarks/real-world-benchmarks
+   benchmarks/time-series-benchmarks
    benchmarks/benchbox-primitives
+   benchmarks/ai-ml-benchmarks
    benchmarks/benchbox-experimental
 
 .. toctree::
@@ -59,6 +62,13 @@ BenchBox is a comprehensive database benchmarking toolkit supporting TPC-H, TPC-
    guides/compression.md
    advanced/index.md
    visualization/overview.md
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Contributing
+
+   contributing-results.md
+   operations/results-phase-2-runbook.md
 
 .. toctree::
    :maxdepth: 2
@@ -91,4 +101,3 @@ BenchBox is a comprehensive database benchmarking toolkit supporting TPC-H, TPC-
    _tags/cat-platform-type
    _tags/cat-content-type
    _tags/cat-feature
-

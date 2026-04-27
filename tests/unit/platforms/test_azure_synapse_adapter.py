@@ -13,6 +13,7 @@ import pytest
 
 import benchbox.platforms.azure_synapse as synapse_module
 from benchbox.platforms.azure_synapse import SYNAPSE_DIALECT, AzureSynapseAdapter
+from benchbox.platforms.base.data_loading import DataSource
 
 pytestmark = [
     pytest.mark.unit,
@@ -749,11 +750,12 @@ class TestAzureSynapseDataLoading:
             storage_sas_token="sv=2025-01-01&sig=fake",
         )
 
+        ds = DataSource(source_type="test", tables={"orders": [csv_file]})
         with (
             patch.object(adapter, "_setup_external_data_source"),
             patch.object(adapter, "_upload_to_blob", return_value=["https://blob/orders.csv"]),
         ):
-            stats = adapter._load_data_via_blob(mock_cursor, {"orders": [csv_file]}, tmp_path)
+            stats = adapter._load_data_via_blob(mock_cursor, ds, tmp_path)
 
         assert stats == {"orders": 2}
         execute_sql = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
@@ -780,11 +782,12 @@ class TestAzureSynapseDataLoading:
             storage_credential="BENCHBOX_SHARED_CRED",
         )
 
+        ds = DataSource(source_type="test", tables={"orders": [csv_file]})
         with (
             patch.object(adapter, "_setup_external_data_source"),
             patch.object(adapter, "_upload_to_blob", return_value=["https://blob/orders.csv"]),
         ):
-            stats = adapter._load_data_via_blob(mock_cursor, {"orders": [csv_file]}, tmp_path)
+            stats = adapter._load_data_via_blob(mock_cursor, ds, tmp_path)
 
         assert stats == {"orders": 1}
         copy_sql = str(mock_cursor.execute.call_args_list[0].args[0])
@@ -1059,3 +1062,97 @@ class TestSynapseMasterKeyPassword:
         # The hardcoded password must NOT appear
         assert "BenchBox#Temp123!" not in sql1
         assert "BenchBox#Temp123!" not in sql2
+
+
+# ---------------------------------------------------------------------------
+# Data loading - _resolve_data_files and load_data delegation
+# ---------------------------------------------------------------------------
+
+
+class TestAzureSynapseDataLoading:
+    """Tests for _resolve_data_files and load_data DataSourceResolver delegation."""
+
+    def test_resolve_data_files_returns_tables_from_resolver(self, tmp_path, synapse_stubs):
+        """_resolve_data_files delegates to DataSourceResolver and returns the DataSource."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="u",
+            password="p",
+        )
+        expected_tables = {"customer": [tmp_path / "customer.tbl"]}
+        fake_ds = DataSource(source_type="test", tables=expected_tables)
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = Mock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = fake_ds
+
+            result = adapter._resolve_data_files(Mock(), tmp_path)
+
+        assert result.tables == expected_tables
+        assert mock_cls.call_args.kwargs.get("platform_name") == adapter.platform_name
+
+    def test_resolve_data_files_raises_when_resolver_returns_none(self, tmp_path, synapse_stubs):
+        """_resolve_data_files raises ValueError when DataSourceResolver returns None."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="u",
+            password="p",
+        )
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = Mock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = None
+
+            with pytest.raises(ValueError, match="No data files found"):
+                adapter._resolve_data_files(Mock(), tmp_path)
+
+    def test_resolve_data_files_raises_when_tables_empty(self, tmp_path, synapse_stubs):
+        """_resolve_data_files raises ValueError when resolver returns empty tables."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="u",
+            password="p",
+        )
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = Mock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = Mock(tables={})
+
+            with pytest.raises(ValueError, match="No data files found"):
+                adapter._resolve_data_files(Mock(), tmp_path)
+
+    def test_load_data_delegates_to_resolve_data_files(self, tmp_path, synapse_stubs):
+        """load_data calls self._resolve_data_files instead of duplicating resolution logic."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="u",
+            password="p",
+        )
+        data_files = {"customer": [tmp_path / "customer.tbl"]}
+
+        with (
+            patch.object(adapter, "_resolve_data_files", return_value=data_files) as mock_resolve,
+            patch.object(adapter, "_load_data_direct", return_value={"customer": 10}),
+        ):
+            mock_conn = Mock()
+            mock_conn.cursor.return_value = Mock()
+            adapter.load_data(Mock(), mock_conn, tmp_path)
+
+        mock_resolve.assert_called_once()
+
+    def test_load_data_propagates_resolve_error(self, tmp_path, synapse_stubs):
+        """load_data propagates ValueError raised by _resolve_data_files."""
+        adapter = AzureSynapseAdapter(
+            server="test.sql.azuresynapse.net",
+            username="u",
+            password="p",
+        )
+
+        with patch.object(adapter, "_resolve_data_files", side_effect=ValueError("No data files found")):
+            mock_conn = Mock()
+            mock_conn.cursor.return_value = Mock()
+            with pytest.raises(ValueError, match="No data files found"):
+                adapter.load_data(Mock(), mock_conn, tmp_path)

@@ -21,23 +21,27 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import argparse
+import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from benchbox.core.sql_utils import normalize_table_name_in_sql
 from benchbox.utils.clock import elapsed_seconds, mono_time
-
-if TYPE_CHECKING:
-    from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
-        PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
-        UnifiedTuningConfiguration,
-    )
 
 from ..utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
+)
+from ._spark_helpers import (
+    SparkLikeAdapterMixin,
+    analyze_spark_table,
+    get_spark_query_plan,
+    is_spark_connect_reachable,
+    list_spark_tables,
+    optimize_spark_table_definition,
+    parse_spark_connect_endpoint,
+    purge_orphaned_warehouse_directory,
+    run_spark_schema_creation_loop,
+    validate_spark_identifier,
 )
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionMixin
@@ -62,7 +66,7 @@ except ImportError:
     DoubleType = None
 
 
-class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
+class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
     """LakeSail Sail platform adapter for Spark-compatible SQL execution.
 
     LakeSail Sail is a Rust-based, drop-in replacement for Apache Spark that
@@ -80,6 +84,25 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
     """
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
+
+    # Sail's CSV reader accepts zstd but doesn't auto-detect from file
+    # extensions, so we must pass it explicitly (unlike Apache Spark).
+    _csv_compression_codecs: frozenset[str] = SparkDataLoadMixin._csv_compression_codecs | frozenset({"zstd"})
+
+    # Sail's file scanner only recognises the .csv extension for CSV reads.
+    # Files with .dat or .tbl extensions are symlinked to .csv before loading.
+    _requires_csv_extension: bool = True
+
+    # Spark Connect does not implement PlanNode::Persist - df.cache() and
+    # df.unpersist() are no-ops. Without a working cache, the count()-before-
+    # write pattern in SparkDataLoadMixin would double-scan every parquet file.
+    # Setting False switches to write-first, then one SQL COUNT(*) delta per
+    # table after all chunks have been appended.
+    _df_caching_supported: bool = False
+
+    # Spark Connect does not implement PlanNode::ClearCache, so disable_cache
+    # must not call spark.catalog.clearCache() in the shared query mixin.
+    _catalog_clear_cache_supported: bool = False
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -115,11 +138,18 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
         # Extra Spark configuration properties
         self.spark_config = config.get("spark_config") or {}
 
-        # Result cache control - disable by default for accurate benchmarking
+        # Result cache control. When True, disable in-memory columnar caching at
+        # session creation via spark.sql.inMemoryColumnarStorage.enabled=false.
+        # LakeSail keeps the same default benchmark semantics as Spark, but skips
+        # the unsupported per-query clearCache() call via
+        # _catalog_clear_cache_supported=False.
         self.disable_cache = config.get("disable_cache") if config.get("disable_cache") is not None else True
 
         # Store SparkSession reference
         self._spark_session = None
+
+        # Subprocess handle for auto-started local server (managed lifecycle)
+        self._managed_server_process = None
 
     @property
     def platform_name(self) -> str:
@@ -324,7 +354,7 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
         """Drop database on the Sail server."""
         database = connection_config.get("database", self.database)
 
-        if not self._validate_identifier(database):
+        if not validate_spark_identifier(database):
             raise ValueError(f"Invalid database identifier: {database}")
 
         if not self.check_server_database_exists(database=database):
@@ -349,14 +379,83 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
                 except Exception:
                     pass
 
-    def _validate_identifier(self, identifier: str) -> bool:
-        """Validate SQL identifier to prevent injection attacks."""
-        if not identifier:
-            return False
-        import re
+    def _auto_start_local_server(self) -> None:
+        """Start pysail Spark Connect server as a managed subprocess (local mode only)."""
+        import atexit
+        import sys
+        import time
 
-        pattern = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
-        return bool(re.match(pattern, identifier)) and len(identifier) <= 128
+        host, port = parse_spark_connect_endpoint(self.endpoint)
+        self.log_verbose("Sail server not running - auto-starting local pysail server...")
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "pysail", "spark", "server", "--ip", host, "--port", str(port)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+
+        # Register atexit handler as safety net in case close_connection is never called
+        def _cleanup_server():
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+
+        atexit.register(_cleanup_server)
+
+        # Wait up to 10 seconds for the server to accept connections
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            # Check if the process crashed before we even connect
+            if proc.poll() is not None:
+                stderr_output = proc.stderr.read().decode(errors="replace").strip() if proc.stderr else ""
+                detail = f": {stderr_output}" if stderr_output else ""
+                raise RuntimeError(
+                    f"pysail server exited immediately (code {proc.returncode}){detail}. "
+                    f"Start it manually: {sys.executable} -m pysail spark server"
+                )
+            time.sleep(0.5)
+            if is_spark_connect_reachable(self.endpoint):
+                self._managed_server_process = proc
+                self._managed_server_atexit = _cleanup_server
+                self.log_verbose("pysail server started and ready")
+                return
+
+        # Timeout - collect stderr for diagnostics
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        stderr_output = proc.stderr.read().decode(errors="replace").strip() if proc.stderr else ""
+        detail = f"\nServer stderr: {stderr_output}" if stderr_output else ""
+        raise RuntimeError(
+            f"Auto-started pysail server did not become ready within 10 seconds.{detail}\n"
+            f"Start it manually: {sys.executable} -m pysail spark server"
+        )
+
+    def _ensure_server_ready(self) -> None:
+        """Ensure the Sail server is reachable; auto-start in local mode if not."""
+        if is_spark_connect_reachable(self.endpoint):
+            return
+
+        if self.sail_mode == "local":
+            try:
+                import pysail  # noqa: F401
+            except ImportError:
+                raise RuntimeError(
+                    f"Cannot connect to LakeSail Sail at {self.endpoint} and 'pysail' is not installed. "
+                    "Install it with: uv add pysail\n"
+                    "Then start the server manually: python -m pysail spark server"
+                ) from None
+            self._auto_start_local_server()
+        else:
+            host, port = parse_spark_connect_endpoint(self.endpoint)
+            raise RuntimeError(
+                f"Cannot connect to LakeSail Sail server at {self.endpoint}. "
+                f"Ensure the server is running and reachable at {host}:{port}."
+            )
 
     def create_connection(self, **connection_config) -> Any:
         """Create a Spark Connect session to the LakeSail Sail server."""
@@ -365,6 +464,7 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
         self.log_very_verbose(f"LakeSail config: endpoint={self.endpoint}, database={self.database}")
 
         try:
+            self._ensure_server_ready()
             spark = self._create_spark_session()
             self._spark_session = spark
 
@@ -374,7 +474,7 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
 
             # Create database if needed
             target_database = connection_config.get("database", self.database)
-            if not self._validate_identifier(target_database):
+            if not validate_spark_identifier(target_database):
                 raise ValueError(f"Invalid database identifier: {target_database}")
 
             if not self.database_was_reused:
@@ -382,12 +482,13 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
 
                 if not database_exists:
                     self.log_verbose(f"Creating database: {target_database}")
-                    # Safety: target_database validated by _validate_identifier() above
+                    # Safety: target_database validated by validate_spark_identifier() above
                     spark.sql(f"CREATE DATABASE IF NOT EXISTS {target_database}")
                     self.logger.info(f"Created database {target_database}")
 
-            # Safety: target_database validated by _validate_identifier() above
-            spark.sql(f"USE {target_database}")
+            # Safety: target_database validated by validate_spark_identifier() above
+            # LakeSail's DataFusion-based parser requires explicit DATABASE keyword
+            spark.sql(f"USE DATABASE {target_database}")
 
             self.logger.info(f"Connected to LakeSail Sail at {self.endpoint}")
             self.log_operation_complete("LakeSail Spark Connect session", details=f"Connected to {self.endpoint}")
@@ -405,7 +506,15 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
             raise
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using Spark SQL DDL on Sail server."""
+        """Create schema using Spark SQL DDL on Sail server.
+
+        Defends against an orphaned warehouse directory left by a previous
+        Sail session by running the same DB-level purge Velox uses; pysail's
+        in-memory catalog keeps this rare but a long-running server with
+        on-disk warehouse data hits the same LOCATION_ALREADY_EXISTS trap.
+        Spark Connect cannot reach the server filesystem to clean per-table
+        dirs, so the DB-level purge is the only mechanism available.
+        """
         start_time = mono_time()
 
         spark = connection
@@ -413,30 +522,15 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
         try:
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
-
-            for statement in statements:
-                if not statement:
-                    continue
-
-                # Normalize table names to lowercase for Spark consistency
-                statement = self._normalize_table_name_in_sql(statement)
-
-                # Add USING clause for table format
-                statement = self._optimize_table_definition(statement)
-
-                try:
-                    spark.sql(statement)
-                    self.logger.debug(f"Executed schema statement: {statement[:100]}...")
-                except Exception as e:
-                    if "already exists" in str(e).lower():
-                        table_name = self._extract_table_name(statement)
-                        if table_name and self._validate_identifier(table_name):
-                            # Safety: table_name validated by _validate_identifier() above
-                            spark.sql(f"DROP TABLE IF EXISTS {table_name}")
-                            spark.sql(statement)
-                    else:
-                        raise
-
+            # Capture table_format once: see Velox.create_schema for rationale.
+            fmt = self.table_format
+            run_spark_schema_creation_loop(
+                spark,
+                statements,
+                lambda stmt: optimize_spark_table_definition(stmt, table_format=fmt),
+                logger=self.logger,
+                on_pre_loop=lambda s: purge_orphaned_warehouse_directory(s, logger=self.logger),
+            )
             self.logger.info("Schema created")
 
         except Exception as e:
@@ -497,52 +591,36 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
             stream_id=stream_id,
         )
 
-    def _extract_table_name(self, statement: str) -> str | None:
-        """Extract table name from CREATE TABLE statement."""
-        from benchbox.core.sql_utils import extract_table_name
-
-        return extract_table_name(statement)
-
-    def _normalize_table_name_in_sql(self, sql: str) -> str:
-        """Normalize table names in SQL to lowercase."""
-        return normalize_table_name_in_sql(sql)
-
-    def _optimize_table_definition(self, statement: str) -> str:
-        """Add USING clause for the specified table format."""
-        if not statement.upper().startswith("CREATE TABLE"):
-            return statement
-
-        import re
-
-        statement = re.sub(r"\s+USING\s+\w+", "", statement, flags=re.IGNORECASE)
-
-        if self.table_format == "orc":
-            if ")" in statement:
-                statement = statement.rstrip(";").rstrip() + " USING ORC"
-        else:
-            if ")" in statement:
-                statement = statement.rstrip(";").rstrip() + " USING PARQUET"
-
-        return statement
-
     def get_query_plan(self, connection: Any, query: str) -> str:
         """Get query execution plan from Sail server."""
-        spark = connection
-        try:
-            result_df = spark.sql(f"EXPLAIN EXTENDED {query}")
-            plan_rows = result_df.collect()
-            return "\n".join([str(row[0]) for row in plan_rows])
-        except Exception as e:
-            return f"Could not get query plan: {e}"
+        return get_spark_query_plan(connection, query)
 
     def close_connection(self, connection: Any) -> None:
-        """Close Spark Connect session."""
+        """Close Spark Connect session and stop any auto-started local server."""
         try:
             if connection and hasattr(connection, "stop"):
                 connection.stop()
                 self._spark_session = None
         except Exception as e:
             self.logger.warning(f"Error closing LakeSail session: {e}")
+
+        if self._managed_server_process is not None:
+            try:
+                self._managed_server_process.terminate()
+                self._managed_server_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._managed_server_process.kill()
+            except Exception as e:
+                self.logger.debug(f"Error stopping managed pysail server: {e}")
+            finally:
+                self._managed_server_process = None
+
+            # Unregister atexit handler since we've cleaned up explicitly
+            if hasattr(self, "_managed_server_atexit"):
+                import atexit
+
+                atexit.unregister(self._managed_server_atexit)
+                del self._managed_server_atexit
 
     def test_connection(self) -> bool:
         """Test connection to LakeSail Sail server."""
@@ -597,66 +675,18 @@ class LakeSailAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdap
 
         log_partition_tunings(table_tuning, self.logger, "LakeSail")
 
-    def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration."""
-        if not unified_config:
-            return
-
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
-
-    def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply Sail-specific platform optimizations."""
-        if not platform_config:
-            return
-
-        spark = connection
-
-        if hasattr(platform_config, "spark") and platform_config.spark:
-            for key, value in platform_config.spark.items():
-                try:
-                    spark.conf.set(f"spark.{key}", str(value))
-                    self.logger.debug(f"Applied Sail config: spark.{key} = {value}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to apply Sail config spark.{key}: {e}")
-
-        self.logger.info("LakeSail platform optimizations applied")
-
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations (informational only, like Spark)."""
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints enabled for LakeSail (informational only, not enforced)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints enabled for LakeSail (informational only, not enforced)")
+    # apply_unified_tuning, apply_platform_optimizations, and
+    # apply_constraint_configuration come from SparkLikeAdapterMixin -
+    # bodies were identical (or differed only in the platform name in log
+    # output) across spark / lakesail / velox.
 
     def _get_existing_tables(self, connection: Any) -> list[str]:
         """Get list of existing tables from Sail server."""
-        spark = connection
-        try:
-            tables = spark.catalog.listTables()
-            return [t.name.lower() for t in tables]
-        except Exception:
-            return []
+        return list_spark_tables(connection)
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Run ANALYZE TABLE for query optimization."""
-        spark = connection
-        try:
-            spark.sql(f"ANALYZE TABLE {table_name.lower()} COMPUTE STATISTICS")
-            self.logger.debug(f"Analyzed table {table_name}")
-        except Exception as e:
-            self.logger.warning(f"Failed to analyze table {table_name}: {e}")
+        analyze_spark_table(connection, table_name, logger=self.logger)
 
 
 def _build_lakesail_config(
@@ -666,7 +696,7 @@ def _build_lakesail_config(
     info: Any,
 ) -> Any:
     """Build LakeSail database configuration with credential loading."""
-    from benchbox.platforms.azure.config_utils import build_platform_config
+    from benchbox.platforms.base.config_utils import build_platform_config
 
     return build_platform_config(
         platform_type="lakesail",

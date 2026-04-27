@@ -33,7 +33,7 @@ def clickhouse_adapter():
     adapter = ClickHouseAdapter(
         host="localhost",
         port=9000,
-        mode="server",
+        deployment_mode="server",
         database="benchbox_test",
     )
     adapter.skip_database_management = True

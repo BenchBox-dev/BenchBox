@@ -1,0 +1,108 @@
+{
+  "chart": "sort_by_magnitude_desc",
+  "version": 1,
+  "cases": [
+    {
+      "id": "four_queries",
+      "input": {
+        "groups": [
+          {
+            "queryId": "Q1",
+            "entries": [
+              {
+                "deltaPct": 10.0
+              },
+              {
+                "deltaPct": -5.0
+              }
+            ]
+          },
+          {
+            "queryId": "Q2",
+            "entries": [
+              {
+                "deltaPct": 50.0
+              }
+            ]
+          },
+          {
+            "queryId": "Q3",
+            "entries": [
+              {
+                "deltaPct": -30.0
+              },
+              {
+                "deltaPct": 20.0
+              }
+            ]
+          },
+          {
+            "queryId": "Q4",
+            "entries": [
+              {
+                "deltaPct": 1.0
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "sortedQueryIds": [
+          "Q2",
+          "Q3",
+          "Q1",
+          "Q4"
+        ]
+      }
+    },
+    {
+      "id": "single_query",
+      "input": {
+        "groups": [
+          {
+            "queryId": "Q1",
+            "entries": [
+              {
+                "deltaPct": 42.0
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "sortedQueryIds": [
+          "Q1"
+        ]
+      }
+    },
+    {
+      "id": "tie_preserves_stable_order",
+      "input": {
+        "groups": [
+          {
+            "queryId": "A",
+            "entries": [
+              {
+                "deltaPct": 20.0
+              }
+            ]
+          },
+          {
+            "queryId": "B",
+            "entries": [
+              {
+                "deltaPct": -20.0
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "sortedQueryIds": [
+          "A",
+          "B"
+        ]
+      }
+    }
+  ]
+}

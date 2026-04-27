@@ -16,7 +16,7 @@ Usage:
   uv run -- python scripts/probe_mooncake_types.py --dry-run
   uv run -- python scripts/probe_mooncake_types.py --generate-reference --format json
 
-Requires: psycopg2 (pip install psycopg2-binary)
+Requires: psycopg (pip install psycopg[binary])
 """
 
 from __future__ import annotations
@@ -105,7 +105,7 @@ TYPE_CATALOG: dict[str, list[tuple[str, str]]] = {
 # Used by --generate-reference to produce a baseline matrix without a live connection.
 # Sources: DuckDB type system + Parquet spec (no geometric, network, range, bit, monetary).
 REFERENCE_TYPE_SUPPORT: dict[str, bool] = {
-    # numeric — all supported (Parquet INT32/INT64/FLOAT/DOUBLE/DECIMAL)
+    # numeric - all supported (Parquet INT32/INT64/FLOAT/DOUBLE/DECIMAL)
     "SMALLINT": True,
     "INTEGER": True,
     "BIGINT": True,
@@ -115,43 +115,43 @@ REFERENCE_TYPE_SUPPORT: dict[str, bool] = {
     "DOUBLE PRECISION": True,
     "SERIAL": True,
     "BIGSERIAL": True,
-    # character — all supported (Parquet BYTE_ARRAY / UTF8)
+    # character - all supported (Parquet BYTE_ARRAY / UTF8)
     "CHAR(10)": True,
     "VARCHAR(255)": True,
     "TEXT": True,
-    # binary — supported (Parquet BYTE_ARRAY)
+    # binary - supported (Parquet BYTE_ARRAY)
     "BYTEA": True,
-    # datetime — mostly supported; INTERVAL and TIME WITH TZ are not
+    # datetime - mostly supported; INTERVAL and TIME WITH TZ are not
     "DATE": True,
     "TIME": True,
     "TIME WITH TIME ZONE": False,
     "TIMESTAMP": True,
     "TIMESTAMP WITH TIME ZONE": True,
     "INTERVAL": False,
-    # boolean — supported (Parquet BOOLEAN)
+    # boolean - supported (Parquet BOOLEAN)
     "BOOLEAN": True,
-    # uuid — supported (DuckDB UUID → Parquet fixed_len_byte_array)
+    # uuid - supported (DuckDB UUID → Parquet fixed_len_byte_array)
     "UUID": True,
-    # json — JSONB supported via DuckDB; plain JSON is not
+    # json - JSONB supported via DuckDB; plain JSON is not
     "JSON": False,
     "JSONB": True,
-    # array — not supported in columnstore
+    # array - not supported in columnstore
     "INTEGER[]": False,
     "TEXT[]": False,
-    # geometric — not supported (no Parquet mapping)
+    # geometric - not supported (no Parquet mapping)
     "POINT": False,
     "LINE": False,
     "BOX": False,
-    # network — not supported (no Parquet mapping)
+    # network - not supported (no Parquet mapping)
     "INET": False,
     "CIDR": False,
     "MACADDR": False,
-    # monetary — not supported
+    # monetary - not supported
     "MONEY": False,
-    # bit — not supported
+    # bit - not supported
     "BIT(8)": False,
     "BIT VARYING(64)": False,
-    # range — not supported
+    # range - not supported
     "INT4RANGE": False,
     "DATERANGE": False,
 }
@@ -441,13 +441,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        import psycopg2
+        import psycopg
     except ImportError:
-        print("Error: psycopg2 is required. Install with: pip install psycopg2-binary", file=sys.stderr)
+        print("Error: psycopg is required. Install with: pip install psycopg[binary]", file=sys.stderr)
         return 1
 
     try:
-        conn = psycopg2.connect(
+        conn = psycopg.connect(
             host=args.host,
             port=args.port,
             user=args.user,

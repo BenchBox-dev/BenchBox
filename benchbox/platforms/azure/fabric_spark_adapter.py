@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -45,6 +46,8 @@ if TYPE_CHECKING:
     )
 
 from benchbox.core.exceptions import ConfigurationError
+from benchbox.platforms.azure._credentials import AzureTokenProvider
+from benchbox.platforms.azure._livy_mixin import LivyStatementMixin
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.cloud_spark import (
     CloudSparkStaging,
@@ -98,7 +101,7 @@ class LivySessionState:
     SUCCESS = "success"
 
 
-class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
+class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
     """Microsoft Fabric Spark platform adapter.
 
     Fabric Spark provides SaaS Spark execution within the Microsoft Fabric
@@ -192,10 +195,12 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         except Exception as e:
             logger.warning("Failed to initialize OneLake staging: %s", e)
 
-        # Credential (lazy initialization)
-        self._credential: Any = None
-        self._access_token: str | None = None
-        self._token_expires_at: float = 0
+        # Credential (lazy initialization) - shared helper owns state.
+        self._token_provider = AzureTokenProvider(
+            scope="https://api.fabric.microsoft.com/.default",
+            credential_class=DefaultAzureCredential,
+            tenant_id=self.tenant_id,
+        )
 
         # Session management
         self._session_id: int | None = None
@@ -221,36 +226,13 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         """Derive the OneLake path for data staging."""
         return f"abfss://{self.workspace_id}@onelake.dfs.fabric.microsoft.com/{self.lakehouse_id}"
 
-    def _get_credential(self) -> Any:
-        """Get or create Azure credential."""
-        if self._credential is None:
-            kwargs: dict[str, Any] = {}
-            if self.tenant_id:
-                # For service principal auth, tenant_id helps scope the credential
-                kwargs["additionally_allowed_tenants"] = ["*"]
-            self._credential = DefaultAzureCredential(**kwargs)
-        return self._credential
-
     def _get_access_token(self) -> str:
         """Get a valid access token, refreshing if needed."""
-        current_time = time.time()
-
-        # Refresh token if expired or about to expire (5 minute buffer)
-        if self._access_token is None or current_time >= self._token_expires_at - 300:
-            credential = self._get_credential()
-            # Fabric API scope
-            token = credential.get_token("https://api.fabric.microsoft.com/.default")
-            self._access_token = token.token
-            self._token_expires_at = token.expires_on
-
-        return self._access_token
+        return self._token_provider.access_token()
 
     def _get_headers(self) -> dict[str, str]:
         """Get HTTP headers with authentication."""
-        return {
-            "Authorization": f"Bearer {self._get_access_token()}",
-            "Content-Type": "application/json",
-        }
+        return self._token_provider.auth_headers()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Return platform metadata.
@@ -398,7 +380,7 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
                         # Wait for it to become idle
                         self._wait_for_session_state(self._session_id, [LivySessionState.IDLE])
                         return self._session_id
-                    # Session is in a terminal state (ERROR, DEAD, KILLED) — close it
+                    # Session is in a terminal state (ERROR, DEAD, KILLED) - close it
                     logger.warning("Session %s is in state %s, closing", self._session_id, session.get("state"))
                     try:
                         requests.delete(session_url, headers=self._get_headers(), timeout=30)
@@ -415,59 +397,6 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         # Create new session
         self._session_id = self._create_session()
         return self._session_id
-
-    def _execute_statement(
-        self,
-        code: str,
-        kind: str = "sql",
-    ) -> dict[str, Any]:
-        """Execute a statement in the Livy session.
-
-        Args:
-            code: The code to execute.
-            kind: Statement kind ('sql', 'spark', 'pyspark').
-
-        Returns:
-            The statement result.
-        """
-        from benchbox.platforms.azure.spark_execution_utils import execute_livy_statement
-
-        session_id = self._ensure_session()
-        result, execution_time = execute_livy_statement(
-            livy_endpoint=self.livy_endpoint,
-            session_id=session_id,
-            code=code,
-            kind=kind,
-            get_headers=self._get_headers,
-            timeout_minutes=self.timeout_minutes,
-        )
-        self._total_statement_time_seconds += execution_time
-        self._query_count += 1
-        return result
-
-    def _wait_for_statement(
-        self,
-        session_id: int,
-        statement_id: int,
-    ) -> dict[str, Any]:
-        """Wait for statement to complete and return result.
-
-        Args:
-            session_id: Session ID.
-            statement_id: Statement ID.
-
-        Returns:
-            The statement result.
-        """
-        from benchbox.platforms.azure.spark_execution_utils import wait_for_livy_statement
-
-        return wait_for_livy_statement(
-            livy_endpoint=self.livy_endpoint,
-            session_id=session_id,
-            statement_id=statement_id,
-            get_headers=self._get_headers,
-            timeout_minutes=self.timeout_minutes,
-        )
 
     def create_connection(self, **kwargs: Any) -> Any:
         """Verify Azure connectivity and workspace access.
@@ -527,7 +456,7 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
 
         Args:
             benchmark: Benchmark instance (provides schema/database name).
-            connection: Database connection (unused — Livy sessions are internal).
+            connection: Database connection (unused - Livy sessions are internal).
 
         Returns:
             Time taken to create schema in seconds.
@@ -558,7 +487,7 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
 
         Args:
             benchmark: Benchmark instance (provides table names via benchmark.tables).
-            connection: Database connection (unused — Livy sessions are internal).
+            connection: Database connection (unused - Livy sessions are internal).
             data_dir: Directory containing data files.
 
         Returns:
@@ -566,7 +495,9 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         """
         start_time = mono_time()
 
-        tables = list(benchmark.tables.keys()) if hasattr(benchmark, "tables") and benchmark.tables else []
+        data_files = getattr(benchmark, "tables", {}) or {}
+        tables = list(data_files.keys()) if isinstance(data_files, Mapping) else []
+        explicit_data_files = data_files if self._has_explicit_data_files(data_files) else None
         source_path = Path(data_dir)
 
         if not source_path.exists():
@@ -582,11 +513,14 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
             logger.info("Tables already exist in OneLake, skipping upload")
         else:
             logger.info("Uploading %d tables to OneLake", len(tables))
-            self._staging.upload_tables(
-                tables=tables,
-                source_dir=source_path,
-                file_format="parquet",
-            )
+            if explicit_data_files is not None:
+                self._staging.upload_data_files(explicit_data_files)
+            else:
+                self._staging.upload_tables(
+                    tables=tables,
+                    source_dir=source_path,
+                    file_format="parquet",
+                )
 
         # Create tables from uploaded data
         per_table_timings: dict[str, Any] = {}
@@ -607,6 +541,26 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
 
         return {}, elapsed_seconds(start_time), per_table_timings or None
 
+    @staticmethod
+    def _has_explicit_data_files(data_files: Any) -> bool:
+        """Return True when benchmark.tables contains concrete file mappings.
+
+        Placeholder metadata (e.g. ``{"orders": None}``) returns False so
+        the caller falls back to legacy parquet discovery.
+        """
+        if not isinstance(data_files, Mapping) or not data_files:
+            return False
+
+        for table_files in data_files.values():
+            if isinstance(table_files, (str, Path)):
+                continue
+            if not isinstance(table_files, Sequence) or not table_files:
+                return False
+            if any(not isinstance(path_like, (str, Path)) for path_like in table_files):
+                return False
+
+        return True
+
     def execute_query(
         self,
         connection: Any,
@@ -623,7 +577,7 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         unused; sessions are managed internally via the Livy API.
 
         Args:
-            connection: Database connection (unused — Livy sessions are internal).
+            connection: Database connection (unused - Livy sessions are internal).
             query: SQL query to execute.
             query_id: Query identifier for result tracking.
             benchmark_type: Benchmark type (unused, for interface compatibility).
@@ -699,7 +653,7 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         unused; sessions are managed internally via the Livy API.
 
         Args:
-            connection: Database connection (unused — Livy sessions are internal).
+            connection: Database connection (unused - Livy sessions are internal).
             benchmark_type: Benchmark name (tpch, tpcds, ssb).
             scale_factor: Data scale factor (updates internal scale if provided).
             **options: Additional benchmark options.
@@ -756,7 +710,7 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
 
         Args:
             unified_config: Unified tuning configuration.
-            connection: Database connection (unused — Livy sessions are internal).
+            connection: Database connection (unused - Livy sessions are internal).
         """
         if hasattr(unified_config, "platform_optimization"):
             self.apply_platform_tuning(unified_config.platform_optimization)
@@ -773,27 +727,28 @@ class FabricSparkAdapter(SparkTuningMixin, PlatformAdapter):
         Args:
             parser: Argument parser to add arguments to.
         """
-        parser.add_argument(
+        group = parser.add_argument_group("Fabric Spark Arguments")
+        group.add_argument(
             "--workspace-id",
             help="Fabric workspace GUID",
             dest="workspace_id",
         )
-        parser.add_argument(
+        group.add_argument(
             "--lakehouse-id",
             help="Fabric Lakehouse GUID",
             dest="lakehouse_id",
         )
-        parser.add_argument(
+        group.add_argument(
             "--tenant-id",
             help="Azure tenant ID",
             dest="tenant_id",
         )
-        parser.add_argument(
+        group.add_argument(
             "--spark-pool",
             help="Spark pool name",
             dest="spark_pool_name",
         )
-        parser.add_argument(
+        group.add_argument(
             "--timeout",
             type=int,
             default=60,

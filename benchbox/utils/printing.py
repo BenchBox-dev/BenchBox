@@ -7,16 +7,16 @@ Policy:
   `silence_output(...)` to guard transitive stdout/stderr writes.
 
 Approved output patterns (in preference order):
-1. `emit(msg)` — primary interface for all user-facing text and Rich renderables.
+1. `emit(msg)` - primary interface for all user-facing text and Rich renderables.
    Accepts any Rich-renderable (str, Panel, Table, Text, …) and respects quiet mode.
    Use this everywhere unless one of the exceptions below applies.
 
-2. `console.print(...)` via module-level alias `console = quiet_console` — approved
+2. `console.print(...)` via module-level alias `console = quiet_console` - approved
    for CLI command modules that need Rich keyword arguments (style=, justify=, end=,
    markup=, highlight=) not exposed by emit(). The alias ensures quiet-mode fidelity
    through QuietConsoleProxy.
 
-3. `self.console.print(...)` via constructor injection — approved for display/handler
+3. `self.console.print(...)` via constructor injection - approved for display/handler
    classes that need to be testable in isolation (e.g. ExceptionHandler, DryRunDisplay,
    BenchmarkOrchestrator). The injected console must default to `quiet_console`.
 

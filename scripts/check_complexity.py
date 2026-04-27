@@ -132,13 +132,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--max-complexity",
         type=int,
         default=None,
-        help="Hard ceiling — functions above this fail the check (default: from pyproject.toml or 20)",
+        help="Hard ceiling - functions above this fail the check (default: from pyproject.toml or 20)",
     )
     parser.add_argument(
         "--warn-complexity",
         type=int,
         default=None,
-        help="Advisory threshold — functions above this are printed as warnings (default: from pyproject.toml or 15)",
+        help="Advisory threshold - functions above this are printed as warnings (default: from pyproject.toml or 15)",
     )
     parser.add_argument(
         "--pyproject",
@@ -160,7 +160,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--no-fail",
         action="store_true",
-        help="Report only — do not fail with non-zero exit code",
+        help="Report only - do not fail with non-zero exit code",
     )
     return parser.parse_args(argv)
 
@@ -176,7 +176,7 @@ def run(args: argparse.Namespace) -> int:
 
     violations = _run_ruff(args.source_root)
     if not violations:
-        print("No functions found — is the source root correct?")
+        print("No functions found - is the source root correct?")
         return 1
 
     # Filter excluded functions

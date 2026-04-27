@@ -21,7 +21,7 @@ pytestmark = [
 
 
 # ===================================================================
-# Concurrency Executor — dataclasses
+# Concurrency Executor - dataclasses
 # ===================================================================
 
 
@@ -210,7 +210,7 @@ class TestConcurrentLoadResult:
 
 
 # ===================================================================
-# Concurrency Executor — execution
+# Concurrency Executor - execution
 # ===================================================================
 
 
@@ -386,7 +386,7 @@ class TestJoinOrderGenerator:
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         count = gen.get_table_row_count("title")
-        assert count == int(2_500_000 * 0.001)
+        assert count == int(500_000 * 0.001)
         assert gen.get_table_row_count("nonexistent") == 0
 
     def test_get_total_size_estimate(self, tmp_path):
@@ -514,7 +514,7 @@ class TestJoinOrderGenerator:
         assert "company_name" in dims
         assert "keyword" in dims
         assert "char_name" in dims
-        assert len(dims["title"]) == int(2_500_000 * 0.001)
+        assert len(dims["title"]) == int(500_000 * 0.001)
 
     def test_generate_relationship_tables(self, tmp_path):
         from benchbox.core.joinorder.generator import JoinOrderGenerator

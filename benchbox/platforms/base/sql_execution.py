@@ -48,11 +48,14 @@ def execute_sql_query(
     start_time = mono_time()
     log_verbose(f"Executing query {query_id}")
 
+    # Support both DB-API connections (need a new cursor) and pre-created cursors
+    # (e.g. a psycopg2 cursor already created by _make_stream_cursor in the TPC-DS
+    # power-test path).  DB-API cursors lack a callable .cursor() method.
+    _owns_cursor = callable(getattr(connection, "cursor", None))
+    cursor = connection.cursor() if _owns_cursor else connection
     try:
-        cursor = connection.cursor()
         cursor.execute(query)
         results = cursor.fetchall()
-        cursor.close()
 
         execution_time = elapsed_seconds(start_time)
         actual_row_count = len(results)
@@ -80,6 +83,13 @@ def execute_sql_query(
 
     except Exception as exc:
         execution_time = elapsed_seconds(start_time)
+        # Rollback to clear aborted-transaction state (psycopg3 requires this after any error)
+        try:
+            real_conn = connection if _owns_cursor else getattr(cursor, "connection", None)
+            if real_conn is not None and hasattr(real_conn, "rollback"):
+                real_conn.rollback()
+        except Exception:
+            pass
         return {
             "query_id": query_id,
             "status": "FAILED",
@@ -88,3 +98,6 @@ def execute_sql_query(
             "error": str(exc),
             "error_type": type(exc).__name__,
         }
+    finally:
+        if _owns_cursor:
+            cursor.close()

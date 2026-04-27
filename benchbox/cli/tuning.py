@@ -98,6 +98,8 @@ def _get_recommended_threads(cpu_cores: int, platform: str) -> int:
         "duckdb": cpu_cores,
         "sqlite": 1,  # SQLite doesn't benefit from parallelism
         "clickhouse": min(cpu_cores, 16),
+        "clickhouse-local": min(cpu_cores, 16),
+        "clickhouse-server": min(cpu_cores, 16),
         "databricks": cpu_cores,  # Managed by cluster
         "snowflake": cpu_cores,  # Managed by warehouse
         "bigquery": cpu_cores,  # Managed by BigQuery
@@ -107,7 +109,7 @@ def _get_recommended_threads(cpu_cores: int, platform: str) -> int:
     max_threads = platform_max_threads.get(platform, cpu_cores)
 
     # For local databases, leave some threads for system
-    if platform in ["duckdb", "sqlite", "clickhouse"]:
+    if platform in {"duckdb", "sqlite", "clickhouse", "clickhouse-local", "clickhouse-server"}:
         return max(1, min(max_threads, cpu_cores - 1))
 
     return max_threads
@@ -130,7 +132,7 @@ def _get_recommended_memory_limit(memory_gb: float, platform: str) -> Optional[f
     elif platform == "sqlite":
         # SQLite uses much less memory
         return min(2.0, memory_gb * 0.3)
-    elif platform == "clickhouse":
+    elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
         # ClickHouse can use more memory
         return memory_gb * 0.8
 
@@ -424,7 +426,7 @@ def _run_advanced_wizard(
         _configure_redshift_optimizations(config)
     elif platform == "duckdb":
         _configure_duckdb_optimizations(config, defaults)
-    elif platform == "clickhouse":
+    elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
         _configure_clickhouse_optimizations(config)
 
     # Step 4: Validation Options

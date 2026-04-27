@@ -27,7 +27,7 @@ class TestBenchmarkInitialization:
         benchmark = TSBSDevOpsBenchmark()
         assert benchmark.scale_factor == 1.0
         assert benchmark.num_hosts == 100
-        assert benchmark.duration_days == 1
+        assert benchmark.duration_days == 2
         assert benchmark.interval_seconds == 10
 
     def test_custom_scale_factor(self):

@@ -27,7 +27,7 @@ from benchbox.core.visualization.ascii.scatter_plot import ScatterPoint
 _STABLE_THRESHOLD_PCT = 2.0
 
 # Number of best/worst queries shown in summary boxes.
-# 3 balances signal density vs. noise — enough to spot patterns, few enough to scan quickly.
+# 3 balances signal density vs. noise - enough to spot patterns, few enough to scan quickly.
 _SUMMARY_QUERY_COUNT = 3
 
 _SUBTITLE_KEYS = frozenset({"benchmark", "scale_factor", "platform_version", "tuning"})
@@ -75,7 +75,7 @@ def render_ascii_chart_from_results(
         results: Normalized benchmark results.
         chart_type: Chart type key (e.g., "performance_bar").
         options: ChartOptions instance.
-        metadata: Deprecated — use subtitle instead. If provided without
+        metadata: Deprecated - use subtitle instead. If provided without
             subtitle, it is converted via build_chart_subtitle().
         subtitle: Pre-formatted subtitle string for chart display.
     """

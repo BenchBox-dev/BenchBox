@@ -29,6 +29,7 @@ BenchBox provides the following commands:
 | `tuning init`          | Generate sample tuning configurations              | [tuning](tuning.md#tuning-init)           |
 | `tuning` (DataFrame)   | DataFrame tuning via unified tuning commands        | [tuning](tuning.md#tuning-dataframe)      |
 | `export`               | Export benchmark results to various formats        | [results](results.md#export)              |
+| `submit`               | Package results for PR contribution to hosted platform | [submit](submit.md)                   |
 | `results`              | Display exported benchmark results                 | [results](results.md#results)             |
 | `compare`              | Compare benchmark results for regression detection | [results](results.md#compare)             |
 | `visualize`            | Generate ASCII charts from benchmark results       | [visualize](visualize.md)                 |
@@ -66,6 +67,7 @@ platforms
 utilities
 tuning
 results
+submit
 visualize
 report
 metrics

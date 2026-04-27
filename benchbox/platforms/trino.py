@@ -26,15 +26,20 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import ipaddress
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
+from benchbox.platforms.base.ddl_helpers import strip_with_properties
 from benchbox.platforms.base.external_table_mixin import HiveExternalTableMixin
+from benchbox.platforms.presto_trino_utils import (
+    load_file_batches,
+    normalize_existing_files,
+    resolve_data_files,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
-
-from .base.data_loading import DataSourceResolver, FileFormatRegistry
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
@@ -48,7 +53,6 @@ from ..utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
 )
-from ..utils.file_format import get_delimiter_for_file
 from .base import DriverIsolationCapability, PlatformAdapter
 from .presto_trino_utils import validate_catalog_exists
 
@@ -657,88 +661,53 @@ class TrinoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin, 
             normalize_table_name_in_sql=self._normalize_table_name_in_sql,
             optimize_table_definition=self._optimize_table_definition,
             extract_table_name=self._extract_table_name,
+            log_notice=self.log_notice,
         )
         return elapsed_seconds(start_time)
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> dict[str, Any]:
         """Resolve benchmark data files from benchmark tables or manifest."""
-        resolver = DataSourceResolver()
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source.tables
-
-    @staticmethod
-    def _normalize_existing_files(file_paths: Any) -> list[Path]:
-        """Normalize file inputs to existing, non-empty local paths."""
-        normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
-        valid_files: list[Path] = []
-        for file_path in normalized_paths:
-            path = Path(file_path)
-            if path.exists() and path.stat().st_size > 0:
-                valid_files.append(path)
-        return valid_files
+        return resolve_data_files(
+            benchmark,
+            data_dir,
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
 
     # External table methods (validate, map types, build columns, build location,
     # create_external_tables) are provided by HiveExternalTableMixin.
+    # _normalize_existing_files, _escape_insert_value, and _is_date_value are
+    # thin delegates to benchbox.platforms.presto_trino_utils helpers.
 
-    def _escape_insert_value(self, value: str) -> str:
-        """Format a CSV field as a Trino literal for INSERT VALUES."""
-        if value == "" or value.lower() == "null":
-            return "NULL"
-        if self._is_date_value(value):
-            return f"DATE '{value}'"
-        try:
-            float(value)
-            return value
-        except ValueError:
-            return "'" + str(value).replace("'", "''") + "'"
-
-    def _load_file_batches(self, cursor: Any, file_path: Path, table_name_lower: str) -> int:
-        """Load one file into Trino using batched INSERT statements."""
-        delimiter = get_delimiter_for_file(file_path)
-        compression_handler = FileFormatRegistry.get_compression_handler(file_path)
-        rows_loaded = 0
-
-        with compression_handler.open(file_path) as file_handle:
-            batch_size = 500
-            batch_data: list[str] = []
-
-            for line in file_handle:
-                line = line.strip()
-                if line and line.endswith(delimiter):
-                    line = line[:-1]
-                if not line:
-                    continue
-
-                escaped_values = [self._escape_insert_value(value) for value in line.split(delimiter)]
-                batch_data.append(f"({', '.join(escaped_values)})")
-
-                if len(batch_data) >= batch_size:
-                    cursor.execute(f"INSERT INTO {table_name_lower} VALUES " + ", ".join(batch_data))
-                    rows_loaded += len(batch_data)
-                    batch_data = []
-
-            if batch_data:
-                cursor.execute(f"INSERT INTO {table_name_lower} VALUES " + ", ".join(batch_data))
-                rows_loaded += len(batch_data)
-
-        return rows_loaded
-
-    def _load_table_data(self, cursor: Any, table_name: str, file_paths: Any) -> tuple[int, int] | None:
+    def _load_table_data(
+        self,
+        cursor: Any,
+        table_name: str,
+        file_paths: Any,
+        target_catalog: str,
+        target_schema: str,
+    ) -> tuple[int, int] | None:
         """Load one table and return (rows_loaded, valid_file_count)."""
-        valid_files = self._normalize_existing_files(file_paths)
+        valid_files = normalize_existing_files(file_paths)
+        table_name_lower = table_name.lower()
+
         if not valid_files:
             self.logger.warning(f"Skipping {table_name} - no valid data files")
+            return None
+
+        if not self._validate_identifier(table_name_lower):
+            self.logger.warning(f"Skipping {table_name} - invalid table identifier")
             return None
 
         chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
         self.log_verbose(f"Loading data for table: {table_name}{chunk_info}")
 
-        table_name_lower = table_name.lower()
+        qualified_table = f"{target_catalog}.{target_schema}.{table_name_lower}"
         rows_loaded = 0
         for file_path in valid_files:
-            rows_loaded += self._load_file_batches(cursor, file_path, table_name_lower)
+            rows_loaded += load_file_batches(cursor, file_path, qualified_table)
 
         return rows_loaded, len(valid_files)
 
@@ -791,6 +760,11 @@ class TrinoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin, 
         total_time = 0.0
 
         cursor = connection.cursor()
+        target_catalog = self.catalog
+        target_schema = self.schema
+
+        if not self._validate_identifier(target_catalog) or not self._validate_identifier(target_schema):
+            raise ValueError(f"Invalid catalog or schema for load: {target_catalog}.{target_schema}")
 
         try:
             data_files = self._resolve_data_files(benchmark, data_dir)
@@ -798,7 +772,7 @@ class TrinoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin, 
             for table_name, file_paths in data_files.items():
                 try:
                     load_start = mono_time()
-                    table_result = self._load_table_data(cursor, table_name, file_paths)
+                    table_result = self._load_table_data(cursor, table_name, file_paths, target_catalog, target_schema)
 
                     table_name_lower = table_name.lower()
                     if table_result is None:
@@ -868,17 +842,6 @@ class TrinoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin, 
         finally:
             cursor.close()
 
-    def _is_date_value(self, value: str) -> bool:
-        """Check if a value looks like a date in YYYY-MM-DD format.
-
-        Trino memory catalog requires DATE literal syntax (DATE 'YYYY-MM-DD')
-        for date columns, unlike other databases that auto-cast strings.
-        """
-        import re
-
-        # Match YYYY-MM-DD format (TPC-H standard date format)
-        return bool(re.match(r"^\d{4}-\d{2}-\d{2}$", value))
-
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""
         from benchbox.core.sql_utils import extract_table_name
@@ -903,11 +866,9 @@ class TrinoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin, 
         # Memory catalog doesn't support WITH properties for the most part
 
         if self.table_format == "memory":
-            # Memory catalog: simple CREATE TABLE without WITH clause
-            # Remove any existing WITH clause that might be incompatible
-            import re
-
-            statement = re.sub(r"\s+WITH\s*\([^)]*\)", "", statement, flags=re.IGNORECASE)
+            # Memory catalog: simple CREATE TABLE without WITH clause or NOT NULL
+            statement = strip_with_properties(statement)
+            statement = re.sub(r"\s+NOT\s+NULL", "", statement, flags=re.IGNORECASE)
 
         elif self.table_format in ("iceberg", "hive"):
             # Add table format specification if not present
@@ -1138,65 +1099,33 @@ def _build_trino_config(
     overrides: dict[str, Any],
     info: Any,
 ) -> Any:
-    """Build Trino database configuration with credential loading.
+    from benchbox.platforms.base.config_utils import build_platform_config
 
-    Args:
-        platform: Platform name (should be 'trino')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded
-    """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("trino") or {}
-
-    # Build merged options: saved_creds < options < overrides
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "Trino"
-    driver_package = info.driver_package if info else "trino"
-
-    config_dict = {
-        "type": "trino",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields at top-level
-        "host": merged_options.get("host"),
-        "port": merged_options.get("port"),
-        "catalog": merged_options.get("catalog"),
-        "username": merged_options.get("username"),
-        "password": merged_options.get("password"),
-        "http_scheme": merged_options.get("http_scheme"),
-        "verify_ssl": merged_options.get("verify_ssl"),
-        "ssl_cert_path": merged_options.get("ssl_cert_path"),
-        "session_properties": merged_options.get("session_properties"),
-        "query_timeout": merged_options.get("query_timeout"),
-        "timezone": merged_options.get("timezone"),
-        "table_format": merged_options.get("table_format"),
-        "staging_root": merged_options.get("staging_root"),
-        # Benchmark context for config-aware schema naming
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    # Only include explicit schema override if provided
-    if "schema" in overrides and overrides["schema"]:
-        config_dict["schema"] = overrides["schema"]
-
-    return DatabaseConfig(**config_dict)
+    return build_platform_config(
+        platform_type="trino",
+        credential_key="trino",
+        default_display_name="Trino",
+        default_driver_package="trino",
+        platform_fields=[
+            "host",
+            "port",
+            "catalog",
+            "username",
+            "password",
+            "http_scheme",
+            "verify_ssl",
+            "ssl_cert_path",
+            "session_properties",
+            "query_timeout",
+            "timezone",
+            "table_format",
+            "staging_root",
+            "schema",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 # Register the config builder with the platform hook registry

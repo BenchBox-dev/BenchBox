@@ -33,15 +33,22 @@ def _adapter() -> SynapseSparkAdapter:
         )
 
 
+def _benchmark(*tables: str) -> SimpleNamespace:
+    return SimpleNamespace(get_table_names=lambda: list(tables))
+
+
 def test_get_access_token_refreshes_and_reuses_cached_token() -> None:
     adapter = _adapter()
     token = SimpleNamespace(token="abc", expires_on=9999999999)
     cred = MagicMock()
     cred.get_token.return_value = token
 
-    with patch.object(adapter, "_get_credential", return_value=cred):
-        assert adapter._get_access_token() == "abc"
-        assert adapter._get_access_token() == "abc"
+    # Replace the token provider's credential with our mock; the adapter's
+    # _get_access_token delegates through the provider now.
+    adapter._token_provider._credential = cred
+
+    assert adapter._get_access_token() == "abc"
+    assert adapter._get_access_token() == "abc"
 
     cred.get_token.assert_called_once_with("https://dev.azuresynapse.net/.default")
 
@@ -49,7 +56,7 @@ def test_get_access_token_refreshes_and_reuses_cached_token() -> None:
 def test_get_headers_includes_bearer_token() -> None:
     adapter = _adapter()
 
-    with patch.object(adapter, "_get_access_token", return_value="token123"):
+    with patch.object(adapter._token_provider, "access_token", return_value="token123"):
         headers = adapter._get_headers()
 
     assert headers["Authorization"] == "Bearer token123"
@@ -71,8 +78,9 @@ def test_create_schema_default_and_non_default_paths() -> None:
     adapter = _adapter()
     adapter._execute_statement = MagicMock()
 
-    adapter.create_schema()
-    adapter.create_schema("benchbox")
+    adapter.create_schema(_benchmark(), None)
+    adapter.database = "benchbox"
+    adapter.create_schema(_benchmark(), None)
 
     call_args = adapter._execute_statement.call_args
     assert call_args is not None, "_execute_statement should have been called"
@@ -86,13 +94,14 @@ def test_load_data_validates_source_dir_and_builds_table_uris(tmp_path: Path) ->
     adapter._execute_statement = MagicMock(side_effect=[None, RuntimeError("table create failed")])
 
     with pytest.raises(ConfigurationError, match="Source directory not found"):
-        adapter.load_data(["lineitem"], tmp_path / "missing")
+        adapter.load_data(_benchmark("lineitem"), None, tmp_path / "missing")
 
     (tmp_path / "lineitem.parquet").write_text("data", encoding="utf-8")
-    result = adapter.load_data(["lineitem", "orders"], tmp_path)
+    stats, _, metadata = adapter.load_data(_benchmark("lineitem", "orders"), None, tmp_path)
 
-    assert "lineitem" in result
-    assert result["orders"].endswith("/tables/orders")
+    assert "lineitem" in stats
+    assert metadata is not None
+    assert metadata["table_uris"]["orders"].endswith("/tables/orders")
 
 
 def test_execute_query_shapes_result_payload() -> None:
@@ -106,10 +115,10 @@ def test_execute_query_shapes_result_payload() -> None:
         }
     )
 
-    output = adapter.execute_query("SELECT * FROM t")
+    output = adapter.execute_query(None, "SELECT * FROM t", "q1")
 
-    assert output["success"] is True
-    assert output["row_count"] == 2
+    assert output["status"] == "SUCCESS"
+    assert output["rows_returned"] == 2
     assert output["columns"] == ["c1", "c2"]
 
 

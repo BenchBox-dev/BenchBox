@@ -1,8 +1,13 @@
 """Tests for power test fail-fast / abort-on-total-failure logic.
 
 Verifies that measurement run loops abort early when:
-1. All queries in a run fail (infrastructure issue) — always
+1. All queries in a run fail (infrastructure issue) - always
 2. Any query fails and power_fail_fast is enabled
+
+Also covers TPC-DS-specific regression guards:
+3. Execute-only connections (no .cursor()) don't raise AttributeError in connection_factory
+4. A power-test factory crash (0 queries executed) produces a sentinel FAILED result so
+   the overall benchmark status is FAILED rather than the false PASSED caused by 0==0
 """
 
 from __future__ import annotations
@@ -37,7 +42,6 @@ class TestGenericPowerTestFailFast:
     @pytest.fixture
     def bench_instance(self):
         b = MagicMock()
-        b._name = "TestBench"
         b.scale_factor = 1.0
         return b
 
@@ -48,6 +52,7 @@ class TestGenericPowerTestFailFast:
     def test_all_queries_failed_aborts_remaining_iterations(self, adapter, bench_instance, connection):
         """When all queries fail, remaining measurement runs are skipped."""
         run_config = {
+            "benchmark_name": "clickbench",
             "iterations": 3,
             "warm_up_iterations": 0,
             "scale_factor": 1.0,
@@ -67,6 +72,7 @@ class TestGenericPowerTestFailFast:
     def test_partial_failure_continues_without_fail_fast(self, adapter, bench_instance, connection):
         """When some queries succeed and fail_fast is off, all iterations run."""
         run_config = {
+            "benchmark_name": "clickbench",
             "iterations": 3,
             "warm_up_iterations": 0,
             "scale_factor": 1.0,
@@ -94,6 +100,7 @@ class TestGenericPowerTestFailFast:
     def test_partial_failure_aborts_with_fail_fast(self, adapter, bench_instance, connection):
         """When any query fails and fail_fast is enabled, remaining runs abort."""
         run_config = {
+            "benchmark_name": "clickbench",
             "iterations": 3,
             "warm_up_iterations": 0,
             "scale_factor": 1.0,
@@ -114,6 +121,7 @@ class TestGenericPowerTestFailFast:
     def test_all_success_completes_all_iterations(self, adapter, bench_instance, connection):
         """When all queries succeed, all iterations complete normally."""
         run_config = {
+            "benchmark_name": "clickbench",
             "iterations": 3,
             "warm_up_iterations": 0,
             "scale_factor": 1.0,
@@ -141,7 +149,9 @@ class TestGenericPowerTestFailFast:
 # ---------------------------------------------------------------------------
 
 
-def _make_power_test_result(*, success: bool, queries_successful: int, queries_executed: int):
+def _make_power_test_result(
+    *, success: bool, queries_successful: int, queries_executed: int, errors: list[str] | None = None
+):
     """Create a mock TPCHPowerTestResult."""
     return SimpleNamespace(
         success=success,
@@ -149,7 +159,7 @@ def _make_power_test_result(*, success: bool, queries_successful: int, queries_e
         queries_executed=queries_executed,
         power_at_size=0.0,
         total_time=1.0,
-        errors=["Query X failed: timeout"] if not success else [],
+        errors=errors if errors is not None else (["Query X failed: timeout"] if not success else []),
         query_results=[
             {
                 "query_id": str(i + 1),
@@ -178,16 +188,14 @@ class TestTPCHPowerTestFailFast:
 
     @pytest.fixture
     def bench_instance(self):
-        b = MagicMock()
-        b._name = "tpch"
-        return b
+        return MagicMock()
 
     @pytest.fixture
     def connection(self):
         return MagicMock()
 
     @patch("benchbox.core.tpch.power_test.TPCHPowerTest")
-    @patch("benchbox.platforms.base.adapter.PlatformAdapterConnection")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
     def test_all_queries_failed_aborts(self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection):
         """When all queries fail (0% success), remaining measurement runs abort."""
         run_config = {
@@ -207,7 +215,7 @@ class TestTPCHPowerTestFailFast:
         assert len(results) == 22
 
     @patch("benchbox.core.tpch.power_test.TPCHPowerTest")
-    @patch("benchbox.platforms.base.adapter.PlatformAdapterConnection")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
     def test_partial_failure_continues_without_fail_fast(
         self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
     ):
@@ -230,7 +238,7 @@ class TestTPCHPowerTestFailFast:
         assert len(results) == 66  # 22 * 3
 
     @patch("benchbox.core.tpch.power_test.TPCHPowerTest")
-    @patch("benchbox.platforms.base.adapter.PlatformAdapterConnection")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
     def test_partial_failure_aborts_with_fail_fast(
         self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
     ):
@@ -253,7 +261,7 @@ class TestTPCHPowerTestFailFast:
         assert len(results) == 22
 
     @patch("benchbox.core.tpch.power_test.TPCHPowerTest")
-    @patch("benchbox.platforms.base.adapter.PlatformAdapterConnection")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
     def test_all_success_completes_all_iterations(
         self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
     ):
@@ -272,3 +280,351 @@ class TestTPCHPowerTestFailFast:
 
         assert mock_pt_cls.call_count == 3
         assert len(results) == 66
+
+    # --- Regression: false PASSED when factory crashes (0 queries) ----------
+
+    @patch("benchbox.core.tpch.power_test.TPCHPowerTest")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
+    def test_factory_crash_produces_sentinel_failed_entry(
+        self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
+    ):
+        """When the power test crashes before running any query, a sentinel FAILED
+        result is appended so total_queries > 0 and the benchmark status becomes FAILED.
+        """
+        run_config = {
+            "iterations": 1,
+            "warm_up_iterations": 0,
+            "scale_factor": 0.01,
+            "stream_id": 0,
+        }
+
+        factory_error_msg = "Power Test execution failed: connection refused"
+        factory_crashed = _make_power_test_result(
+            success=False,
+            queries_successful=0,
+            queries_executed=0,
+            errors=[factory_error_msg],
+        )
+        mock_pt_cls.return_value.run.return_value = factory_crashed
+
+        results = adapter._execute_tpch_power_test(bench_instance, connection, run_config)
+
+        assert len(results) > 0, "results must not be empty when power test factory crashes"
+
+        sentinel = results[-1]
+        assert sentinel["status"] == "FAILED"
+        assert sentinel["query_id"] == "power_test_error"
+        assert factory_error_msg in sentinel["error"]
+
+    @patch("benchbox.core.tpch.power_test.TPCHPowerTest")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
+    def test_factory_crash_does_not_produce_sentinel_when_queries_ran(
+        self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
+    ):
+        """Sentinel is only appended when zero queries ran (factory-level failure)."""
+        run_config = {
+            "iterations": 1,
+            "warm_up_iterations": 0,
+            "scale_factor": 0.01,
+            "stream_id": 0,
+        }
+
+        all_failed = _make_power_test_result(success=False, queries_successful=0, queries_executed=22)
+        mock_pt_cls.return_value.run.return_value = all_failed
+
+        results = adapter._execute_tpch_power_test(bench_instance, connection, run_config)
+
+        assert len(results) == 22
+        assert not any(r.get("query_id") == "power_test_error" for r in results)
+
+
+# ---------------------------------------------------------------------------
+# TPC-DS power test
+# ---------------------------------------------------------------------------
+
+
+def _make_tpcds_power_test_result(
+    *, success: bool, queries_successful: int, queries_executed: int, errors: list[str] | None = None
+):
+    """Create a mock TPCDSPowerTestResult."""
+    return SimpleNamespace(
+        success=success,
+        queries_successful=queries_successful,
+        queries_executed=queries_executed,
+        power_at_size=0.0,
+        total_time=1.0,
+        errors=errors if errors is not None else (["Query X failed"] if not success else []),
+        query_results=[
+            {
+                "query_id": str(i + 1),
+                "execution_time_seconds": 1.0 if i < queries_successful else 0.0,
+                "success": i < queries_successful,
+                "result_count": 10 if i < queries_successful else 0,
+                "error": None if i < queries_successful else "timeout",
+                "stream_id": 0,
+                "position": i,
+            }
+            for i in range(queries_executed)
+        ],
+    )
+
+
+class TestTPCDSPowerTestFailFast:
+    """Tests for _execute_tpcds_power_test abort logic and regression guards."""
+
+    @pytest.fixture
+    def adapter(self):
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        a = DuckDBAdapter()
+        a.get_target_dialect = MagicMock(return_value="duckdb")
+        return a
+
+    @pytest.fixture
+    def bench_instance(self):
+        return MagicMock()
+
+    @pytest.fixture
+    def connection(self):
+        return MagicMock()  # has .cursor() by default
+
+    @patch("benchbox.core.tpcds.power_test.TPCDSPowerTest")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
+    def test_all_queries_failed_aborts_remaining_iterations(
+        self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
+    ):
+        """When all queries fail (0% success), remaining measurement runs abort."""
+        run_config = {
+            "iterations": 3,
+            "warm_up_iterations": 0,
+            "scale_factor": 1.0,
+            "stream_id": 0,
+        }
+
+        all_failed = _make_tpcds_power_test_result(success=False, queries_successful=0, queries_executed=99)
+        mock_pt_cls.return_value.run.return_value = all_failed
+
+        results = adapter._execute_tpcds_power_test(bench_instance, connection, run_config)
+
+        # Should create only 1 TPCDSPowerTest instance then abort
+        assert mock_pt_cls.call_count == 1
+        assert all(r["status"] == "FAILED" for r in results)
+
+    @patch("benchbox.core.tpcds.power_test.TPCDSPowerTest")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
+    def test_partial_failure_continues_without_fail_fast(
+        self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
+    ):
+        """Partial failures continue across all iterations when fail_fast is off."""
+        run_config = {
+            "iterations": 3,
+            "warm_up_iterations": 0,
+            "scale_factor": 1.0,
+            "stream_id": 0,
+            "power_fail_fast": False,
+        }
+
+        partial_fail = _make_tpcds_power_test_result(success=False, queries_successful=80, queries_executed=99)
+        mock_pt_cls.return_value.run.return_value = partial_fail
+
+        results = adapter._execute_tpcds_power_test(bench_instance, connection, run_config)
+
+        assert mock_pt_cls.call_count == 3
+        assert len(results) == 99 * 3
+
+    @patch("benchbox.core.tpcds.power_test.TPCDSPowerTest")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
+    def test_partial_failure_aborts_with_fail_fast(
+        self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
+    ):
+        """Partial failures abort after the first iteration when fail_fast is enabled."""
+        run_config = {
+            "iterations": 3,
+            "warm_up_iterations": 0,
+            "scale_factor": 1.0,
+            "stream_id": 0,
+            "power_fail_fast": True,
+        }
+
+        partial_fail = _make_tpcds_power_test_result(success=False, queries_successful=80, queries_executed=99)
+        mock_pt_cls.return_value.run.return_value = partial_fail
+
+        results = adapter._execute_tpcds_power_test(bench_instance, connection, run_config)
+
+        assert mock_pt_cls.call_count == 1
+        assert len(results) == 99
+
+    @patch("benchbox.core.tpcds.power_test.TPCDSPowerTest")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
+    def test_all_success_completes_all_iterations(
+        self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
+    ):
+        """Full success runs all iterations."""
+        run_config = {
+            "iterations": 3,
+            "warm_up_iterations": 0,
+            "scale_factor": 1.0,
+            "stream_id": 0,
+        }
+
+        all_ok = _make_tpcds_power_test_result(success=True, queries_successful=99, queries_executed=99)
+        mock_pt_cls.return_value.run.return_value = all_ok
+
+        results = adapter._execute_tpcds_power_test(bench_instance, connection, run_config)
+
+        assert mock_pt_cls.call_count == 3
+        assert len(results) == 99 * 3
+
+    # --- Regression: Bug #1 - execute-only connection (no .cursor()) -------
+
+    @patch("benchbox.core.tpcds.power_test.TPCDSPowerTest")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
+    def test_execute_only_connection_does_not_raise(self, mock_conn_cls, mock_pt_cls, adapter, bench_instance):
+        """connection_factory wraps execute-only connections in a non-closing proxy.
+
+        Regression: ClickHouseLocalClient exposes .execute() directly and has no .cursor().
+        The factory must:
+        - Not raise AttributeError (no .cursor() call)
+        - Wrap in a _NoCloseProxy so close() doesn't destroy the shared connection between runs
+        """
+        sentinel = object()
+        execute_only_conn = SimpleNamespace(execute=lambda *a, **kw: sentinel)
+        assert not hasattr(execute_only_conn, "cursor")
+
+        run_config = {
+            "iterations": 1,
+            "warm_up_iterations": 0,
+            "scale_factor": 1.0,
+            "stream_id": 0,
+        }
+
+        all_ok = _make_tpcds_power_test_result(success=True, queries_successful=1, queries_executed=1)
+        mock_pt_cls.return_value.run.return_value = all_ok
+
+        # Must not raise AttributeError
+        adapter._execute_tpcds_power_test(bench_instance, execute_only_conn, run_config)
+
+        # Explicitly invoke connection_factory() so PlatformAdapterConnection gets called
+        factory = mock_pt_cls.call_args.kwargs["connection_factory"]
+        factory()
+
+        # PlatformAdapterConnection must have been called with a proxy, not the raw connection
+        proxy_wrapper, _ = mock_conn_cls.call_args.args
+        assert proxy_wrapper is not execute_only_conn, "raw connection must be wrapped"
+
+        # The proxy must delegate execute() to the underlying connection
+        assert proxy_wrapper.execute("SELECT 1") is sentinel
+
+        # The proxy's close() must be a no-op - underlying connection must survive
+        proxy_wrapper.close()
+        assert proxy_wrapper.execute("SELECT 1") is sentinel, "connection still alive after proxy.close()"
+
+    @patch("benchbox.core.tpcds.power_test.TPCDSPowerTest")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
+    def test_cursor_connection_uses_cursor_not_connection(self, mock_conn_cls, mock_pt_cls, adapter, bench_instance):
+        """When connection has .cursor(), connection_factory passes the cursor (not the connection)."""
+        mock_cursor = MagicMock()
+        cursor_conn = MagicMock()
+        cursor_conn.cursor.return_value = mock_cursor
+
+        run_config = {
+            "iterations": 1,
+            "warm_up_iterations": 0,
+            "scale_factor": 1.0,
+            "stream_id": 0,
+        }
+
+        all_ok = _make_tpcds_power_test_result(success=True, queries_successful=1, queries_executed=1)
+        mock_pt_cls.return_value.run.return_value = all_ok
+
+        adapter._execute_tpcds_power_test(bench_instance, cursor_conn, run_config)
+
+        factory = mock_pt_cls.call_args.kwargs["connection_factory"]
+        factory()
+
+        # PlatformAdapterConnection must be called with the cursor, not the raw connection
+        mock_conn_cls.assert_called_with(mock_cursor, adapter)
+
+    # --- Regression: Bug #2 - false PASSED when factory crashes (0 queries) -----
+
+    @patch("benchbox.core.tpcds.power_test.TPCDSPowerTest")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
+    def test_factory_crash_produces_sentinel_failed_entry(
+        self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
+    ):
+        """When the power test factory errors before running any query, a sentinel FAILED
+        result is appended so total_queries > 0 and the benchmark status becomes FAILED.
+
+        Regression: without the fix, results was [], total_queries == 0 ==
+        successful_queries, so _determine_benchmark_status returned PASSED.
+        """
+        run_config = {
+            "iterations": 1,
+            "warm_up_iterations": 0,
+            "scale_factor": 1.0,
+            "stream_id": 0,
+        }
+
+        factory_error_msg = "Power Test execution failed: 'ClickHouseLocalClient' object has no attribute 'cursor'"
+        factory_crashed = _make_tpcds_power_test_result(
+            success=False,
+            queries_successful=0,
+            queries_executed=0,
+            errors=[factory_error_msg],
+        )
+        mock_pt_cls.return_value.run.return_value = factory_crashed
+
+        results = adapter._execute_tpcds_power_test(bench_instance, connection, run_config)
+
+        # Must not be empty - empty list causes false PASSED via 0 == 0
+        assert len(results) > 0, "results must not be empty when power test factory crashes"
+
+        sentinel = results[-1]
+        assert sentinel["status"] == "FAILED"
+        assert sentinel["query_id"] == "power_test_error"
+        assert factory_error_msg in sentinel["error"]
+
+    @patch("benchbox.core.tpcds.power_test.TPCDSPowerTest")
+    @patch("benchbox.platforms.base.execution.PlatformAdapterConnection")
+    def test_factory_crash_does_not_produce_sentinel_when_queries_ran(
+        self, mock_conn_cls, mock_pt_cls, adapter, bench_instance, connection
+    ):
+        """Sentinel is only appended when zero queries ran (factory-level failure).
+
+        When queries did run but all failed, the real query results already signal
+        the failure - no extra sentinel entry should be appended.
+        """
+        run_config = {
+            "iterations": 1,
+            "warm_up_iterations": 0,
+            "scale_factor": 1.0,
+            "stream_id": 0,
+        }
+
+        # Some queries ran and all failed (not a factory crash)
+        all_failed = _make_tpcds_power_test_result(success=False, queries_successful=0, queries_executed=99)
+        mock_pt_cls.return_value.run.return_value = all_failed
+
+        results = adapter._execute_tpcds_power_test(bench_instance, connection, run_config)
+
+        # Should have exactly the 99 real FAILED results, no extra sentinel
+        assert len(results) == 99
+        assert not any(r.get("query_id") == "power_test_error" for r in results)
+
+
+# ---------------------------------------------------------------------------
+# _determine_benchmark_status defense-in-depth
+# ---------------------------------------------------------------------------
+
+
+class TestDetermineBenchmarkStatusZeroQueries:
+    """Guard against 0==0 false PASSED at the status-determination layer."""
+
+    def test_zero_total_queries_is_failed(self):
+        """When total_queries == 0, status must be FAILED regardless of validation."""
+        from benchbox.cli.output import ConsoleResultFormatter
+
+        result = SimpleNamespace(total_queries=0, successful_queries=0, validation_status="PASSED")
+        status, color = ConsoleResultFormatter._determine_benchmark_status(result)
+        assert status == "FAILED"
+        assert color == "red"

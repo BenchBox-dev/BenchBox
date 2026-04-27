@@ -29,9 +29,10 @@ Usage:
     )
 
     # Run TPC-H benchmark with PySpark API
-    adapter.create_schema("tpch_sf1")
-    adapter.load_data(["lineitem", "orders", ...], source_dir)
-    result = adapter.execute_query("SELECT * FROM lineitem LIMIT 10")
+    session = adapter.create_connection()
+    adapter.create_schema(benchmark, session)
+    adapter.load_data(benchmark, session, source_dir)
+    result = adapter.execute_query(session, "SELECT * FROM lineitem LIMIT 10", "Q1")
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -288,57 +289,62 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         except Exception as e:
             raise ConfigurationError(f"Snowpark session creation failed: {e}") from e
 
-    def create_schema(self, schema_name: str | None = None) -> None:
+    def create_schema(self, benchmark, connection: Any) -> float:
         """Create database and schema if they don't exist.
 
         Args:
-            schema_name: Schema name (uses self.database if not provided).
+            benchmark: Benchmark instance. Snowpark Connect only needs the
+                configured database/schema here.
+            connection: Active Snowpark session.
         """
-        if self._session is None:
+        session = connection or self._session
+        if session is None:
             raise ConfigurationError("No active session. Call create_connection() first.")
 
-        database = schema_name or self.database
+        self._session = session
+        start_time = mono_time()
 
-        # Create database if not exists
-        self._session.sql(f"CREATE DATABASE IF NOT EXISTS {database}").collect()
-        logger.info(f"Database '{database}' created or already exists")
+        session.sql(f"CREATE DATABASE IF NOT EXISTS {self.database}").collect()
+        logger.info(f"Database '{self.database}' created or already exists")
 
-        # Use the database
-        self._session.sql(f"USE DATABASE {database}").collect()
+        session.sql(f"USE DATABASE {self.database}").collect()
 
-        # Create schema if not exists
-        self._session.sql(f"CREATE SCHEMA IF NOT EXISTS {self.schema}").collect()
-        self._session.sql(f"USE SCHEMA {self.schema}").collect()
+        session.sql(f"CREATE SCHEMA IF NOT EXISTS {self.schema}").collect()
+        session.sql(f"USE SCHEMA {self.schema}").collect()
         logger.info(f"Schema '{self.schema}' created or already exists")
+        return elapsed_seconds(start_time)
 
     def load_data(
         self,
-        tables: list[str],
-        source_dir: Path | str,
-        file_format: str = "parquet",
-        **kwargs: Any,
-    ) -> dict[str, int]:
+        benchmark,
+        connection: Any,
+        data_dir: Path,
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Load benchmark data into Snowflake tables.
 
         Args:
-            tables: List of table names to load.
-            source_dir: Local directory containing table data files.
-            file_format: Data file format (default: parquet).
-            **kwargs: Additional options.
+            benchmark: Benchmark instance.
+            connection: Active Snowpark session.
+            data_dir: Local directory containing table data files.
 
         Returns:
-            Dict mapping table names to row counts.
+            Tuple of table row counts, elapsed seconds, and optional per-table timings.
         """
-        if self._session is None:
+        session = connection or self._session
+        if session is None:
             raise ConfigurationError("No active session. Call create_connection() first.")
 
-        source_path = Path(source_dir)
+        self._session = session
+        start_time = mono_time()
+        source_path = Path(data_dir)
         if not source_path.exists():
-            raise ConfigurationError(f"Source directory not found: {source_dir}")
+            raise ConfigurationError(f"Source directory not found: {data_dir}")
 
-        table_stats = {}
+        table_stats: dict[str, int] = {}
+        per_table_timings: dict[str, float] = {}
 
-        for table in tables:
+        for table in self._resolve_table_names(benchmark):
+            table_start = mono_time()
             # Find data files for this table
             table_files = list(source_path.glob(f"{table}.*")) + list(source_path.glob(f"{table}/*.parquet"))
 
@@ -347,19 +353,18 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                 continue
 
             # For Parquet files, use Snowpark DataFrame API
-            if file_format.lower() == "parquet":
+            if all(is_parquet_format(file_path) for file_path in table_files):
                 for file_path in table_files:
-                    if is_parquet_format(file_path):
-                        # Create internal stage and upload
-                        stage_name = f"@~/{table}"
-                        self._session.sql(f"PUT file://{file_path} {stage_name} AUTO_COMPRESS=FALSE").collect()
+                    # Create internal stage and upload
+                    stage_name = f"@~/{table}"
+                    session.sql(f"PUT file://{file_path} {stage_name} AUTO_COMPRESS=FALSE").collect()
 
                 # Create table from staged files
-                df = self._session.read.parquet(f"@~/{table}/")
+                df = session.read.parquet(f"@~/{table}/")
                 df.write.mode("overwrite").save_as_table(table)
 
                 # Get row count
-                count_result = self._session.sql(f"SELECT COUNT(*) FROM {table}").collect()
+                count_result = session.sql(f"SELECT COUNT(*) FROM {table}").collect()
                 row_count = count_result[0][0] if count_result else 0
                 table_stats[table] = row_count
                 logger.info(f"Loaded {row_count:,} rows into {table}")
@@ -368,56 +373,111 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                 # For CSV/TBL files, use COPY INTO
                 for file_path in table_files:
                     stage_name = f"@~/{table}"
-                    self._session.sql(f"PUT file://{file_path} {stage_name}").collect()
+                    session.sql(f"PUT file://{file_path} {stage_name}").collect()
 
                 # Create file format and COPY INTO
-                self._session.sql(
+                session.sql(
                     f"COPY INTO {table} FROM @~/{table}/ FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER = '|')"
                 ).collect()
 
-                count_result = self._session.sql(f"SELECT COUNT(*) FROM {table}").collect()
+                count_result = session.sql(f"SELECT COUNT(*) FROM {table}").collect()
                 row_count = count_result[0][0] if count_result else 0
                 table_stats[table] = row_count
                 logger.info(f"Loaded {row_count:,} rows into {table}")
 
-        return table_stats
+            per_table_timings[table] = elapsed_seconds(table_start)
+
+        return table_stats, elapsed_seconds(start_time), per_table_timings
 
     def execute_query(
         self,
+        connection: Any,
         query: str,
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
         """Execute a SQL query using Snowpark.
 
         Args:
+            connection: Active Snowpark session.
             query: SQL query to execute.
-            **kwargs: Additional query options.
+            query_id: Query identifier.
 
         Returns:
-            Query results as list of dicts.
+            Standard query result dictionary.
         """
-        if self._session is None:
+        session = connection or self._session
+        if session is None:
             raise ConfigurationError("No active session. Call create_connection() first.")
 
+        self._session = session
         start_time = mono_time()
 
         try:
-            result = self._session.sql(query).collect()
+            result = session.sql(query).collect()
             elapsed = elapsed_seconds(start_time)
 
             self._query_count += 1
             self._total_execution_time_seconds += elapsed
 
-            # Convert to list of dicts
-            if result:
-                # Get column names from first row
-                columns = result[0].asDict().keys() if hasattr(result[0], "asDict") else []
-                return [row.asDict() if hasattr(row, "asDict") else dict(zip(columns, row)) for row in result]
-
-            return []
+            rows = self._rows_to_dicts(result)
+            result_dict = self._build_query_result_with_validation(
+                query_id=query_id,
+                execution_time=elapsed,
+                actual_row_count=len(rows),
+                first_row=rows[0] if rows else None,
+            )
+            result_dict["stream_id"] = stream_id
+            result_dict["results"] = rows
+            result_dict["benchmark_type"] = benchmark_type
+            result_dict["scale_factor"] = scale_factor
+            result_dict["validation_enabled"] = validate_row_count
+            return result_dict
 
         except SnowparkSQLException as e:
-            raise RuntimeError(f"Query execution failed: {e}") from e
+            elapsed = elapsed_seconds(start_time)
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "FAILED",
+                "execution_time_seconds": elapsed,
+                "rows_returned": 0,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
+
+    @staticmethod
+    def _rows_to_dicts(result: Any) -> list[dict[str, Any]]:
+        """Convert Snowpark Row objects or tuple rows to dictionaries.
+
+        Snowpark's collect() normally returns Row objects with ``asDict()``,
+        which yields the expected ``{column_name: value}`` mapping. The tuple
+        fallback (no ``asDict``) is only hit if a future Snowpark release or
+        a stub returns plain sequences; in that case we have no column-name
+        metadata, so positional integer keys are the safest non-empty form.
+        """
+        if not result:
+            return []
+        if hasattr(result[0], "asDict"):
+            return [row.asDict() for row in result]
+        return [dict(enumerate(row)) for row in result]
+
+    @staticmethod
+    def _resolve_table_names(benchmark: Any) -> list[str]:
+        """Resolve table names from common BenchBox benchmark interfaces."""
+        if hasattr(benchmark, "get_table_loading_order") and callable(benchmark.get_table_loading_order):
+            return list(benchmark.get_table_loading_order())
+        if hasattr(benchmark, "get_available_tables") and callable(benchmark.get_available_tables):
+            return list(benchmark.get_available_tables())
+        if hasattr(benchmark, "get_table_names") and callable(benchmark.get_table_names):
+            return list(benchmark.get_table_names())
+        tables = getattr(benchmark, "tables", None)
+        if isinstance(tables, dict):
+            return list(tables.keys())
+        raise ConfigurationError("Benchmark does not expose table names for Snowpark data loading")
 
     def execute_dataframe(
         self,
@@ -495,6 +555,15 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
     @staticmethod
     def add_cli_arguments(parser: Any) -> None:
         """Add Snowpark Connect-specific CLI arguments.
+
+        WARNING — namespace collision risk: ``--account``, ``--user``,
+        ``--password``, ``--database``, ``--schema``, ``--warehouse``, and
+        ``--role`` are registered WITHOUT a ``--snowpark-`` prefix.  If this
+        parser is shared with other adapters those names will conflict.
+
+        These are legacy flags for the setup wizard (``benchbox platforms setup``).
+        The ``benchbox run`` flow uses ``--platform-option key=val`` instead
+        and does NOT call ``add_cli_arguments``.
 
         Args:
             parser: Argument parser to add arguments to.

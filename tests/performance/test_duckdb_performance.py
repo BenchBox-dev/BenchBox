@@ -273,7 +273,7 @@ class TestDuckDBQueryPerformance:
             files[table] = str(file_path)
 
             # Create minimal CSV files for testing
-            with open(file_path, "w") as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 if table == "lineitem":
                     f.write(
                         "l_orderkey,l_partkey,l_suppkey,l_linenumber,l_quantity,l_extendedprice,l_discount,l_tax,l_returnflag,l_linestatus,l_shipdate,l_commitdate,l_receiptdate,l_shipinstruct,l_shipmode,l_comment\n"
@@ -306,7 +306,7 @@ class TestDuckDBQueryPerformance:
 
         # Create minimal store_sales table
         store_sales_path = data_dir / "store_sales.csv"
-        with open(store_sales_path, "w") as f:
+        with open(store_sales_path, "w", encoding="utf-8") as f:
             f.write("ss_store_sk,ss_sales_price\n")
             for i in range(100):
                 f.write(f"{i % 10},{100.0 + i}\n")

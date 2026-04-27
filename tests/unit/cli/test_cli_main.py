@@ -7,6 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import json
 import sys
+import sys as _sys
 from unittest.mock import Mock, patch
 
 import pytest
@@ -14,6 +15,15 @@ from click.testing import CliRunner
 
 import benchbox
 from benchbox.cli.main import cli, run
+
+# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
+# same name as the run submodule.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
+# the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.run")
+_run_module = _sys.modules["benchbox.cli.commands.run"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -140,11 +150,11 @@ class TestRunCommand:
         assert "all" in result.output.lower()
 
     @patch("benchbox.cli.main.get_config_manager")
-    @patch("benchbox.cli.commands.run.SystemProfiler")
-    @patch("benchbox.cli.commands.run.DatabaseManager")
-    @patch("benchbox.cli.commands.run.BenchmarkManager")
-    @patch("benchbox.cli.commands.run.BenchmarkOrchestrator")
-    @patch("benchbox.cli.commands.run.console")
+    @patch.object(_run_module, "SystemProfiler")
+    @patch.object(_run_module, "DatabaseManager")
+    @patch.object(_run_module, "BenchmarkManager")
+    @patch.object(_run_module, "BenchmarkOrchestrator")
+    @patch.object(_run_module, "console")
     def test_run_command_interactive_mode(
         self,
         mock_console,
@@ -194,11 +204,11 @@ class TestRunCommand:
         assert result.exit_code == 2
 
     @patch("benchbox.cli.main.get_config_manager")
-    @patch("benchbox.cli.commands.run.SystemProfiler")
-    @patch("benchbox.cli.commands.run.DatabaseManager")
-    @patch("benchbox.cli.commands.run.BenchmarkManager")
-    @patch("benchbox.cli.commands.run.BenchmarkOrchestrator")
-    @patch("benchbox.cli.commands.run.console")
+    @patch.object(_run_module, "SystemProfiler")
+    @patch.object(_run_module, "DatabaseManager")
+    @patch.object(_run_module, "BenchmarkManager")
+    @patch.object(_run_module, "BenchmarkOrchestrator")
+    @patch.object(_run_module, "console")
     def test_run_command_quick_mode_partial_args(
         self,
         mock_console,
@@ -264,10 +274,10 @@ class TestRunCommand:
         assert result.exit_code == 2
 
     @patch("benchbox.cli.main.get_config_manager")
-    @patch("benchbox.cli.commands.run.DatabaseManager")
-    @patch("benchbox.cli.commands.run.BenchmarkManager")
-    @patch("benchbox.cli.commands.run.SystemProfiler")
-    @patch("benchbox.cli.commands.run.console")
+    @patch.object(_run_module, "DatabaseManager")
+    @patch.object(_run_module, "BenchmarkManager")
+    @patch.object(_run_module, "SystemProfiler")
+    @patch.object(_run_module, "console")
     def test_run_command_quick_mode_complete_args(
         self,
         mock_console,
@@ -317,9 +327,9 @@ class TestRunCommand:
 
         runner = CliRunner()
 
-        with patch("benchbox.cli.commands.run.console.print"):
-            with patch("benchbox.cli.commands.run.ResultExporter") as mock_exporter_class:
-                with patch("benchbox.cli.commands.run.BenchmarkOrchestrator") as mock_orchestrator_class:
+        with patch.object(_run_module, "console"):
+            with patch.object(_run_module, "ResultExporter") as mock_exporter_class:
+                with patch.object(_run_module, "BenchmarkOrchestrator") as mock_orchestrator_class:
                     # Setup orchestrator mock
                     mock_orchestrator = Mock()
                     mock_result = Mock()
@@ -367,11 +377,11 @@ class TestRunCommand:
         assert "Invalid value" in result.output
 
     @patch("benchbox.cli.main.get_config_manager")
-    @patch("benchbox.cli.commands.run.SystemProfiler")
-    @patch("benchbox.cli.commands.run.DatabaseManager")
-    @patch("benchbox.cli.commands.run.BenchmarkManager")
-    @patch("benchbox.cli.commands.run.BenchmarkOrchestrator")
-    @patch("benchbox.cli.commands.run.console")
+    @patch.object(_run_module, "SystemProfiler")
+    @patch.object(_run_module, "DatabaseManager")
+    @patch.object(_run_module, "BenchmarkManager")
+    @patch.object(_run_module, "BenchmarkOrchestrator")
+    @patch.object(_run_module, "console")
     def test_run_command_with_output_directory(
         self,
         mock_console,
@@ -453,12 +463,12 @@ class TestRunCommand:
 class TestCLIIntegration:
     """Test CLI integration scenarios."""
 
-    @patch("benchbox.cli.commands.run.SystemProfiler")
-    @patch("benchbox.cli.commands.run.DatabaseManager")
-    @patch("benchbox.cli.commands.run.BenchmarkManager")
-    @patch("benchbox.cli.commands.run.BenchmarkOrchestrator")
-    @patch("benchbox.cli.commands.run.ResultExporter")
-    @patch("benchbox.cli.commands.run.console")
+    @patch.object(_run_module, "SystemProfiler")
+    @patch.object(_run_module, "DatabaseManager")
+    @patch.object(_run_module, "BenchmarkManager")
+    @patch.object(_run_module, "BenchmarkOrchestrator")
+    @patch.object(_run_module, "ResultExporter")
+    @patch.object(_run_module, "console")
     def test_full_cli_workflow_mocked(
         self,
         mock_console,
@@ -530,11 +540,11 @@ class TestCLIIntegration:
         assert result.exit_code != 0
         assert "No such option" in result.output
 
-    @patch("benchbox.cli.commands.run.SystemProfiler")
-    @patch("benchbox.cli.commands.run.DatabaseManager")
-    @patch("benchbox.cli.commands.run.BenchmarkManager")
-    @patch("benchbox.cli.commands.run.BenchmarkOrchestrator")
-    @patch("benchbox.cli.commands.run.console")
+    @patch.object(_run_module, "SystemProfiler")
+    @patch.object(_run_module, "DatabaseManager")
+    @patch.object(_run_module, "BenchmarkManager")
+    @patch.object(_run_module, "BenchmarkOrchestrator")
+    @patch.object(_run_module, "console")
     def test_cli_context_preservation(
         self,
         mock_console,

@@ -30,6 +30,7 @@ from .models import (
     ThroughputTestPhase,
     ValidationPhase,
 )
+from .psycopg2_mixin import PsycopgConnectionMixin
 from .utils import FileFormatInfo, detect_file_format, is_non_interactive
 
 __all__ = [
@@ -60,4 +61,5 @@ __all__ = [
     "QueryDefinition",
     "detect_file_format",
     "is_non_interactive",
+    "PsycopgConnectionMixin",
 ]

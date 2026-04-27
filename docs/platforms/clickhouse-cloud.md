@@ -19,8 +19,8 @@ ClickHouse Cloud is the managed cloud version of ClickHouse, providing serverles
 ## Quick Start
 
 ```bash
-# Install clickhouse-connect
-uv add clickhouse-connect
+# Install ClickHouse Cloud extra
+uv add benchbox --extra clickhouse-cloud
 
 # Set your credentials
 export CLICKHOUSE_CLOUD_HOST=abc123.us-east-2.aws.clickhouse.cloud
@@ -139,7 +139,7 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0 --dry-run 
 
 | Feature | ClickHouse (local) | ClickHouse (server) | ClickHouse Cloud |
 |---------|-------------------|---------------------|------------------|
-| **CLI Name** | `clickhouse:local` | `clickhouse:server` | `clickhouse-cloud` |
+| **CLI Name** | `clickhouse-local` | `clickhouse-server` | `clickhouse-cloud` |
 | **Infrastructure** | None (chDB) | Self-hosted | Managed |
 | **Driver** | chdb | clickhouse-driver | clickhouse-connect |
 | **Port** | N/A | 9000 (native) | 8443 (HTTPS) |

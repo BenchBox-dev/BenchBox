@@ -56,7 +56,7 @@ class TPCDSOBTTransformer:
         *,
         mode: str = "full",
         channels: Sequence[str] | None = None,
-        output_format: str = "dat",
+        output_format: str = "parquet",
         scale_factor: float | None = None,
     ) -> dict[str, Path]:
         """Transform TPC-DS data into the unified OBT table.
@@ -66,7 +66,7 @@ class TPCDSOBTTransformer:
             output_dir: Directory where the OBT output should be written.
             mode: Column group to emit ('full' or 'minimal').
             channels: Optional subset of channels to include.
-            output_format: 'dat' (pipe-delimited) or 'parquet'.
+            output_format: 'parquet' (default) or 'dat' (pipe-delimited).
             scale_factor: Optional scale factor for manifest metadata.
 
         Returns:

@@ -12,12 +12,13 @@ This implementation is based on the TPC-H specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-import concurrent.futures
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Optional
 
+from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
+from benchbox.core.throughput.runner import StreamRunner
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
@@ -36,37 +37,15 @@ class TPCHThroughputTestConfig:
     min_success_rate: float = 0.99
 
 
-@dataclass
-class TPCHThroughputStreamResult:
-    """Result of a single throughput test stream."""
-
-    stream_id: int
-    start_time: float
-    end_time: float
-    duration: float
-    queries_executed: int
-    queries_successful: int
-    queries_failed: int
-    query_results: list[dict[str, Any]] = field(default_factory=list)
-    success: bool = True
-    error: Optional[str] = None
+# Backward-compatibility alias - ThroughputStreamResult is the canonical type.
+TPCHThroughputStreamResult = ThroughputStreamResult
 
 
 @dataclass
-class TPCHThroughputTestResult:
+class TPCHThroughputTestResult(ThroughputResult):
     """Result of TPC-H Throughput Test."""
 
-    config: TPCHThroughputTestConfig
-    start_time: str
-    end_time: str
-    total_time: float
-    throughput_at_size: float
-    streams_executed: int
-    streams_successful: int
-    stream_results: list[TPCHThroughputStreamResult] = field(default_factory=list)
-    query_throughput: float = 0.0
-    success: bool = True
-    errors: list[str] = field(default_factory=list)
+    config: TPCHThroughputTestConfig = field(kw_only=True)
 
     @property
     def scale_factor(self) -> float:
@@ -145,82 +124,10 @@ class TPCHThroughputTest:
                 self.logger.info(f"Scale factor: {config.scale_factor}")
 
             # Execute concurrent streams
-            max_workers = config.max_workers or config.num_streams
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Track future -> stream_id mapping for timeout error reporting
-                future_to_stream_id = {}
-
-                for stream_id in range(config.num_streams):
-                    future = executor.submit(
-                        self._execute_stream,
-                        stream_id,
-                        config.base_seed + stream_id,
-                        config,
-                    )
-                    future_to_stream_id[future] = stream_id
-
-                # Wait for all streams to complete with per-stream timeout enforcement
-                # Note: Timed-out streams continue executing in background (Python threading limitation)
-                timeout = config.stream_timeout if config.stream_timeout > 0 else None
-
-                for future in concurrent.futures.as_completed(future_to_stream_id.keys()):
-                    stream_id = future_to_stream_id[future]
-
-                    try:
-                        # Enforce per-stream timeout
-                        stream_result = future.result(timeout=timeout)
-                        result.stream_results.append(stream_result)
-                        result.streams_executed += 1
-
-                        if stream_result.success:
-                            result.streams_successful += 1
-                        else:
-                            result.errors.append(f"Stream {stream_result.stream_id} failed: {stream_result.error}")
-
-                        if config.verbose:
-                            self.logger.info(
-                                f"Stream {stream_result.stream_id}: "
-                                f"{stream_result.queries_successful}/{stream_result.queries_executed} successful"
-                            )
-
-                    except concurrent.futures.TimeoutError:
-                        result.streams_executed += 1
-                        error_msg = f"Stream {stream_id} timeout after {timeout}s"
-                        result.errors.append(error_msg)
-                        if config.verbose:
-                            self.logger.error(error_msg)
-
-                    except Exception as e:
-                        result.streams_executed += 1
-                        result.errors.append(f"Stream {stream_id} execution failed: {e}")
-                        if config.verbose:
-                            self.logger.error(f"Stream {stream_id} execution failed: {e}")
+            StreamRunner.execute(self._execute_stream, config, result, self.logger)
 
             # Calculate metrics
-            result.end_time = datetime.now().isoformat()
-
-            # Per TPC-H specification: Total Test Time (TTT) is measured from when the
-            # first stream begins execution until the last stream completes execution.
-            # This is the actual concurrent execution time, excluding setup/teardown overhead.
-            if result.stream_results:
-                first_stream_start = min(sr.start_time for sr in result.stream_results)
-                last_stream_end = max(sr.end_time for sr in result.stream_results)
-                total_time = last_stream_end - first_stream_start
-            else:
-                # Fallback if no streams executed (shouldn't happen in normal operation)
-                total_time = elapsed_seconds(start_time)
-
-            result.total_time = total_time
-
-            if total_time > 0:
-                # Throughput@Size = S × 3600 × SF / TTT
-                # where S = num_streams, SF = scale_factor, TTT = total_test_time (concurrent execution)
-                result.throughput_at_size = (config.num_streams * 3600.0 * config.scale_factor) / total_time
-
-                # Calculate query throughput
-                total_queries = sum(sr.queries_executed for sr in result.stream_results)
-                result.query_throughput = total_queries / total_time
+            StreamRunner.compute_metrics(result, config, start_time)
 
             # TPC-H success criteria: configurable stream success rate
             # Default is 99% (allows up to 1% failures per TPC-H spec)
@@ -231,7 +138,7 @@ class TPCHThroughputTest:
                 result.success = False
 
             if config.verbose:
-                self.logger.info(f"Throughput Test completed in {total_time:.3f}s")
+                self.logger.info(f"Throughput Test completed in {result.total_time:.3f}s")
                 self.logger.info(f"Successful streams: {result.streams_successful}/{config.num_streams}")
                 if config.num_streams > 0:
                     success_rate = result.streams_successful / config.num_streams

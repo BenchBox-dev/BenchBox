@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import os
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
 from benchbox.platforms.pyspark import session as session_module
-from benchbox.platforms.pyspark.session import SparkConfigurationError, SparkSessionManager
+from benchbox.platforms.pyspark.session import (
+    SparkConfigurationError,
+    SparkSessionManager,
+    suppress_window_exec_warning,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -159,3 +164,45 @@ def test_java_home_auto_switch(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     assert os.environ.get("JAVA_HOME") == "/fake/jdk17"
+
+
+class TestSuppressWindowExecWarning:
+    """Tests for the shared suppress_window_exec_warning function.
+
+    This function is the single implementation used by both SparkAdapter
+    and SparkSessionManager to suppress WindowExec partition warnings.
+    """
+
+    def test_calls_configurator_with_logger_object(self) -> None:
+        """Verify suppress uses logger-object Configurator.setLevel overload."""
+        mock_spark = SimpleNamespace(sparkContext=SimpleNamespace(_jvm=MagicMock()))
+        mock_jvm = mock_spark.sparkContext._jvm
+        mock_logger = MagicMock()
+        mock_jvm.org.apache.logging.log4j.LogManager.getLogger.return_value = mock_logger
+
+        suppress_window_exec_warning(mock_spark)
+
+        mock_jvm.org.apache.logging.log4j.LogManager.getLogger.assert_called_once_with(
+            "org.apache.spark.sql.execution.window.WindowExec"
+        )
+        mock_jvm.org.apache.logging.log4j.core.config.Configurator.setLevel.assert_called_once_with(
+            mock_logger,
+            mock_jvm.org.apache.logging.log4j.Level.ERROR,
+        )
+
+    def test_does_not_raise_on_jvm_error(self) -> None:
+        """Verify suppression silently passes when JVM gateway fails."""
+        mock_spark = SimpleNamespace(sparkContext=SimpleNamespace(_jvm=MagicMock()))
+        mock_spark.sparkContext._jvm.org.apache.logging.log4j.core.config.Configurator.setLevel.side_effect = (
+            RuntimeError("JVM not available")
+        )
+
+        # Should not raise
+        suppress_window_exec_warning(mock_spark)
+
+    def test_does_not_raise_when_jvm_is_none(self) -> None:
+        """Verify suppression handles missing JVM gateway gracefully."""
+        mock_spark = SimpleNamespace(sparkContext=SimpleNamespace(_jvm=None))
+
+        # Should not raise
+        suppress_window_exec_warning(mock_spark)

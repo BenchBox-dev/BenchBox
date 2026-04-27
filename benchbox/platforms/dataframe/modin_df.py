@@ -126,7 +126,7 @@ from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration  # noqa:
 from benchbox.platforms.dataframe.pandas_family import (  # noqa: E402
     PandasFamilyAdapter,
 )
-from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter, is_tpc_format  # noqa: E402
+from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +270,7 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
         delimiter: str = ",",
         header: int | None = 0,
         names: list[str] | None = None,
+        null_marker: str | None = None,
     ) -> ModinDF:
         """Read a CSV file into a Modin DataFrame.
 
@@ -278,6 +279,7 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
             delimiter: Field delimiter
             header: Row to use as header (None for no header)
             names: Column names (if header is None)
+            null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
 
         Returns:
             Modin DataFrame with the file contents
@@ -292,8 +294,8 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
         if names:
             read_kwargs["names"] = names
 
-        # Handle TPC format files (.tbl, .dat) with trailing delimiter
-        if is_tpc_format(path) and names and has_trailing_delimiter(path, delimiter, names):
+        # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
+        if null_marker is not None and names and has_trailing_delimiter(path, delimiter, names):
             extended_names = names + [TRAILING_DUMMY_COLUMN]
             read_kwargs["names"] = extended_names
 

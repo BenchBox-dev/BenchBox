@@ -14,9 +14,10 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union
 # __version__ must be defined before `from . import platforms` because the
 # platforms import chain can circle back to benchbox.cli.app which reads
 # benchbox.__version__ at module level.
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from benchbox.base import BaseBenchmark
+from benchbox.flightdata import FlightData
 from benchbox.nyctaxi import NYCTaxi
 from benchbox.tpcds import TPCDS
 from benchbox.tpch import TPCH
@@ -82,10 +83,11 @@ _BENCHMARK_REGISTRY: dict[str, _BenchmarkSpec] = {
     "CoffeeShop": _BenchmarkSpec("coffeeshop", "CoffeeShop", ("coffeeshop",)),
     "DataVault": _BenchmarkSpec("datavault", "DataVault", ()),
     "TPCDSOBT": _BenchmarkSpec("tpcds_obt", "TPCDSOBT", ()),
+    "VectorSearch": _BenchmarkSpec("vector_search", "VectorSearch", ()),
 }
 
 
-# Public re-exports for MCP and external consumers — resolved lazily in
+# Public re-exports for MCP and external consumers - resolved lazily in
 # __getattr__ to avoid importing heavy registry modules at package load time.
 _PUBLIC_REEXPORTS: dict[str, tuple[str, str]] = {
     "TPCH_DATAFRAME_QUERIES": ("benchbox.core.tpch.dataframe_queries", "TPCH_DATAFRAME_QUERIES"),
@@ -182,6 +184,7 @@ __all__ = [
     "TPCHSkew",
     "TSBSDevOps",
     "NYCTaxi",
+    "FlightData",
     "TPCDI",
     "SSB",
     "AMPLab",
@@ -195,6 +198,7 @@ __all__ = [
     "CoffeeShop",
     "DataVault",
     "TPCDSOBT",
+    "VectorSearch",
     # Public re-exports (MCP / external consumers)
     "TPCH_DATAFRAME_QUERIES",
     "TPCDS_DATAFRAME_QUERIES",

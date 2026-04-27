@@ -315,7 +315,17 @@ class PrimitivesDataGeneratorBase(CompressionMixin, CloudStorageGeneratorMixin, 
                 # Other TPC-H base tables
                 expected_rows = self._get_tpch_row_count(table_name)
 
-            manifest.add_entry(table_name, file_path, row_count=expected_rows)
+            # TPC-H base tables may be multi-chunk (list[Path] for parallel generation).
+            # add_entry accepts a single PathLike, so iterate chunks individually.
+            if isinstance(file_path, list):
+                chunk_count = len(file_path)
+                rows_per_chunk = expected_rows // chunk_count if chunk_count else expected_rows
+                remainder = expected_rows - rows_per_chunk * chunk_count
+                for i, chunk_file in enumerate(file_path):
+                    rc = rows_per_chunk + (remainder if i == chunk_count - 1 else 0)
+                    manifest.add_entry(table_name, chunk_file, row_count=rc)
+            else:
+                manifest.add_entry(table_name, file_path, row_count=expected_rows)
 
         manifest.write()
         self.log_verbose(f"Wrote manifest with {len(table_paths)} tables")
@@ -384,7 +394,7 @@ class PrimitivesDataGeneratorBase(CompressionMixin, CloudStorageGeneratorMixin, 
         if lock_file.exists():
             try:
                 # Read lock file to get PID
-                with open(lock_file) as f:
+                with open(lock_file, encoding="utf-8") as f:
                     lock_content = f.read().strip()
 
                 # Extract PID from lock file (format: "pid:12345")
@@ -505,7 +515,7 @@ class PrimitivesDataGeneratorBase(CompressionMixin, CloudStorageGeneratorMixin, 
             try:
                 import json
 
-                with open(metadata_file) as f:
+                with open(metadata_file, encoding="utf-8") as f:
                     metadata = json.load(f)
                 stored_sf = metadata.get("scale_factor")
                 if stored_sf != self.scale_factor:
@@ -643,7 +653,7 @@ class PrimitivesDataGeneratorBase(CompressionMixin, CloudStorageGeneratorMixin, 
 
         metadata_file = self.files_dir / ".bulk_load_metadata.json"
         try:
-            with open(metadata_file, "w") as f:
+            with open(metadata_file, "w", encoding="utf-8") as f:
                 json.dump(metadata, f, indent=2)
             self.log_verbose(f"Wrote bulk load metadata: {metadata_file}")
         except Exception as e:

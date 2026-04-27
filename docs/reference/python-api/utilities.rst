@@ -508,7 +508,7 @@ See Also
 - :doc:`platforms/index` - Platform adapter documentation
 - :doc:`benchmarks/index` - Benchmark API overview
 - :doc:`/usage/configuration` - Configuration guide
-- :doc:`/TROUBLESHOOTING` - Troubleshooting guide
+- :doc:`/usage/troubleshooting` - Troubleshooting guide
 
 External Resources
 ~~~~~~~~~~~~~~~~~~

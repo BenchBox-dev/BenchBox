@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 
 from benchbox.base import BaseBenchmark
 from benchbox.core.benchmark_mixins import DataGenerationMixin
-from benchbox.core.query_catalog_base import TranslatableQueryMixin
+from benchbox.core.query_catalog_base import QuerySkippedError, TranslatableQueryMixin
 
 if TYPE_CHECKING:
     from cloudpathlib import CloudPath
@@ -161,19 +161,21 @@ class ReadPrimitivesBenchmark(TranslatableQueryMixin, DataGenerationMixin, BaseB
         base_queries = self.query_manager.get_all_queries()
 
         if dialect:
-            # Get queries with dialect-specific variants (if available) and translate
             translated_queries = {}
             for query_id in base_queries.keys():
+                is_variant = self.query_manager.has_variant(query_id, dialect)
                 try:
-                    # Try to get dialect-specific variant first
                     query_sql = self.query_manager.get_query(query_id, dialect=dialect)
-                    # Translate the query (variant or base) to target dialect
+                except QuerySkippedError:
+                    continue
+                if is_variant:
+                    # Catalog variants are authored as final target SQL for their dialect.
+                    # Bypassing source→dialect translation preserves platform-specific syntax
+                    # (e.g. ClickHouse length(array)/quantile(p)(col), DuckDB list_*/ROW/len,
+                    # Redshift window workarounds, BigQuery UNNEST forms).
+                    translated_queries[query_id] = query_sql
+                else:
                     translated_queries[query_id] = self.translate_query_text(query_sql, dialect)
-                except ValueError as e:
-                    # Query marked as skip_on for this dialect - skip it
-                    if "not supported on dialect" in str(e):
-                        continue
-                    raise
             return translated_queries
 
         return base_queries
@@ -699,15 +701,38 @@ class ReadPrimitivesBenchmark(TranslatableQueryMixin, DataGenerationMixin, BaseB
 
         return get_skip_for_expression_family()
 
-    def get_datafusion_skip_queries(self) -> list[str]:
-        """Get query IDs that should be skipped for DataFusion DataFrame mode.
+    def get_platform_skip_queries(self, platform_name: str) -> list[str]:
+        """Get query IDs to skip for a specific platform in all execution modes.
 
-        These use Polars-only features or DataFusion v50 functions with missing
-        Python bindings or type bugs.
+        These skips apply to both SQL and DataFrame execution.
 
         Returns:
-            List of query IDs to skip for DataFusion
+            List of query IDs to exclude from execution on the given platform
         """
-        from benchbox.core.read_primitives.dataframe_queries import get_skip_for_datafusion
+        name = platform_name.lower()
+        if name == "lakesail":
+            # LakeSail/Sail hangs indefinitely on LEFT JOINs with an empty
+            # build side - a known Sail bug with empty-relation optimization.
+            return ["empty_build_join"]
+        return []
 
-        return get_skip_for_datafusion()
+    def get_df_platform_skip_queries(self, platform_name: str) -> list[str]:
+        """Get query IDs to skip for a specific platform in DataFrame mode only.
+
+        Returns:
+            List of query IDs to exclude from DataFrame execution on the given platform
+        """
+        name = platform_name.lower()
+        if name == "datafusion":
+            from benchbox.core.read_primitives.dataframe_queries import get_skip_for_datafusion
+
+            return get_skip_for_datafusion()
+        if name == "polars":
+            from benchbox.core.read_primitives.dataframe_queries import get_skip_for_polars
+
+            return get_skip_for_polars()
+        if name == "pyspark":
+            from benchbox.core.read_primitives.dataframe_queries import get_skip_for_pyspark
+
+            return get_skip_for_pyspark()
+        return []

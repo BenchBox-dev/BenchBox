@@ -73,6 +73,15 @@ class CoffeeShopBenchmark(TranslatableQueryMixin, BaseBenchmark):
         return self.query_manager.get_query(str(query_id), params)
 
     def get_queries(self, dialect: str | None = None) -> dict[str, str]:
+        import benchbox.sql_compat.rules.query_source.coffeeshop_variants  # noqa: F401
+        from benchbox.sql_compat.actions import CompatAction
+        from benchbox.sql_compat.context import CompatibilityContext, Phase
+        from benchbox.sql_compat.registry import REGISTRY
+        from benchbox.sql_compat.rules.query_source.coffeeshop_variants import (
+            CLICKHOUSE_SA4_SQL,
+            CLICKHOUSE_TM1_SQL,
+        )
+
         queries = self.query_manager.get_all_queries()
         if not dialect:
             return queries
@@ -80,6 +89,39 @@ class CoffeeShopBenchmark(TranslatableQueryMixin, BaseBenchmark):
         translated: dict[str, str] = {}
         for query_id, sql in queries.items():
             translated[query_id] = self.translate_query_text(sql, dialect)
+
+        if "clickhouse" not in dialect.lower():
+            return translated
+
+        qm = self.query_manager
+        _ch_variants: dict[str, str] = {
+            "SA4": CLICKHOUSE_SA4_SQL,
+            "TM1": CLICKHOUSE_TM1_SQL,
+        }
+        for query_id, legacy_sql in _ch_variants.items():
+            if query_id not in translated:
+                continue
+            ctx = CompatibilityContext(
+                platform="clickhouse",
+                platform_version=None,
+                benchmark="coffeeshop",
+                query_id=query_id,
+                phase=Phase.QUERY_SOURCE,
+                mode="sql",
+                dialect=dialect,
+            )
+            registry_decision = REGISTRY.resolve(ctx)
+            if registry_decision is not None:
+                if registry_decision.action is CompatAction.SELECT_VARIANT:
+                    variant_sql = registry_decision.payload.variant_sql  # type: ignore[union-attr]
+                else:
+                    continue  # registry says NATIVE - keep translated SQL
+            else:
+                variant_sql = legacy_sql  # no rule: use legacy SQL
+            entry = qm._queries[query_id]
+            params = dict(entry.get("defaults", {}))
+            translated[query_id] = variant_sql.format(**params)
+
         return translated
 
     # translate_query_text() is inherited from TranslatableQueryMixin
@@ -125,6 +167,10 @@ class CoffeeShopBenchmark(TranslatableQueryMixin, BaseBenchmark):
     # ------------------------------------------------------------------
     # Data loading
     # ------------------------------------------------------------------
+    def get_csv_loading_config(self, table_name: str) -> list[str]:
+        """Get CSV loading configuration for CoffeeShop tables."""
+        return ["header=false", "auto_detect=true", "ignore_errors=true"]
+
     def load_data_to_database(self, connection: Any, tables: list[str] | None = None) -> None:
         if not self.tables:
             raise ValueError("No data generated. Call generate_data() first.")
@@ -152,8 +198,8 @@ class CoffeeShopBenchmark(TranslatableQueryMixin, BaseBenchmark):
             placeholders = ",".join(["?" for _ in columns])
             insert_sql = f"INSERT INTO {table_name} VALUES ({placeholders})"
 
-            with open(file_path) as handle:
-                reader = csv.reader(handle, delimiter="|")
+            with open(file_path, encoding="utf-8") as handle:
+                reader = csv.reader(handle)
                 rows = [self._normalize_row(row) for row in reader]
 
             if hasattr(connection, "executemany"):

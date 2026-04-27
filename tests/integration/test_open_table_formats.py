@@ -386,7 +386,7 @@ class TestDeltaLakeFormatSmoke:
 
         # Parse the transaction log (newline-delimited JSON)
         actions = []
-        with open(log_file) as f:
+        with open(log_file, encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     actions.append(json.loads(line))
@@ -546,7 +546,7 @@ class TestIcebergFormatSmoke:
 
         if metadata_files:
             # Read the latest metadata file
-            with open(metadata_files[-1]) as f:
+            with open(metadata_files[-1], encoding="utf-8") as f:
                 metadata = json.load(f)
 
             # Verify essential Iceberg metadata fields
@@ -600,7 +600,7 @@ def tpch_data_dir_with_manifest(tmp_path_factory) -> Path:
     }
 
     manifest_path = data_dir / "_datagen_manifest.json"
-    with open(manifest_path, "w") as f:
+    with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
     return data_dir

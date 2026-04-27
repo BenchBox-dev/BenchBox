@@ -37,7 +37,7 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
 
     # Region data (5 rows)
     region_file = data_dir / "region.csv"
-    with open(region_file, "w", newline="") as f:
+    with open(region_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerow(["r_regionkey", "r_name", "r_comment"])
         writer.writerows(
@@ -61,7 +61,7 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
 
     # Nation data (25 rows - first 10 for testing)
     nation_file = data_dir / "nation.csv"
-    with open(nation_file, "w", newline="") as f:
+    with open(nation_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerow(["n_nationkey", "n_name", "n_regionkey", "n_comment"])
         writer.writerows(
@@ -87,7 +87,7 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
 
     # Customer data (minimal)
     customer_file = data_dir / "customer.csv"
-    with open(customer_file, "w", newline="") as f:
+    with open(customer_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerow(
             [
@@ -139,7 +139,7 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
 
     # Supplier data (minimal)
     supplier_file = data_dir / "supplier.csv"
-    with open(supplier_file, "w", newline="") as f:
+    with open(supplier_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerow(
             [
@@ -187,7 +187,7 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
 
     # Part data (minimal)
     part_file = data_dir / "part.csv"
-    with open(part_file, "w", newline="") as f:
+    with open(part_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerow(
             [
@@ -243,7 +243,7 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
 
     # Partsupp data (minimal)
     partsupp_file = data_dir / "partsupp.csv"
-    with open(partsupp_file, "w", newline="") as f:
+    with open(partsupp_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerow(["ps_partkey", "ps_suppkey", "ps_availqty", "ps_supplycost", "ps_comment"])
         writer.writerows(
@@ -257,7 +257,7 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
 
     # Orders data (minimal)
     orders_file = data_dir / "orders.csv"
-    with open(orders_file, "w", newline="") as f:
+    with open(orders_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerow(
             [
@@ -313,7 +313,7 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
 
     # Lineitem data (minimal)
     lineitem_file = data_dir / "lineitem.csv"
-    with open(lineitem_file, "w", newline="") as f:
+    with open(lineitem_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
         writer.writerow(
             [

@@ -1,4 +1,4 @@
-"""Tests for Athena SQL generation branches — uncovered by existing test suite.
+"""Tests for Athena SQL generation branches - uncovered by existing test suite.
 
 Targets: _build_ctas_sort_sql, _convert_to_external_table staging path,
 CTAS SQL content, configure_for_benchmark SQL.
@@ -161,7 +161,7 @@ class TestAthenaConfigureForBenchmark:
 
         # Should not raise
         adapter.configure_for_benchmark(mock_conn, "tpch")
-        # Some adapters set query parameters — verify cursor was used
+        # Some adapters set query parameters - verify cursor was used
         # (Athena configure_for_benchmark may be a no-op, that's OK)
 
 

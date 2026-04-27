@@ -16,6 +16,152 @@ from benchbox.security.credentials import CredentialManager, CredentialStatus
 from benchbox.utils.printing import QuietConsoleProxy
 
 
+def _print_athena_auto_config(console, auto_config: dict) -> None:
+    """Display the auto-detected Athena fields for user confirmation."""
+    console.print(f"\n✅ Found region: [cyan]{auto_config.get('region')}[/cyan]")
+    if auto_config.get("workgroup"):
+        console.print(f"✅ Found workgroup: [cyan]{auto_config['workgroup']}[/cyan]")
+    if auto_config.get("s3_staging_dir"):
+        console.print(f"✅ Found S3 staging dir: [cyan]{auto_config['s3_staging_dir']}[/cyan]")
+    if auto_config.get("s3_output_location"):
+        console.print(f"✅ Found S3 output location: [cyan]{auto_config['s3_output_location']}[/cyan]")
+    if auto_config.get("aws_profile"):
+        console.print(f"✅ Found AWS profile: [cyan]{auto_config['aws_profile']}[/cyan]")
+    elif auto_config.get("aws_access_key_id"):
+        console.print("✅ Found AWS access key")
+
+
+def _prompt_athena_s3_config(console, existing: dict) -> Optional[tuple[str, str]]:
+    """Prompt for S3 staging dir and output location; returns None on missing staging dir."""
+    console.print("\n[bold]S3 Configuration (Required):[/bold]")
+    console.print("[dim]Athena requires S3 for query results and data staging.[/dim]\n")
+
+    s3_staging_dir = prompt_with_default(
+        "S3 staging directory (e.g., s3://my-bucket/athena-data/)",
+        current_value=existing.get("s3_staging_dir"),
+    )
+    if not s3_staging_dir:
+        console.print("[red]❌ S3 staging directory is required for Athena[/red]")
+        return None
+
+    s3_output_location = prompt_with_default(
+        "S3 output location for query results (leave empty to use staging dir)",
+        current_value=existing.get("s3_output_location"),
+        default_if_none="",
+    )
+    if not s3_output_location:
+        separator = "" if s3_staging_dir.endswith("/") else "/"
+        s3_output_location = f"{s3_staging_dir}{separator}athena-results/"
+
+    return s3_staging_dir, s3_output_location
+
+
+def _prompt_athena_auth(console, existing: dict) -> Optional[tuple[Optional[str], Optional[str], Optional[str]]]:
+    """Prompt for auth credentials; returns (profile, access_key_id, secret) or None on missing required."""
+    from rich.prompt import IntPrompt
+
+    console.print("\n[bold]AWS Authentication:[/bold]")
+    console.print("1. AWS Profile (recommended if using AWS CLI)")
+    console.print("2. Access Key + Secret Key\n")
+
+    current_aws_profile = existing.get("aws_profile")
+    current_aws_access_key_id = existing.get("aws_access_key_id")
+    default_method = 1 if current_aws_profile else (2 if current_aws_access_key_id else 1)
+    auth_method = IntPrompt.ask("Choose authentication method [1-2]", default=default_method)
+
+    if auth_method == 1:
+        aws_profile = prompt_with_default(
+            "AWS Profile name (from ~/.aws/credentials)",
+            current_value=current_aws_profile,
+            default_if_none="default",
+        )
+        return aws_profile, None, None
+
+    aws_access_key_id = prompt_with_default("AWS Access Key ID", current_value=current_aws_access_key_id)
+    if not aws_access_key_id:
+        console.print("[red]❌ AWS Access Key ID is required[/red]")
+        return None
+
+    aws_secret_access_key = prompt_secure_field(
+        "AWS Secret Access Key",
+        current_value=existing.get("aws_secret_access_key"),
+        console=console,
+    )
+    if not aws_secret_access_key:
+        console.print("[red]❌ AWS Secret Access Key is required[/red]")
+        return None
+
+    return None, aws_access_key_id, aws_secret_access_key
+
+
+def _prompt_athena_full(console, existing_creds: Optional[dict]) -> Optional[dict]:
+    """Full interactive prompt path; returns credentials dict or None on required-field failure."""
+    existing = existing_creds or {}
+    console.print("\n[bold]AWS Configuration:[/bold]")
+
+    region = prompt_with_default("AWS Region", current_value=existing.get("region"), default_if_none="us-east-1")
+    workgroup = prompt_with_default(
+        "Athena Workgroup", current_value=existing.get("workgroup"), default_if_none="primary"
+    )
+
+    s3_result = _prompt_athena_s3_config(console, existing)
+    if s3_result is None:
+        return None
+    s3_staging_dir, s3_output_location = s3_result
+
+    auth_result = _prompt_athena_auth(console, existing)
+    if auth_result is None:
+        return None
+    aws_profile, aws_access_key_id, aws_secret_access_key = auth_result
+
+    return {
+        "region": region,
+        "workgroup": workgroup,
+        "s3_staging_dir": s3_staging_dir,
+        "s3_output_location": s3_output_location,
+        "aws_profile": aws_profile,
+        "aws_access_key_id": aws_access_key_id,
+        "aws_secret_access_key": aws_secret_access_key,
+    }
+
+
+def _finalize_athena_credentials(cred_manager: CredentialManager, console, raw: dict) -> None:
+    """Assemble, save, and validate Athena credentials, printing next steps."""
+    credentials = {
+        "region": raw["region"],
+        "workgroup": raw["workgroup"],
+        "s3_staging_dir": raw["s3_staging_dir"],
+        "s3_output_location": raw["s3_output_location"],
+    }
+    if raw.get("aws_profile"):
+        credentials["aws_profile"] = raw["aws_profile"]
+    if raw.get("aws_access_key_id"):
+        credentials["aws_access_key_id"] = raw["aws_access_key_id"]
+    if raw.get("aws_secret_access_key"):
+        credentials["aws_secret_access_key"] = raw["aws_secret_access_key"]
+
+    console.print("\n🧪 [bold]Validating credentials...[/bold]")
+    cred_manager.set_platform_credentials("athena", credentials, CredentialStatus.NOT_VALIDATED)
+
+    success, error = validate_athena_credentials(cred_manager, console)
+    if success:
+        cred_manager.update_validation_status("athena", CredentialStatus.VALID)
+        cred_manager.save_credentials()
+        console.print("\n[green]✅ Athena credentials validated and saved![/green]")
+        console.print(f"   Location: [cyan]{cred_manager.credentials_path}[/cyan]")
+        console.print("   Status: [green]Ready to use[/green]\n")
+        console.print("[bold]Try it:[/bold]")
+        console.print("  benchbox run --platform athena --benchmark tpch --scale 0.01")
+    else:
+        cred_manager.update_validation_status("athena", CredentialStatus.INVALID, error)
+        cred_manager.save_credentials()
+        console.print("\n[red]❌ Validation failed[/red]")
+        if error:
+            console.print(f"   Error: {error}")
+        console.print("\n[yellow]Credentials saved but marked as invalid.[/yellow]")
+        console.print("Fix the issues and run: benchbox setup --platform athena --validate-only")
+
+
 def setup_athena_credentials(cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy]) -> None:
     """Interactive setup for AWS Athena credentials.
 
@@ -28,177 +174,28 @@ def setup_athena_credentials(cred_manager: CredentialManager, console: Union[Con
     console.print("  • S3 bucket for query results and data staging")
     console.print("  • Athena workgroup (optional, defaults to 'primary')")
     console.print("  • AWS region (defaults to us-east-1)\n")
-
     console.print("[dim]Need help? Visit: https://docs.aws.amazon.com/athena/latest/ug/setting-up.html[/dim]\n")
 
-    # Load existing credentials to use as defaults
     existing_creds = cred_manager.get_platform_credentials("athena")
 
-    # Only offer auto-detection if no existing credentials
     if existing_creds:
         console.print("ℹ️  [cyan]Existing credentials found - updating configuration[/cyan]\n")
         auto_config = None
     else:
-        # Try auto-detection from environment variables
         auto_config = None
-        try_auto = Confirm.ask("🔍 Attempt auto-detection from environment variables?", default=True)
-
-        if try_auto:
+        if Confirm.ask("🔍 Attempt auto-detection from environment variables?", default=True):
             console.print("\n[dim]Checking environment variables...[/dim]")
             auto_config = _auto_detect_athena(console)
 
-    # Get credentials (use auto-detected or prompt)
     if auto_config:
-        region = auto_config.get("region")
-        workgroup = auto_config.get("workgroup")
-        s3_staging_dir = auto_config.get("s3_staging_dir")
-        s3_output_location = auto_config.get("s3_output_location")
-        aws_access_key_id = auto_config.get("aws_access_key_id")
-        aws_secret_access_key = auto_config.get("aws_secret_access_key")
-        aws_profile = auto_config.get("aws_profile")
-
-        console.print(f"\n✅ Found region: [cyan]{region}[/cyan]")
-        if workgroup:
-            console.print(f"✅ Found workgroup: [cyan]{workgroup}[/cyan]")
-        if s3_staging_dir:
-            console.print(f"✅ Found S3 staging dir: [cyan]{s3_staging_dir}[/cyan]")
-        if s3_output_location:
-            console.print(f"✅ Found S3 output location: [cyan]{s3_output_location}[/cyan]")
-        if aws_profile:
-            console.print(f"✅ Found AWS profile: [cyan]{aws_profile}[/cyan]")
-        elif aws_access_key_id:
-            console.print("✅ Found AWS access key")
+        _print_athena_auto_config(console, auto_config)
+        raw = auto_config
     else:
-        console.print("\n[bold]AWS Configuration:[/bold]")
-
-        # Use existing credentials as defaults if available
-        current_region = existing_creds.get("region") if existing_creds else None
-        current_workgroup = existing_creds.get("workgroup") if existing_creds else None
-        current_s3_staging_dir = existing_creds.get("s3_staging_dir") if existing_creds else None
-        current_s3_output_location = existing_creds.get("s3_output_location") if existing_creds else None
-        current_aws_access_key_id = existing_creds.get("aws_access_key_id") if existing_creds else None
-        current_aws_secret_access_key = existing_creds.get("aws_secret_access_key") if existing_creds else None
-        current_aws_profile = existing_creds.get("aws_profile") if existing_creds else None
-
-        region = prompt_with_default(
-            "AWS Region",
-            current_value=current_region,
-            default_if_none="us-east-1",
-        )
-
-        workgroup = prompt_with_default(
-            "Athena Workgroup",
-            current_value=current_workgroup,
-            default_if_none="primary",
-        )
-
-        # S3 configuration
-        console.print("\n[bold]S3 Configuration (Required):[/bold]")
-        console.print("[dim]Athena requires S3 for query results and data staging.[/dim]\n")
-
-        s3_staging_dir = prompt_with_default(
-            "S3 staging directory (e.g., s3://my-bucket/athena-data/)",
-            current_value=current_s3_staging_dir,
-        )
-
-        if not s3_staging_dir:
-            console.print("[red]❌ S3 staging directory is required for Athena[/red]")
+        raw = _prompt_athena_full(console, existing_creds)
+        if raw is None:
             return
 
-        # Output location defaults to staging dir if not specified
-        s3_output_location = prompt_with_default(
-            "S3 output location for query results (leave empty to use staging dir)",
-            current_value=current_s3_output_location,
-            default_if_none="",
-        )
-
-        if not s3_output_location:
-            # Derive from staging dir
-            if s3_staging_dir.endswith("/"):
-                s3_output_location = f"{s3_staging_dir}athena-results/"
-            else:
-                s3_output_location = f"{s3_staging_dir}/athena-results/"
-
-        # AWS Authentication
-        console.print("\n[bold]AWS Authentication:[/bold]")
-        console.print("1. AWS Profile (recommended if using AWS CLI)")
-        console.print("2. Access Key + Secret Key\n")
-
-        # Default to method 1 if profile exists, method 2 if access keys exist
-        from rich.prompt import IntPrompt
-
-        default_method = 1 if current_aws_profile else (2 if current_aws_access_key_id else 1)
-        auth_method = IntPrompt.ask("Choose authentication method [1-2]", default=default_method)
-
-        if auth_method == 1:
-            aws_profile = prompt_with_default(
-                "AWS Profile name (from ~/.aws/credentials)",
-                current_value=current_aws_profile,
-                default_if_none="default",
-            )
-            aws_access_key_id = None
-            aws_secret_access_key = None
-        else:
-            aws_profile = None
-            aws_access_key_id = prompt_with_default(
-                "AWS Access Key ID",
-                current_value=current_aws_access_key_id,
-            )
-            if not aws_access_key_id:
-                console.print("[red]❌ AWS Access Key ID is required[/red]")
-                return
-
-            aws_secret_access_key = prompt_secure_field(
-                "AWS Secret Access Key",
-                current_value=current_aws_secret_access_key,
-                console=console,
-            )
-            if not aws_secret_access_key:
-                console.print("[red]❌ AWS Secret Access Key is required[/red]")
-                return
-
-    # Build credentials
-    credentials = {
-        "region": region,
-        "workgroup": workgroup,
-        "s3_staging_dir": s3_staging_dir,
-        "s3_output_location": s3_output_location,
-    }
-
-    if aws_profile:
-        credentials["aws_profile"] = aws_profile
-    if aws_access_key_id:
-        credentials["aws_access_key_id"] = aws_access_key_id
-    if aws_secret_access_key:
-        credentials["aws_secret_access_key"] = aws_secret_access_key
-
-    # Validate credentials
-    console.print("\n🧪 [bold]Validating credentials...[/bold]")
-
-    # Save temporarily for validation
-    cred_manager.set_platform_credentials("athena", credentials, CredentialStatus.NOT_VALIDATED)
-
-    success, error = validate_athena_credentials(cred_manager, console)
-
-    if success:
-        cred_manager.update_validation_status("athena", CredentialStatus.VALID)
-        cred_manager.save_credentials()
-
-        console.print("\n[green]✅ Athena credentials validated and saved![/green]")
-        console.print(f"   Location: [cyan]{cred_manager.credentials_path}[/cyan]")
-        console.print("   Status: [green]Ready to use[/green]\n")
-
-        console.print("[bold]Try it:[/bold]")
-        console.print("  benchbox run --platform athena --benchmark tpch --scale 0.01")
-    else:
-        cred_manager.update_validation_status("athena", CredentialStatus.INVALID, error)
-        cred_manager.save_credentials()
-
-        console.print("\n[red]❌ Validation failed[/red]")
-        if error:
-            console.print(f"   Error: {error}")
-        console.print("\n[yellow]Credentials saved but marked as invalid.[/yellow]")
-        console.print("Fix the issues and run: benchbox setup --platform athena --validate-only")
+    _finalize_athena_credentials(cred_manager, console, raw)
 
 
 def validate_athena_credentials(

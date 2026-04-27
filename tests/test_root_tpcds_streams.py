@@ -62,7 +62,7 @@ def test_tpcds_streams():
                     print(f"    Size: {file_size} bytes")
 
                     # Read first few lines to verify content
-                    with open(stream_file) as f:
+                    with open(stream_file, encoding="utf-8") as f:
                         lines = f.readlines()[:10]
                         print(f"    First line: {lines[0].strip() if lines else 'Empty file'}")
                 else:

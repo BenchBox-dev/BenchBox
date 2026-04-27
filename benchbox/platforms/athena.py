@@ -18,6 +18,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -40,6 +41,7 @@ from ..utils.dependencies import (
 )
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import DataSourceResolver, FileFormatRegistry
+from .base.ddl_helpers import strip_with_properties
 
 try:
     import boto3
@@ -153,7 +155,6 @@ class AthenaAdapter(PlatformAdapter):
         - Workgroup format
         """
         import os
-        import re
 
         errors = []
 
@@ -425,11 +426,15 @@ class AthenaAdapter(PlatformAdapter):
 
             # Get and delete all tables first
             paginator = glue_client.get_paginator("get_tables")
-            for page in paginator.paginate(DatabaseName=database):
-                for table in page.get("TableList", []):
-                    table_name = table["Name"]
-                    self.logger.debug(f"Deleting table {database}.{table_name}")
-                    glue_client.delete_table(DatabaseName=database, Name=table_name)
+            tables_to_delete = [
+                table["Name"]
+                for page in paginator.paginate(DatabaseName=database)
+                for table in page.get("TableList", [])
+            ]
+            self.log_notice(f"Deleting {len(tables_to_delete)} table(s) from {database}")
+            for table_name in tables_to_delete:
+                self.logger.debug(f"Deleting table {database}.{table_name}")
+                glue_client.delete_table(DatabaseName=database, Name=table_name)
 
             # Delete the database
             glue_client.delete_database(Name=database)
@@ -554,6 +559,7 @@ class AthenaAdapter(PlatformAdapter):
                         if "already exists" in str(e).lower():
                             table_name = self._extract_table_name(staging_statement)
                             if table_name:
+                                self.log_notice(f"Dropping existing Athena table before recreate: {table_name}")
                                 cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
                                 cursor.execute(staging_statement)
                         else:
@@ -568,6 +574,7 @@ class AthenaAdapter(PlatformAdapter):
                         if "already exists" in str(e).lower():
                             table_name = self._extract_table_name(statement)
                             if table_name:
+                                self.log_notice(f"Dropping existing Athena table before recreate: {table_name}")
                                 cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
                                 cursor.execute(statement)
                         else:
@@ -604,8 +611,6 @@ class AthenaAdapter(PlatformAdapter):
         """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
-
-        import re
 
         # Convert types to Hive DDL compatible types
         # Hive DDL for external tables doesn't support VARCHAR(n) - use STRING instead
@@ -681,8 +686,8 @@ class AthenaAdapter(PlatformAdapter):
         # Remove NOT NULL constraints - Athena/Hive DDL doesn't support them for external tables
         statement = re.sub(r"\s+NOT\s+NULL", "", statement, flags=re.IGNORECASE)
 
-        # Remove any existing WITH clause
-        statement = re.sub(r"\s+WITH\s*\([^)]*\)", "", statement, flags=re.IGNORECASE)
+        # Remove any existing WITH clause (balanced-paren walker handles nested parens)
+        statement = strip_with_properties(statement)
 
         # Append storage clause after column definitions
         if statement.rstrip().endswith(")"):
@@ -827,6 +832,7 @@ class AthenaAdapter(PlatformAdapter):
                     cursor.execute(create_table_sql)
                 except Exception as exc:
                     if "already exists" in str(exc).lower():
+                        self.log_notice(f"Dropping existing Athena table before recreate: {table_name_lower}")
                         cursor.execute(f"DROP TABLE IF EXISTS {table_name_lower}")
                         cursor.execute(create_table_sql)
                     else:
@@ -881,7 +887,12 @@ class AthenaAdapter(PlatformAdapter):
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> dict[str, Any]:
         """Resolve benchmark data files from benchmark tables or manifest."""
-        resolver = DataSourceResolver()
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
         data_source = resolver.resolve(benchmark, data_dir)
         if not data_source or not data_source.tables:
             raise ValueError("No data files found")
@@ -987,6 +998,7 @@ class AthenaAdapter(PlatformAdapter):
 
             try:
                 # Drop existing parquet table if exists
+                self.log_notice(f"Dropping existing Athena table before CTAS conversion: {table_name}")
                 cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
 
                 # CTAS to convert staging table to Parquet
@@ -1045,8 +1057,8 @@ class AthenaAdapter(PlatformAdapter):
         """
         try:
             # Drop staging table from Glue catalog
+            self.log_notice(f"Dropping staging table {staging_table}")
             cursor.execute(f"DROP TABLE IF EXISTS {staging_table}")
-            self.logger.debug(f"Dropped staging table {staging_table}")
 
             # Delete staging S3 data
             staging_prefix = f"{self.s3_prefix}/{self.database}_staging/{table_name}/"
@@ -1059,10 +1071,10 @@ class AthenaAdapter(PlatformAdapter):
 
             if objects_to_delete:
                 # Delete in batches of 1000 (S3 limit)
+                self.log_notice(f"Deleting {len(objects_to_delete)} staging files for {table_name}")
                 for i in range(0, len(objects_to_delete), 1000):
                     batch = objects_to_delete[i : i + 1000]
                     s3_client.delete_objects(Bucket=self.s3_bucket, Delete={"Objects": batch})
-                self.logger.debug(f"Deleted {len(objects_to_delete)} staging files for {table_name}")
 
         except Exception as e:
             self.logger.warning(f"Failed to cleanup staging for {table_name}: {e}")
@@ -1173,7 +1185,6 @@ class AthenaAdapter(PlatformAdapter):
 
     def _extract_table_name(self, statement: str) -> str | None:
         """Extract table name from CREATE TABLE statement."""
-        import re
 
         match = re.search(
             r"CREATE\s+(?:EXTERNAL\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)",
@@ -1325,53 +1336,35 @@ def _build_athena_config(
     info: Any,
 ) -> Any:
     """Build Athena database configuration with credential loading."""
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
+    from benchbox.platforms.base.config_utils import build_platform_config
 
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("athena") or {}
-
-    # Build merged options: saved_creds < options < overrides
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "AWS Athena"
-    driver_package = info.driver_package if info else "pyathena"
-
-    config_dict = {
-        "type": "athena",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields
-        "region": merged_options.get("region") or merged_options.get("aws_region"),
-        "workgroup": merged_options.get("workgroup"),
-        "database": merged_options.get("database"),
-        "catalog": merged_options.get("catalog"),
-        "s3_output_location": merged_options.get("s3_output_location"),
-        "s3_staging_dir": merged_options.get("s3_staging_dir"),
-        "staging_root": merged_options.get("staging_root"),
-        "s3_bucket": merged_options.get("s3_bucket"),
-        "s3_prefix": merged_options.get("s3_prefix"),
-        "aws_profile": merged_options.get("aws_profile"),
-        "aws_access_key_id": merged_options.get("aws_access_key_id"),
-        "aws_secret_access_key": merged_options.get("aws_secret_access_key"),
-        # Data format options
-        "data_format": merged_options.get("data_format"),
-        "compression": merged_options.get("compression"),
-        "cleanup_staging": merged_options.get("cleanup_staging"),
-        # Benchmark context
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    return DatabaseConfig(**config_dict)
+    config = build_platform_config(
+        platform_type="athena",
+        credential_key="athena",
+        default_display_name="AWS Athena",
+        default_driver_package="pyathena",
+        platform_fields=[
+            "workgroup",
+            "database",
+            "catalog",
+            "s3_output_location",
+            "s3_staging_dir",
+            "staging_root",
+            "s3_bucket",
+            "s3_prefix",
+            "aws_profile",
+            "aws_access_key_id",
+            "aws_secret_access_key",
+            "data_format",
+            "compression",
+            "cleanup_staging",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
+    config.region = config.options.get("region") or config.options.get("aws_region")
+    return config
 
 
 # Register the config builder with the platform hook registry

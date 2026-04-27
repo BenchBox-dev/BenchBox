@@ -46,7 +46,7 @@ def _safe_yaml_load(file_path: Path) -> Optional[dict[str, Any]]:
             raise ValueError(f"Configuration file too large ({file_size} bytes, max {MAX_YAML_SIZE_BYTES})")
 
         # Load YAML with safe_load (prevents arbitrary code execution)
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         # Validate result is a dictionary
@@ -56,7 +56,7 @@ def _safe_yaml_load(file_path: Path) -> Optional[dict[str, Any]]:
         return data
 
     except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML format: {e}")
+        raise ValueError(f"Invalid YAML format: {e}") from e
 
 
 def get_preferences_dir() -> Path:
@@ -135,7 +135,7 @@ def save_last_run_config(
     last_run_path = get_last_run_path()
 
     try:
-        with open(last_run_path, "w") as f:
+        with open(last_run_path, "w", encoding="utf-8") as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
     except Exception as e:
         # Don't fail the benchmark if we can't save preferences
@@ -360,7 +360,7 @@ def save_favorite_config(
 
     # Save favorites
     try:
-        with open(favorites_path, "w") as f:
+        with open(favorites_path, "w", encoding="utf-8") as f:
             yaml.dump(favorites, f, default_flow_style=False, sort_keys=False)
         console.print(f"[green]✓ Saved favorite configuration: {name}[/green]")
     except Exception as e:
@@ -428,7 +428,7 @@ def delete_favorite_config(name: str) -> bool:
 
         del favorites[name]
 
-        with open(favorites_path, "w") as f:
+        with open(favorites_path, "w", encoding="utf-8") as f:
             yaml.dump(favorites, f, default_flow_style=False, sort_keys=False)
 
         return True

@@ -586,3 +586,44 @@ def test_corrupted_runtime_fallthrough_to_autoinstall(tmp_path, monkeypatch):
     assert resolution.auto_install_used is True
     assert resolution.resolved == "1.2.2"
     assert resolution.runtime_strategy == DriverRuntimeStrategy.CURRENT_PROCESS.value
+
+
+# ---------------------------------------------------------------------------
+# Windows site-packages path resolution
+# ---------------------------------------------------------------------------
+from benchbox.utils.runtime_env import _iter_site_packages  # noqa: E402
+
+
+class TestIterSitePackages:
+    """_iter_site_packages() must yield both Unix lib/pythonX.Y/site-packages
+    and the Windows Lib/site-packages layout when present.
+    """
+
+    def test_yields_unix_site_packages(self, tmp_path):
+        sp = tmp_path / "lib" / "python3.11" / "site-packages"
+        sp.mkdir(parents=True)
+        result = list(_iter_site_packages(tmp_path))
+        assert sp in result
+
+    def test_yields_windows_site_packages_when_present(self, tmp_path):
+        """Windows venvs use Lib/site-packages (capital L, no python version)."""
+        win_sp = tmp_path / "Lib" / "site-packages"
+        win_sp.mkdir(parents=True)
+        result = list(_iter_site_packages(tmp_path))
+        assert win_sp in result
+
+    def test_does_not_yield_missing_windows_path(self, tmp_path):
+        """If Lib/site-packages doesn't exist, it must not appear in results."""
+        result = list(_iter_site_packages(tmp_path))
+        win_sp = tmp_path / "Lib" / "site-packages"
+        assert win_sp not in result
+
+    def test_yields_both_when_both_exist(self, tmp_path):
+        """Environments that have both layouts (unusual but possible) surface both."""
+        unix_sp = tmp_path / "lib" / "python3.12" / "site-packages"
+        unix_sp.mkdir(parents=True)
+        win_sp = tmp_path / "Lib" / "site-packages"
+        win_sp.mkdir(parents=True)
+        result = list(_iter_site_packages(tmp_path))
+        assert unix_sp in result
+        assert win_sp in result

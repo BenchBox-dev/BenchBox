@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, ssb
 ```
 
-> **CLI name:** `ssb` — use `benchbox run --benchmark ssb`
+> **CLI name:** `ssb` - use `benchbox run --benchmark ssb`
 
 ## Overview
 

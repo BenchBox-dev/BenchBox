@@ -116,9 +116,9 @@ def test_read_csv_handles_tpc_trailing_column(monkeypatch, tmp_path):
         return _FakeCuDFFrame(columns=["a", "b", TRAILING_DUMMY_COLUMN], rows=[(1, 2, None)])
 
     monkeypatch.setattr(mod, "cudf", SimpleNamespace(read_csv=_read_csv))
-    monkeypatch.setattr(mod, "is_tpc_format", lambda _p: True)
     monkeypatch.setattr(mod, "has_trailing_delimiter", lambda _p, _d, _n: True)
-    out = adapter.read_csv(tmp_path / "x.tbl", delimiter="|", header=None, names=["a", "b"])
+    # null_marker="" signals TPC-style data (resolver-backed gate replaces is_tpc_format).
+    out = adapter.read_csv(tmp_path / "x.tbl", delimiter="|", header=None, names=["a", "b"], null_marker="")
     assert TRAILING_DUMMY_COLUMN not in out.columns
     assert calls["kwargs"]["names"] == ["a", "b", TRAILING_DUMMY_COLUMN]
 

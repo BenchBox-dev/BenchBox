@@ -19,199 +19,175 @@ from benchbox.security.credentials import CredentialManager, CredentialStatus
 from benchbox.utils.printing import QuietConsoleProxy
 
 
-def setup_redshift_credentials(cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy]) -> None:
-    """Interactive setup for Redshift credentials.
+def _resolve_auto_config(existing_creds: Optional[dict], console: Union[Console, QuietConsoleProxy]) -> Optional[dict]:
+    """Return auto-detected redshift config from env vars, or None.
 
-    Args:
-        cred_manager: Credential manager instance
-        console: Rich console for output
+    Skips auto-detect entirely when existing credentials are present.
     """
-    console.print("\n📋 [bold]You'll need:[/bold]")
-    console.print("  • Redshift cluster endpoint")
-    console.print("  • Username and password")
-    console.print("  • Database name (default: dev)\n")
-
-    console.print(
-        "[dim]Need help? Visit: https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-to-cluster.html[/dim]\n"
-    )
-
-    # Load existing credentials to use as defaults
-    existing_creds = cred_manager.get_platform_credentials("redshift")
-
-    # Only offer auto-detection if no existing credentials
     if existing_creds:
         console.print("ℹ️  [cyan]Existing credentials found - updating configuration[/cyan]\n")
-        auto_config = None
+        return None
+
+    try_auto = Confirm.ask("🔍 Attempt auto-detection from environment variables?", default=True)
+    if not try_auto:
+        return None
+
+    console.print("\n[dim]Checking environment variables...[/dim]")
+    return _auto_detect_redshift(console)
+
+
+def _config_from_auto(auto_config: dict, console: Union[Console, QuietConsoleProxy]) -> dict:
+    """Echo auto-detected values to the user and return them as a normalized config dict."""
+    console.print(f"\n✅ Found cluster endpoint: [cyan]{auto_config.get('host')}[/cyan]")
+    console.print(f"✅ Found port: [cyan]{auto_config.get('port')}[/cyan]")
+    console.print(f"✅ Found database: [cyan]{auto_config.get('database')}[/cyan]")
+    console.print(f"✅ Found username: [cyan]{auto_config.get('username')}[/cyan]")
+    if auto_config.get("schema"):
+        console.print(f"✅ Found schema: [cyan]{auto_config['schema']}[/cyan]")
+    if auto_config.get("s3_bucket"):
+        console.print(f"✅ Found S3 bucket: [cyan]{auto_config['s3_bucket']}[/cyan]")
+    if auto_config.get("iam_role"):
+        console.print(f"✅ Found IAM role: [cyan]{auto_config['iam_role']}[/cyan]")
+    return dict(auto_config)
+
+
+def _prompt_core_credentials(
+    console: Union[Console, QuietConsoleProxy], existing_creds: Optional[dict]
+) -> Optional[dict]:
+    """Prompt for required Redshift credentials. Returns None on missing required field."""
+    console.print("\n[bold]Redshift Cluster Configuration:[/bold]")
+    existing = existing_creds or {}
+
+    host = prompt_with_default(
+        "Cluster endpoint (e.g., my-cluster.abc123.us-east-1.redshift.amazonaws.com)",
+        current_value=existing.get("host"),
+    )
+    if not host:
+        console.print("[red]❌ Cluster endpoint is required[/red]")
+        return None
+
+    current_port = existing.get("port")
+    if current_port:
+        port = IntPrompt.ask(f"Port (current: {current_port})", default=current_port)
     else:
-        # Try auto-detection from environment variables
-        auto_config = None
-        try_auto = Confirm.ask("🔍 Attempt auto-detection from environment variables?", default=True)
+        port = IntPrompt.ask("Port", default=5439)
 
-        if try_auto:
-            console.print("\n[dim]Checking environment variables...[/dim]")
-            auto_config = _auto_detect_redshift(console)
+    database = prompt_with_default("Database name", current_value=existing.get("database"), default_if_none="dev")
+    if not database:
+        console.print("[red]❌ Database name is required[/red]")
+        return None
 
-    # Get credentials (use auto-detected or prompt)
-    if auto_config:
-        host = auto_config.get("host")
-        port = auto_config.get("port")
-        database = auto_config.get("database")
-        username = auto_config.get("username")
-        password = auto_config.get("password")
-        schema = auto_config.get("schema")
-        s3_bucket = auto_config.get("s3_bucket")
-        iam_role = auto_config.get("iam_role")
-        aws_access_key_id = auto_config.get("aws_access_key_id")
-        aws_secret_access_key = auto_config.get("aws_secret_access_key")
-        aws_region = auto_config.get("aws_region")
+    username = prompt_with_default("Username", current_value=existing.get("username"))
+    if not username:
+        console.print("[red]❌ Username is required[/red]")
+        return None
 
-        console.print(f"\n✅ Found cluster endpoint: [cyan]{host}[/cyan]")
-        console.print(f"✅ Found port: [cyan]{port}[/cyan]")
-        console.print(f"✅ Found database: [cyan]{database}[/cyan]")
-        console.print(f"✅ Found username: [cyan]{username}[/cyan]")
-        if schema:
-            console.print(f"✅ Found schema: [cyan]{schema}[/cyan]")
-        if s3_bucket:
-            console.print(f"✅ Found S3 bucket: [cyan]{s3_bucket}[/cyan]")
-        if iam_role:
-            console.print(f"✅ Found IAM role: [cyan]{iam_role}[/cyan]")
-    else:
-        console.print("\n[bold]Redshift Cluster Configuration:[/bold]")
+    password = prompt_secure_field("Password", current_value=existing.get("password"), console=console)
+    if not password:
+        console.print("[red]❌ Password is required[/red]")
+        return None
 
-        # Use existing credentials as defaults if available
-        current_host = existing_creds.get("host") if existing_creds else None
-        current_port = existing_creds.get("port") if existing_creds else None
-        current_database = existing_creds.get("database") if existing_creds else None
-        current_username = existing_creds.get("username") if existing_creds else None
-        current_password = existing_creds.get("password") if existing_creds else None
-        current_schema = existing_creds.get("schema") if existing_creds else None
-        current_s3_bucket = existing_creds.get("s3_bucket") if existing_creds else None
-        current_iam_role = existing_creds.get("iam_role") if existing_creds else None
-        current_aws_access_key_id = existing_creds.get("aws_access_key_id") if existing_creds else None
-        current_aws_secret_access_key = existing_creds.get("aws_secret_access_key") if existing_creds else None
-        current_aws_region = existing_creds.get("aws_region") if existing_creds else None
+    console.print("\n[bold]Optional Settings:[/bold]")
+    schema = prompt_with_default("Schema name", current_value=existing.get("schema"), default_if_none="public")
 
-        host = prompt_with_default(
-            "Cluster endpoint (e.g., my-cluster.abc123.us-east-1.redshift.amazonaws.com)",
-            current_value=current_host,
-        )
-
-        if not host:
-            console.print("[red]❌ Cluster endpoint is required[/red]")
-            return
-
-        # IntPrompt doesn't have a good way to show current value, so handle separately
-        if current_port:
-            port_prompt = f"Port (current: {current_port})"
-            port = IntPrompt.ask(port_prompt, default=current_port)
-        else:
-            port = IntPrompt.ask("Port", default=5439)
-
-        database = prompt_with_default("Database name", current_value=current_database, default_if_none="dev")
-
-        if not database:
-            console.print("[red]❌ Database name is required[/red]")
-            return
-
-        username = prompt_with_default("Username", current_value=current_username)
-
-        if not username:
-            console.print("[red]❌ Username is required[/red]")
-            return
-
-        password = prompt_secure_field("Password", current_value=current_password, console=console)
-
-        if not password:
-            console.print("[red]❌ Password is required[/red]")
-            return
-
-        # Optional settings
-        console.print("\n[bold]Optional Settings:[/bold]")
-        schema = prompt_with_default("Schema name", current_value=current_schema, default_if_none="public")
-
-        # S3 staging configuration (optional but recommended)
-        console.print("\n[bold]S3 Staging Configuration (Recommended):[/bold]")
-        console.print("[dim]Configuring S3 staging enables efficient data loading via COPY commands.[/dim]")
-        console.print("[dim]Without S3, data loading will be slower using direct INSERT statements.[/dim]\n")
-
-        configure_s3 = Confirm.ask("Configure S3 staging for efficient data loading?", default=True)
-
-        if configure_s3:
-            s3_bucket = prompt_with_default(
-                "S3 bucket name (e.g., my-benchbox-data)", current_value=current_s3_bucket, default_if_none=""
-            )
-
-            if s3_bucket:
-                console.print("\n[bold]S3 Authentication Method:[/bold]")
-                console.print("1. IAM Role ARN (recommended for EC2/ECS)")
-                console.print("2. AWS Access Keys\n")
-
-                # Default to method 1 if IAM role exists, method 2 if access keys exist
-                default_method = 1 if current_iam_role else (2 if current_aws_access_key_id else 1)
-                auth_method = IntPrompt.ask("Choose authentication method [1-2]", default=default_method)
-
-                if auth_method == 1:
-                    iam_role = prompt_with_default(
-                        "IAM Role ARN (e.g., arn:aws:iam::123456789012:role/RedshiftS3AccessRole)",
-                        current_value=current_iam_role,
-                        default_if_none="",
-                    )
-                    aws_access_key_id = None
-                    aws_secret_access_key = None
-                else:
-                    iam_role = None
-                    aws_access_key_id = prompt_with_default(
-                        "AWS Access Key ID", current_value=current_aws_access_key_id, default_if_none=""
-                    )
-                    aws_secret_access_key = prompt_secure_field(
-                        "AWS Secret Access Key", current_value=current_aws_secret_access_key, console=console
-                    )
-
-                aws_region = prompt_with_default(
-                    "AWS Region", current_value=current_aws_region, default_if_none="us-east-1"
-                )
-            else:
-                s3_bucket = None
-                iam_role = None
-                aws_access_key_id = None
-                aws_secret_access_key = None
-                aws_region = None
-        else:
-            s3_bucket = None
-            iam_role = None
-            aws_access_key_id = None
-            aws_secret_access_key = None
-            aws_region = None
-
-    # Build credentials
-    credentials = {
+    return {
         "host": host,
         "port": port,
         "database": database,
         "username": username,
         "password": password,
+        "schema": schema,
     }
 
-    if schema:
-        credentials["schema"] = schema
-    if s3_bucket:
-        credentials["s3_bucket"] = s3_bucket
-    if iam_role:
-        credentials["iam_role"] = iam_role
-    if aws_access_key_id:
-        credentials["aws_access_key_id"] = aws_access_key_id
-    if aws_secret_access_key:
-        credentials["aws_secret_access_key"] = aws_secret_access_key
-    if aws_region:
-        credentials["aws_region"] = aws_region
 
-    # Validate credentials
+def _prompt_s3_staging(console: Union[Console, QuietConsoleProxy], existing_creds: Optional[dict]) -> dict:
+    """Prompt for optional S3 staging configuration. Returns S3/IAM/AWS fields (possibly None)."""
+    empty = {
+        "s3_bucket": None,
+        "iam_role": None,
+        "aws_access_key_id": None,
+        "aws_secret_access_key": None,
+        "aws_region": None,
+    }
+
+    console.print("\n[bold]S3 Staging Configuration (Recommended):[/bold]")
+    console.print("[dim]Configuring S3 staging enables efficient data loading via COPY commands.[/dim]")
+    console.print("[dim]Without S3, data loading will be slower using direct INSERT statements.[/dim]\n")
+
+    if not Confirm.ask("Configure S3 staging for efficient data loading?", default=True):
+        return empty
+
+    existing = existing_creds or {}
+    s3_bucket = prompt_with_default(
+        "S3 bucket name (e.g., my-benchbox-data)", current_value=existing.get("s3_bucket"), default_if_none=""
+    )
+    if not s3_bucket:
+        return empty
+
+    console.print("\n[bold]S3 Authentication Method:[/bold]")
+    console.print("1. IAM Role ARN (recommended for EC2/ECS)")
+    console.print("2. AWS Access Keys\n")
+
+    default_method = 1 if existing.get("iam_role") else (2 if existing.get("aws_access_key_id") else 1)
+    auth_method = IntPrompt.ask("Choose authentication method [1-2]", default=default_method)
+
+    if auth_method == 1:
+        iam_role = prompt_with_default(
+            "IAM Role ARN (e.g., arn:aws:iam::123456789012:role/RedshiftS3AccessRole)",
+            current_value=existing.get("iam_role"),
+            default_if_none="",
+        )
+        aws_access_key_id = None
+        aws_secret_access_key = None
+    else:
+        iam_role = None
+        aws_access_key_id = prompt_with_default(
+            "AWS Access Key ID", current_value=existing.get("aws_access_key_id"), default_if_none=""
+        )
+        aws_secret_access_key = prompt_secure_field(
+            "AWS Secret Access Key", current_value=existing.get("aws_secret_access_key"), console=console
+        )
+
+    aws_region = prompt_with_default(
+        "AWS Region", current_value=existing.get("aws_region"), default_if_none="us-east-1"
+    )
+
+    return {
+        "s3_bucket": s3_bucket,
+        "iam_role": iam_role,
+        "aws_access_key_id": aws_access_key_id,
+        "aws_secret_access_key": aws_secret_access_key,
+        "aws_region": aws_region,
+    }
+
+
+def _build_credentials_dict(config: dict) -> dict:
+    """Assemble the credentials dict, including only non-empty optional fields."""
+    credentials: dict[str, Any] = {
+        "host": config["host"],
+        "port": config["port"],
+        "database": config["database"],
+        "username": config["username"],
+        "password": config["password"],
+    }
+    for optional_key in ("schema", "s3_bucket", "iam_role", "aws_access_key_id", "aws_secret_access_key", "aws_region"):
+        value = config.get(optional_key)
+        if value:
+            credentials[optional_key] = value
+    return credentials
+
+
+def _finalize_credentials(
+    cred_manager: CredentialManager,
+    console: Union[Console, QuietConsoleProxy],
+    credentials: dict,
+) -> None:
+    """Validate, persist, and report outcome for the gathered credentials."""
     console.print("\n🧪 [bold]Validating credentials...[/bold]")
-
-    # Save temporarily for validation
     cred_manager.set_platform_credentials("redshift", credentials, CredentialStatus.NOT_VALIDATED)
 
     success, error = validate_redshift_credentials(cred_manager, console)
+    s3_bucket = credentials.get("s3_bucket")
 
     if success:
         cred_manager.update_validation_status("redshift", CredentialStatus.VALID)
@@ -228,20 +204,51 @@ def setup_redshift_credentials(cred_manager: CredentialManager, console: Union[C
                 "[yellow]⚠️  No S3 staging configured - data loading will use direct INSERT (slower)[/yellow]\n"
             )
 
-        # Prompt for default output location (optional)
         _prompt_default_output_location(cred_manager, console, credentials, s3_bucket)
 
         console.print("[bold]Try it:[/bold]")
         console.print("  benchbox run --platform redshift --benchmark tpch --scale 0.01")
-    else:
-        cred_manager.update_validation_status("redshift", CredentialStatus.INVALID, error)
-        cred_manager.save_credentials()
+        return
 
-        console.print("\n[red]❌ Validation failed[/red]")
-        if error:
-            console.print(f"   Error: {error}")
-        console.print("\n[yellow]Credentials saved but marked as invalid.[/yellow]")
-        console.print("Fix the issues and run: benchbox setup --platform redshift --validate-only")
+    cred_manager.update_validation_status("redshift", CredentialStatus.INVALID, error)
+    cred_manager.save_credentials()
+
+    console.print("\n[red]❌ Validation failed[/red]")
+    if error:
+        console.print(f"   Error: {error}")
+    console.print("\n[yellow]Credentials saved but marked as invalid.[/yellow]")
+    console.print("Fix the issues and run: benchbox setup --platform redshift --validate-only")
+
+
+def setup_redshift_credentials(cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy]) -> None:
+    """Interactive setup for Redshift credentials.
+
+    Args:
+        cred_manager: Credential manager instance
+        console: Rich console for output
+    """
+    console.print("\n📋 [bold]You'll need:[/bold]")
+    console.print("  • Redshift cluster endpoint")
+    console.print("  • Username and password")
+    console.print("  • Database name (default: dev)\n")
+
+    console.print(
+        "[dim]Need help? Visit: https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-to-cluster.html[/dim]\n"
+    )
+
+    existing_creds = cred_manager.get_platform_credentials("redshift")
+    auto_config = _resolve_auto_config(existing_creds, console)
+
+    if auto_config:
+        config = _config_from_auto(auto_config, console)
+    else:
+        core = _prompt_core_credentials(console, existing_creds)
+        if core is None:
+            return
+        config = {**core, **_prompt_s3_staging(console, existing_creds)}
+
+    credentials = _build_credentials_dict(config)
+    _finalize_credentials(cred_manager, console, credentials)
 
 
 def _prompt_default_output_location(

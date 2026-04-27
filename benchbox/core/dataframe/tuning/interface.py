@@ -500,7 +500,7 @@ class DataFrameTuningConfiguration:
             metadata=TuningMetadata.from_dict(data["_metadata"]) if "_metadata" in data else None,
         )
 
-    # (predicate_fn, DataFrameTuningType) — checked by get_enabled_settings.
+    # (predicate_fn, DataFrameTuningType) - checked by get_enabled_settings.
     _SETTING_CHECKS: ClassVar[list[tuple[Callable[[DataFrameTuningConfiguration], bool], DataFrameTuningType]]] = [
         # Parallelism
         (lambda s: s.parallelism.thread_count is not None, DataFrameTuningType.THREAD_COUNT),

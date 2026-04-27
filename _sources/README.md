@@ -217,7 +217,7 @@ ls -la *.tbl  # Should create customer.tbl, orders.tbl, etc.
 # TPC-H: Test stdout mode
 _binaries/tpc-h/darwin-arm64/dbgen -z -s 0.01 -T c | head -5
 
-# TPC-DS: Generate small dataset (scale must be >= 1)
+# TPC-DS: Generate small dataset (bundled binaries require SCALE >= 1)
 _binaries/tpc-ds/darwin-arm64/dsdgen -SCALE 1 -TABLE ship_mode -DIR /tmp
 cat /tmp/ship_mode.dat | head -5
 
@@ -229,10 +229,19 @@ _binaries/tpc-ds/darwin-arm64/dsdgen -SCALE 1 -TABLE ship_mode -FILTER Y | head 
 
 ### TPC-DS Scale Factor
 
-**TPC-DS requires scale factor >= 1.** Fractional scale factors (e.g., 0.01) cause
-segmentation faults in the official dsdgen binary. This is a known upstream limitation.
+**Bundled dsdgen binaries require scale factor >= 1.** Fractional scale factors (e.g., 0.01)
+cause segmentation faults in the bundled (unpatched) dsdgen binaries. This is a known upstream
+limitation rooted in `dist.c:dist_weight` / `scaling.c:LogScale` (see `_sources/tpcds-subscale-probe.md`
+for the Gate Zero analysis).
 
-BenchBox handles this by generating SF1 data and sampling for smaller test datasets.
+A patched dsdgen that fixes subscale generation ships with BenchBox (see the
+`patch-and-redistribute-tpcds-dsdgen-subscale-support` TODO for history). SF<1 runs are
+allowed by default for development use.
+
+**Unofficial subscale runs:** SF<1 works out of the box with the bundled patched binaries.
+Results are tagged `compliance_class: unofficial_subscale`; official TPC metrics are suppressed.
+These results cannot be submitted (`benchbox submit` refuses them) and require
+`--label unofficial-research` to publish. See `benchbox/core/tpcds/compliance.py`.
 
 ### File Sizes
 
@@ -298,7 +307,9 @@ Ensure patches are applied: `patch -p1 < stdout-support.patch`
 Ensure `-fcommon` flag is in CFLAGS (handled by patch)
 
 ### Segfault with small scale factors (TPC-DS)
-TPC-DS requires SF >= 1. Use SF 1 and sample for smaller datasets.
+Stock dsdgen crashes at SF<1. BenchBox ships patched binaries that handle subscale generation
+(see `patch-and-redistribute-tpcds-dsdgen-subscale-support` TODO for history); SF<1 runs are
+allowed by default and tagged `compliance_class: unofficial_subscale`.
 
 ### "FILTER unknown" error (TPC-DS)
 Patch not applied correctly. Re-apply: `patch -p1 < stdout-support.patch`

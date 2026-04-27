@@ -74,6 +74,12 @@ BenchBox Primitives are organized into three categories:
    * - **Transaction Primitives**
      - Isolation levels, concurrent access, conflict resolution
      - ACID compliance, concurrency characteristics
+   * - **Metadata Primitives**
+     - INFORMATION_SCHEMA, SHOW, DESCRIBE, PRAGMA catalog queries
+     - Catalog introspection performance for data catalogs, BI tools, governance
+   * - **AI Primitives**
+     - SQL-based AI functions - generation, summarization, sentiment, embeddings
+     - Cloud AI SQL surface (Snowflake Cortex, BigQuery ML, Databricks AI)
 
 DataFrame Support
 ~~~~~~~~~~~~~~~~~
@@ -89,6 +95,8 @@ Included Benchmarks
    read-primitives
    write-primitives
    transaction-primitives
+   metadata-primitives
+   ai-primitives
 
 See Also
 --------

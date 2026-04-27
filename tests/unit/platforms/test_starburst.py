@@ -443,3 +443,129 @@ class TestStarburstErrorMessages:
 
             assert message is not None
             assert "ssl" in message.lower()
+
+
+class TestStarburstGetPlatformInfo:
+    """Test get_platform_info returns Starburst-specific metadata."""
+
+    def _make_adapter(self):
+        with patch.dict(
+            "sys.modules",
+            {"trino": MagicMock(), "trino.auth": MagicMock()},
+        ):
+            from benchbox.platforms.starburst import StarburstAdapter
+
+            return StarburstAdapter(
+                host="cluster.trino.galaxy.starburst.io",
+                username="user@example.com/admin",
+                password="secret",
+            )
+
+    def test_get_platform_info_returns_starburst_keys(self):
+        adapter = self._make_adapter()
+        with patch.object(
+            adapter.__class__.__mro__[1],
+            "get_platform_info",
+            return_value={"configuration": {}},
+        ):
+            info = adapter.get_platform_info()
+
+        assert info["platform_type"] == "starburst"
+        assert info["platform_name"] == "Starburst Galaxy"
+        assert info["connection_mode"] == "cloud"
+        assert info["configuration"]["deployment"] == "managed"
+
+    def test_get_target_dialect_returns_trino(self):
+        adapter = self._make_adapter()
+        assert adapter.get_target_dialect() == "trino"
+
+
+class TestStarburstAddCliArguments:
+    """Test add_cli_arguments registers expected flags."""
+
+    def test_add_cli_arguments_host(self):
+        import argparse
+
+        with patch.dict(
+            "sys.modules",
+            {"trino": MagicMock(), "trino.auth": MagicMock()},
+        ):
+            from benchbox.platforms.starburst import StarburstAdapter
+
+        parser = argparse.ArgumentParser()
+        StarburstAdapter.add_cli_arguments(parser)
+        args = parser.parse_args(["--host", "my-cluster.trino.galaxy.starburst.io"])
+        assert args.host == "my-cluster.trino.galaxy.starburst.io"
+
+    def test_add_cli_arguments_default_port_443(self):
+        import argparse
+
+        with patch.dict(
+            "sys.modules",
+            {"trino": MagicMock(), "trino.auth": MagicMock()},
+        ):
+            from benchbox.platforms.starburst import StarburstAdapter
+
+        parser = argparse.ArgumentParser()
+        StarburstAdapter.add_cli_arguments(parser)
+        args = parser.parse_args([])
+        assert args.port == 443
+
+    def test_add_cli_arguments_role(self):
+        import argparse
+
+        with patch.dict(
+            "sys.modules",
+            {"trino": MagicMock(), "trino.auth": MagicMock()},
+        ):
+            from benchbox.platforms.starburst import StarburstAdapter
+
+        parser = argparse.ArgumentParser()
+        StarburstAdapter.add_cli_arguments(parser)
+        args = parser.parse_args(["--host", "h", "--role", "analyst"])
+        assert args.role == "analyst"
+
+
+class TestStarburstFromConfig:
+    """Test from_config builds adapter from unified config dict."""
+
+    def test_from_config_passes_connection_params(self):
+        with patch.dict(
+            "sys.modules",
+            {"trino": MagicMock(), "trino.auth": MagicMock()},
+        ):
+            from benchbox.platforms.starburst import StarburstAdapter
+
+            adapter = StarburstAdapter.from_config(
+                {
+                    "host": "cluster.trino.galaxy.starburst.io",
+                    "username": "user@example.com/admin",
+                    "password": "secret",
+                    "catalog": "tpch",
+                    "benchmark": "tpch",
+                    "scale_factor": 0.01,
+                }
+            )
+
+        assert adapter.host == "cluster.trino.galaxy.starburst.io"
+        assert adapter.catalog == "tpch"
+
+    def test_from_config_generates_schema_when_not_provided(self):
+        with patch.dict(
+            "sys.modules",
+            {"trino": MagicMock(), "trino.auth": MagicMock()},
+        ):
+            from benchbox.platforms.starburst import StarburstAdapter
+
+            adapter = StarburstAdapter.from_config(
+                {
+                    "host": "cluster.trino.galaxy.starburst.io",
+                    "username": "user@example.com/admin",
+                    "password": "secret",
+                    "benchmark": "tpch",
+                    "scale_factor": 0.01,
+                }
+            )
+
+        assert adapter.schema is not None
+        assert len(adapter.schema) > 0

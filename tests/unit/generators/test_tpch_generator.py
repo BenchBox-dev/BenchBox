@@ -252,6 +252,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
                 generator._find_or_build_dbgen()
             self.assertIn("dbgen binary required but not found", str(cm.exception))
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="Executable bit check not applicable on Windows")
     @mock.patch("os.access")
     @mock.patch("benchbox.core.tpch.generator.Path.exists")
     def test_executable_permission_error(self, mock_exists, mock_access):

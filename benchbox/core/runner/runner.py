@@ -569,6 +569,401 @@ class ValidationOptions:
     enable_postload_validation: bool = False
 
 
+def _resolve_verbosity_settings(
+    verbosity: VerbositySettings | None,
+    options_map: Any,
+) -> VerbositySettings:
+    """Pick an explicit VerbositySettings, fall back to stored or options-map values."""
+    if verbosity is not None:
+        return verbosity
+    stored = options_map.get("verbosity_settings") if isinstance(options_map, Mapping) else None
+    if isinstance(stored, VerbositySettings):
+        return stored
+    if isinstance(stored, Mapping):
+        return VerbositySettings.from_mapping(stored)
+    return VerbositySettings.from_mapping(options_map)
+
+
+def _parse_partition_cols(raw: Any) -> list[str]:
+    """Normalize a partition-cols option (str or iterable) into a list of non-empty strings."""
+    if isinstance(raw, str):
+        return [part.strip() for part in raw.split(",") if part.strip()]
+    if isinstance(raw, (list, tuple)):
+        return [str(part).strip() for part in raw if str(part).strip()]
+    return []
+
+
+def _build_run_config_from_options(
+    benchmark_config: BenchmarkConfig,
+    options: Mapping[str, Any],
+    platform_config: dict[str, Any] | None,
+    validation_opts: ValidationOptions,
+    verbosity_settings: VerbositySettings,
+    test_type: str,
+    table_format: str | None,
+) -> RunConfig:
+    """Assemble the RunConfig passed to SQL adapters."""
+    iterations = int(
+        options.get("power_iterations", GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
+        or GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
+    )
+    warmups = int(
+        options.get("power_warmup_iterations", GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS)
+        or GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS
+    )
+    seed_raw = options.get("seed")
+    return RunConfig(
+        benchmark=benchmark_config.name,
+        query_subset=benchmark_config.queries,
+        concurrent_streams=benchmark_config.concurrency,
+        test_execution_type=test_type,
+        scale_factor=benchmark_config.scale_factor,
+        seed=(int(seed_raw) if seed_raw is not None else None),
+        connection={
+            "database_path": (platform_config or {}).get("database_path"),
+        },
+        enable_postload_validation=validation_opts.enable_postload_validation,
+        verbose=verbosity_settings.verbose,
+        verbose_level=verbosity_settings.level,
+        verbose_enabled=verbosity_settings.verbose_enabled,
+        very_verbose=verbosity_settings.very_verbose,
+        quiet=verbosity_settings.quiet,
+        iterations=max(1, iterations),
+        warm_up_iterations=max(0, warmups),
+        power_fail_fast=bool(options.get("power_fail_fast", False)),
+        capture_plans=benchmark_config.capture_plans,
+        strict_plan_capture=benchmark_config.strict_plan_capture,
+        table_format=table_format,
+        table_format_compression=str(options.get("table_format_compression", "snappy") or "snappy"),
+        table_format_partition_cols=_parse_partition_cols(options.get("table_format_partition_cols")),
+    )
+
+
+def _execute_via_adapter(
+    adapter: Any,
+    benchmark: Any,
+    benchmark_config: BenchmarkConfig,
+    system_profile: SystemProfile | None,
+    run_config: RunConfig,
+    options: Mapping[str, Any],
+    phases: LifecyclePhases,
+    verbosity_settings: VerbositySettings,
+    monitor: Any,
+    output_root: str | None,
+    is_dataframe_adapter: bool,
+) -> BenchmarkResults:
+    """Dispatch benchmark execution to either the DataFrame or SQL adapter path."""
+    if is_dataframe_adapter:
+        from pathlib import Path
+
+        data_dir = getattr(benchmark, "output_dir", None)
+        if data_dir is None and output_root:
+            data_dir = Path(output_root)
+        elif isinstance(data_dir, str):
+            data_dir = Path(data_dir)
+
+        df_phases = DataFramePhases(load=True, execute=phases.execute)
+        df_options = DataFrameRunOptions(
+            ignore_memory_warnings=bool(options.get("ignore_memory_warnings", False)),
+            force_regenerate=bool(options.get("force_regenerate", False)),
+            prefer_parquet=bool(options.get("prefer_parquet", True)),
+            cache_dir=options.get("cache_dir"),
+            verbose=verbosity_settings.verbose,
+            very_verbose=verbosity_settings.very_verbose,
+        )
+        return adapter.run_benchmark(
+            benchmark,
+            benchmark_config=benchmark_config,
+            system_profile=system_profile,
+            data_dir=data_dir,
+            phases=df_phases,
+            options=df_options,
+            monitor=monitor,
+        )
+
+    # SQL adapter: the positional arg is also named "benchmark" (the object),
+    # so we can't spread run_config.benchmark as a keyword arg. Pass the
+    # canonical slug via "benchmark_name" - the fallback _build_execution_metadata
+    # already checks - so the adapter never has to infer benchmark identity.
+    kwargs = {k: v for k, v in run_config.__dict__.items() if k != "benchmark"}
+    if run_config.benchmark is not None:
+        kwargs.setdefault("benchmark_name", run_config.benchmark)
+    return adapter.run_benchmark(benchmark, **kwargs)
+
+
+def _run_data_generation_phase(
+    benchmark: Any,
+    benchmark_config: BenchmarkConfig,
+    phases: LifecyclePhases,
+    validation_opts: ValidationOptions,
+    output_dir_handler: Any,
+    monitor: Any,
+    validation_records: list[tuple[str, ValidationResult]],
+) -> float:
+    """Run preflight+datagen+manifest-validation+format-conversion, return elapsed seconds."""
+    datagen_start = time.monotonic()
+
+    if phases.generate and validation_opts.enable_preflight_validation:
+        preflight_result = _run_preflight_validation(benchmark, benchmark_config, output_dir_handler)
+        validation_records.append(("preflight", preflight_result))
+        if not preflight_result.is_valid:
+            error_msg = ", ".join(preflight_result.errors) or "Unknown preflight validation error"
+            raise RuntimeError(f"Preflight validation failed: {error_msg}")
+
+    if monitor is not None:
+        with monitor.time_operation("data_generation"):
+            data_was_generated = _ensure_data_generated(benchmark, benchmark_config)
+            if data_was_generated:
+                monitor.increment_counter("tables_generated", len(getattr(benchmark, "tables", []) or []))
+    else:
+        _ensure_data_generated(benchmark, benchmark_config)
+
+    if validation_opts.enable_postgen_manifest_validation:
+        manifest_result = _run_manifest_validation(benchmark, benchmark_config)
+        validation_records.append(("post_generation_manifest", manifest_result))
+
+    if phases.generate:
+        _run_format_conversion(benchmark, benchmark_config)
+
+    return time.monotonic() - datagen_start
+
+
+def _build_data_only_result(
+    benchmark: Any,
+    benchmark_config: BenchmarkConfig,
+    database_config: DatabaseConfig | None,
+    datagen_duration: float,
+    validation_records: list[tuple[str, ValidationResult]],
+    execution_context: ExecutionContext | None,
+) -> BenchmarkResults:
+    """Assemble and finalize the BenchmarkResults returned for ``test_type == 'data_only'``."""
+    execution_id = uuid.uuid4().hex[:8]
+    datagen_phase = {
+        "status": "COMPLETED",
+        "duration_ms": int(datagen_duration * 1000),
+    }
+    datagen_phase.update(_read_datagen_stats_from_manifest(benchmark))
+    result_obj = benchmark.create_enhanced_benchmark_result(
+        platform="data_only",
+        query_results=[],
+        duration_seconds=datagen_duration,
+        phases={"data_generation": datagen_phase},
+        execution_metadata={
+            "mode": "datagen",
+            "benchmark_id": benchmark_config.name,
+        },
+        execution_id=execution_id,
+    )
+    result_obj._benchmark_id_override = benchmark_config.name
+    result_obj = _finalize_validation_metadata(result_obj, validation_records)
+    result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=None, database_config=database_config)
+    if execution_context is not None:
+        result_obj.execution_context = execution_context.model_dump()
+    return result_obj
+
+
+def _build_setup_only_result(
+    benchmark: Any,
+    adapter: Any,
+    database_config: DatabaseConfig | None,
+    phases: LifecyclePhases,
+    validation_records: list[tuple[str, ValidationResult]],
+    execution_context: ExecutionContext | None,
+) -> BenchmarkResults:
+    """Assemble and finalize the BenchmarkResults for the setup-only early return."""
+    if phases.execute and adapter is None:
+        raise RuntimeError(
+            "Cannot execute benchmark: platform adapter not initialized. "
+            "This indicates database configuration is missing or adapter creation failed. "
+            "Ensure --platform parameter is provided when using execution phases (power/throughput/maintenance)."
+        )
+    result_obj = benchmark.create_enhanced_benchmark_result(
+        platform=(adapter.platform_name if adapter else "unknown"),
+        query_results=[],
+        duration_seconds=0.0,
+        phases={"setup": {"status": "COMPLETED"}},
+        execution_metadata={"mode": "setup_only"},
+    )
+    result_obj = _finalize_validation_metadata(result_obj, validation_records)
+    result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
+    if execution_context is not None:
+        result_obj.execution_context = execution_context.model_dump()
+    return result_obj
+
+
+def _run_load_only_mode(
+    benchmark: Any,
+    benchmark_config: BenchmarkConfig,
+    system_profile: SystemProfile | None,
+    adapter: Any,
+    platform_config: dict[str, Any] | None,
+    validation_opts: ValidationOptions,
+    table_mode: str,
+    options: Mapping[str, Any],
+    verbosity_settings: VerbositySettings,
+    monitor: Any,
+    output_root: str | None,
+    is_dataframe_adapter: bool,
+    validation_records: list[tuple[str, ValidationResult]],
+) -> BenchmarkResults:
+    """Execute the load-only branch for DataFrame or SQL adapters and record postload results."""
+    if adapter is None:
+        raise RuntimeError("Load-only mode requires a platform adapter and database configuration")
+
+    if is_dataframe_adapter:
+        from pathlib import Path
+
+        data_dir = getattr(benchmark, "output_dir", None)
+        if data_dir is None and output_root:
+            data_dir = Path(output_root)
+        elif isinstance(data_dir, str):
+            data_dir = Path(data_dir)
+
+        df_phases = DataFramePhases(load=True, execute=False)
+        df_options = DataFrameRunOptions(
+            ignore_memory_warnings=bool(options.get("ignore_memory_warnings", False)),
+            force_regenerate=bool(options.get("force_regenerate", False)),
+            prefer_parquet=bool(options.get("prefer_parquet", True)),
+            cache_dir=options.get("cache_dir"),
+            verbose=verbosity_settings.verbose,
+            very_verbose=verbosity_settings.very_verbose,
+        )
+        return adapter.run_benchmark(
+            benchmark,
+            benchmark_config=benchmark_config,
+            system_profile=system_profile,
+            data_dir=data_dir,
+            phases=df_phases,
+            options=df_options,
+            monitor=monitor,
+        )
+
+    result_obj, postload_result = _execute_load_only_mode(
+        benchmark=benchmark,
+        benchmark_config=benchmark_config,
+        adapter=adapter,
+        platform_config=platform_config,
+        validation_opts=validation_opts,
+        table_mode=table_mode,
+    )
+    if postload_result is not None:
+        validation_records.append(("post_load", postload_result))
+    return result_obj
+
+
+def _setup_lifecycle_monitor(
+    monitor: PerformanceMonitor | None,
+    enable_resource_monitoring: bool,
+    benchmark_config: BenchmarkConfig,
+    database_config: DatabaseConfig | None,
+) -> tuple[PerformanceMonitor | None, ResourceMonitor | None]:
+    """Create default monitor (if needed), start resource tracking, and record metadata."""
+    if monitor is None and _MONITORING_AVAILABLE:
+        monitor = PerformanceMonitor()  # type: ignore[misc]
+
+    resource_monitor: ResourceMonitor | None = None
+    if enable_resource_monitoring and monitor is not None:
+        resource_monitor = ResourceMonitor(monitor, sample_interval=2.0)
+        resource_monitor.start()
+
+    if monitor is not None:
+        monitor.set_metadata("benchmark", benchmark_config.name)
+        monitor.set_metadata("scale_factor", getattr(benchmark_config, "scale_factor", 1.0))
+        monitor.set_metadata("platform", database_config.type if database_config else "data_only")
+
+    return monitor, resource_monitor
+
+
+def _configure_lifecycle_adapter(
+    adapter: Any | None,
+    database_config: DatabaseConfig | None,
+    platform_config: dict[str, Any] | None,
+    benchmark: Any,
+    benchmark_config: BenchmarkConfig,
+    validation_opts: ValidationOptions,
+    verbosity_settings: VerbositySettings | None,
+    table_mode: str,
+) -> tuple[Any | None, bool]:
+    """Acquire adapter (if needed), bind benchmark state, propagate table_mode/validation/verbosity."""
+    if adapter is None and database_config is not None:
+        adapter = get_platform_adapter(database_config.type, **(platform_config or {}))
+
+    if adapter is not None and benchmark:
+        adapter.benchmark_instance = benchmark
+        adapter.scale_factor = benchmark_config.scale_factor
+
+    if adapter is not None and validation_opts.enable_postload_validation and hasattr(adapter, "enable_validation"):
+        adapter.enable_validation = True
+
+    if adapter is not None and isinstance(adapter, VerbosityMixin):
+        adapter.apply_verbosity(verbosity_settings)
+
+    if adapter is not None and hasattr(adapter, "table_mode"):
+        adapter.table_mode = table_mode
+
+    is_dataframe_adapter = hasattr(adapter, "family") and adapter.family in ("expression", "pandas")
+    return adapter, is_dataframe_adapter
+
+
+def _resolve_lifecycle_table_format(adapter: Any | None, options: dict[str, Any], table_mode: str) -> str | None:
+    """Resolve requested table format, propagate to adapter, and verify platform support."""
+    table_format_raw = options.get("table_format")
+    table_format: str | None = None
+    if isinstance(table_format_raw, str) and table_format_raw.strip():
+        table_format = table_format_raw.strip().lower()
+
+    if adapter is not None and table_format is not None:
+        adapter.requested_table_format = table_format
+
+    if table_format:
+        from benchbox.platforms.base.format_capabilities import get_supported_formats
+
+        platform_name = getattr(adapter, "platform_name", "unknown")
+        supported = get_supported_formats(
+            platform_name,
+            table_mode=table_mode,
+            platform_config=getattr(adapter, "__dict__", None),
+        )
+        if table_format not in supported:
+            raise RuntimeError(
+                f"Platform '{platform_name}' does not support table format '{table_format}'. "
+                f"Supported formats: {supported}"
+            )
+
+    return table_format
+
+
+def _finalize_lifecycle_result(
+    result_obj: BenchmarkResults,
+    validation_records: list[tuple[str, ValidationResult]],
+    *,
+    adapter: Any | None,
+    database_config: DatabaseConfig | None,
+    monitor: PerformanceMonitor | None,
+    resource_monitor: ResourceMonitor | None,
+    execution_context: ExecutionContext | None,
+) -> BenchmarkResults:
+    """Stop resource monitor, attach validation/driver/monitor metadata and execution context."""
+    if resource_monitor is not None:
+        resource_monitor.stop()
+
+    result_with_validation = _finalize_validation_metadata(result_obj, validation_records)
+    result_with_validation = _enrich_driver_runtime_metadata(
+        result_with_validation,
+        adapter=adapter,
+        database_config=database_config,
+    )
+
+    if monitor is not None:
+        snapshot = monitor.snapshot()
+        attach_snapshot_to_result(result_with_validation, snapshot)
+
+    if execution_context is not None:
+        result_with_validation.execution_context = execution_context.model_dump()
+
+    return result_with_validation
+
+
 def run_benchmark_lifecycle(
     benchmark_config: BenchmarkConfig,
     database_config: DatabaseConfig | None,
@@ -606,33 +1001,12 @@ def run_benchmark_lifecycle(
     phases = phases or LifecyclePhases()
     validation_opts = validation_opts or ValidationOptions()
 
-    # Create default monitor if not provided (deep integration - automatic monitoring)
-    if monitor is None and _MONITORING_AVAILABLE:
-        monitor = PerformanceMonitor()  # type: ignore[misc]
-
-    # Start resource monitoring if enabled
-    resource_monitor: ResourceMonitor | None = None
-    if enable_resource_monitoring and monitor is not None:
-        resource_monitor = ResourceMonitor(monitor, sample_interval=2.0)
-        resource_monitor.start()
-
-    # Record benchmark metadata in monitor
-    if monitor is not None:
-        monitor.set_metadata("benchmark", benchmark_config.name)
-        monitor.set_metadata("scale_factor", getattr(benchmark_config, "scale_factor", 1.0))
-        monitor.set_metadata("platform", database_config.type if database_config else "data_only")
+    monitor, resource_monitor = _setup_lifecycle_monitor(
+        monitor, enable_resource_monitoring, benchmark_config, database_config
+    )
 
     options_map = getattr(benchmark_config, "options", {}) or {}
-    if verbosity is not None:
-        verbosity_settings = verbosity
-    else:
-        stored_settings = options_map.get("verbosity_settings") if isinstance(options_map, Mapping) else None
-        if isinstance(stored_settings, VerbositySettings):
-            verbosity_settings = stored_settings
-        elif isinstance(stored_settings, Mapping):
-            verbosity_settings = VerbositySettings.from_mapping(stored_settings)
-        else:
-            verbosity_settings = VerbositySettings.from_mapping(options_map)
+    verbosity_settings = _resolve_verbosity_settings(verbosity, options_map)
 
     benchmark = benchmark_instance or get_benchmark_instance(benchmark_config, system_profile)
     if isinstance(benchmark, VerbosityMixin):  # type: ignore[arg-type]
@@ -641,312 +1015,119 @@ def run_benchmark_lifecycle(
     output_dir_handler = _resolve_output_dir_handler(benchmark, output_root)
     validation_records: list[tuple[str, ValidationResult]] = []
 
-    # Determine test type and whether data generation / loading is needed
     test_type = getattr(benchmark_config, "test_execution_type", "standard")
     needs_data = test_type != "data_only"
 
-    # Ensure data exists: always when phases.generate is requested (including data_only),
-    # or when a downstream phase (load/execute) needs it.
     datagen_duration = 0.0
     if needs_data or phases.generate:
-        datagen_start = time.monotonic()
-
-        # Only run preflight validation when explicitly generating fresh data
-        if phases.generate and validation_opts.enable_preflight_validation:
-            preflight_result = _run_preflight_validation(benchmark, benchmark_config, output_dir_handler)
-            validation_records.append(("preflight", preflight_result))
-            if not preflight_result.is_valid:
-                error_msg = ", ".join(preflight_result.errors) or "Unknown preflight validation error"
-                raise RuntimeError(f"Preflight validation failed: {error_msg}")
-
-        # Always ensure data exists (will reuse manifest if valid, or generate if needed)
-        if monitor is not None:
-            with monitor.time_operation("data_generation"):
-                data_was_generated = _ensure_data_generated(benchmark, benchmark_config)
-                if data_was_generated:
-                    monitor.increment_counter("tables_generated", len(getattr(benchmark, "tables", []) or []))
-        else:
-            _ensure_data_generated(benchmark, benchmark_config)
-
-        if validation_opts.enable_postgen_manifest_validation:
-            manifest_result = _run_manifest_validation(benchmark, benchmark_config)
-            validation_records.append(("post_generation_manifest", manifest_result))
-
-        # Run format conversion if requested (only when data generation phase is enabled)
-        if phases.generate:
-            _run_format_conversion(benchmark, benchmark_config)
-
-        datagen_duration = time.monotonic() - datagen_start
+        datagen_duration = _run_data_generation_phase(
+            benchmark=benchmark,
+            benchmark_config=benchmark_config,
+            phases=phases,
+            validation_opts=validation_opts,
+            output_dir_handler=output_dir_handler,
+            monitor=monitor,
+            validation_records=validation_records,
+        )
 
     if test_type == "data_only":
-        execution_id = uuid.uuid4().hex[:8]
-        datagen_phase = {
-            "status": "COMPLETED",
-            "duration_ms": int(datagen_duration * 1000),
-        }
-        datagen_phase.update(_read_datagen_stats_from_manifest(benchmark))
-        result_obj = benchmark.create_enhanced_benchmark_result(
-            platform="data_only",
-            query_results=[],
-            duration_seconds=datagen_duration,
-            phases={"data_generation": datagen_phase},
-            execution_metadata={
-                "mode": "datagen",
-                "benchmark_id": benchmark_config.name,
-            },
-            execution_id=execution_id,
+        return _build_data_only_result(
+            benchmark=benchmark,
+            benchmark_config=benchmark_config,
+            database_config=database_config,
+            datagen_duration=datagen_duration,
+            validation_records=validation_records,
+            execution_context=execution_context,
         )
-        result_obj._benchmark_id_override = benchmark_config.name
-        result_obj = _finalize_validation_metadata(result_obj, validation_records)
-        result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=None, database_config=database_config)
-        if execution_context is not None:
-            result_obj.execution_context = execution_context.model_dump()
-        return result_obj
-
-    adapter = platform_adapter
-    if adapter is None and database_config is not None:
-        adapter = get_platform_adapter(database_config.type, **(platform_config or {}))
-
-    # Set benchmark instance on adapter for database validation
-    # This allows the adapter to validate schema compatibility when checking
-    # if an existing database can be reused
-    if adapter is not None and benchmark:
-        adapter.benchmark_instance = benchmark
-        adapter.scale_factor = benchmark_config.scale_factor
-
-    if adapter is not None and validation_opts.enable_postload_validation and hasattr(adapter, "enable_validation"):
-        adapter.enable_validation = True
-
-    if adapter is not None and isinstance(adapter, VerbosityMixin):
-        adapter.apply_verbosity(verbosity_settings)
 
     options = getattr(benchmark_config, "options", {}) or {}
     table_mode = str(options.get("table_mode", "native") or "native").lower()
 
-    # Propagate table_mode to adapter so run_enhanced_benchmark can route
-    # to create_external_tables instead of create_schema + load_data.
-    if adapter is not None and hasattr(adapter, "table_mode"):
-        adapter.table_mode = table_mode
+    adapter, is_dataframe_adapter = _configure_lifecycle_adapter(
+        platform_adapter,
+        database_config,
+        platform_config,
+        benchmark,
+        benchmark_config,
+        validation_opts,
+        verbosity_settings,
+        table_mode,
+    )
 
-    # Detect DataFrame adapter by checking for 'family' attribute
-    is_dataframe_adapter = hasattr(adapter, "family") and adapter.family in ("expression", "pandas")
-
-    # Check if we should run load-only mode:
-    # - Explicit test_type == "load_only" OR
-    # - Phases indicate load without execute (e.g., --phases generate,load)
     should_run_load_only = test_type == "load_only" or (phases.load and not phases.execute and adapter is not None)
 
     if should_run_load_only:
-        if adapter is None:
-            raise RuntimeError("Load-only mode requires a platform adapter and database configuration")
-
-        if is_dataframe_adapter:
-            from pathlib import Path
-
-            data_dir = getattr(benchmark, "output_dir", None)
-            if data_dir is None and output_root:
-                data_dir = Path(output_root)
-            elif isinstance(data_dir, str):
-                data_dir = Path(data_dir)
-
-            df_phases = DataFramePhases(load=True, execute=False)
-            df_options = DataFrameRunOptions(
-                ignore_memory_warnings=bool(options.get("ignore_memory_warnings", False)),
-                force_regenerate=bool(options.get("force_regenerate", False)),
-                prefer_parquet=bool(options.get("prefer_parquet", True)),
-                cache_dir=options.get("cache_dir"),
-                verbose=verbosity_settings.verbose,
-                very_verbose=verbosity_settings.very_verbose,
-            )
-
-            result_obj = adapter.run_benchmark(
-                benchmark,
-                benchmark_config=benchmark_config,
-                system_profile=system_profile,
-                data_dir=data_dir,
-                phases=df_phases,
-                options=df_options,
-                monitor=monitor,
-            )
-        else:
-            result_obj, postload_result = _execute_load_only_mode(
-                benchmark=benchmark,
-                benchmark_config=benchmark_config,
-                adapter=adapter,
-                platform_config=platform_config,
-                validation_opts=validation_opts,
-                table_mode=table_mode,
-            )
-
-            if postload_result is not None:
-                validation_records.append(("post_load", postload_result))
-
-        result_obj = _finalize_validation_metadata(result_obj, validation_records)
-        result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
-        if execution_context is not None:
-            result_obj.execution_context = execution_context.model_dump()
-        return result_obj
-
-    # Only return early for setup-only scenarios (no loading, no execution)
-    # This prevents skipping schema creation when phases.load=True
-    if adapter is None or (not phases.execute and not phases.load):
-        # If execute phase is requested but adapter is missing, this is a configuration error
-        if phases.execute and adapter is None:
-            raise RuntimeError(
-                "Cannot execute benchmark: platform adapter not initialized. "
-                "This indicates database configuration is missing or adapter creation failed. "
-                "Ensure --platform parameter is provided when using execution phases (power/throughput/maintenance)."
-            )
-
-        result_obj = benchmark.create_enhanced_benchmark_result(
-            platform=(adapter.platform_name if adapter else "unknown"),
-            query_results=[],
-            duration_seconds=0.0,
-            phases={"setup": {"status": "COMPLETED"}},
-            execution_metadata={"mode": "setup_only"},
-        )
-        result_obj = _finalize_validation_metadata(result_obj, validation_records)
-        result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
-        if execution_context is not None:
-            result_obj.execution_context = execution_context.model_dump()
-        return result_obj
-
-    iterations = int(
-        options.get("power_iterations", GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
-        or GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
-    )
-    warmups = int(
-        options.get("power_warmup_iterations", GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS)
-        or GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS
-    )
-    fail_fast = bool(options.get("power_fail_fast", False))
-    table_format_raw = options.get("table_format")
-    table_format = None
-    if isinstance(table_format_raw, str) and table_format_raw.strip():
-        table_format = table_format_raw.strip().lower()
-
-    # Fail fast: ensure the platform supports the requested table format
-    if table_format:
-        from benchbox.platforms.base.format_capabilities import get_supported_formats
-
-        platform_name = getattr(adapter, "platform_name", "unknown")
-        supported = get_supported_formats(
-            platform_name,
-            table_mode=table_mode,
-            platform_config=getattr(adapter, "__dict__", None),
-        )
-        if table_format not in supported:
-            raise RuntimeError(
-                f"Platform '{platform_name}' does not support table format '{table_format}'. "
-                f"Supported formats: {supported}"
-            )
-
-    table_format_compression_raw = options.get("table_format_compression", "snappy")
-    table_format_compression = str(table_format_compression_raw or "snappy")
-
-    table_format_partition_cols_raw = options.get("table_format_partition_cols")
-    table_format_partition_cols: list[str] = []
-    if isinstance(table_format_partition_cols_raw, str):
-        table_format_partition_cols = [
-            part.strip() for part in table_format_partition_cols_raw.split(",") if part.strip()
-        ]
-    elif isinstance(table_format_partition_cols_raw, (list, tuple)):
-        table_format_partition_cols = [
-            str(part).strip() for part in table_format_partition_cols_raw if str(part).strip()
-        ]
-
-    run_config = RunConfig(
-        query_subset=benchmark_config.queries,
-        concurrent_streams=benchmark_config.concurrency,
-        test_execution_type=test_type,
-        scale_factor=benchmark_config.scale_factor,
-        seed=(int(options.get("seed")) if options.get("seed") is not None else None),
-        connection={
-            "database_path": (platform_config or {}).get("database_path"),
-        },
-        enable_postload_validation=validation_opts.enable_postload_validation,
-        verbose=verbosity_settings.verbose,
-        verbose_level=verbosity_settings.level,
-        verbose_enabled=verbosity_settings.verbose_enabled,
-        very_verbose=verbosity_settings.very_verbose,
-        quiet=verbosity_settings.quiet,
-        iterations=max(1, iterations),
-        warm_up_iterations=max(0, warmups),
-        power_fail_fast=fail_fast,
-        capture_plans=benchmark_config.capture_plans,
-        strict_plan_capture=benchmark_config.strict_plan_capture,
-        table_format=table_format,
-        table_format_compression=table_format_compression,
-        table_format_partition_cols=table_format_partition_cols,
-    )
-
-    if is_dataframe_adapter:
-        # DataFrame adapter execution path
-        from pathlib import Path
-
-        # Get data directory from benchmark or output_root
-        data_dir = getattr(benchmark, "output_dir", None)
-        if data_dir is None and output_root:
-            data_dir = Path(output_root)
-        elif isinstance(data_dir, str):
-            data_dir = Path(data_dir)
-
-        # Create DataFrame-specific phases and options
-        df_phases = DataFramePhases(
-            load=True,  # DataFrame always loads from files
-            execute=phases.execute,
-        )
-        df_options = DataFrameRunOptions(
-            ignore_memory_warnings=bool(options.get("ignore_memory_warnings", False)),
-            force_regenerate=bool(options.get("force_regenerate", False)),
-            prefer_parquet=bool(options.get("prefer_parquet", True)),
-            cache_dir=options.get("cache_dir"),
-            verbose=verbosity_settings.verbose,
-            very_verbose=verbosity_settings.very_verbose,
-        )
-
-        # Call DataFrame adapter's run_benchmark
-        result_obj = adapter.run_benchmark(
-            benchmark,
+        result_obj = _run_load_only_mode(
+            benchmark=benchmark,
             benchmark_config=benchmark_config,
             system_profile=system_profile,
-            data_dir=data_dir,
-            phases=df_phases,
-            options=df_options,
+            adapter=adapter,
+            platform_config=platform_config,
+            validation_opts=validation_opts,
+            table_mode=table_mode,
+            options=options,
+            verbosity_settings=verbosity_settings,
             monitor=monitor,
+            output_root=output_root,
+            is_dataframe_adapter=is_dataframe_adapter,
+            validation_records=validation_records,
         )
-    else:
-        # SQL adapter execution path (existing behavior)
-        kwargs = {k: v for k, v in run_config.__dict__.items() if k != "benchmark"}
-        result_obj = adapter.run_benchmark(benchmark, **kwargs)
+        result_obj = _finalize_validation_metadata(result_obj, validation_records)
+        result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
+        if execution_context is not None:
+            result_obj.execution_context = execution_context.model_dump()
+        return result_obj
 
-    # Postload validation only applies to SQL adapters (database validation)
+    if adapter is None or (not phases.execute and not phases.load):
+        return _build_setup_only_result(
+            benchmark=benchmark,
+            adapter=adapter,
+            database_config=database_config,
+            phases=phases,
+            validation_records=validation_records,
+            execution_context=execution_context,
+        )
+
+    table_format = _resolve_lifecycle_table_format(adapter, options, table_mode)
+
+    run_config = _build_run_config_from_options(
+        benchmark_config=benchmark_config,
+        options=options,
+        platform_config=platform_config,
+        validation_opts=validation_opts,
+        verbosity_settings=verbosity_settings,
+        test_type=test_type,
+        table_format=table_format,
+    )
+
+    result_obj = _execute_via_adapter(
+        adapter=adapter,
+        benchmark=benchmark,
+        benchmark_config=benchmark_config,
+        system_profile=system_profile,
+        run_config=run_config,
+        options=options,
+        phases=phases,
+        verbosity_settings=verbosity_settings,
+        monitor=monitor,
+        output_root=output_root,
+        is_dataframe_adapter=is_dataframe_adapter,
+    )
+
     if validation_opts.enable_postload_validation and not is_dataframe_adapter:
         postload_result = _run_postload_validation(adapter, benchmark_config, platform_config)
         if postload_result is not None:
             validation_records.append(("post_load", postload_result))
 
-    # Stop resource monitoring and attach performance snapshot to results
-    if resource_monitor is not None:
-        resource_monitor.stop()
-
-    result_with_validation = _finalize_validation_metadata(result_obj, validation_records)
-    result_with_validation = _enrich_driver_runtime_metadata(
-        result_with_validation,
+    return _finalize_lifecycle_result(
+        result_obj,
+        validation_records,
         adapter=adapter,
         database_config=database_config,
+        monitor=monitor,
+        resource_monitor=resource_monitor,
+        execution_context=execution_context,
     )
-
-    # Attach performance monitoring snapshot to result
-    if monitor is not None:
-        snapshot = monitor.snapshot()
-        attach_snapshot_to_result(result_with_validation, snapshot)
-
-    # Attach execution context for reproducibility
-    if execution_context is not None:
-        result_with_validation.execution_context = execution_context.model_dump()
-
-    return result_with_validation
 
 
 def _flatten_manifest_v2_entries(table_formats: Any, preferred_formats: list[str] | None = None) -> list[Any]:
@@ -1190,6 +1371,72 @@ def _emit_manifest_reuse_message(benchmark: Any, summary: dict[str, Any]) -> Non
     emit(f"🔄 Reusing benchmark data ({timestamp}; {table_count} {table_label}, {file_count} {file_label})")
 
 
+def _validate_manifest_entry(entry: dict, output_dir: Any, table_name: str) -> bool:
+    """Check that a single manifest entry references a real file/dir of the expected size."""
+    from pathlib import Path
+
+    from benchbox.utils.datagen_manifest import compute_entry_size
+
+    rel = entry.get("path")
+    size = int(entry.get("size_bytes", -1))
+    if rel is None or size < 0:
+        return False
+    fp = output_dir.joinpath(rel)
+    if not hasattr(fp, "exists") or not fp.exists():
+        return False
+    if isinstance(fp, Path):
+        if fp.is_dir() and not entry.get("is_directory", False):
+            logger.warning(
+                "Manifest entry for table '%s' path '%s' is a directory "
+                "but not marked as is_directory. Manifest invalid.",
+                table_name,
+                rel,
+            )
+            return False
+        return compute_entry_size(fp) == size
+    # Cloud paths: fall back to stat() (directories not expected)
+    if hasattr(fp, "is_dir") and fp.is_dir():
+        logger.warning("Cloud path %s is a directory; size check may be inaccurate", rel)
+    if not hasattr(fp, "stat") or fp.stat().st_size != size:
+        return False
+    return True
+
+
+def _collect_all_entries(table_data: Any) -> list[dict]:
+    """Flatten every entry across all formats for V2 manifest tables (V1 returns [])."""
+    if not isinstance(table_data, dict):
+        return []
+    formats_dict = table_data.get("formats", {})
+    if not isinstance(formats_dict, dict):
+        return []
+    out: list[dict] = []
+    for fmt_entries in formats_dict.values():
+        if isinstance(fmt_entries, list):
+            out.extend(fmt_entries)
+    return out
+
+
+def _check_table_directory_collisions(output_dir: Any, tables: dict) -> bool:
+    """Return True if any unrecorded table-name directory collides with the manifest."""
+    from pathlib import Path
+
+    if not isinstance(output_dir, Path):
+        return False
+    for table_name, table_data in tables.items():
+        table_dir = output_dir / table_name
+        if not table_dir.is_dir():
+            continue
+        all_entries = _collect_all_entries(table_data)
+        if not any(e.get("path") == table_name for e in all_entries):
+            logger.warning(
+                "Datagen cache rejected: directory '%s/' collides with table "
+                "name but is not recorded in manifest. Regenerating.",
+                table_name,
+            )
+            return True
+    return False
+
+
 def _validate_manifest_if_present(benchmark: Any, config: BenchmarkConfig) -> tuple[bool, dict | None, bool]:
     """Validate manifest structure and referenced files.
 
@@ -1214,69 +1461,16 @@ def _validate_manifest_if_present(benchmark: Any, config: BenchmarkConfig) -> tu
         if float(manifest.get("scale_factor", -1)) != float(config.scale_factor):
             return False, None, True
 
-        # Validate manifest entries using V2-aware helper
-        from pathlib import Path
-
-        from benchbox.utils.datagen_manifest import compute_entry_size, get_table_files
+        from benchbox.utils.datagen_manifest import get_table_files
 
         tables = manifest.get("tables", {}) or {}
         for table_name in tables.keys():
-            entries = get_table_files(manifest, table_name)
-            for entry in entries:
-                rel = entry.get("path")
-                size = int(entry.get("size_bytes", -1))
-                if rel is None or size < 0:
+            for entry in get_table_files(manifest, table_name):
+                if not _validate_manifest_entry(entry, output_dir, table_name):
                     return False, None, True
-                fp = output_dir.joinpath(rel)
-                if not hasattr(fp, "exists") or not fp.exists():
-                    return False, None, True
-                # Entry type guard: file-format entry resolving to a directory
-                # (without is_directory flag) indicates corrupted/contaminated state
-                if isinstance(fp, Path) and fp.is_dir() and not entry.get("is_directory", False):
-                    logger.warning(
-                        "Manifest entry for table '%s' path '%s' is a directory "
-                        "but not marked as is_directory. Manifest invalid.",
-                        table_name,
-                        rel,
-                    )
-                    return False, None, True
-                # Use compute_entry_size for directory-aware size comparison
-                # (directories like Delta/Iceberg need recursive file sum)
-                if isinstance(fp, Path) and compute_entry_size(fp) != size:
-                    return False, None, True
-                # Cloud paths: fall back to stat() (directories not expected)
-                if not isinstance(fp, Path):
-                    if hasattr(fp, "is_dir") and fp.is_dir():
-                        logger.warning("Cloud path %s is a directory; size check may be inaccurate", rel)
-                    if not hasattr(fp, "stat") or fp.stat().st_size != size:
-                        return False, None, True
-        # Check for table-name directory collisions (e.g., stale Iceberg output).
-        # Only check local paths — cloud paths don't have this problem.
-        if isinstance(output_dir, Path):
-            for table_name in tables.keys():
-                table_dir = output_dir / table_name
-                if table_dir.is_dir():
-                    # Check ALL entries across all formats, not just the preferred format.
-                    # get_table_files() only returns the default format's entries, but a
-                    # directory might be tracked in a non-default format (e.g., delta).
-                    # V1 manifests: table_data is a list (no directory entries possible),
-                    # so all_entries stays empty and is_tracked is False — correct.
-                    table_data = tables[table_name]
-                    all_entries: list[dict] = []
-                    if isinstance(table_data, dict):
-                        formats_dict = table_data.get("formats", {})
-                        if isinstance(formats_dict, dict):
-                            for fmt_entries in formats_dict.values():
-                                if isinstance(fmt_entries, list):
-                                    all_entries.extend(fmt_entries)
-                    is_tracked = any(e.get("path") == table_name for e in all_entries)
-                    if not is_tracked:
-                        logger.warning(
-                            "Datagen cache rejected: directory '%s/' collides with table "
-                            "name but is not recorded in manifest. Regenerating.",
-                            table_name,
-                        )
-                        return False, None, True
+
+        if _check_table_directory_collisions(output_dir, tables):
+            return False, None, True
 
         return True, manifest, True
     except Exception:

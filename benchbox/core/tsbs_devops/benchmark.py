@@ -25,6 +25,7 @@ from benchbox.core.tsbs_devops.schema import (
     TSBS_DEVOPS_SCHEMA,
     get_create_tables_sql,
 )
+from benchbox.utils.compression_mixin import extract_compression_kwargs
 
 if TYPE_CHECKING:
     from benchbox.core.connection import DatabaseConnection
@@ -50,7 +51,7 @@ class TSBSDevOpsBenchmark(BaseBenchmark):
         >>> from benchbox.core.tsbs_devops import TSBSDevOpsBenchmark
         >>> from benchbox.platforms.duckdb import DuckDBAdapter
         >>>
-        >>> # Create benchmark (SF=1 = 100 hosts, 1 day)
+        >>> # Create benchmark (SF=1 = 100 hosts, 2 days)
         >>> benchmark = TSBSDevOpsBenchmark(scale_factor=1.0)
         >>>
         >>> # Generate data
@@ -88,7 +89,7 @@ class TSBSDevOpsBenchmark(BaseBenchmark):
         """Initialize TSBS DevOps benchmark.
 
         Args:
-            scale_factor: Scale factor (1.0 = 100 hosts, 1 day)
+            scale_factor: Scale factor (1.0 = 100 hosts, 2 days)
             output_dir: Directory for data files
             num_hosts: Override number of hosts
             duration_days: Override duration in days
@@ -114,6 +115,7 @@ class TSBSDevOpsBenchmark(BaseBenchmark):
             **kwargs,
         )
         self.seed = seed
+        self.csv_has_header: bool = True
 
         # Benchmark metadata
         self._name = "TSBS DevOps"
@@ -123,6 +125,7 @@ class TSBSDevOpsBenchmark(BaseBenchmark):
         self.logger = logging.getLogger("benchbox.core.tsbs_devops.benchmark")
 
         # Create data generator
+        compression_kwargs = extract_compression_kwargs(kwargs)
         self.data_generator = TSBSDevOpsDataGenerator(
             scale_factor=scale_factor,
             output_dir=self.output_dir,
@@ -134,6 +137,7 @@ class TSBSDevOpsBenchmark(BaseBenchmark):
             verbose=verbose,
             quiet=quiet,
             force_regenerate=force_regenerate,
+            **compression_kwargs,
         )
 
         # Store configuration
@@ -400,3 +404,55 @@ class TSBSDevOpsBenchmark(BaseBenchmark):
                 rows_loaded += 1
 
         return rows_loaded
+
+
+# ---------------------------------------------------------------------------
+# Register benchmark-specific CLI option specs
+# ---------------------------------------------------------------------------
+
+from benchbox.cli.benchmark_hooks import (  # noqa: E402
+    BenchmarkHookRegistry,
+    BenchmarkOptionSpec,
+    parse_datetime,
+    parse_int,
+)
+
+BenchmarkHookRegistry.register_option_specs(
+    "tsbs_devops",
+    BenchmarkOptionSpec(
+        name="num_hosts",
+        parser=parse_int,
+        help="Number of simulated hosts",
+        aliases=("num-hosts",),
+    ),
+    BenchmarkOptionSpec(
+        name="duration_days",
+        parser=parse_int,
+        help="Duration in days for data generation",
+        aliases=("duration-days",),
+    ),
+    BenchmarkOptionSpec(
+        name="interval_seconds",
+        parser=parse_int,
+        default=10,
+        help="Measurement interval in seconds",
+        aliases=("interval-seconds",),
+    ),
+    BenchmarkOptionSpec(
+        name="start_time",
+        parser=parse_datetime,
+        help="Start time for data generation (ISO format)",
+        aliases=("start-time",),
+    ),
+    BenchmarkOptionSpec(
+        name="seed",
+        parser=parse_int,
+        help="Random seed for reproducibility",
+    ),
+    BenchmarkOptionSpec(
+        name="force_regenerate",
+        parser=lambda v: v.strip().lower() in ("true", "1", "yes"),
+        help="Force data regeneration",
+        aliases=("force-regenerate",),
+    ),
+)

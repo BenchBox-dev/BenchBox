@@ -281,7 +281,7 @@ class TestScaleFactorValidation:
             # Verify metadata shows SF=0.01
             metadata_file = output_dir / "write_primitives_auxiliary" / ".bulk_load_metadata.json"
             assert metadata_file.exists()
-            with open(metadata_file) as f:
+            with open(metadata_file, encoding="utf-8") as f:
                 metadata = json.load(f)
             assert metadata["scale_factor"] == 0.01
 
@@ -296,7 +296,7 @@ class TestScaleFactorValidation:
             gen2.generate()
 
             # Verify metadata updated to SF=0.02
-            with open(metadata_file) as f:
+            with open(metadata_file, encoding="utf-8") as f:
                 metadata = json.load(f)
             assert metadata["scale_factor"] == 0.02
 
@@ -316,7 +316,7 @@ class TestScaleFactorValidation:
             metadata_file = output_dir / "write_primitives_auxiliary" / ".bulk_load_metadata.json"
             assert metadata_file.exists()
 
-            with open(metadata_file) as f:
+            with open(metadata_file, encoding="utf-8") as f:
                 metadata = json.load(f)
 
             assert "scale_factor" in metadata
@@ -370,7 +370,7 @@ class TestSmallDatasetHandling:
                 assert part_file.exists()
 
                 # Count rows (excluding header)
-                with open(part_file) as f:
+                with open(part_file, encoding="utf-8") as f:
                     lines = f.readlines()
                 assert len(lines) > 1  # Header + at least 1 data row
 
@@ -391,7 +391,7 @@ class TestSmallDatasetHandling:
             error_file = output_dir / "write_primitives_auxiliary" / "csv_with_errors.csv"
             assert error_file.exists()
 
-            with open(error_file) as f:
+            with open(error_file, encoding="utf-8") as f:
                 lines = f.readlines()
             assert len(lines) > 1  # Header + at least some data rows
 
@@ -412,7 +412,7 @@ class TestSmallDatasetHandling:
             files_dir = output_dir / "write_primitives_auxiliary"
             part_sizes = []
             for part_num in range(1, 5):
-                with open(files_dir / f"csv_parallel_part{part_num}.csv") as f:
+                with open(files_dir / f"csv_parallel_part{part_num}.csv", encoding="utf-8") as f:
                     lines = f.readlines()
                 part_sizes.append(len(lines) - 1)  # Exclude header
 

@@ -126,6 +126,8 @@ class InfluxDBConnection:
         port: int = 443,
         ssl: bool = True,
         org: str | None = None,
+        verify_ssl: bool = True,
+        ca_cert_path: str | None = None,
     ):
         """Initialize InfluxDB connection.
 
@@ -136,6 +138,8 @@ class InfluxDBConnection:
             port: Server port (default: 443 for HTTPS)
             ssl: Use SSL/TLS connection (default: True)
             org: Organization name (required for some InfluxDB deployments)
+            verify_ssl: Verify TLS certificates (default: True). Set False for self-signed certs.
+            ca_cert_path: Path to custom CA certificate bundle for TLS verification.
         """
         self.host = host
         self.token = token
@@ -143,6 +147,8 @@ class InfluxDBConnection:
         self.port = port
         self.ssl = ssl
         self.org = org
+        self.verify_ssl = verify_ssl
+        self.ca_cert_path = ca_cert_path
 
         self._client = None
         self._client_type: str | None = None
@@ -174,11 +180,18 @@ class InfluxDBConnection:
     def _connect_influxdb3(self) -> None:
         """Connect using influxdb3-python client."""
         try:
+            kwargs: dict[str, Any] = {}
+            if not self.verify_ssl:
+                kwargs["verify_ssl"] = False
+            if self.ca_cert_path:
+                kwargs["ssl_ca_cert"] = self.ca_cert_path
+
             self._client = InfluxDBClient3(
                 host=self._url,
                 token=self.token,
                 database=self.database,
                 org=self.org,
+                **kwargs,
             )
             self._client_type = "influxdb3"
             logger.info(f"Connected to InfluxDB via influxdb3-python: {self._url}")
@@ -191,11 +204,16 @@ class InfluxDBConnection:
             # FlightSQL uses host:port without protocol for gRPC
             grpc_host = f"{self.host}:{self.port}"
 
+            kwargs: dict[str, Any] = {}
+            if not self.verify_ssl:
+                kwargs["disable_server_verification"] = True
+
             self._client = FlightSQLClient(
                 host=grpc_host,
                 token=self.token,
                 metadata={"database": self.database},
                 features={"metadata-reflection": "true"},
+                **kwargs,
             )
             self._client_type = "flightsql"
             logger.info(f"Connected to InfluxDB via flightsql-dbapi: {grpc_host}")

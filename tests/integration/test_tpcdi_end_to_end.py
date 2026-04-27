@@ -528,7 +528,7 @@ class TestTPCDIEndToEndWorkflow:
         corrupted_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Write malformed CSV data
-        with open(corrupted_file, "w") as f:
+        with open(corrupted_file, "w", encoding="utf-8") as f:
             f.write("bad,data,format\n")
             f.write("incomplete,row\n")  # Missing columns
             f.write("another,bad,line,with,too,many,columns,here,extra\n")

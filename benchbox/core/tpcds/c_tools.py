@@ -189,7 +189,7 @@ class DSQGenBinary:
             base_query_id, variant = self._parse_query_id(query_id)
         except (ValueError, TypeError) as e:
             # Convert to ValueError to match TPC-H patterns
-            raise ValueError(f"Invalid query_id: {e}")
+            raise ValueError(f"Invalid query_id: {e}") from e
 
         if not (1 <= base_query_id <= 99):
             raise ValueError(f"Query ID must be 1-99, got {base_query_id}")
@@ -219,6 +219,149 @@ class DSQGenBinary:
         self._query_cache[cache_key] = result
         return result
 
+    def _resolve_template_arg(self, query_id: int, variant: Optional[str], is_multi_part: bool) -> str:
+        """Pick the template path argument dsqgen should use."""
+        template_name = f"query{query_id}.tpl" if is_multi_part else f"query{query_id}{variant or ''}.tpl"
+        template_rel = f"query_templates/{template_name}"
+        try:
+            variants_dir = self.templates_dir.parent / "query_variants"
+            main_path = self.templates_dir / template_name
+            alt_path = variants_dir / template_name
+            if alt_path.exists() and (variant and not is_multi_part) or (not main_path.exists()):
+                template_rel = f"query_variants/{template_name}"
+        except Exception:
+            template_rel = f"query_templates/{template_name}"
+
+        if "query_variants/" in template_rel:
+            return f"../{template_rel}"
+        return template_rel.replace("query_templates/", "")
+
+    def _build_dsqgen_cmd(
+        self,
+        query_id: int,
+        variant: Optional[str],
+        seed: Optional[int],
+        scale_factor: float,
+        dialect: str,
+        is_multi_part: bool,
+    ) -> tuple[list[str], str]:
+        """Build the dsqgen command and return (cmd, opt_prefix)."""
+        _opt = "/" if sys.platform == "win32" else "-"
+        template_arg = self._resolve_template_arg(query_id, variant, is_multi_part)
+
+        cmd = [str(self.dsqgen_path)]
+        cmd.extend([f"{_opt}TEMPLATE", template_arg])
+        cmd.extend([f"{_opt}DIALECT", dialect])
+        cmd.extend([f"{_opt}SCALE", str(scale_factor)])
+        if seed is not None:
+            cmd.extend([f"{_opt}RNGSEED", str(seed)])
+        cmd.extend([f"{_opt}FILTER", "Y"])
+        cmd.extend([f"{_opt}VERBOSE", "N"])
+        return cmd, _opt
+
+    def _stage_dsqgen_workdir(self, temp_path: Path) -> dict[str, str]:
+        """Stage templates + variants + distribution files into temp_path. Returns env."""
+        import os
+        import shutil as _shutil
+
+        _shutil.copytree(self.templates_dir, temp_path / "q")
+        var_src = self.templates_dir.parent / "query_variants"
+        if var_src.exists():
+            _shutil.copytree(var_src, temp_path / "query_variants")
+
+        env = os.environ.copy()
+        env["DSS_QUERY"] = str(temp_path)
+
+        dsqgen_dir = Path(self.dsqgen_path).parent
+        for dist_file in ("tpcds.dst", "tpcds.idx"):
+            dist_src = dsqgen_dir / dist_file
+            if dist_src.exists():
+                _shutil.copy2(dist_src, temp_path / dist_file)
+            dist_src_alt = self.tools_dir / dist_file
+            if not (temp_path / dist_file).exists() and dist_src_alt.exists():
+                _shutil.copy2(dist_src_alt, temp_path / dist_file)
+        return env
+
+    def _run_dsqgen(
+        self, cmd: list[str], opt: str, query_id: int, variant: Optional[str]
+    ) -> subprocess.CompletedProcess:
+        """Run dsqgen in a staged temporary workdir and return the completed process."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            env = self._stage_dsqgen_workdir(temp_path)
+
+            cmd.extend([f"{opt}INPUT", "q/templates.lst"])
+            cmd.extend([f"{opt}DIRECTORY", "q"])
+
+            result = subprocess.run(
+                cmd,
+                cwd=temp_dir,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env,
+            )
+
+        if result.returncode != 0:
+            error_output = result.stderr.strip() if result.stderr else "Unknown error"
+            stdout_output = result.stdout.strip() if result.stdout else ""
+            cmd_str = " ".join(cmd)
+            raise TPCDSError(
+                f"dsqgen failed for query {query_id}{variant or ''} (exit code {result.returncode}): "
+                f"Command: {cmd_str}\n"
+                f"Stderr: {error_output}\n"
+                f"Stdout: {stdout_output}"
+            )
+        return result
+
+    def _extract_sql_from_output(self, stdout: str, query_id: int, variant: Optional[str]) -> str:
+        sql_output = stdout.strip()
+        if not sql_output:
+            raise TPCDSError(f"dsqgen returned empty output for query {query_id}{variant or ''}")
+
+        sql_lines: list[str] = []
+        for line in sql_output.split("\n"):
+            if "qgen2 Query Generator" in line or "Copyright Transaction" in line:
+                break
+            sql_lines.append(line)
+
+        sql_query = "\n".join(sql_lines).strip()
+        if not sql_query:
+            raise TPCDSError(f"No SQL query found in dsqgen output for query {query_id}{variant or ''}")
+        return sql_query
+
+    def _select_multi_part(self, sql_query: str, query_id: int, variant: Optional[str]) -> str:
+        parts = [p.strip() for p in sql_query.split(";") if p.strip()]
+        if len(parts) < 2:
+            raise TPCDSError(f"Expected 2 queries for multi-part query {query_id}, but found {len(parts)}")
+
+        part_index = 0 if variant == "a" else 1
+        if part_index >= len(parts):
+            raise TPCDSError(f"Query {query_id}{variant} not found - only {len(parts)} parts available")
+        return parts[part_index]
+
+    def _wrap_dsqgen_called_process_error(
+        self, exc: subprocess.CalledProcessError, query_id: int, variant: Optional[str]
+    ) -> TPCDSError:
+        error_msg = exc.stderr.strip() if exc.stderr else "Unknown error"
+        error_lower = error_msg.lower()
+        q = f"{query_id}{variant or ''}"
+
+        if "File '" in error_msg and "not found" in error_msg:
+            return TPCDSError(f"Template not found for query {q}: {error_msg}")
+        if "Substitution" in error_msg and "is used before being initialized" in error_msg:
+            return TPCDSError(
+                f"Template substitution error for query {q}: {error_msg}. "
+                "This indicates an issue with the TPC-DS template or dsqgen configuration that needs to be fixed."
+            )
+        if "template" in error_lower:
+            return TPCDSError(f"Template error for query {q}: {error_msg}")
+        if "parameter" in error_lower:
+            return TPCDSError(f"Parameter generation failed for query {q}: {error_msg}")
+        return TPCDSError(f"dsqgen failed for query {q}: {error_msg}")
+
     def _generate_with_binary(
         self,
         query_id: int,
@@ -230,183 +373,21 @@ class DSQGenBinary:
         dialect: str = "netezza",
     ) -> str:
         """Generate query using dsqgen binary with minimal wrapper."""
-        cmd = [str(self.dsqgen_path)]
-
-        # dsqgen uses '/' as option prefix on Windows, '-' on Unix
-        # (see r_params.c OPTION_START definition)
-        _opt = "/" if sys.platform == "win32" else "-"
-
-        # Template and dialect
-        # Multi-part queries (14, 23, 24, 39) have two SQL statements in a single template
-        # For these, we use the base template and extract the appropriate part later
         is_multi_part = query_id in (14, 23, 24, 39) and variant in ("a", "b")
-
-        if is_multi_part:
-            # Use base template (query14.tpl, not query14a.tpl)
-            template_name = f"query{query_id}.tpl"
-        else:
-            template_name = f"query{query_id}{variant or ''}.tpl"
-
-        # Resolve template path relative to the TPC-DS source root which contains
-        # both query_templates/ and query_variants/ (sibling directories).
-        # Default to main templates, prefer query_variants/ when variant exists there only.
-        template_rel = f"query_templates/{template_name}"
-        try:
-            variants_dir = self.templates_dir.parent / "query_variants"
-            main_path = self.templates_dir / template_name
-            alt_path = variants_dir / template_name
-            if alt_path.exists() and (variant and not is_multi_part) or (not main_path.exists()):
-                template_rel = f"query_variants/{template_name}"
-        except Exception:
-            # Fall back to main templates relative path on any error
-            template_rel = f"query_templates/{template_name}"
-
-        if "query_variants/" in template_rel:
-            # For variant templates, use relative path from query_templates (../ to access sibling directory)
-            # query_variants/query14a.tpl becomes ../query_variants/query14a.tpl
-            template_arg = f"../{template_rel}"
-        else:
-            # For main templates, remove the query_templates/ prefix since we're already in that directory
-            template_arg = template_rel.replace("query_templates/", "")
-
-        cmd.extend([f"{_opt}TEMPLATE", template_arg])
-        cmd.extend([f"{_opt}DIALECT", dialect])
-
-        # Scale and generation parameters
-        cmd.extend([f"{_opt}SCALE", str(scale_factor)])
-
-        if seed is not None:
-            cmd.extend([f"{_opt}RNGSEED", str(seed)])
-
-        # Output to stdout
-        cmd.extend([f"{_opt}FILTER", "Y"])
-        cmd.extend([f"{_opt}VERBOSE", "N"])
+        cmd, opt = self._build_dsqgen_cmd(query_id, variant, seed, scale_factor, dialect, is_multi_part)
 
         try:
-            # Set up environment for dsqgen - it needs tpcds.dst and templates to be available
-            import os
-            import shutil
-            import tempfile
-
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
-
-                # Copy templates into temp dir with short names to avoid
-                # exceeding dsqgen's internal 80-char path buffer for -DIRECTORY.
-                # Use single-char name for the templates dir (passed as -DIRECTORY).
-                # We use copytree instead of symlinks because Windows requires
-                # elevated permissions for symlinks, and dsqgen.exe may not
-                # follow Windows symlinks properly.
-                tpl_dir = temp_path / "q"
-                shutil.copytree(self.templates_dir, tpl_dir)
-                # Copy query_variants as sibling so ../query_variants/ resolves
-                var_src = self.templates_dir.parent / "query_variants"
-                if var_src.exists():
-                    shutil.copytree(var_src, temp_path / "query_variants")
-
-                # Use relative paths so the parameter values stay under
-                # dsqgen's internal 80-char PARAM_MAX_LEN buffer (r_params.c).
-                # Absolute Windows temp paths easily exceed 80 chars.
-                cmd.extend([f"{_opt}INPUT", "q/templates.lst"])
-                cmd.extend([f"{_opt}DIRECTORY", "q"])
-
-                # Set up environment for dsqgen
-                env = os.environ.copy()
-                # Point DSS_QUERY at the temp dir which contains both
-                # the q/ (query_templates) and query_variants/ symlinks
-                env["DSS_QUERY"] = str(temp_path)
-
-                # Copy required distribution files to temp directory
-                dsqgen_dir = Path(self.dsqgen_path).parent
-                dist_files = ["tpcds.dst", "tpcds.idx"]
-                for dist_file in dist_files:
-                    dist_src = dsqgen_dir / dist_file
-                    if dist_src.exists():
-                        shutil.copy2(dist_src, temp_path / dist_file)
-                    # Also check if file exists in tools_dir (source version)
-                    dist_src_alt = self.tools_dir / dist_file
-                    if not (temp_path / dist_file).exists() and dist_src_alt.exists():
-                        shutil.copy2(dist_src_alt, temp_path / dist_file)
-
-                result = subprocess.run(
-                    cmd,
-                    cwd=temp_dir,  # Use temp dir as working directory
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    env=env,  # Pass environment with DSS_QUERY
-                )
-
-            if result.returncode != 0:
-                error_output = result.stderr.strip() if result.stderr else "Unknown error"
-                stdout_output = result.stdout.strip() if result.stdout else ""
-                cmd_str = " ".join(cmd)
-                raise TPCDSError(
-                    f"dsqgen failed for query {query_id}{variant or ''} (exit code {result.returncode}): "
-                    f"Command: {cmd_str}\n"
-                    f"Stderr: {error_output}\n"
-                    f"Stdout: {stdout_output}"
-                )
-
-            # Extract SQL from stdout (dsqgen outputs copyright info after the query)
-            sql_output = result.stdout.strip()
-            if not sql_output:
-                raise TPCDSError(f"dsqgen returned empty output for query {query_id}{variant or ''}")
-
-            # Split on copyright line and take everything before it
-            lines = sql_output.split("\n")
-            sql_lines = []
-            for line in lines:
-                if "qgen2 Query Generator" in line or "Copyright Transaction" in line:
-                    break
-                sql_lines.append(line)
-
-            sql_query = "\n".join(sql_lines).strip()
-            if not sql_query:
-                raise TPCDSError(f"No SQL query found in dsqgen output for query {query_id}{variant or ''}")
-
-            # For multi-part queries, split by semicolon and return the appropriate part
+            result = self._run_dsqgen(cmd, opt, query_id, variant)
+            sql_query = self._extract_sql_from_output(result.stdout, query_id, variant)
             if is_multi_part:
-                # Split by semicolons to separate the queries
-                parts = sql_query.split(";")
-                # Filter out empty parts and strip whitespace
-                parts = [part.strip() for part in parts if part.strip()]
-
-                if len(parts) < 2:
-                    raise TPCDSError(f"Expected 2 queries for multi-part query {query_id}, but found {len(parts)}")
-
-                # Return the appropriate part: 'a' = first query, 'b' = second query
-                part_index = 0 if variant == "a" else 1
-                if part_index >= len(parts):
-                    raise TPCDSError(f"Query {query_id}{variant} not found - only {len(parts)} parts available")
-
-                return parts[part_index]
-
+                return self._select_multi_part(sql_query, query_id, variant)
             return sql_query
-
         except subprocess.CalledProcessError as e:
-            error_msg = e.stderr.strip() if e.stderr else "Unknown error"
-
-            # Handle specific dsqgen error types
-            if "File '" in error_msg and "not found" in error_msg:
-                # Template file not found - this is expected for variants
-                raise TPCDSError(f"Template not found for query {query_id}{variant or ''}: {error_msg}")
-            elif "Substitution" in error_msg and "is used before being initialized" in error_msg:
-                # Template substitution error - fail fast with clear error message
-                raise TPCDSError(
-                    f"Template substitution error for query {query_id}{variant or ''}: {error_msg}. "
-                    "This indicates an issue with the TPC-DS template or dsqgen configuration that needs to be fixed."
-                )
-            elif "template" in error_msg.lower():
-                raise TPCDSError(f"Template error for query {query_id}{variant or ''}: {error_msg}")
-            elif "parameter" in error_msg.lower():
-                raise TPCDSError(f"Parameter generation failed for query {query_id}{variant or ''}: {error_msg}")
-            else:
-                raise TPCDSError(f"dsqgen failed for query {query_id}{variant or ''}: {error_msg}")
+            raise self._wrap_dsqgen_called_process_error(e, query_id, variant) from e
         except subprocess.TimeoutExpired:
-            raise TPCDSError(f"dsqgen timed out for query {query_id}{variant or ''} (60s limit exceeded)")
+            raise TPCDSError(f"dsqgen timed out for query {query_id}{variant or ''} (60s limit exceeded)") from None
         except FileNotFoundError:
-            raise TPCDSError(f"dsqgen binary not found at {self.dsqgen_path}")
+            raise TPCDSError(f"dsqgen binary not found at {self.dsqgen_path}") from None
 
     def _detect_supported_dialects(self) -> set[str]:
         """Detect available SQL dialect templates.
@@ -520,7 +501,7 @@ class DSQGenBinary:
         try:
             return int(query_str), None
         except ValueError:
-            raise ValueError(f"Invalid query ID format: {query_id}. Expected int or string like '14a'")
+            raise ValueError(f"Invalid query ID format: {query_id}. Expected int or string like '14a'") from None
 
     def clear_cache(self) -> None:
         """Clear parameter and query caches."""

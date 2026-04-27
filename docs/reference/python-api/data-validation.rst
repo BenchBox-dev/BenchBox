@@ -470,7 +470,7 @@ See Also
 - :doc:`/usage/data-generation` - Data generation guide
 - :doc:`/reference/python-api/base` - Base benchmark interface
 - :doc:`cloud-storage` - Cloud storage utilities
-- :doc:`/TROUBLESHOOTING` - Troubleshooting guide
+- :doc:`/usage/troubleshooting` - Troubleshooting guide
 
 Standard Row Counts
 -------------------

@@ -71,7 +71,7 @@ def download_answers(benchmark: str, force: bool, show_cache_dir: bool) -> None:
         return
 
     if is_download_disabled():
-        console.print("[yellow]BENCHBOX_NO_DOWNLOAD is set — downloads are disabled.[/yellow]")
+        console.print("[yellow]BENCHBOX_NO_DOWNLOAD is set - downloads are disabled.[/yellow]")
         return
 
     console.print(f"[dim]Source URL: {get_answers_base_url()}[/dim]")

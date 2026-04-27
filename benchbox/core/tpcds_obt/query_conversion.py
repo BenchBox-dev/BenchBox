@@ -287,7 +287,7 @@ class TemplateLoader:
                 continue
             values = self._generate_ulist_values(name, expr)
             if values is None:
-                continue  # Unsupported generator — fall back to scalar default
+                continue  # Unsupported generator - fall back to scalar default
             for i, val in enumerate(values, 1):
                 self.body_sql = self.body_sql.replace(f"[{name}.{i}]", str(val))
             # Also replace bare [NAME] with first value (if present)
@@ -300,7 +300,7 @@ class TemplateLoader:
         """Generate distinct values for a ulist() expression. Returns None for unsupported generators."""
         match = re.match(r"ulist\(random\((\d+),(\d+)", expr, re.IGNORECASE)
         if not match:
-            return None  # dist() or rowcount() — not yet supported
+            return None  # dist() or rowcount() - not yet supported
         lo, hi = int(match.group(1)), int(match.group(2))
         count_match = re.search(r",\s*(\d+)\)\s*$", expr)
         if not count_match:
@@ -728,7 +728,7 @@ class QueryConverter:
                     column.set("table", None)
 
     # Mapping from column prefix to (dimension_table, default_role_prefix) for simple dimension lookups.
-    # IMPORTANT: Iteration order matters — "w_" must precede "web_" because both match "web_*" columns,
+    # IMPORTANT: Iteration order matters - "w_" must precede "web_" because both match "web_*" columns,
     # and warehouse columns (w_warehouse_*) should match "w_" first. Do not reorder these entries.
     _SIMPLE_DIMENSION_PREFIX_MAP: dict[str, tuple[str, str]] = {
         "p_": ("promotion", "promo_"),
@@ -771,7 +771,7 @@ class QueryConverter:
             role_prefix = role_map.get(alias_for_item or "", "item_")
             return self.mapper.map_dimension("item", lowered, role_prefix)
 
-        # Date dimension (fall through if not found — column may match later prefixes)
+        # Date dimension (fall through if not found - column may match later prefixes)
         if lowered.startswith("d_"):
             mapped = self._map_date_dimension_column(lowered, aliases, role_map)
             if mapped:
@@ -782,7 +782,7 @@ class QueryConverter:
         if mapped:
             return mapped
 
-        # Store with numeric suffix (s_store_name1 etc.) — checked before s_ prefix
+        # Store with numeric suffix (s_store_name1 etc.) - checked before s_ prefix
         if lowered.startswith("s_store_"):
             return self._map_store_numeric_suffix(lowered, aliases, role_map)
 
@@ -1043,6 +1043,15 @@ class QueryConverter:
 
     def _post_process(self, query_id: int, sql_text: str) -> str:
         """Apply query-specific fixes after AST rewriting."""
+        sql_text = self._post_process_fix_1(query_id, sql_text)
+        sql_text = self._post_process_fix_2(query_id, sql_text)
+        sql_text = self._post_process_fix_3(query_id, sql_text)
+        sql_text = self._post_process_fix_4(query_id, sql_text)
+        sql_text = self._post_process_fix_5(query_id, sql_text)
+        return sql_text
+
+    def _post_process_fix_1(self, query_id: int, sql_text: str) -> str:
+        """Query-specific fixes: Q2, Q8, Q14, Q16."""
         # Q2: Fix CTE column references for week sequence comparison
         if query_id == 2:
             # The wswscs CTE needs d_week_seq alias - it comes from joining with date_dim
@@ -1092,10 +1101,17 @@ class QueryConverter:
 
         # Q8: Value list V1 needs ca_zip column preserved - rewrite the subquery structure
         if query_id == 8:
-            # The subquery structure needs to expose ca_zip properly
+            # Fix outer CROSS JOIN SELECT: SELECT bill_addr_ca_zip → SELECT ca_zip
             sql_text = sql_text.replace(
                 "SELECT\n    bill_addr_ca_zip\n  FROM (",
                 "SELECT\n    ca_zip\n  FROM (",
+            )
+            # Fix INTERSECT branch: its derived table (A1) only exposes ca_zip, not
+            # bill_addr_ca_zip, so the INTERSECT SELECT must use ca_zip regardless of indentation.
+            sql_text = re.sub(
+                r"(\bINTERSECT\b\s+SELECT)\s+bill_addr_ca_zip\s+(FROM\s*\()",
+                r"\1\n    ca_zip\n  \2",
+                sql_text,
             )
             sql_text = sql_text.replace(
                 "SUBSTRING(obt.bill_addr_ca_zip, 1, 5) AS ca_zip",
@@ -1121,6 +1137,10 @@ class QueryConverter:
                 "obt.sale_id = obt.sale_id AND obt.has_return = 'Y' AND obt.channel = 'catalog'",
             )
 
+        return sql_text
+
+    def _post_process_fix_2(self, query_id: int, sql_text: str) -> str:
+        """Query-specific fixes: Q31, Q34/46/68, Q79."""
         # Q31: Fix CTE references - CTEs produce columns with obt. prefix but are referenced without
         if query_id == 31:
             # Fix ss CTE output column aliases
@@ -1210,6 +1230,10 @@ class QueryConverter:
                 "obt.ship_customer_sk = obt.bill_customer_c_customer_sk",
             )
 
+        return sql_text
+
+    def _post_process_fix_3(self, query_id: int, sql_text: str) -> str:
+        """Query-specific fixes: Q40, Q44, Q45, Q47/57, Q49, Q51."""
         # Q40: Interval syntax - fix "- 30 AS days"
         if query_id == 40:
             sql_text = re.sub(
@@ -1314,6 +1338,10 @@ class QueryConverter:
                 "ORDER BY\n  item_sk,\n  d_date",
             )
 
+        return sql_text
+
+    def _post_process_fix_4(self, query_id: int, sql_text: str) -> str:
+        """Query-specific fixes: Q58, Q59, Q65, Q73, Q66, Q71."""
         # Q58: Fix scalar subquery to use DISTINCT (OBT has multiple rows per date)
         if query_id == 58:
             # The innermost subquery returns week_seq for a date, but OBT has many rows per date.
@@ -1481,6 +1509,10 @@ class QueryConverter:
             sql_text = sql_text.replace("t_minute", "sold_time_t_minute")
             sql_text = sql_text.replace("sold_time_sold_time_t_minute", "sold_time_t_minute")
 
+        return sql_text
+
+    def _post_process_fix_5(self, query_id: int, sql_text: str) -> str:
+        """Query-specific fixes: Q75, Q77, Q78, Q90, Q94, Q95, Q97."""
         # Q75: CTE all_sales needs proper column output aliases
         if query_id == 75:
             # The outer CTE SELECT columns need aliases to match what's expected (d_year, i_brand_id, etc.)
@@ -1568,6 +1600,16 @@ class QueryConverter:
             sql_text = sql_text.replace(
                 "obt.sale_id = ws_wh.ws_order_number AND channel = 'web'",
                 "obt.sale_id = obt.sale_id AND obt.has_return = 'Y' AND obt.channel = 'web'",
+            )
+
+        # Q70: The IN subquery does `SELECT store_s_state FROM tmp1` but tmp1 only exposes
+        # `s_state` (aliased from store_s_state).  On strict SQL parsers (e.g. StarRocks)
+        # the unaliased reference is resolved as a correlated outer-query column, which is
+        # rejected outside of a WHERE clause.  Fix by selecting the alias instead.
+        if query_id == 70:
+            sql_text = sql_text.replace(
+                "SELECT\n        store_s_state\n      FROM (\n        SELECT\n          obt.store_s_state AS s_state",
+                "SELECT\n        s_state\n      FROM (\n        SELECT\n          obt.store_s_state AS s_state",
             )
 
         # Q97: Ambiguous item_sk between ssci and csci CTEs

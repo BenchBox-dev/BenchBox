@@ -294,11 +294,16 @@ Total time: {total_time:.2f}s  Average: {total_time / total_queries:.3f}s per qu
         metrics_table.add_row("Duration", f"{result.duration_seconds:.2f} seconds")
         metrics_table.add_row("Validation Status", result.validation_status or "UNKNOWN")
 
-        if result.power_at_size is not None:
-            metrics_table.add_row("Power@Size", f"{result.power_at_size:.2f}")
+        _compliance_class = getattr(result, "compliance_class", None)
+        _unofficial = _compliance_class in {"unofficial_nonstandard", "unofficial_subscale"}
+        if not _unofficial:
+            if result.power_at_size is not None:
+                metrics_table.add_row("Power@Size", f"{result.power_at_size:.2f}")
 
-        if result.throughput_at_size is not None:
-            metrics_table.add_row("Throughput@Size", f"{result.throughput_at_size:.2f}")
+            if result.throughput_at_size is not None:
+                metrics_table.add_row("Throughput@Size", f"{result.throughput_at_size:.2f}")
+        else:
+            metrics_table.add_row("TPC Metrics", f"[yellow]suppressed (compliance: {_compliance_class})[/yellow]")
 
         if result.geometric_mean_execution_time is not None:
             metrics_table.add_row("Geometric Mean", f"{result.geometric_mean_execution_time:.3f}s")

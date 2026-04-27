@@ -88,7 +88,7 @@ class TestLoadConfigFile:
         config_file = tmp_path / "config.yaml"
         config_data = {"key": "value", "nested": {"item": 123}}
 
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         result = load_config_file(config_file)
@@ -99,7 +99,7 @@ class TestLoadConfigFile:
         config_file = tmp_path / "config.json"
         config_data = {"key": "value", "nested": {"item": 123}}
 
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump(config_data, f)
 
         result = load_config_file(config_file)
@@ -110,7 +110,7 @@ class TestLoadConfigFile:
         config_file = tmp_path / "config"
         config_data = {"key": "value"}
 
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         result = load_config_file(config_file)
@@ -127,7 +127,7 @@ class TestLoadConfigFile:
         """Test loading invalid YAML raises ValueError."""
         config_file = tmp_path / "invalid.yaml"
 
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             f.write("invalid: yaml: content: [")
 
         with pytest.raises(ValueError, match="Failed to parse configuration file"):
@@ -152,7 +152,7 @@ class TestSaveConfigFile:
 
         save_config_file(config_data, config_file, "yaml")
 
-        with open(config_file) as f:
+        with open(config_file, encoding="utf-8") as f:
             loaded_data = yaml.safe_load(f)
 
         assert loaded_data == config_data
@@ -164,7 +164,7 @@ class TestSaveConfigFile:
 
         save_config_file(config_data, config_file, "json")
 
-        with open(config_file) as f:
+        with open(config_file, encoding="utf-8") as f:
             loaded_data = json.load(f)
 
         assert loaded_data == config_data
@@ -293,7 +293,8 @@ class TestBuildPlatformAdapterConfig:
     def test_build_clickhouse_config(self):
         """Test building ClickHouse config."""
         args = SimpleNamespace(
-            mode="server",
+            deployment_mode="server",
+            mode=None,
             data_path="/tmp/ch_data",
             host="clickhouse.example.com",
             port=9000,
@@ -305,7 +306,7 @@ class TestBuildPlatformAdapterConfig:
         result = build_platform_adapter_config("clickhouse", args)
 
         expected = {
-            "mode": "server",
+            "deployment_mode": "server",
             "data_path": "/tmp/ch_data",
             "host": "clickhouse.example.com",
             "port": 9000,
@@ -314,6 +315,41 @@ class TestBuildPlatformAdapterConfig:
             "secure": True,
         }
         assert result == expected
+
+    def test_build_clickhouse_config_normalizes_legacy_mode_alias(self):
+        """Legacy `mode` input should emit canonical deployment_mode."""
+        args = SimpleNamespace(
+            deployment_mode=None,
+            mode="embedded",
+            data_path="/tmp/ch_data",
+            host="clickhouse.example.com",
+            port=9000,
+            user="admin",
+            password="secret",
+            secure=True,
+        )
+
+        result = build_platform_adapter_config("clickhouse", args)
+
+        assert result["deployment_mode"] == "local"
+        assert "mode" not in result
+
+    def test_build_clickhouse_config_rejects_cloud_mode(self):
+        """Passing cloud deployment through config helpers must raise."""
+        args = SimpleNamespace(
+            deployment_mode="cloud",
+            mode=None,
+            embedded=None,
+            data_path=None,
+            host=None,
+            port=None,
+            user=None,
+            password=None,
+            secure=None,
+        )
+
+        with pytest.raises(ValueError, match="clickhouse-cloud"):
+            build_platform_adapter_config("clickhouse", args)
 
     def test_build_unknown_platform_config(self):
         """Test building config for unknown platform returns empty."""
@@ -572,7 +608,7 @@ class TestBuiltinDefaults:
         [
             ("duckdb", {"memory_limit": "4GB", "database_path": None}),
             ("databricks", {"catalog": "workspace", "schema": "benchbox"}),
-            ("clickhouse", {"mode": "local", "data_path": "/tmp/benchbox_ch_local"}),
+            ("clickhouse", {"deployment_mode": "local", "data_path": "/tmp/benchbox_ch_local"}),
             ("sqlite", {"timeout": 30.0, "database_path": None}),
             ("bigquery", {"location": "US", "dataset_id": "benchbox"}),
             ("redshift", {"port": 5439, "database": "dev"}),

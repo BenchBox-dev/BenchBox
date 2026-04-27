@@ -299,7 +299,7 @@ class DatabricksVolumeAdapter:
                 return data.read()
             return bytes(data)
         except Exception as e:  # pragma: no cover - provider specific
-            raise RuntimeError(f"Failed to read remote file: {remote_path}: {e}")
+            raise RuntimeError(f"Failed to read remote file: {remote_path}: {e}") from e
 
     def write_file(self, remote_path: str, content: bytes) -> None:
         path = self._to_ws_path(remote_path)
@@ -308,7 +308,7 @@ class DatabricksVolumeAdapter:
 
             self._ws.files.upload(path, BytesIO(content), overwrite=True)  # type: ignore[attr-defined]
         except Exception as e:  # pragma: no cover - provider specific
-            raise RuntimeError(f"Failed to write remote file: {remote_path}: {e}")
+            raise RuntimeError(f"Failed to write remote file: {remote_path}: {e}") from e
 
     def list_files(self, remote_path: str, pattern: str = "*") -> list[str]:
         path = self._to_ws_path(remote_path)
@@ -439,7 +439,7 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
     try:
         return CloudPath(str(path))  # type: ignore
     except Exception as e:
-        raise ValueError(f"Invalid cloud path format '{path}': {e}")
+        raise ValueError(f"Invalid cloud path format '{path}': {e}") from e
 
 
 def get_remote_fs_adapter(remote_path: str) -> RemoteFileSystemAdapter:

@@ -15,6 +15,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from benchbox.platforms.base import DriverIsolationCapability
+from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource
 from benchbox.platforms.snowflake import SnowflakeAdapter
 
 pytestmark = [
@@ -326,6 +327,21 @@ class TestSnowflakeAdapter:
         mock_connection.close.assert_called_once()
 
     @patch("benchbox.platforms.snowflake.snowflake")
+    def test_drop_database_connection_error_preserves_database_name(self, mock_snowflake):
+        """Connection failures should not be masked by an unbound database variable."""
+        mock_snowflake.connector.connect.side_effect = RuntimeError("connection failed")
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+
+        with pytest.raises(RuntimeError, match="Failed to drop Snowflake database TEST_DB: connection failed"):
+            adapter.drop_database()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
     def test_create_connection_success(self, mock_snowflake):
         """Test successful connection creation."""
         mock_connection = Mock()
@@ -362,7 +378,7 @@ class TestSnowflakeAdapter:
         mock_snowflake.connector.connect.return_value = mock_connection
 
         # Create a temporary key file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False, encoding="utf-8") as f:
             f.write("""-----BEGIN TEST KEY-----
 benchbox-fixture-key-material
 -----END TEST KEY-----""")
@@ -489,7 +505,7 @@ benchbox-fixture-key-material
         mock_benchmark = Mock()
 
         # Create temporary test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
             f.write("1|test1|\n2|test2|\n")
             temp_path = Path(f.name)
 
@@ -553,7 +569,8 @@ benchbox-fixture-key-material
             staging_root="s3://benchbox-stage-root",
         )
 
-        with patch.object(adapter, "_resolve_data_files", return_value={"lineitem": [Path("/tmp/lineitem.parquet")]}):
+        ds = DataSource(source_type="test", tables={"lineitem": [Path("/tmp/lineitem.parquet")]})
+        with patch.object(adapter, "_resolve_data_files", return_value=ds):
             table_stats, load_time, per_table_timings = adapter.create_external_tables(
                 benchmark=Mock(),
                 connection=mock_connection,
@@ -591,8 +608,9 @@ benchbox-fixture-key-material
             iceberg_external_volume="BENCHBOX_VOL",
         )
 
+        ds = DataSource(source_type="test", tables={"lineitem": [Path("/tmp/lineitem")]})
         with (
-            patch.object(adapter, "_resolve_data_files", return_value={"lineitem": [Path("/tmp/lineitem")]}),
+            patch.object(adapter, "_resolve_data_files", return_value=ds),
             patch.object(adapter, "_detect_external_table_format", return_value="iceberg"),
         ):
             table_stats, _, _ = adapter.create_external_tables(
@@ -623,8 +641,9 @@ benchbox-fixture-key-material
             staging_root="s3://benchbox-stage-root/external-prefix",
         )
 
+        ds = DataSource(source_type="test", tables={"lineitem": [Path("/tmp/lineitem")]})
         with (
-            patch.object(adapter, "_resolve_data_files", return_value={"lineitem": [Path("/tmp/lineitem")]}),
+            patch.object(adapter, "_resolve_data_files", return_value=ds),
             patch.object(adapter, "_detect_external_table_format", return_value="iceberg"),
             pytest.raises(ValueError, match="requires --platform-option iceberg_external_volume"),
         ):
@@ -648,8 +667,9 @@ benchbox-fixture-key-material
             staging_root="s3://benchbox-stage-root",
         )
 
+        ds = DataSource(source_type="test", tables={"lineitem": [Path("/tmp/lineitem")]})
         with (
-            patch.object(adapter, "_resolve_data_files", return_value={"lineitem": [Path("/tmp/lineitem")]}),
+            patch.object(adapter, "_resolve_data_files", return_value=ds),
             patch.object(adapter, "_detect_external_table_format", return_value="delta"),
         ):
             table_stats, _, _ = adapter.create_external_tables(
@@ -678,7 +698,8 @@ benchbox-fixture-key-material
             staging_root="s3://bucket/it's-a-path",
         )
 
-        with patch.object(adapter, "_resolve_data_files", return_value={"orders": [Path("/tmp/orders.parquet")]}):
+        ds = DataSource(source_type="test", tables={"orders": [Path("/tmp/orders.parquet")]})
+        with patch.object(adapter, "_resolve_data_files", return_value=ds):
             adapter.create_external_tables(
                 benchmark=Mock(),
                 connection=mock_connection,
@@ -741,9 +762,54 @@ benchbox-fixture-key-material
             database="TEST_DB",
             schema="PUBLIC",
         )
+        empty_ds = DataSource(source_type="test", tables={})
 
-        assert adapter._get_file_format_for_table("lineitem", Path("lineitem.tbl.1")) == "PUBLIC.BENCHBOX_TBL_FORMAT"
-        assert adapter._get_file_format_for_table("orders", Path("orders.csv")) == "PUBLIC.BENCHBOX_CSV_FORMAT"
+        assert (
+            adapter._get_file_format_for_table("lineitem", Path("lineitem.tbl.1"), empty_ds, NO_BENCHMARK)
+            == "PUBLIC.BENCHBOX_TBL_FORMAT"
+        )
+        assert (
+            adapter._get_file_format_for_table("orders", Path("orders.csv"), empty_ds, NO_BENCHMARK)
+            == "PUBLIC.BENCHBOX_CSV_FORMAT"
+        )
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_get_file_format_for_table_manifest_csv_with_tpc_dialect_picks_tbl_format(self, mock_snowflake):
+        """Manifest-declared TPC dialect on a .csv path must select BENCHBOX_TBL_FORMAT."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        file_path = Path("lineitem.csv")
+        ds = resolver_data_source("lineitem", file_path, {"csv_delimiter": "|", "csv_null_marker": ""})
+
+        assert (
+            adapter._get_file_format_for_table("lineitem", file_path, ds, NO_BENCHMARK) == "PUBLIC.BENCHBOX_TBL_FORMAT"
+        )
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_get_file_format_for_table_manifest_csv_without_null_marker_picks_csv_format(self, mock_snowflake):
+        """Manifest-declared CSV dialect without null_marker must select BENCHBOX_CSV_FORMAT."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        file_path = Path("orders.csv")
+        ds = resolver_data_source("orders", file_path, {"csv_delimiter": ",", "csv_null_marker": None})
+
+        assert adapter._get_file_format_for_table("orders", file_path, ds, NO_BENCHMARK) == "PUBLIC.BENCHBOX_CSV_FORMAT"
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_parse_copy_results_logs_failed_and_unparseable_rows(self, mock_snowflake, caplog):

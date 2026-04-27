@@ -59,7 +59,8 @@ def _build_lakesail_config() -> DatabaseConfig:
             "driver_memory": "4g",
             "shuffle_partitions": 200,
             "adaptive_enabled": True,
-            "disable_cache": True,
+            # disable_cache defaults to True for LakeSail; session-level cache suppression is safe,
+            # and the adapter skips the unsupported Spark Connect clearCache() call.
         },
     )
 

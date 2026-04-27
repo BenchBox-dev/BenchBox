@@ -1,7 +1,7 @@
 """Behavior-verifying tests for credential management using real files.
 
 Every test creates real YAML/JSON credential files in tmp_path and loads
-them through a real CredentialManager — no MagicMock on the credential path.
+them through a real CredentialManager - no MagicMock on the credential path.
 
 Replaces the mock-heavy coverage tests:
 - test_snowflake_coverage.py

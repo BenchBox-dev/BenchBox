@@ -1,0 +1,133 @@
+{
+  "chart": "distribution_box",
+  "version": 1,
+  "cases": [
+    {
+      "id": "five_values",
+      "input": {
+        "values": [
+          10,
+          20,
+          30,
+          40,
+          50
+        ]
+      },
+      "expected": {
+        "min": 10,
+        "q1": 20,
+        "median": 30,
+        "q3": 40,
+        "max": 50
+      }
+    },
+    {
+      "id": "single_value",
+      "input": {
+        "values": [
+          42
+        ]
+      },
+      "expected": {
+        "min": 42,
+        "q1": 42,
+        "median": 42,
+        "q3": 42,
+        "max": 42
+      }
+    },
+    {
+      "id": "two_values",
+      "input": {
+        "values": [
+          10,
+          20
+        ]
+      },
+      "expected": {
+        "min": 10,
+        "q1": 12.5,
+        "median": 15.0,
+        "q3": 17.5,
+        "max": 20
+      }
+    },
+    {
+      "id": "three_values",
+      "input": {
+        "values": [
+          5,
+          15,
+          25
+        ]
+      },
+      "expected": {
+        "min": 5,
+        "q1": 10.0,
+        "median": 15,
+        "q3": 20.0,
+        "max": 25
+      }
+    },
+    {
+      "id": "nulls_filtered",
+      "input": {
+        "values": [
+          null,
+          10,
+          null,
+          30,
+          50
+        ]
+      },
+      "expected": {
+        "min": 10,
+        "q1": 20.0,
+        "median": 30,
+        "q3": 40.0,
+        "max": 50
+      }
+    },
+    {
+      "id": "all_null",
+      "input": {
+        "values": [
+          null,
+          null
+        ]
+      },
+      "expected": null
+    },
+    {
+      "id": "empty",
+      "input": {
+        "values": []
+      },
+      "expected": null
+    },
+    {
+      "id": "real_latencies_ms",
+      "input": {
+        "values": [
+          12.4,
+          34.8,
+          8.1,
+          55.6,
+          22.3,
+          18.9,
+          41.2,
+          9.7,
+          67.5,
+          15.3
+        ]
+      },
+      "expected": {
+        "min": 8.1,
+        "q1": 13.125,
+        "median": 20.6,
+        "q3": 39.6,
+        "max": 67.5
+      }
+    }
+  ]
+}

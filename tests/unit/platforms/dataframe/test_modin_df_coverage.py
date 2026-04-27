@@ -95,7 +95,6 @@ class TestModinCoverage:
         fake_mpd.merge = lambda *args, **kwargs: {"merged": True, **kwargs}
 
         monkeypatch.setattr(mod, "mpd", fake_mpd)
-        monkeypatch.setattr(mod, "is_tpc_format", lambda p: str(p).endswith(".tbl"))
 
         adapter = mod.ModinDataFrameAdapter.__new__(mod.ModinDataFrameAdapter)
         adapter.engine = "ray"

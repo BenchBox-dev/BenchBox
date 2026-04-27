@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -25,9 +24,9 @@ def runner() -> CliRunner:
 @pytest.mark.parametrize(
     ("benchmark_name", "expected_path"),
     [
-        ("all", str(Path("/cache/answers"))),
-        ("tpch", str(Path("/cache/answers/tpch"))),
-        ("tpcds", str(Path("/cache/answers/tpcds"))),
+        ("all", "/cache/answers"),
+        ("tpch", "/cache/answers/tpch"),
+        ("tpcds", "/cache/answers/tpcds"),
     ],
 )
 def test_show_cache_dir_prints_requested_cache_path(
@@ -43,7 +42,7 @@ def test_show_cache_dir_prints_requested_cache_path(
         result = runner.invoke(download_answers, ["--benchmark", benchmark_name, "--show-cache-dir"])
 
     assert result.exit_code == 0
-    assert expected_path in result.output
+    assert expected_path in result.output.replace("\\", "/")
 
 
 def test_disabled_download_short_circuits_before_fetching(runner: CliRunner) -> None:
@@ -85,7 +84,7 @@ def test_download_tpch_success_reports_cache_location(runner: CliRunner) -> None
 
     assert result.exit_code == 0
     assert "Downloading TPC-H answer files" in result.output
-    assert str(Path("/cache/tpch")) in result.output
+    assert "/cache/tpch" in result.output.replace("\\", "/")
 
 
 def test_download_tpch_failure_returns_exit_code_one(runner: CliRunner) -> None:
@@ -110,7 +109,7 @@ def test_download_tpcds_success_reports_cache_location(runner: CliRunner) -> Non
 
     assert result.exit_code == 0
     assert "Downloading TPC-DS answer files" in result.output
-    assert str(Path("/cache/tpcds")) in result.output
+    assert "/cache/tpcds" in result.output.replace("\\", "/")
 
 
 def test_download_tpcds_failure_returns_exit_code_one(runner: CliRunner) -> None:

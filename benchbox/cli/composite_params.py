@@ -66,7 +66,7 @@ class CompressionConfig:
                 if comp_type == "gzip" and not (1 <= level <= 9):
                     raise click.BadParameter(f"gzip level must be 1-9, got {level}")
             except ValueError:
-                raise click.BadParameter(f"Invalid compression level '{parts[1]}', expected integer")
+                raise click.BadParameter(f"Invalid compression level '{parts[1]}', expected integer") from None
 
         return cls(type=comp_type, level=level, enabled=(comp_type != "none"))
 
@@ -147,7 +147,7 @@ class PlanCaptureConfig:
                     if not (0.0 <= config.sample_rate <= 1.0):
                         raise click.BadParameter(f"sample rate must be 0.0-1.0, got {val}")
                 except ValueError:
-                    raise click.BadParameter(f"Invalid sample rate '{val}', expected float")
+                    raise click.BadParameter(f"Invalid sample rate '{val}', expected float") from None
 
             elif key == "first":
                 try:
@@ -155,7 +155,7 @@ class PlanCaptureConfig:
                     if config.first_n < 1:
                         raise click.BadParameter(f"first must be positive, got {val}")
                 except ValueError:
-                    raise click.BadParameter(f"Invalid first value '{val}', expected integer")
+                    raise click.BadParameter(f"Invalid first value '{val}', expected integer") from None
 
             elif key == "queries":
                 # Split query IDs

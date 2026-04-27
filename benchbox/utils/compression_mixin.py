@@ -15,6 +15,20 @@ from .compression import CompressionError, CompressionManager
 from .file_format import strip_compression_suffix
 from .printing import emit
 
+COMPRESSION_KWARG_KEYS = frozenset(
+    {
+        "compress_data",
+        "compression_type",
+        "compression_level",
+        "uncompressed_output",
+    }
+)
+
+
+def extract_compression_kwargs(kwargs: dict) -> dict:
+    """Extract compression-related kwargs for forwarding to CompressionMixin classes."""
+    return {key: value for key, value in kwargs.items() if key in COMPRESSION_KWARG_KEYS}
+
 
 class CompressionMixin:
     """Mixin that adds compression capabilities to data generators."""
@@ -101,7 +115,12 @@ class CompressionMixin:
         path = Path(path)
 
         if not self.compress_data or self.compression_type == "none":
-            return open(path, mode)
+            # Use newline="" for text mode so that csv.writer's own \r\n line
+            # endings are written verbatim. Without this, Python's text-mode
+            # \n→\r\n translation combines with csv.writer's \r\n to produce
+            # \r\r\n (double carriage-return) on Windows.
+            kwargs: dict = {"newline": ""} if "b" not in mode else {}
+            return open(path, mode, **kwargs)
 
         # Add compression extension if not already present
         compressor = self.get_compressor()

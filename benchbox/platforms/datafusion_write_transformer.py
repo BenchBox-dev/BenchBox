@@ -5,6 +5,12 @@ CREATE EXTERNAL TABLE + INSERT INTO patterns. Called by the DataFusion
 adapter's preprocess_operation_sql() to keep platform-specific logic
 in the adapter layer rather than the core benchmark.
 
+Import discipline: DataFusion adapter imports ``transform_write_sql`` lazily inside
+``preprocess_operation_sql``. Tests should patch this source-module name
+(``benchbox.platforms.datafusion_write_transformer.transform_write_sql``) before
+calling the adapter method; there is no stable module-level binding on
+``benchbox.platforms.datafusion`` to patch.
+
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.

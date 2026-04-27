@@ -295,7 +295,7 @@ class PlatformManager:
             return {"enabled_platforms": list(PlatformRegistry.get_all_platform_metadata().keys())}
 
         try:
-            with open(self.config_path) as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
             console.print(f"[yellow]Warning: Failed to load platform config: {e}[/yellow]")
@@ -305,7 +305,7 @@ class PlatformManager:
         """Save platform configuration to file."""
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with open(self.config_path, "w") as f:
+            with open(self.config_path, "w", encoding="utf-8") as f:
                 yaml.dump(self._config, f, default_flow_style=False)
         except Exception as e:
             console.print(f"[red]Error: Failed to save platform config: {e}[/red]")
@@ -536,7 +536,7 @@ class PlatformManager:
             self.console.print(table)
             self.console.print()
             self.console.print("[dim]Usage: benchbox run --platform <platform>:<mode> --benchmark tpch[/dim]")
-            self.console.print("[dim]Example: benchbox run --platform clickhouse:cloud --benchmark tpch[/dim]")
+            self.console.print("[dim]Example: benchbox run --platform clickhouse-server --benchmark tpch[/dim]")
         else:
             self.console.print("[yellow]No platforms with deployment modes configured.[/yellow]")
 
@@ -583,7 +583,7 @@ def list_platforms(show_all: bool, format: str, show_deployments: bool):
     """List all available platforms and their status.
 
     Use --show-deployments to see available deployment modes for platforms
-    that support multiple deployment targets (e.g., clickhouse:local, clickhouse:cloud).
+    that support multiple deployment targets (e.g., clickhouse-local, clickhouse-server).
     """
     manager = get_platform_manager()
 

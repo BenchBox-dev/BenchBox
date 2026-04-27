@@ -36,7 +36,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import contextlib
-import json
 import re
 import struct
 import warnings
@@ -53,8 +52,9 @@ if TYPE_CHECKING:
     )
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message, get_package_install_message
-from ..utils.file_format import get_delimiter_for_file, is_parquet_format, is_tpc_format
+from ..utils.file_format import is_parquet_format
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
 
 # Microsoft Fabric uses T-SQL dialect (subset of SQL Server T-SQL)
 FABRIC_DIALECT = "tsql"
@@ -740,7 +740,7 @@ class FabricWarehouseAdapter(PlatformAdapter):
         cursor = connection.cursor()
         try:
             cursor.execute(f"DROP TABLE IF EXISTS {qualified_name}")
-            self.logger.debug(f"Dropped table {qualified_name}")
+            self.logger.info(f"Dropped table {qualified_name}")
         finally:
             cursor.close()
 
@@ -805,6 +805,32 @@ class FabricWarehouseAdapter(PlatformAdapter):
         onelake_uri = f"https://onelake.dfs.fabric.microsoft.com/{self.onelake_workspace}/{warehouse_path}/{file_name}"
         return onelake_uri
 
+    def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> DataSource:
+        """Resolve benchmark data files via DataSourceResolver."""
+        from benchbox.platforms.base.data_loading import DataSourceResolver
+
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
+        data_source = resolver.resolve(benchmark, data_dir)
+        if not data_source or not data_source.tables:
+            raise ValueError(f"No data files found in {data_dir}")
+        return data_source
+
+    @staticmethod
+    def _normalize_existing_files(file_paths: Any) -> list[Path]:
+        """Normalize table file inputs to existing, non-empty local paths."""
+        normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
+        valid_files: list[Path] = []
+        for file_path in normalized_paths:
+            path = Path(file_path)
+            if path.is_file() and path.stat().st_size > 0:
+                valid_files.append(path)
+        return valid_files
+
     def load_data(
         self,
         benchmark: Any,
@@ -830,31 +856,13 @@ class FabricWarehouseAdapter(PlatformAdapter):
         self.log_operation_start("Fabric Warehouse data loading")
         start_time = mono_time()
         table_stats: dict[str, int] = {}
-        tables_to_load = []
-
-        # Discover tables from benchmark or manifest
-        if hasattr(benchmark, "tables"):
-            tables_to_load = list(benchmark.tables.keys())
-        else:
-            manifest_path = data_dir / "_datagen_manifest.json"
-            if manifest_path.exists():
-                with open(manifest_path) as f:
-                    manifest = json.load(f)
-                tables_to_load = list(manifest.get("tables", {}).keys())
-
-        if not tables_to_load:
-            raise ValueError(f"No tables found in benchmark or manifest at {data_dir}")
+        data_source = self._resolve_data_files(benchmark, data_dir)
 
         # Try OneLake + COPY INTO first (can be disabled via config)
         use_onelake = getattr(self, "use_onelake", True)
 
-        for table_name in tables_to_load:
-            # Find data files for this table
-            data_files = (
-                list(data_dir.glob(f"{table_name}*.tbl"))
-                + list(data_dir.glob(f"{table_name}*.dat"))
-                + list(data_dir.glob(f"{table_name}*.csv"))
-            )
+        for table_name, file_paths in data_source.tables.items():
+            data_files = self._normalize_existing_files(file_paths)
 
             if not data_files:
                 self.logger.warning(f"No data files found for table {table_name}")
@@ -863,9 +871,9 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
             try:
                 if use_onelake:
-                    row_count = self._load_data_via_onelake(connection, table_name, data_files)
+                    row_count = self._load_data_via_onelake(connection, table_name, data_files, data_source, benchmark)
                 else:
-                    row_count = self._load_data_direct(connection, table_name, data_files)
+                    row_count = self._load_data_direct(connection, table_name, data_files, data_source, benchmark)
 
                 table_stats[table_name] = row_count
                 self.logger.info(f"Loaded {row_count:,} rows into {table_name}")
@@ -885,7 +893,7 @@ class FabricWarehouseAdapter(PlatformAdapter):
                     # Fallback to direct INSERT
                     try:
                         self.logger.info(f"Falling back to direct INSERT for {table_name}")
-                        row_count = self._load_data_direct(connection, table_name, data_files)
+                        row_count = self._load_data_direct(connection, table_name, data_files, data_source, benchmark)
                         table_stats[table_name] = row_count
                     except Exception as fallback_error:
                         self.logger.error(f"Direct INSERT also failed: {fallback_error}")
@@ -908,6 +916,8 @@ class FabricWarehouseAdapter(PlatformAdapter):
         connection: Any,
         table_name: str,
         data_files: list[Path],
+        data_source: DataSource | None = None,
+        benchmark: Any = None,
     ) -> int:
         """Load data via OneLake and COPY INTO.
 
@@ -922,6 +932,8 @@ class FabricWarehouseAdapter(PlatformAdapter):
         total_rows = 0
         qualified_table = f"[{self.schema}].[{table_name}]"
         cursor = connection.cursor()
+        ds = data_source or DataSource(source_type="fabric_onelake", tables={})
+        bm = benchmark if benchmark is not None else NO_BENCHMARK
 
         try:
             for data_file in data_files:
@@ -931,16 +943,14 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 # Upload to OneLake
                 onelake_uri = self._upload_to_onelake(data_file, table_name)
 
-                # Determine file format and delimiter
+                # Determine file format and delimiter via resolver
                 if is_parquet_format(data_file):
                     file_type = "PARQUET"
                     field_terminator = None
-                elif is_tpc_format(data_file):
-                    file_type = "CSV"
-                    field_terminator = "|"
                 else:
+                    dialect = resolve_csv_dialect(ds, table_name, data_file, bm)
                     file_type = "CSV"
-                    field_terminator = get_delimiter_for_file(data_file)
+                    field_terminator = dialect.delimiter
 
                 # Build COPY INTO command
                 if file_type == "PARQUET":
@@ -988,6 +998,8 @@ class FabricWarehouseAdapter(PlatformAdapter):
         connection: Any,
         table_name: str,
         data_files: list[Path],
+        data_source: DataSource | None = None,
+        benchmark: Any = None,
     ) -> int:
         """Load data via direct INSERT statements.
 
@@ -1007,14 +1019,17 @@ class FabricWarehouseAdapter(PlatformAdapter):
         qualified_table = f"[{self.schema}].[{table_name}]"
         cursor = connection.cursor()
         batch_size = 1000
+        ds = data_source or DataSource(source_type="fabric_direct", tables={})
+        bm = benchmark if benchmark is not None else NO_BENCHMARK
 
         try:
             for data_file in data_files:
                 if data_file.stat().st_size == 0:
                     continue
 
-                # Determine delimiter
-                delimiter = get_delimiter_for_file(data_file)
+                # Determine delimiter via resolver
+                dialect = resolve_csv_dialect(ds, table_name, data_file, bm)
+                delimiter = dialect.delimiter
 
                 with open(data_file, encoding="utf-8") as f:
                     reader = csv.reader(f, delimiter=delimiter)
@@ -1209,14 +1224,20 @@ class FabricWarehouseAdapter(PlatformAdapter):
         """
         # Add schema prefix if not present
         if "[" not in table_sql and self.schema:
-            # Find table name and add schema
-            match = re.search(r"CREATE\s+TABLE\s+(\w+)", table_sql, re.IGNORECASE)
-            if match:
-                table_name = match.group(1)
-                table_sql = table_sql.replace(
-                    f"CREATE TABLE {table_name}",
-                    f"CREATE TABLE [{self.schema}].[{table_name}]",
-                )
+            schema = self.schema
+
+            def _add_schema(m: re.Match) -> str:
+                ifne = m.group(1) or ""
+                name = m.group(2).strip("[]")
+                return f"CREATE TABLE {ifne}[{schema}].[{name}]"
+
+            table_sql = re.sub(
+                r"CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?(\[?\w+\]?)",
+                _add_schema,
+                table_sql,
+                count=1,
+                flags=re.IGNORECASE,
+            )
 
         return table_sql
 

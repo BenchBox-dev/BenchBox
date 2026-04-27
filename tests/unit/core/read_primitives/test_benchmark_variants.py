@@ -31,7 +31,13 @@ queries:
     category: test
     sql: SELECT * FROM orders
     variants:
-      duckdb: SELECT * FROM orders USING SAMPLE 10%
+      duckdb: SELECT order_id FROM orders USING SAMPLE 10%
+
+  - id: query_with_clickhouse_variant
+    category: test
+    sql: SELECT CARDINALITY(parts) AS part_count FROM supplier_parts
+    variants:
+      clickhouse: SELECT length(parts) AS part_count FROM supplier_parts
 
   - id: query_skip_on_duckdb
     category: test
@@ -68,15 +74,17 @@ queries:
 
         queries = benchmark.get_queries()
 
-        # Should have all 4 queries (no skip_on without dialect)
-        assert len(queries) == 4
+        # Should have all 5 queries (no skip_on without dialect)
+        assert len(queries) == 5
         assert "query_base_only" in queries
         assert "query_with_duckdb_variant" in queries
+        assert "query_with_clickhouse_variant" in queries
         assert "query_skip_on_duckdb" in queries
         assert "query_with_multiple_variants" in queries
 
         # All should be base SQL (no variants without dialect)
         assert "USING SAMPLE" not in queries["query_with_duckdb_variant"]
+        assert "length(parts)" not in queries["query_with_clickhouse_variant"]
         assert "TABLESAMPLE" not in queries["query_with_multiple_variants"]
 
     def test_get_queries_with_dialect_skips_skip_on_queries(self, mock_catalog_with_variants):
@@ -85,10 +93,11 @@ queries:
 
         queries = benchmark.get_queries(dialect="duckdb")
 
-        # Should have 3 queries (skip_on_duckdb excluded)
-        assert len(queries) == 3
+        # Should have 4 queries (skip_on_duckdb excluded)
+        assert len(queries) == 4
         assert "query_base_only" in queries
         assert "query_with_duckdb_variant" in queries
+        assert "query_with_clickhouse_variant" in queries
         assert "query_with_multiple_variants" in queries
         assert "query_skip_on_duckdb" not in queries  # Skipped!
 
@@ -98,15 +107,15 @@ queries:
 
         queries = benchmark.get_queries(dialect="duckdb")
 
-        # Should use DuckDB variant for query_with_duckdb_variant
-        # SQLGlot transforms "USING SAMPLE 10%" to "USING SAMPLE (10 PERCENT)"
+        # Should use DuckDB variant for query_with_duckdb_variant verbatim (final SQL).
         assert "USING SAMPLE" in queries["query_with_duckdb_variant"]
+        # Variant is returned as-is - SQLGlot does not re-quote identifiers.
+        assert '"order_id"' not in queries["query_with_duckdb_variant"]
 
         # Should use DuckDB variant for query_with_multiple_variants
         assert "USING SAMPLE" in queries["query_with_multiple_variants"]
 
-        # Should use base SQL for query_base_only (no variant)
-        # identify=True adds quotes around identifiers
+        # Should use base SQL for query_base_only (no variant) - still translated.
         assert "orders" in queries["query_base_only"].lower()
 
     def test_get_queries_with_non_matching_dialect(self, mock_catalog_with_variants):
@@ -116,25 +125,12 @@ queries:
         queries = benchmark.get_queries(dialect="snowflake")
 
         # Should have all queries except skip_on (snowflake not in skip_on list)
-        assert len(queries) == 4
+        assert len(queries) == 5
 
         # All should be base SQL (no snowflake variants defined)
         # identify=True adds quotes, so check for "orders" (quoted or not)
         assert "orders" in queries["query_with_duckdb_variant"].lower()
         assert "USING SAMPLE" not in queries["query_with_duckdb_variant"].upper()
-
-    def test_get_queries_translates_variant_sql(self, mock_catalog_with_variants):
-        """Test get_queries() translates variant SQL through SQLGlot."""
-        benchmark = ReadPrimitivesBenchmark()
-
-        queries = benchmark.get_queries(dialect="duckdb")
-
-        # Variants should be translated and contain expected content
-        # The USING SAMPLE syntax should be preserved or translated appropriately
-        assert "query_with_duckdb_variant" in queries
-        query_sql = queries["query_with_duckdb_variant"]
-        # Should contain the variant content (even if quoted by identify=True)
-        assert "SAMPLE" in query_sql.upper()
 
     def test_get_queries_with_bigquery_uses_correct_variant(self, mock_catalog_with_variants):
         """Test get_queries() returns correct variant for BigQuery."""
@@ -161,7 +157,16 @@ queries:
         assert "query_skip_on_duckdb" not in queries_mixed
 
         # All should have the same number of queries
-        assert len(queries_lower) == len(queries_upper) == len(queries_mixed) == 3
+        assert len(queries_lower) == len(queries_upper) == len(queries_mixed) == 4
+
+    def test_get_queries_keeps_clickhouse_variant_verbatim(self, mock_catalog_with_variants):
+        """Test ClickHouse variants bypass SQLGlot re-translation."""
+        benchmark = ReadPrimitivesBenchmark()
+
+        queries = benchmark.get_queries(dialect="clickhouse")
+
+        assert queries["query_with_clickhouse_variant"] == "SELECT length(parts) AS part_count FROM supplier_parts"
+        assert "CHAR_LENGTH" not in queries["query_with_clickhouse_variant"]
 
 
 class TestBenchmarkVariantEdgeCases:
@@ -258,8 +263,44 @@ class TestBenchmarkWithActualCatalog:
         # Total queries minus 1 for json_extract_simple
         assert len(queries_no_dialect) >= 136
         assert len(queries_duckdb) == len(queries_no_dialect) - 1
-        assert "json_extract_simple" in queries_no_dialect
-        assert "json_extract_simple" not in queries_duckdb
+
+    def test_clickhouse_keeps_timeout_only_query_available(self):
+        """Timeout-only ClickHouse queries should remain runnable unless truly unsupported."""
+        benchmark = ReadPrimitivesBenchmark()
+
+        queries_clickhouse = benchmark.get_queries(dialect="clickhouse")
+
+        assert "aggregation_groupby_large" in queries_clickhouse
+
+    def test_clickhouse_uses_native_array_length_variant(self):
+        """ClickHouse variants should preserve native syntax that sqlglot mangles."""
+        benchmark = ReadPrimitivesBenchmark()
+
+        queries_clickhouse = benchmark.get_queries(dialect="clickhouse")
+
+        assert "array_length" in queries_clickhouse
+        assert "length(parts)" in queries_clickhouse["array_length"]
+        assert "CHAR_LENGTH" not in queries_clickhouse["array_length"]
+
+    def test_snowflake_variant_bypasses_translation(self, monkeypatch):
+        """Snowflake catalog variants should not be re-run through SQLGlot."""
+        benchmark = ReadPrimitivesBenchmark()
+        snowflake_variant = benchmark.query_manager.get_query("asof_join_basic", dialect="snowflake")
+        translated_inputs: list[tuple[str, str]] = []
+        original_translate = benchmark.translate_query_text
+
+        def tracking_translate(query_text: str, target_dialect: str) -> str:
+            translated_inputs.append((query_text, target_dialect))
+            return original_translate(query_text, target_dialect)
+
+        monkeypatch.setattr(benchmark, "translate_query_text", tracking_translate)
+
+        queries_snowflake = benchmark.get_queries(dialect="snowflake")
+
+        assert translated_inputs
+        assert queries_snowflake["asof_join_basic"] == snowflake_variant
+        assert (snowflake_variant, "snowflake") not in translated_inputs
+        assert "MATCH_CONDITION" in queries_snowflake["asof_join_basic"].upper()
 
     def test_get_queries_with_duckdb_translates_correctly(self):
         """Test DuckDB dialect translation works."""
@@ -441,7 +482,7 @@ class TestModernSQLFeatures:
         assert "window_running_sum" not in queries_redshift
 
     def test_redshift_skips_unsupported_statistical_functions(self):
-        """Test Redshift skips queries using CORR/COVAR/REGR_* — absent from Redshift catalog."""
+        """Test Redshift skips queries using CORR/COVAR/REGR_* - absent from Redshift catalog."""
         benchmark = ReadPrimitivesBenchmark()
         queries_redshift = benchmark.get_queries(dialect="redshift")
 

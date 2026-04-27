@@ -22,16 +22,24 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+import time
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any
 
-from .postgresql import POSTGRES_DIALECT, PostgreSQLAdapter
+from .postgresql import POSTGRES_DIALECT, PostgreSQLAdapter, _build_postgres_connection_kwargs
+
+if TYPE_CHECKING:
+    from benchbox.core.platform_registry import PlatformInfo
+    from benchbox.core.schemas import DatabaseConfig
 
 logger = logging.getLogger(__name__)
 
 try:
-    import psycopg2
+    import psycopg
+    from psycopg import sql as psycopg_sql
 except ImportError:
-    psycopg2 = None
+    psycopg = None
+    psycopg_sql = None  # type: ignore[assignment]
 
 
 class PgDuckDBAdapter(PostgreSQLAdapter):
@@ -116,57 +124,14 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> PgDuckDBAdapter:
         """Create pg_duckdb adapter from unified configuration."""
-        adapter_config = {}
-
-        # Connection parameters (inherited from PostgreSQL)
-        adapter_config["host"] = config.get("host", "localhost")
-        adapter_config["port"] = config.get("port", 5432)
-        adapter_config["username"] = config.get("username", "postgres")
-        adapter_config["password"] = config.get("password")
-        adapter_config["schema"] = config.get("schema", "public")
-        adapter_config["sslmode"] = config.get("sslmode", "prefer")
-
-        # Database name - use provided or generate from benchmark config
-        if config.get("database"):
-            adapter_config["database"] = config["database"]
-        elif config.get("benchmark") and config.get("scale_factor") is not None:
-            from benchbox.utils.scale_factor import format_benchmark_name
-
-            benchmark_name = format_benchmark_name(config["benchmark"], config["scale_factor"])
-            adapter_config["database"] = f"benchbox_{benchmark_name}".lower().replace("-", "_")
-        else:
-            adapter_config["database"] = "benchbox"
-
-        # Admin database for CREATE/DROP DATABASE operations
-        adapter_config["admin_database"] = config.get("admin_database", "postgres")
-
-        # Performance settings (inherited from PostgreSQL)
-        adapter_config["work_mem"] = config.get("work_mem", "256MB")
-        adapter_config["maintenance_work_mem"] = config.get("maintenance_work_mem", "512MB")
-        adapter_config["effective_cache_size"] = config.get("effective_cache_size", "1GB")
-        adapter_config["max_parallel_workers_per_gather"] = config.get("max_parallel_workers_per_gather", 2)
-
-        # Connection pool settings
-        adapter_config["connect_timeout"] = config.get("connect_timeout", 10)
-        adapter_config["statement_timeout"] = config.get("statement_timeout", 0)
-
-        # pg_duckdb-specific settings
+        adapter_config = _build_postgres_connection_kwargs(config)
         adapter_config["force_execution"] = config.get("force_execution", True)
         adapter_config["postgres_scan_threads"] = config.get("postgres_scan_threads", 0)
-
-        # Deployment mode and MotherDuck support
+        adapter_config["compare_native"] = config.get("compare_native", False)
+        adapter_config["duckdb_db_path"] = config.get("duckdb_db_path")
         adapter_config["deployment_mode"] = config.get("deployment_mode", "self-hosted")
         if config.get("motherduck_token"):
             adapter_config["motherduck_token"] = config["motherduck_token"]
-
-        # Force recreate
-        adapter_config["force_recreate"] = config.get("force", False)
-
-        # Pass through other config
-        for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
-            if key in config:
-                adapter_config[key] = config[key]
-
         return cls(**adapter_config)
 
     def __init__(self, **config):
@@ -193,6 +158,15 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
         # pg_duckdb-specific configuration
         self.force_execution = config.get("force_execution", True)
         self.postgres_scan_threads = config.get("postgres_scan_threads", 0)
+
+        # Native DuckDB comparison (triggered by --platform-option compare_native=true).
+        # from_config() normalizes the string "true"/"false" to bool; direct callers
+        # may pass either type, so coerce here once.
+        raw_compare = config.get("compare_native", False)
+        self.compare_native: bool = (
+            str(raw_compare).lower() == "true" if isinstance(raw_compare, str) else bool(raw_compare)
+        )
+        self.duckdb_db_path: str | None = config.get("duckdb_db_path")
 
         # MotherDuck token (set in _configure_motherduck_mode or from env)
         self.motherduck_token = config.get("motherduck_token") or os.environ.get("MOTHERDUCK_TOKEN")
@@ -256,9 +230,11 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
 
             # Configure MotherDuck if in motherduck mode
             if self.deployment_mode == "motherduck" and self.motherduck_token:
-                # Use psycopg2 escaping to prevent SQL injection via token value
-                escaped_token = cursor.mogrify("%s", (self.motherduck_token,)).decode()
-                cursor.execute(f"SET duckdb.motherduck_token = {escaped_token}")
+                cursor.execute(
+                    psycopg_sql.SQL("SET duckdb.motherduck_token = {}").format(
+                        psycopg_sql.Literal(self.motherduck_token)
+                    )
+                )
                 self.logger.info("Configured MotherDuck token for hybrid queries")
 
             conn.commit()
@@ -326,6 +302,114 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
 
         return platform_info
 
+    def run_native_comparison(
+        self,
+        query_results: list[dict],
+        query_sql_map: dict[str, str],
+        scale_factor: float,
+    ) -> Any:
+        """Compare pg_duckdb query timings against native DuckDB execution.
+
+        Replays each query from query_results on a native DuckDB connection,
+        then computes per-query timing deltas. Triggered via
+        --platform-option compare_native=true (self.compare_native must be True).
+
+        The native DuckDB connection uses self.duckdb_db_path when provided
+        (--platform-option duckdb_db_path=/path/to/db.duckdb), otherwise opens
+        an in-memory database. The in-memory path is useful for structural
+        timing comparisons (empty tables); point to a populated DuckDB file for
+        meaningful end-to-end comparison.
+
+        Timing caveat: pg_duckdb timings are *averaged* across all measurement
+        rows (potentially multiple warm iterations), while native DuckDB
+        timings are a single cold run. Positive deltas therefore overstate the
+        gap when pg_duckdb has had warmup benefit. Interpret deltas as
+        directional, not exact.
+
+        Args:
+            query_results: List of query result dicts from the pg_duckdb run.
+                Each dict must have 'query_id' and 'ms' (execution time in ms).
+                Only measurement rows (run_type == 'measurement' or absent) are used;
+                warmup rows are skipped.
+            query_sql_map: Mapping of query_id -> SQL string for native replay.
+            scale_factor: Scale factor of the benchmark (carried into the result).
+
+        Returns:
+            NativeComparison instance, or None if compare_native is False or
+            duckdb is not importable.
+        """
+        if not self.compare_native:
+            return None
+
+        try:
+            import duckdb as _duckdb
+        except ImportError:
+            self.logger.warning(
+                "compare_native=true requested but duckdb package is not installed. "
+                "Install duckdb to enable native comparison."
+            )
+            return None
+
+        from benchbox.core.results.models import NativeComparison, NativeComparisonEntry
+
+        # Build pg_duckdb timing lookup: query_id -> mean ms over measurement rows
+        pg_timings: dict[str, list[float]] = {}
+        for row in query_results:
+            qid = row.get("query_id") or row.get("id")
+            run_type = row.get("run_type", "measurement")
+            if qid and run_type != "warmup" and qid in query_sql_map:
+                ms = row.get("ms") or row.get("execution_time_ms")
+                if ms is not None:
+                    pg_timings.setdefault(qid, []).append(float(ms))
+
+        if not pg_timings:
+            self.logger.info("run_native_comparison: no matching measurement rows found")
+            return None
+
+        db_path = self.duckdb_db_path or ":memory:"
+        entries: list[NativeComparisonEntry] = []
+
+        try:
+            native_conn = _duckdb.connect(db_path, read_only=bool(self.duckdb_db_path))
+        except Exception as exc:
+            self.logger.warning(f"run_native_comparison: could not open DuckDB at {db_path!r}: {exc}")
+            return None
+
+        try:
+            for query_id, pg_ms_list in sorted(pg_timings.items()):
+                sql = query_sql_map[query_id]
+                pg_mean_ms = sum(pg_ms_list) / len(pg_ms_list)
+                t0 = time.monotonic()
+                try:
+                    native_conn.execute(sql).fetchall()
+                    native_ms = (time.monotonic() - t0) * 1000
+                except Exception as exc:
+                    self.logger.debug(f"Native DuckDB query {query_id} failed: {exc}")
+                    continue
+                entries.append(
+                    NativeComparisonEntry(
+                        query_id=query_id,
+                        pg_duckdb_ms=round(pg_mean_ms, 3),
+                        duckdb_ms=round(native_ms, 3),
+                        delta_ms=round(pg_mean_ms - native_ms, 3),
+                    )
+                )
+        finally:
+            native_conn.close()
+
+        if not entries:
+            return None
+
+        deltas = [e.delta_ms for e in entries]
+        return NativeComparison(
+            generated_at=datetime.now(tz=timezone.utc).isoformat(),
+            scale_factor=scale_factor,
+            total_queries=len(entries),
+            mean_delta_ms=round(sum(deltas) / len(deltas), 3),
+            max_delta_ms=round(max(deltas), 3),
+            entries=entries,
+        )
+
     def supports_tuning_type(self, tuning_type: Any) -> bool:
         """Check if pg_duckdb supports a specific tuning type.
 
@@ -350,31 +434,48 @@ class PgDuckDBAdapter(PostgreSQLAdapter):
             return False
 
 
-def _build_pg_duckdb_config(benchmark_config: dict, platform_options: dict) -> dict:
-    """Build pg_duckdb configuration from benchmark and platform options.
+def _build_pg_duckdb_config(
+    platform: str,
+    options: dict[str, Any],
+    overrides: dict[str, Any],
+    info: PlatformInfo | None,
+) -> DatabaseConfig:
+    """Build pg_duckdb database configuration with credential loading.
 
     This function is registered with PlatformHookRegistry to provide
     pg_duckdb-specific configuration handling.
     """
-    config = {
-        "host": platform_options.get("host", "localhost"),
-        "port": platform_options.get("port", 5432),
-        "username": platform_options.get("username", "postgres"),
-        "password": platform_options.get("password"),
-        "schema": platform_options.get("schema", "public"),
-        "database": platform_options.get("database"),
-        "admin_database": platform_options.get("admin_database", "postgres"),
-        "sslmode": platform_options.get("sslmode", "prefer"),
-        "work_mem": platform_options.get("work_mem", "256MB"),
-        "maintenance_work_mem": platform_options.get("maintenance_work_mem", "512MB"),
-        "effective_cache_size": platform_options.get("effective_cache_size", "1GB"),
-        "max_parallel_workers_per_gather": platform_options.get("max_parallel_workers_per_gather", 2),
-        # pg_duckdb-specific
-        "force_execution": platform_options.get("force_execution", True),
-        "postgres_scan_threads": platform_options.get("postgres_scan_threads", 0),
-    }
+    from benchbox.platforms.base.config_utils import POSTGRES_FAMILY_BASE_OPTIONS, build_platform_config
 
-    # Merge benchmark configuration
-    config.update(benchmark_config)
-
-    return config
+    return build_platform_config(
+        platform_type="pg-duckdb",
+        credential_key="pg-duckdb",
+        default_display_name="pg_duckdb",
+        default_driver_package="psycopg",
+        base_options={
+            **POSTGRES_FAMILY_BASE_OPTIONS,
+            "force_execution": True,
+            "postgres_scan_threads": 0,
+            "compare_native": False,
+        },
+        platform_fields=[
+            "host",
+            "port",
+            "username",
+            "password",
+            "database",
+            "admin_database",
+            "sslmode",
+            "work_mem",
+            "maintenance_work_mem",
+            "effective_cache_size",
+            "max_parallel_workers_per_gather",
+            "force_execution",
+            "postgres_scan_threads",
+            "compare_native",
+            "duckdb_db_path",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )

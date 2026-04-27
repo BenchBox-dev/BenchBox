@@ -352,3 +352,286 @@ class TestLakeSailDataFrameAdapterLifecycle:
 
         adapter.register_table("orders", df)
         df.createOrReplaceTempView.assert_called_once_with("orders")
+
+
+# ---------------------------------------------------------------------------
+# Fast-lane mocked coverage: all methods without needing real PySpark
+# ---------------------------------------------------------------------------
+
+from types import SimpleNamespace  # noqa: E402
+from unittest.mock import MagicMock, patch  # noqa: E402
+
+import benchbox.platforms.dataframe.lakesail_df as _lakesail_mod  # noqa: E402
+
+
+def _make_lakesail_F():
+    def _col(n):
+        m = MagicMock()
+        m.asc.return_value = m
+        m.desc.return_value = m
+        m.cast.return_value = m
+        m.over = lambda ws: MagicMock()
+        return m
+
+    def _agg(x):
+        m = MagicMock()
+        m.over = lambda ws: MagicMock()
+        return m
+
+    return SimpleNamespace(
+        col=_col,
+        lit=lambda v: MagicMock(),
+        sum=_agg,
+        avg=_agg,
+        count=_agg,
+        min=_agg,
+        max=_agg,
+        when=lambda c, v: MagicMock(),
+        concat_ws=lambda sep, *cols: MagicMock(),
+        concat=lambda *cols: MagicMock(),
+        date_sub=lambda col, d: MagicMock(),
+        date_add=lambda col, d: MagicMock(),
+        rank=lambda: MagicMock(over=lambda ws: MagicMock()),
+        row_number=lambda: MagicMock(over=lambda ws: MagicMock()),
+        dense_rank=lambda: MagicMock(over=lambda ws: MagicMock()),
+    )
+
+
+def _new_lakesail_adapter(monkeypatch):
+    mock_F = _make_lakesail_F()
+    mock_Window = MagicMock()
+    mock_Window.partitionBy.return_value = mock_Window
+    mock_Window.orderBy.return_value = mock_Window
+    mock_Window.rowsBetween.return_value = mock_Window
+    mock_Window.unboundedPreceding = -1
+    mock_Window.currentRow = 0
+    mock_session = MagicMock()
+
+    monkeypatch.setattr(_lakesail_mod, "PYSPARK_AVAILABLE", True)
+    monkeypatch.setattr(_lakesail_mod, "F", mock_F)
+    monkeypatch.setattr(_lakesail_mod, "Window", mock_Window)
+
+    # Mock SparkSession.builder.remote chain
+    mock_builder = MagicMock()
+    mock_builder.remote.return_value = mock_builder
+    mock_builder.config.return_value = mock_builder
+    mock_builder.getOrCreate.return_value = mock_session
+    mock_session_class = MagicMock(builder=mock_builder)
+    monkeypatch.setattr(_lakesail_mod, "SparkSession", mock_session_class)
+
+    adapter = _lakesail_mod.LakeSailDataFrameAdapter(endpoint="sc://localhost:50051", shuffle_partitions=4)
+    adapter._spark = mock_session
+    return adapter, mock_session, mock_F, mock_Window
+
+
+class TestLakeSailMockedCoverage:
+    """Fast-lane coverage: all methods with PYSPARK_AVAILABLE patched True."""
+
+    def test_init_and_platform_name(self, monkeypatch):
+        adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
+        assert adapter.platform_name == "LakeSail"
+        assert adapter._endpoint == "sc://localhost:50051"
+        assert adapter._shuffle_partitions == 4
+
+    def test_apply_tuning(self, monkeypatch):
+        monkeypatch.setattr(_lakesail_mod, "PYSPARK_AVAILABLE", True)
+        mock_builder = MagicMock()
+        mock_builder.remote.return_value = mock_builder
+        mock_builder.config.return_value = mock_builder
+        mock_builder.getOrCreate.return_value = MagicMock()
+        monkeypatch.setattr(_lakesail_mod, "SparkSession", MagicMock(builder=mock_builder))
+        tuning = DataFrameTuningConfiguration(
+            parallelism=ParallelismConfiguration(thread_count=8),
+            memory=MemoryConfiguration(memory_limit="16GB"),
+            execution=ExecutionConfiguration(streaming_mode=True),
+        )
+        adapter = _lakesail_mod.LakeSailDataFrameAdapter(tuning_config=tuning)
+        assert adapter._shuffle_partitions == 8
+        assert adapter._driver_memory == "16GB"
+
+    def test_get_or_create_session_and_close(self, monkeypatch):
+        mock_F = _make_lakesail_F()
+        mock_session = MagicMock()
+        mock_builder = MagicMock()
+        mock_builder.remote.return_value = mock_builder
+        mock_builder.config.return_value = mock_builder
+        mock_builder.getOrCreate.return_value = mock_session
+
+        monkeypatch.setattr(_lakesail_mod, "PYSPARK_AVAILABLE", True)
+        monkeypatch.setattr(_lakesail_mod, "F", mock_F)
+        monkeypatch.setattr(_lakesail_mod, "Window", MagicMock())
+        monkeypatch.setattr(_lakesail_mod, "SparkSession", MagicMock(builder=mock_builder))
+
+        adapter = _lakesail_mod.LakeSailDataFrameAdapter(endpoint="sc://host:50051", verbose=True)
+        adapter._spark = None  # reset to force creation
+        session = adapter._get_or_create_session()
+        assert session is mock_session
+        # Cached on second call
+        assert adapter._get_or_create_session() is mock_session
+
+        # close()
+        adapter.close()
+        assert adapter._spark is None
+        # close when None is no-op
+        adapter.close()
+
+    def test_context_manager(self, monkeypatch):
+        adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
+        with adapter as a:
+            assert a is adapter
+        assert adapter._spark is None
+
+    def test_expression_and_agg_methods(self, monkeypatch):
+        adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
+        assert adapter.col("name") is not None
+        assert adapter.lit(42) is not None
+        assert adapter.date_sub(MagicMock(), 7) is not None
+        assert adapter.date_add(MagicMock(), 3) is not None
+        col_mock = MagicMock()
+        col_mock.cast.return_value = "d"
+        assert adapter.cast_date(col_mock) == "d"
+        col_mock.cast.return_value = "s"
+        assert adapter.cast_string(col_mock) == "s"
+        assert adapter.sum("amt") is not None
+        assert adapter.mean("amt") is not None
+        assert adapter.count("amt") is not None
+        assert adapter.count(None) is not None
+        assert adapter.min("amt") is not None
+        assert adapter.max("amt") is not None
+        assert adapter.when(MagicMock()) is not None
+        assert adapter.concat_str("a", "b") is not None
+        assert adapter.concat_str("a", "b", separator="-") is not None
+
+    def test_read_csv_and_parquet(self, monkeypatch):
+        adapter, mock_session, _, _ = _new_lakesail_adapter(monkeypatch)
+        from pathlib import Path
+
+        mock_reader = MagicMock()
+        mock_session.read.option.return_value = mock_reader
+        mock_reader.option.return_value = mock_reader
+        mock_reader.csv.return_value = MagicMock()
+        mock_reader.schema.return_value = mock_reader
+        mock_session.read.parquet.return_value = MagicMock()
+
+        assert adapter.read_csv(Path("/data/test.csv")) is not None
+        assert adapter.read_csv(Path("/data/test.csv"), column_names=["a", "b"]) is not None
+        assert adapter.read_parquet(Path("/data/file.parquet")) is not None
+
+    def test_collect_and_row_count(self, monkeypatch):
+        adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
+        df = MagicMock()
+        df.count.return_value = 5
+        assert adapter.collect(df) is df
+        assert adapter.get_row_count(df) == 5
+
+    def test_scalar_paths(self, monkeypatch):
+        adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
+        row = MagicMock()
+        row.__getitem__ = lambda self, k: (99 if k == 0 else "v")
+        df = MagicMock()
+        df.limit.return_value.collect.return_value = [row]
+        assert adapter.scalar(df) == 99
+
+        row2 = MagicMock()
+        row2.__getitem__ = lambda self, k: "named"
+        df2 = MagicMock()
+        df2.limit.return_value.collect.return_value = [row2]
+        assert adapter.scalar(df2, column="col1") == "named"
+
+        df_empty = MagicMock()
+        df_empty.limit.return_value.collect.return_value = []
+        with pytest.raises(ValueError, match="empty"):
+            adapter.scalar(df_empty)
+
+        df_multi = MagicMock()
+        df_multi.limit.return_value.collect.return_value = [row, row]
+        with pytest.raises(ValueError, match="exactly one row"):
+            adapter.scalar(df_multi)
+
+    def test_scalar_to_df(self, monkeypatch):
+        adapter, mock_session, _, _ = _new_lakesail_adapter(monkeypatch)
+        mock_session.createDataFrame.return_value = MagicMock()
+        with patch.dict("sys.modules", {"pyspark.sql": MagicMock(Row=lambda **kw: kw)}):
+            result = adapter.scalar_to_df({"x": 1})
+            assert result is not None
+
+    def test_window_functions(self, monkeypatch):
+        adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
+        assert adapter._build_window_spec([("c", True), ("d", False)]) is not None
+        assert adapter._build_window_spec([("c", True)], partition_by=["dept"]) is not None
+        assert adapter._build_window_spec([]) is not None
+        assert adapter._build_aggregate_window_spec(partition_by=["p"]) is not None
+        assert adapter._build_aggregate_window_spec(order_by=[("d", True)]) is not None
+        assert adapter.window_rank([("c", True)]) is not None
+        assert adapter.window_row_number([("c", False)]) is not None
+        assert adapter.window_dense_rank([("c", True)]) is not None
+        assert adapter.window_sum("amt") is not None
+        assert adapter.window_avg("price", order_by=[("d", True)]) is not None
+        assert adapter.window_count("col") is not None
+        assert adapter.window_count(None) is not None
+        assert adapter.window_min("price") is not None
+        assert adapter.window_max("qty") is not None
+
+    def test_union_rename_concat_firstrow(self, monkeypatch):
+        adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
+        df1 = MagicMock()
+        df2 = MagicMock()
+        df1.union.return_value = MagicMock()
+
+        with pytest.raises(ValueError):
+            adapter.union_all()
+        assert adapter.union_all(df1) is df1
+        assert adapter.union_all(df1, df2) is not None
+
+        df3 = MagicMock()
+        df3.columns = ["old"]
+        df3.withColumnRenamed.return_value = df3
+        adapter.rename_columns(df3, {"old": "new"})
+        df3.withColumnRenamed.assert_called_with("old", "new")
+
+        assert adapter._concat_dataframes([df1]) is df1
+        assert adapter._concat_dataframes([df1, df2]) is not None
+
+        df4 = MagicMock()
+        df4.take.return_value = [("x", "y")]
+        assert adapter._get_first_row(df4) == ("x", "y")
+        df4.take.return_value = []
+        assert adapter._get_first_row(df4) is None
+
+    def test_platform_info_and_tuning_summary(self, monkeypatch):
+        adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
+        info = adapter.get_platform_info()
+        assert info["platform"] == "LakeSail"
+        assert "endpoint" in info
+        summary = adapter.get_tuning_summary()
+        assert "endpoint" in summary
+
+    def test_sql_register_explain(self, monkeypatch):
+        adapter, mock_session, _, _ = _new_lakesail_adapter(monkeypatch)
+        mock_session.sql.return_value = MagicMock()
+        assert adapter.sql("SELECT 1") is not None
+
+        df = MagicMock()
+        adapter.register_table("t", df)
+        df.createOrReplaceTempView.assert_called_with("t")
+
+        df.toPandas.return_value = MagicMock()
+        adapter.to_pandas(df)
+
+        df2 = MagicMock()
+        df2.explain.side_effect = lambda mode="extended": print(f"{mode}_out")
+        result = adapter.explain(df2, "simple")
+        assert "simple_out" in result
+        plans = adapter.get_query_plan(df2)
+        assert "logical" in plans
+
+    def test_to_polars(self, monkeypatch):
+        adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
+        import polars as pl
+
+        df = MagicMock()
+        df.toPandas.return_value = MagicMock()
+        del df.toArrow
+        with patch("polars.from_pandas", return_value=MagicMock()) as mock_fp:
+            adapter.to_polars(df)
+            mock_fp.assert_called_once()

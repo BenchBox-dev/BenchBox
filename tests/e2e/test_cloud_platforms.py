@@ -236,7 +236,7 @@ def test_cloud_platform_benchmark_dry_run(tmp_path: Path, platform: str, benchma
     output_dir = tmp_path / f"dry_run_{platform}_{benchmark_name}"
     output_dir.mkdir()
 
-    # TPC-DS requires SF >= 1
+    # Keep cloud dry-run coverage on an official TPC-DS scale.
     scale = "1" if benchmark_name == "tpcds" else "0.01"
 
     result = run_cli_command(

@@ -1,0 +1,76 @@
+{
+  "chart": "speedup_ratio",
+  "version": 1,
+  "cases": [
+    {
+      "id": "identical",
+      "input": {
+        "baselineMs": 100.0,
+        "thisMs": 100.0
+      },
+      "expected": {
+        "speedup": 1.0
+      }
+    },
+    {
+      "id": "two_x_faster",
+      "input": {
+        "baselineMs": 200.0,
+        "thisMs": 100.0
+      },
+      "expected": {
+        "speedup": 2.0
+      }
+    },
+    {
+      "id": "two_x_slower",
+      "input": {
+        "baselineMs": 100.0,
+        "thisMs": 200.0
+      },
+      "expected": {
+        "speedup": 0.5
+      }
+    },
+    {
+      "id": "null_baseline",
+      "input": {
+        "baselineMs": null,
+        "thisMs": 100.0
+      },
+      "expected": {
+        "speedup": null
+      }
+    },
+    {
+      "id": "null_this",
+      "input": {
+        "baselineMs": 100.0,
+        "thisMs": null
+      },
+      "expected": {
+        "speedup": null
+      }
+    },
+    {
+      "id": "zero_baseline",
+      "input": {
+        "baselineMs": 0.0,
+        "thisMs": 100.0
+      },
+      "expected": {
+        "speedup": null
+      }
+    },
+    {
+      "id": "sub_ms_precision",
+      "input": {
+        "baselineMs": 1.234567,
+        "thisMs": 0.987654
+      },
+      "expected": {
+        "speedup": 1.2499994937498353
+      }
+    }
+  ]
+}

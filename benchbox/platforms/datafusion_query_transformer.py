@@ -11,6 +11,12 @@ Q20) that produce incorrect results due to:
 The rewrites transform these queries into semantically equivalent SQL that DataFusion
 executes correctly, using CTEs, NOT EXISTS, and explicit joins instead.
 
+Import discipline: DataFusion adapter imports ``DataFusionQueryTransformer`` lazily
+inside ``execute_query``. Tests should patch this source-module name
+(``benchbox.platforms.datafusion_query_transformer.DataFusionQueryTransformer``)
+before calling ``execute_query``; there is no stable module-level binding on
+``benchbox.platforms.datafusion`` to patch.
+
 Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
@@ -258,7 +264,7 @@ class DataFusionQueryTransformer:
         if not nation_match:
             return query
 
-        # Extract date parameter — handles both:
+        # Extract date parameter - handles both:
         #   l_shipdate >= date '1994-01-01'  (raw qgen)
         #   l_shipdate >= CAST('1994-01-01' AS DATE)  (SQLGlot translated)
         date_match = re.search(

@@ -1,0 +1,86 @@
+{
+  "chart": "heatmap_color",
+  "version": 1,
+  "cases": [
+    {
+      "id": "fastest_in_col",
+      "input": {
+        "ms": 100.0,
+        "minInCol": 100.0
+      },
+      "expected": {
+        "hue": 120
+      }
+    },
+    {
+      "id": "ten_x_slower",
+      "input": {
+        "ms": 1000.0,
+        "minInCol": 100.0
+      },
+      "expected": {
+        "hue": 0
+      }
+    },
+    {
+      "id": "two_x_slower",
+      "input": {
+        "ms": 200.0,
+        "minInCol": 100.0
+      },
+      "expected": {
+        "hue": 84
+      }
+    },
+    {
+      "id": "outlier_clamped_to_ten_x",
+      "input": {
+        "ms": 5000.0,
+        "minInCol": 100.0
+      },
+      "expected": {
+        "hue": 0
+      }
+    },
+    {
+      "id": "null_ms",
+      "input": {
+        "ms": null,
+        "minInCol": 100.0
+      },
+      "expected": {
+        "hue": null
+      }
+    },
+    {
+      "id": "null_min_in_col",
+      "input": {
+        "ms": 100.0,
+        "minInCol": null
+      },
+      "expected": {
+        "hue": null
+      }
+    },
+    {
+      "id": "zero_min_in_col",
+      "input": {
+        "ms": 100.0,
+        "minInCol": 0.0
+      },
+      "expected": {
+        "hue": null
+      }
+    },
+    {
+      "id": "sub_ms_realistic",
+      "input": {
+        "ms": 0.5,
+        "minInCol": 0.1
+      },
+      "expected": {
+        "hue": 36
+      }
+    }
+  ]
+}

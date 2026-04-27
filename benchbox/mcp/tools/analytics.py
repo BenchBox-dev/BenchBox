@@ -145,6 +145,86 @@ def register_analytics_tools(mcp: FastMCP, *, results_dir: Path) -> None:
                 details={"exception_type": type(e).__name__},
             )
 
+    @mcp.tool(annotations=ANALYTICS_READONLY_ANNOTATIONS)
+    def validate_results(
+        result_file: str = "",
+        directory: str = "",
+        verbose: bool = False,
+    ) -> dict[str, Any]:
+        """Validate integrity, completeness, and believability of result JSON files.
+
+        Provide result_file (single file path) or directory (batch mode).
+        Returns structured check results with PASS/WARN/FAIL status per check.
+
+        Args:
+            result_file: Path to a single result JSON file
+            directory: Path to a directory of result JSON files
+            verbose: Include PASS checks in output (default: WARN+FAIL only)
+
+        Returns:
+            Validation report with per-check status and overall result.
+        """
+        from benchbox.core.results.integrity_validator import (
+            validate_directory as _validate_directory,
+            validate_file as _validate_file,
+        )
+
+        if result_file:
+            file_path = resolve_result_file_path(result_file, configured_results_dir)
+            if not file_path.exists():
+                return make_not_found_error(result_file, configured_results_dir)
+            report = _validate_file(file_path)
+            checks = [
+                {
+                    "category": c.category.value,
+                    "name": c.name,
+                    "status": c.status.value,
+                    "message": c.message,
+                    "details": c.details,
+                }
+                for c in report.checks
+                if verbose or c.status.value != "PASS"
+            ]
+            return {
+                "file": report.file,
+                "benchmark_id": report.benchmark_id,
+                "platform": report.platform,
+                "scale_factor": report.scale_factor,
+                "overall_status": report.overall_status.value,
+                "summary": report.summary,
+                "checks": checks,
+            }
+        elif directory:
+            dir_path = Path(directory)
+            if not dir_path.is_absolute():
+                dir_path = configured_results_dir / directory
+            if not dir_path.is_dir():
+                return make_error(
+                    ErrorCode.RESOURCE_NOT_FOUND,
+                    f"Directory not found: {directory}",
+                )
+            reports = _validate_directory(dir_path)
+            return {
+                "total": len(reports),
+                "pass": sum(1 for r in reports if r.overall_status.value == "PASS"),
+                "warn": sum(1 for r in reports if r.overall_status.value == "WARN"),
+                "fail": sum(1 for r in reports if r.overall_status.value == "FAIL"),
+                "files": [
+                    {
+                        "file": r.file,
+                        "benchmark_id": r.benchmark_id,
+                        "platform": r.platform,
+                        "overall_status": r.overall_status.value,
+                    }
+                    for r in reports
+                ],
+            }
+        else:
+            return make_error(
+                ErrorCode.VALIDATION_ERROR,
+                "Provide either result_file or directory parameter",
+            )
+
 
 def _list_result_files(results_dir: Path) -> list[Path]:
     """List and sort result JSON files, excluding plans and tuning files."""
@@ -227,7 +307,7 @@ def _format_plan_response(query_plan: dict, format_lower: str, normalized_id: st
 
 def _get_query_plan_impl(file_path: Path, result_file: str, query_id: str, format_lower: str) -> dict[str, Any]:
     """Core implementation for getting a query plan."""
-    with open(file_path) as f:
+    with open(file_path, encoding="utf-8") as f:
         data = json.load(f)
 
     normalized_id = normalize_query_id(query_id)
@@ -249,7 +329,7 @@ def _get_query_plan_impl(file_path: Path, result_file: str, query_id: str, forma
             "query_info": query_info,
         }
 
-    with open(plans_path) as plans_handle:
+    with open(plans_path, encoding="utf-8") as plans_handle:
         plans_data = json.load(plans_handle)
 
     query_plan_entry = plans_data.get("queries", {}).get(normalized_id)
@@ -330,7 +410,7 @@ def _load_regression_runs(
     runs: list[dict[str, Any]] = []
     for file_path in result_files[: lookback_runs * 2]:
         try:
-            with open(file_path) as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             run_platform, benchmark_block, run_benchmark = _extract_run_identity(data)
@@ -532,7 +612,7 @@ def _load_trend_data_point(
 ) -> dict[str, Any] | None:
     """Load a single result file as a trend data point, or None if filtered/invalid."""
     try:
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
     except Exception as e:
         logger.warning(f"Could not parse result file {file_path}: {e}")
@@ -699,7 +779,7 @@ def _aggregate_results_impl(
 
     for file_path in result_files:
         try:
-            with open(file_path) as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             run_platform, benchmark_block, run_benchmark = _extract_run_identity(data)

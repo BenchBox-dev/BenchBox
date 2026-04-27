@@ -372,6 +372,61 @@ class TestFabricSparkAdapterDataLoading:
                     # Should not call upload_tables since tables exist
                     mock_staging_instance.upload_tables.assert_not_called()
 
+    def test_load_data_falls_back_to_table_discovery_for_placeholder_tables(self):
+        """Placeholder benchmark.tables mappings should keep the legacy parquet discovery path."""
+        with (
+            patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.requests") as mock_requests,
+            patch("benchbox.platforms.azure.fabric_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging_instance = MagicMock()
+            mock_staging_instance.tables_exist.return_value = False
+            mock_staging.from_uri.return_value = mock_staging_instance
+
+            mock_cred = MagicMock()
+            mock_token = MagicMock()
+            mock_token.token = "test-token"
+            mock_token.expires_on = 9999999999
+            mock_cred.get_token.return_value = mock_token
+
+            mock_session_response = MagicMock()
+            mock_session_response.status_code = 201
+            mock_session_response.json.return_value = {"id": 1, "state": "idle"}
+
+            mock_statement_response = MagicMock()
+            mock_statement_response.status_code = 201
+            mock_statement_response.json.return_value = {"id": 1, "state": "available", "output": {"status": "ok"}}
+
+            mock_requests.post.return_value = mock_session_response
+            mock_requests.get.return_value = mock_statement_response
+
+            from benchbox.platforms.azure import FabricSparkAdapter
+
+            with patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", return_value=mock_cred):
+                adapter = FabricSparkAdapter(
+                    workspace_id="workspace-abc",
+                    lakehouse_id="lakehouse-xyz",
+                )
+
+                import tempfile
+
+                mock_benchmark = MagicMock()
+                mock_benchmark.tables = {"lineitem": None, "orders": None}
+
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    from pathlib import Path
+
+                    adapter.load_data(mock_benchmark, None, Path(tmpdir))
+
+                    mock_staging_instance.upload_tables.assert_called_once_with(
+                        tables=["lineitem", "orders"],
+                        source_dir=Path(tmpdir),
+                        file_format="parquet",
+                    )
+                    mock_staging_instance.upload_data_files.assert_not_called()
+
 
 class TestFabricSparkAdapterTuning:
     """Test benchmark tuning configuration."""

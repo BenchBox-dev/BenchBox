@@ -13,26 +13,32 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import logging
+import os
+import re
+import shutil
+import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from benchbox.core.sql_utils import normalize_table_name_in_sql
 from benchbox.utils.clock import elapsed_seconds, mono_time
-
-if TYPE_CHECKING:
-    from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
-        PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
-        UnifiedTuningConfiguration,
-    )
 
 from ..utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
 )
+from ._spark_helpers import (
+    SparkLikeAdapterMixin,
+    analyze_spark_table,
+    get_spark_query_plan,
+    list_spark_tables,
+    optimize_spark_table_definition,
+    run_spark_schema_creation_loop,
+    validate_spark_identifier,
+)
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionMixin
+from .base.spark_logging import suppress_window_exec_warning
 
 try:
     from pyspark.sql import SparkSession
@@ -54,7 +60,126 @@ except ImportError:
     DoubleType = None
 
 
-class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
+# Maximum Java version compatible with PySpark's bundled Hadoop.
+# Subject.getSubject() was removed in Java 23 (JEP 411), which breaks
+# Hadoop's UserGroupInformation used during SparkSession initialization.
+_MAX_COMPATIBLE_JAVA_VERSION = 22
+
+_logger = logging.getLogger(__name__)
+
+
+def _get_java_version(java_home: str | None = None) -> int | None:
+    """Return the major Java version, or None if it cannot be determined."""
+    java_bin = "java"
+    if java_home:
+        java_bin = os.path.join(java_home, "bin", "java")
+
+    try:
+        result = subprocess.run(
+            [java_bin, "-version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        # Java version string is on stderr, e.g. 'openjdk version "17.0.17"'
+        output = result.stderr + result.stdout
+        match = re.search(r'"(\d+)[\.\+]', output)
+        if match:
+            return int(match.group(1))
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return None
+
+
+def _find_compatible_java_home() -> str | None:
+    """Try to find a compatible JDK installation (Java 17 or 21 preferred).
+
+    On macOS, uses /usr/libexec/java_home. On Linux, checks common paths.
+    Returns the JAVA_HOME path or None.
+    """
+    import platform as _platform
+
+    if _platform.system() == "Darwin":
+        # Try preferred versions in order
+        for version in ("17", "21", "11"):
+            try:
+                result = subprocess.run(
+                    ["/usr/libexec/java_home", "-v", version],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    candidate = result.stdout.strip()
+                    ver = _get_java_version(candidate)
+                    if ver and ver <= _MAX_COMPATIBLE_JAVA_VERSION:
+                        return candidate
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+    else:
+        # Linux: check common JDK paths
+        for base in ("/usr/lib/jvm", "/usr/java"):
+            base_path = Path(base)
+            if not base_path.exists():
+                continue
+            for version in ("17", "21", "11"):
+                for candidate_dir in sorted(base_path.glob(f"*-{version}*"), reverse=True):
+                    if candidate_dir.is_dir():
+                        ver = _get_java_version(str(candidate_dir))
+                        if ver and ver <= _MAX_COMPATIBLE_JAVA_VERSION:
+                            return str(candidate_dir)
+    return None
+
+
+def _ensure_compatible_java(java_home_override: str | None = None) -> str | None:
+    """Ensure a compatible Java is configured for Spark. Returns JAVA_HOME used.
+
+    If the current Java is incompatible (>= 23), attempts to find and configure
+    a compatible one. Raises RuntimeError if no compatible Java can be found.
+    """
+    # If user explicitly provided java_home, validate and use it
+    if java_home_override:
+        ver = _get_java_version(java_home_override)
+        if ver and ver > _MAX_COMPATIBLE_JAVA_VERSION:
+            raise RuntimeError(
+                f"Specified java_home ({java_home_override}) uses Java {ver}, "
+                f"but PySpark requires Java <= {_MAX_COMPATIBLE_JAVA_VERSION}. "
+                f"Subject.getSubject() was removed in Java 23 (JEP 411)."
+            )
+        os.environ["JAVA_HOME"] = java_home_override
+        _logger.info(f"Using user-specified JAVA_HOME: {java_home_override}")
+        return java_home_override
+
+    # Check current Java version
+    current_version = _get_java_version()
+    if current_version is None or current_version <= _MAX_COMPATIBLE_JAVA_VERSION:
+        return os.environ.get("JAVA_HOME")  # Current Java is fine
+
+    # Current Java is too new - try to find a compatible one
+    _logger.warning(
+        f"System Java {current_version} is incompatible with PySpark "
+        f"(requires <= {_MAX_COMPATIBLE_JAVA_VERSION}). "
+        f"Searching for a compatible JDK..."
+    )
+
+    compatible_home = _find_compatible_java_home()
+    if compatible_home:
+        os.environ["JAVA_HOME"] = compatible_home
+        compat_ver = _get_java_version(compatible_home)
+        _logger.info(f"Auto-selected Java {compat_ver} at {compatible_home} for Spark compatibility")
+        return compatible_home
+
+    raise RuntimeError(
+        f"System Java version {current_version} is incompatible with PySpark. "
+        f"Hadoop's UserGroupInformation uses Subject.getSubject(), which was "
+        f"removed in Java 23 (JEP 411). Install Java 17 or 21 and either:\n"
+        f"  1. Set JAVA_HOME to point to it before running BenchBox\n"
+        f"  2. Use --platform-option java_home=/path/to/jdk17\n"
+        f"  3. Install via: brew install openjdk@17"
+    )
+
+
+class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
     """Apache Spark platform adapter for distributed SQL query execution.
 
     Spark is a distributed computing framework for large-scale data processing.
@@ -113,6 +238,9 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
 
         # Extra Spark configuration properties
         self.spark_config = config.get("spark_config") or {}
+
+        # Java home override for compatibility with newer JDKs
+        self.java_home = config.get("java_home")
 
         # Data loading configuration
         self.staging_root = config.get("staging_root")
@@ -315,6 +443,19 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
         if self.warehouse_dir:
             conf["spark.sql.warehouse.dir"] = self.warehouse_dir
 
+        # Register zstd in Hadoop's codec list - the zstd-jni JAR ships
+        # with PySpark but isn't in Hadoop's default codec registry,
+        # causing CODEC_NOT_AVAILABLE when reading zstd-compressed files.
+        conf["spark.hadoop.io.compression.codecs"] = (
+            "org.apache.hadoop.io.compress.DefaultCodec,"
+            "org.apache.hadoop.io.compress.GzipCodec,"
+            "org.apache.hadoop.io.compress.BZip2Codec,"
+            "org.apache.hadoop.io.compress.DeflateCodec,"
+            "org.apache.hadoop.io.compress.SnappyCodec,"
+            "org.apache.hadoop.io.compress.Lz4Codec,"
+            "org.apache.hadoop.io.compress.ZStandardCodec"
+        )
+
         # Disable result cache for benchmarking
         if self.disable_cache:
             conf["spark.sql.inMemoryColumnarStorage.enabled"] = "false"
@@ -359,7 +500,7 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
         """
         database = connection_config.get("database", self.database)
 
-        if not self._validate_identifier(database):
+        if not validate_spark_identifier(database):
             raise ValueError(f"Invalid database identifier: {database}")
 
         # Check if database exists first
@@ -374,23 +515,17 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
         except Exception as e:
             raise RuntimeError(f"Failed to drop Spark database {database}: {e}") from e
 
-    def _validate_identifier(self, identifier: str) -> bool:
-        """Validate SQL identifier to prevent injection attacks."""
-        if not identifier:
-            return False
-        import re
-
-        pattern = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
-        return bool(re.match(pattern, identifier)) and len(identifier) <= 128
-
     def create_connection(self, **connection_config) -> Any:
         """Create optimized Spark session."""
         self.log_operation_start("Spark session")
 
-        # Handle existing database using base class method
-        self.handle_existing_database(**connection_config)
+        # Ensure compatible Java before attempting SparkSession creation
+        java_home = _ensure_compatible_java(self.java_home)
+        if java_home:
+            self.log_verbose(f"Using JAVA_HOME: {java_home}")
 
-        # Build SparkSession
+        # Build SparkSession first - check_server_database_exists requires an
+        # active session, so handle_existing_database must run after getOrCreate().
         builder = SparkSession.builder.master(self.master)
 
         # Apply configuration
@@ -407,6 +542,13 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
         try:
             spark = builder.getOrCreate()
             self._spark_session = spark
+
+            self._configure_runtime_logging(spark)
+
+            # Handle existing database using base class method.
+            # This must run after SparkSession is available so that
+            # check_server_database_exists can query the catalog.
+            self.handle_existing_database(**connection_config)
 
             # Create database if needed
             target_database = connection_config.get("database", self.database)
@@ -432,42 +574,53 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
             self.logger.error(f"Failed to create Spark session: {e}")
             raise
 
+    def _configure_runtime_logging(self, spark: Any) -> None:
+        """Reduce Spark log noise for benchmark runs.
+
+        Spark's default WARN output is useful during interactive debugging, but the
+        benchmark path should not flood stderr with spec-compliant WindowExec warnings
+        from global windows used in standard TPC-DS queries like Q44 and Q49.
+        """
+        spark_log_level = "WARN" if self.verbose else "ERROR"
+        spark.sparkContext.setLogLevel(spark_log_level)
+        # Suppression must follow setLogLevel - setLogLevel resets all log4j2 loggers,
+        # which would undo the WindowExec level override if called after.
+        suppress_window_exec_warning(spark)
+
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using Spark-optimized table definitions."""
+        """Create schema using Spark-optimized table definitions.
+
+        Spark runs in-process (local mode) so it has filesystem access to
+        ``spark.sql.warehouse.dir`` and can clean per-table orphaned directories
+        directly via ``_remove_orphaned_table_location``.  Remote Spark Connect
+        adapters (Velox/LakeSail) cannot reach that filesystem and use a
+        coarser DB-level purge instead.
+        """
         start_time = mono_time()
 
         spark = connection
 
         try:
-            # Use common schema creation helper
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
-
-            # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
-
-            for statement in statements:
-                if not statement:
-                    continue
-
-                # Normalize table names to lowercase for Spark consistency
-                statement = self._normalize_table_name_in_sql(statement)
-
-                # Optimize table definition for Spark
-                statement = self._optimize_table_definition(statement)
-
-                try:
-                    spark.sql(statement)
-                    self.logger.debug(f"Executed schema statement: {statement[:100]}...")
-                except Exception as e:
-                    # If table already exists, drop and recreate
-                    if "already exists" in str(e).lower():
-                        table_name = self._extract_table_name(statement)
-                        if table_name:
-                            spark.sql(f"DROP TABLE IF EXISTS {table_name}")
-                            spark.sql(statement)
-                    else:
-                        raise
-
+            # Capture table_format once: the bound method re-reads
+            # self.table_format on each call, and pinning the format up front
+            # keeps statement N and N+1 in agreement even if a future hook
+            # mutates the attribute mid-loop.
+            fmt = self.table_format
+            v1_table = (fmt or "parquet").lower() in {"parquet", "orc"}
+            run_spark_schema_creation_loop(
+                spark,
+                statements,
+                lambda stmt: optimize_spark_table_definition(
+                    stmt,
+                    table_format=fmt,
+                    strip_v1_constraints=v1_table,
+                    upcast_smallint=v1_table,
+                ),
+                logger=self.logger,
+                on_location_collision=self._remove_orphaned_table_location,
+            )
             self.logger.info("Schema created")
 
         except Exception as e:
@@ -532,61 +685,35 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
             stream_id=stream_id,
         )
 
-    def _extract_table_name(self, statement: str) -> str | None:
-        """Extract table name from CREATE TABLE statement."""
-        from benchbox.core.sql_utils import extract_table_name
+    def _remove_orphaned_table_location(self, spark: Any, table_name: str) -> None:
+        """Remove orphaned managed-table directory when catalog entry is gone.
 
-        return extract_table_name(statement)
-
-    def _normalize_table_name_in_sql(self, sql: str) -> str:
-        """Normalize table names in SQL to lowercase for Spark."""
-        return normalize_table_name_in_sql(sql)
-
-    def _optimize_table_definition(self, statement: str) -> str:
-        """Optimize table definition for Spark.
-
-        Spark SQL table creation depends on the format:
-        - For Parquet/ORC: simple CREATE TABLE with USING clause
-        - For Delta Lake: CREATE TABLE with USING DELTA
-        - For Iceberg: CREATE TABLE with USING ICEBERG
+        Spark managed tables store data under the warehouse directory. If a
+        prior run was interrupted, the catalog entry may be gone but the
+        physical directory remains, causing LOCATION_ALREADY_EXISTS on retry.
         """
-        if not statement.upper().startswith("CREATE TABLE"):
-            return statement
-
-        import re
-
-        # Remove any USING clause that might already exist
-        statement = re.sub(r"\s+USING\s+\w+", "", statement, flags=re.IGNORECASE)
-
-        # Add USING clause for the specified format
-        if self.table_format == "delta":
-            # Delta Lake format
-            if ")" in statement:
-                statement = statement.rstrip(";").rstrip() + " USING DELTA"
-        elif self.table_format == "iceberg":
-            # Iceberg format
-            if ")" in statement:
-                statement = statement.rstrip(";").rstrip() + " USING ICEBERG"
-        elif self.table_format == "orc":
-            # ORC format
-            if ")" in statement:
-                statement = statement.rstrip(";").rstrip() + " USING ORC"
-        else:
-            # Default to Parquet
-            if ")" in statement:
-                statement = statement.rstrip(";").rstrip() + " USING PARQUET"
-
-        return statement
+        try:
+            warehouse_dir = spark.conf.get("spark.sql.warehouse.dir", "spark-warehouse")
+            # Resolve relative paths against CWD (Spark's default behavior)
+            warehouse_path = Path(warehouse_dir.removeprefix("file:")).resolve()
+            # Strip qualifiers (e.g. spark_catalog.db.tbl) and backticks
+            leaf_name = table_name.split(".")[-1].strip("`")
+            # Current database directory
+            current_db = spark.catalog.currentDatabase()
+            table_dir = (warehouse_path / f"{current_db}.db" / leaf_name).resolve()
+            # Guard: only remove if table_dir is actually inside the warehouse
+            if not table_dir.is_relative_to(warehouse_path):
+                self.log_verbose(f"Refusing to remove {table_dir}: outside warehouse {warehouse_path}")
+                return
+            if table_dir.exists():
+                shutil.rmtree(table_dir)
+                self.log_verbose(f"Removed orphaned table location: {table_dir}")
+        except Exception as e:
+            self.log_verbose(f"Could not remove orphaned location for {table_name}: {e}")
 
     def get_query_plan(self, connection: Any, query: str) -> str:
         """Get query execution plan for analysis."""
-        spark = connection
-        try:
-            result_df = spark.sql(f"EXPLAIN EXTENDED {query}")
-            plan_rows = result_df.collect()
-            return "\n".join([str(row[0]) for row in plan_rows])
-        except Exception as e:
-            return f"Could not get query plan: {e}"
+        return get_spark_query_plan(connection, query)
 
     def close_connection(self, connection: Any) -> None:
         """Close Spark session."""
@@ -604,6 +731,9 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
             True if connection successful, False otherwise
         """
         try:
+            # Ensure compatible Java
+            _ensure_compatible_java(self.java_home)
+
             # Create a temporary SparkSession for testing
             builder = SparkSession.builder.master(self.master)
             spark_conf = self._get_spark_conf()
@@ -611,6 +741,7 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
                 builder = builder.config(key, value)
 
             spark = builder.getOrCreate()
+            self._configure_runtime_logging(spark)
 
             try:
                 # Execute simple query to verify
@@ -716,83 +847,21 @@ class SparkAdapter(SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
 
-    def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to Spark."""
-        if not unified_config:
-            return
-
-        # Apply constraint configurations (informational only in Spark)
-        self.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
-
-        # Apply platform optimizations
-        if unified_config.platform_optimizations:
-            self.apply_platform_optimizations(unified_config.platform_optimizations, connection)
-
-        # Apply table-level tunings
-        for _table_name, table_tuning in unified_config.table_tunings.items():
-            self.apply_table_tunings(table_tuning, connection)
-
-    def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply Spark-specific platform optimizations.
-
-        Spark optimizations include:
-        - Adaptive Query Execution (AQE)
-        - Cost-based optimization
-        - Join reordering
-        - Memory management
-        """
-        if not platform_config:
-            return
-
-        spark = connection
-
-        # Apply Spark-specific settings from platform config
-        if hasattr(platform_config, "spark") and platform_config.spark:
-            for key, value in platform_config.spark.items():
-                try:
-                    spark.conf.set(f"spark.{key}", str(value))
-                    self.logger.debug(f"Applied Spark config: spark.{key} = {value}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to apply Spark config spark.{key}: {e}")
-
-        self.logger.info("Spark platform optimizations applied")
-
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations to Spark.
-
-        Note: Spark SQL does not enforce constraints. They are informational only.
-        """
-        if primary_key_config and primary_key_config.enabled:
-            self.logger.info("Primary key constraints enabled for Spark (informational only, not enforced)")
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info("Foreign key constraints enabled for Spark (informational only, not enforced)")
+    # apply_unified_tuning, apply_platform_optimizations, and
+    # apply_constraint_configuration come from SparkLikeAdapterMixin -
+    # bodies were identical (or differed only in the platform name in log
+    # output) across spark / lakesail / velox.
 
     def _get_existing_tables(self, connection: Any) -> list[str]:
         """Get list of existing tables from Spark database."""
-        spark = connection
-        try:
-            tables = spark.catalog.listTables()
-            return [t.name.lower() for t in tables]
-        except Exception:
-            return []
+        return list_spark_tables(connection)
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Run ANALYZE TABLE for query optimization.
 
         Spark uses ANALYZE TABLE to compute statistics for cost-based optimization.
         """
-        spark = connection
-        try:
-            spark.sql(f"ANALYZE TABLE {table_name.lower()} COMPUTE STATISTICS")
-            self.logger.debug(f"Analyzed table {table_name}")
-        except Exception as e:
-            self.logger.warning(f"Failed to analyze table {table_name}: {e}")
+        analyze_spark_table(connection, table_name, logger=self.logger)
 
 
 def _build_spark_config(
@@ -801,66 +870,34 @@ def _build_spark_config(
     overrides: dict[str, Any],
     info: Any,
 ) -> Any:
-    """Build Spark database configuration with credential loading.
+    from benchbox.platforms.base.config_utils import build_platform_config
 
-    Args:
-        platform: Platform name (should be 'spark')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with configuration loaded
-    """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("spark") or {}
-
-    # Build merged options: saved_creds < options < overrides
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "Apache Spark"
-    driver_package = info.driver_package if info else "pyspark"
-
-    config_dict = {
-        "type": "spark",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields at top-level
-        "master": merged_options.get("master"),
-        "app_name": merged_options.get("app_name"),
-        "deploy_mode": merged_options.get("deploy_mode"),
-        "driver_memory": merged_options.get("driver_memory"),
-        "executor_memory": merged_options.get("executor_memory"),
-        "executor_cores": merged_options.get("executor_cores"),
-        "num_executors": merged_options.get("num_executors"),
-        "shuffle_partitions": merged_options.get("shuffle_partitions"),
-        "broadcast_threshold": merged_options.get("broadcast_threshold"),
-        "adaptive_enabled": merged_options.get("adaptive_enabled"),
-        "table_format": merged_options.get("table_format"),
-        "enable_hive": merged_options.get("enable_hive"),
-        "spark_config": merged_options.get("spark_config"),
-        "staging_root": merged_options.get("staging_root"),
-        # Benchmark context for config-aware database naming
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    # Only include explicit database override if provided
-    if "database" in overrides and overrides["database"]:
-        config_dict["database"] = overrides["database"]
-
-    return DatabaseConfig(**config_dict)
+    return build_platform_config(
+        platform_type="spark",
+        credential_key="spark",
+        default_display_name="Apache Spark",
+        default_driver_package="pyspark",
+        platform_fields=[
+            "master",
+            "app_name",
+            "deploy_mode",
+            "driver_memory",
+            "executor_memory",
+            "executor_cores",
+            "num_executors",
+            "shuffle_partitions",
+            "broadcast_threshold",
+            "adaptive_enabled",
+            "table_format",
+            "enable_hive",
+            "spark_config",
+            "java_home",
+            "staging_root",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 # Register the config builder with the platform hook registry

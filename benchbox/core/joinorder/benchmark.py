@@ -22,6 +22,7 @@ from .queries import JoinOrderQueryManager
 from .schema import JoinOrderSchema
 
 if TYPE_CHECKING:
+    from benchbox.core.dataframe.query import QueryRegistry
     from benchbox.core.tuning import UnifiedTuningConfiguration
 
 
@@ -34,6 +35,16 @@ class JoinOrderBenchmark(BaseBenchmark):
     implementation provides synthetic data generation while preserving
     the join patterns that stress-test query optimizers.
     """
+
+    # CSV dialect for resolve_csv_dialect path (b) — used when manifest metadata is absent
+    # (e.g. data cached before the generator wrote manifests).  Manifest-annotated data
+    # (path a) will carry the same values; this class attribute is the safe fallback so
+    # existing cached datasets load correctly without regeneration.
+    # csv_null_marker="" tells SingleStore/PostgreSQL that empty CSV fields mean NULL,
+    # which is required for nullable integer columns (imdb_id, episode_of_id, etc.)
+    # that produce lines like "1,Comedy Adventure,,4,1957,,,,,,,".
+    csv_delimiter = ","
+    csv_null_marker = ""
 
     def __init__(
         self,
@@ -292,6 +303,19 @@ class JoinOrderBenchmark(BaseBenchmark):
             "authors": "Viktor Leis, Andrey Gubichev, Atanas Mirchev, Peter Boncz, Alfons Kemper, Thomas Neumann",
         }
 
+    def get_dataframe_queries(self) -> QueryRegistry:
+        """Get DataFrame query implementations for JoinOrder.
+
+        Returns the QueryRegistry containing DataFrame implementations of all
+        13 JoinOrder queries for both expression-family and pandas-family platforms.
+
+        Returns:
+            QueryRegistry with all 13 JoinOrder DataFrame queries
+        """
+        from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries
+
+        return get_dataframe_queries()
+
     def __repr__(self) -> str:
         """String representation of the benchmark.
 
@@ -299,3 +323,28 @@ class JoinOrderBenchmark(BaseBenchmark):
             String representation
         """
         return f"JoinOrderBenchmark(scale_factor={self.scale_factor}, queries={self.get_query_count()})"
+
+
+# ---------------------------------------------------------------------------
+# Register benchmark-specific CLI option specs
+# ---------------------------------------------------------------------------
+
+from benchbox.cli.benchmark_hooks import (  # noqa: E402
+    BenchmarkHookRegistry,
+    BenchmarkOptionSpec,
+)
+
+BenchmarkHookRegistry.register_option_specs(
+    "joinorder",
+    BenchmarkOptionSpec(
+        name="queries_dir",
+        help="Directory containing custom query files",
+        aliases=("queries-dir",),
+    ),
+    BenchmarkOptionSpec(
+        name="force_regenerate",
+        parser=lambda v: v.strip().lower() in ("true", "1", "yes"),
+        help="Force data regeneration",
+        aliases=("force-regenerate",),
+    ),
+)

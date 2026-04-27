@@ -1,0 +1,142 @@
+name: Cross-Platform Validation
+
+# Nightly matrix: DuckDB × {DataFusion, Polars-DF, ClickHouse-local} at TPC-H SF=0.01.
+#
+# Purpose: detect silent cross-platform divergences before they land on main.
+# Scope:   credential-free tier only.  Snowflake/Databricks join when the
+#          nightly lane gains secrets (separate follow-up TODO).
+#
+# On failure: structured JSON diff artifacts are uploaded per (benchmark, platform-pair)
+# cell so that triage can identify the divergent query without re-running the suite.
+
+on:
+  schedule:
+    # 03:00 UTC every day - after nightly build artifacts are available.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      query_subset:
+        description: "Comma-separated query IDs to test (e.g. Q1,Q6). Empty = all."
+        required: false
+        default: ""
+
+jobs:
+  cross-platform-validation:
+    name: "TPC-H SF=0.01 | DuckDB × ${{ matrix.comparison }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        comparison:
+          - datafusion
+          - polars-df
+          - clickhouse-local
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: Run cross-platform validation tests
+        id: run_tests
+        run: |
+          # Map matrix.comparison to the pytest class name filter.
+          # Each matrix leg installs only the relevant extra so the other
+          # platform classes are automatically skipped via importorskip.
+          case "${{ matrix.comparison }}" in
+            datafusion)      CLASS_FILTER="TestDuckDBDataFusion" ;;
+            polars-df)       CLASS_FILTER="TestDuckDBPolarsDF" ;;
+            clickhouse-local) CLASS_FILTER="TestDuckDBClickHouseLocal" ;;
+            *) CLASS_FILTER="TestDuckDB" ;;
+          esac
+
+          # Build optional query subset filter from workflow_dispatch input.
+          # "Q1,Q6" → CLASS_FILTER becomes "TestDuckDBDataFusion and (Q1 or Q6)".
+          QUERY_SUBSET="${{ inputs.query_subset }}"
+          if [ -n "${QUERY_SUBSET}" ]; then
+            QUERY_EXPR=$(echo "${QUERY_SUBSET}" | tr ',' '\n' | paste -sd ' or ' -)
+            K_FILTER="${CLASS_FILTER} and (${QUERY_EXPR})"
+          else
+            K_FILTER="${CLASS_FILTER}"
+          fi
+
+          uv run -- python -m pytest \
+            tests/integration/validation/test_cross_platform.py \
+            -v \
+            -m "live_integration" \
+            -k "${K_FILTER}" \
+            --tb=short \
+            --json-report \
+            --json-report-file=validation-report-${{ matrix.comparison }}.json \
+          || echo "TESTS_FAILED=true" >> "$GITHUB_ENV"
+
+      - name: Generate structured diff artifact on failure
+        if: env.TESTS_FAILED == 'true'
+        run: |
+          uv run -- python -c "
+          import json, sys
+          from pathlib import Path
+
+          report_file = Path('validation-report-${{ matrix.comparison }}.json')
+          if not report_file.exists():
+              print('No report file found')
+              sys.exit(0)
+
+          report = json.loads(report_file.read_text())
+          failed_tests = [
+              t for t in report.get('tests', [])
+              if t.get('outcome') == 'failed'
+          ]
+
+          diff_artifact = {
+              'benchmark': 'tpch',
+              'scale_factor': 0.01,
+              'reference_platform': 'duckdb',
+              'comparison_platform': '${{ matrix.comparison }}',
+              'failed_queries': [
+                  {
+                      'query_id': t['nodeid'].rsplit('[', 1)[-1].rstrip(']'),
+                      'longrepr': t.get('call', {}).get('longrepr', ''),
+                  }
+                  for t in failed_tests
+              ],
+          }
+
+          output_path = Path('diff-artifact-${{ matrix.comparison }}.json')
+          output_path.write_text(json.dumps(diff_artifact, indent=2))
+          print(f'Wrote {output_path} with {len(failed_tests)} failed queries')
+          "
+
+      - name: Upload diff artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "cross-platform-diff-tpch-${{ matrix.comparison }}"
+          path: |
+            validation-report-${{ matrix.comparison }}.json
+            diff-artifact-${{ matrix.comparison }}.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Fail job if tests failed
+        if: env.TESTS_FAILED == 'true'
+        run: |
+          echo "Cross-platform validation failed for DuckDB × ${{ matrix.comparison }}"
+          echo "See the uploaded diff artifact for details on which queries diverged."
+          echo ""
+          echo "Triage steps:"
+          echo "  1. Download 'diff-artifact-${{ matrix.comparison }}.json'"
+          echo "  2. Identify the divergent query_id(s)"
+          echo "  3. See docs/development/result-validation-triage.md for next steps"
+          exit 1

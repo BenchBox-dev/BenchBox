@@ -599,7 +599,7 @@ class TestDuckDBAdapter:
         temp_dir = Path(tempfile.mkdtemp())
         temp_path = temp_dir / "test_table.tbl"
 
-        with open(temp_path, "w") as f:
+        with open(temp_path, "w", encoding="utf-8") as f:
             f.write("1|test1|\n2|test2|\n")
 
         try:
@@ -648,7 +648,9 @@ class TestDuckDBAdapter:
         temp_files = []
         try:
             for i in range(2):
-                with tempfile.NamedTemporaryFile(mode="w", suffix=f"_1_{i + 1}.tbl", delete=False) as f:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=f"_1_{i + 1}.tbl", delete=False, encoding="utf-8"
+                ) as f:
                     f.write(f"{i + 1}|test{i + 1}|\n{i + 3}|test{i + 3}|\n")
                     temp_files.append(Path(f.name))
 
@@ -692,7 +694,7 @@ class TestDuckDBAdapter:
         mock_benchmark = Mock()
 
         # Create empty test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
             pass  # Empty file
         temp_path = Path(f.name)
 
@@ -882,7 +884,7 @@ class TestDuckDBAdapter:
         assert "ANALYZE" in call_sql
         assert "FORMAT JSON" in call_sql
 
-        # analyze_plans=False: uses EXPLAIN (FORMAT JSON) — estimated plan only
+        # analyze_plans=False: uses EXPLAIN (FORMAT JSON) - estimated plan only
         mock_connection.execute.reset_mock()
         estimated_payload = '{"name": "SEQ_SCAN", "timing": null}'
         mock_connection.execute.return_value.fetchall.return_value = [("explain_key", estimated_payload)]
@@ -1223,7 +1225,7 @@ class TestDuckDBAdapter:
         temp_files = {}
         try:
             for table in ["table1", "table2"]:
-                with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False) as f:
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
                     f.write("1|test|\n")
                     temp_files[table] = str(Path(f.name))
 
@@ -1252,7 +1254,7 @@ class TestDuckDBAdapter:
         mock_benchmark = Mock()
 
         # Create test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
             f.write("1|test|\n")
             temp_path = Path(f.name)
 
@@ -1523,10 +1525,10 @@ class TestDuckDBAdapter:
         with patch("benchbox.platforms.duckdb.duckdb"):
             adapter = DuckDBAdapter()
 
-        # Directory has _delta_log — should be detected as Delta, not Iceberg
+        # Directory has _delta_log - should be detected as Delta, not Iceberg
         delta_dir = tmp_path / "lineitem_delta"
         (delta_dir / "_delta_log").mkdir(parents=True)
-        (delta_dir / "metadata").mkdir(parents=True)  # Also has metadata/ — Delta wins
+        (delta_dir / "metadata").mkdir(parents=True)  # Also has metadata/ - Delta wins
 
         benchmark = Mock()
         benchmark.tables = {"lineitem": delta_dir}

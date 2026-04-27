@@ -38,7 +38,7 @@ def analyze_dry_run_output(dry_run_dir: str):
         print(f"❌ Summary file not found: {summary_file}")
         return
 
-    with open(summary_file) as f:
+    with open(summary_file, encoding="utf-8") as f:
         summary = json.load(f)
 
     # Extract key information
@@ -68,7 +68,7 @@ def analyze_dry_run_output(dry_run_dir: str):
         # Analyze complexity for first few queries
         print("\n  Complexity analysis:")
         for query_file in query_files[:5]:
-            with open(query_file) as f:
+            with open(query_file, encoding="utf-8") as f:
                 content = f.read()
                 joins = content.upper().count("JOIN")
                 complexity = "High" if joins > 3 else "Medium" if joins > 1 else "Low"

@@ -53,25 +53,6 @@ class StarRocksMetadataMixin:
             help="StarRocks BE HTTP port for Stream Load (default: 8040)",
         )
 
-    @classmethod
-    def from_config(cls, config: dict[str, Any]):
-        """Create StarRocks adapter from unified configuration."""
-        adapter_config = {
-            "host": config.get("host", "localhost"),
-            "port": config.get("port", 9030),
-            "username": config.get("username", "root"),
-            "password": config.get("password", ""),
-            "database": config.get("database"),
-            "http_port": config.get("http_port", 8040),
-        }
-
-        # Pass through other relevant config
-        for key in ["tuning_config", "verbose_enabled", "very_verbose", "deployment_mode"]:
-            if key in config:
-                adapter_config[key] = config[key]
-
-        return cls(**adapter_config)
-
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect for StarRocks."""
         return "starrocks"

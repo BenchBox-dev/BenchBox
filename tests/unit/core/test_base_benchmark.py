@@ -384,9 +384,9 @@ def test_create_enhanced_benchmark_result_per_table_timings_missing_table(base_b
         per_table_timings={"lineitem": {"total_ms": 950}},
     )
 
-    # lineitem has timing — emitted as dict
+    # lineitem has timing - emitted as dict
     assert result.table_statistics["lineitem"] == {"rows": 6000000, "load_time_ms": 950}
-    # nation has no timing — load_time_ms=0 → only rows emitted
+    # nation has no timing - load_time_ms=0 → only rows emitted
     assert result.table_statistics["nation"] == {"rows": 25}
 
 
@@ -399,10 +399,10 @@ def test_create_enhanced_benchmark_result_per_table_timings_float_format(base_be
         duration_seconds=1.0,
         data_loading_time=1.0,
         table_statistics={"sales": 100000},
-        per_table_timings={"sales": 1.5},  # float, not dict — pre-fix fabric_spark format
+        per_table_timings={"sales": 1.5},  # float, not dict - pre-fix fabric_spark format
     )
 
-    assert result.table_statistics["sales"] == {"rows": 100000}  # no load_time_ms — graceful fallback
+    assert result.table_statistics["sales"] == {"rows": 100000}  # no load_time_ms - graceful fallback
 
 
 def test_result_factory_build_enhanced_benchmark_result_matches_base_behavior(base_benchmark):

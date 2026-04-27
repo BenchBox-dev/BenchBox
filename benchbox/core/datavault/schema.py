@@ -6,7 +6,7 @@ This module defines the Data Vault schema consisting of 21 tables:
 - 8 Satellite tables (descriptive attributes)
 
 The schema follows Data Vault 2.0 conventions with:
-- MD5 hash keys as surrogate keys
+- Hash keys as surrogate keys (MD5 or SHA-256; columns sized VARCHAR(64))
 - LOAD_DTS (load timestamp) for auditability
 - RECORD_SOURCE for data lineage
 - HASHDIFF for satellite change detection
@@ -19,6 +19,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from enum import Enum
 from typing import NamedTuple, Optional
 
+from benchbox.core.schema_primitives import BaseSchemaTable
+
 
 class DataType(Enum):
     """Enumeration of SQL data types used in Data Vault schema."""
@@ -29,7 +31,7 @@ class DataType(Enum):
     CHAR = "CHAR"
     DATE = "DATE"
     TIMESTAMP = "TIMESTAMP"
-    HASHKEY = "VARCHAR(32)"  # MD5 hash keys are always 32 hex characters
+    HASHKEY = "VARCHAR(64)"  # Hash key columns: 32 chars for MD5, 64 for SHA-256
 
 
 class Column(NamedTuple):
@@ -45,14 +47,14 @@ class Column(NamedTuple):
     def get_sql_type(self) -> str:
         """Get the SQL data type string for this column."""
         if self.data_type == DataType.HASHKEY:
-            return "VARCHAR(32)"
+            return "VARCHAR(64)"
         if self.data_type in (DataType.VARCHAR, DataType.CHAR) and self.size is not None:
             return f"{self.data_type.value}({self.size})"
         return self.data_type.value
 
 
-class Table:
-    """Represents a database table with its columns and constraints."""
+class Table(BaseSchemaTable):
+    """Represents a Data Vault table with its columns and constraints."""
 
     def __init__(
         self,
@@ -60,57 +62,15 @@ class Table:
         columns: list[Column],
         table_type: str = "unknown",
     ) -> None:
-        """Initialize a Table with a name and list of columns.
+        """Initialize a Table with a name, columns, and Data Vault type.
 
         Args:
             name: The name of the table
             columns: List of column definitions
             table_type: One of 'hub', 'link', 'satellite'
         """
-        self.name = name
-        self.columns = columns
+        super().__init__(name, columns)
         self.table_type = table_type
-
-    def get_primary_key(self) -> list[str]:
-        """Get the primary key column names for this table."""
-        return [col.name for col in self.columns if col.primary_key]
-
-    def get_foreign_keys(self) -> dict[str, tuple[str, str]]:
-        """Get the foreign key mappings for this table."""
-        return {col.name: col.foreign_key for col in self.columns if col.foreign_key is not None}
-
-    def get_create_table_sql(self, enable_primary_keys: bool = True, enable_foreign_keys: bool = True) -> str:
-        """Generate CREATE TABLE SQL statement for this table."""
-        column_defs = []
-        pk_columns = []
-        fk_defs = []
-
-        for col in self.columns:
-            col_def = f"{col.name} {col.get_sql_type()}"
-
-            if not col.nullable:
-                col_def += " NOT NULL"
-
-            if col.primary_key and enable_primary_keys:
-                pk_columns.append(col.name)
-
-            if col.foreign_key and enable_foreign_keys:
-                ref_table, ref_col = col.foreign_key
-                fk_defs.append(f"FOREIGN KEY ({col.name}) REFERENCES {ref_table}({ref_col})")
-
-            column_defs.append(col_def)
-
-        if pk_columns and enable_primary_keys:
-            column_defs.append(f"PRIMARY KEY ({', '.join(pk_columns)})")
-
-        if enable_foreign_keys:
-            column_defs.extend(fk_defs)
-
-        sql = f"CREATE TABLE {self.name} (\n    "
-        sql += ",\n    ".join(column_defs)
-        sql += "\n);"
-
-        return sql
 
 
 # =============================================================================

@@ -115,8 +115,8 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
             "shuffle_partitions": 200,
             # Enable Adaptive Query Execution for optimal performance
             "adaptive_enabled": True,
-            # Disable result cache for accurate benchmark timings
-            "disable_cache": True,
+            # disable_cache defaults to True for LakeSail; session-level cache suppression is safe,
+            # and the adapter skips the unsupported Spark Connect clearCache() call.
         },
     )
 

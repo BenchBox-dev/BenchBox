@@ -25,9 +25,9 @@ class TestSchemaDefinition:
     """Tests for NYC Taxi schema definition."""
 
     def test_schema_has_required_tables(self):
-        """Schema should define trips and taxi_zones tables."""
-        required_tables = {"trips", "taxi_zones"}
-        assert set(NYC_TAXI_SCHEMA.keys()) == required_tables
+        """Schema should define trips and taxi_zones tables (plus multi-type tables)."""
+        required_tables = {"trips", "taxi_zones", "green_trips", "hvfhv_trips"}
+        assert required_tables.issubset(set(NYC_TAXI_SCHEMA.keys()))
 
     def test_table_order_matches_schema(self):
         """TABLE_ORDER should contain all schema tables."""
@@ -114,13 +114,13 @@ class TestGetCreateTablesSql:
     """Tests for get_create_tables_sql function."""
 
     def test_generates_standard_sql(self):
-        """Should generate valid SQL for all tables."""
+        """Should generate valid SQL for Yellow+zones tables (default, no taxi_types)."""
         sql = get_create_tables_sql(dialect="standard")
         assert isinstance(sql, str)
         assert len(sql) > 0
-        # Should contain CREATE TABLE for all tables
-        for table_name in TABLE_ORDER:
-            assert f"CREATE TABLE {table_name}" in sql
+        # Default creates taxi_zones + trips (Yellow only)
+        assert "CREATE TABLE taxi_zones" in sql
+        assert "CREATE TABLE trips" in sql
 
     def test_includes_primary_key_constraints(self):
         """Should include PRIMARY KEY constraints by default."""

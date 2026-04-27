@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, clickbench
 ```
 
-> **CLI name:** `clickbench` — use `benchbox run --benchmark clickbench`
+> **CLI name:** `clickbench` - use `benchbox run --benchmark clickbench`
 
 ## Overview
 
@@ -276,6 +276,18 @@ print(f"Generated hits data: {size_mb:.2f} MB")
 schema = clickbench_small.get_schema()
 print(f"HITS table has {len(schema[0]['columns'])} columns")
 ```
+
+> **CSV loader preserves empty strings.** `ClickBench.get_csv_loading_config`
+> in `benchbox/core/clickbench/benchmark.py` configures the DuckDB CSV
+> loader with `nullstr='__NULL__'` - a sentinel chosen because it will
+> never appear in the generated data. The effect is that empty `|` `|`
+> fields load as empty strings, not NULL. This is required for
+> compatibility with the official ClickBench workload: the HITS schema
+> declares columns as `NOT NULL`, and many queries (e.g. Q11-Q15, Q22,
+> Q23, Q25-Q29, Q31, Q32, Q37, Q38) filter empties with
+> `<column> <> ''`. If you load the data via a different path (custom
+> COPY, `read_csv(nullstr='')`, etc.), apply the same empty-as-empty
+> policy or the result validator will diverge from the reference answers.
 
 ### DuckDB Integration Example
 

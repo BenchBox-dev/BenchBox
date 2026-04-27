@@ -429,7 +429,7 @@ See [Platform Documentation](../docs/platforms/index.md) for detailed setup guid
 - **Dry-Run Samples**: [dry_run_samples/README.md](dry_run_samples/README.md) - Example outputs
 
 ### Support
-- **Troubleshooting**: [../docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md)
+- **Troubleshooting**: [../docs/usage/troubleshooting.md](../docs/usage/troubleshooting.md)
 - **GitHub Issues**: [github.com/joeharris76/benchbox/issues](https://github.com/joeharris76/benchbox/issues)
 
 ---

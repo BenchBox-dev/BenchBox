@@ -121,7 +121,7 @@ class GzipCompressor(BaseCompressor):
                     shutil.copyfileobj(f_in, f_out)
             return output_path
         except Exception as e:
-            raise CompressionError(f"Failed to compress {input_path}: {e}")
+            raise CompressionError(f"Failed to compress {input_path}: {e}") from e
 
     def decompress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
         """Decompress a gzip file."""
@@ -136,7 +136,7 @@ class GzipCompressor(BaseCompressor):
                 shutil.copyfileobj(f_in, f_out)
             return output_path
         except Exception as e:
-            raise CompressionError(f"Failed to decompress {input_path}: {e}")
+            raise CompressionError(f"Failed to decompress {input_path}: {e}") from e
 
     def open_for_write(self, path: Path, mode: str = "wt") -> Union[TextIO, BinaryIO]:
         """Open a file for gzip-compressed writing."""
@@ -146,7 +146,7 @@ class GzipCompressor(BaseCompressor):
             )
             return result
         except Exception as e:
-            raise CompressionError(f"Failed to open {path} for compressed writing: {e}")
+            raise CompressionError(f"Failed to open {path} for compressed writing: {e}") from e
 
     def open_for_read(self, path: Path, mode: str = "rt") -> Union[TextIO, BinaryIO]:
         """Open a gzip file for reading."""
@@ -154,7 +154,7 @@ class GzipCompressor(BaseCompressor):
             result: Union[TextIO, BinaryIO] = cast(Union[TextIO, BinaryIO], gzip.open(path, mode))
             return result
         except Exception as e:
-            raise CompressionError(f"Failed to open {path} for compressed reading: {e}")
+            raise CompressionError(f"Failed to open {path} for compressed reading: {e}") from e
 
 
 class ZstdCompressor(BaseCompressor):
@@ -189,7 +189,7 @@ class ZstdCompressor(BaseCompressor):
                 cctx.copy_stream(f_in, f_out)
             return output_path
         except Exception as e:
-            raise CompressionError(f"Failed to compress {input_path}: {e}")
+            raise CompressionError(f"Failed to compress {input_path}: {e}") from e
 
     def decompress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
         """Decompress a zstd file."""
@@ -205,7 +205,7 @@ class ZstdCompressor(BaseCompressor):
                 dctx.copy_stream(f_in, f_out)
             return output_path
         except Exception as e:
-            raise CompressionError(f"Failed to decompress {input_path}: {e}")
+            raise CompressionError(f"Failed to decompress {input_path}: {e}") from e
 
     def open_for_write(self, path: Path, mode: str = "wt") -> Union[TextIO, BinaryIO]:
         """Open a file for zstd-compressed writing."""
@@ -220,7 +220,7 @@ class ZstdCompressor(BaseCompressor):
             else:
                 return cctx.stream_writer(open(path, "wb"), closefd=True)
         except Exception as e:
-            raise CompressionError(f"Failed to open {path} for compressed writing: {e}")
+            raise CompressionError(f"Failed to open {path} for compressed writing: {e}") from e
 
     def open_for_read(self, path: Path, mode: str = "rt") -> Union[TextIO, BinaryIO]:
         """Open a zstd file for reading."""
@@ -235,7 +235,7 @@ class ZstdCompressor(BaseCompressor):
             else:
                 return dctx.stream_reader(open(path, "rb"), closefd=True)
         except Exception as e:
-            raise CompressionError(f"Failed to open {path} for compressed reading: {e}")
+            raise CompressionError(f"Failed to open {path} for compressed reading: {e}") from e
 
 
 class NoCompressor(BaseCompressor):
@@ -257,7 +257,7 @@ class NoCompressor(BaseCompressor):
             shutil.copy2(input_path, output_path)
             return output_path
         except Exception as e:
-            raise CompressionError(f"Failed to copy {input_path}: {e}")
+            raise CompressionError(f"Failed to copy {input_path}: {e}") from e
 
     def decompress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
         """Copy file without decompression."""
@@ -268,21 +268,21 @@ class NoCompressor(BaseCompressor):
             shutil.copy2(input_path, output_path)
             return output_path
         except Exception as e:
-            raise CompressionError(f"Failed to copy {input_path}: {e}")
+            raise CompressionError(f"Failed to copy {input_path}: {e}") from e
 
     def open_for_write(self, path: Path, mode: str = "wt") -> Union[TextIO, BinaryIO]:
         """Open a file for uncompressed writing."""
         try:
             return cast(Union[TextIO, BinaryIO], open(path, mode))
         except Exception as e:
-            raise CompressionError(f"Failed to open {path} for writing: {e}")
+            raise CompressionError(f"Failed to open {path} for writing: {e}") from e
 
     def open_for_read(self, path: Path, mode: str = "rt") -> Union[TextIO, BinaryIO]:
         """Open a file for uncompressed reading."""
         try:
             return cast(Union[TextIO, BinaryIO], open(path, mode))
         except Exception as e:
-            raise CompressionError(f"Failed to open {path} for reading: {e}")
+            raise CompressionError(f"Failed to open {path} for reading: {e}") from e
 
 
 class CompressionManager:
@@ -367,4 +367,4 @@ class CompressionManager:
                 "space_savings_percent": space_savings,
             }
         except Exception as e:
-            raise CompressionError(f"Failed to get compression info: {e}")
+            raise CompressionError(f"Failed to get compression info: {e}") from e

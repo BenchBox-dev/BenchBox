@@ -32,6 +32,7 @@ BenchBox supports benchmarking DataFrame libraries using their native APIs inste
 | **PySpark** | `pyspark-df` | Expression | Production-ready | [PySpark DataFrame](pyspark-dataframe.md) |
 | **LakeSail** | `lakesail-df` | Expression | Production-ready | [LakeSail DataFrame](lakesail.md) |
 | **DataFusion** | `datafusion-df` | Expression | Production-ready | [DataFusion DataFrame](datafusion-dataframe.md) |
+| **Databricks** | `databricks-df` | Expression | Production-ready | [Databricks DataFrame](databricks-dataframe.md) |
 
 ```bash
 # Quick start with DataFrame platforms
@@ -43,6 +44,7 @@ benchbox run --platform cudf-df --benchmark tpch --scale 0.1      # GPU (Linux o
 benchbox run --platform pyspark-df --benchmark tpch --scale 0.1   # Spark ecosystem
 benchbox run --platform lakesail-df --benchmark tpch --scale 0.1  # Sail (fast Spark)
 benchbox run --platform datafusion-df --benchmark tpch --scale 0.1
+benchbox run --platform databricks-df --benchmark tpch --scale 0.1  # Databricks Connect
 
 # Compare SQL vs DataFrame on same workload
 benchbox run --platform polars --benchmark tpch --scale 0.1       # SQL mode
@@ -61,17 +63,25 @@ These platforms are included in the base BenchBox installation with no additiona
 ### Local/Embedded Analytics Engines
 
 - [Apache DataFusion](datafusion.md) - Rust-based in-memory query engine
-- [ClickHouse Local Mode](clickhouse-local-mode.md) - Running ClickHouse embedded
+- [ClickHouse Local](clickhouse-local-mode.md) - Embedded ClickHouse via chDB (zero-config)
+- [ClickHouse Server](clickhouse-server.md) - Self-hosted ClickHouse via clickhouse-driver
 - [Polars](polars.md) - High-performance DataFrame library with SQL support
 
 ### Traditional Relational Databases
 
 - [PostgreSQL](postgresql.md) - Open-source relational database with TimescaleDB support
+- [CedarDB](cedardb.md) - High-performance HTAP engine over PostgreSQL wire protocol (formerly Umbra)
+
+### PostgreSQL Extensions
+
+- [pg_duckdb](pg_duckdb.md) - DuckDB-powered Postgres extension for vectorized OLAP
+- [pg_mooncake](pg_mooncake.md) - Columnar storage for Postgres with Iceberg and Delta Lake support
 
 ### Self-Hosted OLAP Databases
 
 - [StarRocks](starrocks.md) - MPP columnar OLAP database (MySQL protocol + Stream Load)
 - [Apache Doris](doris.md) - MPP real-time analytical database (MySQL protocol + Stream Load)
+- [SingleStore](singlestore.md) - Distributed SQL with columnstore analytics (MySQL protocol + LOAD DATA)
 - [QuestDB](questdb.md) - Time-series database (PostgreSQL wire protocol + REST API)
 
 ### Distributed SQL Engines
@@ -80,6 +90,7 @@ These platforms are included in the base BenchBox installation with no additiona
 - [Trino](trino.md) - Distributed SQL query engine (community fork, formerly PrestoSQL)
 - [Apache Spark](spark.md) - Unified analytics engine for large-scale data processing
 - [LakeSail Sail](lakesail.md) - High-performance Spark-compatible engine (Spark Connect)
+- [Apache Gluten + Velox](velox.md) - Spark plugin that offloads physical operators to a vectorized C++ engine (Linux-only, Docker on macOS/Windows)
 
 ### Cloud Data Warehouses
 
@@ -95,7 +106,8 @@ These platforms are included in the base BenchBox installation with no additiona
 - [Firebolt](firebolt.md) - High-performance cloud analytics (Core + Cloud modes)
 - [Databend](databend.md) - Cloud-native OLAP warehouse (Snowflake-compatible SQL, S3/MinIO storage)
 - [Azure Synapse Analytics](azure-platforms.md) - Microsoft cloud analytics platform
-- [Microsoft Fabric](microsoft-fabric.md) - Microsoft unified analytics platform
+- [Microsoft Fabric Warehouse](microsoft-fabric.md) - T-SQL warehouse with OneLake-native storage
+- [Microsoft Fabric Lakehouse SQL](fabric-lakehouse.md) - Read-only SQL endpoint over Fabric lakehouses
 - [TimescaleDB / TigerData](timescaledb.md) - TimescaleDB with managed TigerData cloud mode (`timescaledb:cloud`)
 
 ### GPU-Accelerated Platforms
@@ -116,7 +128,7 @@ These platforms are included in the base BenchBox installation with no additiona
 - Databricks SQL, Databend, BigQuery, Redshift, Snowflake, Amazon Athena, Firebolt, Azure Synapse Analytics
 
 **Infrastructure Required** (external cluster needed):
-- Trino, Presto, Spark, LakeSail, StarRocks, Doris, QuestDB, ClickHouse (server mode)
+- Trino, Presto, Spark, LakeSail, Gluten+Velox (Linux/Docker), StarRocks, Doris, QuestDB, ClickHouse (server mode)
 
 ### By Use Case
 
@@ -127,7 +139,7 @@ These platforms are included in the base BenchBox installation with no additiona
 - Databricks, Snowflake, BigQuery, Redshift
 
 **Self-Hosted Analytics:**
-- ClickHouse, StarRocks, Doris, QuestDB, PostgreSQL, Trino, Presto, Spark, LakeSail
+- ClickHouse, StarRocks, Doris, QuestDB, PostgreSQL, Trino, Presto, Spark, LakeSail, Gluten+Velox
 
 **GPU Workloads:**
 - CUDF (NVIDIA GPUs required)
@@ -184,15 +196,24 @@ dask-dataframe
 cudf
 pyspark-dataframe
 datafusion-dataframe
+databricks-dataframe
 spark
 lakesail
+velox
+velox_jar_setup
 starrocks
 doris
+singlestore
 questdb
 databend
+cedardb
 clickhouse-local-mode
+clickhouse-server
 clickhouse-cloud
+clickhouse-migration
 postgresql
+pg_duckdb
+pg_mooncake
 presto
 trino
 snowflake
@@ -206,6 +227,7 @@ athena
 athena-spark
 firebolt
 microsoft-fabric
+fabric-lakehouse
 azure-platforms
 datafusion
 influxdb

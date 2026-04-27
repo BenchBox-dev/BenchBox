@@ -34,7 +34,7 @@ class DataVaultETLTransformer(CompressionMixin):
     5. Optionally compresses output files
 
     Attributes:
-        hash_algorithm: Algorithm for hash key generation ('md5')
+        hash_algorithm: Algorithm for hash key generation ('md5' or 'sha256')
         record_source: Source system identifier for audit columns
         compress_data: Whether to compress output files (inherited from CompressionMixin)
         compression_type: Type of compression to use ('none', 'gzip', 'zstd')
@@ -123,7 +123,7 @@ class DataVaultETLTransformer(CompressionMixin):
 
         Args:
             scale_factor: Benchmark scale factor
-            hash_algorithm: Hash algorithm for keys (only 'md5' supported)
+            hash_algorithm: Hash algorithm for keys ('md5' or 'sha256')
             record_source: Source identifier for RECORD_SOURCE columns
             **kwargs: Compression options passed to CompressionMixin:
                 - compress_data: Whether to enable compression (default: False)
@@ -133,8 +133,16 @@ class DataVaultETLTransformer(CompressionMixin):
         # Initialize compression mixin first
         super().__init__(**kwargs)
 
-        if hash_algorithm != "md5":
-            raise ValueError(f"Only 'md5' hash algorithm is supported, got: {hash_algorithm}")
+        # Local import: benchmark.py lazily imports this module via its etl_transformer
+        # property, so a module-level import would work today. Keeping the import local
+        # is defensive - stays safe regardless of future import-order changes.
+        from benchbox.core.datavault.benchmark import DataVaultBenchmark
+
+        if hash_algorithm not in DataVaultBenchmark.SUPPORTED_HASH_ALGORITHMS:
+            raise ValueError(
+                f"Unsupported hash algorithm: '{hash_algorithm}'. "
+                f"Supported algorithms: {DataVaultBenchmark.SUPPORTED_HASH_ALGORITHMS}."
+            )
 
         self.scale_factor = scale_factor
         self.hash_algorithm = hash_algorithm
@@ -479,11 +487,11 @@ class DataVaultETLTransformer(CompressionMixin):
         if "bk_cols" in config:
             # Composite business key
             bk_cols = config["bk_cols"]
-            hk_expr = generate_hash_key_sql(*bk_cols)
+            hk_expr = generate_hash_key_sql(*bk_cols, algorithm=self.hash_algorithm)
             bk_select = ", ".join(bk_cols)
         else:
             bk_col = config["bk_col"]
-            hk_expr = generate_hash_key_sql(bk_col)
+            hk_expr = generate_hash_key_sql(bk_col, algorithm=self.hash_algorithm)
             bk_select = bk_col
 
         return f"""
@@ -554,16 +562,16 @@ class DataVaultETLTransformer(CompressionMixin):
         source = config["source"]
 
         # Link hash key from all FK columns
-        link_hk_expr = generate_hash_key_sql(*config["hk_cols"])
+        link_hk_expr = generate_hash_key_sql(*config["hk_cols"], algorithm=self.hash_algorithm)
         link_hk_name = "hk_lineitem_link" if table_name == "link_lineitem" else f"hk_{table_name.replace('link_', '')}"
 
         # Hub hash keys
         hub_hk_exprs = []
         for hk_name, cols in config["hub_hks"]:
             if isinstance(cols, list):
-                expr = generate_hash_key_sql(*cols)
+                expr = generate_hash_key_sql(*cols, algorithm=self.hash_algorithm)
             else:
-                expr = generate_hash_key_sql(cols)
+                expr = generate_hash_key_sql(cols, algorithm=self.hash_algorithm)
             hub_hk_exprs.append(f"{expr} AS {hk_name}")
 
         hub_hks_select = ",\n                ".join(hub_hk_exprs)
@@ -667,12 +675,12 @@ class DataVaultETLTransformer(CompressionMixin):
         # Hub/Link hash key
         hk_source = config["hk_source"]
         if isinstance(hk_source, list):
-            hk_expr = generate_hash_key_sql(*hk_source)
+            hk_expr = generate_hash_key_sql(*hk_source, algorithm=self.hash_algorithm)
         else:
-            hk_expr = generate_hash_key_sql(hk_source)
+            hk_expr = generate_hash_key_sql(hk_source, algorithm=self.hash_algorithm)
 
         # HASHDIFF from all attributes
-        hashdiff_expr = generate_hashdiff_sql(*attrs)
+        hashdiff_expr = generate_hashdiff_sql(*attrs, algorithm=self.hash_algorithm)
 
         # Attribute columns
         attrs_select = ",\n                ".join(attrs)

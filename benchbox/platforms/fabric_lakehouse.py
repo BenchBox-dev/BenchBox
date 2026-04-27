@@ -227,6 +227,8 @@ class FabricLakehouseAdapter(PlatformAdapter):
         return token not in self._READ_ONLY_TOKENS
 
     def create_schema(self, benchmark: Any, connection: Any) -> float:
+        # Raises (not returns dict) because these setup-phase calls are fatal:
+        # the orchestrator has no mechanism to continue if schema creation fails.
         raise self._read_only_error("CREATE SCHEMA/TABLE")
 
     def load_data(

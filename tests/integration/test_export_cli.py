@@ -98,7 +98,7 @@ def test_export_specific_file_to_csv(tmp_path):
     result_file = tmp_path / "test_result.json"
     result_data = make_v2_result_data()
 
-    with open(result_file, "w") as f:
+    with open(result_file, "w", encoding="utf-8") as f:
         json.dump(result_data, f)
 
     output_dir = tmp_path / "exports"
@@ -129,7 +129,7 @@ def test_export_multiple_formats(tmp_path):
     result_file = tmp_path / "test_result.json"
     result_data = make_v2_result_data()
 
-    with open(result_file, "w") as f:
+    with open(result_file, "w", encoding="utf-8") as f:
         json.dump(result_data, f)
 
     output_dir = tmp_path / "exports"
@@ -168,7 +168,7 @@ def test_export_with_force_flag(tmp_path):
     result_file = tmp_path / "test_result.json"
     result_data = make_v2_result_data()
 
-    with open(result_file, "w") as f:
+    with open(result_file, "w", encoding="utf-8") as f:
         json.dump(result_data, f)
 
     output_dir = tmp_path / "exports"
@@ -200,7 +200,7 @@ def test_export_invalid_schema_version(tmp_path):
         "benchmark": {"name": "Test"},
     }
 
-    with open(result_file, "w") as f:
+    with open(result_file, "w", encoding="utf-8") as f:
         json.dump(result_data, f)
 
     result = run_cli_command(["export", str(result_file), "--format", "csv"])
@@ -214,7 +214,7 @@ def test_export_corrupted_json(tmp_path):
     """Test export with corrupted JSON shows error."""
     result_file = tmp_path / "corrupted.json"
 
-    with open(result_file, "w") as f:
+    with open(result_file, "w", encoding="utf-8") as f:
         f.write("{ invalid json content")
 
     result = run_cli_command(["export", str(result_file), "--format", "csv"])
@@ -253,7 +253,7 @@ def test_export_preserves_content(tmp_path):
         ],
     )
 
-    with open(result_file, "w") as f:
+    with open(result_file, "w", encoding="utf-8") as f:
         json.dump(result_data, f)
 
     output_dir = tmp_path / "exports"
@@ -270,7 +270,7 @@ def test_export_preserves_content(tmp_path):
     json_files = list(output_dir.glob("*.json"))
     assert len(json_files) == 1
 
-    with open(json_files[0]) as f:
+    with open(json_files[0], encoding="utf-8") as f:
         exported_data = json.load(f)
 
     # Verify key fields are preserved (v2.x schema structure)
@@ -288,7 +288,7 @@ def test_export_html_format_creates_standalone_file(tmp_path):
     result_file = tmp_path / "test_result.json"
     result_data = make_v2_result_data(execution_id="html_test")
 
-    with open(result_file, "w") as f:
+    with open(result_file, "w", encoding="utf-8") as f:
         json.dump(result_data, f)
 
     output_dir = tmp_path / "exports"

@@ -33,14 +33,14 @@ from .registry import register_query
 
 
 def q1_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q1: COUNT(*) — full table scan count."""
+    """Q1: COUNT(*) - full table scan count."""
     hits = ctx.get_table("hits")
     col = ctx.col
     return hits.select(col("WatchID").count().alias("count"))
 
 
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q1: COUNT(*) — full table scan count."""
+    """Q1: COUNT(*) - full table scan count."""
     import pandas as pd
 
     hits = ctx.get_table("hits")
@@ -70,7 +70,7 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q3_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q3: SUM, COUNT, AVG — multi-aggregate full scan."""
+    """Q3: SUM, COUNT, AVG - multi-aggregate full scan."""
     hits = ctx.get_table("hits")
     col = ctx.col
     return hits.select(
@@ -81,7 +81,7 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q3_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q3: SUM, COUNT, AVG — multi-aggregate full scan."""
+    """Q3: SUM, COUNT, AVG - multi-aggregate full scan."""
     import pandas as pd
 
     hits = ctx.get_table("hits")
@@ -96,14 +96,14 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q4_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q4: AVG(UserID) — average of BIGINT column."""
+    """Q4: AVG(UserID) - average of BIGINT column."""
     hits = ctx.get_table("hits")
     col = ctx.col
     return hits.select(col("UserID").mean().alias("avg_user_id"))
 
 
 def q4_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q4: AVG(UserID) — average of BIGINT column."""
+    """Q4: AVG(UserID) - average of BIGINT column."""
     import pandas as pd
 
     hits = ctx.get_table("hits")
@@ -687,7 +687,7 @@ def q29_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q30_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q30: Wide aggregation — SUM(ResolutionWidth + N) for N=0..89."""
+    """Q30: Wide aggregation - SUM(ResolutionWidth + N) for N=0..89."""
     hits = ctx.get_table("hits")
     col = ctx.col
     lit = ctx.lit
@@ -696,7 +696,7 @@ def q30_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q30_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q30: Wide aggregation — SUM(ResolutionWidth + N) for N=0..89."""
+    """Q30: Wide aggregation - SUM(ResolutionWidth + N) for N=0..89."""
     import pandas as pd
 
     hits = ctx.get_table("hits")
@@ -1167,7 +1167,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q1",
             query_name="Full Scan Count",
-            description="COUNT(*) full table scan — baseline performance test",
+            description="COUNT(*) full table scan - baseline performance test",
             categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
             expression_impl=q1_expression_impl,
             pandas_impl=q1_pandas_impl,
@@ -1187,7 +1187,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q3",
             query_name="Multi-Aggregate Scan",
-            description="SUM, COUNT, AVG on full table scan — multiple aggregate functions",
+            description="SUM, COUNT, AVG on full table scan - multiple aggregate functions",
             categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
             expression_impl=q3_expression_impl,
             pandas_impl=q3_pandas_impl,
@@ -1197,7 +1197,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q4",
             query_name="Average UserID",
-            description="AVG on BIGINT column — numeric precision test",
+            description="AVG on BIGINT column - numeric precision test",
             categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
             expression_impl=q4_expression_impl,
             pandas_impl=q4_pandas_impl,
@@ -1207,7 +1207,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q5",
             query_name="Unique Users",
-            description="COUNT(DISTINCT UserID) — cardinality estimation",
+            description="COUNT(DISTINCT UserID) - cardinality estimation",
             categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
             expression_impl=q5_expression_impl,
             pandas_impl=q5_pandas_impl,
@@ -1217,7 +1217,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q6",
             query_name="Unique Search Phrases",
-            description="COUNT(DISTINCT SearchPhrase) — string cardinality",
+            description="COUNT(DISTINCT SearchPhrase) - string cardinality",
             categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
             expression_impl=q6_expression_impl,
             pandas_impl=q6_pandas_impl,
@@ -1227,7 +1227,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q7",
             query_name="Date Range",
-            description="MIN/MAX on EventDate — date column statistics",
+            description="MIN/MAX on EventDate - date column statistics",
             categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
             expression_impl=q7_expression_impl,
             pandas_impl=q7_pandas_impl,
@@ -1259,7 +1259,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q10",
             query_name="Region Multi-Aggregate",
-            description="Multi-aggregate by RegionID — SUM, COUNT, AVG, COUNT(DISTINCT)",
+            description="Multi-aggregate by RegionID - SUM, COUNT, AVG, COUNT(DISTINCT)",
             categories=[QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.AGGREGATE],
             expression_impl=q10_expression_impl,
             pandas_impl=q10_pandas_impl,
@@ -1341,7 +1341,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q18",
             query_name="User Search Unordered",
-            description="User + search phrase group without ordering — nondeterministic",
+            description="User + search phrase group without ordering - nondeterministic",
             categories=[QueryCategory.GROUP_BY],
             expression_impl=q18_expression_impl,
             pandas_impl=q18_pandas_impl,
@@ -1373,7 +1373,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q21",
             query_name="URL Google Count",
-            description="Count rows where URL contains 'google' — string containment test",
+            description="Count rows where URL contains 'google' - string containment test",
             categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
             expression_impl=q21_expression_impl,
             pandas_impl=q21_pandas_impl,
@@ -1393,7 +1393,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q23",
             query_name="Google Title Analysis",
-            description="Search phrases for Google titles excluding .google. URLs — case-sensitive LIKE",
+            description="Search phrases for Google titles excluding .google. URLs - case-sensitive LIKE",
             categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
             expression_impl=q23_expression_impl,
             pandas_impl=q23_pandas_impl,
@@ -1403,7 +1403,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q24",
             query_name="Google URL Full Rows",
-            description="All columns for google URLs sorted by EventTime — wide output",
+            description="All columns for google URLs sorted by EventTime - wide output",
             categories=[QueryCategory.FILTER, QueryCategory.SORT, QueryCategory.PROJECTION],
             expression_impl=q24_expression_impl,
             pandas_impl=q24_pandas_impl,
@@ -1455,7 +1455,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q29",
             query_name="Domain Extraction",
-            description="Regex domain extraction from Referer with HAVING — complex string operation",
+            description="Regex domain extraction from Referer with HAVING - complex string operation",
             categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE, QueryCategory.ANALYTICAL],
             expression_impl=q29_expression_impl,
             pandas_impl=q29_pandas_impl,
@@ -1467,7 +1467,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q30",
             query_name="Wide Aggregation",
-            description="90-column SUM(ResolutionWidth + N) — wide aggregation test",
+            description="90-column SUM(ResolutionWidth + N) - wide aggregation test",
             categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
             expression_impl=q30_expression_impl,
             pandas_impl=q30_pandas_impl,
@@ -1489,7 +1489,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q32",
             query_name="Watch Client Analysis (Filtered)",
-            description="Multi-agg by WatchID + ClientIP, filtered — high cardinality",
+            description="Multi-agg by WatchID + ClientIP, filtered - high cardinality",
             categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
             expression_impl=q32_expression_impl,
             pandas_impl=q32_pandas_impl,
@@ -1499,7 +1499,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q33",
             query_name="Watch Client Analysis (Unfiltered)",
-            description="Multi-agg by WatchID + ClientIP, unfiltered — high cardinality full scan",
+            description="Multi-agg by WatchID + ClientIP, unfiltered - high cardinality full scan",
             categories=[QueryCategory.GROUP_BY, QueryCategory.SORT],
             expression_impl=q33_expression_impl,
             pandas_impl=q33_pandas_impl,
@@ -1509,7 +1509,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q34",
             query_name="Top URLs",
-            description="Top URLs by count — high cardinality text GROUP BY",
+            description="Top URLs by count - high cardinality text GROUP BY",
             categories=[QueryCategory.GROUP_BY, QueryCategory.SORT],
             expression_impl=q34_expression_impl,
             pandas_impl=q34_pandas_impl,
@@ -1519,7 +1519,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q35",
             query_name="Literal Column URL Group",
-            description="GROUP BY literal constant column plus URL — tests derived column grouping",
+            description="GROUP BY literal constant column plus URL - tests derived column grouping",
             categories=[QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
             expression_impl=q35_expression_impl,
             pandas_impl=q35_pandas_impl,
@@ -1529,7 +1529,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q36",
             query_name="Derived Column Group",
-            description="GROUP BY ClientIP and derived arithmetic columns — expression grouping",
+            description="GROUP BY ClientIP and derived arithmetic columns - expression grouping",
             categories=[QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
             expression_impl=q36_expression_impl,
             pandas_impl=q36_pandas_impl,
@@ -1561,7 +1561,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q39",
             query_name="URL Views with Offset",
-            description="URL page views with OFFSET 1000 — pagination test",
+            description="URL page views with OFFSET 1000 - pagination test",
             categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
             expression_impl=q39_expression_impl,
             pandas_impl=q39_pandas_impl,
@@ -1606,7 +1606,7 @@ def _register_all_queries() -> None:
         DataFrameQuery(
             query_id="Q43",
             query_name="Minute Granularity",
-            description="Page views by minute with DATE_TRUNC — temporal aggregation",
+            description="Page views by minute with DATE_TRUNC - temporal aggregation",
             categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
             expression_impl=q43_expression_impl,
             pandas_impl=q43_pandas_impl,

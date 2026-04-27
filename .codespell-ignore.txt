@@ -83,3 +83,9 @@ asceding
 
 # Python unittest method names (codespell false positives)
 assertIn
+
+# DuckDB SQL function name
+iif
+
+# IATA airport codes in FlightData reference data (not misspellings)
+MKE

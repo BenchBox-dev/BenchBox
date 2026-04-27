@@ -183,7 +183,7 @@ class TestLinuxMachineID:
         machine_id = manager._get_linux_machine_id()
 
         assert machine_id == "abc123def456ghi789"
-        mock_file.assert_called_with("/etc/machine-id")
+        mock_file.assert_called_with("/etc/machine-id", encoding="utf-8")
 
     @patch("platform.system")
     @patch("os.path.exists")
@@ -197,7 +197,7 @@ class TestLinuxMachineID:
         machine_id = manager._get_linux_machine_id()
 
         assert machine_id == "xyz789abc123def456"
-        mock_file.assert_called_with("/var/lib/dbus/machine-id")
+        mock_file.assert_called_with("/var/lib/dbus/machine-id", encoding="utf-8")
 
     @patch("platform.system")
     @patch("os.path.exists")
@@ -477,6 +477,247 @@ class TestAnonymizationConfig:
         assert config.include_machine_id is False
         assert config.machine_id_salt == "custom_salt"
         assert config.anonymize_paths is False
+
+
+class TestAnonymizeSystemProfile:
+    """Test anonymize_system_profile method."""
+
+    def test_returns_dict_with_expected_keys(self):
+        manager = AnonymizationManager()
+        profile = manager.anonymize_system_profile()
+        assert isinstance(profile, dict)
+        assert "os_type" in profile
+        assert "cpu_count" in profile
+        assert "python_version" in profile
+
+    def test_hostname_is_anonymized(self):
+        config = AnonymizationConfig(anonymize_hostnames=True)
+        manager = AnonymizationManager(config)
+        profile = manager.anonymize_system_profile()
+        assert profile["hostname"].startswith("host_")
+
+    def test_hostname_not_anonymized_when_disabled(self):
+        config = AnonymizationConfig(anonymize_hostnames=False)
+        manager = AnonymizationManager(config)
+        profile = manager.anonymize_system_profile()
+        assert not profile["hostname"].startswith("host_")
+
+    def test_username_anonymized_when_enabled(self):
+        config = AnonymizationConfig(anonymize_usernames=True)
+        manager = AnonymizationManager(config)
+        profile = manager.anonymize_system_profile()
+        username = profile.get("username", "")
+        assert username.startswith("user_") or username == "anonymous"
+
+    def test_include_system_profile_false_returns_empty(self):
+        config = AnonymizationConfig(include_system_profile=False)
+        manager = AnonymizationManager(config)
+        profile = manager.anonymize_system_profile()
+        assert profile == {}
+
+    def test_hostname_is_cached_consistently(self):
+        manager = AnonymizationManager()
+        p1 = manager.anonymize_system_profile()
+        p2 = manager.anonymize_system_profile()
+        assert p1["hostname"] == p2["hostname"]
+
+
+class TestSanitizePath:
+    """Test path sanitization."""
+
+    def test_allowed_prefix_path_unchanged(self):
+        manager = AnonymizationManager()
+        result = manager.sanitize_path("/tmp/benchmark/results.json")
+        assert result == "/tmp/benchmark/results.json"
+
+    def test_path_anonymization_disabled(self):
+        config = AnonymizationConfig(anonymize_paths=False)
+        manager = AnonymizationManager(config)
+        result = manager.sanitize_path("/home/user/secret/data.parquet")
+        assert result == "/home/user/secret/data.parquet"
+
+    def test_long_path_component_hashed(self):
+        manager = AnonymizationManager()
+        # A path component with more than 20 chars should be hashed
+        result = manager.sanitize_path("/some/averylongdirectorynamewithmanychars/file.parquet")
+        assert "averylongdirectorynamewithmanychars" not in result
+        assert "dir_" in result
+
+    def test_path_cache_returns_same_result(self):
+        manager = AnonymizationManager()
+        p = "/home/alice/project/data.csv"
+        r1 = manager.sanitize_path(p)
+        r2 = manager.sanitize_path(p)
+        assert r1 == r2
+
+    def test_common_system_dirs_kept(self):
+        manager = AnonymizationManager()
+        result = manager.sanitize_path("/home/foo")
+        assert "home" in result
+
+    def test_numeric_component_hashed(self):
+        manager = AnonymizationManager()
+        result = manager.sanitize_path("/data/user123/file.parquet")
+        # "user123" has a digit so should be hashed
+        assert "user123" not in result
+
+
+class TestRemovePII:
+    """Test PII removal from text."""
+
+    def test_removes_ip_address(self):
+        manager = AnonymizationManager()
+        result = manager.remove_pii("Server at 192.168.1.100 failed")
+        assert "192.168.1.100" not in result
+        assert "[REDACTED]" in result
+
+    def test_removes_email(self):
+        manager = AnonymizationManager()
+        result = manager.remove_pii("Contact user@example.com for help")
+        assert "user@example.com" not in result
+        assert "[REDACTED]" in result
+
+    def test_removes_ssn_like_pattern(self):
+        manager = AnonymizationManager()
+        result = manager.remove_pii("SSN: 123-45-6789")
+        assert "123-45-6789" not in result
+
+    def test_empty_string_returns_empty(self):
+        manager = AnonymizationManager()
+        assert manager.remove_pii("") == ""
+
+    def test_custom_sanitizer_applied(self):
+        config = AnonymizationConfig(custom_sanitizers={r"SECRET-\d+": "[TOKEN]"})
+        manager = AnonymizationManager(config)
+        result = manager.remove_pii("Using key SECRET-9876")
+        assert "SECRET-9876" not in result
+        assert "[TOKEN]" in result
+
+    def test_clean_text_unchanged(self):
+        manager = AnonymizationManager()
+        clean = "Benchmark finished in 3.5 seconds"
+        assert manager.remove_pii(clean) == clean
+
+
+class TestAnonymizeQueryMetadata:
+    """Test query metadata anonymization."""
+
+    def test_safe_fields_preserved(self):
+        manager = AnonymizationManager()
+        meta = {"query_id": "Q1", "execution_time": 1.5, "rows_returned": 100, "status": "ok"}
+        result = manager.anonymize_query_metadata(meta)
+        assert result["query_id"] == "Q1"
+        assert result["execution_time"] == 1.5
+        assert result["rows_returned"] == 100
+
+    def test_sql_text_pii_removed(self):
+        manager = AnonymizationManager()
+        meta = {"sql_text": "SELECT * FROM t WHERE email = 'user@example.com'"}
+        result = manager.anonymize_query_metadata(meta)
+        assert "user@example.com" not in result["sql_text"]
+
+    def test_file_path_sanitized(self):
+        manager = AnonymizationManager()
+        meta = {"file_path": "/tmp/data.parquet"}
+        result = manager.anonymize_query_metadata(meta)
+        assert result["file_path"] == "/tmp/data.parquet"
+
+    def test_nested_dict_recursed(self):
+        manager = AnonymizationManager()
+        meta = {"nested": {"sql_text": "SELECT 1"}}
+        result = manager.anonymize_query_metadata(meta)
+        assert "nested" in result
+
+    def test_list_values_processed(self):
+        manager = AnonymizationManager()
+        meta = {"tags": ["fast", "192.168.1.1"]}
+        result = manager.anonymize_query_metadata(meta)
+        assert isinstance(result["tags"], list)
+        joined = " ".join(result["tags"])
+        assert "192.168.1.1" not in joined
+
+    def test_empty_dict_returns_empty(self):
+        manager = AnonymizationManager()
+        assert manager.anonymize_query_metadata({}) == {}
+
+
+class TestAnonymizeExecutionMetadata:
+    """Test execution metadata anonymization."""
+
+    def test_safe_benchmark_fields_preserved(self):
+        manager = AnonymizationManager()
+        meta = {
+            "benchmark_name": "tpch",
+            "platform": "duckdb",
+            "scale_factor": 1.0,
+            "execution_id": "run-001",
+        }
+        result = manager.anonymize_execution_metadata(meta)
+        assert result["benchmark_name"] == "tpch"
+        assert result["platform"] == "duckdb"
+
+    def test_machine_id_replaced_with_anonymous(self):
+        manager = AnonymizationManager()
+        meta = {"machine_id": "real-machine-id-12345"}
+        result = manager.anonymize_execution_metadata(meta)
+        assert "anonymous_machine_id" in result
+        assert result["anonymous_machine_id"].startswith("machine_")
+
+    def test_system_profile_included(self):
+        manager = AnonymizationManager()
+        meta = {"system_profile": {"hostname": "myhost", "os_type": "Linux"}}
+        result = manager.anonymize_execution_metadata(meta)
+        assert "system_profile" in result
+
+    def test_data_path_sanitized(self):
+        manager = AnonymizationManager()
+        meta = {"data_directory": "/tmp/bench_data"}
+        result = manager.anonymize_execution_metadata(meta)
+        assert result["data_directory"] == "/tmp/bench_data"
+
+    def test_query_results_list_anonymized(self):
+        manager = AnonymizationManager()
+        meta = {
+            "query_results": [
+                {"query_id": "Q1", "execution_time": 1.0},
+                {"query_id": "Q2", "execution_time": 2.0},
+            ]
+        }
+        result = manager.anonymize_execution_metadata(meta)
+        assert isinstance(result["query_results"], list)
+        assert len(result["query_results"]) == 2
+
+    def test_empty_metadata_returns_empty(self):
+        manager = AnonymizationManager()
+        assert manager.anonymize_execution_metadata({}) == {}
+
+
+class TestValidateAnonymization:
+    """Test anonymization validation."""
+
+    def test_valid_anonymized_data_passes(self):
+        manager = AnonymizationManager()
+        meta = {"benchmark_name": "tpch", "machine_id": "x"}
+        anonymized = manager.anonymize_execution_metadata(meta)
+        validation = manager.validate_anonymization(meta, anonymized)
+        assert validation["is_valid"] is True
+        assert isinstance(validation["checks_performed"], list)
+
+    def test_pii_in_anonymized_data_generates_warning(self):
+        manager = AnonymizationManager()
+        original = {}
+        # Manually inject IP into otherwise clean data
+        anonymized = {"result": "connected to 10.0.0.1"}
+        validation = manager.validate_anonymization(original, anonymized)
+        warnings = " ".join(validation["warnings"])
+        assert "IP" in warnings or "ip" in warnings.lower()
+
+    def test_missing_machine_id_generates_error(self):
+        config = AnonymizationConfig(include_machine_id=True)
+        manager = AnonymizationManager(config)
+        validation = manager.validate_anonymization({}, {"result": "ok"})
+        assert any("machine" in e.lower() for e in validation["errors"])
+        assert validation["is_valid"] is False
 
 
 if __name__ == "__main__":

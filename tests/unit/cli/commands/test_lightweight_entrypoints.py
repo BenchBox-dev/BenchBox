@@ -14,14 +14,17 @@ from rich.panel import Panel
 from benchbox.cli.app import main as app_main, version_callback, version_json_callback
 from benchbox.cli.commands.benchmarks import list_benchmarks
 from benchbox.cli.commands.config import validate
+from benchbox.cli.commands.profile import profile
 
+# benchbox.cli.commands.__init__ re-exports `profile` and `benchmarks` (Click
+# Commands) under the same names as their submodules.  On Python 3.10 mock's
+# string-based patch() resolves via getattr(benchbox.cli.commands, "profile"),
+# returning the Command, not the submodule.  Seeding sys.modules here avoids
+# the ambiguity on all Python versions.
 __import__("benchbox.cli.commands.profile")
 _profile_module = _sys.modules["benchbox.cli.commands.profile"]
-
 __import__("benchbox.cli.commands.benchmarks")
 _benchmarks_module = _sys.modules["benchbox.cli.commands.benchmarks"]
-
-from benchbox.cli.commands.profile import profile
 
 pytestmark = [
     pytest.mark.unit,

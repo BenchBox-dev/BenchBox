@@ -118,7 +118,7 @@ class TuningMetadataManager:
             self.logger.info(f"Creating tuning metadata table: {self._metadata_table_name}")
 
             # Create temporary connection for schema operations
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.config)
+            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
             try:
                 self._execute_sql(temp_conn, create_sql)
 
@@ -162,7 +162,7 @@ class TuningMetadataManager:
         elif platform == "redshift":
             # Redshift prefers explicit column encoding
             return base_sql + " ENCODE AUTO"
-        elif platform == "clickhouse":
+        elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
             # ClickHouse uses specific engine and ordering
             return base_sql.replace(")", ") ENGINE = MergeTree() ORDER BY (table_name, tuning_type)")
         else:
@@ -173,7 +173,7 @@ class TuningMetadataManager:
         """Get platform-specific index creation SQL."""
         platform = self.platform_adapter.platform_name.lower()
 
-        if platform in ["clickhouse"]:
+        if platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
             # ClickHouse uses ORDER BY in table definition, no separate index needed
             return None
         elif platform == "bigquery":
@@ -324,7 +324,7 @@ class TuningMetadataManager:
             )
 
         # Execute batch insert - handle platforms that don't support batch operations
-        temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.config)
+        temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
         try:
             cursor = temp_conn.cursor()
             for params in param_lists:
@@ -354,7 +354,7 @@ class TuningMetadataManager:
             ORDER BY table_name, tuning_type, column_order
             """
 
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.config)
+            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
             try:
                 results = self._fetch_all(temp_conn, query_sql)
             finally:
@@ -377,7 +377,7 @@ class TuningMetadataManager:
         try:
             # Try to query the table
             query_sql = f"SELECT COUNT(*) FROM {self._metadata_table_name} LIMIT 1"
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.config)
+            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
             try:
                 self._fetch_one(temp_conn, query_sql)
                 self._table_exists = True
@@ -554,7 +554,7 @@ class TuningMetadataManager:
 
             # Delete all records (could be filtered by benchmark_name if we stored it)
             delete_sql = f"DELETE FROM {self._metadata_table_name}"
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.config)
+            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
             try:
                 self._execute_sql(temp_conn, delete_sql)
             finally:
@@ -589,7 +589,7 @@ class TuningMetadataManager:
             FROM {self._metadata_table_name}
             """
 
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.config)
+            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
             try:
                 result = self._fetch_one(temp_conn, summary_sql)
             finally:

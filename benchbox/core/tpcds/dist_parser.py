@@ -53,80 +53,91 @@ class TPCDSDistributionParser:
     def __init__(self) -> None:
         self.distributions: dict[str, TPCDSDistribution] = {}
 
+    @staticmethod
+    def _clean_lines(content: str) -> list[str]:
+        """Strip comments and blank lines from a .dst file body."""
+        cleaned: list[str] = []
+        for raw in content.split("\n"):
+            if "--" in raw:
+                raw = raw[: raw.index("--")]
+            line = raw.strip()
+            if line:
+                cleaned.append(line)
+        return cleaned
+
+    @staticmethod
+    def _handle_create(line: str, distributions: dict[str, TPCDSDistribution]) -> Optional[TPCDSDistribution]:
+        """Handle `create <name>;` - returns the new current distribution or None."""
+        match = re.match(r"create\s+(\w+);?", line)
+        if not match:
+            return None
+        dist_name = match.group(1)
+        current_dist = TPCDSDistribution(dist_name)
+        distributions[dist_name] = current_dist
+        return current_dist
+
+    @staticmethod
+    def _handle_set_types(line: str, current_dist: Optional[TPCDSDistribution]) -> None:
+        if current_dist is None:
+            return
+        match = re.match(r"set\s+types\s*=\s*\(([^)]+)\);?", line)
+        if match:
+            current_dist.types = [t.strip() for t in match.group(1).split(",")]
+
+    @staticmethod
+    def _handle_set_weights(line: str, current_dist: Optional[TPCDSDistribution]) -> None:
+        if current_dist is None:
+            return
+        match = re.match(r"set\s+weights\s*=\s*(\d+);?", line)
+        if match:
+            current_dist.weights = int(match.group(1))
+
+    @staticmethod
+    def _handle_set_names(line: str, current_dist: Optional[TPCDSDistribution]) -> None:
+        if current_dist is None:
+            return
+        match = re.match(r"set\s+names\s*=\s*\(([^)]+)\);?", line)
+        if not match:
+            return
+        names: list[str] = []
+        for raw_name in match.group(1).split(","):
+            name = raw_name.strip()
+            if ":" in name:
+                name = name.split(":")[0]
+            names.append(name)
+        current_dist.weight_names = names
+
+    def _handle_add(self, line: str, current_dist: Optional[TPCDSDistribution]) -> None:
+        if current_dist is None:
+            return
+        paren_content = self._extract_parentheses_content(line)
+        if not paren_content:
+            return
+        parts = self._parse_add_statement(paren_content)
+        if not parts:
+            return
+        value, weights = parts
+        current_dist.add_entry(value, weights)
+
     def parse_file(self, file_path: Path) -> dict[str, TPCDSDistribution]:
         """Parse a single .dst file and return distributions."""
-        distributions = {}
+        distributions: dict[str, TPCDSDistribution] = {}
 
         with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
-        # Remove comments and empty lines
-        lines = []
-        for line in content.split("\n"):
-            # Remove comments (-- style)
-            if "--" in line:
-                line = line[: line.index("--")]
-            line = line.strip()
-            if line:
-                lines.append(line)
-
-        # Parse the cleaned content
-        current_dist = None
-        i = 0
-
-        while i < len(lines):
-            line = lines[i].strip()
-
+        current_dist: Optional[TPCDSDistribution] = None
+        for line in self._clean_lines(content):
             if line.startswith("create "):
-                # Parse: create distribution_name;
-                match = re.match(r"create\s+(\w+);?", line)
-                if match:
-                    dist_name = match.group(1)
-                    current_dist = TPCDSDistribution(dist_name)
-                    distributions[dist_name] = current_dist
-
+                current_dist = self._handle_create(line, distributions) or current_dist
             elif line.startswith("set types"):
-                # Parse: set types = (varchar);
-                if current_dist:
-                    match = re.match(r"set\s+types\s*=\s*\(([^)]+)\);?", line)
-                    if match:
-                        types_str = match.group(1)
-                        current_dist.types = [t.strip() for t in types_str.split(",")]
-
+                self._handle_set_types(line, current_dist)
             elif line.startswith("set weights"):
-                # Parse: set weights = 6;
-                if current_dist:
-                    match = re.match(r"set\s+weights\s*=\s*(\d+);?", line)
-                    if match:
-                        current_dist.weights = int(match.group(1))
-
+                self._handle_set_weights(line, current_dist)
             elif line.startswith("set names"):
-                # Parse: set names = (name:usgs, uniform, large, medium, small, unified);
-                if current_dist:
-                    match = re.match(r"set\s+names\s*=\s*\(([^)]+)\);?", line)
-                    if match:
-                        names_str = match.group(1)
-                        names = []
-                        for name in names_str.split(","):
-                            name = name.strip()
-                            # Handle "name:usgs" format
-                            if ":" in name:
-                                name = name.split(":")[0]
-                            names.append(name)
-                        current_dist.weight_names = names
-
+                self._handle_set_names(line, current_dist)
             elif line.startswith("add ("):
-                # Parse: add ("Midway":212, 1, 1, 0, 0, 600);
-                if current_dist:
-                    # Extract the content between parentheses
-                    paren_content = self._extract_parentheses_content(line)
-                    if paren_content:
-                        parts = self._parse_add_statement(paren_content)
-                        if parts:
-                            value, weights = parts
-                            current_dist.add_entry(value, weights)
-
-            i += 1
+                self._handle_add(line, current_dist)
 
         return distributions
 
@@ -216,7 +227,7 @@ add ("Fairview":199, 1, 1, 0, 0, 600);
 add ("Oak Grove":160, 1, 1, 0, 0, 600);
 """
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:  # pragma: no cover
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:  # pragma: no cover
         f.write(sample_dst_content)
         temp_file = f.name
 

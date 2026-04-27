@@ -204,6 +204,44 @@ class TestRunDataframeBenchmark:
         assert result.validation_details is not None
         assert "error" in result.validation_details
 
+    def test_skip_dataframe_data_loading_bypasses_generic_loader(self):
+        """Benchmarks with self-managed DataFrame loading must bypass _load_dataframe_data."""
+        adapter = MagicMock()
+        adapter.platform_name = "Polars"
+        adapter.create_context.return_value = MagicMock()
+        adapter.get_platform_info.return_value = {"platform": "Polars"}
+        adapter.get_standard_platform_info.return_value = PlatformInfoInput(name="Polars", execution_mode="dataframe")
+
+        config = BenchmarkConfig(
+            name="metadata_primitives",
+            display_name="Metadata",
+            scale_factor=1.0,
+            options={"power_iterations": 1},
+        )
+
+        class BenchmarkWithManagedLoading:
+            def skip_dataframe_data_loading(self) -> bool:
+                return True
+
+        benchmark_instance = BenchmarkWithManagedLoading()
+
+        with (
+            patch("benchbox.core.runner.dataframe_runner._load_dataframe_data") as load_fn,
+            patch("benchbox.core.runner.dataframe_runner.check_sufficient_memory") as mem_check,
+            patch("benchbox.core.runner.dataframe_runner.validate_scale_factor", return_value=(True, None)),
+        ):
+            mem_check.return_value = MagicMock(is_safe=True)
+            result = run_dataframe_benchmark(
+                benchmark_config=config,
+                adapter=adapter,
+                phases=DataFramePhases(load=True, execute=False),
+                benchmark_instance=benchmark_instance,
+            )
+
+        load_fn.assert_not_called()
+        assert result.validation_status == "PASSED"
+        assert result.total_queries == 0
+
     def test_load_phase_uses_data_loader_preparation_pipeline(self, tmp_path):
         """Data load phase should use DataFrameDataLoader.prepare_benchmark_data."""
         adapter = MagicMock()
@@ -247,6 +285,16 @@ class TestRunDataframeBenchmark:
         assert args[1] == "lineitem"
         assert args[2] == [tmp_path / "lineitem.parquet"]
         assert kwargs["column_names"] is not None
+
+
+def test_get_queries_for_benchmark_ignores_magicmock_synthesized_provider():
+    config = BenchmarkConfig(name="dummy", display_name="Dummy", scale_factor=1.0)
+    benchmark_instance = MagicMock()
+    benchmark_instance.name = "dummy"
+
+    queries = _get_queries_for_benchmark(config, benchmark_instance, stream_id=0)
+
+    assert queries == []
 
 
 class TestModeCoexistence:

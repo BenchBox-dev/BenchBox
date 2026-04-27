@@ -10,10 +10,20 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import sys as _sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
+
+# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
+# same name as the run submodule.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
+# the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.run")
+_run_module = _sys.modules["benchbox.cli.commands.run"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -316,7 +326,7 @@ class TestDescribePlatformOptions:
     def test_no_options(self):
         from benchbox.cli.commands.run import _describe_platform_options
 
-        with patch("benchbox.cli.commands.run.console") as mock_console:
+        with patch.object(_run_module, "console") as mock_console:
             with patch(
                 "benchbox.cli.platform_hooks.PlatformHookRegistry.describe_options",
                 return_value=[],
@@ -329,7 +339,7 @@ class TestDescribePlatformOptions:
     def test_with_options(self):
         from benchbox.cli.commands.run import _describe_platform_options
 
-        with patch("benchbox.cli.commands.run.console") as mock_console:
+        with patch.object(_run_module, "console") as mock_console:
             with patch(
                 "benchbox.cli.platform_hooks.PlatformHookRegistry.describe_options",
                 return_value=["memory_limit: Set memory limit", "threads: Set thread count"],
@@ -723,7 +733,7 @@ class TestRunCommandBranchCoverage:
     def test_platform_option_parse_error_logs_and_exits(self):
         from benchbox.cli.commands.run import PlatformOptionError, run
 
-        with patch("benchbox.cli.commands.run.PlatformHookRegistry.parse_options") as parse_options:
+        with patch.object(_run_module.PlatformHookRegistry, "parse_options") as parse_options:
             parse_options.side_effect = PlatformOptionError("invalid option")
             result = self.runner.invoke(
                 run,
@@ -760,3 +770,79 @@ class TestRunCommandBranchCoverage:
 
         assert result.exit_code == 2
         assert "Non-interactive mode requires all parameters" in result.output
+
+
+# ===================================================================
+# _derive_execution_type  (regression tests for operator-precedence fix)
+# ===================================================================
+
+
+class TestDeriveExecutionType:
+    """Unit tests for _derive_execution_type.
+
+    These cover the operator-precedence bug that was fixed in the
+    load_only and data_only branches (previously `not set(phases) & X`
+    parsed as `not ((set(phases) & X[0]) | X[1])`, always returning False
+    for non-empty sets).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _import(self):
+        from benchbox.cli.commands.run import _derive_execution_type
+
+        self.fn = _derive_execution_type
+
+    # --- query-phase branch ---
+    @pytest.mark.parametrize(
+        ("phases", "expected"),
+        [
+            (["power"], "power"),
+            (["throughput"], "throughput"),
+            (["maintenance"], "maintenance"),
+            (["power", "throughput"], "combined"),
+            (["power", "maintenance"], "combined"),
+        ],
+    )
+    def test_query_phases(self, phases, expected):
+        assert self.fn(phases) == expected
+
+    # --- load_only branch (was affected by precedence bug) ---
+    @pytest.mark.parametrize(
+        "phases",
+        [
+            ["load"],
+            ["generate", "load"],  # generate present but load present → not data_only
+            ["load", "warmup"],
+        ],
+    )
+    def test_load_only(self, phases):
+        assert self.fn(phases) == "load_only"
+
+    # --- data_only branch (was affected by precedence bug) ---
+    @pytest.mark.parametrize(
+        "phases",
+        [
+            ["generate"],
+            ["generate", "warmup"],  # previously misclassified as "standard"
+        ],
+    )
+    def test_data_only(self, phases):
+        assert self.fn(phases) == "data_only"
+
+    # --- generate with load or query phases → not data_only ---
+    @pytest.mark.parametrize(
+        "phases",
+        [
+            ["generate", "load"],
+            ["generate", "power"],
+            ["generate", "throughput"],
+            ["generate", "maintenance"],
+        ],
+    )
+    def test_generate_with_load_or_query_not_data_only(self, phases):
+        assert self.fn(phases) != "data_only"
+
+    # --- fallback ---
+    def test_standard_fallback(self):
+        assert self.fn(["warmup"]) == "standard"
+        assert self.fn(["load", "power"]) == "power"

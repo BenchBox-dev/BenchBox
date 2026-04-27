@@ -41,7 +41,7 @@ def check_and_run_first_time_setup() -> bool:
     try:
         marker_path.parent.mkdir(parents=True, exist_ok=True)
         # Use 'x' mode for exclusive creation (fails if file exists)
-        with open(marker_path, "x") as f:
+        with open(marker_path, "x", encoding="utf-8") as f:
             f.write(f"First run completed at {datetime.now().isoformat()}\n")
     except FileExistsError:
         # Another process already completed first-run setup

@@ -334,7 +334,7 @@ class TestTPCDIScalabilityPerformance:
             }
 
         try:
-            with open(baseline_file, "w") as f:
+            with open(baseline_file, "w", encoding="utf-8") as f:
                 json.dump(baseline_summary, f, indent=2)
             print(f"\nPerformance baseline saved to: {baseline_file}")
         except Exception as e:
@@ -383,7 +383,7 @@ class TestTPCDIScalabilityPerformance:
 
                     # Count records (approximate)
                     try:
-                        with open(path_obj) as f:
+                        with open(path_obj, encoding="utf-8") as f:
                             line_count = sum(1 for _ in f)
 
                         file_analysis[table_name] = {

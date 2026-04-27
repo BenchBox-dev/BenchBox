@@ -49,7 +49,7 @@ def load_manifest(manifest_path: Path) -> ManifestV1 | ManifestV2:
     Returns:
         ManifestV1 or ManifestV2 instance based on detected version
     """
-    with open(manifest_path) as f:
+    with open(manifest_path, encoding="utf-8") as f:
         data = json.load(f)
 
     version = detect_version(data)
@@ -110,6 +110,7 @@ def _parse_v2(data: dict) -> ManifestV2:
                     row_groups=f.get("row_groups"),
                     is_directory=bool(f.get("is_directory", False)),
                     conversion_options=f.get("conversion_options", {}),
+                    metadata=f.get("metadata", {}),
                 )
                 for f in files
             ]
@@ -210,7 +211,7 @@ def write_manifest(manifest: ManifestV1 | ManifestV2, path: Path) -> None:
         # Convert v2 to dict
         data = _manifest_v2_to_dict(manifest)
 
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
 

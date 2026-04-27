@@ -191,16 +191,14 @@ class TestTPCTestRouting:
         """Test that unsupported benchmarks fall back to standard execution."""
         adapter = DuckDBAdapter()
 
-        # Mock unsupported benchmark
         mock_benchmark = Mock()
-        mock_benchmark.__class__.__name__ = "UnsupportedBenchmark"
-        mock_benchmark._name = "unsupported"
         mock_connection = Mock()
 
         # Mock fallback method
         adapter._execute_all_queries = Mock(return_value=[{"test_type": "standard"}])
 
         run_config = {
+            "benchmark_name": "unsupported",
             "test_execution_type": "power",
             "iterations": 1,  # Single iteration for test
             "warm_up_iterations": 0,  # No warmup
@@ -219,8 +217,6 @@ class TestTPCTestIntegration:
     def tpch_mock_benchmark(self):
         """Create a mock TPC-H benchmark."""
         mock = Mock()
-        mock.__class__.__name__ = "TPCHBenchmark"
-        mock._name = ""
         mock.get_query = Mock(return_value="SELECT 1 as test_query")
         return mock
 
@@ -228,8 +224,6 @@ class TestTPCTestIntegration:
     def tpcds_mock_benchmark(self):
         """Create a mock TPC-DS benchmark."""
         mock = Mock()
-        mock.__class__.__name__ = "TPCDSBenchmark"
-        mock._name = ""
         mock.get_query = Mock(return_value="SELECT 1 as test_query")
         mock.get_queries = Mock(return_value={"1": "SELECT 1", "2": "SELECT 2"})
         return mock
@@ -273,6 +267,7 @@ class TestTPCTestIntegration:
             ]
 
             run_config = {
+                "benchmark_name": "tpch",
                 "scale_factor": 1.0,
                 "seed": 1,
                 "stream_id": 0,
@@ -304,6 +299,7 @@ class TestTPCTestIntegration:
         mock_connection.fetchall = Mock(return_value=[])
 
         run_config = {
+            "benchmark_name": "tpcds",
             "scale_factor": 1.0,
             "seed": 1,
             "stream_id": 0,

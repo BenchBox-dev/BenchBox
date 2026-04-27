@@ -89,8 +89,8 @@ class ClickHouseTuningMixin:
             # OLAP optimizations with local ClickHouse validation
             olap_settings = {
                 "max_bytes_in_join": int(
-                    self._parse_memory_setting(self.max_memory_usage) * 0.25
-                ),  # 25% of memory for JOINs (reduced from 50%)
+                    self._parse_memory_setting(self.max_memory_usage) * 0.5
+                ),  # 50% of memory for JOINs - Q5 multi-table join at SF1 needs 2.72 GiB
                 "join_use_nulls": 1,
                 "optimize_aggregation_in_order": 1,
                 "group_by_two_level_threshold": 100000,
@@ -231,7 +231,7 @@ class ClickHouseTuningMixin:
                 raise ConfigurationError(
                     "Failed to validate ClickHouse cache control settings",
                     details={"original_error": str(e), "validation_result": result},
-                )
+                ) from e
 
         return result
 
@@ -380,7 +380,7 @@ class ClickHouseTuningMixin:
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
         except Exception as e:
-            raise ValueError(f"Failed to apply tunings to ClickHouse table {table_name}: {e}")
+            raise ValueError(f"Failed to apply tunings to ClickHouse table {table_name}: {e}") from e
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate ClickHouse-specific tuning clauses for CREATE TABLE statements.

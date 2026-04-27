@@ -1,0 +1,77 @@
+{
+  "chart": "per_query_speedup",
+  "version": 1,
+  "cases": [
+    {
+      "id": "two_results_two_x_spread",
+      "input": {
+        "validMs": [
+          100.0,
+          200.0
+        ]
+      },
+      "expected": {
+        "speedup": 2.0
+      }
+    },
+    {
+      "id": "three_results",
+      "input": {
+        "validMs": [
+          50.0,
+          100.0,
+          300.0
+        ]
+      },
+      "expected": {
+        "speedup": 6.0
+      }
+    },
+    {
+      "id": "all_identical",
+      "input": {
+        "validMs": [
+          100.0,
+          100.0,
+          100.0
+        ]
+      },
+      "expected": {
+        "speedup": 1.0
+      }
+    },
+    {
+      "id": "single_result",
+      "input": {
+        "validMs": [
+          100.0
+        ]
+      },
+      "expected": {
+        "speedup": 1.0
+      }
+    },
+    {
+      "id": "empty",
+      "input": {
+        "validMs": []
+      },
+      "expected": {
+        "speedup": null
+      }
+    },
+    {
+      "id": "sub_ms_values",
+      "input": {
+        "validMs": [
+          0.1,
+          0.5,
+          1.2
+        ]
+      },
+      "expected": {
+        "speedup": 11.999999999999998
+      }
+    }
+  ]
+}

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import sys
+import sys as _sys
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -29,6 +30,15 @@ import pytest
 from click.testing import CliRunner
 
 from benchbox.cli.app import cli
+
+# benchbox.cli.commands.__init__ re-exports `compare` (a Click Command) under
+# the same name as the compare submodule.  On Python 3.10 mock's string-based
+# patch() resolves the target via getattr(benchbox.cli.commands, "compare"),
+# which returns the Command object, not the submodule.  Seeding sys.modules
+# here via __import__ and using patch.object() avoids the ambiguity on all
+# Python versions.
+__import__("benchbox.cli.commands.compare")
+_compare_module = _sys.modules["benchbox.cli.commands.compare"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -77,7 +87,7 @@ class TestConflictingArguments:
     def test_platforms_and_files_together_rejected(self):
         """Specifying both -p and file arguments should error."""
         runner = CliRunner()
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as tmp_file:
             json.dump({"test": "data"}, tmp_file)
             file_path = tmp_file.name
 
@@ -245,8 +255,8 @@ class TestCheckRegression:
 class TestMultiFileComparisonWarning:
     """Test that providing more than 2 files produces a warning."""
 
-    @patch("benchbox.cli.commands.compare.load_result_file")
-    @patch("benchbox.cli.commands.compare.ResultExporter")
+    @patch.object(_compare_module, "load_result_file")
+    @patch.object(_compare_module, "ResultExporter")
     def test_three_files_shows_warning(self, mock_exporter_class, mock_load):
         """Providing 3 files should warn about only comparing first 2."""
         runner = CliRunner()
@@ -286,7 +296,7 @@ class TestRunFlagDeprecation:
     """Test --run flag deprecation warning."""
 
     @pytest.mark.filterwarnings("ignore::DeprecationWarning")
-    @patch("benchbox.cli.commands.compare._run_platform_comparison")
+    @patch.object(_compare_module, "_run_platform_comparison")
     def test_run_flag_shows_deprecation_warning(self, mock_platform_comparison):
         """Using the deprecated --run flag should show a deprecation warning."""
         runner = CliRunner()
@@ -354,8 +364,8 @@ class TestCompareHelpOptions:
 class TestCheckRegressionThresholdFunction:
     """Test _check_regression_threshold exit behavior."""
 
-    @patch("benchbox.cli.commands.compare.load_result_file")
-    @patch("benchbox.cli.commands.compare.ResultExporter")
+    @patch.object(_compare_module, "load_result_file")
+    @patch.object(_compare_module, "ResultExporter")
     def test_no_regression_shows_pass_message(self, mock_exporter_class, mock_load):
         """When no regression is found, a pass message should appear."""
         runner = CliRunner()
@@ -462,7 +472,7 @@ class TestDisplayResultsTable:
             ),
         ]
 
-        with patch("benchbox.cli.commands.compare.console") as mock_console:
+        with patch.object(_compare_module, "console") as mock_console:
             _display_results_table(results)
 
         mock_console.print.assert_called_once()
@@ -488,7 +498,7 @@ class TestDisplayResultsTable:
             ),
         ]
 
-        with patch("benchbox.cli.commands.compare.console") as mock_console:
+        with patch.object(_compare_module, "console") as mock_console:
             _display_results_table(results)
 
         # Should complete without error - color application is internal
@@ -522,7 +532,7 @@ class TestValidateRegressionThreshold:
 class TestComparePlatformRunMode:
     """Test compare command platform run mode validation."""
 
-    @patch("benchbox.cli.commands.compare._run_platform_comparison")
+    @patch.object(_compare_module, "_run_platform_comparison")
     def test_single_platform_in_run_mode_errors(self, mock_comparison):
         """Run mode with only one platform should fail."""
         mock_comparison.side_effect = SystemExit(1)

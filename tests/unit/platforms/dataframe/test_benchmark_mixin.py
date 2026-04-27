@@ -8,7 +8,7 @@ Covers:
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -81,6 +81,22 @@ class DummyPandasProfiledAdapter(DummyAdapter):
 class FailingLoadAdapter(DummyAdapter):
     def load_table(self, ctx, table_name, file_paths, column_names=None, delimiter=None):
         raise RuntimeError("load failed")
+
+
+class DummyDataFusionAdapter(DummyAdapter):
+    platform_name = "DataFusion"
+    family = "expression"
+
+
+class DummyBenchmarkWithPlatformSkips:
+    """Benchmark that vends platform-specific skip lists via get_platform_skip_queries."""
+
+    def get_platform_skip_queries(self, platform_name: str) -> list[str]:
+        if platform_name.lower() == "datafusion":
+            return ["list_filter", "list_transform"]
+        if platform_name.lower() == "lakesail":
+            return ["empty_build_join"]
+        return []
 
 
 class DummyBenchmark:
@@ -274,6 +290,65 @@ def test_prefer_parquet_fails_fast_when_preparation_raises(tmp_path):
     assert adapter.execute_called is False
 
 
+def test_magicmock_benchmark_does_not_false_positive_skip_loader(tmp_path):
+    adapter = DummyAdapter()
+    tbl_path = tmp_path / "customer.tbl"
+    tbl_path.write_text("1|Alice|\n")
+
+    benchmark = MagicMock()
+    benchmark.name = "dummy"
+    benchmark.display_name = "Dummy"
+    benchmark.scale_factor = 1.0
+    benchmark.tables = {"customer": tbl_path}
+
+    config = BenchmarkConfig(name="dummy", display_name="Dummy", scale_factor=1.0)
+
+    result = adapter.run_benchmark(
+        benchmark,
+        benchmark_config=config,
+        phases=DataFramePhases(load=True, execute=False),
+        options=DataFrameRunOptions(prefer_parquet=False),
+    )
+
+    assert result.validation_status == "PASSED"
+    assert adapter.loaded_paths["customer"] == [tbl_path]
+
+
+def test_magicmock_benchmark_does_not_false_positive_execute_workload():
+    adapter = DummyAdapter()
+    benchmark = MagicMock()
+    benchmark.name = "dummy"
+    benchmark.display_name = "Dummy"
+    benchmark.scale_factor = 1.0
+    benchmark.get_dataframe_queries = MagicMock(
+        return_value=[
+            DataFrameQuery(
+                query_id="Q1",
+                query_name="Test",
+                description="Test query",
+                expression_impl=lambda _ctx: None,
+            )
+        ]
+    )
+    config = BenchmarkConfig(
+        name="dummy",
+        display_name="Dummy",
+        scale_factor=1.0,
+        options={"power_warmup_iterations": 0, "power_iterations": 1},
+    )
+
+    result = adapter.run_benchmark(
+        benchmark,
+        benchmark_config=config,
+        phases=DataFramePhases(load=False, execute=True),
+        options=DataFrameRunOptions(prefer_parquet=False),
+    )
+
+    assert result.validation_status == "PASSED"
+    assert benchmark.execute_dataframe_workload.called is False
+    assert adapter.executed_query_ids == ["Q1"]
+
+
 def test_capture_plans_uses_profiled_execution_without_capture_plan_kw(tmp_path):
     adapter = DummyPandasProfiledAdapter(query_plan={"kind": "logical"})
     tbl_path = tmp_path / "customer.tbl"
@@ -325,6 +400,41 @@ def test_capture_plans_counts_missing_plan_as_failure(tmp_path):
     assert result.plan_capture_failures == 1
     assert result.plan_capture_errors
     assert result.plan_capture_errors[0]["query_id"] == "Q1"
+
+
+def test_collect_skip_query_ids_routes_through_get_platform_skip_queries():
+    """Platform-specific skips flow through get_platform_skip_queries, not a hardcoded check."""
+    adapter = DummyDataFusionAdapter()
+    benchmark = DummyBenchmarkWithPlatformSkips()
+
+    skip_ids = adapter._collect_skip_query_ids(benchmark)
+
+    assert "LIST_FILTER" in skip_ids
+    assert "LIST_TRANSFORM" in skip_ids
+
+
+def test_collect_skip_query_ids_platform_dispatch_is_parameterized():
+    """Different platforms get different skip lists from the same dispatch point."""
+    datafusion_adapter = DummyDataFusionAdapter()
+    polars_adapter = DummyAdapter()  # platform_name = "Polars"
+    benchmark = DummyBenchmarkWithPlatformSkips()
+
+    datafusion_skips = datafusion_adapter._collect_skip_query_ids(benchmark)
+    polars_skips = polars_adapter._collect_skip_query_ids(benchmark)
+
+    assert "LIST_FILTER" in datafusion_skips
+    assert "LIST_FILTER" not in polars_skips
+
+
+def test_collect_skip_query_ids_no_platform_skips_method():
+    """Benchmarks without get_platform_skip_queries silently produce no platform skips."""
+    adapter = DummyDataFusionAdapter()
+    benchmark = DummyBenchmark(tables={})  # no get_platform_skip_queries
+
+    skip_ids = adapter._collect_skip_query_ids(benchmark)
+
+    assert "LIST_FILTER" not in skip_ids
+    assert "LIST_TRANSFORM" not in skip_ids
 
 
 class _StubTPCDSQueryManager:

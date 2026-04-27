@@ -67,8 +67,8 @@ class H2ODataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         self.very_verbose = self.verbose_level >= 2 and not quiet
         self.quiet = bool(quiet)
 
-        # Base number of trips for scale_factor = 1.0
-        self.base_trips = 1000000
+        # Match the published 10M-row H2O small tier at SF=1.
+        self.base_trips = 10000000
 
         # Initialize random seed for reproducible data
         random.seed(42)

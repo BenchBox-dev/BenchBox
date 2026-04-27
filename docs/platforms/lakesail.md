@@ -327,6 +327,18 @@ Table 'lineitem' already exists
 2. Force data regeneration: `benchbox run --force all --platform lakesail ...`
 3. Manually drop the database: connect to the Sail server and run `DROP DATABASE <name> CASCADE`
 
+## Compressed Data Files
+
+BenchBox generates zstd-compressed data files by default (e.g., `lineitem.tbl.1.zst`). LakeSail's Sail engine supports reading compressed CSV files, but its CSV reader defaults to `UNCOMPRESSED` and does not auto-detect compression from file extensions.
+
+BenchBox handles this automatically -- during data loading, it detects the compression type from the file extension and passes the appropriate `compression` option to the Spark CSV reader. No user action is required.
+
+If you encounter `No files found in the specified paths` errors during data loading, ensure you are running a current version of BenchBox that includes this auto-detection. As a workaround, you can regenerate data without compression:
+
+```bash
+benchbox run --platform lakesail --benchmark tpch --compression none --force datagen
+```
+
 ## See Also
 
 - [Spark Platform](spark.md) - Apache Spark benchmarking (for comparison)

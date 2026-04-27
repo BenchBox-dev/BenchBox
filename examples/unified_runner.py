@@ -514,35 +514,200 @@ def _phase_succeeded(plan_item: _PhaseExecutionPlan, result: Any) -> bool:
     return failed_queries == 0
 
 
-def main() -> int:
-    """Main execution function."""
-    # Handle list operations first (before full parsing)
+def _handle_compare_only(args) -> int:
+    """Run comparison-only export when both baseline and current files are provided."""
+    results_dir = (
+        Path(getattr(args, "output_dir", None))
+        if getattr(args, "output_dir", None)
+        else Path("_project/runner_results")
+    )
+    exporter = ResultExporter(output_dir=results_dir, anonymize=getattr(args, "anonymize", False))
+    comparison = exporter.compare_results(Path(args.compare_baseline), Path(args.compare_current))
+    output_path = Path(args.comparison_output) if getattr(args, "comparison_output", None) else None
+    report_path = exporter.export_comparison_report(comparison, output_path)
+    if not getattr(args, "quiet", False):
+        pinfo(f"✅ Comparison report exported to {report_path}")
+    return 0
+
+
+def _validate_phases_and_scale(args, parser) -> list[str]:
+    """Parse/validate --phases and --scale. parser.error or return [] on fatal issues."""
+    phase_choices = ["generate", "load", "warmup", "power", "throughput", "maintenance"]
+    user_phases = [p.strip() for p in args.phases.split(",") if p.strip()]
+    if any(p not in phase_choices for p in user_phases):
+        parser.error(f"Invalid phases. Choices: {phase_choices}")
+
+    canonical_order = ["generate", "load", "warmup", "power", "throughput", "maintenance"]
+    phases_to_run = [p for p in canonical_order if p in user_phases]
+    if not phases_to_run:
+        parser.error("No phases selected. Provide --phases with at least one supported phase.")
+    return phases_to_run
+
+
+def _validate_output_path(args) -> bool:
+    """Return True when --output is absent or valid; False (and report) otherwise."""
+    if not args.output:
+        return True
+    try:
+        ValidationRules.validate_output_directory(args.output)
+        if is_cloud_path(args.output) and not args.quiet:
+            pinfo(f"✅ Cloud storage output validated: {args.output}")
+        return True
+    except (ValidationError, CloudStorageError) as e:
+        if not args.quiet:
+            perror(f"Output validation failed: {e}")
+        return False
+
+
+def _execute_dry_run(args, config: dict, phases_to_run: list[str]) -> int:
+    """Preview a run without executing - writes dry-run artifacts to ``--dry-run`` directory."""
+    dry_run_dir = ensure_output_directory(Path(args.dry_run))
+    if not args.quiet:
+        pinfo(" Running dry run preview...")
+
+    profiler = SystemProfiler()
+    system_profile = profiler.get_system_profile()
+
+    platform_options = get_platform_adapter_config(
+        args.platform,
+        args,
+        system_profile=system_profile,
+        benchmark_name=args.benchmark,
+        scale_factor=args.scale,
+    )
+    platform_options = platform_options or {}
+    if args.platform.lower() == "duckdb" and "database_path" not in platform_options:
+        platform_options["database_path"] = ":memory:"
+    if getattr(args, "force_upload", False):
+        platform_options["force_upload"] = True
+
+    query_subset = _normalize_query_subset(config.get("query_subset") or config.get("queries"))
+
+    options = {
+        "force_regenerate": bool(config.get("force_regenerate") or config.get("force")),
+        "enable_preflight_validation": bool(config.get("enable_preflight_validation")),
+        "enable_postload_validation": bool(config.get("enable_postload_validation")),
+        "seed": getattr(args, "seed", None) or config.get("seed"),
+        "phases": ",".join(phases_to_run) if phases_to_run else None,
+    }
+    if config.get("tuning_config"):
+        options["unified_tuning_configuration"] = config["tuning_config"]
+        options["tuning_enabled"] = True
+    if config.get("compress"):
+        options["compress_data"] = True
+        options["compression_type"] = config.get("compression_type", "zstd")
+    if query_subset:
+        options["query_subset"] = query_subset
+
+    benchmark_config = BenchmarkConfig(
+        name=args.benchmark,
+        display_name=config.get("display_name", args.benchmark.upper()),
+        scale_factor=float(config.get("scale_factor", args.scale)),
+        queries=query_subset,
+        concurrency=int(config.get("streams", 1)),
+        options={k: v for k, v in options.items() if v is not None},
+        compress_data=bool(config.get("compress")),
+        compression_type=config.get("compression_type", "zstd"),
+        test_execution_type=_determine_test_execution_type(phases_to_run),
+    )
+    database_config = DatabaseConfig(
+        type=args.platform,
+        name=f"{args.platform}_dry_run",
+        options=platform_options,
+    )
+    execute_example_dry_run(
+        benchmark_config=benchmark_config,
+        database_config=database_config,
+        output_dir=dry_run_dir,
+        filename_prefix=f"{args.platform}_{args.benchmark}",
+    )
+    return 0
+
+
+def _run_phase_plan(
+    args,
+    config: dict,
+    phase_plan: list,
+    benchmark_config: BenchmarkConfig,
+    database_config: Optional[DatabaseConfig],
+    adapter,
+    platform_options: dict,
+    benchmark_instance,
+    system_profile,
+    validation_opts: ValidationOptions,
+    verbosity_settings,
+    output_root,
+    exporter: ResultExporter,
+    formats: list[str],
+) -> bool:
+    """Drive the per-phase execution loop and export each result. Returns overall success."""
+    phase_results: list[tuple[Any, Any]] = []
+    for plan_item in phase_plan:
+        phase_config = benchmark_config.model_copy(update={"test_execution_type": plan_item.execution_type})
+        lifecycle_result = run_benchmark_lifecycle(
+            benchmark_config=phase_config,
+            database_config=database_config if plan_item.requires_adapter else None,
+            system_profile=system_profile,
+            platform_config=platform_options if plan_item.requires_adapter else None,
+            platform_adapter=adapter if plan_item.requires_adapter else None,
+            benchmark_instance=benchmark_instance,
+            phases=plan_item.lifecycle,
+            validation_opts=validation_opts,
+            output_root=str(output_root) if output_root else None,
+            verbosity=verbosity_settings,
+        )
+
+        existing_metadata = getattr(lifecycle_result, "execution_metadata", None)
+        metadata: dict[str, Any] = existing_metadata.copy() if isinstance(existing_metadata, dict) else {}
+        metadata["phase"] = plan_item.name
+        lifecycle_result.execution_metadata = metadata
+        phase_results.append((plan_item, lifecycle_result))
+
+        if not args.quiet:
+            summary_context = {
+                "benchmark": args.benchmark,
+                "scale_factor": phase_config.scale_factor,
+                "platform": args.platform,
+                "phase": plan_item.name,
+            }
+            summary = _make_console_summary(lifecycle_result, summary_context)
+            display_results(summary, args.verbose)
+
+        exported = exporter.export_result(lifecycle_result, formats=formats)
+        if not args.quiet and exported:
+            for _fmt, path in exported.items():
+                pinfo(f"✅ Results saved to {path}")
+
+    overall_success = True
+    for plan_item, lifecycle_result in phase_results:
+        overall_success = overall_success and _phase_succeeded(plan_item, lifecycle_result)
+    return overall_success
+
+
+def _handle_list_commands_main() -> int | None:
+    """Return exit code if a list-command short-circuit applied, else None."""
     if "--list-platforms" in sys.argv:
         display_platform_list(
             PlatformRegistry.get_platform_availability(),
             PlatformRegistry.get_platform_requirements,
         )
         return 0
-
     if "--list-benchmarks" in sys.argv:
         display_benchmark_list(_get_benchmark_name_map())
         return 0
+    return None
 
-    # Extract platform for conditional argument setup
+
+def _parse_main_args() -> tuple[argparse.Namespace, argparse.ArgumentParser]:
+    """Build the parser (injecting platform-specific args) and parse argv."""
     platform = extract_platform_from_argv()
-
-    # Create parser with base arguments
     parser = create_base_parser()
-
-    # Add platform-specific arguments if platform is known
     if platform:
         try:
             PlatformRegistry.add_platform_arguments(parser, platform)
         except ValueError:
             # Platform not registered, will be caught later
             pass
-
-    # Parse all arguments
     args = parser.parse_args()
 
     skip_platform_requirement = (
@@ -560,28 +725,13 @@ def main() -> int:
         if missing:
             parser.error("Missing required option(s): " + ", ".join(missing))
 
-    # Optional: perform comparison-only export if both files provided
-    if (
-        hasattr(args, "compare_baseline")
-        and hasattr(args, "compare_current")
-        and args.compare_baseline
-        and args.compare_current
-    ):
-        # Use core exporter to compare and emit HTML report
-        results_dir = (
-            Path(getattr(args, "output_dir", None))
-            if getattr(args, "output_dir", None)
-            else Path("_project/runner_results")
-        )
-        exporter = ResultExporter(output_dir=results_dir, anonymize=getattr(args, "anonymize", False))
-        comparison = exporter.compare_results(Path(args.compare_baseline), Path(args.compare_current))
-        output_path = Path(args.comparison_output) if getattr(args, "comparison_output", None) else None
-        report_path = exporter.export_comparison_report(comparison, output_path)
-        if not getattr(args, "quiet", False):
-            pinfo(f"✅ Comparison report exported to {report_path}")
-        return 0
+    return args, parser
 
-    # Validate platform availability (allow tests to patch availability map)
+
+def _validate_main_preconditions(
+    args: argparse.Namespace, parser: argparse.ArgumentParser
+) -> tuple[int | None, list[str]]:
+    """Run platform/scale/output-path checks; return (exit_code_or_None, phases_to_run)."""
     availability_map = list_available_platforms()
     is_available = availability_map.get(args.platform, PlatformRegistry.is_platform_available(args.platform))
     if not is_available:
@@ -589,48 +739,187 @@ def main() -> int:
         if not args.quiet:
             perror(f"Error: Platform '{args.platform}' is not available.")
             pinfo(f"Install required dependencies: {requirements}")
-        return 1
+        return 1, []
 
-    # Validate phases
-    phase_choices = ["generate", "load", "warmup", "power", "throughput", "maintenance"]
-    user_phases = [p.strip() for p in args.phases.split(",") if p.strip()]
-    if any(p not in phase_choices for p in user_phases):
-        parser.error(f"Invalid phases. Choices: {phase_choices}")
+    phases_to_run = _validate_phases_and_scale(args, parser)
 
-    canonical_order = ["generate", "load", "warmup", "power", "throughput", "maintenance"]
-    phases_to_run = [p for p in canonical_order if p in user_phases]
-
-    if not phases_to_run:
-        parser.error("No phases selected. Provide --phases with at least one supported phase.")
-
-    # Validate scale factor (TPC-DS requires integer scale >= 1)
     if args.scale >= 1 and args.scale != int(args.scale):
         if not args.quiet:
             perror(f"Scale factors >= 1 must be whole integers. Got: {args.scale}")
             pinfo("Use values like 1, 2, 10, etc. for large scale factors")
-        return 1
+        return 1, phases_to_run
 
-    # Validate cloud storage output paths if provided
-    if args.output:
-        try:
-            ValidationRules.validate_output_directory(args.output)
-            if is_cloud_path(args.output) and not args.quiet:
-                pinfo(f"✅ Cloud storage output validated: {args.output}")
-        except (ValidationError, CloudStorageError) as e:
-            if not args.quiet:
-                perror(f"Output validation failed: {e}")
-            return 1
+    if not _validate_output_path(args):
+        return 1, phases_to_run
+
+    return None, phases_to_run
+
+
+def _build_main_benchmark_config(
+    args: argparse.Namespace,
+    config: dict[str, Any],
+    verbosity_settings: Any,
+    phases_to_run: list[str],
+) -> tuple[BenchmarkConfig, dict[str, Any], str | None]:
+    """Assemble BenchmarkConfig + benchmark_options from merged config."""
+    benchmark_config_raw = get_benchmark_config(config)
+    output_root = benchmark_config_raw.get("output_dir")
+    query_subset = _normalize_query_subset(config.get("query_subset") or config.get("queries"))
+
+    benchmark_options: dict[str, Any] = {
+        "force_regenerate": bool(
+            benchmark_config_raw.get("force_regenerate") or config.get("force_regenerate") or config.get("force")
+        ),
+        "no_regenerate": bool(config.get("no_regenerate")),
+        "enable_preflight_validation": bool(config.get("enable_preflight_validation")),
+        "enable_postgen_manifest_validation": bool(config.get("enable_postgen_manifest_validation")),
+        "enable_postload_validation": bool(config.get("enable_postload_validation")),
+        "seed": getattr(args, "seed", None) or config.get("seed"),
+        "verbosity_settings": verbosity_settings,
+    }
+    if config.get("tuning_config"):
+        benchmark_options["unified_tuning_configuration"] = config["tuning_config"]
+        benchmark_options["tuning_enabled"] = True
+    if query_subset:
+        benchmark_options["query_subset"] = query_subset
+
+    benchmark_config = BenchmarkConfig(
+        name=args.benchmark,
+        display_name=config.get("display_name", args.benchmark.upper()),
+        scale_factor=float(config.get("scale_factor", args.scale)),
+        queries=query_subset,
+        concurrency=int(config.get("streams", getattr(args, "streams", 1))),
+        options={k: v for k, v in benchmark_options.items() if v is not None},
+        compress_data=bool(benchmark_config_raw.get("compress_data")),
+        compression_type=benchmark_config_raw.get("compression_type", config.get("compression_type", "zstd")),
+        compression_level=config.get("compression_level"),
+        test_execution_type=_determine_test_execution_type(phases_to_run),
+    )
+
+    return benchmark_config, benchmark_options, output_root
+
+
+def _build_main_adapter_and_db(
+    args: argparse.Namespace,
+    config: dict[str, Any],
+    platform_options: dict[str, Any],
+    needs_adapter: bool,
+) -> tuple[Any | None, Optional[DatabaseConfig]]:
+    """Create platform adapter + DatabaseConfig when any phase needs them."""
+    if not needs_adapter:
+        return None, None
+
+    adapter = PlatformRegistry.create_adapter(args.platform, config)
+    if args.verbose > 0 and not args.quiet:
+        display_verbose_config_feedback(adapter.config, args.platform)
+
+    database_config = DatabaseConfig(
+        type=args.platform,
+        name=config.get("database_name") or f"{args.platform}_{args.benchmark}",
+        options=platform_options,
+        driver_package=config.get("driver_package"),
+        driver_version=config.get("driver_version"),
+        driver_version_resolved=config.get("driver_version_resolved"),
+        driver_auto_install=bool(config.get("driver_auto_install")),
+    )
+    return adapter, database_config
+
+
+def _execute_main_benchmark(
+    args: argparse.Namespace,
+    config: dict[str, Any],
+    phase_plan: list[Any],
+    phases_to_run: list[str],
+    verbosity_settings: Any,
+    needs_adapter: bool,
+) -> int:
+    """Run the full benchmark flow (the original try-body); returns exit code."""
+    if args.dry_run:
+        return _execute_dry_run(args, config, phases_to_run)
+
+    profiler = SystemProfiler()
+    system_profile = profiler.get_system_profile()
+
+    platform_options = get_platform_adapter_config(
+        args.platform,
+        config,
+        system_profile=system_profile,
+        benchmark_name=args.benchmark,
+        scale_factor=config.get("scale_factor", args.scale),
+    )
+    platform_options = platform_options or {}
+    if getattr(args, "force_upload", False):
+        platform_options["force_upload"] = True
+
+    benchmark_config, benchmark_options, output_root = _build_main_benchmark_config(
+        args, config, verbosity_settings, phases_to_run
+    )
+    benchmark_instance = config.get("benchmark_instance")
+
+    adapter, database_config = _build_main_adapter_and_db(args, config, platform_options, needs_adapter)
+
+    validation_opts = ValidationOptions(
+        enable_preflight_validation=bool(benchmark_options.get("enable_preflight_validation")),
+        enable_postgen_manifest_validation=bool(benchmark_options.get("enable_postgen_manifest_validation")),
+        enable_postload_validation=bool(benchmark_options.get("enable_postload_validation")),
+    )
+
+    formats = [f.strip() for f in (args.formats or "json").split(",") if f.strip()]
+
+    results_dir = Path(args.output_dir) if args.output_dir else Path("_project/runner_results")
+    from io import StringIO
+
+    from rich.console import Console
+
+    export_console = Console(file=StringIO(), stderr=False) if args.quiet else None
+    exporter = ResultExporter(output_dir=results_dir, anonymize=args.anonymize, console=export_console)
+
+    overall_success = _run_phase_plan(
+        args=args,
+        config=config,
+        phase_plan=phase_plan,
+        benchmark_config=benchmark_config,
+        database_config=database_config,
+        adapter=adapter,
+        platform_options=platform_options,
+        benchmark_instance=benchmark_instance,
+        system_profile=system_profile,
+        validation_opts=validation_opts,
+        verbosity_settings=verbosity_settings,
+        output_root=output_root,
+        exporter=exporter,
+        formats=formats,
+    )
+    return 0 if overall_success else 1
+
+
+def main() -> int:
+    """Main execution function."""
+    listing = _handle_list_commands_main()
+    if listing is not None:
+        return listing
+
+    args, parser = _parse_main_args()
+
+    # Optional: perform comparison-only export if both files provided
+    if (
+        hasattr(args, "compare_baseline")
+        and hasattr(args, "compare_current")
+        and args.compare_baseline
+        and args.compare_current
+    ):
+        return _handle_compare_only(args)
+
+    precondition_exit, phases_to_run = _validate_main_preconditions(args, parser)
+    if precondition_exit is not None:
+        return precondition_exit
 
     previous_quiet_state = is_global_quiet()
-
-    # Apply global quiet setting early to minimize noise
     if args.quiet:
         set_global_quiet(True)
 
-    # Setup verbose logging early so connection messages appear
     _, verbosity_settings = setup_verbose_logging(args.verbose, quiet=args.quiet)
 
-    # Merge all configurations using the new system
     config = merge_all_configs(
         platform=args.platform,
         benchmark=args.benchmark,
@@ -639,210 +928,15 @@ def main() -> int:
         platform_config_path=getattr(args, "platform_config", None),
         verbose=args.verbose > 0,
     )
-
-    # Add phases to config
     config["phases"] = phases_to_run
 
-    # Display configuration summary (skip in quiet mode)
     if not args.quiet:
         display_configuration_summary(config, args.verbose)
     phase_plan = _build_phase_execution_plan(phases_to_run)
     needs_adapter = any(item.requires_adapter for item in phase_plan)
 
     try:
-        if args.dry_run:
-            dry_run_dir = ensure_output_directory(Path(args.dry_run))
-
-            if not args.quiet:
-                pinfo(" Running dry run preview...")
-
-            profiler = SystemProfiler()
-            system_profile = profiler.get_system_profile()
-
-            platform_options = get_platform_adapter_config(
-                args.platform,
-                args,
-                system_profile=system_profile,
-                benchmark_name=args.benchmark,
-                scale_factor=args.scale,
-            )
-            platform_options = platform_options or {}
-            if args.platform.lower() == "duckdb" and "database_path" not in platform_options:
-                platform_options["database_path"] = ":memory:"
-            if getattr(args, "force_upload", False):
-                platform_options["force_upload"] = True
-
-            query_subset = _normalize_query_subset(config.get("query_subset") or config.get("queries"))
-
-            options = {
-                "force_regenerate": bool(config.get("force_regenerate") or config.get("force")),
-                "enable_preflight_validation": bool(config.get("enable_preflight_validation")),
-                "enable_postload_validation": bool(config.get("enable_postload_validation")),
-                "seed": getattr(args, "seed", None) or config.get("seed"),
-                "phases": ",".join(phases_to_run) if phases_to_run else None,
-            }
-            if config.get("tuning_config"):
-                options["unified_tuning_configuration"] = config["tuning_config"]
-                options["tuning_enabled"] = True
-            if config.get("compress"):
-                options["compress_data"] = True
-                options["compression_type"] = config.get("compression_type", "zstd")
-            if query_subset:
-                options["query_subset"] = query_subset
-
-            benchmark_config = BenchmarkConfig(
-                name=args.benchmark,
-                display_name=config.get("display_name", args.benchmark.upper()),
-                scale_factor=float(config.get("scale_factor", args.scale)),
-                queries=query_subset,
-                concurrency=int(config.get("streams", 1)),
-                options={k: v for k, v in options.items() if v is not None},
-                compress_data=bool(config.get("compress")),
-                compression_type=config.get("compression_type", "zstd"),
-                test_execution_type=_determine_test_execution_type(phases_to_run),
-            )
-
-            database_config = DatabaseConfig(
-                type=args.platform,
-                name=f"{args.platform}_dry_run",
-                options=platform_options,
-            )
-
-            execute_example_dry_run(
-                benchmark_config=benchmark_config,
-                database_config=database_config,
-                output_dir=dry_run_dir,
-                filename_prefix=f"{args.platform}_{args.benchmark}",
-            )
-            return 0
-
-        profiler = SystemProfiler()
-        system_profile = profiler.get_system_profile()
-
-        platform_options = get_platform_adapter_config(
-            args.platform,
-            config,
-            system_profile=system_profile,
-            benchmark_name=args.benchmark,
-            scale_factor=config.get("scale_factor", args.scale),
-        )
-        platform_options = platform_options or {}
-        if getattr(args, "force_upload", False):
-            platform_options["force_upload"] = True
-
-        benchmark_config_raw = get_benchmark_config(config)
-        output_root = benchmark_config_raw.get("output_dir")
-        query_subset = _normalize_query_subset(config.get("query_subset") or config.get("queries"))
-
-        benchmark_options = {
-            "force_regenerate": bool(
-                benchmark_config_raw.get("force_regenerate") or config.get("force_regenerate") or config.get("force")
-            ),
-            "no_regenerate": bool(config.get("no_regenerate")),
-            "enable_preflight_validation": bool(config.get("enable_preflight_validation")),
-            "enable_postgen_manifest_validation": bool(config.get("enable_postgen_manifest_validation")),
-            "enable_postload_validation": bool(config.get("enable_postload_validation")),
-            "seed": getattr(args, "seed", None) or config.get("seed"),
-            "verbosity_settings": verbosity_settings,
-        }
-        if config.get("tuning_config"):
-            benchmark_options["unified_tuning_configuration"] = config["tuning_config"]
-            benchmark_options["tuning_enabled"] = True
-        if query_subset:
-            benchmark_options["query_subset"] = query_subset
-
-        benchmark_config = BenchmarkConfig(
-            name=args.benchmark,
-            display_name=config.get("display_name", args.benchmark.upper()),
-            scale_factor=float(config.get("scale_factor", args.scale)),
-            queries=query_subset,
-            concurrency=int(config.get("streams", getattr(args, "streams", 1))),
-            options={k: v for k, v in benchmark_options.items() if v is not None},
-            compress_data=bool(benchmark_config_raw.get("compress_data")),
-            compression_type=benchmark_config_raw.get("compression_type", config.get("compression_type", "zstd")),
-            compression_level=config.get("compression_level"),
-            test_execution_type=_determine_test_execution_type(phases_to_run),
-        )
-
-        benchmark_instance = config.get("benchmark_instance")
-
-        adapter = None
-        database_config: Optional[DatabaseConfig] = None
-        if needs_adapter:
-            adapter = PlatformRegistry.create_adapter(args.platform, config)
-            if args.verbose > 0 and not args.quiet:
-                display_verbose_config_feedback(adapter.config, args.platform)
-
-            database_config = DatabaseConfig(
-                type=args.platform,
-                name=config.get("database_name") or f"{args.platform}_{args.benchmark}",
-                options=platform_options,
-                driver_package=config.get("driver_package"),
-                driver_version=config.get("driver_version"),
-                driver_version_resolved=config.get("driver_version_resolved"),
-                driver_auto_install=bool(config.get("driver_auto_install")),
-            )
-
-        validation_opts = ValidationOptions(
-            enable_preflight_validation=bool(benchmark_options.get("enable_preflight_validation")),
-            enable_postgen_manifest_validation=bool(benchmark_options.get("enable_postgen_manifest_validation")),
-            enable_postload_validation=bool(benchmark_options.get("enable_postload_validation")),
-        )
-
-        formats = [f.strip() for f in (args.formats or "json").split(",") if f.strip()]
-
-        results_dir = Path(args.output_dir) if args.output_dir else Path("_project/runner_results")
-        from io import StringIO
-
-        from rich.console import Console
-
-        export_console = Console(file=StringIO(), stderr=False) if args.quiet else None
-        exporter = ResultExporter(output_dir=results_dir, anonymize=args.anonymize, console=export_console)
-
-        overall_success = True
-        phase_results = []
-
-        for plan_item in phase_plan:
-            phase_config = benchmark_config.model_copy(update={"test_execution_type": plan_item.execution_type})
-            lifecycle_result = run_benchmark_lifecycle(
-                benchmark_config=phase_config,
-                database_config=database_config if plan_item.requires_adapter else None,
-                system_profile=system_profile,
-                platform_config=platform_options if plan_item.requires_adapter else None,
-                platform_adapter=adapter if plan_item.requires_adapter else None,
-                benchmark_instance=benchmark_instance,
-                phases=plan_item.lifecycle,
-                validation_opts=validation_opts,
-                output_root=str(output_root) if output_root else None,
-                verbosity=verbosity_settings,
-            )
-
-            existing_metadata = getattr(lifecycle_result, "execution_metadata", None)
-            metadata: dict[str, Any] = existing_metadata.copy() if isinstance(existing_metadata, dict) else {}
-            metadata["phase"] = plan_item.name
-            lifecycle_result.execution_metadata = metadata
-            phase_results.append((plan_item, lifecycle_result))
-
-            if not args.quiet:
-                summary_context = {
-                    "benchmark": args.benchmark,
-                    "scale_factor": phase_config.scale_factor,
-                    "platform": args.platform,
-                    "phase": plan_item.name,
-                }
-                summary = _make_console_summary(lifecycle_result, summary_context)
-                display_results(summary, args.verbose)
-
-            exported = exporter.export_result(lifecycle_result, formats=formats)
-            if not args.quiet and exported:
-                for _fmt, path in exported.items():
-                    pinfo(f"✅ Results saved to {path}")
-
-        for plan_item, lifecycle_result in phase_results:
-            overall_success = overall_success and _phase_succeeded(plan_item, lifecycle_result)
-
-        return 0 if overall_success else 1
-
+        return _execute_main_benchmark(args, config, phase_plan, phases_to_run, verbosity_settings, needs_adapter)
     except Exception as e:
         if not args.quiet:
             perror(f"Benchmark execution failed: {e}")

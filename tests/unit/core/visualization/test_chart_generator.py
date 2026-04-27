@@ -10,12 +10,25 @@ from benchbox.core.visualization.chart_generator import (
     normalized_from_sql_vs_df,
     normalized_from_unified,
 )
+from benchbox.core.visualization.chart_types import ALL_CHART_TYPES
 from benchbox.core.visualization.result_plotter import NormalizedQuery, NormalizedResult
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def test_all_chart_types_count_matches_registry() -> None:
+    """Guard against forward drift: adding a chart type without updating chartRegistry.ts.
+
+    When the count here and in chartRegistry.meta.test.ts disagree, the mismatch
+    surfaces in CI so the developer knows to update the TS registry too.
+    """
+    assert len(ALL_CHART_TYPES) == 16, (
+        f"Expected 16 chart types but found {len(ALL_CHART_TYPES)}. "
+        "If you added a chart type, also update chartRegistry.ts and chartRegistry.meta.test.ts."
+    )
 
 
 def test_generate_comparison_charts_empty_results_returns_empty(tmp_path):

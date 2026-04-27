@@ -10,9 +10,12 @@ This implementation is based on the TPC-DS specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import logging
 from typing import Optional, Union
 
 from .c_tools import DSQGenBinary, TPCDSError
+
+_log = logging.getLogger(__name__)
 
 
 class TPCDSQueryManager:
@@ -112,14 +115,23 @@ class TPCDSQueryManager:
         self._ensure_available()
 
         queries = {}
+        failed_ids: list[int] = []
 
         for query_id in range(1, 100):
             # Get base query
             try:
                 queries[query_id] = self.get_query(query_id, **kwargs)
-            except (TPCDSError, ValueError):
-                # Skip missing queries
+            except (TPCDSError, ValueError) as exc:
+                failed_ids.append(query_id)
+                _log.warning("dsqgen failed for query %d: %s", query_id, exc)
                 continue
+
+        if not queries:
+            raise RuntimeError(
+                f"dsqgen failed for all {len(failed_ids)} TPC-DS queries - "
+                "check that the dsqgen binary is available and functional. "
+                f"First failed query ID: {failed_ids[0] if failed_ids else 'unknown'}"
+            )
 
         return queries
 

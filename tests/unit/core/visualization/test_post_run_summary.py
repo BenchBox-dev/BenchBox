@@ -177,7 +177,7 @@ class TestGeneratePostRunSummary:
             # Q1: mean = 100ms (one fast outlier at 5ms shouldn't make it "best")
             _make_query("Q1", 5.0),
             _make_query("Q1", 195.0),
-            # Q2: mean = 50ms (consistently fast — should be best)
+            # Q2: mean = 50ms (consistently fast - should be best)
             _make_query("Q2", 45.0),
             _make_query("Q2", 55.0),
             # Q3: mean = 300ms (should be worst)
@@ -396,7 +396,7 @@ class TestExtractEnvironment:
         assert env["CPUs"] == "8"
 
     def test_system_info_to_dict_keys(self):
-        """SystemInfo.to_dict() uses os_type/cpu_cores/total_memory_gb — all should work."""
+        """SystemInfo.to_dict() uses os_type/cpu_cores/total_memory_gb - all should work."""
         profile = {
             "os_type": "Darwin",
             "os_version": "25.2.0",

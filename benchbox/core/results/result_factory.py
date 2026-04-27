@@ -155,6 +155,7 @@ def build_enhanced_benchmark_result(
             test_type=kwargs.get("test_execution_type", "standard"),
             benchmark_id=benchmark_id,
             display_name=short_name,
+            compliance_class=getattr(benchmark, "compliance_class", None),
         ),
         platform=_build_platform_input(platform, execution_metadata, kwargs),
         execution_id=kwargs.get("execution_id"),

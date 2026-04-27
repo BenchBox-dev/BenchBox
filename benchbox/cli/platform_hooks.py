@@ -155,10 +155,14 @@ class PlatformHookRegistry:
         overrides = runtime_overrides or {}
         info = PlatformRegistry.get_platform_info(platform)
 
-        builder = cls._config_builders.get(platform, cls._default_builder)
+        custom_builder = cls._config_builders.get(platform)
+        builder = custom_builder or cls._default_builder
         config = builder(platform, options, overrides, info)
 
-        config.options.update(options)
+        # Custom builders already return merged options that preserve the
+        # saved-creds contract; only the default builder needs this backfill.
+        if custom_builder is None:
+            config.options.update(options)
         config.options.update(overrides)
 
         return config

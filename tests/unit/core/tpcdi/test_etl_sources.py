@@ -6,6 +6,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pandas as pd
@@ -15,15 +16,6 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.medium,
 ]
-
-
-# Check if lxml is available for XML tests
-try:
-    import lxml  # noqa: F401
-
-    HAS_LXML = True
-except ImportError:
-    HAS_LXML = False
 
 from benchbox.core.tpcdi.etl.sources import (
     CSVSourceFormat,
@@ -98,7 +90,7 @@ class TestCSVSourceFormat:
             csv_format.write_to_file(test_data, file_path)
 
             # Verify file has pipe delimiter
-            with open(file_path) as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
                 assert "|" in content
                 assert "," not in content.split("\n")[1]  # Not in data rows
@@ -131,7 +123,6 @@ class TestXMLSourceFormat:
             )
             assert isinstance(result, str)
 
-    @pytest.mark.skipif(not HAS_LXML, reason="lxml not installed")
     def test_write_to_file(self) -> None:
         """Test writing dataframe to XML file."""
         xml_format = XMLSourceFormat(root_element="employees", record_element="employee")
@@ -146,16 +137,15 @@ class TestXMLSourceFormat:
             file_path = Path(tmpdir) / "test.xml"
             xml_format.write_to_file(test_data, file_path)
 
-            # Verify file was created
+            # Verify file was created and is well-formed XML
             assert file_path.exists()
+            tree = ET.parse(file_path)
+            root = tree.getroot()
 
-            # Verify XML structure
-            with open(file_path) as f:
-                content = f.read()
-                assert "<employees>" in content
-                assert "</employees>" in content
-                assert "<employee>" in content
-                assert "</employee>" in content
+            # Verify root element and record elements
+            assert root.tag == "employees"
+            records = root.findall("employee")
+            assert len(records) == len(test_data)
 
 
 class TestFixedWidthSourceFormat:
@@ -205,7 +195,7 @@ class TestFixedWidthSourceFormat:
             assert file_path.exists()
 
             # Verify fixed-width formatting
-            with open(file_path) as f:
+            with open(file_path, encoding="utf-8") as f:
                 lines = f.readlines()
                 # Each line should have length = sum of field widths
                 expected_length = sum(field_widths.values())
@@ -222,7 +212,7 @@ class TestFixedWidthSourceFormat:
             file_path = Path(tmpdir) / "test_fill.txt"
             fw_format.write_to_file(test_data, file_path)
 
-            with open(file_path) as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
                 assert "_" in content  # Should have padding with underscores
 
@@ -273,7 +263,7 @@ class TestPipeDelimitedSourceFormat:
             assert file_path.exists()
 
             # Verify pipe delimiter
-            with open(file_path) as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
                 assert "|" in content
 
@@ -291,7 +281,7 @@ class TestPipeDelimitedSourceFormat:
             file_path = Path(tmpdir) / "test_null.txt"
             pipe_format.write_to_file(test_data, file_path)
 
-            with open(file_path) as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
                 assert "NULL" in content
 

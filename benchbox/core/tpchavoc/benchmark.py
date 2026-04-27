@@ -200,6 +200,20 @@ class TPCHavocBenchmark(TPCHBenchmark):
         """
         return self.query_manager.get_implemented_queries()
 
+    def supports_dataframe_mode(self) -> bool:
+        """TPC-Havoc supports DataFrame execution mode."""
+        return True
+
+    def get_dataframe_queries(self):
+        """Get DataFrame query variants for TPC-Havoc.
+
+        Returns the QueryRegistry containing 10 DataFrame variants for each
+        TPC-H query, using the same TPC-H data and parameters as SQL mode.
+        """
+        from benchbox.core.tpchavoc.dataframe_queries import get_dataframe_queries
+
+        return get_dataframe_queries()
+
     def get_all_variants_info(self, query_id: int) -> dict[int, dict[str, str]]:
         """Get information about all variants for a specific query.
 

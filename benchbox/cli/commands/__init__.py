@@ -22,6 +22,7 @@ from .export import export
 from .metrics import metrics_group
 from .plan_history import plan_history
 from .profile import profile
+from .publish import publish, publish_bundle
 from .report import report
 from .results import results
 from .run import PlatformOptionParamType, run, setup_verbose_logging
@@ -29,6 +30,7 @@ from .run_official import run_official
 from .setup import setup_credentials
 from .shell import shell
 from .show_plan import show_plan
+from .submit import submit
 from .tuning import create_sample_tuning
 from .tuning_group import tuning_group
 from .visualize import visualize
@@ -36,6 +38,7 @@ from .visualize import visualize
 COMMANDS = (
     run,
     run_official,
+    publish,
     compare,
     compare_dataframes,
     compare_plans,
@@ -54,6 +57,7 @@ COMMANDS = (
     create_sample_tuning,  # Deprecated: hidden, kept for backwards compatibility
     df_tuning_group,  # Deprecated: hidden, kept for backwards compatibility
     export,
+    submit,
     check_dependencies,
     download_answers,
     results,
@@ -74,6 +78,8 @@ __all__ = [
     "COMMANDS",
     "register_commands",
     "run",
+    "publish",
+    "publish_bundle",
     "run_official",
     "compare",
     "compare_dataframes",
@@ -93,6 +99,7 @@ __all__ = [
     "create_sample_tuning",
     "df_tuning_group",
     "export",
+    "submit",
     "check_dependencies",
     "download_answers",
     "results",

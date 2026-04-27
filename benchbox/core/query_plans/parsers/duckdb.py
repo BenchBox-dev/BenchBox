@@ -161,7 +161,7 @@ class DuckDBQueryPlanParser(QueryPlanParser):
         try:
             data = json.loads(explain_output)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON format: {e}")
+            raise ValueError(f"Invalid JSON format: {e}") from e
 
         # Handle different JSON structures
         if isinstance(data, list):
@@ -231,7 +231,7 @@ class DuckDBQueryPlanParser(QueryPlanParser):
             if "children" in data and data["children"]:
                 return self._find_plan_root_in_json(data["children"][0])
 
-        # No name/operator_type field (e.g. root stats object) — look at children
+        # No name/operator_type field (e.g. root stats object) - look at children
         if "children" in data and data["children"]:
             return self._find_plan_root_in_json(data["children"][0])
 

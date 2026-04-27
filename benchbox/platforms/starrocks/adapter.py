@@ -12,10 +12,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any
 
 from benchbox.platforms.base.adapter import DriverIsolationCapability, PlatformAdapter
+from benchbox.platforms.base.data_loading import validate_sql_identifier
 from benchbox.utils.dependencies import check_platform_dependencies
 
 from .metadata import StarRocksMetadataMixin
@@ -47,6 +47,41 @@ class StarRocksAdapter(
     """
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
+
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> StarRocksAdapter:
+        """Create StarRocks adapter from unified configuration."""
+        adapter_config: dict[str, Any] = {}
+
+        adapter_config["host"] = config.get("host", "localhost")
+        adapter_config["port"] = config.get("port", 9030)
+        adapter_config["username"] = config.get("username", "root")
+        adapter_config["password"] = config.get("password", "")
+        adapter_config["http_port"] = config.get("http_port", 8040)
+
+        if config.get("database"):
+            adapter_config["database"] = config["database"]
+        elif config.get("benchmark") and config.get("scale_factor") is not None:
+            from benchbox.utils.scale_factor import format_benchmark_name
+
+            benchmark_name = format_benchmark_name(config["benchmark"], config["scale_factor"])
+            adapter_config["database"] = f"benchbox_{benchmark_name}".lower().replace("-", "_")
+
+        for key in [
+            "tuning_config",
+            "verbose_enabled",
+            "very_verbose",
+            "disable_result_cache",
+            "strict_validation",
+            "max_execution_time",
+            "deployment_mode",
+            "verify_ssl",
+            "ca_cert_path",
+        ]:
+            if key in config:
+                adapter_config[key] = config[key]
+
+        return cls(**adapter_config)
 
     def __init__(self, **config: Any) -> None:
         """Initialize StarRocks adapter.
@@ -81,7 +116,7 @@ class StarRocksAdapter(
     @property
     def dialect(self) -> str:
         """Return the SQL dialect for this adapter."""
-        return self._dialect
+        return self._dialect or "starrocks"
 
     def get_connection(self) -> Any:
         """Get a StarRocks connection."""
@@ -107,7 +142,9 @@ class StarRocksAdapter(
             cursor = connection.cursor()
             try:
                 for table_name in table_stats:
-                    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table_name):
+                    try:
+                        validate_sql_identifier(table_name, "table name")
+                    except ValueError:
                         self.logger.warning(f"Skipping invalid table name: {table_name!r}")
                         inaccessible_tables.append(table_name)
                         continue

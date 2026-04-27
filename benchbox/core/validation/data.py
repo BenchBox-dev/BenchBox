@@ -167,7 +167,7 @@ class DataValidator:
         # Get actual row counts from database
         try:
             # Create connection for validation operations
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.config)
+            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
             try:
                 actual_counts = self.get_actual_row_counts(temp_conn, list(expected_counts.keys()))
             finally:
@@ -296,7 +296,7 @@ class DataValidator:
 
             elif platform == "bigquery":
                 # BigQuery __TABLES__ metadata
-                dataset_id = self.platform_adapter.config.get("dataset_id", "benchbox")
+                dataset_id = self.platform_adapter.platform_config.get("dataset_id", "benchbox")
                 query = f"""
                 SELECT row_count
                 FROM `{dataset_id}.__TABLES__`
@@ -317,7 +317,7 @@ class DataValidator:
                 result = cursor.fetchone()
                 return int(result[0]) if result and result[0] is not None else None
 
-            elif platform == "clickhouse":
+            elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
                 # ClickHouse system.parts for MergeTree tables
                 query = f"""
                 SELECT SUM(rows)
@@ -348,7 +348,7 @@ class DataValidator:
         # Quote table name if necessary
         quoted_table = self._quote_identifier(table_name, platform)
 
-        if platform in ["clickhouse"]:
+        if platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
             # ClickHouse can optimize COUNT(*) on MergeTree tables
             return f"SELECT COUNT(*) FROM {quoted_table}"
         elif platform == "duckdb":
@@ -372,7 +372,7 @@ class DataValidator:
             return f"`{identifier}`"
         elif platform in ["postgresql", "redshift", "snowflake"]:
             return f'"{identifier}"'
-        elif platform == "clickhouse":
+        elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
             # ClickHouse typically doesn't require quoting for simple names
             return identifier
         else:
@@ -497,7 +497,7 @@ class DataValidator:
         status = {}
 
         # Create connection for table existence checks
-        temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.config)
+        temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
         try:
             for table_name in table_names:
                 try:
@@ -530,7 +530,7 @@ class DataValidator:
         result.total_tables = len(validation_queries)
 
         # Create connection for integrity checks
-        temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.config)
+        temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
         try:
             for check_name, query in validation_queries.items():
                 try:

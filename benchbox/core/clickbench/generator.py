@@ -382,4 +382,10 @@ class ClickBenchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
         """Write manifest describing generated ClickBench dataset."""
-        write_generator_manifest(self, "clickbench", table_paths, self._table_row_counts)
+        write_generator_manifest(
+            self,
+            "clickbench",
+            table_paths,
+            self._table_row_counts,
+            metadata={"csv_delimiter": "|", "csv_null_marker": None},
+        )

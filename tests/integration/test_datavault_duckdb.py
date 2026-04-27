@@ -290,7 +290,7 @@ class TestDataVaultTPCHEquivalence:
         return sorted(normalized)
 
     @staticmethod
-    def _tpch_query_for_params(query_id: int, params: dict[str, object]) -> str:
+    def _tpch_query_for_params(query_id: int, params: dict[str, object]) -> str:  # noqa: C901
         """Build canonical TPC-H SQL for a given query ID using shared params.
 
         All 22 queries follow the TPC-H specification exactly, parameterized

@@ -33,6 +33,7 @@ from benchbox.core.read_primitives.dataframe_queries import (
     REGISTRY,
     SKIP_FOR_DATAFRAME,
     SKIP_FOR_EXPRESSION_FAMILY,
+    SKIP_FOR_POLARS,
 )
 
 pytestmark = [
@@ -43,7 +44,12 @@ pytestmark = [
 
 
 # All queries that should execute on expression-family platforms right now.
-EXPRESSION_SKIP_SET = {q.upper() for q in SKIP_FOR_EXPRESSION_FAMILY} | {q.upper() for q in SKIP_FOR_DATAFRAME}
+# Include Polars-specific skips since this test file runs on Polars.
+EXPRESSION_SKIP_SET = (
+    {q.upper() for q in SKIP_FOR_EXPRESSION_FAMILY}
+    | {q.upper() for q in SKIP_FOR_DATAFRAME}
+    | {q.upper() for q in SKIP_FOR_POLARS}
+)
 ALL_QUERY_IDS = REGISTRY.get_query_ids()
 RUNNABLE_QUERY_IDS = [qid for qid in ALL_QUERY_IDS if qid.upper() not in EXPRESSION_SKIP_SET]
 
@@ -483,13 +489,13 @@ class TestSkipListConsistency:
     """Ensure skip lists stay in sync with the registry and unified API capabilities."""
 
     def test_skipped_queries_actually_fail_on_polars(self, polars_ctx):
-        """Queries in SKIP_FOR_EXPRESSION_FAMILY should actually fail (or be unsupported).
+        """Queries in SKIP_FOR_POLARS should actually fail (or be unsupported).
 
         Currently only map queries are skipped because Polars has no native Map dtype.
         These should raise NotImplementedError from map_from_entries() or UnifiedMapExpr.
         """
         queries_that_now_work = []
-        for query_id in SKIP_FOR_EXPRESSION_FAMILY:
+        for query_id in SKIP_FOR_POLARS:
             query = REGISTRY.get(query_id)
             if query is None:
                 continue
@@ -509,8 +515,7 @@ class TestSkipListConsistency:
 
         if queries_that_now_work:
             pytest.fail(
-                f"These queries now work on Polars and should be removed from "
-                f"SKIP_FOR_EXPRESSION_FAMILY: {queries_that_now_work}"
+                f"These queries now work on Polars and should be removed from SKIP_FOR_POLARS: {queries_that_now_work}"
             )
 
     def test_non_skipped_queries_do_not_use_unsupported_apis(self, polars_ctx):
@@ -536,7 +541,7 @@ class TestSkipListConsistency:
                 failed_queries.append((query_id, str(e)))
 
         if failed_queries:
-            msg = "These queries failed with AttributeError and should be added to SKIP_FOR_EXPRESSION_FAMILY:\n"
+            msg = "These queries failed with AttributeError and should be added to SKIP_FOR_POLARS:\n"
             for qid, err in failed_queries:
                 msg += f"  - {qid}: {err}\n"
             pytest.fail(msg)

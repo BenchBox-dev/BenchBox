@@ -17,7 +17,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
@@ -27,7 +26,6 @@ from typing import TYPE_CHECKING, Any
 from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
 from benchbox.utils.clock import elapsed_seconds, mono_time
-from benchbox.utils.file_format import get_delimiter_for_file
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +44,7 @@ from ..utils.dependencies import (
 )
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import FileFormatRegistry
+from .base.ddl_helpers import strip_foreign_keys, strip_primary_keys
 
 try:
     from firebolt.client.auth import ClientCredentials
@@ -622,10 +621,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
                 # Normalize table names to lowercase
                 statement = self._normalize_table_name_in_sql(statement)
-
                 # Optimize table definition for Firebolt
                 statement = self._optimize_table_definition(statement)
-
                 try:
                     cursor.execute(statement)
                     self.logger.debug(f"Executed schema statement: {statement[:100]}...")
@@ -683,51 +680,35 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 valid_files.append(path)
         return valid_files
 
-    def _resolve_data_files(self, benchmark, data_dir: Path) -> dict[str, list[Path]]:
-        """Resolve data files from benchmark tables or manifest fallback.
+    def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
+        """Resolve data files via DataSourceResolver.
 
         Returns:
-            Mapping of table_name -> list of file paths.
+            Resolved DataSource with table_name -> list of file paths.
 
         Raises:
             ValueError: If no data files are found.
         """
-        if hasattr(benchmark, "tables") and benchmark.tables:
-            # Normalize to dict[str, list[Path]]
-            result = {}
-            for table, paths in benchmark.tables.items():
-                if not isinstance(paths, list):
-                    paths = [paths]
-                result[table] = [Path(p) for p in paths]
-            return result
+        from benchbox.platforms.base.data_loading import DataSource, DataSourceResolver
 
-        data_files = None
-        try:
-            manifest_path = Path(data_dir) / "_datagen_manifest.json"
-            if manifest_path.exists():
-                with open(manifest_path) as f:
-                    manifest = json.load(f)
-                tables = manifest.get("tables") or {}
-                mapping = {}
-                for table, entries in tables.items():
-                    if entries:
-                        chunk_paths = []
-                        for entry in entries:
-                            rel = entry.get("path")
-                            if rel:
-                                chunk_paths.append(Path(data_dir) / rel)
-                        if chunk_paths:
-                            mapping[table] = chunk_paths
-                if mapping:
-                    data_files = mapping
-                    self.logger.debug("Using data files from _datagen_manifest.json")
-        except Exception as e:
-            self.logger.debug(f"Manifest fallback failed: {e}")
-
-        if not data_files:
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
+        data_source = resolver.resolve(benchmark, data_dir)
+        if not data_source or not data_source.tables:
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-
-        return data_files
+        # Return a fresh DataSource so we don't mutate the resolver-owned object;
+        # table_metadata and table_formats are forwarded so resolve_csv_dialect()
+        # still sees the manifest annotations downstream.
+        return DataSource(
+            source_type=data_source.source_type,
+            tables={table: [Path(p) for p in paths] for table, paths in data_source.tables.items()},
+            table_formats=dict(data_source.table_formats),
+            table_metadata=dict(data_source.table_metadata),
+        )
 
     def _load_data_via_insert(
         self, benchmark, connection: Any, data_dir: Path
@@ -744,10 +725,14 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         placeholder = self._get_parameter_placeholder(cursor)
 
         try:
-            data_files = self._resolve_data_files(benchmark, data_dir)
+            data_source = self._resolve_data_files(benchmark, data_dir)
+            from benchbox.platforms.base.data_loading import DataSource, resolve_csv_dialect
+
+            if not isinstance(data_source, DataSource):
+                data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
 
             # Load data using INSERT statements in batches
-            for table_name, file_paths in data_files.items():
+            for table_name, file_paths in data_source.tables.items():
                 valid_files = self._normalize_existing_files(file_paths)
 
                 if not valid_files:
@@ -767,8 +752,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     for file_path in valid_files:
                         file_path = Path(file_path)
 
-                        # Detect delimiter from file extension (handle compressed extensions)
-                        delimiter = get_delimiter_for_file(file_path)
+                        dialect = resolve_csv_dialect(data_source, table_name, file_path, benchmark)
+                        delimiter = dialect.delimiter
 
                         # Get compression handler (handles .zst, .gz, or uncompressed)
                         compression_handler = FileFormatRegistry.get_compression_handler(file_path)
@@ -782,8 +767,7 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
                             for raw_line in f:
                                 line = raw_line.rstrip("\n")
-                                # Handle trailing delimiter (TPC format)
-                                if line and line.endswith(delimiter):
+                                if dialect.null_marker is not None and line and line.endswith(delimiter):
                                     line = line[:-1]
 
                                 if not line:
@@ -803,7 +787,12 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                                         f"expected {column_count}, got {len(values)}"
                                     )
 
-                                converted_values = tuple(None if v == "" or v.lower() == "null" else v for v in values)
+                                if dialect.null_marker is None:
+                                    converted_values = tuple(values)
+                                else:
+                                    converted_values = tuple(
+                                        None if v == dialect.null_marker or v.lower() == "null" else v for v in values
+                                    )
                                 batch_rows.append(converted_values)
 
                                 if len(batch_rows) >= batch_size:
@@ -826,7 +815,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     )
 
                 except Exception as e:
-                    self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
+                    error_message = str(e) or repr(e) or type(e).__name__
+                    self.logger.error(f"Failed to load {table_name}: {error_message}")
                     table_stats[table_name.lower()] = 0
 
             total_time = elapsed_seconds(start_time)
@@ -885,9 +875,13 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         cursor = connection.cursor()
 
         try:
-            data_files = self._resolve_data_files(benchmark, data_dir)
+            data_source = self._resolve_data_files(benchmark, data_dir)
+            from benchbox.platforms.base.data_loading import DataSource, resolve_csv_dialect
 
-            for table_name, file_paths in data_files.items():
+            if not isinstance(data_source, DataSource):
+                data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
+
+            for table_name, file_paths in data_source.tables.items():
                 if not isinstance(file_paths, list):
                     file_paths = [file_paths]
 
@@ -915,8 +909,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     for file_path in valid_files:
                         file_path = Path(file_path)
 
-                        # Detect delimiter
-                        delimiter = get_delimiter_for_file(file_path)
+                        dialect = resolve_csv_dialect(data_source, table_name, file_path, benchmark)
+                        delimiter = dialect.delimiter
 
                         # Determine the S3 key for this file
                         s3_key = f"{s3_prefix}{table_name_lower}/{file_path.name}"
@@ -974,7 +968,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     )
 
                 except Exception as e:
-                    self.logger.error(f"Failed to load {table_name} via S3: {str(e)[:200]}...")
+                    error_message = str(e) or repr(e) or type(e).__name__
+                    self.logger.error(f"Failed to load {table_name} via S3: {error_message}")
                     table_stats[table_name.lower()] = 0
 
             total_time = elapsed_seconds(start_time)
@@ -1076,21 +1071,11 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         # Replace DECIMAL with NUMERIC (preserve precision/scale)
         statement = re.sub(r"\bDECIMAL\b", "NUMERIC", statement, flags=re.IGNORECASE)
 
-        # Remove PRIMARY KEY constraints (Firebolt doesn't enforce them)
-        statement = re.sub(r",?\s*PRIMARY\s+KEY\s*\([^)]*\)", "", statement, flags=re.IGNORECASE)
-        statement = re.sub(r"\s+PRIMARY\s+KEY\b", "", statement, flags=re.IGNORECASE)
+        # Remove PRIMARY KEY and FOREIGN KEY constraints
+        statement = strip_primary_keys(statement)
+        statement = strip_foreign_keys(statement)
 
-        # Remove FOREIGN KEY constraints
-        statement = re.sub(
-            r",?\s*FOREIGN\s+KEY\s*\([^)]*\)\s*REFERENCES\s+[^\s,)]+\s*\([^)]*\)",
-            "",
-            statement,
-            flags=re.IGNORECASE,
-        )
-
-        # Remove NOT NULL constraints (Firebolt supports nullable by default)
-        # Keep NOT NULL as Firebolt does support it
-        # statement = re.sub(r"\s+NOT\s+NULL\b", "", statement, flags=re.IGNORECASE)
+        # NOT NULL is preserved: Firebolt enforces NOT NULL on ENGINE tables.
 
         # Clean up any double commas or trailing commas before closing paren
         statement = re.sub(r",\s*,", ",", statement)
@@ -1300,6 +1285,11 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     def validate_session_cache_control(self, connection: Any) -> bool:
         """Validate that result cache is disabled for the session.
 
+        Intentionally not delegating to ``cloud_shared.validate_session_cache_control``:
+        Firebolt uses ``SHOW enable_result_cache`` (Firebolt-specific DDL) and must
+        soft-fail with ``True`` when SHOW is unsupported, which differs from the
+        cloud_shared contract (structured-dict return, strict error propagation).
+
         Returns:
             True if cache is confirmed disabled, False otherwise.
 
@@ -1418,62 +1408,28 @@ def _build_firebolt_config(
     overrides: dict[str, Any],
     info: Any,
 ) -> Any:
-    """Build Firebolt database configuration with credential loading.
+    from benchbox.platforms.base.config_utils import build_platform_config
 
-    Args:
-        platform: Platform name (should be 'firebolt')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded
-    """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("firebolt") or {}
-
-    # Build merged options: saved_creds < options < overrides
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "Firebolt"
-    driver_package = info.driver_package if info else "firebolt-sdk"
-
-    config_dict = {
-        "type": "firebolt",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields at top-level
-        "url": merged_options.get("url"),
-        "client_id": merged_options.get("client_id"),
-        "client_secret": merged_options.get("client_secret"),
-        "account_name": merged_options.get("account_name"),
-        "engine_name": merged_options.get("engine_name"),
-        "api_endpoint": merged_options.get("api_endpoint"),
-        "deployment_mode": overrides.get("deployment_mode") or options.get("deployment_mode"),
-        # S3 staging configuration
-        "s3_staging_url": merged_options.get("s3_staging_url"),
-        "s3_region": merged_options.get("s3_region"),
-        # Benchmark context for config-aware database naming
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    # Only include explicit database override if provided
-    if "database" in overrides and overrides["database"]:
-        config_dict["database"] = overrides["database"]
-
-    return DatabaseConfig(**config_dict)
+    return build_platform_config(
+        platform_type="firebolt",
+        credential_key="firebolt",
+        default_display_name="Firebolt",
+        default_driver_package="firebolt-sdk",
+        platform_fields=[
+            "url",
+            "client_id",
+            "client_secret",
+            "account_name",
+            "engine_name",
+            "api_endpoint",
+            "deployment_mode",
+            "s3_staging_url",
+            "s3_region",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 # Register the config builder with the platform hook registry

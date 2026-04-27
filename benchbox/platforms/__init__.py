@@ -68,6 +68,8 @@ _LAZY_ADAPTERS = {
     "SnowflakeAdapter": ".snowflake",
     "RedshiftAdapter": ".redshift",
     "ClickHouseAdapter": ".clickhouse",
+    "ClickHouseLocalAdapter": ".clickhouse_local",
+    "ClickHouseServerAdapter": ".clickhouse_server",
     "ClickHouseCloudAdapter": ".clickhouse_cloud",
     "TrinoAdapter": ".trino",
     "AthenaAdapter": ".athena",
@@ -82,8 +84,10 @@ _LAZY_ADAPTERS = {
     "FabricLakehouseAdapter": ".fabric_lakehouse",
     "FabricSparkAdapter": ".fabric_spark",
     "StarRocksAdapter": ".starrocks",
+    "SingleStoreAdapter": ".singlestore",
     "QuantonAdapter": ".onehouse",
     "LakeSailAdapter": ".lakesail",
+    "VeloxAdapter": ".velox",
     "DorisAdapter": ".doris",
     # Native-heavy adapters deferred to avoid ~210 MB of native library loading per process
     "DataFusionAdapter": ".datafusion",
@@ -242,6 +246,11 @@ except ImportError:
     PgMooncakeAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
 
 try:
+    from .cedardb import CedarDBAdapter
+except ImportError:
+    CedarDBAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
+
+try:
     from .questdb import QuestDBAdapter
 except ImportError:
     QuestDBAdapter: Optional[Type[PlatformAdapter]] = None  # type: ignore[assignment,misc]
@@ -271,12 +280,14 @@ __all__ = [
     "PostgreSQLAdapter",
     "PgDuckDBAdapter",
     "PgMooncakeAdapter",
+    "CedarDBAdapter",
     "QuestDBAdapter",
     "AzureSynapseAdapter",
     "FabricWarehouseAdapter",
     "FabricLakehouseAdapter",
     "FabricSparkAdapter",
     "StarRocksAdapter",
+    "SingleStoreAdapter",
     "QuantonAdapter",
     "LakeSailAdapter",
     "DorisAdapter",
@@ -352,7 +363,7 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
     except ValueError:
         # Platform not registered - provide helpful error with available platforms
         available = ", ".join(PlatformRegistry.get_available_platforms())
-        raise ValueError(f"Unsupported platform: {platform_name}. Available: {available}")
+        raise ValueError(f"Unsupported platform: {platform_name}. Available: {available}") from None
 
     # Check if adapter class is actually available (deps installed)
     if adapter_class is None:
@@ -380,7 +391,7 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
     requested_version = explicit_requested_version
 
     if already_resolved:
-        # Upstream (database.py) already resolved the driver — reconstruct without re-resolving.
+        # Upstream (database.py) already resolved the driver - reconstruct without re-resolving.
         resolution = DriverResolution(
             package=driver_package or package_hint or "",
             requested=explicit_requested_version,
@@ -392,7 +403,7 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
             runtime_python_executable=config.get("driver_runtime_python_executable"),
         )
     else:
-        # No upstream resolution (e.g., direct API usage) — resolve now.
+        # No upstream resolution (e.g., direct API usage) - resolve now.
         resolution = ensure_driver_version(
             package_name=package_hint,
             requested_version=requested_version,
@@ -878,6 +889,37 @@ try:
             default="public",
         ),
         PlatformOptionSpec(
+            name="admin_database",
+            help="Database used for CREATE/DROP DATABASE operations",
+            default="postgres",
+        ),
+        PlatformOptionSpec(
+            name="sslmode",
+            help="PostgreSQL SSL mode",
+            default="prefer",
+        ),
+        PlatformOptionSpec(
+            name="work_mem",
+            help="TimescaleDB work_mem setting for queries",
+            default="256MB",
+        ),
+        PlatformOptionSpec(
+            name="maintenance_work_mem",
+            help="TimescaleDB maintenance_work_mem for VACUUM/CREATE INDEX",
+            default="512MB",
+        ),
+        PlatformOptionSpec(
+            name="effective_cache_size",
+            help="TimescaleDB effective_cache_size planner hint",
+            default="1GB",
+        ),
+        PlatformOptionSpec(
+            name="max_parallel_workers_per_gather",
+            help="TimescaleDB max_parallel_workers_per_gather setting",
+            parser=int,
+            default=2,
+        ),
+        PlatformOptionSpec(
             name="chunk_interval",
             help="Chunk time interval for hypertables (e.g., '1 day', '1 week')",
             default="1 day",
@@ -931,6 +973,37 @@ try:
             default="public",
         ),
         PlatformOptionSpec(
+            name="admin_database",
+            help="Database used for CREATE/DROP DATABASE operations",
+            default="postgres",
+        ),
+        PlatformOptionSpec(
+            name="sslmode",
+            help="PostgreSQL SSL mode",
+            default="prefer",
+        ),
+        PlatformOptionSpec(
+            name="work_mem",
+            help="PostgreSQL work_mem setting for queries",
+            default="256MB",
+        ),
+        PlatformOptionSpec(
+            name="maintenance_work_mem",
+            help="PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX",
+            default="512MB",
+        ),
+        PlatformOptionSpec(
+            name="effective_cache_size",
+            help="PostgreSQL effective_cache_size planner hint",
+            default="1GB",
+        ),
+        PlatformOptionSpec(
+            name="max_parallel_workers_per_gather",
+            help="PostgreSQL max_parallel_workers_per_gather setting",
+            parser=int,
+            default=2,
+        ),
+        PlatformOptionSpec(
             name="force_execution",
             help="Force DuckDB execution engine for all queries",
             parser=parse_bool,
@@ -941,6 +1014,12 @@ try:
             help="Threads for parallel PostgreSQL table scanning (0 = auto)",
             parser=int,
             default="0",
+        ),
+        PlatformOptionSpec(
+            name="compare_native",
+            help="Run native DuckDB comparison for matched queries",
+            parser=parse_bool,
+            default=False,
         ),
     )
 
@@ -981,6 +1060,37 @@ try:
             default="public",
         ),
         PlatformOptionSpec(
+            name="admin_database",
+            help="Database used for CREATE/DROP DATABASE operations",
+            default="postgres",
+        ),
+        PlatformOptionSpec(
+            name="sslmode",
+            help="PostgreSQL SSL mode",
+            default="prefer",
+        ),
+        PlatformOptionSpec(
+            name="work_mem",
+            help="PostgreSQL work_mem setting for queries",
+            default="256MB",
+        ),
+        PlatformOptionSpec(
+            name="maintenance_work_mem",
+            help="PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX",
+            default="512MB",
+        ),
+        PlatformOptionSpec(
+            name="effective_cache_size",
+            help="PostgreSQL effective_cache_size planner hint",
+            default="1GB",
+        ),
+        PlatformOptionSpec(
+            name="max_parallel_workers_per_gather",
+            help="PostgreSQL max_parallel_workers_per_gather setting",
+            parser=int,
+            default=2,
+        ),
+        PlatformOptionSpec(
             name="storage_mode",
             help="Storage backend: local (disk) or s3 (object storage)",
             choices=("local", "s3"),
@@ -989,6 +1099,94 @@ try:
         PlatformOptionSpec(
             name="mooncake_bucket",
             help="S3/GCS bucket URL for columnstore data (required when storage_mode=s3)",
+        ),
+    )
+
+    # QuestDB (eagerly loaded - shares psycopg2 with PostgreSQL)
+    if QuestDBAdapter is not None:
+        from benchbox.platforms.questdb import _build_questdb_config
+
+        PlatformHookRegistry.register_config_builder("questdb", _build_questdb_config)
+
+    PlatformHookRegistry.register_option_specs(
+        "questdb",
+        PlatformOptionSpec(
+            name="host",
+            help="QuestDB server hostname",
+            default="localhost",
+        ),
+        PlatformOptionSpec(
+            name="pg_port",
+            help="QuestDB PostgreSQL wire protocol port",
+            default="8812",
+        ),
+        PlatformOptionSpec(
+            name="http_port",
+            help="QuestDB REST API HTTP port (BenchBox Docker uses 19000; native default is 9000)",
+            default="9000",
+        ),
+        PlatformOptionSpec(
+            name="ilp_port",
+            help="QuestDB InfluxDB Line Protocol port",
+            default="9009",
+        ),
+        PlatformOptionSpec(
+            name="username",
+            help="QuestDB username",
+            default="admin",
+        ),
+        PlatformOptionSpec(
+            name="password",
+            help="QuestDB password",
+            default="quest",
+        ),
+        PlatformOptionSpec(
+            name="database",
+            help="QuestDB database name",
+            default="qdb",
+        ),
+        PlatformOptionSpec(
+            name="loading_method",
+            help="Data loading method: 'rest' (CSV import, default) or 'ilp' (InfluxDB Line Protocol)",
+            default="rest",
+        ),
+    )
+
+    # CedarDB (eagerly loaded - shares psycopg2 with PostgreSQL)
+    if CedarDBAdapter is not None:
+        from benchbox.platforms.cedardb import _build_cedardb_config
+
+        PlatformHookRegistry.register_config_builder("cedardb", _build_cedardb_config)
+
+    PlatformHookRegistry.register_option_specs(
+        "cedardb",
+        PlatformOptionSpec(
+            name="host",
+            help="CedarDB server hostname",
+            default="localhost",
+        ),
+        PlatformOptionSpec(
+            name="port",
+            help="CedarDB server port",
+            default="5432",
+        ),
+        PlatformOptionSpec(
+            name="database",
+            help="CedarDB database name (auto-generated if not specified)",
+        ),
+        PlatformOptionSpec(
+            name="username",
+            help="CedarDB username",
+            default="postgres",
+        ),
+        PlatformOptionSpec(
+            name="password",
+            help="CedarDB password",
+        ),
+        PlatformOptionSpec(
+            name="schema",
+            help="CedarDB schema name",
+            default="public",
         ),
     )
 
@@ -1148,9 +1346,29 @@ try:
             help="Database name",
             default="default",
         ),
+        PlatformOptionSpec(
+            name="oauth_token",
+            help="OAuth token for keyless authentication (alternative to password)",
+        ),
+        PlatformOptionSpec(
+            name="s3_staging_url",
+            help="S3 URL for bulk data loading (e.g., s3://my-bucket/benchbox-staging/)",
+        ),
+        PlatformOptionSpec(
+            name="s3_region",
+            help="AWS region for the S3 staging bucket",
+            default="us-east-1",
+        ),
+        PlatformOptionSpec(
+            name="gcs_staging_url",
+            help="GCS URL for bulk data loading (e.g., gs://my-bucket/benchbox-staging/)",
+        ),
     )
 
     # StarRocks (lazy - uses pymysql)
+    PlatformHookRegistry.register_config_builder(
+        "starrocks", _make_lazy_config_builder(".starrocks.setup", "_build_starrocks_config")
+    )
     PlatformHookRegistry.register_option_specs(
         "starrocks",
         PlatformOptionSpec(
@@ -1232,13 +1450,21 @@ try:
         ),
         PlatformOptionSpec(
             name="port",
+            parser=int,
             help="Doris MySQL protocol port",
-            default="9030",
+            default=9030,
         ),
         PlatformOptionSpec(
             name="http_port",
-            help="Doris Stream Load HTTP port",
-            default="8030",
+            parser=int,
+            help="Doris Stream Load HTTP port (FE)",
+            default=8030,
+        ),
+        PlatformOptionSpec(
+            name="be_http_port",
+            parser=int,
+            help="Doris BE HTTP port for stream load redirects",
+            default=8040,
         ),
         PlatformOptionSpec(
             name="database",
@@ -1252,6 +1478,37 @@ try:
         PlatformOptionSpec(
             name="password",
             help="Doris password",
+        ),
+    )
+
+    # SingleStore (lazy - uses singlestoredb SDK)
+    PlatformHookRegistry.register_config_builder(
+        "singlestore", _make_lazy_config_builder(".singlestore", "_build_singlestore_config")
+    )
+    PlatformHookRegistry.register_option_specs(
+        "singlestore",
+        PlatformOptionSpec(
+            name="host",
+            help="SingleStore server hostname or Helios endpoint",
+            default="localhost",
+        ),
+        PlatformOptionSpec(
+            name="port",
+            help="SingleStore MySQL protocol port",
+            default="3306",
+        ),
+        PlatformOptionSpec(
+            name="database",
+            help="SingleStore database name (auto-generated if not specified)",
+        ),
+        PlatformOptionSpec(
+            name="username",
+            help="SingleStore username",
+            default="root",
+        ),
+        PlatformOptionSpec(
+            name="password",
+            help="SingleStore password",
         ),
     )
 
@@ -1384,6 +1641,70 @@ try:
             help="Temporary directory for disk spilling (default: system temp)",
         ),
     )
+    # SQLite (embedded — stdlib sqlite3, no heavy SDK imports)
+    PlatformHookRegistry.register_option_specs(
+        "sqlite",
+        PlatformOptionSpec(
+            name="database_path",
+            help="Path to the SQLite database file (auto-generated from --benchmark/--scale when omitted)",
+        ),
+        PlatformOptionSpec(
+            name="timeout",
+            help="SQLite connection timeout in seconds",
+            parser=float,
+            default="30.0",
+        ),
+        PlatformOptionSpec(
+            name="check_same_thread",
+            help="Enforce that connections are used on the creating thread only",
+            parser=parse_bool,
+            default="false",
+        ),
+    )
+
+    # Apache Gluten + Velox (lazy - uses pyspark + Gluten bundle jar)
+    PlatformHookRegistry.register_option_specs(
+        "velox",
+        PlatformOptionSpec(
+            name="deployment",
+            help="Deployment mode: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)",
+            choices=("local", "remote"),
+            default="local",
+        ),
+        PlatformOptionSpec(
+            name="endpoint",
+            help="Spark-Connect endpoint for remote mode (e.g., sc://localhost:50051)",
+            default="sc://localhost:50051",
+        ),
+        PlatformOptionSpec(
+            name="gluten_jar_path",
+            help="Absolute path to the Gluten Velox bundle jar (required for local mode)",
+            aliases=("jar",),
+        ),
+        PlatformOptionSpec(
+            name="offheap_size",
+            help="Off-heap memory for Velox native engine (e.g., '8g', '16g')",
+            default="8g",
+        ),
+        PlatformOptionSpec(
+            name="driver_memory",
+            help="Spark driver JVM heap memory (e.g., '4g')",
+            default="4g",
+        ),
+        PlatformOptionSpec(
+            name="shuffle_partitions",
+            help="Number of shuffle partitions",
+            parser=int,
+            default="200",
+        ),
+        PlatformOptionSpec(
+            name="adaptive_enabled",
+            help="Enable Spark Adaptive Query Execution",
+            parser=parse_bool,
+            default="true",
+        ),
+    )
+
 except ImportError:
     # Platform hooks may not be available in all contexts
     pass

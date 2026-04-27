@@ -1,7 +1,7 @@
 # BenchBox Makefile
 # This makefile provides commands for building, testing and development
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json codex-skills-sync codex-skills-check mutation-test
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json codex-skills-sync codex-skills-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -144,6 +144,10 @@ test-live-firebolt:
 	@echo "Running Firebolt live tests (requires FIREBOLT_CLIENT_ID)"
 	uv run -- python -m pytest -m "live_firebolt" --tb=short -v
 
+test-live-firebolt-core:
+	@echo "Running Firebolt Core live tests (requires Docker - make test-docker-up-firebolt)"
+	uv run -- python -m pytest -m "live_firebolt_core" --tb=short -v -n 0
+
 test-live-starburst:
 	@echo "Running Starburst Galaxy live tests (requires STARBURST_HOST)"
 	uv run -- python -m pytest -m "live_starburst" --tb=short -v
@@ -159,6 +163,10 @@ test-live-pg-duckdb:
 test-live-pg-mooncake:
 	@echo "Running pg_mooncake live tests (requires Docker PostgreSQL with pg_mooncake)"
 	uv run -- python -m pytest -m "live_pg_mooncake" --tb=short -v
+
+test-live-cedardb:
+	@echo "Running CedarDB live tests (requires Docker CedarDB - make test-docker-up-cedardb)"
+	uv run -- python -m pytest -m "live_cedardb" --tb=short -v -n 0
 
 test-docker-up-pg-extensions:
 	@echo "Starting pg_duckdb (port 5432) and pg_mooncake (port 5433)..."
@@ -204,7 +212,7 @@ test-docker-pg-extensions:
 		uv run -- python -m pytest -m "live_pg_duckdb or live_pg_mooncake" --tb=short -v -n 0
 
 # Docker-based integration tests (requires Docker and docker compose)
-DOCKER_PLATFORMS := clickhouse trino presto postgresql starrocks doris databend influxdb
+DOCKER_PLATFORMS := clickhouse trino presto postgresql starrocks doris databend influxdb cedardb firebolt questdb singlestore
 DOCKER_TEST_STATE_DIR ?= /tmp/benchbox-docker-projects
 
 test-docker-up-%:
@@ -239,6 +247,17 @@ test-docker-down-%:
 		fi; \
 		docker compose -p "$$project_name" -f docker/$*/docker-compose.yml down -v; \
 		rm -f "$$project_file"
+
+# Explicit override: generic test-docker-% expands to -m "live_firebolt" (cloud tests).
+# Firebolt Core Docker tests use the separate live_firebolt_core marker.
+test-docker-firebolt:
+	@echo "Running Firebolt Core Docker integration tests"
+	@set -e; \
+		project_name="benchbox-firebolt-test-$$(date +%s)-$$RANDOM"; \
+		cleanup() { docker compose -p "$$project_name" -f docker/firebolt/docker-compose.yml down -v || true; }; \
+		trap cleanup EXIT INT TERM; \
+		docker compose -p "$$project_name" -f docker/firebolt/docker-compose.yml up -d --wait; \
+		uv run -- python -m pytest -m "live_firebolt_core" --tb=short -v -n 0
 
 test-docker-%:
 	@echo "Running $* Docker integration tests"
@@ -351,7 +370,12 @@ clean:
 lint:
 	uv run ruff check .
 
-# Validate test marker annotations — fails on speed-lane conflicts or fast-incompatible pairs.
+# Dependency audit - checks that every declared dep has an import site or is allowlisted.
+# Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
+audit-deps:
+	uv run -- python _project/scripts/dependency_audit/check_deps.py
+
+# Validate test marker annotations - fails on speed-lane conflicts or fast-incompatible pairs.
 # Uses --collect-only so no tests run; the conflict-detection hook fires at collection time.
 lint-markers:
 	uv run -- python -m pytest --collect-only -q -p no:warnings
@@ -512,7 +536,7 @@ docs-build:
 docs-serve: docs-build
 	@echo "Serving docs at http://localhost:8000"
 	@echo "Press Ctrl+C to stop"
-	@cd docs/_build/html && python -m http.server 8000
+	@cd docs/_build/html && uv run -- python -m http.server 8000
 
 # Clean documentation build artifacts
 docs-clean:
@@ -548,6 +572,42 @@ docs-images:
 docs-check: docs-validate docs-linkcheck docs-build
 	@echo ""
 	@echo "✅ All documentation checks passed!"
+
+# Compile TPC-DS (and TPC-H) binaries from patched sources for the current
+# platform and deploy them into benchbox/_binaries/ so they are used at runtime.
+# No Docker required - builds natively on macOS ARM64/x86_64.
+# Run this whenever _sources/tpc-ds/tools/ patches change.
+compile-tpcds-binaries:
+	bash _sources/compilation/scripts/compile-all-platforms.sh --native
+
+# ---------------------------------------------------------------------------
+# Visualization parity fixtures (CLI↔explorer contract)
+# ---------------------------------------------------------------------------
+
+# Regenerate fixtures from the canonical Python implementation.
+# This CHANGES the contract - commit the resulting diff after review.
+parity-fixtures:
+	uv run python tests/parity/generate_visualization_fixtures.py
+
+# Regenerate sql_compat capability matrix and skip reference docs from the registry.
+compat-docs:
+	uv run scripts/generate_compat_docs.py
+
+# Verify the committed compat docs match the registry. CI gate against drift.
+compat-docs-check:
+	uv run scripts/generate_compat_docs.py --check
+
+# Verify fixtures match the current Python implementation without overwriting.
+# Fails if any fixture is out of date (drift detected).
+# comparison_artifact.json is excluded from the diff - it requires real result bundles to generate
+# and is verified by the comparisonArtifact.parity.test.tsx suite instead.
+parity-check:
+	@tmpdir=$$(mktemp -d) && \
+	uv run python tests/parity/generate_visualization_fixtures.py --out $$tmpdir && \
+	diff -r --exclude='.gitkeep' --exclude='comparison_artifact.json' tests/parity/fixtures $$tmpdir && \
+	echo "parity-check: fixtures match Python source" && \
+	rm -rf $$tmpdir || \
+	(echo "parity-check FAILED: fixtures are out of date - run 'make parity-fixtures' to regenerate" && rm -rf $$tmpdir && exit 1)
 
 # Create distribution packages
 dist: clean
@@ -646,6 +706,7 @@ help:
 	@echo "  make install         Install the package"
 	@echo "  make develop         Install the package in development mode"
 	@echo "  make dist            Create distribution packages"
+	@echo "  make compile-tpcds-binaries  Rebuild TPC-DS/TPC-H binaries from patched sources (no Docker)"
 	@echo ""
 	@echo "Documentation:"
 	@echo "  make docs-build      Build Sphinx documentation locally"

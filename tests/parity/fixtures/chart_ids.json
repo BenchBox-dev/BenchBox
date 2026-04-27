@@ -1,0 +1,20 @@
+{
+  "chart_ids": [
+    "performance_bar",
+    "power_bar",
+    "distribution_box",
+    "query_heatmap",
+    "query_histogram",
+    "cost_scatter",
+    "time_series",
+    "comparison_bar",
+    "diverging_bar",
+    "summary_box",
+    "percentile_ladder",
+    "normalized_speedup",
+    "stacked_phase",
+    "sparkline_table",
+    "cdf_chart",
+    "rank_table"
+  ]
+}

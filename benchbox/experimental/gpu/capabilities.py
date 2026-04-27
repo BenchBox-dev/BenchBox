@@ -233,14 +233,14 @@ def _detect_cuda_toolkit() -> tuple[bool, str]:
         version_file = os.path.join(cuda_home, "version.txt")
         if os.path.exists(version_file):
             try:
-                with open(version_file) as f:
+                with open(version_file, encoding="utf-8") as f:
                     content = f.read()
                     # Parse "CUDA Version 12.1.66" format
                     if "CUDA Version" in content:
                         version = content.split("CUDA Version")[1].strip().split()[0]
                         return True, version
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to parse CUDA version file {version_file}: {e}")
         return True, ""
 
     return False, ""
@@ -300,66 +300,72 @@ def detect_gpu() -> GPUInfo:
     """
     info = GPUInfo()
 
-    # Try to detect NVIDIA GPUs via nvidia-smi
-    nvidia_devices = _detect_nvidia_smi()
+    try:
+        # Try to detect NVIDIA GPUs via nvidia-smi
+        nvidia_devices = _detect_nvidia_smi()
 
-    if nvidia_devices:
-        info.available = True
-        info.device_count = len(nvidia_devices)
-        info.driver_version = nvidia_devices[0].get("driver_version", "")
+        if nvidia_devices:
+            info.available = True
+            info.device_count = len(nvidia_devices)
+            info.driver_version = nvidia_devices[0].get("driver_version", "")
 
-        for dev in nvidia_devices:
-            device = GPUDevice(
-                index=dev["index"],
-                name=dev["name"],
-                vendor=GPUVendor.NVIDIA,
-                memory_total_mb=dev["memory_total"],
-                memory_free_mb=dev["memory_free"],
-                compute_capability=dev.get("compute_cap", ""),
-                driver_version=dev.get("driver_version", ""),
-                pcie_generation=dev.get("pcie_gen", 0),
-                pcie_width=dev.get("pcie_width", 0),
-                temperature_celsius=dev.get("temperature", 0.0),
-                power_watts=dev.get("power", 0.0),
-                utilization_percent=dev.get("utilization", 0.0),
-            )
-            info.devices.append(device)
+            for dev in nvidia_devices:
+                device = GPUDevice(
+                    index=dev["index"],
+                    name=dev["name"],
+                    vendor=GPUVendor.NVIDIA,
+                    memory_total_mb=dev["memory_total"],
+                    memory_free_mb=dev["memory_free"],
+                    compute_capability=dev.get("compute_cap", ""),
+                    driver_version=dev.get("driver_version", ""),
+                    pcie_generation=dev.get("pcie_gen", 0),
+                    pcie_width=dev.get("pcie_width", 0),
+                    temperature_celsius=dev.get("temperature", 0.0),
+                    power_watts=dev.get("power", 0.0),
+                    utilization_percent=dev.get("utilization", 0.0),
+                )
+                info.devices.append(device)
 
-    # Detect CUDA toolkit
-    cuda_available, cuda_version = _detect_cuda_toolkit()
-    info.cuda_available = cuda_available
-    info.cuda_version = cuda_version
+        # Detect CUDA toolkit
+        cuda_available, cuda_version = _detect_cuda_toolkit()
+        info.cuda_available = cuda_available
+        info.cuda_version = cuda_version
 
-    # Detect RAPIDS
-    rapids_available, rapids_version, libraries = _detect_rapids()
-    info.rapids_available = rapids_available
-    info.rapids_version = rapids_version
-    info.cudf_available = "cudf" in libraries
-    info.cudf_version = libraries.get("cudf", "")
-    info.cuml_available = "cuml" in libraries
-    info.cuml_version = libraries.get("cuml", "")
+        # Detect RAPIDS
+        rapids_available, rapids_version, libraries = _detect_rapids()
+        info.rapids_available = rapids_available
+        info.rapids_version = rapids_version
+        info.cudf_available = "cudf" in libraries
+        info.cudf_version = libraries.get("cudf", "")
+        info.cuml_available = "cuml" in libraries
+        info.cuml_version = libraries.get("cuml", "")
 
-    # If we have cuDF, try to get more detailed GPU info via CUDA runtime
-    if info.cudf_available and not info.available:
-        try:
-            import cupy  # type: ignore
+        # If we have cuDF, try to get more detailed GPU info via CUDA runtime
+        if info.cudf_available and not info.available:
+            try:
+                import cupy  # type: ignore
 
-            device_count = cupy.cuda.runtime.getDeviceCount()
-            if device_count > 0:
-                info.available = True
-                info.device_count = device_count
-                for i in range(device_count):
-                    props = cupy.cuda.runtime.getDeviceProperties(i)
-                    device = GPUDevice(
-                        index=i,
-                        name=props["name"].decode() if isinstance(props["name"], bytes) else props["name"],
-                        vendor=GPUVendor.NVIDIA,
-                        memory_total_mb=props.get("totalGlobalMem", 0) // (1024 * 1024),
-                        compute_capability=f"{props.get('major', 0)}.{props.get('minor', 0)}",
-                    )
-                    info.devices.append(device)
-        except Exception as e:
-            logger.debug(f"Failed to get GPU info via cupy: {e}")
+                device_count = cupy.cuda.runtime.getDeviceCount()
+                if device_count > 0:
+                    info.available = True
+                    info.device_count = device_count
+                    for i in range(device_count):
+                        props = cupy.cuda.runtime.getDeviceProperties(i)
+                        device = GPUDevice(
+                            index=i,
+                            name=props["name"].decode() if isinstance(props["name"], bytes) else props["name"],
+                            vendor=GPUVendor.NVIDIA,
+                            memory_total_mb=props.get("totalGlobalMem", 0) // (1024 * 1024),
+                            compute_capability=f"{props.get('major', 0)}.{props.get('minor', 0)}",
+                        )
+                        info.devices.append(device)
+            except Exception as e:
+                logger.debug(f"Failed to get GPU info via cupy: {e}")
+
+    except Exception as e:
+        error_message = str(e) or repr(e) or type(e).__name__
+        info.error_message = error_message
+        logger.debug(f"GPU detection failed: {error_message}")
 
     return info
 

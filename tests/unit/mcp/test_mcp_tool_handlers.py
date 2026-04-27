@@ -98,8 +98,8 @@ class TestValidateConfigTool:
     def test_dataframe_unsupported_benchmark_returns_error(self, tool_functions):
         """DataFrame mode with unsupported benchmark produces error."""
         fn = tool_functions["run_benchmark"]
-        # metadata_primitives does not support DataFrame mode
-        result = fn(platform="polars-df", benchmark="metadata_primitives", scale_factor=1.0, validate_only=True)
+        # ai_primitives does not support DataFrame mode
+        result = fn(platform="polars-df", benchmark="ai_primitives", scale_factor=1.0, validate_only=True)
 
         assert result["valid"] is False
         assert any("DataFrame" in e for e in result["errors"])

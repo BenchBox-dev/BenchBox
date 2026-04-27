@@ -3,22 +3,23 @@
 ```{tags} intermediate, reference
 ```
 
-This matrix provides a comprehensive comparison of all **37 supported platforms** in BenchBox, organized by category to help you choose the right platform for your benchmarking needs.
+This matrix provides a comprehensive comparison of all **41 supported platforms** in BenchBox, organized by category to help you choose the right platform for your benchmarking needs.
 
 ## Platform Overview
 
-BenchBox supports platforms across six categories:
+BenchBox supports platforms across seven categories:
 
 | Category                                                       | Platforms | Description                                    |
 | -------------------------------------------------------------- | --------- | ---------------------------------------------- |
 | [Local/Embedded](#localembedded-platforms)                     | 5         | In-process engines, no infrastructure required |
 | [Cloud Data Warehouses](#cloud-data-warehouses)                | 8         | Managed cloud analytics platforms              |
-| [Distributed SQL Engines](#distributed-sql-engines)            | 4         | Federated and cluster-based query engines      |
+| [Distributed SQL Engines](#distributed-sql-engines)            | 5         | Federated and cluster-based query engines      |
+| [Spark-Compatible Engines](#spark-compatible-engines)          | 2         | Native-code Spark alternatives (LakeSail, Velox) |
 | [Relational & Time-Series](#relational--time-series-databases) | 3         | Traditional RDBMS and time-series databases    |
 | [Managed Spark Services](#managed-spark-services)              | 7         | Cloud-managed Spark execution environments     |
-| [DataFrame Platforms](#dataframe-platforms)                    | 10        | Native DataFrame API libraries                 |
+| [DataFrame Platforms](#dataframe-platforms)                    | 11        | Native DataFrame API libraries                 |
 
-**Total: 37 platforms** (27 SQL + 10 DataFrame)
+**Total: 41 platforms** (30 SQL + 11 DataFrame)
 
 ```{note}
 **CLI Naming Convention**: DataFrame platforms use the `-df` suffix (e.g., `polars-df`, `pandas-df`) to distinguish them from SQL mode platforms. Some platforms like DataFusion support both modes - see [Hybrid Platforms](#hybrid-platforms-sql--dataframe) for details.
@@ -66,10 +67,12 @@ BenchBox supports multiple deployment modes for platforms, enabling the same ben
 
 | Platform        | Default Mode  | Available Modes        | Syntax Examples                                 |
 | --------------- | ------------- | ---------------------- | ----------------------------------------------- |
-| **ClickHouse**  | `local`       | `local`, `server`      | `clickhouse:local`, `clickhouse:server`         |
+| **ClickHouse**  | `local`       | `local`, `server`      | `clickhouse-local`, `clickhouse-server`         |
 | **Firebolt**    | `core`        | `core`, `cloud`        | `firebolt:core`, `firebolt:cloud`               |
 | **TimescaleDB** | `self-hosted` | `self-hosted`, `cloud` | `timescaledb`, `timescaledb:cloud`              |
 | **PySpark**     | `local`       | `local`                | `pyspark`                                       |
+| **LakeSail**    | `local`       | `local`, `distributed` | `lakesail` (+ `lakesail-df` for DataFrame mode) |
+| **Velox**       | `local`       | `local`, `remote`      | `velox` with `--velox-deployment local\|remote` |
 
 ### First-Class Cloud Platforms (Dialect Inheritance)
 
@@ -85,8 +88,8 @@ BenchBox supports multiple deployment modes for platforms, enabling the same ben
 | Mode            | Credentials | Network | Cloud Storage | Examples                                       |
 | --------------- | ----------- | ------- | ------------- | ---------------------------------------------- |
 | **local**       | No          | No      | No            | DuckDB, chDB, Firebolt Core                    |
-| **self-hosted** | Yes         | Yes     | No            | ClickHouse Server, Trino, TimescaleDB          |
-| **managed**     | Yes         | Yes     | Sometimes     | MotherDuck, ClickHouse Cloud, Starburst Galaxy |
+| **self-hosted** | Yes         | Yes     | No            | ClickHouse Server, Trino, TimescaleDB, SingleStore |
+| **managed**     | Yes         | Yes     | Sometimes     | MotherDuck, ClickHouse Cloud, Starburst Galaxy, SingleStore Helios |
 
 ```{note}
 For detailed deployment mode configuration, see [Deployment Modes Guide](deployment-modes.md).
@@ -102,7 +105,7 @@ Zero-infrastructure platforms that run in-process. Ideal for development, testin
 
 | Feature            | DuckDB            | DataFusion         | SQLite             | Polars             | ClickHouse               |
 | ------------------ | ----------------- | ------------------ | ------------------ | ------------------ | ------------------------ |
-| **CLI Name**       | `duckdb`          | `datafusion`       | `sqlite`           | `polars-df`        | `clickhouse`             |
+| **CLI Name**       | `duckdb`          | `datafusion`       | `sqlite`           | `polars-df`        | `clickhouse-local`       |
 | **Architecture**   | Embedded Columnar | In-memory Columnar | Embedded Row-based | In-memory Columnar | Embedded/Server Columnar |
 | **Storage Format** | Native/Parquet    | Arrow/Parquet      | B-tree Pages       | Arrow/Parquet      | MergeTree                |
 | **Query Engine**   | Vectorized        | Vectorized (Rust)  | B-tree             | Vectorized (Rust)  | Vectorized               |
@@ -111,7 +114,7 @@ Zero-infrastructure platforms that run in-process. Ideal for development, testin
 | **SQL Support**    | Full              | Full               | Full               | **DataFrame only** | Full                     |
 
 ```{note}
-**ClickHouse Deployment**: The `clickhouse` CLI name works for both local mode (via chdb, zero-config) and server mode (requires running ClickHouse instance). BenchBox auto-detects the mode based on connection configuration.
+**ClickHouse Platforms**: ClickHouse is available as three first-class platforms: `clickhouse-local` (chDB, zero-config), `clickhouse-server` (self-hosted), and `clickhouse-cloud` (managed). The legacy bare `clickhouse` selector still works but is deprecated. See [Migration Guide](clickhouse-migration.md).
 ```
 
 ### Relative Performance Characteristics
@@ -152,8 +155,11 @@ uv add datafusion
 # Polars (DataFrame API only - use polars-df platform)
 uv add polars
 
-# ClickHouse (local mode via chdb, or server mode)
-uv add clickhouse-driver chdb
+# ClickHouse Local (chDB, zero-config)
+uv add benchbox --extra clickhouse-local
+
+# ClickHouse Server (self-hosted, requires running instance)
+uv add benchbox --extra clickhouse-server
 ```
 
 ---
@@ -252,24 +258,24 @@ Federated and distributed query engines for multi-source analytics.
 
 ### Architecture Comparison
 
-| Feature          | Trino           | PrestoDB        | Spark SQL           | ClickHouse           |
-| ---------------- | --------------- | --------------- | ------------------- | -------------------- |
-| **CLI Name**     | `trino`         | `presto`        | `spark`             | `clickhouse`         |
-| **Architecture** | Distributed MPP | Distributed MPP | Distributed (Spark) | Distributed Columnar |
-| **Query Engine** | Vectorized      | Vectorized      | Spark Catalyst      | Vectorized           |
-| **Federation**   | Native          | Native          | Via connectors      | Limited              |
-| **Concurrency**  | High            | High            | Job-based           | Very High            |
-| **Execution Model** | Interactive MPP | Interactive MPP | Batch-oriented      | Interactive          |
+| Feature          | Trino           | PrestoDB        | Spark SQL           | ClickHouse           | SingleStore            |
+| ---------------- | --------------- | --------------- | ------------------- | -------------------- | ---------------------- |
+| **CLI Name**     | `trino`         | `presto`        | `spark`             | `clickhouse-server`  | `singlestore`          |
+| **Architecture** | Distributed MPP | Distributed MPP | Distributed (Spark) | Distributed Columnar | Distributed Columnar   |
+| **Query Engine** | Vectorized      | Vectorized      | Spark Catalyst      | Vectorized           | Vectorized + Code Gen  |
+| **Federation**   | Native          | Native          | Via connectors      | Limited              | Limited                |
+| **Concurrency**  | High            | High            | Job-based           | Very High            | Very High              |
+| **Execution Model** | Interactive MPP | Interactive MPP | Batch-oriented      | Interactive          | Interactive            |
 
 ### Architectural Characteristics
 
-| Feature              | Trino               | PrestoDB            | Spark SQL                | ClickHouse         |
-| -------------------- | ------------------- | ------------------- | ------------------------ | ------------------ |
-| **Execution Model**  | Interactive MPP     | Interactive MPP     | Batch/micro-batch        | Interactive columnar |
-| **Optimization**     | Cost-based          | Cost-based          | Catalyst optimizer       | Columnar vectorized |
-| **Max Scale Factor** | 1000+               | 1000+               | 10000+                   | 1000+              |
-| **Memory Model**     | Distributed         | Distributed         | Distributed              | Distributed        |
-| **Typical Use Case** | Ad-hoc federation   | Ad-hoc federation   | Large-scale batch ETL    | Analytical queries |
+| Feature              | Trino               | PrestoDB            | Spark SQL                | ClickHouse         | SingleStore              |
+| -------------------- | ------------------- | ------------------- | ------------------------ | ------------------ | ------------------------ |
+| **Execution Model**  | Interactive MPP     | Interactive MPP     | Batch/micro-batch        | Interactive columnar | Interactive HTAP        |
+| **Optimization**     | Cost-based          | Cost-based          | Catalyst optimizer       | Columnar vectorized | Cost-based + code gen   |
+| **Max Scale Factor** | 1000+               | 1000+               | 10000+                   | 1000+              | 1000+                    |
+| **Memory Model**     | Distributed         | Distributed         | Distributed              | Distributed        | Distributed              |
+| **Typical Use Case** | Ad-hoc federation   | Ad-hoc federation   | Large-scale batch ETL    | Analytical queries | Real-time analytics/HTAP |
 
 ### Use Cases
 
@@ -277,7 +283,8 @@ Federated and distributed query engines for multi-source analytics.
 | --------------------------- | ---------------- | ----------------------------- |
 | **Data Lake Analytics**     | Trino, Spark SQL | S3/GCS/ADLS support           |
 | **Multi-source Federation** | Trino, PrestoDB  | Native connector ecosystem    |
-| **Real-time Analytics**     | ClickHouse       | Interactive columnar queries  |
+| **Real-time Analytics**     | ClickHouse       | SingleStore, Firebolt         |
+| **HTAP (Analytics + OLTP)** | SingleStore      | TimescaleDB                   |
 | **Batch ETL**               | Spark SQL        | Native Spark integration      |
 | **Starburst Enterprise**    | Trino            | Commercial Trino distribution |
 
@@ -294,8 +301,65 @@ uv add presto-python-client
 uv add pyspark
 
 # ClickHouse (server mode - requires running instance)
-uv add clickhouse-driver
+uv add benchbox --extra clickhouse-server
+
+# SingleStore
+uv add singlestoredb
 ```
+
+---
+
+## Spark-Compatible Engines
+
+Native-code engines that accept Spark SQL / DataFrame workloads without running Apache Spark's JVM execution path. Both speak the **Spark Connect** protocol, so the standard `pyspark` client is the only client library required.
+
+### Architecture Comparison
+
+| Feature                | LakeSail Sail                | Apache Gluten + Velox              |
+| ---------------------- | ---------------------------- | ---------------------------------- |
+| **CLI Name**           | `lakesail` (+ `lakesail-df`) | `velox`                            |
+| **Engine**             | Rust (DataFusion core)       | C++ (Velox) offloaded from Spark   |
+| **Spark relationship** | Drop-in replacement - no JVM | Plugin - retains JVM scheduler     |
+| **Execution Mode**     | SQL and DataFrame            | SQL (Spark SQL dialect)            |
+| **Protocol**           | Spark Connect                | Spark Connect (remote) / in-process SparkSession (local) |
+| **Platform Support**   | Linux, macOS                 | **Linux only** (Docker on macOS/Windows) |
+| **Fallback Behavior**  | Native-only (no JVM path)    | Unsupported operators fall back to JVM |
+| **Headline Speedup**   | ~4x faster than Spark, TPC-H SF100 | ~3.3x faster than Spark, TPC-H (Gluten community) |
+
+### Deployment Options
+
+| Feature              | LakeSail Sail                      | Apache Gluten + Velox                    |
+| -------------------- | ---------------------------------- | ---------------------------------------- |
+| **Local**            | Single-node multi-threaded server  | In-process SparkSession with Gluten jar  |
+| **Distributed**      | Multi-worker Rust cluster          | Not applicable (single-host native)      |
+| **Remote**           | Spark Connect endpoint             | Pre-started Gluten-enabled Spark Connect server |
+| **Docker Image**     | Community images                   | `benchbox-velox` (`linux/amd64` by default; custom arm64 jar required for native arm64) |
+
+### Use Cases
+
+| Use Case                                          | Recommended      | Notes                                  |
+| ------------------------------------------------- | ---------------- | -------------------------------------- |
+| **Drop-in Spark replacement (no JVM)**            | LakeSail         | Rust engine, zero-rewrite migration    |
+| **Accelerate existing Spark deployments**         | Velox            | Keep Spark scheduler; offload operators |
+| **Benchmark DataFrame + SQL on the same engine**  | LakeSail         | `lakesail` (SQL) and `lakesail-df` (DF) share engine |
+| **Linux-only native tuning**                      | Velox            | Requires Gluten bundle jar             |
+| **macOS / Windows development**                   | LakeSail         | Runs natively; Velox requires Docker   |
+
+### Installation
+
+```bash
+# LakeSail (uses standard PySpark client via Spark Connect)
+uv add pyspark pyarrow
+# Start a Sail server separately (see LakeSail docs), then:
+benchbox run --platform lakesail --benchmark tpch --scale 1.0
+
+# Velox (pulls pyspark[connect]>=3.5.0; requires the Gluten bundle jar)
+uv add benchbox --extra velox
+benchbox run --platform velox --benchmark tpch --scale 0.1 \
+    --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar
+```
+
+See [LakeSail Platform Guide](lakesail.md), [Velox Platform Guide](velox.md), and [Velox Jar Setup](velox_jar_setup.md) for full setup instructions.
 
 ---
 
@@ -435,14 +499,14 @@ Native DataFrame API libraries for programmatic data manipulation.
 
 ### Expression Family (Lazy Evaluation)
 
-| Feature          | Polars                | PySpark        | DataFusion      | Databricks      | Snowpark Connect     |
-| ---------------- | --------------------- | -------------- | --------------- | --------------- | -------------------- |
-| **CLI Name**     | `polars-df`           | `pyspark-df`   | `datafusion-df` | `databricks-df` | `snowpark-connect`   |
-| **Language**     | Rust + Python         | Scala + Python | Rust + Python   | Scala + Python  | Python               |
-| **Execution**    | Lazy                  | Lazy           | Lazy            | Lazy            | Lazy (pushdown)      |
-| **Parallelism**  | Multi-threaded        | Distributed    | Multi-threaded  | Distributed     | Snowflake compute    |
-| **Memory Model** | In-memory + streaming | Cluster-bound  | In-memory       | Cluster-bound   | Snowflake-managed    |
-| **Arrow Native** | Yes                   | Yes            | Yes             | Yes             | No (Snowflake types) |
+| Feature          | Polars                | PySpark        | DataFusion      | Databricks      | Snowpark Connect     | LakeSail            |
+| ---------------- | --------------------- | -------------- | --------------- | --------------- | -------------------- | ------------------- |
+| **CLI Name**     | `polars-df`           | `pyspark-df`   | `datafusion-df` | `databricks-df` | `snowpark-connect`   | `lakesail-df`       |
+| **Language**     | Rust + Python         | Scala + Python | Rust + Python   | Scala + Python  | Python               | Rust + Python       |
+| **Execution**    | Lazy                  | Lazy           | Lazy            | Lazy            | Lazy (pushdown)      | Lazy                |
+| **Parallelism**  | Multi-threaded        | Distributed    | Multi-threaded  | Distributed     | Snowflake compute    | Multi-threaded / distributed |
+| **Memory Model** | In-memory + streaming | Cluster-bound  | In-memory       | Cluster-bound   | Snowflake-managed    | In-memory + streaming |
+| **Arrow Native** | Yes                   | Yes            | Yes             | Yes             | No (Snowflake types) | Yes                 |
 
 ### Pandas Family (Eager/Lazy)
 
@@ -463,6 +527,7 @@ Native DataFrame API libraries for programmatic data manipulation.
 | **DataFusion**       | Very Low      | High       | Efficient         | 50     |
 | **Databricks**       | Medium        | Very High  | Cluster-bound     | 1000+  |
 | **Snowpark Connect** | Medium        | High       | Snowflake-managed | 1000+  |
+| **LakeSail**         | Low           | Very High  | Efficient         | 100+   |
 | **Pandas**           | Low           | Medium     | High              | 10     |
 | **Modin**            | Low-Medium    | High       | Distributed       | 100    |
 | **Dask**             | Medium        | High       | Distributed       | 1000+  |
@@ -492,6 +557,9 @@ uv add databricks-connect
 # Snowpark Connect (PySpark-compatible on Snowflake)
 uv add "snowflake-snowpark-python[pandas]"
 
+# LakeSail DataFrame (Spark Connect via standard PySpark client)
+uv add pyspark pyarrow
+
 # Pandas Family
 uv add pandas                    # Pandas DataFrame
 uv add modin[ray]                # Modin (with Ray backend)
@@ -514,6 +582,7 @@ These platforms support both SQL and native DataFrame execution modes. Use the a
 | **PySpark**          | `spark`      | `pyspark-df`       | DataFrame    | SparkSQL vs DataFrame API           |
 | **Databricks**       | `databricks` | `databricks-df`    | SQL          | SQL Warehouse vs Databricks Connect |
 | **Snowpark Connect** | N/A          | `snowpark-connect` | DataFrame    | PySpark-compatible API on Snowflake |
+| **LakeSail**         | `lakesail`   | `lakesail-df`      | SQL          | Rust/DataFusion engine, Spark Connect |
 
 ```{note}
 **Polars** is DataFrame-only (`polars-df`). SQL mode was removed due to fundamental limitations in Polars' SQL implementation (no implicit joins, limited subquery support) that make it incompatible with TPC benchmarks. For SQL benchmarks, use `duckdb` or another SQL-native platform.
@@ -684,6 +753,11 @@ benchbox run --platform snowpark-connect --benchmark tpch --scale 10
 - **PrestoDB**: Meta's fork, similar to Trino
 - **Spark SQL**: Batch processing, Spark ecosystem
 - **ClickHouse**: Real-time OLAP, high concurrency
+- **SingleStore**: Distributed HTAP, columnstore analytics (MySQL protocol)
+
+### Spark-Compatible Engines
+- **LakeSail Sail**: Rust drop-in Spark replacement (DataFusion core), SQL + DataFrame via Spark Connect
+- **Apache Gluten + Velox**: Native C++ acceleration plugin for Spark SQL (Linux-only local mode; Docker on macOS/Windows)
 
 ### Relational & Time-Series
 - **PostgreSQL**: Traditional RDBMS baseline
@@ -696,7 +770,7 @@ benchbox run --platform snowpark-connect --benchmark tpch --scale 10
 - **Azure**: Fabric Spark, Synapse Spark
 
 ### DataFrame
-- **Expression Family**: Polars (single-node), PySpark (distributed), DataFusion (Arrow-native), Databricks (managed), Snowpark Connect (Snowflake-native)
+- **Expression Family**: Polars (single-node), PySpark (distributed), DataFusion (Arrow-native), Databricks (managed), Snowpark Connect (Snowflake-native), LakeSail (Rust/DataFusion via Spark Connect)
 - **Pandas Family**: Pandas (reference), Modin (parallel), Dask (distributed), cuDF (GPU-accelerated)
 
 ---

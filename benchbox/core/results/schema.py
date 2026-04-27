@@ -43,6 +43,7 @@ CANONICAL_KEY_ORDER = [
     "queries",
     "tables",
     "validation",
+    "comparisons",
     "cost",
     "execution",
     "environment",
@@ -73,6 +74,7 @@ PHASE_KEY_ORDER = [
     "schema_creation",
     "data_loading",
     "validation",
+    "migration",
     "power_test",
     "throughput_test",
 ]
@@ -299,6 +301,7 @@ def build_result_payload(result: BenchmarkResults) -> dict[str, Any]:
         errors_list.sort(key=lambda e: (e.get("phase", ""), e.get("query_id", ""), e.get("type", "")))
         payload["errors"] = errors_list
 
+    _add_comparisons_section(payload, result)
     _add_cost_section(payload, result)
     _add_execution_section(payload, result, driver_metadata)
 
@@ -436,12 +439,16 @@ def _build_run_section(
 def _build_benchmark_section(result: BenchmarkResults) -> dict[str, Any]:
     """Build the benchmark block of the payload."""
     benchmark_name = _shorten_benchmark_name(result.benchmark_name)
-    return {
+    section: dict[str, Any] = {
         "id": result.benchmark_id,
         "name": benchmark_name,
         "scale_factor": result.scale_factor,
         "test_type": result.test_execution_type,
     }
+    compliance_class = getattr(result, "compliance_class", None)
+    if compliance_class is not None:
+        section["compliance_class"] = compliance_class
+    return section
 
 
 def _build_platform_section(result: BenchmarkResults, driver_metadata: dict[str, Any]) -> dict[str, Any]:
@@ -482,6 +489,31 @@ def _build_platform_section(result: BenchmarkResults, driver_metadata: dict[str,
         platform["tuning"] = tuning
 
     return platform
+
+
+def _add_comparisons_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
+    """Add pg_duckdb vs native DuckDB comparison to payload if available (omit-empty)."""
+    nc = getattr(result, "native_comparison", None)
+    if nc is None:
+        return
+    payload["comparisons"] = {
+        "native_duckdb": {
+            "generated_at": nc.generated_at,
+            "scale_factor": nc.scale_factor,
+            "total_queries": nc.total_queries,
+            "mean_delta_ms": nc.mean_delta_ms,
+            "max_delta_ms": nc.max_delta_ms,
+            "queries": [
+                {
+                    "id": e.query_id,
+                    "pg_duckdb_ms": e.pg_duckdb_ms,
+                    "duckdb_ms": e.duckdb_ms,
+                    "delta_ms": e.delta_ms,
+                }
+                for e in nc.entries
+            ],
+        }
+    }
 
 
 def _add_cost_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
@@ -774,14 +806,33 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
             }
 
     if result.execution_phases and result.execution_phases.power_test:
+        power_test = result.execution_phases.power_test
+        # FAILED when only the error sentinel ran (no real queries were generated/executed).
+        # COMPLETED when at least one real query execution was attempted (even if it failed).
+        real_executions = [qe for qe in power_test.query_executions if qe.query_id != "power_test_error"]
+        power_test_status = "COMPLETED" if real_executions else "FAILED"
         phases["power_test"] = {
-            "status": "COMPLETED",
-            "duration_ms": result.execution_phases.power_test.duration_ms,
+            "status": power_test_status,
+            "duration_ms": power_test.duration_ms,
         }
     if result.execution_phases and result.execution_phases.throughput_test:
         phases["throughput_test"] = {
             "status": "COMPLETED",
             "duration_ms": result.execution_phases.throughput_test.duration_ms,
+        }
+
+    # pg_mooncake heap-to-columnstore migration phase (omit when not run).
+    # per_table_stats intentionally excluded - summary-level only per schema v2 design.
+    if result.execution_phases and result.execution_phases.migration:
+        m = result.execution_phases.migration
+        phases["migration"] = {
+            "status": m.status,
+            "duration_ms": m.duration_ms,
+            "tables_migrated": m.tables_migrated,
+            "tables_failed": m.tables_failed,
+            "storage_before_bytes": m.storage_before_bytes,
+            "storage_after_bytes": m.storage_after_bytes,
+            "storage_delta_bytes": m.storage_delta_bytes,
         }
 
     if isinstance(result.execution_metadata, Mapping):
@@ -1041,6 +1092,12 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
 
 def _build_tpc_metrics(result: BenchmarkResults) -> dict[str, Any] | None:
     """Build TPC metrics block if available."""
+    # Official TPC composite metrics are suppressed for unofficial compliance classes
+    compliance_class = getattr(result, "compliance_class", None)
+    _unofficial_classes = {"unofficial_nonstandard", "unofficial_subscale"}
+    if compliance_class in _unofficial_classes:
+        return {"suppressed": True, "reason": f"compliance_class={compliance_class}"}
+
     metrics: dict[str, Any] = {}
 
     if result.power_at_size is not None:
@@ -1147,9 +1204,9 @@ def _build_tables_block(table_statistics: dict[str, Any] | None) -> dict[str, An
                 entry["rows"] = stats["rows"]
             elif "rows_loaded" in stats:
                 entry["rows"] = stats["rows_loaded"]
-            if "load_time_ms" in stats:
+            if "load_time_ms" in stats and stats["load_time_ms"] is not None:
                 entry["load_ms"] = round(stats["load_time_ms"], 1)
-            elif "load_ms" in stats:
+            elif "load_ms" in stats and stats["load_ms"] is not None:
                 entry["load_ms"] = round(stats["load_ms"], 1)
             if entry:
                 tables[table_name] = entry

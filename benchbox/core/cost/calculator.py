@@ -57,6 +57,14 @@ RESOURCE_USAGE_SCHEMA = {
         "required": [],
         "optional": ["execution_time_seconds", "memory_usage", "bytes_read"],
     },
+    "clickhouse-local": {
+        "required": [],
+        "optional": ["execution_time_seconds", "memory_usage", "bytes_read"],
+    },
+    "clickhouse-server": {
+        "required": [],
+        "optional": ["execution_time_seconds", "memory_usage", "bytes_read"],
+    },
     "athena": {
         "required": [],  # Either data_scanned_bytes or cost_usd required
         "optional": ["data_scanned_bytes", "cost_usd", "execution_time_ms"],
@@ -206,6 +214,8 @@ class CostCalculator:
             "duckdb",
             "sqlite",
             "clickhouse",
+            "clickhouse-local",
+            "clickhouse-server",
             "chdb",
             # Self-hosted SQL
             "postgresql",

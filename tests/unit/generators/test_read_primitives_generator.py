@@ -50,11 +50,11 @@ class TestReadPrimitivesDataGenerator:
         assert mock_files["nation"].exists()
 
         # Quick validation of file content without full generation
-        with open(mock_files["region"]) as f:
+        with open(mock_files["region"], encoding="utf-8") as f:
             lines = f.readlines()
             assert len(lines) == 5
 
-        with open(mock_files["nation"]) as f:
+        with open(mock_files["nation"], encoding="utf-8") as f:
             lines = f.readlines()
             assert len(lines) == 25
 

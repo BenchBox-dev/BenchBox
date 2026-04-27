@@ -6,6 +6,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import pytest
 
+from benchbox.core.query_catalog_base import QuerySkippedError
 from benchbox.core.read_primitives.queries import ReadPrimitivesQueryManager
 
 pytestmark = [
@@ -107,11 +108,11 @@ queries:
         snowflake_query = manager.get_query("query_with_multiple_variants", dialect="snowflake")
         assert "SAMPLE (10)" in snowflake_query
 
-    def test_get_query_skip_on_raises_valueerror(self, mock_catalog_with_variants):
-        """Test get_query() raises ValueError for skip_on dialects."""
+    def test_get_query_skip_on_raises_query_skipped_error(self, mock_catalog_with_variants):
+        """Test get_query() raises QuerySkippedError for skip_on dialects."""
         manager = ReadPrimitivesQueryManager()
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(QuerySkippedError) as exc_info:
             manager.get_query("query_skip_on_duckdb", dialect="duckdb")
 
         assert "not supported on dialect" in str(exc_info.value)

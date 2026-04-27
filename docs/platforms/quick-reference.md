@@ -17,13 +17,17 @@ Looking ahead? See the [Development Roadmap](../development/roadmap.md) for plan
 | ------------------- | --------- | ------------------------------------------------------------ | --------------------------------------------------- |
 | **DuckDB**          | Built-in  | In-process analytical database                               | `uv add duckdb`                                     |
 | **DataFusion**      | Available | In-memory query engine (Apache Arrow)                        | `uv add datafusion`                                 |
-| **ClickHouse**      | Available | Column-oriented OLAP database                                | `uv add clickhouse-driver`                          |
+| **ClickHouse Local**  | Available | Embedded ClickHouse via chDB (zero-config)                 | `uv add benchbox --extra clickhouse-local`          |
+| **ClickHouse Server** | Available | Self-hosted ClickHouse (clickhouse-driver)                 | `uv add benchbox --extra clickhouse-server`         |
+| **ClickHouse Cloud**  | Available | Managed ClickHouse service (HTTPS)                         | `uv add benchbox --extra clickhouse-cloud`          |
 | **Databricks SQL**  | Available | Data Intelligence Platform (lakehouse)                       | `uv add databricks-sql-connector`                   |
 | **BigQuery**        | Available | Serverless data warehouse (Google Cloud)                     | `uv add google-cloud-bigquery google-cloud-storage` |
 | **Redshift**        | Available | Cloud data warehouse (AWS)                                   | `uv add redshift-connector boto3`                   |
 | **Snowflake**       | Available | Data Cloud / Multi-cloud data warehouse                      | `uv add snowflake-connector-python`                 |
 | **Trino**           | Available | Distributed SQL (Trino/Starburst)                            | `uv add benchbox[trino]`                            |
 | **PrestoDB**        | Available | Distributed SQL (Meta's Presto)                              | `uv add benchbox[presto]`                           |
+| **LakeSail Sail**   | Available | Rust drop-in Spark replacement (SQL + DataFrame via Spark Connect) | `uv add pyspark pyarrow`                      |
+| **Apache Gluten + Velox** | Available | Native C++ acceleration for Spark SQL (Linux-only local; Docker on macOS/Windows) | `uv add benchbox --extra velox`       |
 | **SQLite**          | Built-in  | Embedded transactional database                              | (built-in)                                          |
 | **Azure Platforms** | Available | Microsoft Fabric Warehouse, Azure Synapse Analytics, Microsoft Fabric Spark, Azure Synapse Analytics Spark | See [Azure Platforms](azure-platforms.md)           |
 
@@ -37,6 +41,7 @@ BenchBox supports benchmarking DataFrame libraries using their native APIs inste
 | **Pandas**     | `pandas-df`     | Available | Pandas     | Reference Pandas implementation                        | `uv add benchbox --extra pandas`     |
 | **PySpark**    | `pyspark-df`    | Available | Expression | Apache Spark DataFrame API (distributed)               | `uv add benchbox --extra pyspark`    |
 | **DataFusion** | `datafusion-df` | Available | Expression | Arrow-native query engine                              | `uv add benchbox --extra datafusion` |
+| **LakeSail**   | `lakesail-df`   | Available | Expression | Rust/DataFusion Spark replacement via Spark Connect    | `uv add pyspark pyarrow`             |
 | Modin          | `modin-df`      | Available | Pandas     | Distributed Pandas replacement                         | `uv add benchbox --extra modin`      |
 | Dask           | `dask-df`       | Available | Pandas     | Parallel computing DataFrames                          | `uv add benchbox --extra dask`       |
 | cuDF           | `cudf-df`       | Available | Pandas     | NVIDIA GPU-accelerated DataFrames                      | `uv add benchbox --extra cudf`       |
@@ -48,6 +53,7 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.1
 benchbox run --platform pandas-df --benchmark tpch --scale 0.1
 benchbox run --platform pyspark-df --benchmark tpch --scale 0.1
 benchbox run --platform datafusion-df --benchmark tpch --scale 0.1
+benchbox run --platform lakesail-df --benchmark tpch --scale 0.1
 ```
 
 ## Quick Start
@@ -61,8 +67,14 @@ uv add benchbox[cloud]
 
 Or install individual platforms:
 ```bash
-# ClickHouse
-uv add benchbox[clickhouse]
+# ClickHouse Local (chDB, zero-config)
+uv add benchbox[clickhouse-local]
+
+# ClickHouse Server (self-hosted)
+uv add benchbox[clickhouse-server]
+
+# ClickHouse Cloud (managed)
+uv add benchbox[clickhouse-cloud]
 
 # Databricks SQL
 uv add benchbox[databricks]
@@ -294,6 +306,67 @@ adapter = SQLiteAdapter()
 # File-based database
 adapter = SQLiteAdapter(database_path="benchmark.db")
 ```
+
+---
+
+## LakeSail Sail
+
+**Type**: Rust-based drop-in Apache Spark replacement (DataFusion core)
+**Common Use Cases**: Migrating off Spark with zero client-code changes; benchmarking SQL + DataFrame on the same Rust engine
+
+### Configuration
+
+```bash
+# Install the PySpark client (Sail uses standard PySpark via Spark Connect)
+uv add pyspark pyarrow
+
+# Start your LakeSail Sail server (see LakeSail documentation)
+# Default endpoint: sc://localhost:50051
+
+# SQL mode
+benchbox run --platform lakesail --benchmark tpch --scale 1.0
+
+# DataFrame mode
+benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
+
+# Distributed mode
+benchbox run --platform lakesail --benchmark tpch --scale 10.0 \
+    --lakesail-mode distributed \
+    --lakesail-workers 4 \
+    --lakesail-endpoint sc://my-sail-cluster:50051
+```
+
+See [LakeSail Platform Guide](lakesail.md) for the full configuration reference.
+
+---
+
+## Apache Gluten + Velox
+
+**Type**: Native C++ query-acceleration plugin for Apache Spark (via the Velox engine)
+**Common Use Cases**: Accelerating existing Spark SQL deployments without changing client code; high-performance native execution on Linux
+
+### Configuration
+
+```{important}
+Local mode is **Linux-only** - the Gluten Velox bundle jar has no macOS or Windows build. Use Docker (`docker/velox/`) or a remote Linux host on macOS and Windows. The checked-in Docker workflow currently defaults to `linux/amd64`; on Apple Silicon that is for smoke testing only, not timing-valid benchmarks.
+```
+
+```bash
+# Install the Velox extra (pulls pyspark[connect]>=3.5.0)
+uv add benchbox --extra velox
+
+# Local mode - in-process SparkSession with the Gluten bundle jar loaded
+benchbox run --platform velox --benchmark tpch --scale 0.1 \
+    --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar \
+    --offheap-size 8g
+
+# Remote mode - connect to a pre-started Gluten-enabled Spark Connect server
+benchbox run --platform velox --velox-deployment remote \
+    --velox-endpoint sc://localhost:50051 \
+    --benchmark tpch --scale 0.1
+```
+
+See [Velox Platform Guide](velox.md) and [Velox Jar Setup](velox_jar_setup.md) for Gluten bundle jar URLs, checksums, and the provided `benchbox-velox` Docker image.
 
 ---
 
@@ -603,7 +676,12 @@ If you encounter issues not covered here:
 - **[DataFrame Platforms Guide](dataframe.md)** - Native DataFrame API benchmarking (Polars, Pandas, PySpark, DataFusion)
 - **[Platform Selection Guide](platform-selection-guide.md)** - Comprehensive platform comparison and selection criteria
 - **[Platform Comparison Matrix](comparison-matrix.md)** - Feature and performance comparison table
-- **[ClickHouse Local Mode](clickhouse-local-mode.md)** - Running ClickHouse locally for development
+- **[ClickHouse Local](clickhouse-local-mode.md)** - Running ClickHouse locally for development
+- **[ClickHouse Server](clickhouse-server.md)** - Self-hosted ClickHouse via clickhouse-driver
+- **[ClickHouse Migration Guide](clickhouse-migration.md)** - Migrating from legacy `clickhouse` selector
+- **[LakeSail Sail](lakesail.md)** - Rust drop-in Spark replacement (SQL + DataFrame via Spark Connect)
+- **[Apache Gluten + Velox](velox.md)** - Native C++ acceleration for Spark SQL (Linux-only local, Docker elsewhere)
+- **[Velox Jar Setup](velox_jar_setup.md)** - Gluten bundle jar URLs and checksums
 - **[Development Roadmap](../development/roadmap.md)** - Planned platform and benchmark additions
 
 ### API Reference

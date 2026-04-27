@@ -22,6 +22,13 @@ pytestmark = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def mock_databend_available():
+    """Mock DATABEND_AVAILABLE so tests run without the databend-driver installed."""
+    with patch("benchbox.platforms.databend.adapter.DATABEND_AVAILABLE", True):
+        yield
+
+
 class TestDatabendAdapterInitialization:
     """Test Databend adapter initialization and configuration."""
 
@@ -431,7 +438,7 @@ class TestDatabendDataLoading:
         mock_benchmark = Mock()
 
         # Create temporary test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test1\n2,test2\n")
             temp_path = Path(f.name)
 
@@ -465,7 +472,7 @@ class TestDatabendDataLoading:
         mock_benchmark = Mock()
 
         # Create temporary test file with pipe delimiter
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
             f.write("1|test1|\n2|test2|\n")
             temp_path = Path(f.name)
 
@@ -491,7 +498,7 @@ class TestDatabendDataLoading:
         mock_benchmark = Mock()
 
         # Create file with single quotes in data
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test's data\n")
             temp_path = Path(f.name)
 
@@ -907,6 +914,42 @@ class TestDatabendResourceCleanup:
 
         assert result is True
         mock_client.close.assert_called_once()
+
+
+class TestDatabendDataResolution:
+    """Tests for shared DataSourceResolver delegation."""
+
+    def test_resolve_data_files_delegates_to_resolver(self, tmp_path):
+        try:
+            adapter = DatabendAdapter(host="localhost", ssl=False, password="")
+        except ImportError:
+            pytest.skip("databend-driver not installed")
+
+        expected = {"orders": [tmp_path / "orders.tbl"]}
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = Mock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = Mock(tables=expected)
+
+            result = adapter._resolve_data_files(Mock(), tmp_path)
+
+        assert result.tables == expected
+        assert mock_cls.call_args.kwargs.get("platform_name") == adapter.platform_name
+
+    def test_resolve_data_files_raises_when_resolver_returns_none(self, tmp_path):
+        try:
+            adapter = DatabendAdapter(host="localhost", ssl=False, password="")
+        except ImportError:
+            pytest.skip("databend-driver not installed")
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
+            mock_resolver = Mock()
+            mock_cls.return_value = mock_resolver
+            mock_resolver.resolve.return_value = None
+
+            with pytest.raises(ValueError, match="No data files found"):
+                adapter._resolve_data_files(Mock(), tmp_path)
 
     def test_test_connection_closes_client_on_failure(self):
         """test_connection should close the client even on failure."""

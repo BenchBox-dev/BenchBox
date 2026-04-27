@@ -5,7 +5,7 @@
 ```{tags} advanced, concept, datavault, custom-benchmark
 ```
 
-> **CLI name:** `datavault` — use `benchbox run --benchmark datavault`
+> **CLI name:** `datavault` - use `benchbox run --benchmark datavault`
 
 ## Overview
 
@@ -200,6 +200,24 @@ benchbox run --dry-run ./preview --platform duckdb --benchmark datavault --scale
 
 ## Configuration Options
 
+### CLI Options (`--benchmark-option`)
+
+Configure Data Vault via `--benchmark-option KEY=VALUE`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `hash_algorithm` | `md5` | Hash algorithm for hub/link keys. Only `md5` is accepted by the benchmark runner (`SUPPORTED_HASH_ALGORITHMS = ("md5",)` in `datavault/benchmark.py`); the `VARCHAR(32)` hash-key column constrains the schema to 32-hex-char outputs. The lower-level `datavault/etl/hash_functions.py` helper also accepts `sha1` and (truncated) `sha256`, but those are only reachable from library code, not the CLI. |
+| `record_source` | `TPCH` | Record source identifier for audit columns |
+| `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+
+Accepts hyphenated aliases (e.g. `hash-algorithm`, `record-source`).
+
+```bash
+# Custom record source (hash algorithm stays md5 - SHA-256 is rejected at the CLI)
+benchbox run --platform duckdb --benchmark datavault --scale 1 \
+  --benchmark-option record_source=MY_SOURCE
+```
+
 ### Initialization Parameters
 
 ```python
@@ -214,6 +232,63 @@ DataVault(
     compression_type="gzip" # Compression type (gzip, zstd)
 )
 ```
+
+### TPC-H Source File Discovery
+
+The Data Vault transformer (`datavault/etl/transformer.py`) reads the upstream
+TPC-H `.tbl` files and supports three on-disk layouts for each source table,
+probed in order:
+
+1. **Compressed, sharded** - `customer.tbl.1.zst`, `customer.tbl.2.zst`, …
+   (also `.gz`). Preferred when present.
+2. **Compressed, single file** - `customer.tbl.zst` or `customer.tbl.gz`.
+3. **Uncompressed, sharded** - `customer.tbl.1`, `customer.tbl.2`, … Matched
+   when the final dot-separated segment is numeric; returned as a glob pattern
+   so DuckDB reads all shards.
+4. **Uncompressed, single file** - `customer.tbl` (fallback).
+
+Shard numbering is a flat integer suffix (no zero padding); any non-numeric
+suffix is treated as a compression extension rather than a shard index.
+
+### Row-Count Validation API
+
+`benchbox.core.datavault.validate_row_counts` returns a
+`DataVaultValidationReport` dataclass that summarises whether every generated
+Data Vault table matches its expected row count for the given TPC-H scale
+factor (`datavault/validation.py`).
+
+```python
+from pathlib import Path
+from benchbox.core.datavault import validate_row_counts
+
+report = validate_row_counts(
+    data_dir=Path("datavault_data"),
+    scale_factor=1.0,
+    use_manifest=True,   # prefers _datagen_manifest.json if present
+    tolerance_pct=1.0,   # default variance allowance
+)
+
+print(report)                  # human-readable summary
+print(report.is_valid)         # True when every table is within tolerance
+print(report.tables_passed,    # counts populated by __post_init__
+      report.tables_failed,
+      report.tables_validated)
+report.to_dict()               # serialisable form for JSON output
+```
+
+Fields on `DataVaultValidationReport`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `scale_factor` | `float` | TPC-H scale factor used for generation |
+| `results` | `list[ValidationResult]` | Per-table actual vs expected counts and variance |
+| `tables_validated` | `int` | Total tables inspected (derived) |
+| `tables_passed` | `int` | Tables within tolerance (derived) |
+| `tables_failed` | `int` | Tables outside tolerance (derived) |
+| `is_valid` | `bool` | `True` iff `tables_failed == 0` (derived) |
+
+Lineitem-derived tables use a minimum tolerance of 1% to absorb the natural
+variance of TPC-H lineitem generation.
 
 ### Scale Factor Guidelines
 

@@ -184,7 +184,7 @@ def estimate_height(text: str, pad: int = 80) -> int:
 def save_png(html_content: str, out_path: Path, text: str, width: int = 960) -> None:
     """Render HTML to PNG via headless Chrome."""
     height = estimate_height(text)
-    with tempfile.NamedTemporaryFile(suffix=".html", mode="w", delete=False) as handle:
+    with tempfile.NamedTemporaryFile(suffix=".html", mode="w", delete=False, encoding="utf-8") as handle:
         handle.write(html_content)
         tmp_html = handle.name
 

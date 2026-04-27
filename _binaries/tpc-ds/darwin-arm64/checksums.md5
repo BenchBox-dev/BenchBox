@@ -1,4 +1,4 @@
-9e64e7c35697f7fd7a6edec7c0ca47da dsdgen
-1683d4bf3e2d1fe40db8e43a606c6eac dsqgen
-41fcc659ee3539c3bb9b3aa62ad40fde tpcds.idx
-93956fdb155c1073394a2a15df573303 tpcds.dst
+4526d69262538ae6d53366283fa7ccb0 ./dsqgen
+0f79e20d41faeef328928d4360225a85 ./dsdgen
+41fcc659ee3539c3bb9b3aa62ad40fde ./tpcds.idx
+93956fdb155c1073394a2a15df573303 ./tpcds.dst

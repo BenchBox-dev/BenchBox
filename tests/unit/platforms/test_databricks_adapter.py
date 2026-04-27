@@ -11,6 +11,7 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 
+from benchbox.platforms.base.data_loading import DataSource
 from benchbox.platforms.databricks import DatabricksAdapter
 from benchbox.platforms.databricks.adapter import _select_databricks_warehouse
 
@@ -452,7 +453,7 @@ class TestDatabricksAdapter:
         mock_benchmark = Mock()
 
         # Create temporary test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("id,name\n1,test1\n2,test2\n")
             temp_path = Path(f.name)
 
@@ -1071,6 +1072,10 @@ class TestDatabricksSqlGenerationHelpers:
             DatabricksAdapter._external_location_from_file_uri("dbfs:/Volumes/main/benchbox/orders/part-000.parquet")
             == "dbfs:/Volumes/main/benchbox/orders"
         )
+        assert (
+            DatabricksAdapter._external_location_from_file_uri("dbfs:/Volumes/main/benchbox/orders")
+            == "dbfs:/Volumes/main/benchbox/orders"
+        )
         with pytest.raises(ValueError, match="requires Parquet sources"):
             DatabricksAdapter._external_location_from_file_uri("dbfs:/Volumes/main/benchbox/orders/orders.csv")
 
@@ -1687,6 +1692,12 @@ class TestDetectManifestWildcard:
         result = adapter._detect_manifest_wildcard(names)
         assert result == "orders.tbl.*"
 
+    def test_non_sharded_part_files_do_not_produce_wildcard(self):
+        adapter = self._make_adapter()
+        names = ["part-00000.parquet", "part-00000.parquet"]
+        result = adapter._detect_manifest_wildcard(names)
+        assert result is None
+
 
 class TestEnsureUcVolumeExists:
     """Test _ensure_uc_volume_exists SQL generation and error handling."""
@@ -2136,47 +2147,69 @@ class TestResolveDataFiles:
                 access_token="tok",
             )
 
-    def test_uses_benchmark_tables_attribute(self):
+    def test_delegates_to_resolver_and_normalizes_single_file_tables(self):
         adapter = self._make_adapter()
         benchmark = Mock()
-        benchmark.tables = {"orders": "/data/orders.tbl", "lineitem": "/data/lineitem.tbl"}
-        result = adapter._resolve_databricks_data_files(benchmark, Path("/data"))
-        assert result == {"orders": "/data/orders.tbl", "lineitem": "/data/lineitem.tbl"}
+        data_source = DataSource(
+            source_type="manifest_v2",
+            tables={"orders": [Path("/data/orders.tbl")], "lineitem": [Path("/data/lineitem.tbl")]},
+            table_metadata={"orders": {"csv_delimiter": "|"}},
+        )
 
-    def test_uses_impl_tables_fallback(self):
-        adapter = self._make_adapter()
-        benchmark = Mock(spec=[])
-        benchmark._impl = Mock()
-        benchmark._impl.tables = {"region": "/data/region.tbl"}
-        # Need to make hasattr return True for _impl
-        benchmark.tables = None
-        result = adapter._resolve_databricks_data_files(benchmark, Path("/data"))
-        assert result == {"region": "/data/region.tbl"}
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver = mock_resolver_cls.return_value
+            mock_resolver.resolve.return_value = data_source
 
-    def test_uses_manifest_fallback(self, tmp_path):
-        import json
+            result = adapter._resolve_databricks_data_files(benchmark, Path("/data"))
 
-        adapter = self._make_adapter()
-        benchmark = Mock(spec=[])
-
-        manifest = {
-            "tables": {
-                "nation": [{"path": "nation.tbl"}],
-                "region": [{"path": "region.tbl"}],
-            }
+        mock_resolver_cls.assert_called_once_with(
+            platform_name=adapter.platform_name,
+            table_mode=adapter.table_mode,
+            platform_config=adapter.platform_config,
+            requested_format=None,
+        )
+        mock_resolver.resolve.assert_called_once_with(benchmark, Path("/data"))
+        assert result.tables == {
+            "orders": Path("/data/orders.tbl"),
+            "lineitem": Path("/data/lineitem.tbl"),
         }
-        (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest))
+        # Manifest metadata must survive the normalization step so the COPY INTO
+        # delimiter resolver still sees it downstream.
+        assert result.table_metadata == {"orders": {"csv_delimiter": "|"}}
+        # Resolver-owned object must not be mutated by the normalization step.
+        assert data_source.tables == {
+            "orders": [Path("/data/orders.tbl")],
+            "lineitem": [Path("/data/lineitem.tbl")],
+        }
 
-        result = adapter._resolve_databricks_data_files(benchmark, tmp_path)
-        assert "nation" in result
-        assert "region" in result
+    def test_preserves_multi_file_tables(self):
+        adapter = self._make_adapter()
+        benchmark = Mock()
+        data_source = DataSource(
+            source_type="manifest_v2",
+            tables={
+                "lineitem": [Path("/data/lineitem.tbl.1"), Path("/data/lineitem.tbl.2")],
+            },
+        )
+
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver_cls.return_value.resolve.return_value = data_source
+
+            result = adapter._resolve_databricks_data_files(benchmark, Path("/data"))
+
+        assert result.tables == {
+            "lineitem": [Path("/data/lineitem.tbl.1"), Path("/data/lineitem.tbl.2")],
+        }
 
     def test_raises_when_no_data_found(self, tmp_path):
         adapter = self._make_adapter()
         benchmark = Mock(spec=[])
 
-        with pytest.raises(ValueError, match="No data files found"):
-            adapter._resolve_databricks_data_files(benchmark, tmp_path)
+        with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver_cls.return_value.resolve.return_value = None
+
+            with pytest.raises(ValueError, match="No data files found"):
+                adapter._resolve_databricks_data_files(benchmark, tmp_path)
 
 
 class TestSelectDatabricksWarehouseEdgeCases:

@@ -27,7 +27,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
@@ -36,7 +35,6 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
-from benchbox.utils.file_format import get_delimiter_for_file
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +49,7 @@ if TYPE_CHECKING:
 from benchbox.core.exceptions import ConfigurationError
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.data_loading import FileFormatRegistry
+from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
@@ -367,7 +366,6 @@ class DatabendAdapter(PlatformAdapter):
 
                 # Optimize table definition for Databend
                 statement = self._optimize_table_definition(statement)
-
                 try:
                     connection.exec(statement)
                     self.logger.debug(f"Executed schema statement: {statement[:100]}...")
@@ -406,9 +404,9 @@ class DatabendAdapter(PlatformAdapter):
 
         try:
             connection.exec(f"USE {self._quote_identifier(self.database)}")
-            data_files = self._resolve_data_files(benchmark, data_dir)
+            data_source = self._resolve_data_files(benchmark, data_dir)
 
-            for table_name, file_paths in data_files.items():
+            for table_name, file_paths in data_source.tables.items():
                 if not isinstance(file_paths, list):
                     file_paths = [file_paths]
 
@@ -427,7 +425,9 @@ class DatabendAdapter(PlatformAdapter):
                     table_name_lower = table_name.lower()
                     table_name_quoted = self._quote_identifier(table_name_lower)
 
-                    total_rows_loaded = self._insert_files_batched(connection, table_name_quoted, valid_files)
+                    total_rows_loaded = self._insert_files_batched(
+                        connection, table_name_quoted, valid_files, table_name, data_source, benchmark
+                    )
 
                     table_stats[table_name_lower] = total_rows_loaded
                     load_time = elapsed_seconds(load_start)
@@ -449,7 +449,15 @@ class DatabendAdapter(PlatformAdapter):
 
         return table_stats, elapsed_seconds(start_time), None
 
-    def _insert_files_batched(self, connection: Any, table_name_quoted: str, valid_files: list[Path]) -> int:
+    def _insert_files_batched(
+        self,
+        connection: Any,
+        table_name_quoted: str,
+        valid_files: list[Path],
+        table_name: str,
+        data_source: Any,
+        benchmark: Any,
+    ) -> int:
         """Read data files and insert rows into Databend in batches.
 
         Returns:
@@ -458,8 +466,11 @@ class DatabendAdapter(PlatformAdapter):
         total_rows_loaded = 0
         batch_size = 500
 
+        from benchbox.platforms.base.data_loading import resolve_csv_dialect
+
         for file_path in valid_files:
-            delimiter = get_delimiter_for_file(file_path)
+            dialect = resolve_csv_dialect(data_source, table_name, file_path, benchmark)
+            delimiter = dialect.delimiter
             if delimiter not in (",", "|", "\t"):
                 raise ValueError(f"Unsafe delimiter character: {delimiter!r}")
 
@@ -506,30 +517,20 @@ class DatabendAdapter(PlatformAdapter):
 
         return total_rows_loaded
 
-    def _resolve_data_files(self, benchmark, data_dir: Path) -> dict[str, Any]:
-        """Resolve data files from benchmark or manifest fallback."""
-        if hasattr(benchmark, "tables") and benchmark.tables:
-            return benchmark.tables
+    def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
+        """Resolve data files via DataSourceResolver."""
+        from benchbox.platforms.base.data_loading import DataSourceResolver
 
-        try:
-            manifest_path = Path(data_dir) / "_datagen_manifest.json"
-            if manifest_path.exists():
-                with open(manifest_path) as f:
-                    manifest = json.load(f)
-                tables = manifest.get("tables") or {}
-                mapping = {}
-                for table, entries in tables.items():
-                    if entries:
-                        chunk_paths = [Path(data_dir) / entry["path"] for entry in entries if entry.get("path")]
-                        if chunk_paths:
-                            mapping[table] = chunk_paths
-                if mapping:
-                    self.logger.debug("Using data files from _datagen_manifest.json")
-                    return mapping
-        except Exception as e:
-            self.logger.debug(f"Manifest fallback failed: {e}")
-
-        raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
+        data_source = resolver.resolve(benchmark, data_dir)
+        if not data_source or not data_source.tables:
+            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
+        return data_source
 
     def execute_query(
         self,
@@ -880,15 +881,9 @@ class DatabendAdapter(PlatformAdapter):
         # Remove inline PRIMARY KEY constraints
         statement = re.sub(r",?\s*PRIMARY\s+KEY\s*\([^)]*\)", "", statement, flags=re.IGNORECASE)
 
-        # Remove FOREIGN KEY constraints
-        statement = re.sub(
-            r",?\s*FOREIGN\s+KEY\s*\([^)]*\)\s*REFERENCES\s+[^\s,)]+\s*\([^)]*\)",
-            "",
-            statement,
-            flags=re.IGNORECASE,
-        )
+        statement = strip_foreign_keys(statement)
 
-        # Clean up double commas or trailing commas before closing paren
+        # Clean up double commas left by PRIMARY KEY removal
         statement = re.sub(r",\s*,", ",", statement)
         statement = re.sub(r",\s*\)", ")", statement)
 

@@ -31,7 +31,10 @@ except ImportError:
 def databricks_dependencies():
     """Mock Databricks dependency check to simulate installed extras."""
 
-    with patch("benchbox.platforms.databricks.check_platform_dependencies", return_value=(True, [])):
+    with (
+        patch("benchbox.platforms.databricks.check_platform_dependencies", return_value=(True, [])),
+        patch("databricks.sdk.WorkspaceClient"),
+    ):
         yield
 
 

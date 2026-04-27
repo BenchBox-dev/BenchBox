@@ -5,6 +5,9 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import hashlib
+
+import duckdb
 import pytest
 
 from benchbox.core.datavault.etl.hash_functions import (
@@ -59,15 +62,15 @@ class TestGenerateHashKey:
         result = generate_hash_key("test")
         assert len(result) == 32
 
-    def test_sha1_algorithm(self):
-        """SHA1 algorithm should produce 40-char hashes."""
-        result = generate_hash_key(1, algorithm="sha1")
-        assert len(result) == 40
+    def test_sha1_algorithm_raises(self):
+        """SHA-1 is rejected - not present in the supported algorithm set."""
+        with pytest.raises(ValueError, match="Unsupported hash algorithm"):
+            generate_hash_key(1, algorithm="sha1")
 
-    def test_sha256_algorithm(self):
-        """SHA256 algorithm should produce truncated 32-char hashes."""
+    def test_sha256_algorithm_accepted(self):
+        """SHA-256 is supported after VARCHAR(64) schema migration."""
         result = generate_hash_key(1, algorithm="sha256")
-        assert len(result) == 32
+        assert len(result) == 64
 
     def test_unsupported_algorithm_raises(self):
         """Unsupported algorithm should raise ValueError."""
@@ -117,9 +120,15 @@ class TestGenerateHashKeySql:
         result = generate_hash_key_sql("c_custkey", table_alias="c")
         assert "c.c_custkey" in result
 
-    def test_non_md5_raises(self):
-        """Non-MD5 algorithm should raise ValueError."""
-        with pytest.raises(ValueError, match="only supports 'md5'"):
+    def test_sha256_algorithm_accepted(self):
+        """SHA-256 is supported via DuckDB's built-in sha256() function."""
+        result = generate_hash_key_sql("c_custkey", algorithm="sha256")
+        assert "sha256" in result
+        assert "c_custkey" in result
+
+    def test_unsupported_algorithm_raises(self):
+        """Algorithms outside md5/sha256 should raise ValueError."""
+        with pytest.raises(ValueError, match="only supports"):
             generate_hash_key_sql("col", algorithm="sha1")
 
 
@@ -138,3 +147,59 @@ class TestGenerateHashdiffSql:
         """HASHDIFF SQL should support table alias."""
         result = generate_hashdiff_sql("c_name", table_alias="sc")
         assert "sc.c_name" in result
+
+    def test_sha256_algorithm_accepted(self):
+        """SHA-256 is supported via DuckDB's built-in sha256() function."""
+        result = generate_hashdiff_sql("c_name", "c_address", algorithm="sha256")
+        assert "sha256" in result
+        assert "COALESCE" in result
+
+    def test_unsupported_algorithm_raises(self):
+        """Algorithms outside md5/sha256 should raise ValueError."""
+        with pytest.raises(ValueError, match="only supports"):
+            generate_hashdiff_sql("col", algorithm="sha1")
+
+
+class TestSqlRoundTrip:
+    """Execute generated SQL against DuckDB and verify parity with hashlib."""
+
+    @pytest.fixture(scope="class")
+    def conn(self):
+        connection = duckdb.connect(":memory:")
+        yield connection
+        connection.close()
+
+    @pytest.mark.parametrize(
+        ("algorithm", "expected_len"),
+        [("md5", 32), ("sha256", 64)],
+    )
+    def test_hash_key_sql_matches_hashlib(self, conn, algorithm, expected_len):
+        """generate_hash_key_sql output must match hashlib for the same inputs."""
+        expr = generate_hash_key_sql("c_custkey", algorithm=algorithm)
+        sql_result = conn.execute(f"SELECT {expr} FROM (SELECT 42 AS c_custkey)").fetchone()[0]
+        py_result = generate_hash_key(42, algorithm=algorithm)
+        assert sql_result == py_result
+        assert len(sql_result) == expected_len
+
+    @pytest.mark.parametrize(
+        ("algorithm", "expected_len"),
+        [("md5", 32), ("sha256", 64)],
+    )
+    def test_hashdiff_sql_matches_hashlib(self, conn, algorithm, expected_len):
+        """generate_hashdiff_sql output must match hashlib (NULL→'' via COALESCE)."""
+        expr = generate_hashdiff_sql("c_name", "c_address", algorithm=algorithm)
+        sql_result = conn.execute(
+            f"SELECT {expr} FROM (SELECT 'John' AS c_name, '123 Main St' AS c_address)"
+        ).fetchone()[0]
+        py_result = hashlib.new(algorithm, b"John|123 Main St").hexdigest()
+        assert sql_result == py_result
+        assert len(sql_result) == expected_len
+
+    def test_hashdiff_sql_null_handling(self, conn):
+        """NULL attributes become empty string via COALESCE in SQL path."""
+        expr = generate_hashdiff_sql("c_name", "c_address", algorithm="sha256")
+        sql_result = conn.execute(
+            f"SELECT {expr} FROM (SELECT 'John' AS c_name, CAST(NULL AS VARCHAR) AS c_address)"
+        ).fetchone()[0]
+        py_result = hashlib.sha256(b"John|").hexdigest()
+        assert sql_result == py_result

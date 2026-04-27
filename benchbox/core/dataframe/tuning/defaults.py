@@ -84,7 +84,7 @@ def _get_available_memory_gb() -> float:
 
     # Try reading from /proc/meminfo on Linux
     try:
-        with open("/proc/meminfo") as f:
+        with open("/proc/meminfo", encoding="utf-8") as f:
             for line in f:
                 if line.startswith("MemAvailable:"):
                     # Value is in kB

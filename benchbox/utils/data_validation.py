@@ -111,10 +111,15 @@ class BenchmarkDataValidator:
     def _scale_expectations(self, base_expectations: dict[str, TableExpectation]) -> dict[str, TableExpectation]:
         """Scale row count expectations based on scale factor."""
         scaled = {}
-        # Tables that have fixed row counts regardless of scale factor
-        fixed_size_tables = {
-            "nation",
-            "region",
+
+        # TPC-H: nation and region are invariantly fixed (25 nations, 5 regions by spec)
+        # - these do not scale regardless of scale factor.
+        tpch_invariant_fixed = {"nation", "region"}
+
+        # TPC-DS: these tables are "fixed" at official scale (sf >= 1.0) but scale
+        # proportionally with max(1, floor(sf1_baseline * sf)) at sf < 1.0.
+        # See _sources/tpcds-subscale-contract.md for the full data contract.
+        tpcds_official_fixed = {
             "call_center",
             "reason",
             "ship_mode",
@@ -126,11 +131,16 @@ class BenchmarkDataValidator:
         }
 
         for table_name, expectation in base_expectations.items():
-            if table_name in fixed_size_tables:
-                # Don't scale these tables
+            if table_name in tpch_invariant_fixed:
+                # TPC-H dimension tables: always fixed regardless of scale factor
+                scaled_rows = expectation.expected_rows
+            elif table_name in tpcds_official_fixed and self.scale_factor >= 1.0:
+                # TPC-DS "fixed" tables: use baseline row count at official scale
                 scaled_rows = expectation.expected_rows
             else:
-                scaled_rows = int(expectation.expected_rows * self.scale_factor)
+                # All other tables (and TPC-DS "fixed" tables at subscale):
+                # scale proportionally with min-1 floor
+                scaled_rows = max(1, int(expectation.expected_rows * self.scale_factor))
 
             scaled[table_name] = TableExpectation(
                 name=expectation.name,
@@ -306,7 +316,7 @@ class BenchmarkDataValidator:
                         with open(f, "rb") as fh, dctx.stream_reader(fh) as reader:
                             import io
 
-                            text = io.TextIOWrapper(reader)
+                            text = io.TextIOWrapper(reader, encoding="utf-8")
                             total += sum(1 for _ in text)
                     except Exception:
                         # If zstandard is not available, skip row counting for this file
@@ -450,7 +460,7 @@ class BenchmarkDataValidator:
             mp = self._manifest_path(data_dir)
             if not mp.exists():
                 return None
-            with open(mp) as f:
+            with open(mp, encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             logger.debug(f"Failed to read manifest: {e}")
@@ -621,5 +631,5 @@ class BenchmarkDataValidator:
                     }
                 )
         mp = self._manifest_path(data_dir)
-        with open(mp, "w") as f:
+        with open(mp, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)

@@ -137,7 +137,7 @@ def save_baseline(results: dict, baseline_path: Path) -> None:
     """Save results as baseline for future comparisons."""
     baseline_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(baseline_path, "w") as f:
+    with open(baseline_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
 
     print(f"✓ Baseline saved to: {baseline_path}")
@@ -148,7 +148,7 @@ def load_baseline(baseline_path: Path) -> dict:
     if not baseline_path.exists():
         raise FileNotFoundError(f"Baseline file not found: {baseline_path}")
 
-    with open(baseline_path) as f:
+    with open(baseline_path, encoding="utf-8") as f:
         return json.load(f)
 
 

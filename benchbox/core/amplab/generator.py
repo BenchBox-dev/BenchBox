@@ -69,9 +69,9 @@ class AMPLabDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         self.quiet = bool(quiet)
 
         # Data size constants (base sizes for scale_factor = 1.0)
-        self.base_rankings = 100000  # 100K pages
-        self.base_uservisits = 1000000  # 1M visits
-        self.base_documents = 50000  # 50K documents
+        self.base_rankings = 250000  # 250K pages
+        self.base_uservisits = 2500000  # 2.5M visits
+        self.base_documents = 125000  # 125K documents
 
         # Initialize random seed for reproducible data
         random.seed(42)

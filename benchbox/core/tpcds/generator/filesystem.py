@@ -225,9 +225,20 @@ class FileArtifactMixin:
         """
         from datetime import datetime, timezone
 
+        # compliance_class is set on the generator by validate_tpcds_scale()
+        compliance_class = getattr(self, "compliance_class", None)
+        compliance_str = (
+            compliance_class.value
+            if hasattr(compliance_class, "value")
+            else str(compliance_class)
+            if compliance_class
+            else "unknown"
+        )
+
         manifest = {
             "benchmark": "tpcds",
             "scale_factor": self.scale_factor,
+            "compliance_class": compliance_str,
             "compression": {
                 "enabled": self.should_use_compression(),
                 "type": (
@@ -362,7 +373,7 @@ class FileArtifactMixin:
 
         out = output_dir / "_datagen_manifest.json"
 
-        with open(out, "w") as f:
+        with open(out, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)
 
     def _get_sample_data_dir(self) -> Path | None:

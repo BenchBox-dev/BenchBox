@@ -27,9 +27,8 @@ if TYPE_CHECKING:
 from ..core.exceptions import ConfigurationError
 from ..utils.cloud_storage import get_cloud_path_info
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
-from ..utils.file_format import is_tpc_format
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import DataSourceResolver
+from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, resolve_csv_dialect
 
 try:
     import snowflake.connector
@@ -440,17 +439,16 @@ class SnowflakeAdapter(PlatformAdapter):
 
     def drop_database(self, **connection_config) -> None:
         """Drop database in Snowflake account."""
+        database = connection_config.get("database", self.database)
         try:
             connection = self._create_admin_connection(**connection_config)
             cursor = connection.cursor()
-
-            database = connection_config.get("database", self.database)
 
             # Drop database and all its schemas/tables (quote identifier for SQL safety)
             cursor.execute(f'DROP DATABASE IF EXISTS "{database}"')
 
         except Exception as e:
-            raise RuntimeError(f"Failed to drop Snowflake database {database}: {e}")
+            raise RuntimeError(f"Failed to drop Snowflake database {database}: {e}") from e
         finally:
             if "connection" in locals() and connection:
                 connection.close()
@@ -669,10 +667,10 @@ class SnowflakeAdapter(PlatformAdapter):
             cursor.execute(f"ALTER SESSION SET QUERY_TAG = '{self.query_tag}_data_loading'")
 
             self._create_load_file_formats(cursor)
-            data_files = self._resolve_data_files(benchmark, data_dir)
+            data_source = self._resolve_data_files(benchmark, data_dir)
 
             # Load data for each table (handle multi-chunk files)
-            for table_name, file_paths in data_files.items():
+            for table_name, file_paths in data_source.tables.items():
                 valid_files = self._normalize_existing_files(file_paths)
 
                 if not valid_files:
@@ -686,7 +684,9 @@ class SnowflakeAdapter(PlatformAdapter):
                 try:
                     load_start = mono_time()
                     table_name_upper = table_name.upper()
-                    actual_count = self._load_table_from_stage(cursor, table_name, table_name_upper, valid_files)
+                    actual_count = self._load_table_from_stage(
+                        cursor, table_name, table_name_upper, valid_files, data_source, benchmark
+                    )
                     table_stats[table_name_upper] = actual_count
 
                     effective_tuning = self.get_effective_tuning_configuration()
@@ -742,11 +742,11 @@ class SnowflakeAdapter(PlatformAdapter):
         stage_root = self.staging_root.rstrip("/").replace("'", "''")
 
         try:
-            data_files = self._resolve_data_files(benchmark, data_dir)
+            data_source = self._resolve_data_files(benchmark, data_dir)
 
             cursor.execute(f"CREATE STAGE IF NOT EXISTS {stage_name} URL='{stage_root}'")
 
-            for table_name, file_paths in data_files.items():
+            for table_name, file_paths in data_source.tables.items():
                 table_name_upper = table_name.upper()
                 table_path = f"{self.database.lower()}/{table_name.lower()}/"
                 source_format = self._detect_external_table_format(file_paths)
@@ -827,17 +827,18 @@ class SnowflakeAdapter(PlatformAdapter):
             COMPRESSION = '{self.compression}'
         """)
 
-    def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> dict[str, Any]:
+    def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> DataSource:
         """Resolve benchmark data files from benchmark tables or manifest."""
         resolver = DataSourceResolver(
             platform_name=self.platform_name,
-            table_mode=getattr(self, "table_mode", "native"),
-            platform_config=getattr(self, "__dict__", None),
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
         )
         data_source = resolver.resolve(benchmark, data_dir)
         if not data_source or not data_source.tables:
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source.tables
+        return data_source
 
     @staticmethod
     def _normalize_existing_files(file_paths: Any) -> list[Path]:
@@ -850,9 +851,16 @@ class SnowflakeAdapter(PlatformAdapter):
                 valid_files.append(path)
         return valid_files
 
-    def _get_file_format_for_table(self, table_name: str, first_file: Path) -> str:
-        """Select Snowflake file format object based on source file type."""
-        if is_tpc_format(first_file):
+    def _get_file_format_for_table(
+        self,
+        table_name: str,
+        first_file: Path,
+        data_source: DataSource,
+        benchmark: Any,
+    ) -> str:
+        """Select Snowflake file format object based on resolved CSV dialect."""
+        dialect = resolve_csv_dialect(data_source, table_name, first_file, benchmark)
+        if dialect.null_marker is not None:
             self.log_very_verbose(f"Using TBL file format for {table_name}")
             return f"{self.schema}.BENCHBOX_TBL_FORMAT"
         self.log_very_verbose(f"Using CSV file format for {table_name}")
@@ -884,6 +892,8 @@ class SnowflakeAdapter(PlatformAdapter):
         table_name: str,
         table_name_upper: str,
         valid_files: list[Path],
+        data_source: DataSource | None = None,
+        benchmark: Any = None,
     ) -> int:
         """Upload table files to stage, COPY INTO target table, and return actual row count."""
         stage_name = f"@%{table_name_upper}"
@@ -894,7 +904,9 @@ class SnowflakeAdapter(PlatformAdapter):
             self.log_very_verbose(f"Uploading file{chunk_msg} with PUT: {file_path.name}")
             cursor.execute(f"PUT file://{file_path.absolute()} {stage_name}")
 
-        file_format = self._get_file_format_for_table(table_name, valid_files[0])
+        ds = data_source or DataSource(source_type="snowflake_stage", tables={})
+        bm = benchmark if benchmark is not None else NO_BENCHMARK
+        file_format = self._get_file_format_for_table(table_name, valid_files[0], ds, bm)
         copy_command = f"""
             COPY INTO {table_name_upper}
             FROM {stage_name}
@@ -1622,7 +1634,7 @@ class SnowflakeAdapter(PlatformAdapter):
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
         except Exception as e:
-            raise ValueError(f"Failed to apply tunings to Snowflake table {table_name}: {e}")
+            raise ValueError(f"Failed to apply tunings to Snowflake table {table_name}: {e}") from e
         finally:
             cursor.close()
 
@@ -1707,70 +1719,28 @@ def _build_snowflake_config(
     overrides: dict[str, Any],
     info: Any,
 ) -> Any:
-    """Build Snowflake database configuration with credential loading.
+    from benchbox.platforms.base.config_utils import build_platform_config
 
-    This function loads saved credentials from the CredentialManager and
-    merges them with CLI options and runtime overrides.
-
-    Args:
-        platform: Platform name (should be 'snowflake')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded and platform-specific fields at top-level
-    """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("snowflake") or {}
-
-    # Build merged options: saved_creds < options < overrides
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    # Extract credential fields for DatabaseConfig
-    name = info.display_name if info else "Snowflake"
-    driver_package = info.driver_package if info else "snowflake-connector-python"
-
-    # Build config dict with platform-specific fields at top-level
-    # This allows SnowflakeAdapter.__init__() to access them via config.get()
-    config_dict = {
-        "type": "snowflake",
-        "name": name,
-        "options": merged_options or {},  # Ensure options is never None (Pydantic v2 uses None if explicitly passed)
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields at top-level (adapters expect these here)
-        "account": merged_options.get("account"),
-        "warehouse": merged_options.get("warehouse"),
-        # NOTE: database is NOT included here - from_config() generates it from benchmark context
-        # Only explicit overrides (via --platform-option database=...) should bypass generation
-        "schema": merged_options.get("schema"),
-        "username": merged_options.get("username"),
-        "password": merged_options.get("password"),
-        "role": merged_options.get("role"),
-        "authenticator": merged_options.get("authenticator"),
-        "private_key_path": merged_options.get("private_key_path"),
-        "private_key_passphrase": merged_options.get("private_key_passphrase"),
-        # Benchmark context for config-aware database naming (from overrides)
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    # Only include explicit database override if provided via CLI or overrides
-    # Saved credentials should NOT override generated database names
-    if "database" in overrides and overrides["database"]:
-        config_dict["database"] = overrides["database"]
-
-    return DatabaseConfig(**config_dict)
+    return build_platform_config(
+        platform_type="snowflake",
+        credential_key="snowflake",
+        default_display_name="Snowflake",
+        default_driver_package="snowflake-connector-python",
+        platform_fields=[
+            "account",
+            "warehouse",
+            "schema",
+            "username",
+            "password",
+            "role",
+            "authenticator",
+            "private_key_path",
+            "private_key_passphrase",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 # Register the config builder with the platform hook registry

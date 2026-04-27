@@ -28,13 +28,18 @@ try:
 except ImportError:
     SessionContext = None  # type: ignore[assignment, misc]
     SessionConfig = None  # type: ignore[assignment, misc]
-    RuntimeEnv = None  # type: ignore[assignment, misc]
+    RuntimeEnv = None  # type: ignore[assignment, misc]  # ty: ignore[conflicting-declarations]
 
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
+from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
+from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
 from benchbox.utils.clock import elapsed_seconds, mono_time
-from benchbox.utils.file_format import get_delimiter_for_file
 
 logger = logging.getLogger(__name__)
+
+# Threshold for switching CSV→Parquet conversion from in-memory to streaming.
+# Files larger than this are written in batches to avoid OOM on large inputs.
+_CSV_TO_PARQUET_STREAM_THRESHOLD = 256 * 1024 * 1024  # 256 MB
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import TuningColumn
@@ -117,7 +122,7 @@ class DataFusionConnectionCompat:
         return getattr(self._context, name)
 
 
-class DataFusionAdapter(PlatformAdapter):
+class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
     """Apache DataFusion platform adapter with optimized bulk loading and execution."""
 
     driver_isolation_capability = DriverIsolationCapability.SUPPORTED
@@ -415,17 +420,6 @@ class DataFusionAdapter(PlatformAdapter):
         # Note: Parquet optimizations already configured via with_parquet_pruning(True)
         # Redundant config.set() calls have been removed
 
-        # Try to normalize identifiers to lowercase (for TPC benchmark compatibility)
-        # Note: This setting is undocumented in DataFusion 50.x and may not be necessary
-        # as DataFusion already handles identifier case according to PostgreSQL semantics
-        try:
-            config = config.set("datafusion.sql_parser.enable_ident_normalization", "true")
-            self.log_very_verbose("Enabled SQL identifier normalization (if supported)")
-            config_applied.append("ident_normalization=enabled")
-        except BaseException as e:
-            # Not critical - DataFusion's PostgreSQL semantics handle TPC naming correctly
-            self.log_very_verbose(f"Identifier normalization not available (using PostgreSQL defaults): {e}")
-
         # Create SessionContext with runtime environment if available
         if runtime is not None:
             try:
@@ -672,6 +666,12 @@ class DataFusionAdapter(PlatformAdapter):
                         columns.append({"name": col["name"], "type": col_type})
                     else:
                         self.log_very_verbose(f"Skipping invalid column definition in {table_name}: {col}")
+            elif hasattr(table_def, "columns"):
+                # Handle dataclass-style schema objects (e.g., OBTTable with OBTColumn instances)
+                for col in table_def.columns:
+                    if hasattr(col, "name"):
+                        col_type = col.sql_type() if hasattr(col, "sql_type") else "VARCHAR"
+                        columns.append({"name": col.name, "type": col_type})
 
             if columns:
                 schemas[table_name] = {"columns": columns}
@@ -680,6 +680,50 @@ class DataFusionAdapter(PlatformAdapter):
                 self.log_verbose(f"Warning: No valid columns found for table {table_name}")
 
         return schemas
+
+    def _create_empty_schema_tables(self, connection: Any) -> dict[str, int]:
+        """Create empty in-memory tables from self._table_schemas.
+
+        Used when a benchmark has no data files (e.g. metadata_primitives) so
+        that catalog-discovery queries can find the tables via INFORMATION_SCHEMA.
+        DataFusion maps SQL types to Arrow types; unsupported DDL is skipped.
+        """
+        type_map = {
+            "BIGINT": "BIGINT",
+            "INTEGER": "INT",
+            "INT": "INT",
+            "SMALLINT": "SMALLINT",
+            "FLOAT": "FLOAT",
+            "DOUBLE": "DOUBLE",
+            "BOOLEAN": "BOOLEAN",
+            "DATE": "DATE",
+            "TIMESTAMP": "TIMESTAMP",
+        }
+        for table_name, schema_info in self._table_schemas.items():
+            columns = schema_info.get("columns", [])
+            if not columns:
+                continue
+            col_defs = []
+            for col in columns:
+                col_name = col["name"].lower()
+                if '"' in col_name:
+                    raise ValueError(f"Column name contains illegal double-quote: {col_name!r}")
+                col_type = col.get("type", "VARCHAR").upper()
+                # Resolve parameterised types: DECIMAL(10,2) → DECIMAL, VARCHAR(100) → VARCHAR
+                base_type = col_type.split("(")[0]
+                arrow_type = type_map.get(base_type, "VARCHAR")
+                if "(" in col_type and base_type in ("DECIMAL", "NUMERIC"):
+                    arrow_type = f"DECIMAL{col_type[len(base_type) :]}"
+                col_defs.append(f'"{col_name}" {arrow_type}')
+            ddl = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(col_defs)})"
+            try:
+                connection.execute(ddl)
+                self.log_very_verbose(f"Created empty table: {table_name}")
+            except Exception as e:
+                self.log_verbose(f"Could not create empty table {table_name}: {e}")
+        # Return empty stats so row-count validation is skipped for empty-data benchmarks.
+        # Schema-integrity validation will check that the tables exist in the catalog.
+        return {}
 
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
@@ -695,11 +739,20 @@ class DataFusionAdapter(PlatformAdapter):
         self.log_operation_start("Data loading", f"format: {self.data_format}")
 
         # Resolve data source (pass platform name for correct format preference)
-        resolver = DataSourceResolver(platform_name=self.platform_name.lower())
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name.lower(),
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
         data_source = resolver.resolve(benchmark, data_dir)
 
         if not data_source or not data_source.tables:
-            raise ValueError(f"No data files found in {data_dir}")
+            # Benchmark generates no data files (e.g. metadata_primitives creates schema in SQL).
+            # Create empty in-memory tables from the schema so catalog queries can discover them.
+            self.log_verbose(f"No data files found in {data_dir}; creating empty schema tables")
+            table_stats = self._create_empty_schema_tables(connection)
+            return table_stats, 0.0, None
 
         table_stats = {}
         per_table_timings = {}
@@ -719,15 +772,31 @@ class DataFusionAdapter(PlatformAdapter):
             # Detect directory-based table formats (delta/iceberg)
             dir_format = self._detect_directory_format(file_paths)
 
+            # Resolver hint keys follow the data-source table names, which may
+            # preserve benchmark casing (e.g. TPC-DI's DimCustomer).
+            table_csv_format = data_source.table_formats.get(table_name)
+            if table_csv_format is None:
+                table_csv_format = data_source.table_formats.get(table_name_lower)
+
             if dir_format == "delta":
                 row_count = self._load_table_delta(connection, table_name_lower, file_paths[0])
             elif dir_format == "iceberg":
                 row_count = self._load_table_iceberg(connection, table_name_lower, file_paths[0])
             elif self.data_format == "parquet":
-                row_count = self._load_table_parquet(connection, table_name_lower, file_paths, data_dir)
+                row_count = self._load_table_parquet(
+                    connection, table_name_lower, file_paths, data_dir, csv_format=table_csv_format
+                )
             else:
                 # Load CSV directly
-                row_count = self._load_table_csv(connection, table_name_lower, file_paths, data_dir)
+                row_count = self._load_table_csv(
+                    connection,
+                    table_name_lower,
+                    file_paths,
+                    data_dir,
+                    csv_format=table_csv_format,
+                    data_source=data_source,
+                    benchmark=benchmark,
+                )
 
             if effective_tuning:
                 self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
@@ -763,24 +832,57 @@ class DataFusionAdapter(PlatformAdapter):
         order_by_clause = ", ".join(column.name for column in sort_columns)
         return f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM {table_name} ORDER BY {order_by_clause};"
 
-    def _detect_csv_format(self, file_paths: list[Path]) -> str:
-        """Detect CSV delimiter from file extension.
+    def _detect_csv_format(
+        self,
+        file_paths: list[Path],
+        csv_format: str | None = None,
+        data_source: DataSource | None = None,
+        table_name: str = "",
+        benchmark: Any = None,
+    ) -> str:
+        """Detect CSV delimiter from manifest metadata, format hint, or file extension.
+
+        Args:
+            file_paths: List of data file paths (used for extension-based fallback)
+            csv_format: Explicit format name from the datagen manifest ("tbl" or "csv").
+                        When provided, overrides file-extension detection.
 
         Returns:
             Delimiter string
         """
+        if csv_format == "tbl":
+            return "|"
+        if csv_format == "csv":
+            return ","
         if file_paths:
-            return get_delimiter_for_file(file_paths[0])
+            ds = data_source or DataSource(source_type="datafusion_csv", tables={})
+            bm = benchmark if benchmark is not None else NO_BENCHMARK
+            return resolve_csv_dialect(ds, table_name, file_paths[0], bm).delimiter
         return ","
 
-    def _load_table_csv(self, connection: Any, table_name: str, file_paths: list[Path], data_dir: Path) -> int:
+    def _load_table_csv(
+        self,
+        connection: Any,
+        table_name: str,
+        file_paths: list[Path],
+        data_dir: Path,
+        csv_format: str | None = None,
+        data_source: DataSource | None = None,
+        benchmark: Any = None,
+    ) -> int:
         """Load table from CSV files using CREATE EXTERNAL TABLE.
 
         Handles TPC benchmark format with trailing pipe delimiters and
         uses glob patterns for multiple files.
         """
-        # Detect delimiter
-        delimiter = self._detect_csv_format(file_paths)
+        # Detect delimiter (manifest metadata > format hint > file extension)
+        delimiter = self._detect_csv_format(
+            file_paths,
+            csv_format=csv_format,
+            data_source=data_source,
+            table_name=table_name,
+            benchmark=benchmark,
+        )
 
         # Get schema information for proper column names
         schema_info = self._table_schemas.get(table_name, {})
@@ -894,7 +996,9 @@ class DataFusionAdapter(PlatformAdapter):
         # Return as-is if not in mapping (assume it's already valid)
         return sql_type
 
-    def _load_table_parquet(self, connection: Any, table_name: str, file_paths: list[Path], data_dir: Path) -> int:
+    def _load_table_parquet(
+        self, connection: Any, table_name: str, file_paths: list[Path], data_dir: Path, csv_format: str | None = None
+    ) -> int:
         """Load table as Parquet, converting from CSV/TBL if needed.
 
         If the input files are already Parquet, registers them directly.
@@ -909,7 +1013,7 @@ class DataFusionAdapter(PlatformAdapter):
         if input_is_parquet:
             return self._register_parquet_files(connection, table_name, file_paths)
 
-        return self._convert_and_register_parquet(connection, table_name, file_paths, pa, pq)
+        return self._convert_and_register_parquet(connection, table_name, file_paths, pa, pq, csv_format=csv_format)
 
     def _is_parquet_file(self, file_path: Path) -> bool:
         """Check if a file is Parquet by extension (stripping compression suffixes)."""
@@ -922,12 +1026,35 @@ class DataFusionAdapter(PlatformAdapter):
         return name.endswith(".parquet")
 
     def _register_parquet_files(self, connection: Any, table_name: str, file_paths: list[Path]) -> int:
-        """Register pre-existing Parquet files directly with DataFusion."""
+        """Register pre-existing Parquet files directly with DataFusion.
+
+        DataFusion lowercases unquoted SQL identifiers at parse time, so any parquet
+        file with mixed-case column names (e.g. ClickBench's AdvEngineID, UserID)
+        must have its columns renamed to lowercase before registration.
+        """
         import pyarrow.parquet as pq
 
         if len(file_paths) == 1:
             parquet_path = str(file_paths[0])
             self.log_very_verbose(f"Registering existing Parquet file for {table_name}: {parquet_path}")
+            schema = pq.read_schema(file_paths[0])
+            if any(name != name.lower() for name in schema.names):
+                # Mixed-case columns: stream row-groups through a rename to avoid
+                # loading the full file into memory (ClickBench SF1 is ~14 GB).
+                import pyarrow as pa
+
+                new_schema = pa.schema([field.with_name(field.name.lower()) for field in schema])
+                self.working_dir.mkdir(exist_ok=True)
+                norm_path = self.working_dir / f"{table_name}.parquet"
+                row_count = 0
+                pf = pq.ParquetFile(file_paths[0])
+                with pq.ParquetWriter(norm_path, new_schema, compression="snappy") as writer:
+                    for batch in pf.iter_batches():
+                        renamed = batch.rename_columns([c.lower() for c in batch.schema.names])
+                        writer.write_batch(renamed)
+                        row_count += renamed.num_rows
+                connection.register_parquet(table_name, str(norm_path))
+                return row_count
             row_count = pq.read_metadata(file_paths[0]).num_rows
             connection.register_parquet(table_name, parquet_path)
             return row_count
@@ -940,6 +1067,8 @@ class DataFusionAdapter(PlatformAdapter):
         for fp in file_paths:
             tables.append(pq.read_table(fp))
         combined = pa.concat_tables(tables)
+        if any(name != name.lower() for name in combined.schema.names):
+            combined = combined.rename_columns([c.lower() for c in combined.schema.names])
 
         parquet_file = self.working_dir / f"{table_name}.parquet"
         self.working_dir.mkdir(exist_ok=True)
@@ -978,11 +1107,16 @@ class DataFusionAdapter(PlatformAdapter):
         delta_table = DeltaTable(str(table_path))
         arrow_table = delta_table.to_pyarrow_table()
 
+        # Normalize column names to lowercase: DataFusion lowercases unquoted identifiers
+        # at parse time, so any mixed-case column (e.g. SK_CustomerID) must be stored lowercase.
+        if any(name != name.lower() for name in arrow_table.schema.names):
+            arrow_table = arrow_table.rename_columns([c.lower() for c in arrow_table.schema.names])
+
         batches = arrow_table.to_batches()
         if batches:
             connection.register_record_batches(table_name, [batches])
         else:
-            # Empty table — register with schema but no data
+            # Empty table - register with schema but no data
             import pyarrow as pa
 
             empty_batch = pa.RecordBatch.from_pydict(
@@ -1016,6 +1150,11 @@ class DataFusionAdapter(PlatformAdapter):
         ice_table = catalog.load_table(f"default.{table_name}")
         arrow_table = ice_table.scan().to_arrow()
 
+        # Normalize column names to lowercase: DataFusion lowercases unquoted identifiers
+        # at parse time, so any mixed-case column must be stored lowercase.
+        if any(name != name.lower() for name in arrow_table.schema.names):
+            arrow_table = arrow_table.rename_columns([c.lower() for c in arrow_table.schema.names])
+
         batches = arrow_table.to_batches()
         if batches:
             connection.register_record_batches(table_name, [batches])
@@ -1031,126 +1170,138 @@ class DataFusionAdapter(PlatformAdapter):
         self.log_very_verbose(f"Registered Iceberg table {table_name}: {arrow_table.num_rows:,} rows")
         return arrow_table.num_rows
 
-    def _convert_and_register_parquet(
-        self, connection: Any, table_name: str, file_paths: list[Path], pa: Any, pq: Any
-    ) -> int:
-        """Convert CSV/TBL files to Parquet and register with DataFusion."""
-        import pyarrow.csv as csv
+    @staticmethod
+    def _map_schema_type_to_pyarrow(col_type: str, pa: Any) -> Any | None:
+        """Map a BenchBox schema type to a PyArrow type, or None for auto-inference."""
+        if col_type.startswith(("CHAR", "VARCHAR", "TEXT", "STRING")):
+            return pa.string()
+        if col_type.startswith("DATE"):
+            return pa.date32()
+        if col_type.startswith(("DECIMAL", "NUMERIC", "FLOAT", "REAL", "DOUBLE")):
+            # float64 avoids precision hassles for DECIMAL/NUMERIC in benchmarks
+            return pa.float64()
+        if col_type.startswith("BIGINT") or col_type.startswith("INT8"):
+            return pa.int64()
+        if col_type.startswith(("INTEGER", "INT4", "INT ")) or col_type in ("INT", "SMALLINT", "TINYINT"):
+            return pa.int32()
+        if col_type.startswith("BOOLEAN"):
+            return pa.bool_()
+        if col_type.startswith("TIMESTAMP"):
+            return pa.timestamp("us")
+        return None
 
-        # Store parquet files directly in working directory
-        parquet_dir = self.working_dir
-        parquet_dir.mkdir(exist_ok=True)
-
-        parquet_file = parquet_dir / f"{table_name}.parquet"
-
-        # Detect delimiter - PyArrow's CSV reader handles trailing delimiters automatically
-        delimiter = self._detect_csv_format(file_paths)
-
-        # Get schema information for proper column names and types
+    def _build_pyarrow_columns(self, table_name: str, pa: Any) -> tuple[list[str] | None, dict[str, Any] | None]:
+        """Resolve (column_names, column_types) for a table's CSV → Parquet conversion."""
         schema_info = self._table_schemas.get(table_name, {})
         columns = schema_info.get("columns", [])
-
-        # Build column names list from schema
-        # PyArrow's CSV reader handles trailing delimiters correctly - it doesn't create extra columns
-        column_names = None
-        column_types = None
-        if columns:
-            column_names = [col["name"] for col in columns]
-            # Build PyArrow column types from schema to prevent incorrect type inference
-            # e.g., ca_zip "89436" should be string, not int64
-            column_types = {}
-            for col in columns:
-                col_name = col["name"]
-                col_type = col.get("type", "VARCHAR").upper()
-                # Map schema types to PyArrow types - string types must be explicit
-                # to prevent PyArrow from inferring numeric types for zip codes etc.
-                if col_type.startswith(("CHAR", "VARCHAR", "TEXT", "STRING")):
-                    column_types[col_name] = pa.string()
-                elif col_type.startswith("DATE"):
-                    column_types[col_name] = pa.date32()
-                elif col_type.startswith("DECIMAL"):
-                    # Use float64 for decimal to avoid precision issues
-                    column_types[col_name] = pa.float64()
-                # Other types (INT, BIGINT, etc.) can use auto-inference
-            self.log_very_verbose(f"Using {len(column_names)} columns from schema for {table_name}: {column_names}")
-        else:
+        if not columns:
             self.log_verbose(f"Warning: No schema found for {table_name}, using auto-generated column names")
+            return None, None
 
-        # Convert CSV to Parquet
-        self.log_very_verbose(f"Converting {len(file_paths)} CSV file(s) to Parquet for {table_name}")
+        column_names = [col["name"].lower() for col in columns]
+        column_types: dict[str, Any] = {}
+        for col in columns:
+            col_name = col["name"].lower()
+            col_type = col.get("type", "VARCHAR").upper()
+            pa_type = self._map_schema_type_to_pyarrow(col_type, pa)
+            if pa_type is not None:
+                column_types[col_name] = pa_type
+        self.log_very_verbose(f"Using {len(column_names)} columns from schema for {table_name}: {column_names}")
+        return column_names, column_types
 
-        # Read all CSV files and combine
-        # Note: PyArrow automatically detects and handles compressed files (.gz, .bz2, etc.)
-        tables = []
-        for file_path in file_paths:
-            try:
-                # Configure CSV read options
-                read_options = csv.ReadOptions(
-                    column_names=column_names,
-                    autogenerate_column_names=(column_names is None),
-                )
-
-                parse_options = csv.ParseOptions(
-                    delimiter=delimiter,
-                    quote_char='"',  # Standard quote character
-                    escape_char="\\",  # Standard escape character
-                )
-
-                convert_options = csv.ConvertOptions(
-                    null_values=[""],
-                    strings_can_be_null=True,
-                    column_types=column_types,  # Explicit types to prevent incorrect inference
-                )
-
-                # Read CSV with PyArrow (handles Path objects and compression automatically)
-                table = csv.read_csv(
-                    file_path,
-                    read_options=read_options,
-                    parse_options=parse_options,
-                    convert_options=convert_options,
-                )
-
-                tables.append(table)
-
-            except Exception as e:
-                self.log_verbose(f"Error reading CSV file {file_path}: {e}")
-                raise RuntimeError(f"Failed to read CSV file {file_path}: {e}") from e
-
-        # Concatenate all tables
+    def _write_csv_file_to_parquet(
+        self,
+        file_path: Path,
+        parquet_file: Path,
+        writer_ref: list[Any],
+        read_opts: Any,
+        parse_opts: Any,
+        conv_opts: Any,
+        pq: Any,
+        csv_mod: Any,
+        table_name: str,
+    ) -> int:
+        """Convert a single CSV file to the shared Parquet writer; returns row count."""
+        file_size = file_path.stat().st_size if file_path.exists() else 0
         try:
-            combined_table = pa.concat_tables(tables)
-        except Exception as e:
-            self.log_verbose(f"Error concatenating tables for {table_name}: {e}")
-            raise RuntimeError(f"Failed to concatenate CSV data for {table_name}: {e}") from e
+            if file_size > _CSV_TO_PARQUET_STREAM_THRESHOLD:
+                self.log_verbose(
+                    f"Streaming {file_path.name} ({file_size / (1024**3):.1f} GB) to Parquet for {table_name}"
+                )
+                reader = csv_mod.open_csv(
+                    file_path, read_options=read_opts, parse_options=parse_opts, convert_options=conv_opts
+                )
+                rows = 0
+                for batch in reader:
+                    if writer_ref[0] is None:
+                        writer_ref[0] = pq.ParquetWriter(parquet_file, batch.schema, compression="snappy")
+                    writer_ref[0].write_batch(batch)
+                    rows += batch.num_rows
+                return rows
 
-        # Write to Parquet with compression
-        try:
-            pq.write_table(
-                combined_table,
-                parquet_file,
-                compression="snappy",  # Fast compression, good balance
+            table = csv_mod.read_csv(
+                file_path, read_options=read_opts, parse_options=parse_opts, convert_options=conv_opts
             )
-            self.log_very_verbose(f"Created Parquet file: {parquet_file} ({combined_table.num_rows:,} rows)")
+            if writer_ref[0] is None:
+                writer_ref[0] = pq.ParquetWriter(parquet_file, table.schema, compression="snappy")
+            writer_ref[0].write_table(table)
+            return table.num_rows
         except Exception as e:
-            self.log_verbose(f"Error writing Parquet file for {table_name}: {e}")
-            raise RuntimeError(f"Failed to write Parquet file for {table_name}: {e}") from e
+            self.log_verbose(f"Error processing CSV file {file_path}: {e}")
+            raise RuntimeError(f"Failed to process CSV file {file_path}: {e}") from e
 
-        # Register Parquet table in DataFusion
+    def _register_parquet_or_cleanup(self, connection: Any, table_name: str, parquet_file: Path) -> None:
+        """Register the parquet file in DataFusion; delete the file on failure."""
         try:
             connection.register_parquet(table_name, str(parquet_file))
         except Exception as e:
-            # Clean up the Parquet file if registration fails
             try:
                 if parquet_file.exists():
                     parquet_file.unlink()
                     self.log_very_verbose(f"Cleaned up orphaned Parquet file: {parquet_file}")
             except Exception as cleanup_error:
                 self.log_very_verbose(f"Could not clean up Parquet file: {cleanup_error}")
-
             self.log_verbose(f"Error registering Parquet table {table_name}: {e}")
             raise RuntimeError(f"Failed to register Parquet table {table_name}: {e}") from e
 
-        return combined_table.num_rows
+    def _convert_and_register_parquet(
+        self, connection: Any, table_name: str, file_paths: list[Path], pa: Any, pq: Any, csv_format: str | None = None
+    ) -> int:
+        """Convert CSV/TBL files to Parquet and register with DataFusion."""
+        import pyarrow.csv as csv
+
+        parquet_dir = self.working_dir
+        parquet_dir.mkdir(exist_ok=True)
+        parquet_file = parquet_dir / f"{table_name}.parquet"
+
+        delimiter = self._detect_csv_format(file_paths, csv_format=csv_format)
+        column_names, column_types = self._build_pyarrow_columns(table_name, pa)
+
+        self.log_very_verbose(f"Converting {len(file_paths)} CSV file(s) to Parquet for {table_name}")
+
+        read_opts = csv.ReadOptions(
+            column_names=column_names,
+            autogenerate_column_names=(column_names is None),
+        )
+        parse_opts = csv.ParseOptions(delimiter=delimiter, quote_char='"', escape_char="\\")
+        conv_opts = csv.ConvertOptions(null_values=[""], strings_can_be_null=True, column_types=column_types)
+
+        # writer_ref is a single-slot list so the helper can lazily open the shared writer
+        writer_ref: list[Any] = [None]
+        total_rows = 0
+        try:
+            for file_path in file_paths:
+                total_rows += self._write_csv_file_to_parquet(
+                    file_path, parquet_file, writer_ref, read_opts, parse_opts, conv_opts, pq, csv, table_name
+                )
+        finally:
+            if writer_ref[0] is not None:
+                writer_ref[0].close()
+
+        self.log_very_verbose(f"Created Parquet file: {parquet_file} ({total_rows:,} rows)")
+
+        self._register_parquet_or_cleanup(connection, table_name, parquet_file)
+        return total_rows
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply DataFusion-specific optimizations based on benchmark type."""
@@ -1275,43 +1426,6 @@ class DataFusionAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
 
-    def apply_platform_optimizations(self, platform_config, connection: Any) -> None:
-        """Apply DataFusion-specific platform optimizations.
-
-        DataFusion optimizations are primarily configured at SessionContext creation.
-        This method logs the optimization configuration.
-        """
-        if not platform_config:
-            self.log_verbose("No platform optimizations configured")
-            return
-
-        self.log_verbose("DataFusion optimizations configured at session creation")
-
-        # DataFusion doesn't support most traditional database optimizations
-        # like Z-ordering, auto-optimize, bloom filters, etc.
-        # These are handled through file organization (Parquet partitioning)
-
-    def apply_constraint_configuration(
-        self,
-        primary_key_config,
-        foreign_key_config,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configuration.
-
-        Note: DataFusion does not enforce PRIMARY KEY or FOREIGN KEY constraints.
-        This method logs the configuration but does not apply constraints.
-        """
-        if primary_key_config and primary_key_config.enabled:
-            self.log_verbose(
-                "DataFusion does not enforce PRIMARY KEY constraints - configuration noted but not applied"
-            )
-
-        if foreign_key_config and foreign_key_config.enabled:
-            self.log_verbose(
-                "DataFusion does not enforce FOREIGN KEY constraints - configuration noted but not applied"
-            )
-
     def check_database_exists(self, **connection_config) -> bool:
         """Check if DataFusion working directory exists with data."""
         working_dir = Path(connection_config.get("working_dir", self.working_dir))
@@ -1332,9 +1446,9 @@ class DataFusionAdapter(PlatformAdapter):
         working_dir = Path(connection_config.get("working_dir", self.working_dir))
 
         if working_dir.exists():
-            self.log_verbose(f"Removing DataFusion working directory: {working_dir}")
+            self.logger.warning(f"Removing DataFusion working directory: {working_dir}")
             shutil.rmtree(working_dir)
-            self.log_verbose("DataFusion working directory removed")
+            self.logger.warning("DataFusion working directory removed")
 
     def validate_platform_capabilities(self, benchmark_type: str):
         """Validate DataFusion-specific capabilities for the benchmark."""

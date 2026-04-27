@@ -38,6 +38,8 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.utils.clock import elapsed_seconds, mono_time
+
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
         UnifiedTuningConfiguration,
@@ -51,6 +53,7 @@ from benchbox.platforms.base.cloud_spark import (
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
+from benchbox.platforms.base.phase_tracking import _resolve_benchmark_table_names
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
@@ -267,13 +270,15 @@ class AWSGlueAdapter(SparkTuningMixin, PlatformAdapter):
                 ) from e
             raise ConfigurationError(f"Failed to connect to AWS Glue: {e}") from e
 
-    def create_schema(self, schema_name: str | None = None) -> None:
+    def create_schema(self, benchmark, connection: Any) -> float:
         """Create Glue Data Catalog database if it doesn't exist.
 
         Args:
-            schema_name: Database name (uses self.database if not provided).
+            benchmark: Benchmark instance.
+            connection: Active connection metadata; not used by Glue.
         """
-        database = schema_name or self.database
+        start_time = mono_time()
+        database = self.database
         client = self._get_glue_client()
 
         try:
@@ -290,33 +295,36 @@ class AWSGlueAdapter(SparkTuningMixin, PlatformAdapter):
                 )
             else:
                 raise
+        return elapsed_seconds(start_time)
 
     def load_data(
         self,
-        tables: list[str],
-        source_dir: Path | str,
-        file_format: str = "parquet",
-        **kwargs: Any,
-    ) -> dict[str, str]:
+        benchmark,
+        connection: Any,
+        data_dir: Path,
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Upload benchmark data to S3 and create Glue tables.
 
         Args:
-            tables: List of table names to load.
-            source_dir: Local directory containing table data files.
-            file_format: Data file format (default: parquet).
-            **kwargs: Additional options.
+            benchmark: Benchmark instance.
+            connection: Active connection metadata; not used by Glue.
+            data_dir: Local directory containing table data files.
 
         Returns:
-            Dict mapping table names to S3 URIs.
+            Tuple of table row-count placeholders, elapsed seconds, and table URI metadata.
         """
-        source_path = Path(source_dir)
+        start_time = mono_time()
+        source_path = Path(data_dir)
+        tables = _resolve_benchmark_table_names(benchmark)
+        file_format = self.requested_table_format or "parquet"
         if not source_path.exists():
-            raise ConfigurationError(f"Source directory not found: {source_dir}")
+            raise ConfigurationError(f"Source directory not found: {data_dir}")
 
         # Check if tables already exist in S3
         if self._staging and self._staging.tables_exist(tables):
             logger.info("Tables already exist in S3 staging, skipping upload")
-            return {table: self._staging.get_table_uri(table) for table in tables}
+            table_uris = {table: self._staging.get_table_uri(table) for table in tables}
+            return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
         # Upload tables using shared staging infrastructure
         logger.info(f"Uploading {len(tables)} tables to S3")
@@ -333,7 +341,7 @@ class AWSGlueAdapter(SparkTuningMixin, PlatformAdapter):
         for table in tables:
             self._create_catalog_table(table, file_format, uploaded.get(table, ""))
 
-        return uploaded
+        return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": uploaded}
 
     def _create_catalog_table(
         self,
@@ -392,33 +400,55 @@ class AWSGlueAdapter(SparkTuningMixin, PlatformAdapter):
             else:
                 raise
 
-    def execute_query(self, query: str, **kwargs: Any) -> list[dict[str, Any]]:
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
         """Execute SQL query via Glue job.
 
         Args:
+            connection: Active connection metadata; not used by Glue.
             query: SQL query to execute.
-            **kwargs: Additional options.
+            query_id: Query identifier.
 
         Returns:
-            Query results as list of dicts.
+            Standard query result dictionary.
         """
-        # Ensure job exists
-        self._ensure_job_exists()
-
-        # Submit job run
-        run_id = self._submit_job_run(query)
-
-        # Wait for completion
-        status = self._wait_for_job(run_id)
-
-        if status != GlueJobStatus.SUCCEEDED:
-            raise RuntimeError(f"Glue job failed with status: {status}")
-
-        # Retrieve results from S3
-        results = self._retrieve_results(run_id)
-
-        self._query_count += 1
-        return results
+        start_time = mono_time()
+        try:
+            self._ensure_job_exists()
+            run_id = self._submit_job_run(query)
+            status = self._wait_for_job(run_id)
+            if status != GlueJobStatus.SUCCEEDED:
+                raise RuntimeError(f"Glue job failed with status: {status}")
+            results = self._retrieve_results(run_id)
+            elapsed = elapsed_seconds(start_time)
+            self._query_count += 1
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "SUCCESS",
+                "execution_time_seconds": elapsed,
+                "rows_returned": len(results),
+                "results": results,
+                "error": None,
+            }
+        except Exception as e:
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "FAILED",
+                "execution_time_seconds": elapsed_seconds(start_time),
+                "rows_returned": 0,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
 
     def _ensure_job_exists(self) -> str:
         """Ensure Glue job exists for benchmark execution.

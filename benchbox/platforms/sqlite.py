@@ -46,6 +46,11 @@ class SQLiteAdapter(PlatformAdapter):
         """Add SQLite-specific CLI arguments.
 
         Kept minimal for testing; provides database path and basic options.
+
+        NOTE: These flags (``--sqlite-database``, etc.) are legacy and are NOT
+        exposed by ``benchbox run``.  Use ``--platform-option database_path=<path>``
+        instead, which is registered in PlatformHookRegistry and appears in
+        ``benchbox run --help``.
         """
         if not hasattr(parser, "add_argument"):
             return
@@ -123,7 +128,7 @@ class SQLiteAdapter(PlatformAdapter):
 
             raise ConfigurationError(
                 "SQLite requires database path configuration.\n"
-                "Either specify --sqlite-database or provide --benchmark and --scale."
+                "Either pass --platform-option database_path=<path> or provide --benchmark and --scale."
             )
 
         # Extract optional configuration parameters

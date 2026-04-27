@@ -1,6 +1,6 @@
 """Behavior-verifying tests for SQLite adapter using real in-memory connections.
 
-Every test creates a real SQLite connection — no MagicMock on the connection path.
+Every test creates a real SQLite connection - no MagicMock on the connection path.
 """
 
 from __future__ import annotations

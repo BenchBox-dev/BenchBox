@@ -270,8 +270,8 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
         self.logger.debug(f"dbgen_exe path: {dbgen_exe}")
         if dbgen_exe.exists():
             self.log_verbose(f"Using existing dbgen executable: {dbgen_exe}")
-            # Validate the executable is actually executable
-            if not os.access(dbgen_exe, os.X_OK):
+            # Validate the executable is actually executable (X_OK is a no-op on Windows)
+            if os.name != "nt" and not os.access(dbgen_exe, os.X_OK):
                 raise PermissionError(f"dbgen executable at {dbgen_exe} is not executable")
             return dbgen_exe
 

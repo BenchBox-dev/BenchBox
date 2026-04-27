@@ -126,7 +126,7 @@ class TestLintingConsolidation:
         """Test that Makefile targets use ruff commands."""
         makefile_path = Path(__file__).parent.parent.parent / "Makefile"
 
-        with open(makefile_path) as f:
+        with open(makefile_path, encoding="utf-8") as f:
             makefile_content = f.read()
 
         # Lint target should use ruff check
@@ -146,7 +146,7 @@ class TestLintingConsolidation:
         """Test that GitHub Actions workflows use ruff."""
         lint_workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "lint.yml"
 
-        with open(lint_workflow_path) as f:
+        with open(lint_workflow_path, encoding="utf-8") as f:
             workflow_content = f.read()
 
         # Should use ruff commands

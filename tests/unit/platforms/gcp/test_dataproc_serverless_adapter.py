@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -337,13 +338,11 @@ class TestDataprocServerlessAdapterDataLoading:
                 gcs_staging_dir="gs://bucket/data",
             )
 
-            result = adapter.load_data(
-                tables=["lineitem", "orders"],
-                source_dir=source_dir,
-            )
+            mock_benchmark = SimpleNamespace(tables=["lineitem", "orders"])
+            result_dict, _, _ = adapter.load_data(mock_benchmark, None, source_dir)
 
-            assert "lineitem" in result
-            assert "orders" in result
+            assert "lineitem" in result_dict
+            assert "orders" in result_dict
             mock_staging_instance.upload_tables.assert_not_called()
 
 

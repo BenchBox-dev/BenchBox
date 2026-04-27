@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import sys as _sys
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -8,6 +9,15 @@ import pytest
 from click.testing import CliRunner
 
 from benchbox.cli.main import cli
+
+# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
+# same name as the run submodule.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
+# the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.run")
+_run_module = _sys.modules["benchbox.cli.commands.run"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -32,13 +42,14 @@ def test_direct_and_non_interactive_direct_use_shared_execution_and_export_helpe
     runner = CliRunner()
 
     with (
-        patch("benchbox.cli.commands.run.DatabaseManager") as mock_db_mgr,
-        patch("benchbox.cli.commands.run.BenchmarkManager") as mock_bench_mgr,
-        patch("benchbox.cli.commands.run.SystemProfiler") as mock_profiler,
-        patch("benchbox.cli.commands.run.BenchmarkOrchestrator") as mock_orchestrator_cls,
-        patch("benchbox.cli.commands.run._execute_orchestrated_run", return_value=_mock_result()) as mock_execute,
-        patch(
-            "benchbox.cli.commands.run._export_orchestrated_result",
+        patch.object(_run_module, "DatabaseManager") as mock_db_mgr,
+        patch.object(_run_module, "BenchmarkManager") as mock_bench_mgr,
+        patch.object(_run_module, "SystemProfiler") as mock_profiler,
+        patch.object(_run_module, "BenchmarkOrchestrator") as mock_orchestrator_cls,
+        patch.object(_run_module, "_execute_orchestrated_run", return_value=_mock_result()) as mock_execute,
+        patch.object(
+            _run_module,
+            "_export_orchestrated_result",
             return_value={"json": "/tmp/result.json"},
         ) as mock_export,
     ):
@@ -84,13 +95,14 @@ def test_load_only_uses_shared_execution_and_export_helpers() -> None:
     runner = CliRunner()
 
     with (
-        patch("benchbox.cli.commands.run.DatabaseManager") as mock_db_mgr,
-        patch("benchbox.cli.commands.run.BenchmarkManager") as mock_bench_mgr,
-        patch("benchbox.cli.commands.run.SystemProfiler") as mock_profiler,
-        patch("benchbox.cli.commands.run.BenchmarkOrchestrator") as mock_orchestrator_cls,
-        patch("benchbox.cli.commands.run._execute_orchestrated_run", return_value=_mock_result()) as mock_execute,
-        patch(
-            "benchbox.cli.commands.run._export_orchestrated_result",
+        patch.object(_run_module, "DatabaseManager") as mock_db_mgr,
+        patch.object(_run_module, "BenchmarkManager") as mock_bench_mgr,
+        patch.object(_run_module, "SystemProfiler") as mock_profiler,
+        patch.object(_run_module, "BenchmarkOrchestrator") as mock_orchestrator_cls,
+        patch.object(_run_module, "_execute_orchestrated_run", return_value=_mock_result()) as mock_execute,
+        patch.object(
+            _run_module,
+            "_export_orchestrated_result",
             return_value={"json": "/tmp/result.json"},
         ) as mock_export,
     ):

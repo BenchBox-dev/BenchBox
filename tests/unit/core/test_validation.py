@@ -183,7 +183,7 @@ class TestDataValidationEngine:
         }
 
         manifest_path = tmp_path / "_datagen_manifest.json"
-        with open(manifest_path, "w") as f:
+        with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest_data, f)
 
         # Create corresponding data files

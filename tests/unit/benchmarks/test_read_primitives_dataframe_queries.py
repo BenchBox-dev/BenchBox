@@ -86,15 +86,11 @@ class TestSkipLists:
         assert result == SKIP_FOR_DATAFRAME
         assert result is not SKIP_FOR_DATAFRAME
 
-    def test_skip_for_expression_family_contains_only_map_queries(self):
-        """SKIP_FOR_EXPRESSION_FAMILY should only contain map queries (Polars has no Map dtype)."""
+    def test_skip_for_expression_family_is_empty(self):
+        """SKIP_FOR_EXPRESSION_FAMILY is empty - platform-specific skips are in SKIP_FOR_POLARS etc."""
         assert isinstance(SKIP_FOR_EXPRESSION_FAMILY, list)
-        assert len(SKIP_FOR_EXPRESSION_FAMILY) == 3, (
-            f"Should have exactly 3 map queries, got {len(SKIP_FOR_EXPRESSION_FAMILY)}"
-        )
-        expected = {"map_construction", "map_access", "map_keys_values"}
-        assert set(SKIP_FOR_EXPRESSION_FAMILY) == expected, (
-            f"Expected only map queries: {expected}, got: {set(SKIP_FOR_EXPRESSION_FAMILY)}"
+        assert len(SKIP_FOR_EXPRESSION_FAMILY) == 0, (
+            f"SKIP_FOR_EXPRESSION_FAMILY should be empty, got {SKIP_FOR_EXPRESSION_FAMILY}"
         )
 
     def test_skip_for_expression_family_all_in_registry(self):
@@ -161,11 +157,11 @@ class TestBenchmarkIntegration:
         assert hasattr(benchmark, "get_expression_family_skip_queries")
 
     def test_benchmark_get_expression_family_skip_queries_returns_list(self):
-        """Benchmark.get_expression_family_skip_queries should return map-only skip list."""
+        """Benchmark.get_expression_family_skip_queries should return empty list."""
         benchmark = ReadPrimitivesBenchmark(scale_factor=0.01)
         skip_list = benchmark.get_expression_family_skip_queries()
         assert isinstance(skip_list, list)
-        assert len(skip_list) == 3  # Only map queries
+        assert len(skip_list) == 0  # Platform-specific skips moved to SKIP_FOR_POLARS etc.
 
     def test_benchmark_get_expression_family_skip_queries_matches_constant(self):
         """Benchmark method should return same queries as the module constant."""

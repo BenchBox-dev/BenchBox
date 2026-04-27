@@ -147,7 +147,7 @@ class TestAMPLabDataFrameQueriesExecution:
         ]
 
     def test_q1_pandas(self, ctx):
-        """AMPLab Q1 pandas — use pandas DataFrames via a simple context."""
+        """AMPLab Q1 pandas - use pandas DataFrames via a simple context."""
         import pandas as pd
 
         from benchbox.core.amplab.dataframe_queries.queries import q1_pandas_impl

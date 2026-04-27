@@ -131,7 +131,7 @@ Running TPC-H on a tool optimized for TPC-C (or vice versa) produces misleading 
   - Polars, Pandas, PySpark DataFrame, DataFusion, Modin, Dask, cuDF (GPU)
   - Native DataFrame API translations (not SQL-over-DataFrame)
   - Side-by-side SQL vs DataFrame comparisons on the same data
-- You need **benchmark variety** (18 benchmarks, TPC standards + industry)
+- You need **benchmark variety** (22 benchmarks, TPC standards + industry + real-world + time-series + AI/ML)
 - Your team prefers **Python tooling**
 - Evaluating the **full OLAP platform spectrum** in one framework
 

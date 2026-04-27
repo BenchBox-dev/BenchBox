@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from benchbox.platforms.base.spark_logging import suppress_window_exec_warning
 from benchbox.utils.dependencies import get_package_install_message
 
 try:
@@ -429,6 +430,13 @@ class SparkSessionManager:
         spark_log_level = "WARN" if config.verbose else "ERROR"
         session.sparkContext.setLogLevel(spark_log_level)
 
+        # Suppress WindowExec "No Partition Defined for Window operation" warnings.
+        # Standard TPC-DS queries (Q44, Q49) use OVER (ORDER BY ...) without
+        # PARTITION BY - per-spec, not fixable. The warning floods output (~100+
+        # lines per run) and is not actionable.  Must be set *after* setLogLevel()
+        # because setLogLevel resets all log4j2 loggers.
+        suppress_window_exec_warning(session)
+
         logger.info("SparkSession created with master=%s app=%s", config.master, config.app_name)
         return session
 
@@ -485,6 +493,8 @@ __all__ = [
     "get_effective_java_home",
     # Session management
     "SparkSessionManager",
+    # Logging utilities (re-exported from base.spark_logging)
+    "suppress_window_exec_warning",
     # Exceptions
     "SparkSessionError",
     "SparkUnavailableError",

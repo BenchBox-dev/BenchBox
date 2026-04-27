@@ -74,6 +74,7 @@ class PlatformCapability:
     default_deployment: str = "local"
     platform_family: Optional[str] = None
     inherits_from: Optional[str] = None
+    unsupported_benchmarks: dict[str, str] = field(default_factory=dict)
 
 
 class PlatformRegistry:
@@ -293,6 +294,46 @@ class PlatformRegistry:
                     },
                 },
             },
+            "clickhouse-local": {
+                "display_name": "ClickHouse Local (chDB)",
+                "description": "Embedded ClickHouse via chDB • In-process • Zero network",
+                "category": "analytical",
+                "libraries": [
+                    {"name": "chdb", "required": True, "import_name": "chdb"},
+                ],
+                "requirements": ["chdb>=0.10.0"],
+                "installation_command": "uv add benchbox --extra clickhouse-local",
+                "adoption": "established",
+                "supports": ["olap", "columnar", "embedded", "in-process"],
+                "driver_package": "chdb",
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "platform_family": "clickhouse",
+                    "inherits_from": "clickhouse",
+                },
+            },
+            "clickhouse-server": {
+                "display_name": "ClickHouse Server",
+                "description": "Self-hosted ClickHouse • Docker/dedicated • High-performance columnar",
+                "category": "analytical",
+                "libraries": [
+                    {"name": "clickhouse_driver", "required": True, "import_name": "clickhouse_driver"},
+                ],
+                "requirements": ["clickhouse-driver>=0.2.0"],
+                "installation_command": "uv add benchbox --extra clickhouse-server",
+                "adoption": "established",
+                "supports": ["olap", "columnar", "distributed", "self-hosted"],
+                "driver_package": "clickhouse-driver",
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "platform_family": "clickhouse",
+                    "inherits_from": "clickhouse",
+                },
+            },
             "clickhouse-cloud": {
                 "display_name": "ClickHouse Cloud",
                 "description": "Managed ClickHouse • Serverless/dedicated • Cloud analytics",
@@ -300,8 +341,8 @@ class PlatformRegistry:
                 "libraries": [
                     {"name": "clickhouse_connect", "required": True, "import_name": "clickhouse_connect"},
                 ],
-                "requirements": ["clickhouse-connect>=0.6.0"],
-                "installation_command": "uv add clickhouse-connect",
+                "requirements": ["clickhouse-connect>=0.10.0"],
+                "installation_command": "uv add benchbox --extra clickhouse-cloud",
                 "adoption": "emerging",
                 "supports": ["olap", "columnar", "distributed", "serverless", "cloud"],
                 "driver_package": "clickhouse-connect",
@@ -478,12 +519,12 @@ class PlatformRegistry:
                 "display_name": "PostgreSQL",
                 "description": "Relational database • COPY loading",
                 "category": "relational",
-                "libraries": [{"name": "psycopg2", "required": True}],
-                "requirements": ["psycopg2-binary>=2.9.0"],
-                "installation_command": "uv add psycopg2-binary",
+                "libraries": [{"name": "psycopg", "required": True}],
+                "requirements": ["psycopg[binary]>=3.1"],
+                "installation_command": "uv add 'psycopg[binary]'",
                 "adoption": "established",
                 "supports": ["olap", "oltp", "relational"],
-                "driver_package": "psycopg2-binary",
+                "driver_package": "psycopg",
                 "notes": "Supports PostgreSQL 12+. COPY-based bulk loading. For time-series workloads use timescaledb.",
                 "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
             },
@@ -491,12 +532,12 @@ class PlatformRegistry:
                 "display_name": "TimescaleDB",
                 "description": "Time-series database • Hypertables • Compression",
                 "category": "timeseries",
-                "libraries": [{"name": "psycopg2", "required": True}],
-                "requirements": ["psycopg2-binary>=2.9.0"],
-                "installation_command": "uv add psycopg2-binary",
+                "libraries": [{"name": "psycopg", "required": True}],
+                "requirements": ["psycopg[binary]>=3.1"],
+                "installation_command": "uv add 'psycopg[binary]'",
                 "adoption": "niche",
                 "supports": ["timeseries", "olap", "compression"],
-                "driver_package": "psycopg2-binary",
+                "driver_package": "psycopg",
                 "notes": "PostgreSQL extension for time-series. Automatic hypertables, compression policies. Requires TimescaleDB 2.x on server.",
                 "capabilities": {
                     "supports_sql": True,
@@ -513,7 +554,7 @@ class PlatformRegistry:
                             "requires_cloud_storage": False,
                             "requires_network": True,
                             "default_for_platform": True,
-                            "dependencies": ["psycopg2-binary"],
+                            "dependencies": ["psycopg[binary]"],
                             "auth_methods": ["password"],
                         },
                         "cloud": {
@@ -524,7 +565,7 @@ class PlatformRegistry:
                             "requires_cloud_storage": False,
                             "requires_network": True,
                             "default_for_platform": False,
-                            "dependencies": ["psycopg2-binary"],
+                            "dependencies": ["psycopg[binary]"],
                             "auth_methods": ["password"],
                         },
                     },
@@ -534,12 +575,12 @@ class PlatformRegistry:
                 "display_name": "pg_mooncake",
                 "description": "Columnstore PostgreSQL • Parquet/Iceberg • DuckDB Execution",
                 "category": "olap",
-                "libraries": [{"name": "psycopg2", "required": True}],
-                "requirements": ["psycopg2-binary>=2.9.0"],
-                "installation_command": "uv add psycopg2-binary",
+                "libraries": [{"name": "psycopg", "required": True}],
+                "requirements": ["psycopg[binary]>=3.1"],
+                "installation_command": "uv add 'psycopg[binary]'",
                 "adoption": "emerging",
                 "supports": ["olap", "columnstore", "analytics"],
-                "driver_package": "psycopg2-binary",
+                "driver_package": "psycopg",
                 "notes": "PostgreSQL extension adding native columnstore tables (Parquet/Iceberg) with DuckDB execution. Requires pg_mooncake on server. Conflicts with standalone pg_duckdb (shared libduckdb.so).",
                 "capabilities": {
                     "supports_sql": True,
@@ -557,7 +598,39 @@ class PlatformRegistry:
                             "requires_cloud_storage": False,
                             "requires_network": True,
                             "default_for_platform": True,
-                            "dependencies": ["psycopg2-binary"],
+                            "dependencies": ["psycopg[binary]"],
+                            "auth_methods": ["password"],
+                        },
+                    },
+                },
+            },
+            "cedardb": {
+                "display_name": "CedarDB",
+                "description": "High-performance OLAP/OLTP • PostgreSQL-compatible • Formerly Umbra",
+                "category": "olap",
+                "libraries": [{"name": "psycopg", "required": True}],
+                "requirements": ["psycopg[binary]>=3.1"],
+                "installation_command": "uv add 'psycopg[binary]'",
+                "adoption": "emerging",
+                "supports": ["olap", "oltp", "relational"],
+                "driver_package": "psycopg",
+                "notes": "CedarDB (formerly Umbra) is a standalone RDBMS with PostgreSQL wire protocol compatibility. Not a PostgreSQL extension - connects via standard psycopg3 (psycopg) drivers.",
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "platform_family": "cedardb",
+                    "default_deployment": "self-hosted",
+                    "deployment_modes": {
+                        "self-hosted": {
+                            "mode": "self-hosted",
+                            "display_name": "CedarDB Self-Hosted",
+                            "description": "Self-hosted CedarDB server",
+                            "requires_credentials": True,
+                            "requires_cloud_storage": False,
+                            "requires_network": True,
+                            "default_for_platform": True,
+                            "dependencies": ["psycopg[binary]"],
                             "auth_methods": ["password"],
                         },
                     },
@@ -567,12 +640,12 @@ class PlatformRegistry:
                 "display_name": "pg_duckdb",
                 "description": "DuckDB-accelerated PostgreSQL • Vectorized OLAP • MotherDuck",
                 "category": "olap",
-                "libraries": [{"name": "psycopg2", "required": True}],
-                "requirements": ["psycopg2-binary>=2.9.0"],
-                "installation_command": "uv add psycopg2-binary",
+                "libraries": [{"name": "psycopg", "required": True}],
+                "requirements": ["psycopg[binary]>=3.1"],
+                "installation_command": "uv add 'psycopg[binary]'",
                 "adoption": "emerging",
                 "supports": ["olap", "analytics"],
-                "driver_package": "psycopg2-binary",
+                "driver_package": "psycopg",
                 "notes": "PostgreSQL extension embedding DuckDB vectorized execution. Requires pg_duckdb 1.0+ on server. Conflicts with pg_mooncake (shared libduckdb.so).",
                 "capabilities": {
                     "supports_sql": True,
@@ -590,7 +663,7 @@ class PlatformRegistry:
                             "requires_cloud_storage": False,
                             "requires_network": True,
                             "default_for_platform": True,
-                            "dependencies": ["psycopg2-binary"],
+                            "dependencies": ["psycopg[binary]"],
                             "auth_methods": ["password"],
                         },
                         "motherduck": {
@@ -601,7 +674,7 @@ class PlatformRegistry:
                             "requires_cloud_storage": False,
                             "requires_network": True,
                             "default_for_platform": False,
-                            "dependencies": ["psycopg2-binary"],
+                            "dependencies": ["psycopg[binary]"],
                             "auth_methods": ["token"],
                         },
                     },
@@ -800,6 +873,49 @@ class PlatformRegistry:
                     },
                 },
             },
+            "singlestore": {
+                "display_name": "SingleStore",
+                "description": "Distributed SQL • Real-time analytics • MySQL protocol",
+                "category": "distributed",
+                "libraries": [{"name": "singlestoredb", "required": True, "import_name": "singlestoredb"}],
+                "requirements": ["singlestoredb>=1.0.0"],
+                "installation_command": "uv add singlestoredb",
+                "adoption": "emerging",
+                "supports": ["olap", "htap", "distributed", "columnstore", "real-time", "mysql-compatible"],
+                "driver_package": "singlestoredb",
+                "notes": "SingleStore 8.0+ with columnstore analytics. MySQL wire protocol on port 3306. SQLGlot 'mysql' dialect. Supports both Helios (cloud) and self-managed deployments.",
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "platform_family": "singlestore",
+                    "default_deployment": "self-hosted",
+                    "deployment_modes": {
+                        "self-hosted": {
+                            "mode": "self-hosted",
+                            "display_name": "SingleStore Self-Managed",
+                            "description": "Self-managed SingleStore cluster",
+                            "requires_credentials": True,
+                            "requires_cloud_storage": False,
+                            "requires_network": True,
+                            "default_for_platform": True,
+                            "dependencies": ["singlestoredb"],
+                            "auth_methods": ["password"],
+                        },
+                        "cloud": {
+                            "mode": "managed",
+                            "display_name": "SingleStore Helios",
+                            "description": "SingleStore Helios managed cloud service",
+                            "requires_credentials": True,
+                            "requires_cloud_storage": False,
+                            "requires_network": True,
+                            "default_for_platform": False,
+                            "dependencies": ["singlestoredb"],
+                            "auth_methods": ["password"],
+                        },
+                    },
+                },
+            },
             "influxdb": {
                 "display_name": "InfluxDB",
                 "description": "Time series database • FlightSQL • Arrow-native",
@@ -820,12 +936,12 @@ class PlatformRegistry:
                 "display_name": "QuestDB",
                 "description": "Time-series database • PG wire protocol • High-performance ingestion",
                 "category": "timeseries",
-                "libraries": [{"name": "psycopg2", "required": True}, {"name": "requests", "required": True}],
-                "requirements": ["psycopg2-binary>=2.9.0", "requests>=2.28.0"],
+                "libraries": [{"name": "psycopg", "required": True}, {"name": "requests", "required": True}],
+                "requirements": ["psycopg[binary]>=3.1", "requests>=2.28.0"],
                 "installation_command": "uv add benchbox --extra questdb",
                 "adoption": "emerging",
                 "supports": ["timeseries", "olap", "columnar", "high_throughput"],
-                "driver_package": "psycopg2-binary",
+                "driver_package": "psycopg",
                 "notes": "QuestDB 7.0+ time-series database. PostgreSQL wire protocol for queries, REST API for data import. Optimized for fast ingestion and time-series analytics.",
                 "capabilities": {
                     "supports_sql": True,
@@ -842,9 +958,16 @@ class PlatformRegistry:
                             "requires_cloud_storage": False,
                             "requires_network": True,
                             "default_for_platform": True,
-                            "dependencies": ["psycopg2-binary"],
+                            "dependencies": ["psycopg[binary]"],
                             "auth_methods": ["password"],
                         },
+                    },
+                    "unsupported_benchmarks": {
+                        "vector_search": (
+                            "QuestDB 9.3.4 has no VECTOR column type. "
+                            "Schema creation fails immediately. "
+                            "No fix planned: requires QuestDB to add native vector support."
+                        ),
                     },
                 },
             },
@@ -1005,6 +1128,56 @@ class PlatformRegistry:
                 "driver_package": "pyspark",
                 "notes": "Apache Spark distributed SQL engine. Supports local, standalone, YARN, and Kubernetes modes. Use 'pyspark' for DataFrame API benchmarking.",
                 "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+            },
+            "velox": {
+                "display_name": "Apache Gluten + Velox",
+                "description": "Spark SQL • Native C++ acceleration • Gluten plugin",
+                "category": "distributed",
+                "libraries": [
+                    {"name": "pyspark", "required": True},
+                ],
+                "requirements": ["pyspark>=3.5.0"],
+                "installation_command": "uv add benchbox --extra velox",
+                "adoption": "emerging",
+                "supports": ["olap", "distributed", "spark", "native", "accelerated", "batch"],
+                "driver_package": "pyspark",
+                "notes": (
+                    "Apache Gluten + Velox accelerates Spark SQL by offloading physical operators "
+                    "to a vectorized C++ engine. Requires the Gluten bundle jar on the execution host. "
+                    "Linux only for local mode; Docker is the primary path on macOS/Windows. "
+                    "See docs/platforms/velox.md and docker/velox/."
+                ),
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "platform_family": "spark",
+                    "default_deployment": "local",
+                    "deployment_modes": {
+                        "local": {
+                            "mode": "local",
+                            "display_name": "Velox Local",
+                            "description": "SparkSession with Gluten jar on local Linux host (or Docker container)",
+                            "requires_credentials": False,
+                            "requires_cloud_storage": False,
+                            "requires_network": False,
+                            "default_for_platform": True,
+                            "dependencies": ["pyspark"],
+                            "auth_methods": [],
+                        },
+                        "remote": {
+                            "mode": "remote",
+                            "display_name": "Velox Remote",
+                            "description": "Connect to a pre-started Spark-Connect server with Gluten wired",
+                            "requires_credentials": False,
+                            "requires_cloud_storage": False,
+                            "requires_network": True,
+                            "default_for_platform": False,
+                            "dependencies": ["pyspark"],
+                            "auth_methods": [],
+                        },
+                    },
+                },
             },
             "lakesail": {
                 "display_name": "LakeSail Sail",
@@ -1458,7 +1631,10 @@ class PlatformRegistry:
         requirements_map = {
             "duckdb": "uv add duckdb",
             "databricks": "uv add databricks-sql-connector",
-            "clickhouse": "uv add clickhouse-driver chdb",
+            "clickhouse": "uv add benchbox --extra clickhouse",
+            "clickhouse-local": "uv add benchbox --extra clickhouse-local",
+            "clickhouse-server": "uv add benchbox --extra clickhouse-server",
+            "clickhouse-cloud": "uv add benchbox --extra clickhouse-cloud",
             "sqlite": "Built-in (no additional requirements)",
             "bigquery": "uv add google-cloud-bigquery",
             "redshift": "uv add redshift-connector",
@@ -1627,6 +1803,24 @@ class PlatformRegistry:
                 auth_methods=mode_spec.get("auth_methods", []),
             )
 
+        # unsupported_benchmarks is computed from registry benchmark_gate rules;
+        # the hardcoded dict in metadata is the legacy source and is ignored post-w16.
+        import benchbox.sql_compat.rules.benchmark_gate.questdb_gate  # noqa: F401
+        from benchbox.sql_compat.actions import CompatAction
+        from benchbox.sql_compat.context import Phase
+        from benchbox.sql_compat.registry import REGISTRY
+
+        unsupported: dict[str, str] = {}
+        for (phase, platform, benchmark, _query_id), entry in REGISTRY.all_rules():
+            if (
+                phase is Phase.BENCHMARK_GATE
+                and platform == canonical_name
+                and benchmark is not None
+                and entry.decision.action is CompatAction.BLOCK_BENCHMARK
+            ):
+                reason = getattr(entry.decision.payload, "reason", None) or entry.decision.reason or ""
+                unsupported[benchmark] = reason
+
         return PlatformCapability(
             supports_sql=caps.get("supports_sql", False),
             supports_dataframe=caps.get("supports_dataframe", False),
@@ -1635,6 +1829,7 @@ class PlatformRegistry:
             default_deployment=caps.get("default_deployment", "local"),
             platform_family=caps.get("platform_family"),
             inherits_from=caps.get("inherits_from"),
+            unsupported_benchmarks=unsupported,
         )
 
     @classmethod
@@ -1845,6 +2040,73 @@ class PlatformRegistry:
         return deployment_mode in caps.deployment_modes
 
 
+# (name, module_path, class_name) - each entry becomes one optional import+register.
+# pg-mooncake historically co-registered questdb in the same try/except; that
+# coupling is now explicit (two separate entries).
+_OPTIONAL_ADAPTERS: tuple[tuple[str, str, str], ...] = (
+    ("duckdb", "benchbox.platforms.duckdb", "DuckDBAdapter"),
+    ("motherduck", "benchbox.platforms.motherduck", "MotherDuckAdapter"),
+    ("datafusion", "benchbox.platforms.datafusion", "DataFusionAdapter"),
+    ("databricks", "benchbox.platforms.databricks", "DatabricksAdapter"),
+    ("databricks-df", "benchbox.platforms.databricks", "DatabricksDataFrameAdapter"),
+    ("clickhouse", "benchbox.platforms.clickhouse", "ClickHouseAdapter"),
+    ("clickhouse-local", "benchbox.platforms.clickhouse_local", "ClickHouseLocalAdapter"),
+    ("clickhouse-server", "benchbox.platforms.clickhouse_server", "ClickHouseServerAdapter"),
+    ("clickhouse-cloud", "benchbox.platforms.clickhouse_cloud", "ClickHouseCloudAdapter"),
+    ("starrocks", "benchbox.platforms.starrocks", "StarRocksAdapter"),
+    ("sqlite", "benchbox.platforms.sqlite", "SQLiteAdapter"),
+    ("bigquery", "benchbox.platforms.bigquery", "BigQueryAdapter"),
+    ("redshift", "benchbox.platforms.redshift", "RedshiftAdapter"),
+    ("snowflake", "benchbox.platforms.snowflake", "SnowflakeAdapter"),
+    ("trino", "benchbox.platforms.trino", "TrinoAdapter"),
+    ("starburst", "benchbox.platforms.starburst", "StarburstAdapter"),
+    ("presto", "benchbox.platforms.presto", "PrestoAdapter"),
+    ("postgresql", "benchbox.platforms.postgresql", "PostgreSQLAdapter"),
+    ("timescaledb", "benchbox.platforms.timescaledb", "TimescaleDBAdapter"),
+    ("pg-duckdb", "benchbox.platforms.pg_duckdb", "PgDuckDBAdapter"),
+    ("pg-mooncake", "benchbox.platforms.pg_mooncake", "PgMooncakeAdapter"),
+    ("questdb", "benchbox.platforms.questdb", "QuestDBAdapter"),
+    ("cedardb", "benchbox.platforms.cedardb", "CedarDBAdapter"),
+    ("synapse", "benchbox.platforms.azure_synapse", "AzureSynapseAdapter"),
+    ("pyspark", "benchbox.platforms.pyspark", "PySparkSQLAdapter"),
+    ("firebolt", "benchbox.platforms.firebolt", "FireboltAdapter"),
+    ("databend", "benchbox.platforms.databend", "DatabendAdapter"),
+    ("doris", "benchbox.platforms.doris", "DorisAdapter"),
+    ("singlestore", "benchbox.platforms.singlestore", "SingleStoreAdapter"),
+    ("influxdb", "benchbox.platforms.influxdb", "InfluxDBAdapter"),
+    ("fabric_dw", "benchbox.platforms.fabric_warehouse", "FabricWarehouseAdapter"),
+    ("athena", "benchbox.platforms.athena", "AthenaAdapter"),
+    ("glue", "benchbox.platforms.aws", "AWSGlueAdapter"),
+    ("emr-serverless", "benchbox.platforms.aws", "EMRServerlessAdapter"),
+    ("athena-spark", "benchbox.platforms.aws", "AthenaSparkAdapter"),
+    ("dataproc", "benchbox.platforms.gcp", "DataprocAdapter"),
+    ("dataproc-serverless", "benchbox.platforms.gcp", "DataprocServerlessAdapter"),
+    ("fabric-spark", "benchbox.platforms.azure", "FabricSparkAdapter"),
+    ("fabric-lakehouse", "benchbox.platforms.fabric_lakehouse", "FabricLakehouseAdapter"),
+    ("synapse-spark", "benchbox.platforms.azure", "SynapseSparkAdapter"),
+    ("spark", "benchbox.platforms.spark", "SparkAdapter"),
+    ("lakesail", "benchbox.platforms.lakesail", "LakeSailAdapter"),
+    ("velox", "benchbox.platforms.velox", "VeloxAdapter"),
+    ("polars", "benchbox.platforms.polars_platform", "PolarsAdapter"),
+    ("snowpark-connect", "benchbox.platforms.snowpark_connect", "SnowparkConnectAdapter"),
+    ("quanton", "benchbox.platforms.onehouse", "QuantonAdapter"),
+)
+
+
+def _try_register_adapter(name: str, module_path: str, class_name: str) -> None:
+    """Import ``class_name`` from ``module_path`` and register as ``name``.
+
+    Missing optional dependencies are silently skipped - adapters whose driver
+    packages aren't installed simply don't appear in the registry.
+    """
+    try:
+        module = importlib.import_module(module_path)
+        adapter_cls = getattr(module, class_name)
+        PlatformRegistry.register_adapter(name, adapter_cls)
+    except ImportError:
+        pass
+
+
 def auto_register_platforms() -> None:
     """Automatically register all available platform adapters.
 
@@ -1852,289 +2114,8 @@ def auto_register_platforms() -> None:
     The BENCHBOX_ENABLE_EXPERIMENTAL environment variable is reserved for future
     truly-experimental features but is not currently used.
     """
-    # Import and register platform adapters
-    try:
-        from benchbox.platforms.duckdb import DuckDBAdapter
-
-        PlatformRegistry.register_adapter("duckdb", DuckDBAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.motherduck import MotherDuckAdapter
-
-        PlatformRegistry.register_adapter("motherduck", MotherDuckAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.datafusion import DataFusionAdapter
-
-        PlatformRegistry.register_adapter("datafusion", DataFusionAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.databricks import DatabricksAdapter
-
-        PlatformRegistry.register_adapter("databricks", DatabricksAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.databricks import DatabricksDataFrameAdapter
-
-        PlatformRegistry.register_adapter("databricks-df", DatabricksDataFrameAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.clickhouse import ClickHouseAdapter
-
-        PlatformRegistry.register_adapter("clickhouse", ClickHouseAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.clickhouse_cloud import ClickHouseCloudAdapter
-
-        PlatformRegistry.register_adapter("clickhouse-cloud", ClickHouseCloudAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.starrocks import StarRocksAdapter
-
-        PlatformRegistry.register_adapter("starrocks", StarRocksAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.sqlite import SQLiteAdapter
-
-        PlatformRegistry.register_adapter("sqlite", SQLiteAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.bigquery import BigQueryAdapter
-
-        PlatformRegistry.register_adapter("bigquery", BigQueryAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.redshift import RedshiftAdapter
-
-        PlatformRegistry.register_adapter("redshift", RedshiftAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.snowflake import SnowflakeAdapter
-
-        PlatformRegistry.register_adapter("snowflake", SnowflakeAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.trino import TrinoAdapter
-
-        PlatformRegistry.register_adapter("trino", TrinoAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.starburst import StarburstAdapter
-
-        PlatformRegistry.register_adapter("starburst", StarburstAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.presto import PrestoAdapter
-
-        PlatformRegistry.register_adapter("presto", PrestoAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.postgresql import PostgreSQLAdapter
-
-        PlatformRegistry.register_adapter("postgresql", PostgreSQLAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.timescaledb import TimescaleDBAdapter
-
-        PlatformRegistry.register_adapter("timescaledb", TimescaleDBAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.pg_duckdb import PgDuckDBAdapter
-
-        PlatformRegistry.register_adapter("pg-duckdb", PgDuckDBAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.pg_mooncake import PgMooncakeAdapter
-
-        PlatformRegistry.register_adapter("pg-mooncake", PgMooncakeAdapter)
-        from benchbox.platforms.questdb import QuestDBAdapter
-
-        PlatformRegistry.register_adapter("questdb", QuestDBAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.azure_synapse import AzureSynapseAdapter
-
-        PlatformRegistry.register_adapter("synapse", AzureSynapseAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.pyspark import PySparkSQLAdapter
-
-        PlatformRegistry.register_adapter("pyspark", PySparkSQLAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.firebolt import FireboltAdapter
-
-        PlatformRegistry.register_adapter("firebolt", FireboltAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.databend import DatabendAdapter
-
-        PlatformRegistry.register_adapter("databend", DatabendAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.doris import DorisAdapter
-
-        PlatformRegistry.register_adapter("doris", DorisAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.influxdb import InfluxDBAdapter
-
-        PlatformRegistry.register_adapter("influxdb", InfluxDBAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.fabric_warehouse import FabricWarehouseAdapter
-
-        PlatformRegistry.register_adapter("fabric_dw", FabricWarehouseAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.athena import AthenaAdapter
-
-        PlatformRegistry.register_adapter("athena", AthenaAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.aws import AWSGlueAdapter
-
-        PlatformRegistry.register_adapter("glue", AWSGlueAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.aws import EMRServerlessAdapter
-
-        PlatformRegistry.register_adapter("emr-serverless", EMRServerlessAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.aws import AthenaSparkAdapter
-
-        PlatformRegistry.register_adapter("athena-spark", AthenaSparkAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.gcp import DataprocAdapter
-
-        PlatformRegistry.register_adapter("dataproc", DataprocAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.gcp import DataprocServerlessAdapter
-
-        PlatformRegistry.register_adapter("dataproc-serverless", DataprocServerlessAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.azure import FabricSparkAdapter
-
-        PlatformRegistry.register_adapter("fabric-spark", FabricSparkAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.fabric_lakehouse import FabricLakehouseAdapter
-
-        PlatformRegistry.register_adapter("fabric-lakehouse", FabricLakehouseAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.azure import SynapseSparkAdapter
-
-        PlatformRegistry.register_adapter("synapse-spark", SynapseSparkAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.spark import SparkAdapter
-
-        PlatformRegistry.register_adapter("spark", SparkAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.lakesail import LakeSailAdapter
-
-        PlatformRegistry.register_adapter("lakesail", LakeSailAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.polars_platform import PolarsAdapter
-
-        PlatformRegistry.register_adapter("polars", PolarsAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
-
-        PlatformRegistry.register_adapter("snowpark-connect", SnowparkConnectAdapter)
-    except ImportError:
-        pass
-
-    try:
-        from benchbox.platforms.onehouse import QuantonAdapter
-
-        PlatformRegistry.register_adapter("quanton", QuantonAdapter)
-    except ImportError:
-        pass
+    for name, module_path, class_name in _OPTIONAL_ADAPTERS:
+        _try_register_adapter(name, module_path, class_name)
 
 
 # NOTE: auto_register_platforms() is no longer called at module level.

@@ -273,7 +273,7 @@ class TestDisplayInteractivePreview:
     def _create_mock_database_config(self, platform_type="duckdb", execution_mode="sql"):
         """Create a mock database config for testing."""
 
-        class MockDatabaseConfig:
+        class MockDatabaseConfig:  # noqa: B903 - test stub, not domain model
             def __init__(self):
                 self.type = platform_type
                 self.execution_mode = execution_mode
@@ -799,6 +799,29 @@ class TestPromptPhases:
         monkeypatch.setattr("benchbox.cli.benchmarks.Prompt.ask", lambda *_args, **_kwargs: next(response_iter))
         assert prompt_phases() == expected
 
+    def test_phases_out_of_range_input_explains_and_points_to_query_step(self, monkeypatch):
+        """Out-of-range input (e.g. '37') must show typed value and point user to the query step."""
+        rendered_lines: list[str] = []
+        monkeypatch.setattr(
+            "benchbox.cli.benchmarks.console.print",
+            lambda *args, **_kwargs: rendered_lines.append(str(args[0]) if args else ""),
+        )
+        # First answer "6" to enter custom mode, then "37" (intending Query 37)
+        response_iter = iter(["6", "37"])
+        monkeypatch.setattr("benchbox.cli.benchmarks.Prompt.ask", lambda *_args, **_kwargs: next(response_iter))
+
+        result = prompt_phases()
+
+        assert result == ["power"]
+        joined = "\n".join(rendered_lines)
+        # Up-front guidance distinguishing phase numbers from query numbers
+        assert "not query numbers" in joined
+        assert "power or standard" in joined.lower()
+        # Fallback echoes the typed input
+        assert "'37'" in joined
+        # Fallback points the user to the query step
+        assert "query selection" in joined.lower()
+
 
 class TestPromptTableMode:
     """Tests for prompt_table_mode function."""
@@ -1289,7 +1312,7 @@ class TestPromptTableFormat:
         mock_prompt.side_effect = ["5", "1"]  # Iceberg + zstd
         fmt, compression = prompt_table_format("snowflake")
 
-        # Format must be a plain name without colon — runner validates against {"parquet", "vortex", "delta", "iceberg"}
+        # Format must be a plain name without colon - runner validates against {"parquet", "vortex", "delta", "iceberg"}
         assert fmt == "iceberg"
         assert ":" not in fmt
         assert compression == "zstd"

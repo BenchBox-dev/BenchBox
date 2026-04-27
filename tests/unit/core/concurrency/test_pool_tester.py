@@ -334,3 +334,32 @@ class TestConnectionPoolTesterEdgeCases:
         result = tester.test_pool_limits()
 
         assert result.total_attempts > 0
+
+
+class TestAcquireErrorCapture:
+    """`_acquire_connection` must always capture a non-empty error string."""
+
+    def test_non_empty_exception_message_captured(self):
+        def factory():
+            raise RuntimeError("pool exhausted")
+
+        tester = ConnectionPoolTester(PoolTestConfig(connection_factory=factory))
+        attempt = tester._acquire_connection(1)
+
+        assert attempt.success is False
+        assert attempt.error == "pool exhausted"
+
+    def test_empty_exception_message_falls_back_to_repr(self):
+        class EmptyError(Exception):
+            def __str__(self) -> str:
+                return ""
+
+        def factory():
+            raise EmptyError()
+
+        tester = ConnectionPoolTester(PoolTestConfig(connection_factory=factory))
+        attempt = tester._acquire_connection(2)
+
+        assert attempt.success is False
+        assert attempt.error, "attempt.error must never be empty"
+        assert "EmptyError" in attempt.error

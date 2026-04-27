@@ -43,7 +43,9 @@ When working with experimental benchmarks, keep these considerations in mind:
    Schemas, queries, and methodologies may evolve. Pin to specific BenchBox versions for reproducible results.
 
 **Validate relevance**
-   Check whether the benchmark's assumptions match your use case. An AI primitives benchmark designed for embedding retrieval may not apply to your vector search workload.
+   Check whether the benchmark's assumptions match your use case. A skew or
+   optimizer-stress benchmark may not tell you much about production dashboard
+   workloads.
 
 **Contribute feedback**
    Experimental benchmarks improve through usage. Report issues, suggest improvements, and share results to help refine them.
@@ -62,26 +64,17 @@ Experimental Benchmarks in BenchBox
      - Focus
      - Status
    * - **TPC-HAVOC**
-     - Chaos testing, failure injection, recovery performance
+     - Optimizer stress testing with 220 TPC-H syntax variants
      - Research prototype
    * - **TPC-H Skew**
      - Data skew effects on query performance
      - Methodology validation
+   * - **TPC-DS-OBT**
+     - TPC-DS on a single denormalized "One Big Table" schema
+     - Active development
    * - **Data Vault**
      - Data Vault 2.0 modeling patterns
      - Schema finalization
-   * - **AI Primitives**
-     - Vector operations, embedding queries, ML serving
-     - Active development
-   * - **Metadata Primitives**
-     - Schema operations, catalog queries, lineage
-     - Early stage
-   * - **NYC Taxi**
-     - Real-world transportation analytics
-     - Stable, may graduate
-   * - **TSBS DevOps**
-     - Time-series database benchmark (monitoring workload)
-     - Adaptation in progress
 
 Graduation Criteria
 ~~~~~~~~~~~~~~~~~~~
@@ -101,15 +94,14 @@ Included Benchmarks
 
    tpc-havoc
    tpch-skew
+   tpc-ds-obt
    datavault
-   ai-primitives
-   metadata-primitives
-   nyctaxi
-   tsbs-devops
 
 See Also
 --------
 
-- :doc:`benchbox-primitives` - Stable BenchBox-created benchmarks
+- :doc:`benchbox-primitives` - Stable BenchBox-created benchmarks (Read/Write/Transaction/Metadata/AI)
+- :doc:`real-world-benchmarks` - Public-dataset benchmarks (NYC Taxi, Flight Data)
+- :doc:`time-series-benchmarks` - Time-series workloads (TSBS DevOps)
+- :doc:`ai-ml-benchmarks` - AI/ML workloads (Vector Search)
 - :doc:`academic-benchmarks` - Research benchmarks with established methodology
-- `Time Series Benchmark Suite <https://github.com/timescale/tsbs>`_ - Original TSBS project

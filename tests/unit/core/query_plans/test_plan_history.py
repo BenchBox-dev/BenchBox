@@ -117,7 +117,7 @@ class TestPlanHistory:
             assert (Path(tmpdir) / "run1.json").exists()
 
             # Verify content
-            with open(Path(tmpdir) / "run1.json") as f:
+            with open(Path(tmpdir) / "run1.json", encoding="utf-8") as f:
                 data = json.load(f)
             assert data["run_id"] == "run1"
             assert "q1" in data["plan_fingerprints"]

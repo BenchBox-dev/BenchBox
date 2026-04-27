@@ -184,7 +184,7 @@ class TestLiveFireboltSpecificFeatures:
             live_firebolt_adapter.close_connection(connection)
 
     def test_drop_table_is_synchronous(self, live_firebolt_adapter):
-        """Verify DROP TABLE completes synchronously — table is immediately gone after drop."""
+        """Verify DROP TABLE completes synchronously - table is immediately gone after drop."""
         connection = live_firebolt_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -195,6 +195,6 @@ class TestLiveFireboltSpecificFeatures:
                 cursor.execute("SELECT COUNT(*) FROM benchbox_cleanup_test")
                 pytest.fail("Table should have been dropped")
             except Exception:
-                pass  # Expected — table does not exist
+                pass  # Expected - table does not exist
         finally:
             live_firebolt_adapter.close_connection(connection)

@@ -119,7 +119,7 @@ def _resolve_tpch_seed(
             if actual_seed is None:
                 return stream_id * 1000 + position
         except ValueError:
-            raise ValueError(f"Query {query_id} not found in stream {stream_id} permutation")
+            raise ValueError(f"Query {query_id} not found in stream {stream_id} permutation") from None
 
     elif permutation is not None:
         if query_id not in permutation:
@@ -131,6 +131,25 @@ def _resolve_tpch_seed(
                 pass
 
     return actual_seed
+
+
+def _expand_sqlite_named_column_aliases(query: str) -> str:
+    """Move TPC-H named table-alias columns into SELECT aliases for SQLite translation."""
+    if ") as c_orders (c_custkey, c_count)" in query:
+        query = query.replace(
+            "count(o_orderkey)\nfrom",
+            "count(o_orderkey) as c_count\nfrom",
+            1,
+        ).replace(
+            ") as c_orders (c_custkey, c_count)",
+            ") as c_orders",
+            1,
+        )
+    return query.replace(
+        "with revenue (supplier_no, total_revenue) as (\nselect\nl_suppkey,\nsum(l_extendedprice * (1-l_discount))",
+        "with revenue as (\nselect\nl_suppkey as supplier_no,\nsum(l_extendedprice * (1-l_discount)) as total_revenue",
+        1,
+    )
 
 
 class TPCHBenchmark(BaseBenchmark):
@@ -266,6 +285,8 @@ class TPCHBenchmark(BaseBenchmark):
 
         src = (source_dialect or "netezza").lower()
         tgt = (target_dialect or src).lower()
+        if tgt in ("sqlite", "mysql"):
+            query = _expand_sqlite_named_column_aliases(query)
 
         return translate_sql_query(
             query=query,

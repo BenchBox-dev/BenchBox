@@ -7,9 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import platform
 import subprocess
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -353,6 +351,8 @@ class TestCompileQgen:
     @patch("subprocess.run")
     def test_compile_qgen_success_returns_path(self, mock_run, mock_templates, tmp_path):
         """When compilation succeeds and exe exists, returns path."""
+        import os
+
         templates_dir = tmp_path / "templates"
         templates_dir.mkdir()
         mock_templates.return_value = templates_dir
@@ -364,13 +364,13 @@ class TestCompileQgen:
         work_dir = tmp_path / "work"
         work_dir.mkdir()
 
-        # Seed the template directory with the expected binary so copytree() carries it into the build dir.
-        exe_name = "qgen.exe" if platform.system().lower() == "windows" else "qgen"
-        qgen_exe = templates_dir / exe_name
+        # Seed the template directory with the platform-appropriate binary name.
+        qgen_name = "qgen.exe" if os.name == "nt" else "qgen"
+        qgen_exe = templates_dir / qgen_name
         qgen_exe.write_bytes(b"fake exe")
 
         result = streams._compile_qgen(work_dir)
-        assert result == work_dir / "tpch_tools" / exe_name
+        assert result == work_dir / "tpch_tools" / qgen_name
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     @patch("subprocess.run")

@@ -1,6 +1,6 @@
 """ASCII chart visualizations for terminal display.
 
-Compatibility shim — all chart implementations live in the ``textcharts``
+Compatibility shim - all chart implementations live in the ``textcharts``
 standalone library. This package re-exports them under the original
 ``benchbox.core.visualization.ascii`` import paths.
 """

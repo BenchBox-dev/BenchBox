@@ -32,20 +32,29 @@ def get_benchmark_instance(config: BenchmarkConfig, system_profile: SystemProfil
         "compression_level": config.compression_level,
     }
 
-    try:
-        options = getattr(config, "options", {}) or {}
-        force_regenerate = bool(options.get("force_regenerate"))
-        benchmark_id = config.name.lower()
-        if benchmark_id in ("tpcds", "joinorder"):
+    options = getattr(config, "options", {}) or {}
+    force_regenerate = bool(options.get("force_regenerate"))
+    benchmark_id = config.name.lower()
+    if benchmark_id == "tpcds":
+        return benchmark_class(
+            parallel=cpu_cores,
+            force_regenerate=force_regenerate,
+            **benchmark_kwargs,
+        )
+    elif benchmark_id == "joinorder":
+        try:
             return benchmark_class(
                 parallel=cpu_cores,
                 force_regenerate=force_regenerate,
                 **benchmark_kwargs,
             )
-        else:
+        except TypeError:
+            return benchmark_class(**benchmark_kwargs)
+    else:
+        try:
             return benchmark_class(parallel=cpu_cores, **benchmark_kwargs)
-    except TypeError:
-        return benchmark_class(**benchmark_kwargs)
+        except TypeError:
+            return benchmark_class(**benchmark_kwargs)
 
 
 def get_benchmark_class(benchmark_name: str) -> Any:

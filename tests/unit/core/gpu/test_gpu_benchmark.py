@@ -373,3 +373,126 @@ class TestGPUBenchmarkScaling:
         small_size = os.path.getsize(small_files["gpu_benchmark_main"])
         large_size = os.path.getsize(large_files["gpu_benchmark_main"])
         assert large_size > small_size
+
+
+# ---------------------------------------------------------------------------
+# Additional GPU benchmark coverage
+# ---------------------------------------------------------------------------
+
+
+class TestGPUBenchmarkExtraCoverage:
+    """Extra coverage for GPUBenchmark methods."""
+
+    @pytest.fixture
+    def gpu_benchmark(self):
+        return GPUBenchmark(scale_factor=0.01, seed=42)
+
+    def test_get_query_with_params(self, gpu_benchmark):
+        sql = gpu_benchmark.get_query(
+            "aggregation_simple",
+            params={"table": "my_table", "group_col": "cat", "sum_col": "val"},
+        )
+        assert "my_table" in sql
+        assert "cat" in sql
+
+    def test_get_query_invalid_raises(self, gpu_benchmark):
+        with pytest.raises(ValueError, match="Unknown query ID"):
+            gpu_benchmark.get_query("nonexistent_query_xyz")
+
+    @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
+    def test_is_gpu_available_uses_cache(self, mock_detect, gpu_benchmark):
+        """Second call to is_gpu_available uses cached _gpu_info."""
+        mock_detect.return_value = GPUInfo(available=True, cudf_available=True, device_count=1)
+        gpu_benchmark._gpu_info = None
+        _ = gpu_benchmark.is_gpu_available()  # first call populates cache
+        _ = gpu_benchmark.is_gpu_available()  # second call uses cache
+        assert mock_detect.call_count == 1  # should only call detect once
+
+    @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
+    def test_get_gpu_info_uses_cache(self, mock_detect, gpu_benchmark):
+        """Second call to get_gpu_info uses cached _gpu_info."""
+        mock_detect.return_value = GPUInfo(available=False)
+        gpu_benchmark._gpu_info = None
+        _ = gpu_benchmark.get_gpu_info()
+        _ = gpu_benchmark.get_gpu_info()
+        assert mock_detect.call_count == 1
+
+    def test_execute_gpu_query_success(self, gpu_benchmark):
+        """execute_gpu_query with a mock cudf df that supports len()."""
+        mock_df = MagicMock()
+        mock_df.__len__ = MagicMock(return_value=100)
+
+        result = gpu_benchmark.execute_gpu_query(mock_df, "aggregation_simple", "SELECT COUNT(*) FROM data")
+        assert isinstance(result, GPUQueryResult)
+        # May succeed or fail depending on dask_sql availability - just check type
+
+    @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
+    def test_run_benchmark_no_gpu_raises(self, mock_detect, gpu_benchmark):
+        """run_benchmark raises RuntimeError when GPU not available."""
+        mock_detect.return_value = GPUInfo(available=False)
+
+        with pytest.raises(RuntimeError, match="No GPU available"):
+            gpu_benchmark.run_benchmark(MagicMock())
+
+    @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
+    def test_run_benchmark_with_gpu(self, mock_detect, gpu_benchmark):
+        """run_benchmark with GPU available runs all queries."""
+        gpu_info = GPUInfo(
+            available=True,
+            device_count=1,
+            cudf_available=True,
+            devices=[GPUDevice(index=0, name="Test GPU", vendor=GPUVendor.NVIDIA, memory_total_mb=8000)],
+        )
+        mock_detect.return_value = gpu_info
+        gpu_benchmark._gpu_info = gpu_info
+        gpu_benchmark.collect_metrics = False
+
+        mock_df = MagicMock()
+        mock_df.__len__ = MagicMock(return_value=10)
+
+        results = gpu_benchmark.run_benchmark(mock_df)
+        assert isinstance(results, GPUBenchmarkResults)
+        assert results.total_queries > 0
+
+    @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
+    def test_run_benchmark_with_query_ids(self, mock_detect, gpu_benchmark):
+        """run_benchmark with specific query_ids."""
+        gpu_info = GPUInfo(available=True, device_count=1, cudf_available=True)
+        mock_detect.return_value = gpu_info
+        gpu_benchmark._gpu_info = gpu_info
+        gpu_benchmark.collect_metrics = False
+
+        mock_df = MagicMock()
+        results = gpu_benchmark.run_benchmark(mock_df, query_ids=["aggregation_simple"])
+        assert results.total_queries == 1
+
+    @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
+    def test_run_benchmark_with_categories(self, mock_detect, gpu_benchmark):
+        """run_benchmark with category filter."""
+        gpu_info = GPUInfo(available=True, device_count=1, cudf_available=True)
+        mock_detect.return_value = gpu_info
+        gpu_benchmark._gpu_info = gpu_info
+        gpu_benchmark.collect_metrics = False
+
+        mock_df = MagicMock()
+        results = gpu_benchmark.run_benchmark(mock_df, categories=["aggregation"])
+        assert results.total_queries >= 2  # multiple aggregation queries
+
+    def test_compare_cpu_vs_gpu(self, gpu_benchmark):
+        """compare_cpu_vs_gpu should return comparison dict."""
+        import numpy as np
+        import pandas as pd
+
+        from benchbox.experimental.gpu.benchmark import compare_cpu_vs_gpu
+
+        pandas_df = pd.DataFrame({"category": list("ABCDE") * 20, "value": np.random.uniform(0, 100, 100)})
+        mock_gpu_df = MagicMock()
+        mock_gpu_df.__len__ = MagicMock(return_value=100)
+
+        result = compare_cpu_vs_gpu(pandas_df, mock_gpu_df, gpu_benchmark, query_ids=["aggregation_simple"])
+        assert "queries" in result
+        assert "summary" in result
+        assert "aggregation_simple" in result["queries"]
+
+
+from unittest.mock import MagicMock

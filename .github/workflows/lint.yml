@@ -35,3 +35,6 @@ jobs:
 
       - name: Validate test marker annotations
         run: make lint-markers
+
+      - name: Compatibility docs drift check
+        run: make compat-docs-check

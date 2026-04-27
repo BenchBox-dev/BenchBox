@@ -80,7 +80,7 @@ class PgDuckDBDDLGenerator(PostgreSQLDDLGenerator):
         """
         clauses = super().generate_tuning_clauses(table_tuning, platform_opts)
 
-        # Filter out CLUSTER statements — DuckDB engine bypasses PostgreSQL
+        # Filter out CLUSTER statements - DuckDB engine bypasses PostgreSQL
         # index-based scan ordering, so CLUSTER provides no benefit
         clauses.post_create_statements = [
             stmt for stmt in clauses.post_create_statements if not stmt.upper().startswith("CLUSTER")

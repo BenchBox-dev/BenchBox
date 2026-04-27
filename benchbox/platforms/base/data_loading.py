@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import contextlib
 import gzip
+import hashlib
+import inspect
 import json
 import logging
 import os
@@ -20,16 +22,31 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import (
     get_column_names_with_trailing,
+    get_data_extension,
+    get_delimiter_for_file,
     has_trailing_delimiter,
 )
 from benchbox.utils.printing import quiet_console
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_table_paths(table_paths: Any) -> list[Path]:
+    """Normalize a benchmark ``tables`` value to a list of Paths.
+
+    Benchmark generators may emit a single path (single-file tables) or a list
+    of paths (multi-chunk tables like TPC-H ``lineitem``/``orders``). Adapters
+    that iterate per-chunk should funnel through this helper rather than
+    calling ``Path(value)`` directly - which raises ``TypeError`` on lists.
+    """
+    normalized = table_paths if isinstance(table_paths, list) else [table_paths]
+    return [Path(path_like) for path_like in normalized]
+
 
 # Regex pattern for valid SQL identifiers (table/column names)
 # Allows letters, digits, underscores; must start with letter or underscore
@@ -97,6 +114,146 @@ class DataSource:
 
     source_type: str  # 'benchmark_tables', 'benchmark_impl_tables', 'manifest'
     tables: dict[str, Any]  # table_name -> file_path or data
+    table_formats: dict[str, str] = None  # table_name -> format ("tbl", "csv", "parquet"); from manifest
+    # Standardized CSV dialect keys per table from manifest metadata:
+    #   csv_delimiter: str, csv_has_header: bool, csv_null_marker: str|None,
+    #   csv_normalize_booleans: bool, csv_quote: str|None
+    table_metadata: dict[str, dict[str, Any]] = None
+
+    def __post_init__(self) -> None:
+        if self.table_formats is None:
+            self.table_formats = {}
+        if self.table_metadata is None:
+            self.table_metadata = {}
+
+
+@dataclass
+class CsvDialect:
+    """Resolved CSV dialect for a single data file.
+
+    Produced by resolve_csv_dialect() from manifest metadata, benchmark attributes,
+    or format-derived defaults — in that precedence order.
+
+    ``null_marker`` gates empty-field→NULL conversion only (e.g. NULL DEFINED BY
+    in SingleStore's LOAD DATA, NULL in PostgreSQL COPY).  It does NOT gate
+    trailing-delimiter stripping.
+
+    Trailing-delimiter stripping is controlled by file extension, not by
+    null_marker.  Both TPC-H dbgen (.tbl) and TPC-DS dsdgen (.dat) emit a
+    spurious trailing pipe after every record; all CSV files do not.  Adapters
+    must use ``get_data_extension(data_file) in (".tbl", ".dat")`` and pass that
+    result as ``strip_trailing_delim`` to prepare_local_load_file() — never
+    derive it from ``null_marker is not None``, and never use
+    ``data_file.suffix.lower()`` which breaks for compressed inputs like
+    ``lineitem.tbl.zst``.  A .csv file with null_marker="" (e.g. JoinOrder) has
+    meaningful trailing commas that represent NULL fields and must not be stripped.
+    """
+
+    delimiter: str
+    has_header: bool
+    null_marker: str | None  # '' = empty→NULL; None = no NULL conversion
+    normalize_booleans: bool  # True/False → 1/0
+    quote: str | None  # None → default '"' for LOAD DATA callers
+
+
+# Sentinel passed to resolve_csv_dialect() by callers that have no benchmark
+# instance available (e.g. external scan helpers exercised from unit tests).
+# Keeps the dialect resolver's "(b) Benchmark instance attributes" branch from
+# tripping on attribute lookups against a freshly created object().
+NO_BENCHMARK: Any = object()
+
+
+def resolve_csv_dialect(
+    data_source: DataSource,
+    table_name: str,
+    file_path: Path,
+    benchmark: Any,
+) -> CsvDialect:
+    """Return the CSV dialect for one data file.
+
+    Precedence (highest to lowest):
+      a) Manifest metadata in data_source.table_metadata[table_name]
+      b) Benchmark instance attributes (csv_delimiter, csv_has_header, csv_normalize_booleans)
+      c) Format-derived defaults from the file extension
+
+    Emits logger.warning when falling back to (b) or (c) so unannotated benchmarks
+    are surfaced without breaking them.
+    """
+    name_lower = table_name.lower()
+
+    # (a) Manifest metadata wins — keys are always stored lowercase by the resolver
+    meta = data_source.table_metadata.get(name_lower)
+    if meta:
+        return CsvDialect(
+            delimiter=meta.get("csv_delimiter", get_delimiter_for_file(file_path)),
+            has_header=bool(meta.get("csv_has_header", False)),
+            null_marker=meta.get("csv_null_marker", None),
+            normalize_booleans=bool(meta.get("csv_normalize_booleans", False)),
+            quote=meta.get("csv_quote", None),
+        )
+
+    # (b) Benchmark instance attributes
+    benchmark_delimiter = _get_optional_str_attr(benchmark, "csv_delimiter")
+    benchmark_header = _get_optional_bool_attr(benchmark, "csv_has_header")
+    benchmark_booleans = _get_optional_bool_attr(benchmark, "csv_normalize_booleans")
+    benchmark_null_marker = _get_optional_str_attr(benchmark, "csv_null_marker")
+    if any(v is not None for v in (benchmark_delimiter, benchmark_header, benchmark_booleans, benchmark_null_marker)):
+        logger.warning(
+            "table '%s': CSV dialect from benchmark attributes (no manifest metadata). "
+            "Annotate the generator with manifest metadata to suppress this warning.",
+            table_name,
+        )
+        ext = get_data_extension(file_path)
+        is_tpc = ext in (".tbl", ".dat")
+        return CsvDialect(
+            delimiter=benchmark_delimiter if benchmark_delimiter is not None else ("|" if is_tpc else ","),
+            has_header=bool(benchmark_header) if benchmark_header is not None else False,
+            null_marker=benchmark_null_marker if benchmark_null_marker is not None else ("" if is_tpc else None),
+            normalize_booleans=bool(benchmark_booleans) if benchmark_booleans is not None else False,
+            quote=None,
+        )
+
+    # (c) Format-derived defaults
+    logger.warning(
+        "table '%s': CSV dialect from file extension heuristic (no manifest metadata or benchmark attributes). "
+        "Annotate the generator with manifest metadata to suppress this warning.",
+        table_name,
+    )
+    ext = get_data_extension(file_path)
+    if ext in (".tbl", ".dat"):
+        return CsvDialect(
+            delimiter="|",
+            has_header=False,
+            null_marker="",
+            normalize_booleans=False,
+            quote=None,
+        )
+    # .csv and everything else
+    return CsvDialect(
+        delimiter=get_delimiter_for_file(file_path),
+        has_header=False,
+        null_marker=None,
+        normalize_booleans=False,
+        quote=None,
+    )
+
+
+def _get_optional_str_attr(obj: Any, name: str) -> str | None:
+    """Return a string CSV dialect attr, ignoring Mock-created child attrs.
+
+    Empty strings are preserved as-is (``isinstance("", str)`` is True), so
+    ``csv_null_marker=""`` on a benchmark class correctly returns ``""`` rather
+    than ``None``.  Only non-string values (None, int, Mock child attrs) become
+    None.
+    """
+    value = getattr(obj, name, None)
+    return value if isinstance(value, str) else None
+
+
+def _get_optional_bool_attr(obj: Any, name: str) -> bool | None:
+    """Return a bool CSV dialect attr, ignoring Mock-created child attrs."""
+    value = getattr(obj, name, None)
+    return value if isinstance(value, bool) else None
 
 
 class DataSourceProvider(Protocol):
@@ -162,7 +319,15 @@ class BenchmarkTablesSource:
 
 
 class BenchmarkImplTablesSource:
-    """Data source provider from benchmark._impl.tables attribute."""
+    """Data source provider from benchmark._impl.tables attribute.
+
+    This provider is kept alongside :class:`BenchmarkTablesSource` because
+    ``BenchmarkTablesSource`` reads ``benchmark.tables``, which only delegates
+    to ``_impl.tables`` for :class:`~benchbox.base.BaseBenchmark` subclasses.
+    Benchmark objects that carry a ``_impl`` attribute without extending
+    ``BaseBenchmark`` (e.g. plain dataclasses or third-party wrappers) are
+    handled exclusively by this provider.
+    """
 
     def can_provide(self, benchmark: Any, data_dir: Path) -> bool:
         """Check if benchmark._impl has tables attribute."""
@@ -198,6 +363,20 @@ class BenchmarkImplTablesSource:
 class ManifestFileSource:
     """Data source provider from _datagen_manifest.json (supports v1 and v2)."""
 
+    def __init__(
+        self,
+        platform_name: str = "duckdb",
+        table_mode: str = "native",
+        platform_config: dict[str, Any] | None = None,
+        requested_format: str | None = None,
+    ):
+        self._platform_name = platform_name
+        self._table_mode = table_mode
+        self._platform_config = platform_config
+        self._requested_format = (
+            requested_format.strip().lower() if requested_format and requested_format.strip() else None
+        )
+
     def can_provide(self, benchmark: Any, data_dir: Path) -> bool:
         """Check if manifest file exists."""
         manifest_path = Path(data_dir) / "_datagen_manifest.json"
@@ -228,11 +407,30 @@ class ManifestFileSource:
 
     @staticmethod
     def _prefer_platform_defaults(platform_name: str, table_mode: str) -> bool:
-        """Return True when a native loader must override manifest order."""
-        from benchbox.platforms.base.format_capabilities import PREFER_PLATFORM_FORMAT_ORDER, normalize_platform_key
+        """Return True when a native loader must override manifest order.
 
+        All native-mode platforms use PLATFORM_FORMAT_PREFERENCES as their
+        default format ordering. Manifest format_preference records conversion
+        history but does not drive default selection.
+        """
         normalized_mode = (table_mode or "native").strip().lower()
-        return normalized_mode == "native" and normalize_platform_key(platform_name) in PREFER_PLATFORM_FORMAT_ORDER
+        return normalized_mode == "native"
+
+    def _resolve_format_for_table(self, manifest: Any, table_name: str, get_preferred_format: Any) -> str | None:
+        """Resolve the best format for a table, honoring explicit --table-format overrides."""
+        if self._requested_format:
+            table_formats_obj = manifest.tables.get(table_name)
+            available = list((table_formats_obj.formats or {}).keys()) if table_formats_obj else []
+            if self._requested_format in available:
+                return self._requested_format
+        return get_preferred_format(
+            manifest,
+            table_name,
+            self._platform_name,
+            table_mode=self._table_mode,
+            platform_config=self._platform_config,
+            prefer_platform_defaults=self._prefer_platform_defaults(self._platform_name, self._table_mode),
+        )
 
     def _try_manifest_v2(self, manifest_path: Path, benchmark: Any, data_dir: Path) -> DataSource | None:
         """Attempt to load data source using manifest v2 format."""
@@ -245,48 +443,55 @@ class ManifestFileSource:
                 return None
 
             mapping = {}
-            platform_name = getattr(self, "_platform_name", None) or self._infer_platform_name(benchmark)
+            formats_mapping: dict[str, str] = {}
+            table_metadata: dict[str, dict[str, Any]] = {}
             preferred_format = None
-            table_mode = getattr(self, "_table_mode", "native")
-            platform_config = getattr(self, "_platform_config", None)
 
             for table_name in manifest.tables.keys():
-                preferred_format = get_preferred_format(
-                    manifest,
-                    table_name,
-                    platform_name,
-                    table_mode=table_mode,
-                    platform_config=platform_config,
-                    prefer_platform_defaults=self._prefer_platform_defaults(platform_name, table_mode),
-                )
+                preferred_format = self._resolve_format_for_table(manifest, table_name, get_preferred_format)
 
+                table_formats_obj = manifest.tables[table_name]
                 if preferred_format:
                     files = get_files_for_format(manifest, table_name, preferred_format)
                     if files:
                         mapping[table_name] = [Path(data_dir) / f for f in files]
+                        formats_mapping[table_name.lower()] = preferred_format.lower()
+                    # Extract metadata from the first entry of the preferred format.
+                    format_entries = table_formats_obj.formats.get(preferred_format, [])
+                    if format_entries and format_entries[0].metadata:
+                        table_metadata[table_name.lower()] = dict(format_entries[0].metadata)
                 else:
                     # Fallback: try first available format
-                    table_formats = manifest.tables[table_name]
-                    for _format_name, format_files in table_formats.formats.items():
+                    for _format_name, format_files in table_formats_obj.formats.items():
                         if format_files:
                             mapping[table_name] = [Path(data_dir) / f.path for f in format_files]
+                            formats_mapping[table_name.lower()] = _format_name.lower()
+                            if format_files[0].metadata:
+                                table_metadata[table_name.lower()] = dict(format_files[0].metadata)
                             break
 
             if mapping:
                 quiet_console.print(
                     f"Using data files from _datagen_manifest.json (v2, format: {preferred_format or 'auto'})"
                 )
-                return DataSource(source_type="manifest_v2", tables=mapping)
+                return DataSource(
+                    source_type="manifest_v2",
+                    tables=mapping,
+                    table_formats=formats_mapping,
+                    table_metadata=table_metadata,
+                )
 
         except ImportError:
             pass
+        except Exception as e:
+            logger.debug("_try_manifest_v2 failed with non-import error, falling back to v1: %s", e)
 
         return None
 
     @staticmethod
     def _try_manifest_v1(manifest_path: Path, data_dir: Path) -> DataSource | None:
         """Attempt to load data source using manifest v1 format."""
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             manifest_dict = json.load(f)
 
         tables = manifest_dict.get("tables") or {}
@@ -307,15 +512,75 @@ class ManifestFileSource:
 
         return None
 
-    def _infer_platform_name(self, benchmark: Any) -> str:
-        """Infer platform name from context."""
-        # Try to get platform name from various sources
-        if hasattr(benchmark, "platform_name"):
-            return cast(str, benchmark.platform_name)
-        if hasattr(self, "platform_name"):
-            return cast(str, self.platform_name)
-        # Default fallback
-        return "duckdb"
+    def read_format_hints(
+        self,
+        manifest_path: Path,
+        benchmark: Any,
+        table_names: list[str],
+    ) -> dict[str, str]:
+        """Read format hints for the given tables from a v2 manifest.
+
+        Used by DataSourceResolver to inject format metadata after a non-manifest
+        provider (BenchmarkTablesSource, BenchmarkImplTablesSource) wins the chain.
+        Uses the same platform-aware get_preferred_format() as _try_manifest_v2().
+
+        Returns an empty dict if the manifest is absent, not v2, or on any error.
+        """
+        if not manifest_path.exists():
+            return {}
+        try:
+            from benchbox.core.manifest import ManifestV2, get_preferred_format, load_manifest
+
+            manifest = load_manifest(manifest_path)
+            if not isinstance(manifest, ManifestV2):
+                return {}
+            result: dict[str, str] = {}
+            for table_name in table_names:
+                fmt = self._resolve_format_for_table(manifest, table_name, get_preferred_format)
+                if fmt:
+                    result[table_name.lower()] = fmt.lower()
+            return result
+        except Exception:
+            return {}
+
+    def read_table_metadata_hints(
+        self,
+        manifest_path: Path,
+        table_names: list[str],
+    ) -> dict[str, dict[str, Any]]:
+        """Read CSV dialect metadata for the given tables from a v2 manifest.
+
+        Used by DataSourceResolver to inject table_metadata after a non-manifest
+        provider wins the chain — mirrors how read_format_hints() injects table_formats.
+
+        Returns an empty dict if the manifest is absent, not v2, or on any error.
+        """
+        if not manifest_path.exists():
+            return {}
+        try:
+            from benchbox.core.manifest import ManifestV2, get_preferred_format, load_manifest
+
+            manifest = load_manifest(manifest_path)
+            if not isinstance(manifest, ManifestV2):
+                return {}
+            result: dict[str, dict[str, Any]] = {}
+            for table_name in table_names:
+                fmt = self._resolve_format_for_table(manifest, table_name, get_preferred_format)
+                table_formats_obj = manifest.tables.get(table_name)
+                if not table_formats_obj:
+                    continue
+                entries = table_formats_obj.formats.get(fmt or "", []) if fmt else []
+                if not entries:
+                    # Fallback: first available format
+                    for format_files in table_formats_obj.formats.values():
+                        if format_files:
+                            entries = format_files
+                            break
+                if entries and entries[0].metadata:
+                    result[table_name.lower()] = dict(entries[0].metadata)
+            return result
+        except Exception:
+            return {}
 
 
 class DataSourceResolver:
@@ -326,27 +591,86 @@ class DataSourceResolver:
         platform_name: str | None = None,
         table_mode: str | None = None,
         platform_config: dict[str, Any] | None = None,
+        requested_format: str | None = None,
     ):
         """Initialize resolver with ordered list of providers.
 
         Args:
             platform_name: Platform name for format preference resolution.
-                If not provided, ManifestFileSource falls back to inferring
-                from the benchmark object (default: "duckdb").
+                If not provided, defaults to "duckdb".
+            requested_format: Explicit --table-format from CLI; overrides
+                platform defaults for this run only.
         """
-        manifest_source = ManifestFileSource()
-        if platform_name:
-            manifest_source._platform_name = platform_name
-        if table_mode:
-            manifest_source._table_mode = table_mode
-        if platform_config:
-            manifest_source._platform_config = platform_config
+        self._manifest_source = ManifestFileSource(
+            platform_name=platform_name or "duckdb",
+            table_mode=table_mode or "native",
+            platform_config=platform_config,
+            requested_format=requested_format,
+        )
 
         self.providers = [
             BenchmarkTablesSource(),
             BenchmarkImplTablesSource(),
-            manifest_source,
+            self._manifest_source,
         ]
+
+    def get_manifest_data_source(self, benchmark: Any, data_dir: Path) -> DataSource | None:
+        """Return a DataSource built solely from the manifest file.
+
+        Callers that need to fall back to manifest-selected files (e.g. Athena
+        external-table mode) should prefer this over accessing ``_manifest_source``
+        directly.
+        """
+        return self._manifest_source.get_data_source(benchmark, data_dir)
+
+    @staticmethod
+    def _normalize_paths(table_paths: Any) -> list[Path]:
+        """Normalize a table-path payload to a list of Paths."""
+        return normalize_table_paths(table_paths)
+
+    @staticmethod
+    def _get_case_insensitive(mapping: dict[str, Any], key: str) -> Any:
+        """Return a mapping value using exact or lower-case key lookup."""
+        return mapping.get(key, mapping.get(key.lower()))
+
+    def _select_manifest_override_tables(
+        self,
+        source: DataSource,
+        benchmark: Any,
+        data_dir: Path,
+    ) -> None:
+        """Apply platform-specific manifest-selected file overrides centrally."""
+        if source.source_type not in {"benchmark_tables", "benchmark_impl_tables"}:
+            return
+
+        platform_name = str(getattr(self._manifest_source, "_platform_name", "") or "").strip().lower()
+        table_mode = str(getattr(self._manifest_source, "_table_mode", "native") or "native").strip().lower()
+
+        if platform_name == "athena" and table_mode == "external":
+            selector = lambda paths: any(path.suffix.lower() != ".parquet" for path in paths)
+        elif platform_name == "redshift" and table_mode != "external":
+            selector = lambda paths: any(path.exists() and path.is_dir() for path in paths)
+        else:
+            return
+
+        manifest_source = None
+        for table_name, table_paths in list(source.tables.items()):
+            if not selector(self._normalize_paths(table_paths)):
+                continue
+
+            if manifest_source is None:
+                manifest_source = self.get_manifest_data_source(benchmark, data_dir)
+                if manifest_source is None or not manifest_source.tables:
+                    return
+
+            replacement = self._get_case_insensitive(manifest_source.tables, table_name)
+            if replacement is None:
+                continue
+
+            source.tables[table_name] = replacement
+            replacement_format = self._get_case_insensitive(manifest_source.table_formats, table_name)
+            if replacement_format:
+                source.table_formats[table_name.lower()] = str(replacement_format).lower()
 
     def resolve(self, benchmark: Any, data_dir: Path) -> DataSource | None:
         """Resolve data source from benchmark and data directory.
@@ -358,11 +682,29 @@ class DataSourceResolver:
         Returns:
             DataSource if found, None otherwise
         """
+        source = None
         for provider in self.providers:
             source = provider.get_data_source(benchmark, data_dir)
             if source:
-                return source
-        return None
+                break
+
+        if source is None:
+            return None
+
+        # Providers that supply file paths directly (BenchmarkTablesSource,
+        # BenchmarkImplTablesSource) short-circuit ManifestFileSource and return
+        # empty table_formats and table_metadata. Inject both from the manifest
+        # here — centrally, once — so all providers get platform-aware resolution.
+        manifest_path = Path(data_dir) / "_datagen_manifest.json"
+        table_names = list(source.tables.keys())
+        if not source.table_formats:
+            source.table_formats = self._manifest_source.read_format_hints(manifest_path, benchmark, table_names)
+        if not source.table_metadata:
+            source.table_metadata = self._manifest_source.read_table_metadata_hints(manifest_path, table_names)
+
+        self._select_manifest_override_tables(source, benchmark, data_dir)
+
+        return source
 
 
 class CompressionHandler(ABC):
@@ -426,7 +768,7 @@ class ZstdHandler(CompressionHandler):
 
         try:
             # Decompress using system command
-            with open(temp_file_path, "w") as temp_file:
+            with open(temp_file_path, "w", encoding="utf-8") as temp_file:
                 subprocess.run(
                     ["zstd", "-d", str(file_path), "-c"],
                     stdout=temp_file,
@@ -439,7 +781,7 @@ class ZstdHandler(CompressionHandler):
                 self.adapter.log_very_verbose(f"Decompressed to temporary file: {temp_file_path}")
 
             # Yield the decompressed file
-            with open(temp_file_path) as f:
+            with open(temp_file_path, encoding="utf-8") as f:
                 yield f
 
         finally:
@@ -454,7 +796,7 @@ class NoCompressionHandler(CompressionHandler):
     @contextmanager
     def open(self, file_path: Path) -> Iterator[Any]:
         """Open uncompressed file for reading."""
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             yield f
 
 
@@ -682,15 +1024,6 @@ class DuckDBNativeHandler(FileFormatHandler):
         if hasattr(self.benchmark, "get_csv_loading_config"):
             try:
                 benchmark_config = self.benchmark.get_csv_loading_config(table_name)
-                if benchmark_config:
-                    config_parts = list(benchmark_config)
-            except Exception:
-                pass  # Use defaults
-
-        # Check if benchmark implementation provides CSV loading configuration
-        elif hasattr(self.benchmark, "_impl") and hasattr(self.benchmark._impl, "get_csv_loading_config"):
-            try:
-                benchmark_config = self.benchmark._impl.get_csv_loading_config(table_name)
                 if benchmark_config:
                     config_parts = list(benchmark_config)
             except Exception:
@@ -1594,20 +1927,6 @@ class ClickHouseNativeHandler(FileFormatHandler):
             except Exception:
                 pass  # Use defaults
 
-        # Check if benchmark implementation provides CSV loading configuration
-        elif hasattr(self.benchmark, "_impl") and hasattr(self.benchmark._impl, "get_csv_loading_config"):
-            try:
-                benchmark_config_list = self.benchmark._impl.get_csv_loading_config(table_name)
-                if benchmark_config_list:
-                    # Parse DuckDB-style config list into ClickHouse config
-                    for config_item in benchmark_config_list:
-                        if "delim=" in config_item:
-                            # Extract delimiter: delim='|' -> delimiter = '|'
-                            delim_part = config_item.split("delim=")[1].strip("'\"")
-                            config["delimiter"] = delim_part
-            except Exception:
-                pass  # Use defaults
-
         return config
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
@@ -1627,27 +1946,34 @@ class ClickHouseNativeHandler(FileFormatHandler):
         validated_table = validate_sql_identifier(table_name, "table name")
 
         try:
-            # Get CSV configuration
-            csv_config = self._get_csv_loading_config(validated_table)
-            delimiter = csv_config["delimiter"]
-
-            # ClickHouse (both server and chDB) natively handles zstd-compressed
-            # files via auto-detection of .zst file extensions in file().
             escaped_path = escape_sql_string_literal(str(file_path))
 
-            # Build ClickHouse file() query
-            if delimiter == ",":
+            # ClickHouse natively supports Parquet via file().  Use that path
+            # for parquet files, including compressed/sharded names.
+            base_ext = FileFormatRegistry.get_base_data_extension(file_path)
+            if base_ext == ".parquet":
                 load_query = f"""
                     INSERT INTO {validated_table}
-                    SELECT * FROM file('{escaped_path}', 'CSV')
+                    SELECT * FROM file('{escaped_path}', 'Parquet')
                 """
             else:
-                escaped_delimiter = escape_sql_string_literal(delimiter)
-                load_query = f"""
-                    INSERT INTO {validated_table}
-                    SELECT * FROM file('{escaped_path}', 'CSV')
-                    SETTINGS format_csv_delimiter='{escaped_delimiter}'
-                """
+                # ClickHouse (both server and chDB) natively handles zstd-compressed
+                # files via auto-detection of .zst file extensions in file().
+                csv_config = self._get_csv_loading_config(validated_table)
+                delimiter = csv_config["delimiter"]
+
+                if delimiter == ",":
+                    load_query = f"""
+                        INSERT INTO {validated_table}
+                        SELECT * FROM file('{escaped_path}', 'CSV')
+                    """
+                else:
+                    escaped_delimiter = escape_sql_string_literal(delimiter)
+                    load_query = f"""
+                        INSERT INTO {validated_table}
+                        SELECT * FROM file('{escaped_path}', 'CSV')
+                        SETTINGS format_csv_delimiter='{escaped_delimiter}'
+                    """
 
             # Execute the load query with before/after COUNT for accurate per-shard delta
             before_result = connection.execute(f"SELECT COUNT(*) FROM {validated_table}")
@@ -1674,7 +2000,7 @@ class ClickHouseNativeHandler(FileFormatHandler):
 
         ClickHouse (both server and chDB) natively supports zstd via auto-detection
         of .zst file extensions in file(), so compressed shards are handled identically
-        to uncompressed ones — no manual decompression needed.
+        to uncompressed ones - no manual decompression needed.
 
         Falls back to the default per-shard loop only when shards span multiple directories.
         """
@@ -1697,17 +2023,22 @@ class ClickHouseNativeHandler(FileFormatHandler):
 
         validated_table = validate_sql_identifier(table_name, "table name")
         escaped_glob = escape_sql_string_literal(glob_pattern)
-        csv_config = self._get_csv_loading_config(validated_table)
-        delimiter = csv_config["delimiter"]
 
-        if delimiter == ",":
-            insert_sql = f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', 'CSV')"
+        # Use Parquet format for .parquet files; CSV (with optional delimiter) otherwise.
+        base_ext = FileFormatRegistry.get_base_data_extension(file_paths[0])
+        if base_ext == ".parquet":
+            insert_sql = f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', 'Parquet')"
         else:
-            escaped_delimiter = escape_sql_string_literal(delimiter)
-            insert_sql = (
-                f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', 'CSV')"
-                f" SETTINGS format_csv_delimiter='{escaped_delimiter}'"
-            )
+            csv_config = self._get_csv_loading_config(validated_table)
+            delimiter = csv_config["delimiter"]
+            if delimiter == ",":
+                insert_sql = f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', 'CSV')"
+            else:
+                escaped_delimiter = escape_sql_string_literal(delimiter)
+                insert_sql = (
+                    f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', 'CSV')"
+                    f" SETTINGS format_csv_delimiter='{escaped_delimiter}'"
+                )
 
         if hasattr(self.adapter, "dry_run_mode") and self.adapter.dry_run_mode:
             if hasattr(self.adapter, "capture_sql"):
@@ -1787,9 +2118,9 @@ class FileFormatRegistry:
     def get_base_data_extension(file_path: Path) -> str | None:
         """Determine the base (uncompressed) data file extension.
 
-        Handles multi-suffix filenames such as 'customer.tbl.1.zst' by
-        stripping known compression extensions and walking backward through
-        remaining suffixes until a known data extension is found.
+        Delegates to get_data_extension() for consistent behaviour with the
+        rest of the file-format utilities (full compression-extension set,
+        uniform skip-unknown logic).
 
         Args:
             file_path: Path to the data file (possibly compressed and/or sharded)
@@ -1798,20 +2129,7 @@ class FileFormatRegistry:
             The base extension including leading dot (e.g., '.tbl', '.csv', '.dat'),
             or None if no known data extension is found.
         """
-        suffixes = list(file_path.suffixes)
-        # Remove trailing compression suffix(es)
-        while suffixes and suffixes[-1] in FileFormatRegistry._compression_handlers:
-            suffixes.pop()
-
-        if not suffixes:
-            return None
-
-        # Walk backward to find the first known data extension
-        known_formats = set(FileFormatRegistry._format_handlers.keys())
-        for ext in reversed(suffixes):
-            if ext in known_formats:
-                return ext
-        return None
+        return get_data_extension(file_path)
 
     @classmethod
     def get_handler(cls, file_path: Path) -> FileFormatHandler | None:
@@ -1860,6 +2178,62 @@ class FileFormatRegistry:
         return handler_class()
 
 
+@contextmanager
+def prepare_local_load_file(
+    file_path: Path,
+    *,
+    dialect: CsvDialect,
+    strip_trailing_delim: bool,
+) -> Iterator[Path]:
+    """Yield a plain, uncompressed, ready-to-load file path.
+
+    Applies up to three transformations — decompression, trailing-delimiter strip,
+    boolean rewrite — in a single pass. Writes a temp file only when at least one
+    transformation is required; yields the original path otherwise (no spurious copy).
+
+    The temp file is written to file_path.parent so that LOAD DATA LOCAL INFILE
+    permissions match the source directory.
+
+    Args:
+        file_path: Path to the source data file (may be compressed or raw).
+        dialect: CSV dialect (for delimiter and normalize_booleans).
+        strip_trailing_delim: If True, strip one trailing dialect.delimiter per line.
+    """
+    compression_handler = FileFormatRegistry.get_compression_handler(file_path)
+    is_compressed = not isinstance(compression_handler, NoCompressionHandler)
+    needs_transform = is_compressed or strip_trailing_delim or dialect.normalize_booleans
+
+    if not needs_transform:
+        yield file_path
+        return
+
+    tmp_path: Path | None = None
+    try:
+        tmp_fd, tmp_name = tempfile.mkstemp(suffix=".csv", dir=file_path.parent)
+        os.close(tmp_fd)
+        tmp_path = Path(tmp_name)
+
+        delim = dialect.delimiter
+        with tmp_path.open("w", encoding="utf-8", newline="") as dst:
+            with compression_handler.open(file_path) as src:
+                for line in src:
+                    line = line.rstrip("\n").rstrip("\r")
+                    if not line:
+                        continue
+                    if strip_trailing_delim and line.endswith(delim):
+                        line = line[: -len(delim)]
+                    if dialect.normalize_booleans:
+                        fields = line.split(delim)
+                        fields = ["1" if f == "True" else "0" if f == "False" else f for f in fields]
+                        line = delim.join(fields)
+                    dst.write(line + "\n")
+        yield tmp_path
+    finally:
+        if tmp_path is not None:
+            with contextlib.suppress(Exception):
+                tmp_path.unlink(missing_ok=True)
+
+
 class DataLoader:
     """Main orchestrator for data loading operations."""
 
@@ -1880,7 +2254,9 @@ class DataLoader:
             connection: Database connection
             data_dir: Data directory path
             handler_factory: Optional factory function for creating custom file format handlers.
-                           Should accept (file_path, adapter, benchmark) and return FileFormatHandler or None.
+                           Should accept either (file_path, adapter, benchmark) or
+                           (file_path, adapter, benchmark, table_name, data_source)
+                           and return FileFormatHandler or None.
             tuning_config: Optional unified tuning configuration. When provided,
                            DataLoader calls PlatformAdapter.apply_ctas_sort() after each
                            table load. Adapters opt in by overriding
@@ -1892,7 +2268,12 @@ class DataLoader:
         self.benchmark = benchmark
         self.connection = connection
         self.data_dir = data_dir
-        self.resolver = DataSourceResolver()
+        self.resolver = DataSourceResolver(
+            platform_name=adapter.platform_name,
+            table_mode=adapter.table_mode,
+            platform_config=adapter.platform_config,
+            requested_format=getattr(adapter, "requested_table_format", None),
+        )
         self.handler_factory = handler_factory
         self.tuning_config = tuning_config
 
@@ -1914,7 +2295,7 @@ class DataLoader:
             self.adapter.log_very_verbose("No data source found")
             return table_stats, elapsed_seconds(start_time)
 
-        table_stats = self._load_file_based_data(data_source.tables)
+        table_stats = self._load_file_based_data(data_source)
 
         self.connection.commit()
 
@@ -1947,16 +2328,19 @@ class DataLoader:
 
         return table_stats
 
-    def _load_file_based_data(self, data_files: dict[str, Path]) -> dict[str, int]:
+    def _load_file_based_data(self, data_source: DataSource | dict[str, Any]) -> dict[str, int]:
         """Load data from files.
 
         Args:
-            data_files: Dictionary mapping table names to file paths
+            data_source: Resolved data source with table paths and metadata
 
         Returns:
             Dictionary mapping table names to row counts
         """
         table_stats = {}
+        if not isinstance(data_source, DataSource):
+            data_source = DataSource(source_type="legacy_mapping", tables=data_source)
+        data_files = data_source.tables
 
         # Get table loading order (if benchmark supports it)
         if hasattr(self.benchmark, "get_table_loading_order"):
@@ -1973,11 +2357,11 @@ class DataLoader:
             table_start = mono_time()
 
             if isinstance(file_path_or_paths, list):
-                row_count = self._load_sharded_table(table_name, file_path_or_paths)
+                row_count = self._load_sharded_table(table_name, file_path_or_paths, data_source)
                 source_desc = f"{len(file_path_or_paths)} shard(s)"
             else:
                 file_path = Path(file_path_or_paths)
-                row_count = self._load_single_file(table_name, file_path)
+                row_count = self._load_single_file(table_name, file_path, data_source)
                 source_desc = file_path.name
 
             table_stats[table_name] = row_count
@@ -1999,7 +2383,9 @@ class DataLoader:
         else:
             quiet_console.print(f"  ✅ Loaded {row_count:,} rows into {table_name} from {source}")
 
-    def _load_sharded_table(self, table_name: str, file_path_or_paths: list) -> int:
+    def _load_sharded_table(
+        self, table_name: str, file_path_or_paths: list, data_source: DataSource | None = None
+    ) -> int:
         """Load a sharded table from multiple files.
 
         Categorizes shard paths into files, directories, and missing, raising
@@ -2015,36 +2401,40 @@ class DataLoader:
         Raises:
             DataLoadingError: If any shard is a directory or missing
         """
+        if data_source is None:
+            data_source = DataSource(source_type="legacy_mapping", tables={table_name: file_path_or_paths})
+
         shard_paths = []
-        dir_shards = []
         missing_shards = []
         for p in file_path_or_paths:
             pp = Path(p)
             if pp.is_file():
                 shard_paths.append(pp)
             elif pp.is_dir():
-                dir_shards.append(pp)
+                # dbgen at SF>=1 creates a directory of chunk files per table
+                data_globs = ["*.tbl*", "*.csv*", "*.parquet*", "*.tsv*", "*.dat*"]
+                dir_files: list[Path] = []
+                for pattern in data_globs:
+                    dir_files.extend(pp.glob(pattern))
+                if not dir_files:
+                    raise DataLoadingError(
+                        f"Table '{table_name}': shard path is a directory with no data files: {pp}. "
+                        f"Use --force datagen to regenerate."
+                    )
+                shard_paths.extend(sorted(dir_files))
             else:
                 missing_shards.append(pp)
 
-        if dir_shards:
-            logger.warning(
-                "Table '%s': %d shard path(s) are directories, not files: %s",
-                table_name,
-                len(dir_shards),
-                [str(p) for p in dir_shards[:3]],
-            )
-
-        if dir_shards or missing_shards:
+        if missing_shards:
             raise DataLoadingError(
                 f"Table '{table_name}': {len(file_path_or_paths)} shard(s) listed "
-                f"but {len(dir_shards)} directories and {len(missing_shards)} missing "
+                f"but {len(missing_shards)} missing "
                 f"({len(shard_paths)} valid files). Use --force datagen to regenerate."
             )
 
         handler = None
         if self.handler_factory:
-            handler = self.handler_factory(shard_paths[0], self.adapter, self.benchmark)
+            handler = self._create_custom_handler(shard_paths[0], table_name, data_source)
         if not handler:
             handler = FileFormatRegistry.get_handler(shard_paths[0])
 
@@ -2060,7 +2450,7 @@ class DataLoader:
             quiet_console.print(f"  ❌ Failed to bulk-load {table_name}: {e}")
             return 0
 
-    def _load_single_file(self, table_name: str, file_path: Path) -> int:
+    def _load_single_file(self, table_name: str, file_path: Path, data_source: DataSource | None = None) -> int:
         """Load data from a single file into a table.
 
         Args:
@@ -2073,6 +2463,9 @@ class DataLoader:
         Raises:
             DataLoadingError: If path is a directory or does not exist
         """
+        if data_source is None:
+            data_source = DataSource(source_type="legacy_mapping", tables={table_name: file_path})
+
         if file_path.is_dir():
             raise DataLoadingError(
                 f"Table '{table_name}': expected file but found directory at {file_path}. "
@@ -2089,7 +2482,7 @@ class DataLoader:
             # Try custom handler factory first (for platform-specific optimization)
             handler = None
             if self.handler_factory:
-                handler = self.handler_factory(file_path, self.adapter, self.benchmark)
+                handler = self._create_custom_handler(file_path, table_name, data_source)
 
             # Fall back to generic registry if no custom handler
             if not handler:
@@ -2111,11 +2504,269 @@ class DataLoader:
             quiet_console.print(f"  ❌ Failed to load {file_path.name}: {e}")
             return 0
 
+    def _create_custom_handler(self, file_path: Path, table_name: str, data_source: DataSource) -> Any | None:
+        """Call a platform handler factory, preserving backward-compatible arity."""
+        if not self.handler_factory:
+            return None
+
+        signature = inspect.signature(self.handler_factory)
+        supports_extended_context = (
+            any(param.kind is inspect.Parameter.VAR_POSITIONAL for param in signature.parameters.values())
+            or sum(
+                1
+                for param in signature.parameters.values()
+                if param.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            )
+            >= 5
+        )
+
+        if supports_extended_context:
+            return self.handler_factory(file_path, self.adapter, self.benchmark, table_name, data_source)
+        return self.handler_factory(file_path, self.adapter, self.benchmark)
+
+
+class SchemaHelpersMixin:
+    """Mixin providing schema creation and platform metadata helpers.
+
+    Extracted from PlatformAdapter (slice w9). Expects host class to expose:
+    - ``platform_name`` property, ``logger``
+    - ``get_effective_tuning_configuration()`` (TuningConfigMixin)
+    - ``get_target_dialect()`` (DialectTranslationMixin)
+    - ``translate_sql()`` (DialectTranslationMixin)
+    - ``log_verbose()``, ``log_very_verbose()``, ``log_operation_start()``,
+      ``log_operation_complete()`` (VerbosityMixin)
+    """
+
+    def _calculate_data_size(self, data_dir: Path) -> float:
+        """Calculate total size of data files in MB.
+
+        Note: Returns 0.0 for cloud storage paths (S3, Azure, GCS, DBFS) as they
+        require authentication and don't support local file operations. Data size
+        calculation is optional for metrics and skipped for cloud paths.
+        """
+        from benchbox.utils.cloud_storage import is_cloud_path
+
+        total_size = 0
+        try:
+            # Skip cloud paths - they require authentication and listing can fail
+            if is_cloud_path(str(data_dir)):
+                return 0.0
+
+            # rglob() not supported on some special paths
+            if not hasattr(data_dir, "rglob"):
+                return 0.0
+
+            for file_path in data_dir.rglob("*"):
+                if file_path.is_file() and file_path.suffix in [".csv", ".tbl"]:
+                    total_size += file_path.stat().st_size
+        except (AttributeError, NotImplementedError, OSError):
+            # Cloud paths may not support rglob(), stat(), or is_file()
+            return 0.0
+        except Exception:
+            # Catch all other errors (e.g., authentication errors from cloud providers)
+            # Data size calculation is optional, so gracefully skip on any error
+            return 0.0
+
+        return total_size / (1024 * 1024)
+
+    def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
+        """Get platform-specific metadata (to be overridden by subclasses)."""
+        metadata = {
+            "platform": self.platform_name,
+            "connection_type": type(connection).__name__,
+            "tuning_enabled": self.tuning_enabled,
+        }
+
+        # Include tuning configuration metadata if available
+        effective_config = self.get_effective_tuning_configuration()
+        if self.tuning_enabled and effective_config:
+            metadata["tuning_configuration_hash"] = effective_config.get_configuration_hash()
+            metadata["tuned_tables"] = list(effective_config.table_tunings.keys())
+            metadata["tuning_types_enabled"] = [t.value for t in effective_config.get_enabled_tuning_types()]
+
+        return metadata
+
+    def _hash_connection_config(self, connection_config: dict[str, Any]) -> str:
+        """Generate a hash of connection configuration (excluding sensitive data)."""
+        # Create a sanitized version of config for hashing
+        sanitized_config = {}
+        for key, value in connection_config.items():
+            if key not in ["password", "token", "service_account_path"]:
+                sanitized_config[key] = value
+
+        config_str = str(sorted(sanitized_config.items()))
+        return hashlib.md5(config_str.encode()).hexdigest()[:16]
+
+    def _create_schema_with_tuning(self, benchmark, source_dialect: str = "duckdb") -> str:
+        """Common schema creation logic with tuning support.
+
+        Args:
+            benchmark: Benchmark instance to get schema from
+            source_dialect: Source SQL dialect to translate from (default: "duckdb")
+
+        Returns:
+            SQL schema string ready for execution
+
+        Raises:
+            Exception: If schema creation fails
+        """
+        self.log_operation_start(
+            "Schema SQL generation", f"benchmark: {benchmark.__class__.__name__}, target: {self.get_target_dialect()}"
+        )
+
+        # Get effective tuning configuration
+        effective_config = self.get_effective_tuning_configuration()
+
+        tuning_status = "with tuning" if effective_config else "no tuning"
+        self.log_verbose(f"Schema generation {tuning_status} - target dialect: {self.get_target_dialect()}")
+        self.log_very_verbose(f"Effective tuning config type: {type(effective_config)}")
+
+        # Use standardized signature with dialect and tuning configuration
+        try:
+            schema_sql = benchmark.get_create_tables_sql(
+                dialect=self.get_target_dialect(), tuning_config=effective_config
+            )
+            self.log_very_verbose("Using standardized schema generation with tuning configuration")
+            self.log_verbose(f"Schema SQL from benchmark: {len(schema_sql)} characters")
+        except TypeError as e:
+            # Fallback for benchmarks that don't support the new signature yet
+            self.logger.warning(
+                f"TypeError calling get_create_tables_sql with new signature: {e}. Falling back to legacy."
+            )
+            schema_sql = benchmark.get_create_tables_sql()
+            self.log_very_verbose("Using legacy schema generation (no tuning configuration)")
+            self.log_verbose(f"Schema SQL from benchmark (legacy): {len(schema_sql)} characters")
+        except Exception as e:
+            self.logger.error(f"Unexpected exception in schema generation: {type(e).__name__}: {e}")
+            raise
+
+        # Translate to target dialect if needed
+        translation_needed = source_dialect != self.get_target_dialect()
+        if translation_needed:
+            original_len = len(schema_sql)
+            self.log_verbose(f"Translating schema SQL from {source_dialect} to {self.get_target_dialect()}")
+            self.log_very_verbose(f"SQL before translation: {original_len} characters")
+            schema_sql = self.translate_sql(schema_sql, source_dialect)
+            self.log_verbose(f"SQL after translation: {len(schema_sql)} characters (was {original_len})")
+            if len(schema_sql) < original_len * 0.5:
+                self.logger.warning(
+                    f"Translation reduced SQL size significantly: {original_len} -> {len(schema_sql)} characters. "
+                    "This may indicate a translation problem."
+                )
+
+        self.log_operation_complete(
+            "Schema SQL generation",
+            details=f"{len(schema_sql)} characters, translation: {'yes' if translation_needed else 'no'}",
+        )
+
+        return schema_sql
+
+    def _execute_schema_statements(self, statements: list[str], cursor: Any) -> tuple[int, list[tuple[str, str]]]:
+        """Execute schema statements with comprehensive error handling and logging.
+
+        This method provides robust error handling for schema creation across all platforms.
+        It attempts to create all tables even if some fail, and provides detailed error
+        reporting showing exactly which tables failed and why.
+
+        Args:
+            statements: List of SQL CREATE TABLE statements to execute
+            cursor: Database cursor for executing statements
+
+        Returns:
+            Tuple of (tables_created_count, failed_tables_list)
+            where failed_tables_list contains (table_name, error_message) tuples
+
+        Example:
+            statements = ["CREATE TABLE region (...)", "CREATE TABLE nation (...)"]
+            created, failed = self._execute_schema_statements(statements, cursor)
+            if failed:
+                self.logger.error(f"Failed to create {len(failed)} tables: {failed}")
+
+        Raises:
+            RuntimeError: If any table creation fails (after attempting all statements)
+        """
+        tables_created = 0
+        failed_tables: list[tuple[str, str]] = []
+
+        for i, statement in enumerate(statements, 1):
+            if not statement.strip():
+                continue
+
+            # Extract table name for better error reporting
+            table_name = "unknown"
+            match = re.search(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)", statement, re.IGNORECASE)
+            if match:
+                table_name = match.group(1).strip("`").strip('"')
+
+            try:
+                self.log_very_verbose(f"Creating table {table_name} ({i}/{len(statements)})")
+                self.log_very_verbose(f"SQL: {statement[:150]}...")
+
+                # Execute the statement
+                cursor.execute(statement)
+                tables_created += 1
+                self.log_very_verbose(f"✅ Created table {table_name}")
+
+            except Exception as e:
+                error_msg = str(e)
+                self.logger.error(f"❌ Failed to create table {table_name}: {error_msg}")
+                self.log_very_verbose(f"Failed SQL: {statement[:200]}...")
+                failed_tables.append((table_name, error_msg))
+                # Continue to next table instead of failing immediately
+
+        # Report summary
+        self.log_verbose(f"Schema creation: {tables_created} tables created, {len(failed_tables)} failed")
+
+        # If any tables failed, raise error with details
+        if failed_tables:
+            failure_details = "\n".join([f"  - {table}: {error[:100]}" for table, error in failed_tables])
+            raise RuntimeError(
+                f"Failed to create {len(failed_tables)} table(s) out of {len(statements)}:\n{failure_details}"
+            )
+
+        return tables_created, failed_tables
+
+    def _get_constraint_configuration(self) -> tuple[bool, bool]:
+        """Extract constraint configuration settings from tuning config.
+
+        Returns:
+            Tuple of (enable_primary_keys, enable_foreign_keys)
+        """
+        effective_config = self.get_effective_tuning_configuration()
+        enable_primary_keys = effective_config.primary_keys.enabled if effective_config else False
+        enable_foreign_keys = effective_config.foreign_keys.enabled if effective_config else False
+
+        return enable_primary_keys, enable_foreign_keys
+
+    def _log_constraint_configuration(self, enable_primary_keys: bool, enable_foreign_keys: bool) -> None:
+        """Log constraint configuration settings.
+
+        Args:
+            enable_primary_keys: Whether primary key constraints are enabled
+            enable_foreign_keys: Whether foreign key constraints are enabled
+        """
+        if enable_primary_keys:
+            self.logger.info(f"Primary key constraints enabled for {self.platform_name}")
+
+        if enable_foreign_keys:
+            self.logger.info(f"Foreign key constraints enabled for {self.platform_name}")
+
+        if not enable_primary_keys and not enable_foreign_keys:
+            self.logger.debug(f"No constraints enabled for {self.platform_name}")
+
+        self.logger.debug(
+            f"Schema constraints from tuning config: primary_keys={enable_primary_keys}, foreign_keys={enable_foreign_keys}"
+        )
+
 
 __all__ = [
     "DataLoadingError",
     "DataSource",
+    "CsvDialect",
+    "resolve_csv_dialect",
+    "prepare_local_load_file",
     "DataSourceResolver",
+    "SchemaHelpersMixin",
     "CompressionHandler",
     "GzipHandler",
     "ZstdHandler",

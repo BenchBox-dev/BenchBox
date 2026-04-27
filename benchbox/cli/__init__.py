@@ -28,6 +28,6 @@ def __getattr__(name: str) -> Any:
     try:
         module = importlib.import_module(f"{__name__}.{name}")
     except ModuleNotFoundError:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
     globals()[name] = module
     return module

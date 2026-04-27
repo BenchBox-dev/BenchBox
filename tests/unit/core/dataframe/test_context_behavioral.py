@@ -100,7 +100,7 @@ class StubContext(DataFrameContextImpl[dict]):
 
 
 # ---------------------------------------------------------------------------
-# element() – default raises NotImplementedError
+# element() - default raises NotImplementedError
 # ---------------------------------------------------------------------------
 
 
@@ -115,7 +115,7 @@ class TestElementMethod:
 
 
 # ---------------------------------------------------------------------------
-# Table registration – edge cases
+# Table registration - edge cases
 # ---------------------------------------------------------------------------
 
 
@@ -164,7 +164,7 @@ class TestTableRegistrationEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# to_date – additional edge cases
+# to_date - additional edge cases
 # ---------------------------------------------------------------------------
 
 
@@ -204,7 +204,7 @@ class TestToDateEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# days() – edge cases
+# days() - edge cases
 # ---------------------------------------------------------------------------
 
 
@@ -225,7 +225,7 @@ class TestDaysEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# Window functions – descriptor verification
+# Window functions - descriptor verification
 # ---------------------------------------------------------------------------
 
 
@@ -391,7 +391,7 @@ class TestScalarMethods:
 
 
 # ---------------------------------------------------------------------------
-# Protocol compliance – duck typing
+# Protocol compliance - duck typing
 # ---------------------------------------------------------------------------
 
 

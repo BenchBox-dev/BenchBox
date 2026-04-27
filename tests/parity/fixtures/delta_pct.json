@@ -1,0 +1,76 @@
+{
+  "chart": "delta_pct",
+  "version": 1,
+  "cases": [
+    {
+      "id": "identical",
+      "input": {
+        "thisMs": 100.0,
+        "baselineMs": 100.0
+      },
+      "expected": {
+        "deltaPct": 0.0
+      }
+    },
+    {
+      "id": "fifty_pct_faster",
+      "input": {
+        "thisMs": 50.0,
+        "baselineMs": 100.0
+      },
+      "expected": {
+        "deltaPct": -50.0
+      }
+    },
+    {
+      "id": "one_hundred_pct_slower",
+      "input": {
+        "thisMs": 200.0,
+        "baselineMs": 100.0
+      },
+      "expected": {
+        "deltaPct": 100.0
+      }
+    },
+    {
+      "id": "extreme_regression_300pct",
+      "input": {
+        "thisMs": 400.0,
+        "baselineMs": 100.0
+      },
+      "expected": {
+        "deltaPct": 300.0
+      }
+    },
+    {
+      "id": "null_baseline",
+      "input": {
+        "thisMs": 100.0,
+        "baselineMs": null
+      },
+      "expected": {
+        "deltaPct": null
+      }
+    },
+    {
+      "id": "null_this",
+      "input": {
+        "thisMs": null,
+        "baselineMs": 100.0
+      },
+      "expected": {
+        "deltaPct": null
+      }
+    },
+    {
+      "id": "sub_ms_precision",
+      "input": {
+        "thisMs": 1.111,
+        "baselineMs": 1.0
+      },
+      "expected": {
+        "deltaPct": 11.099999999999998
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 """Behavior-verifying tests for DataFusion adapter using real SessionContext.
 
-Every test creates a real DataFusion context — no MagicMock on the connection path.
+Every test creates a real DataFusion context - no MagicMock on the connection path.
 """
 
 from __future__ import annotations

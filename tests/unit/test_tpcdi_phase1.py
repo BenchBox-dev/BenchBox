@@ -343,7 +343,7 @@ class TestDataGenerator:
             assert Path(industry_file).exists()
 
             # Check file content
-            with open(industry_file) as f:
+            with open(industry_file, encoding="utf-8") as f:
                 lines = f.readlines()
                 assert len(lines) >= 10  # Should have industry data
 
@@ -360,7 +360,7 @@ class TestDataGenerator:
             assert Path(broker_file).exists()
 
             # Check file content
-            with open(broker_file) as f:
+            with open(broker_file, encoding="utf-8") as f:
                 lines = f.readlines()
                 assert len(lines) >= 100  # Minimum 100 brokers
 
@@ -381,7 +381,7 @@ class TestDataGenerator:
             assert Path(holdings_file).exists()
 
             # Check that files have data
-            with open(cash_file) as f:
+            with open(cash_file, encoding="utf-8") as f:
                 assert len(f.readlines()) > 0
 
     @pytest.mark.slow
@@ -449,7 +449,7 @@ class TestIntegration:
             # Generate broker data and verify realistic patterns
             broker_file = generator._generate_dimbroker_data()
 
-            with open(broker_file) as f:
+            with open(broker_file, encoding="utf-8") as f:
                 lines = f.readlines()
 
             # Check that we have reasonable data

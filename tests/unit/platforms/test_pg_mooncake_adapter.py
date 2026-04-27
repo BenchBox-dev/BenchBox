@@ -7,6 +7,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import inspect
 from unittest.mock import Mock, patch
 
 import pytest
@@ -24,20 +25,19 @@ pytestmark = [
 
 @pytest.fixture()
 def pg_mooncake_stubs(monkeypatch):
-    """Patch psycopg2 objects so tests don't require the real driver.
+    """Patch psycopg objects so tests don't require the real driver.
 
     Must patch both pg_mooncake and postgresql modules since PgMooncakeAdapter
-    inherits from PostgreSQLAdapter which checks for psycopg2 in its __init__.
+    inherits from PostgreSQLAdapter which checks for psycopg in its __init__.
     """
-    mock_psycopg2 = Mock()
-    mock_psycopg2.__version__ = "2.9.9"
-    mock_psycopg2.extras = Mock()
+    mock_psycopg = Mock()
+    mock_psycopg.__version__ = "3.1.0"
 
     # Patch both modules - parent checks in postgresql module
-    monkeypatch.setattr(pg_mooncake_module, "psycopg2", mock_psycopg2)
-    monkeypatch.setattr(postgresql_module, "psycopg2", mock_psycopg2)
+    monkeypatch.setattr(pg_mooncake_module, "psycopg", mock_psycopg)
+    monkeypatch.setattr(postgresql_module, "psycopg", mock_psycopg)
 
-    return mock_psycopg2
+    return mock_psycopg
 
 
 class TestPgMooncakeAdapter:
@@ -213,26 +213,58 @@ class TestPgMooncakeColumnstoreDDL:
         assert adapter._add_columnstore_access_method(index) == index
 
     def test_create_schema_adds_columnstore(self, pg_mooncake_stubs):
-        """create_schema should add USING columnstore to CREATE TABLE DDL."""
+        """create_schema should add USING columnstore through the parent flow."""
         adapter = PgMooncakeAdapter()
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        schema_sql = (
+            "CREATE TABLE foo (id INT, name TEXT);"
+            "CREATE INDEX idx_foo ON foo (id);"
+            "CREATE TABLE bar (x BIGINT, y DECIMAL(10,2));"
+        )
 
-        ddl_list = [
-            "CREATE TABLE foo (id INT, name TEXT);",
-            "CREATE INDEX idx_foo ON foo (id);",
-            "CREATE TABLE bar (x BIGINT, y DECIMAL(10,2));",
+        with patch.object(adapter, "_create_schema_with_tuning", return_value=schema_sql):
+            adapter.create_schema(Mock(), conn)
+
+        executed = [call.args[0] for call in cursor.execute.call_args_list]
+        assert executed[0] == "CREATE TABLE foo (id INT, name TEXT) USING columnstore"
+        assert executed[1] == "CREATE INDEX idx_foo ON foo (id)"
+        assert executed[2] == "CREATE TABLE bar (x BIGINT, y DECIMAL(10,2)) USING columnstore"
+        conn.commit.assert_called_once()
+        cursor.close.assert_called_once()
+
+    def test_create_schema_signature_matches_postgresql_parent(self, pg_mooncake_stubs):
+        """create_schema must keep the PostgreSQLAdapter public contract."""
+        assert inspect.signature(PgMooncakeAdapter.create_schema) == inspect.signature(
+            postgresql_module.PostgreSQLAdapter.create_schema
+        )
+
+    def test_create_schema_fk_strip_retry_preserves_columnstore(self, pg_mooncake_stubs):
+        """When the initial CREATE TABLE fails and FK-strip retry runs, the retry
+        statement must still carry ``USING columnstore`` — pg_mooncake's only
+        reason to override the parent hook.
+        """
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        cursor = Mock()
+        conn.cursor.return_value = cursor
+        cursor.execute.side_effect = [
+            Exception("FK violation"),
+            None,
         ]
+        schema_sql = "CREATE TABLE foo (id INT, ref_id INT, FOREIGN KEY (ref_id) REFERENCES bar(id));"
 
-        # We can't call create_schema directly without a real connection,
-        # but we can verify the DDL modification logic
-        modified = []
-        for stmt in ddl_list:
-            modified.append(adapter._add_columnstore_access_method(stmt))
+        with patch.object(adapter, "_create_schema_with_tuning", return_value=schema_sql):
+            adapter.create_schema(Mock(), conn)
 
-        # CREATE TABLE statements should have USING columnstore
-        assert "USING columnstore" in modified[0]
-        assert "USING columnstore" in modified[2]
-        # CREATE INDEX should be unchanged
-        assert "USING columnstore" not in modified[1]
+        executed = [call.args[0] for call in cursor.execute.call_args_list]
+        assert len(executed) == 2
+        assert "USING columnstore" in executed[0]
+        assert "FOREIGN KEY" in executed[0]
+        assert "USING columnstore" in executed[1], f"FK-strip retry dropped columnstore: {executed[1]!r}"
+        assert "FOREIGN KEY" not in executed[1]
+        conn.rollback.assert_called_once()
 
 
 class TestPgMooncakeExtensionVerification:
@@ -359,13 +391,12 @@ class TestPgMooncakeStorageConfig:
         bucket_set = any("default_bucket" in call for call in calls)
         assert bucket_set
 
-    def test_create_connection_mogrify_uses_existing_cursor(self, pg_mooncake_stubs, monkeypatch):
-        """mogrify() should use existing cursor, not create a new orphaned one."""
+    def test_create_connection_bucket_set_uses_sql_literal(self, pg_mooncake_stubs, monkeypatch):
+        """SET mooncake.default_bucket should use psycopg.sql.Literal, not f-string."""
         monkeypatch.delenv("MOONCAKE_S3_BUCKET", raising=False)
 
         mock_conn = Mock()
         mock_cursor = Mock()
-        mock_cursor.mogrify.return_value = b"'s3://test-bucket/data'"
         mock_conn.cursor.return_value = mock_cursor
 
         mock_cursor.fetchone.side_effect = [
@@ -388,8 +419,15 @@ class TestPgMooncakeStorageConfig:
         ):
             adapter.create_connection()
 
-        # mogrify should be called on the same cursor, not via conn.cursor().mogrify()
-        mock_cursor.mogrify.assert_called_once()
+        # Verify execute was called with a psycopg.sql.Composed object (not an f-string)
+        from psycopg import sql as psycopg_sql
+
+        set_calls = [
+            call
+            for call in mock_cursor.execute.call_args_list
+            if isinstance(call[0][0], (psycopg_sql.Composed, psycopg_sql.SQL))
+        ]
+        assert len(set_calls) >= 1, "Expected at least one psycopg.sql.Composed execute call for bucket SET"
 
 
 class TestPgMooncakeRegistration:
@@ -423,28 +461,166 @@ class TestPgMooncakeConfigBuilder:
         """Config builder should produce correct configuration."""
         from benchbox.platforms.pg_mooncake import _build_pg_mooncake_config
 
-        benchmark_config = {"scale_factor": 1.0}
-        platform_options = {
+        options = {
             "host": "localhost",
             "port": 5432,
             "storage_mode": "local",
         }
+        overrides = {"scale_factor": 1.0}
 
-        config = _build_pg_mooncake_config(benchmark_config, platform_options)
+        config = _build_pg_mooncake_config("pg-mooncake", options, overrides, None)
 
-        assert config["host"] == "localhost"
-        assert config["port"] == 5432
-        assert config["storage_mode"] == "local"
-        assert config["scale_factor"] == 1.0
+        assert config.host == "localhost"
+        assert config.port == 5432
+        assert config.storage_mode == "local"
+        assert config.scale_factor == 1.0
 
     def test_config_builder_defaults(self, pg_mooncake_stubs):
         """Config builder should apply defaults for missing options."""
         from benchbox.platforms.pg_mooncake import _build_pg_mooncake_config
 
-        config = _build_pg_mooncake_config({}, {})
+        config = _build_pg_mooncake_config("pg-mooncake", {}, {}, None)
 
-        assert config["host"] == "localhost"
-        assert config["port"] == 5432
-        assert config["username"] == "postgres"
-        assert config["storage_mode"] == "local"
-        assert config["mooncake_bucket"] is None
+        assert config.host == "localhost"
+        assert config.port == 5432
+        assert config.username == "postgres"
+        assert config.admin_database == "postgres"
+        assert config.sslmode == "prefer"
+        assert config.work_mem == "256MB"
+        assert config.maintenance_work_mem == "512MB"
+        assert config.effective_cache_size == "1GB"
+        assert config.max_parallel_workers_per_gather == 2
+        assert config.storage_mode == "local"
+        assert config.mooncake_bucket is None
+        assert config.options["schema"] == "public"
+
+
+class TestPgMooncakeMigrationPhase:
+    """Tests for run_migration_phase() heap-to-columnstore migration."""
+
+    def _make_mock_conn(self, table_names: list[str], storage_before: int = 8192, storage_after: int = 4096):
+        """Build a mock psycopg connection that satisfies run_migration_phase queries."""
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        # Responses: heap-table discovery, then (before, after) per table
+        fetchall_response = [(t,) for t in table_names]
+        fetchone_responses = []
+        for _ in table_names:
+            fetchone_responses.append((storage_before,))  # before
+            fetchone_responses.append((storage_after,))  # after
+
+        mock_cursor.fetchall.return_value = fetchall_response
+        mock_cursor.fetchone.side_effect = fetchone_responses
+        return mock_conn, mock_cursor
+
+    def test_returns_none_when_no_tables(self, pg_mooncake_stubs):
+        """run_migration_phase should return None when table_names is empty."""
+        adapter = PgMooncakeAdapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+
+        result = adapter.run_migration_phase(mock_conn, table_names=[])
+
+        assert result is None
+
+    def test_returns_none_when_auto_discovery_finds_nothing(self, pg_mooncake_stubs):
+        """run_migration_phase should return None when schema has no heap tables."""
+        adapter = PgMooncakeAdapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+
+        result = adapter.run_migration_phase(mock_conn, table_names=None)
+
+        assert result is None
+
+    def test_migrates_provided_tables(self, pg_mooncake_stubs):
+        """run_migration_phase should ALTER TABLE for each provided table."""
+        from benchbox.core.results.models import MigrationPhase
+
+        adapter = PgMooncakeAdapter()
+        mock_conn, mock_cursor = self._make_mock_conn(["lineitem", "orders"])
+
+        result = adapter.run_migration_phase(mock_conn, table_names=["lineitem", "orders"])
+
+        assert isinstance(result, MigrationPhase)
+        assert result.tables_migrated == 2
+        assert result.tables_failed == 0
+        assert result.status == "completed"
+        assert "lineitem" in result.per_table_stats
+        assert "orders" in result.per_table_stats
+
+    def test_storage_delta_computed_correctly(self, pg_mooncake_stubs):
+        """Migration phase should record correct storage before/after/delta."""
+        adapter = PgMooncakeAdapter()
+        mock_conn, mock_cursor = self._make_mock_conn(["lineitem"], storage_before=8192, storage_after=4096)
+
+        result = adapter.run_migration_phase(mock_conn, table_names=["lineitem"])
+
+        assert result.storage_before_bytes == 8192
+        assert result.storage_after_bytes == 4096
+        assert result.storage_delta_bytes == -4096
+        tbl = result.per_table_stats["lineitem"]
+        assert tbl.storage_before_bytes == 8192
+        assert tbl.storage_after_bytes == 4096
+        assert tbl.storage_delta_bytes == -4096
+
+    def test_failed_table_recorded_as_partial(self, pg_mooncake_stubs):
+        """When one table fails, status should be 'partial' not 'completed'."""
+        from benchbox.core.results.models import MigrationPhase
+
+        adapter = PgMooncakeAdapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        # lineitem succeeds, orders raises
+        mock_cursor.fetchone.side_effect = [
+            (8192,),  # lineitem before
+            (4096,),  # lineitem after
+            (8192,),  # orders before - fetched before the ALTER fails
+        ]
+
+        call_count = [0]
+
+        def execute_side_effect(sql, *args):
+            if "SET ACCESS METHOD" in str(sql) and "orders" in str(sql):
+                raise Exception("columnstore not available")
+            call_count[0] += 1
+
+        mock_cursor.execute.side_effect = execute_side_effect
+
+        result = adapter.run_migration_phase(mock_conn, table_names=["lineitem", "orders"])
+
+        assert isinstance(result, MigrationPhase)
+        assert result.tables_migrated == 1
+        assert result.tables_failed == 1
+        assert result.status == "partial"
+        assert result.per_table_stats["orders"].status == "failed"
+        assert result.per_table_stats["orders"].error_message is not None
+
+    def test_all_failed_status_is_failed(self, pg_mooncake_stubs):
+        """When all tables fail, status should be 'failed'."""
+        adapter = PgMooncakeAdapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        # Storage size query succeeds; ALTER TABLE fails
+        mock_cursor.fetchone.return_value = (8192,)
+
+        def execute_side_effect(sql, *args):
+            if "SET ACCESS METHOD" in str(sql):
+                raise Exception("columnar error")
+
+        mock_cursor.execute.side_effect = execute_side_effect
+
+        result = adapter.run_migration_phase(mock_conn, table_names=["lineitem"])
+
+        assert result.status == "failed"
+        assert result.tables_migrated == 0
+        assert result.tables_failed == 1

@@ -21,7 +21,7 @@ These tests use the built-in TPC-H catalog available in Starburst Galaxy.
 Write tests (SchemaManagement, DataLoading) require a writable catalog:
    - STARBURST_WRITABLE_CATALOG (e.g., 'memory' or a configured Hive/Iceberg catalog)
 
-Without STARBURST_WRITABLE_CATALOG these tests are skipped — the default tpch
+Without STARBURST_WRITABLE_CATALOG these tests are skipped - the default tpch
 catalog is read-only and cannot accept DDL or DML.
 """
 

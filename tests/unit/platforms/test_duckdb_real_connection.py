@@ -1,7 +1,7 @@
 """Behavior-verifying tests for DuckDB adapter using real in-memory connections.
 
 These tests replace mock-heavy coverage tests with real database operations.
-Every test creates a real DuckDB connection — no MagicMock on the connection path.
+Every test creates a real DuckDB connection - no MagicMock on the connection path.
 """
 
 from __future__ import annotations

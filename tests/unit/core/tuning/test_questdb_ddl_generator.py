@@ -1,6 +1,6 @@
 """Tests for benchbox.core.tuning.generators.questdb.QuestDBDDLGenerator.
 
-Focused on the generator class itself — DDL string content and TuningClauses
+Focused on the generator class itself - DDL string content and TuningClauses
 field values. Does not duplicate adapter-level tests.
 
 Copyright 2026 Joe Harris / BenchBox Project

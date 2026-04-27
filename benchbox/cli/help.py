@@ -14,7 +14,7 @@ from typing import Any
 import click
 
 # Valid help topics
-HELP_TOPICS = ("all", "examples")
+HELP_TOPICS = ("all", "examples", "benchmarks")
 
 
 # Command categories for grouped help display
@@ -62,7 +62,7 @@ COMMAND_EXAMPLES: dict[str, dict[str, list[str]]] = {
         ],
         "Driver & Version Management": [
             "# BenchBox uses whatever driver version is installed in the current environment.",
-            "# When invoked via 'uv run', uv syncs your env to uv.lock first — a version you",
+            "# When invoked via 'uv run', uv syncs your env to uv.lock first - a version you",
             "# installed manually (e.g. uv pip install duckdb==1.5.0) may be silently reverted.",
             "# Use driver_auto_install to reliably switch versions without touching the lock file:",
             "benchbox run --platform duckdb --benchmark tpch \\",
@@ -363,11 +363,11 @@ class BenchBoxCommand(click.Command):
         self.params.append(
             click.Option(
                 ["--help-topic"],
-                type=click.Choice(["all", "examples"], case_sensitive=False),
+                type=click.Choice(["all", "examples", "benchmarks"], case_sensitive=False),
                 default=None,
                 expose_value=False,
                 is_eager=True,
-                help="Show extended help: 'all' for advanced options, 'examples' for usage examples",
+                help="Show extended help: 'all' for advanced options, 'examples' for usage examples, 'benchmarks' for benchmark options",
                 callback=self._handle_help_topic,
             )
         )
@@ -397,6 +397,51 @@ class BenchBoxCommand(click.Command):
             # --help-topic examples: show categorized examples
             self._show_examples(ctx)
             ctx.exit(0)
+
+        elif topic == "benchmarks":
+            # --help-topic benchmarks: show benchmark-specific options
+            self._show_benchmark_options(ctx)
+            ctx.exit(0)
+
+    @staticmethod
+    def _show_benchmark_options(ctx: click.Context) -> None:
+        """Display available benchmark-specific options (--benchmark-option)."""
+        from benchbox.cli.benchmark_hooks import BenchmarkHookRegistry
+        from benchbox.core.benchmark_loader import list_loader_benchmark_ids
+
+        click.echo(
+            click.style("\nBenchmark-specific options (--benchmark-option KEY=VALUE):\n", bold=True),
+            color=ctx.color,
+        )
+
+        # Eagerly import all benchmark modules so their specs register
+        from benchbox.core.benchmark_loader import get_benchmark_class
+
+        found_any = False
+        for bench_id in sorted(list_loader_benchmark_ids()):
+            try:
+                get_benchmark_class(bench_id)
+            except ValueError:
+                continue
+
+            lines = BenchmarkHookRegistry.describe_options(bench_id)
+            if not lines:
+                continue
+
+            found_any = True
+            click.echo(click.style(f"  {bench_id}:", fg="cyan", bold=True), color=ctx.color)
+            for line in lines:
+                click.echo(f"    {line}", color=ctx.color)
+            click.echo("", color=ctx.color)
+
+        if not found_any:
+            click.echo("  No benchmarks have registered custom options.", color=ctx.color)
+
+        click.echo(
+            click.style("Usage: ", fg="yellow", bold=True)
+            + "--benchmark-option taxi_types=yellow,green --benchmark-option year=2020",
+            color=ctx.color,
+        )
 
     def _show_examples(self, ctx: click.Context) -> None:
         """Display categorized usage examples."""
@@ -668,9 +713,16 @@ def handle_help_callback(ctx: click.Context, param: click.Parameter, value: str 
         else:
             click.echo("No examples available.", color=ctx.color)
         ctx.exit(0)
+    elif topic == "benchmarks":
+        cmd = ctx.command
+        if hasattr(cmd, "_show_benchmark_options"):
+            cmd._show_benchmark_options(ctx)  # type: ignore[call-non-callable]
+        else:
+            click.echo("No benchmark options available.", color=ctx.color)
+        ctx.exit(0)
     else:
         click.echo(
-            f"Unknown help topic: '{topic}'\nValid topics: all, examples",
+            f"Unknown help topic: '{topic}'\nValid topics: all, examples, benchmarks",
             color=ctx.color,
         )
         ctx.exit(1)

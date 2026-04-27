@@ -365,7 +365,7 @@ class TestTPCDISpecificationValidator:
         # Should contain valid JSON
         import json
 
-        with open(output_path) as f:
+        with open(output_path, encoding="utf-8") as f:
             report_data = json.load(f)
 
         assert "timestamp" in report_data

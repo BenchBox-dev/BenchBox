@@ -5,7 +5,7 @@ describes the files produced during benchmark data generation. The manifest is
 used by the CLI to decide when existing datasets can be safely reused without
 triggering another expensive generation step.
 
-The helpers here intentionally avoid expensive filesystem work – they rely on
+The helpers here intentionally avoid expensive filesystem work - they rely on
 metadata gathered during generation (row counts, file sizes) and normalise
 paths so the manifest is portable across local and cloud storage backends.
 """
@@ -38,7 +38,7 @@ def compute_entry_size(path: Path) -> int:
 
     For regular files, returns ``path.stat().st_size`` (the byte count).
     For directories (used by Delta, Iceberg, DuckLake, partitioned Parquet),
-    returns the recursive sum of all contained files — matching exactly how
+    returns the recursive sum of all contained files - matching exactly how
     converters compute ``size_bytes`` at write time.
 
     Note:
@@ -225,7 +225,13 @@ class DataGenerationManifest:
             size_bytes: Size of the file in bytes (auto-detected if None)
             checksum: Optional checksum for data validation
             format: Format name (e.g., 'tbl', 'parquet', 'delta')
-            metadata: Format-specific metadata
+            metadata: CSV dialect metadata consumed by DataSourceResolver.
+                Standardized keys (all optional):
+                  csv_delimiter: str           — field separator (default: '|' for tbl/dat, ',' for csv)
+                  csv_has_header: bool         — True if first row is a header
+                  csv_null_marker: str | None  — '' = empty→NULL; None = no conversion
+                  csv_normalize_booleans: bool — True/False → 1/0 (for STRICT_ALL_TABLES)
+                  csv_quote: str | None        — quote character; defaults to '"' when None
         """
 
         resolved, manifest_path = _normalise_to_root(self._root, file_path)
@@ -397,50 +403,62 @@ def get_table_files(
         return []
 
     table_data = tables[table_name]
+
+    # V1 manifests store table entries as a flat list; V2 wraps them in a
+    # dict with a "formats" key.  Handle both.
+    # Note: V1 manifests have no per-format structure, so `format` and
+    # `skip_directory_only_formats` params are ignored - all entries returned.
+    if isinstance(table_data, list):
+        return table_data
     if not isinstance(table_data, dict):
         return []
 
     formats_dict = table_data.get("formats", {})
 
     if format:
-        # Return entries for specific format
         return formats_dict.get(format, [])
-
-    def _all_directory(entries: list) -> bool:
-        return bool(entries) and all(isinstance(e, dict) and e.get("is_directory", False) for e in entries)
 
     preferred_order = manifest.get("format_preference") or manifest.get("formats") or []
     if not skip_directory_only_formats:
-        if preferred_order:
-            for fmt in preferred_order:
-                entries = formats_dict.get(fmt)
-                if entries:
-                    return entries
+        return _select_any_entries(formats_dict, preferred_order)
+    return _select_file_based_entries(formats_dict, preferred_order)
 
-        for entries in formats_dict.values():
-            if entries:
-                return entries
-        return []
 
-    # Choose default format: manifest format_preference > manifest formats list > first available.
-    # Skip directory-only formats (e.g. delta, iceberg) so file-based callers never
-    # receive directory entries unless no file-based format exists.
+def _all_directory_entries(entries: list) -> bool:
+    return bool(entries) and all(isinstance(e, dict) and e.get("is_directory", False) for e in entries)
+
+
+def _select_any_entries(formats_dict: dict, preferred_order: list) -> list[dict[str, Any]]:
+    """Return first non-empty format entries, preferred order then fallback."""
     if preferred_order:
         for fmt in preferred_order:
             entries = formats_dict.get(fmt)
-            if entries and not _all_directory(entries):
+            if entries:
                 return entries
-
-    # Fallback to any available non-directory format
     for entries in formats_dict.values():
-        if entries and not _all_directory(entries):
+        if entries:
             return entries
+    return []
 
+
+def _select_file_based_entries(formats_dict: dict, preferred_order: list) -> list[dict[str, Any]]:
+    """Return first non-empty, non-directory-only format entries.
+
+    Skips directory-only formats (delta, iceberg) so file-based callers never
+    receive directory entries unless no file-based format exists.
+    """
+    if preferred_order:
+        for fmt in preferred_order:
+            entries = formats_dict.get(fmt)
+            if entries and not _all_directory_entries(entries):
+                return entries
+    for entries in formats_dict.values():
+        if entries and not _all_directory_entries(entries):
+            return entries
     # Last resort: return first available even if directory-based
     for entries in formats_dict.values():
         if entries:
             return entries
-
     return []
 
 

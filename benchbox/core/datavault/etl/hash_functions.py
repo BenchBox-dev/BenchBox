@@ -12,8 +12,21 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import hashlib
 from typing import Any, Literal
 
-# Type alias for supported hash algorithms
-HashAlgorithm = Literal["md5", "sha1", "sha256"]
+# Type alias for supported hash algorithms.
+# Kept in sync with DataVaultBenchmark.SUPPORTED_HASH_ALGORITHMS (benchmark.py) -
+# not derived from it to avoid a circular import between this module and benchmark.py.
+HashAlgorithm = Literal["md5", "sha256"]
+
+# Runtime allowlist for SQL hash generation. Must match HashAlgorithm above.
+# Restricted to algorithms with DuckDB built-ins whose function names match these strings.
+_SUPPORTED_SQL_ALGORITHMS: frozenset[str] = frozenset({"md5", "sha256"})
+
+
+def _require_sql_algorithm(algorithm: str) -> None:
+    if algorithm not in _SUPPORTED_SQL_ALGORITHMS:
+        raise ValueError(
+            f"SQL hash generation only supports {tuple(sorted(_SUPPORTED_SQL_ALGORITHMS))}, got: {algorithm}"
+        )
 
 
 def generate_hash_key(*business_keys: Any, algorithm: HashAlgorithm = "md5") -> str:
@@ -25,11 +38,11 @@ def generate_hash_key(*business_keys: Any, algorithm: HashAlgorithm = "md5") -> 
 
     Args:
         *business_keys: One or more business key values to hash.
-        algorithm: Hash algorithm to use. Defaults to "md5" which produces
-                   a 32-character hex string.
+        algorithm: Hash algorithm to use. "md5" produces a 32-character hex
+                   string; "sha256" produces a 64-character hex string.
 
     Returns:
-        Hexadecimal hash string (32 chars for MD5, 40 for SHA1, 64 for SHA256).
+        Hexadecimal hash string (32 chars for md5, 64 chars for sha256).
 
     Examples:
         >>> generate_hash_key(1)  # Single business key
@@ -42,13 +55,9 @@ def generate_hash_key(*business_keys: Any, algorithm: HashAlgorithm = "md5") -> 
 
     if algorithm == "md5":
         return hashlib.md5(key_string.encode("utf-8")).hexdigest()
-    elif algorithm == "sha1":
-        return hashlib.sha1(key_string.encode("utf-8")).hexdigest()
-    elif algorithm == "sha256":
-        # Truncate to 32 chars for consistency with MD5 length
-        return hashlib.sha256(key_string.encode("utf-8")).hexdigest()[:32]
-    else:
-        raise ValueError(f"Unsupported hash algorithm: {algorithm}")
+    if algorithm == "sha256":
+        return hashlib.sha256(key_string.encode("utf-8")).hexdigest()
+    raise ValueError(f"Unsupported hash algorithm: {algorithm}")
 
 
 def generate_hashdiff(*attribute_values: Any, algorithm: HashAlgorithm = "md5") -> str:
@@ -63,7 +72,7 @@ def generate_hashdiff(*attribute_values: Any, algorithm: HashAlgorithm = "md5") 
         algorithm: Hash algorithm to use. Defaults to "md5".
 
     Returns:
-        Hexadecimal hash string representing the attribute state.
+        Hexadecimal hash string (32 chars for md5, 64 chars for sha256).
 
     Examples:
         >>> generate_hashdiff("John", "Doe", "123 Main St")
@@ -81,11 +90,12 @@ def generate_hash_key_sql(
     """Generate SQL expression for hash key calculation.
 
     This creates a SQL expression that can be used in DuckDB queries
-    to generate hash keys during ETL transformation.
+    to generate hash keys during ETL transformation. Both 'md5' and
+    'sha256' map directly to DuckDB built-in functions of the same name.
 
     Args:
         *column_names: Column names to include in the hash.
-        algorithm: Hash algorithm to use (only 'md5' supported in SQL).
+        algorithm: Hash algorithm to use ('md5' or 'sha256').
         table_alias: Optional table alias prefix for columns.
 
     Returns:
@@ -94,25 +104,27 @@ def generate_hash_key_sql(
     Examples:
         >>> generate_hash_key_sql("c_custkey")
         "md5(CAST(c_custkey AS VARCHAR))"
+        >>> generate_hash_key_sql("c_custkey", algorithm="sha256")
+        "sha256(CAST(c_custkey AS VARCHAR))"
         >>> generate_hash_key_sql("ps_partkey", "ps_suppkey")
         "md5(CAST(ps_partkey AS VARCHAR) || '|' || CAST(ps_suppkey AS VARCHAR))"
     """
-    if algorithm != "md5":
-        raise ValueError(f"SQL hash generation only supports 'md5', got: {algorithm}")
+    _require_sql_algorithm(algorithm)
 
     prefix = f"{table_alias}." if table_alias else ""
 
     if len(column_names) == 1:
-        return f"md5(CAST({prefix}{column_names[0]} AS VARCHAR))"
+        return f"{algorithm}(CAST({prefix}{column_names[0]} AS VARCHAR))"
 
     # Multiple columns - concatenate with pipe delimiter
     cast_expressions = [f"CAST({prefix}{col} AS VARCHAR)" for col in column_names]
     concat_expr = " || '|' || ".join(cast_expressions)
-    return f"md5({concat_expr})"
+    return f"{algorithm}({concat_expr})"
 
 
 def generate_hashdiff_sql(
     *column_names: str,
+    algorithm: HashAlgorithm = "md5",
     table_alias: str = "",
 ) -> str:
     """Generate SQL expression for HASHDIFF calculation.
@@ -122,14 +134,17 @@ def generate_hashdiff_sql(
 
     Args:
         *column_names: Attribute column names to include in the hash.
+        algorithm: Hash algorithm to use ('md5' or 'sha256').
         table_alias: Optional table alias prefix for columns.
 
     Returns:
         SQL expression string for HASHDIFF generation.
     """
+    _require_sql_algorithm(algorithm)
+
     prefix = f"{table_alias}." if table_alias else ""
 
     # Use COALESCE to handle NULLs consistently
     cast_expressions = [f"COALESCE(CAST({prefix}{col} AS VARCHAR), '')" for col in column_names]
     concat_expr = " || '|' || ".join(cast_expressions)
-    return f"md5({concat_expr})"
+    return f"{algorithm}({concat_expr})"

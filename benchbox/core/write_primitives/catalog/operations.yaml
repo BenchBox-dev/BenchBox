@@ -86,6 +86,8 @@ operations:
     cleanup_sql: |
       DELETE FROM insert_ops_lineitem WHERE l_orderkey BETWEEN 1 AND 10
     expected_rows_affected: null  # Varies by data
+    platform_overrides:
+      starrocks: null
 
   - id: insert_batch_values_100
     category: insert
@@ -103,6 +105,8 @@ operations:
     cleanup_sql: |
       DELETE FROM insert_ops_lineitem WHERE l_orderkey BETWEEN 9000100 AND 9000199
     expected_rows_affected: 100
+    platform_overrides:
+      starrocks: null
 
   - id: insert_batch_values_1000
     category: insert
@@ -120,6 +124,8 @@ operations:
     cleanup_sql: |
       DELETE FROM insert_ops_lineitem WHERE l_orderkey BETWEEN 9001000 AND 9001999
     expected_rows_affected: 1000
+    platform_overrides:
+      starrocks: null
 
   - id: insert_select_with_join
     category: insert
@@ -253,6 +259,7 @@ operations:
         INSERT OR IGNORE INTO insert_ops_orders
         SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 10
       datafusion: null
+      starrocks: null
 
   - id: insert_returning_clause
     category: insert
@@ -277,6 +284,7 @@ operations:
       mysql: null  # MySQL doesn't support RETURNING
       bigquery: null  # BigQuery doesn't support RETURNING in same way
       datafusion: null
+      starrocks: null
 
   # ============================================================================
   # UPDATE OPERATIONS (15 operations)
@@ -648,6 +656,7 @@ operations:
       mysql: null  # MySQL doesn't support RETURNING
       bigquery: null  # BigQuery doesn't support RETURNING
       datafusion: null
+      starrocks: null
 
   # ============================================================================
   # DELETE OPERATIONS (14 operations)
@@ -860,6 +869,7 @@ operations:
       mysql: null  # MySQL doesn't support RETURNING
       bigquery: null  # BigQuery doesn't support RETURNING
       datafusion: null
+      starrocks: null
 
   - id: delete_cascade_simulation
     category: delete
@@ -887,6 +897,7 @@ operations:
     expected_rows_affected: null
     platform_overrides:
       datafusion: null
+      starrocks: null
 
   - id: delete_all_truncate_comparison
     category: delete
@@ -901,6 +912,7 @@ operations:
     expected_rows_affected: null
     platform_overrides:
       datafusion: null
+      starrocks: null
 
   # ============================================================================
   # BULK_LOAD OPERATIONS (36 operations)
@@ -940,6 +952,7 @@ operations:
         DELETE FROM bulk_load_ops_target;
         .mode csv
         .import {file_path}/csv_small_1k.csv bulk_load_ops_target
+      starrocks: null
 
   - id: bulk_load_csv_small_gzip
     category: bulk_load
@@ -960,6 +973,7 @@ operations:
       duckdb: |
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_small_1k.csv.gz' (FORMAT CSV, HEADER true, COMPRESSION 'gzip')
+      starrocks: null
 
   - id: bulk_load_csv_small_zstd
     category: bulk_load
@@ -980,6 +994,7 @@ operations:
       duckdb: |
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_small_1k.csv.zst' (FORMAT CSV, HEADER true, COMPRESSION 'zstd')
+      starrocks: null
 
   - id: bulk_load_csv_small_bzip2
     category: bulk_load
@@ -1001,6 +1016,7 @@ operations:
         -- DuckDB does not support bzip2 compression - use gzip instead
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_small_1k.csv.gz' (FORMAT CSV, HEADER true, COMPRESSION 'gzip')
+      starrocks: null
 
   - id: bulk_load_csv_medium_uncompressed
     category: bulk_load
@@ -1028,6 +1044,7 @@ operations:
         FIELDS TERMINATED BY ','
         LINES TERMINATED BY '\n'
         IGNORE 1 ROWS
+      starrocks: null
 
   - id: bulk_load_csv_medium_gzip
     category: bulk_load
@@ -1048,6 +1065,7 @@ operations:
       duckdb: |
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_medium_100k.csv.gz' (FORMAT CSV, HEADER true, COMPRESSION 'gzip')
+      starrocks: null
 
   - id: bulk_load_csv_medium_zstd
     category: bulk_load
@@ -1068,6 +1086,7 @@ operations:
       duckdb: |
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_medium_100k.csv.zst' (FORMAT CSV, HEADER true, COMPRESSION 'zstd')
+      starrocks: null
 
   - id: bulk_load_csv_medium_bzip2
     category: bulk_load
@@ -1089,6 +1108,7 @@ operations:
         -- DuckDB does not support bzip2 compression - use gzip instead
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_medium_100k.csv.gz' (FORMAT CSV, HEADER true, COMPRESSION 'gzip')
+      starrocks: null
 
   - id: bulk_load_csv_large_uncompressed
     category: bulk_load
@@ -1116,6 +1136,7 @@ operations:
         FIELDS TERMINATED BY ','
         LINES TERMINATED BY '\n'
         IGNORE 1 ROWS
+      starrocks: null
 
   - id: bulk_load_csv_large_gzip
     category: bulk_load
@@ -1136,6 +1157,7 @@ operations:
       duckdb: |
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_large_1m.csv.gz' (FORMAT CSV, HEADER true, COMPRESSION 'gzip')
+      starrocks: null
 
   - id: bulk_load_csv_large_zstd
     category: bulk_load
@@ -1156,6 +1178,7 @@ operations:
       duckdb: |
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_large_1m.csv.zst' (FORMAT CSV, HEADER true, COMPRESSION 'zstd')
+      starrocks: null
 
   - id: bulk_load_csv_large_bzip2
     category: bulk_load
@@ -1177,6 +1200,7 @@ operations:
         -- DuckDB does not support bzip2 compression - use gzip instead
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_large_1m.csv.gz' (FORMAT CSV, HEADER true, COMPRESSION 'gzip')
+      starrocks: null
 
   # --------------------
   # PARQUET OPERATIONS (12 operations: 3 sizes × 4 compression variants)
@@ -1197,6 +1221,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 1000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_small_snappy
     category: bulk_load
@@ -1213,6 +1239,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 1000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_small_gzip
     category: bulk_load
@@ -1229,6 +1257,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 1000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_small_zstd
     category: bulk_load
@@ -1245,6 +1275,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 1000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_medium_uncompressed
     category: bulk_load
@@ -1261,6 +1293,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 100000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_medium_snappy
     category: bulk_load
@@ -1277,6 +1311,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 100000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_medium_gzip
     category: bulk_load
@@ -1293,6 +1329,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 100000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_medium_zstd
     category: bulk_load
@@ -1309,6 +1347,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 100000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_large_uncompressed
     category: bulk_load
@@ -1325,6 +1365,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 1000000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_large_snappy
     category: bulk_load
@@ -1341,6 +1383,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 1000000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_large_gzip
     category: bulk_load
@@ -1357,6 +1401,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 1000000
+    platform_overrides:
+      starrocks: null
 
   - id: bulk_load_parquet_large_zstd
     category: bulk_load
@@ -1373,6 +1419,8 @@ operations:
     cleanup_sql: |
       TRUNCATE TABLE bulk_load_ops_target
     expected_rows_affected: 1000000
+    platform_overrides:
+      starrocks: null
 
   # --------------------
   # SPECIAL BULK LOAD OPERATIONS (12 operations)
@@ -1403,6 +1451,7 @@ operations:
         INSERT INTO bulk_load_ops_target (o_orderkey, o_custkey, o_orderstatus, o_totalprice, o_orderdate)
         SELECT o_orderkey, o_custkey, o_orderstatus, o_totalprice, o_orderdate
         FROM read_csv_auto('{file_path}/csv_medium_100k.csv')
+      starrocks: null
 
   - id: bulk_load_with_transformation
     category: bulk_load
@@ -1447,6 +1496,7 @@ operations:
           o_shippriority,
           CONCAT('TRANSFORMED: ', o_comment)
         FROM read_csv_auto('{file_path}/csv_small_1k.csv')
+      starrocks: null
 
   - id: bulk_load_error_handling_skip_bad_rows
     category: bulk_load
@@ -1471,6 +1521,7 @@ operations:
         COPY bulk_load_ops_target FROM '{file_path}/csv_with_errors.csv'
         (FORMAT CSV, HEADER true, IGNORE_ERRORS true)
       datafusion: null
+      starrocks: null
 
   - id: bulk_load_parallel_multi_file
     category: bulk_load
@@ -1494,6 +1545,7 @@ operations:
       duckdb: |
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_parallel_part*.csv' (FORMAT CSV, HEADER true)
+      starrocks: null
 
   - id: bulk_load_upsert_mode
     category: bulk_load
@@ -1526,6 +1578,7 @@ operations:
     expected_rows_affected: null
     platform_overrides:
       datafusion: null
+      starrocks: null
 
   - id: bulk_load_append_mode
     category: bulk_load
@@ -1549,6 +1602,7 @@ operations:
     platform_overrides:
       duckdb: |
         COPY bulk_load_ops_target FROM '{file_path}/csv_small_1k.csv' (FORMAT CSV, HEADER true)
+      starrocks: null
 
   - id: bulk_load_replace_mode
     category: bulk_load
@@ -1569,6 +1623,7 @@ operations:
       duckdb: |
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_medium_100k.csv' (FORMAT CSV, HEADER true)
+      starrocks: null
 
   - id: bulk_load_delimited_custom
     category: bulk_load
@@ -1598,6 +1653,7 @@ operations:
         FIELDS TERMINATED BY '|'
         LINES TERMINATED BY '\n'
         IGNORE 1 ROWS
+      starrocks: null
 
   - id: bulk_load_quoted_fields
     category: bulk_load
@@ -1620,6 +1676,7 @@ operations:
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_quoted_fields.csv'
         (FORMAT CSV, HEADER true, QUOTE '"', ESCAPE '"')
+      starrocks: null
 
   - id: bulk_load_null_handling
     category: bulk_load
@@ -1645,6 +1702,7 @@ operations:
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_with_nulls.csv'
         (FORMAT CSV, HEADER true, NULLSTR 'NULL')
+      starrocks: null
 
   - id: bulk_load_encoding_utf8
     category: bulk_load
@@ -1667,6 +1725,7 @@ operations:
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_utf8_encoded.csv'
         (FORMAT CSV, HEADER true)
+      starrocks: null
 
   - id: bulk_load_date_format_custom
     category: bulk_load
@@ -1690,7 +1749,8 @@ operations:
       duckdb: |
         TRUNCATE TABLE bulk_load_ops_target;
         COPY bulk_load_ops_target FROM '{file_path}/csv_custom_dates.csv'
-        (FORMAT CSV, HEADER true, DATEFORMAT '%m/%d/%Y')
+        (FORMAT CSV, HEADER true, DATEFORMAT '%Y/%m/%d')
+      starrocks: null
 
   # ============================================================================
   # MERGE OPERATIONS (20 operations)
@@ -2193,6 +2253,7 @@ operations:
       mysql: null  # MySQL doesn't support MERGE
       bigquery: null  # BigQuery MERGE doesn't support RETURNING
       datafusion: null
+      starrocks: null
 
   - id: merge_error_handling
     category: merge
@@ -2250,6 +2311,7 @@ operations:
     expected_rows_affected: null  # Data-dependent: varies by scale factor (~1% of suppliers)
     platform_overrides:
       datafusion: null
+      starrocks: null
 
   - id: delete_gdpr_suppliers_5pct
     category: delete
@@ -2280,6 +2342,7 @@ operations:
     expected_rows_affected: null  # Data-dependent: varies by scale factor (~5% of suppliers)
     platform_overrides:
       datafusion: null
+      starrocks: null
 
   - id: merge_etl_aggregation_pattern
     category: merge
@@ -2519,6 +2582,7 @@ operations:
     expected_rows_affected: 0
     platform_overrides:
       datafusion: null
+      starrocks: null
 
   - id: ddl_alter_table_add_column
     category: ddl
@@ -2594,6 +2658,7 @@ operations:
           old_name VARCHAR(100)
         );
         ALTER TABLE test_rename_col CHANGE old_name new_name VARCHAR(100)
+      starrocks: null
       datafusion: null
 
   - id: ddl_create_index_on_existing
@@ -2613,6 +2678,7 @@ operations:
     expected_rows_affected: null
     platform_overrides:
       datafusion: null
+      starrocks: null
 
   - id: ddl_drop_index
     category: ddl
@@ -2638,6 +2704,7 @@ operations:
         CREATE INDEX idx_test_drop ON test_drop_idx(value);
         DROP INDEX idx_test_drop ON test_drop_idx
       datafusion: null
+      starrocks: null
 
   - id: ddl_create_view_simple
     category: ddl

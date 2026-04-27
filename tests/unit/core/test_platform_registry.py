@@ -107,11 +107,11 @@ class TestPlatformRegistry:
         mock_module.__version__ = "2.0.0"
         mock_import.return_value = mock_module
 
-        lib_spec = {"name": "psycopg2", "import_name": "psycopg2", "required": True}
+        lib_spec = {"name": "psycopg", "import_name": "psycopg", "required": True}
         lib_info = PlatformRegistry.detect_library(lib_spec)
 
-        mock_import.assert_called_once_with("psycopg2")
-        assert lib_info.name == "psycopg2"
+        mock_import.assert_called_once_with("psycopg")
+        assert lib_info.name == "psycopg"
         assert lib_info.version == "2.0.0"
         assert lib_info.installed is True
 

@@ -129,7 +129,7 @@ def display_verbose_config_feedback(config: dict[str, Any], platform: str) -> No
     elif platform in ["redshift", "snowflake"]:
         database_name = config.get("database", "unknown")
         emit(f"Database name: {database_name}")
-    elif platform == "clickhouse":
+    elif platform in {"clickhouse", "clickhouse-local"}:
         data_path = config.get("data_path", "unknown")
         emit(f"Data path: {data_path}")
 
@@ -156,24 +156,14 @@ def print_completion_message(phase: str, output_location: str | None = None) -> 
         emit(f"✅ {phase.title()} phase complete.")
 
 
-def print_dry_run_summary(result, output_dir, saved_files=None) -> None:
-    """Print a human-friendly summary of dry run artifacts and insights."""
+def _format_metric(value, suffix):
+    try:
+        return f"{float(value):.2f} {suffix}"
+    except (TypeError, ValueError):
+        return f"{value} {suffix}" if value is not None else None
 
-    benchmark_info = result.benchmark_config or {}
-    preview = result.query_preview or {}
-    platform_info = result.platform_config or {}
-    resources = result.estimated_resources or {}
-    query_count = preview.get("query_count") or len(result.queries) or 0
 
-    emit("✅ Dry run completed successfully!")
-    emit(f"Artifacts directory: {output_dir}")
-
-    def _format_metric(value, suffix):
-        try:
-            return f"{float(value):.2f} {suffix}"
-        except (TypeError, ValueError):
-            return f"{value} {suffix}" if value is not None else None
-
+def _print_dry_run_artifacts(saved_files) -> None:
     if saved_files:
         emit("Artifacts:")
         for label, path in sorted(saved_files.items()):
@@ -181,6 +171,8 @@ def print_dry_run_summary(result, output_dir, saved_files=None) -> None:
     else:
         emit("Artifacts: JSON, YAML, and per-query SQL files emitted.")
 
+
+def _print_benchmark_overview(benchmark_info: dict, preview: dict, query_count: int) -> None:
     emit("\nBenchmark Overview:")
     display_name = benchmark_info.get("display_name") or benchmark_info.get("name", "unknown").upper()
     emit(f"  • Benchmark: {display_name}")
@@ -196,40 +188,56 @@ def print_dry_run_summary(result, output_dir, saved_files=None) -> None:
     if preview.get("data_size_mb"):
         emit(f"  • Estimated data size: {preview['data_size_mb']} MB")
 
-    if platform_info:
-        emit("\nPlatform Summary:")
-        platform_name = platform_info.get("platform_name") or platform_info.get("platform_type")
-        if platform_name:
-            emit(f"  • Platform: {platform_name}")
-        connection_mode = platform_info.get("connection_mode") or platform_info.get("connection_type")
-        if connection_mode:
-            emit(f"  • Connection: {connection_mode}")
-        configuration = platform_info.get("configuration") or {}
-        if configuration:
-            interesting_keys = [
-                "database_path",
-                "memory_limit",
-                "schema",
-                "catalog",
-                "staging_root",
-            ]
-            for key in interesting_keys:
-                if key in configuration and configuration[key] is not None:
-                    emit(f"  • {key.replace('_', ' ').title()}: {configuration[key]}")
 
-    if resources:
-        emit("\nResource Estimates:")
-        data_size = _format_metric(resources.get("estimated_data_size_mb"), "MB")
-        if data_size:
-            emit(f"  • Estimated data size: {data_size}")
-        memory_usage = _format_metric(resources.get("estimated_memory_usage_mb"), "MB")
-        if memory_usage:
-            emit(f"  • Estimated memory usage: {memory_usage}")
-        runtime = _format_metric(resources.get("estimated_runtime_minutes"), "minutes")
-        if runtime:
-            emit(f"  • Estimated runtime: {runtime}")
-        if resources.get("cpu_cores_available") is not None:
-            emit(f"  • Cores available: {resources['cpu_cores_available']}")
+def _print_platform_summary(platform_info: dict) -> None:
+    if not platform_info:
+        return
+    emit("\nPlatform Summary:")
+    platform_name = platform_info.get("platform_name") or platform_info.get("platform_type")
+    if platform_name:
+        emit(f"  • Platform: {platform_name}")
+    connection_mode = platform_info.get("connection_mode") or platform_info.get("connection_type")
+    if connection_mode:
+        emit(f"  • Connection: {connection_mode}")
+    configuration = platform_info.get("configuration") or {}
+    interesting_keys = ["database_path", "memory_limit", "schema", "catalog", "staging_root"]
+    for key in interesting_keys:
+        if key in configuration and configuration[key] is not None:
+            emit(f"  • {key.replace('_', ' ').title()}: {configuration[key]}")
+
+
+def _print_resource_estimates(resources: dict) -> None:
+    if not resources:
+        return
+    emit("\nResource Estimates:")
+    data_size = _format_metric(resources.get("estimated_data_size_mb"), "MB")
+    if data_size:
+        emit(f"  • Estimated data size: {data_size}")
+    memory_usage = _format_metric(resources.get("estimated_memory_usage_mb"), "MB")
+    if memory_usage:
+        emit(f"  • Estimated memory usage: {memory_usage}")
+    runtime = _format_metric(resources.get("estimated_runtime_minutes"), "minutes")
+    if runtime:
+        emit(f"  • Estimated runtime: {runtime}")
+    if resources.get("cpu_cores_available") is not None:
+        emit(f"  • Cores available: {resources['cpu_cores_available']}")
+
+
+def print_dry_run_summary(result, output_dir, saved_files=None) -> None:
+    """Print a human-friendly summary of dry run artifacts and insights."""
+    benchmark_info = result.benchmark_config or {}
+    preview = result.query_preview or {}
+    platform_info = result.platform_config or {}
+    resources = result.estimated_resources or {}
+    query_count = preview.get("query_count") or len(result.queries) or 0
+
+    emit("✅ Dry run completed successfully!")
+    emit(f"Artifacts directory: {output_dir}")
+
+    _print_dry_run_artifacts(saved_files)
+    _print_benchmark_overview(benchmark_info, preview, query_count)
+    _print_platform_summary(platform_info)
+    _print_resource_estimates(resources)
 
     if result.warnings:
         emit("\nWarnings:")

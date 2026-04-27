@@ -186,11 +186,68 @@ class MaintenanceTestPhase:
 
 
 @dataclass
+class MigrationTableStats:
+    duration_ms: int
+    status: str
+    storage_before_bytes: int
+    storage_after_bytes: int
+    storage_delta_bytes: int
+    error_message: str | None = None
+
+
+@dataclass
+class MigrationPhase:
+    """Phase result for heap-to-columnstore migration (pg_mooncake-specific).
+
+    Captures the overhead of converting existing PostgreSQL heap tables to
+    pg_mooncake's columnstore format via ALTER TABLE ... SET ACCESS METHOD columnar.
+    Set on ExecutionPhases.migration when run_migration_phase() completes.
+    """
+
+    duration_ms: int
+    status: str
+    tables_migrated: int
+    tables_failed: int
+    storage_before_bytes: int
+    storage_after_bytes: int
+    storage_delta_bytes: int
+    per_table_stats: dict[str, MigrationTableStats]
+
+
+@dataclass
 class ExecutionPhases:
     setup: SetupPhase
     power_test: PowerTestPhase | None = None
     throughput_test: ThroughputTestPhase | None = None
     maintenance_test: MaintenanceTestPhase | None = None
+    migration: MigrationPhase | None = None  # pg_mooncake heap-to-columnstore
+
+
+@dataclass
+class NativeComparisonEntry:
+    """Per-query timing delta between pg_duckdb and native DuckDB execution."""
+
+    query_id: str
+    pg_duckdb_ms: float
+    duckdb_ms: float
+    delta_ms: float  # pg_duckdb_ms - duckdb_ms; positive = pg_duckdb slower
+
+
+@dataclass
+class NativeComparison:
+    """Comparison of pg_duckdb vs native DuckDB query timings.
+
+    Produced by PgDuckDBAdapter.run_native_comparison() when triggered via
+    --platform-option compare_native=true. Serialized under the top-level
+    'comparisons' key in the result JSON (omitted when None).
+    """
+
+    generated_at: str  # ISO-8601 timestamp
+    scale_factor: float
+    total_queries: int
+    mean_delta_ms: float
+    max_delta_ms: float
+    entries: list[NativeComparisonEntry]
 
 
 @dataclass
@@ -283,6 +340,10 @@ class BenchmarkResults:
     max_plan_capture_time_ms: float = 0.0  # Maximum single capture time
     # Execution context for reproducibility (captures CLI/MCP/API params)
     execution_context: dict[str, Any] | None = None
+    # pg_duckdb vs native DuckDB comparison (omitted when not run)
+    native_comparison: NativeComparison | None = None
+    # Methodology/comparability classification (TPC-DS: "official", "unofficial_nonstandard", "unofficial_subscale")
+    compliance_class: str | None = None
 
     @property
     def benchmark_id(self) -> str:

@@ -33,7 +33,9 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import os
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -274,6 +276,110 @@ class CloudSparkStaging(ABC):
             recursive: If True, delete directory contents recursively
         """
 
+    @staticmethod
+    def _normalize_data_files(
+        data_files: Mapping[str, str | Path | Sequence[str | Path] | None],
+    ) -> dict[str, list[Path]]:
+        """Normalize per-table file mappings to concrete local paths.
+
+        Raises TypeError if any table's value is None - callers should filter
+        placeholder metadata (e.g. via ``_has_explicit_data_files``) before
+        invoking this method.
+        """
+        normalized: dict[str, list[Path]] = {}
+        for table_name, table_files in data_files.items():
+            if table_files is None:
+                raise TypeError(f"Explicit data files for table '{table_name}' cannot be None")
+            if isinstance(table_files, (str, Path)):
+                candidates = [table_files]
+            else:
+                candidates = list(table_files)
+
+            paths = [Path(path) for path in candidates]
+            if paths:
+                normalized[table_name] = paths
+        return normalized
+
+    @staticmethod
+    def _expand_explicit_table_files(table_name: str, table_files: list[Path]) -> list[tuple[Path, str]]:
+        """Expand explicit files/directories to upload entries with stable relative paths."""
+        standalone_files: list[Path] = []
+        expanded: list[tuple[Path, str]] = []
+
+        for candidate in table_files:
+            if candidate.is_dir():
+                for nested_file in sorted(path for path in candidate.rglob("*") if path.is_file()):
+                    expanded.append((nested_file, nested_file.relative_to(candidate).as_posix()))
+            else:
+                standalone_files.append(candidate)
+
+        if standalone_files:
+            if len(standalone_files) == 1:
+                expanded.append((standalone_files[0], standalone_files[0].name))
+            else:
+                try:
+                    common_root = Path(os.path.commonpath([str(path.parent) for path in standalone_files]))
+                except ValueError as exc:
+                    raise ValueError(f"Cannot determine common root for table '{table_name}' files: {exc}") from exc
+                for file_path in standalone_files:
+                    expanded.append((file_path, file_path.relative_to(common_root).as_posix()))
+
+        seen_targets: set[str] = set()
+        for _file_path, relative_target in expanded:
+            if relative_target in seen_targets:
+                raise ValueError(
+                    f"Explicit data files for table '{table_name}' would overwrite staged path '{relative_target}'"
+                )
+            seen_targets.add(relative_target)
+
+        return expanded
+
+    def upload_data_files(
+        self,
+        data_files: Mapping[str, str | Path | Sequence[str | Path]],
+        progress_callback: Callable[[UploadProgress], None] | None = None,
+    ) -> dict[str, str]:
+        """Upload explicit per-table file mappings to cloud storage.
+
+        Callers that already know the exact data files should use this API
+        instead of relying on table-name globbing via ``upload_tables()``.
+        """
+        normalized = self._normalize_data_files(data_files)
+        uploaded: dict[str, str] = {}
+        upload_entries = {
+            table_name: self._expand_explicit_table_files(table_name, table_files)
+            for table_name, table_files in normalized.items()
+        }
+        total_files = sum(len(entries) for entries in upload_entries.values())
+        files_completed = 0
+
+        for table_name, table_entries in upload_entries.items():
+            if not table_entries:
+                self._logger.warning(f"No files found for table {table_name}")
+                continue
+
+            for file_path, relative_target in table_entries:
+                remote_path = f"{table_name}/{relative_target}"
+                self.upload_file(file_path, remote_path, progress_callback)
+                files_completed += 1
+
+                if progress_callback:
+                    file_size = file_path.stat().st_size
+                    progress = UploadProgress(
+                        table_name=table_name,
+                        file_name=file_path.name,
+                        bytes_uploaded=file_size,
+                        total_bytes=file_size,
+                        files_completed=files_completed,
+                        total_files=total_files,
+                    )
+                    progress_callback(progress)
+
+            uploaded[table_name] = self.get_table_uri(table_name)
+            self._logger.info(f"Uploaded table {table_name} ({len(table_entries)} files)")
+
+        return uploaded
+
     def upload_tables(
         self,
         tables: list[str],
@@ -292,10 +398,9 @@ class CloudSparkStaging(ABC):
         Returns:
             Dict mapping table names to their remote URIs
         """
-        uploaded: dict[str, str] = {}
-        total_files = len(tables)
+        data_files: dict[str, list[Path]] = {}
 
-        for idx, table_name in enumerate(tables):
+        for table_name in tables:
             # Find table files
             pattern = f"{table_name}*.{file_format}"
             table_files = list(source_dir.glob(pattern))
@@ -309,27 +414,9 @@ class CloudSparkStaging(ABC):
                 self._logger.warning(f"No files found for table {table_name}")
                 continue
 
-            # Upload each file for the table
-            for file_path in table_files:
-                remote_path = f"{table_name}/{file_path.name}"
-                self.upload_file(file_path, remote_path, progress_callback)
+            data_files[table_name] = table_files
 
-                if progress_callback:
-                    progress = UploadProgress(
-                        table_name=table_name,
-                        file_name=file_path.name,
-                        bytes_uploaded=file_path.stat().st_size,
-                        total_bytes=file_path.stat().st_size,
-                        files_completed=idx + 1,
-                        total_files=total_files,
-                    )
-                    progress_callback(progress)
-
-            # Store the table prefix URI
-            uploaded[table_name] = f"{self.config.uri.rstrip('/')}/{table_name}/"
-            self._logger.info(f"Uploaded table {table_name} ({len(table_files)} files)")
-
-        return uploaded
+        return self.upload_data_files(data_files, progress_callback)
 
     def tables_exist(self, tables: list[str], file_format: str = "parquet") -> bool:
         """Check if all tables already exist in staging.

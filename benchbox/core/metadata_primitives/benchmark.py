@@ -27,6 +27,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -1205,6 +1206,10 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         """
         return True
 
+    def skip_dataframe_data_loading(self) -> bool:
+        """Metadata Primitives bootstraps in-memory schema fixtures itself."""
+        return True
+
     def get_dataframe_operations(
         self,
         platform_name: str,
@@ -1279,6 +1284,197 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             return get_platform_capabilities(platform_name)
         return manager.get_capabilities()
 
+    def execute_dataframe_workload(
+        self,
+        *,
+        ctx: Any,
+        adapter: Any,
+        benchmark_config: Any,
+        query_filter: set[str] | None = None,
+        monitor: Any | None = None,  # noqa: ARG002
+        run_options: Any | None = None,  # noqa: ARG002
+    ) -> list[dict[str, Any]]:
+        """Execute Metadata Primitives in DataFrame mode.
+
+        This hook is called by the DataFrame adapter to execute the benchmark
+        workload using the Metadata Primitives operations manager.
+        """
+        platform_name = adapter.platform_name
+        spark_session = getattr(ctx, "spark_session", None) or getattr(adapter, "spark", None)
+        dataframes = self._get_registered_dataframes(ctx)
+        if not dataframes:
+            logger.info("Bootstrapping in-memory schema fixtures for Metadata Primitives DataFrame mode")
+            dataframes = self._bootstrap_dataframe_fixture_tables(ctx, adapter)
+        else:
+            self._register_dataframes_with_adapter(adapter, dataframes)
+
+        # Get iterations from config
+        config_options = getattr(benchmark_config, "options", {}) or {}
+        iterations = int(config_options.get("power_iterations", 1) or 1)
+
+        # Map categories if provided in config
+        categories = config_options.get("metadata_categories")
+        if isinstance(categories, str):
+            categories = [c.strip() for c in categories.split(",")]
+
+        # Run the benchmark
+        result = self.run_dataframe_benchmark(
+            platform_name=platform_name,
+            dataframes=dataframes,
+            spark_session=spark_session,
+            categories=categories,
+            iterations=iterations,
+        )
+
+        # Convert MetadataBenchmarkResult to adapter-compatible list of dicts.
+        # run_dataframe_benchmark flattens iterations × operations, so we derive
+        # the iteration number from the number of unique operations.
+        output = []
+        unique_ops: dict[str, int] = {}
+        for res in result.results:
+            # Filter by query_filter if provided
+            if query_filter and res.query_id.upper() not in query_filter:
+                continue
+
+            iteration = unique_ops.get(res.query_id, 0) + 1
+            unique_ops[res.query_id] = iteration
+
+            output.append(
+                {
+                    "query_id": res.query_id,
+                    "status": "SUCCESS" if res.success else "FAILED",
+                    "execution_time_seconds": res.execution_time_ms / 1000.0,
+                    "rows_returned": res.row_count,
+                    "error": res.error,
+                    "iteration": iteration,
+                    "run_type": "measurement",
+                }
+            )
+        return output
+
+    def _bootstrap_dataframe_fixture_tables(self, ctx: Any, adapter: Any) -> dict[str, Any]:
+        """Build and register in-memory schema fixtures for DataFrame metadata ops."""
+        dataframes = self._build_dataframe_fixture_tables(adapter)
+
+        register_table = getattr(ctx, "register_table", None)
+        if callable(register_table):
+            for table_name, dataframe in dataframes.items():
+                register_table(table_name, dataframe)
+
+        self._register_dataframes_with_adapter(adapter, dataframes)
+        return dataframes
+
+    @staticmethod
+    def _register_dataframes_with_adapter(adapter: Any, dataframes: dict[str, Any]) -> None:
+        """Register tables with adapter-native catalogs when the adapter supports it."""
+        register_table = getattr(adapter, "register_table", None)
+        if not callable(register_table):
+            return
+
+        for table_name, dataframe in dataframes.items():
+            register_table(table_name, dataframe)
+
+    def _build_dataframe_fixture_tables(self, adapter: Any) -> dict[str, Any]:
+        """Construct one representative in-memory table per metadata schema table."""
+        schema = self.get_schema()
+        return {
+            table_name: self._create_fixture_dataframe(
+                adapter,
+                self._build_dataframe_fixture_row(table_name, table_meta.get("columns", [])),
+            )
+            for table_name, table_meta in schema.items()
+        }
+
+    @staticmethod
+    def _build_dataframe_fixture_row(
+        table_name: str,
+        columns: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Build a deterministic fixture row from the benchmark schema metadata."""
+        row: dict[str, Any] = {}
+        for ordinal, column in enumerate(columns, start=1):
+            column_name = str(column.get("name", f"col_{ordinal}"))
+            column_type = str(column.get("type", "")).upper()
+            row[column_name] = MetadataPrimitivesBenchmark._sample_dataframe_value(
+                table_name=table_name,
+                column_name=column_name,
+                column_type=column_type,
+                ordinal=ordinal,
+            )
+        return row
+
+    @staticmethod
+    def _sample_dataframe_value(
+        *,
+        table_name: str,
+        column_name: str,
+        column_type: str,
+        ordinal: int,
+    ) -> Any:
+        """Return a single representative scalar value for a schema column."""
+        if column_type.startswith("INTEGER"):
+            return ordinal
+        if column_type.startswith("DECIMAL"):
+            return float(ordinal) + 0.25
+        if column_type.startswith("DATE"):
+            return date(1998, 1, min(ordinal, 28))
+        if "CHAR" in column_type or "VARCHAR" in column_type or "STRING" in column_type:
+            return f"{table_name}_{column_name}_{ordinal}"
+        return f"{table_name}_{column_name}_{ordinal}"
+
+    @staticmethod
+    def _create_fixture_dataframe(adapter: Any, row: dict[str, Any]) -> Any:
+        """Create a platform-native single-row DataFrame fixture."""
+        platform_name = str(getattr(adapter, "platform_name", "")).lower()
+
+        if "polars" in platform_name:
+            import polars as pl
+
+            return pl.DataFrame([row])
+
+        if "pandas" in platform_name:
+            import pandas as pd
+
+            return pd.DataFrame([row])
+
+        if "pyspark" in platform_name or "spark" in platform_name:
+            spark_session = getattr(adapter, "spark", None)
+            if spark_session is None:
+                raise ValueError("PySpark metadata fixtures require an active SparkSession on the adapter.")
+            return spark_session.createDataFrame([row])
+
+        if "datafusion" in platform_name:
+            import pyarrow as pa
+
+            session_ctx = getattr(adapter, "session_ctx", None)
+            if session_ctx is None:
+                raise ValueError("DataFusion metadata fixtures require an active SessionContext on the adapter.")
+            return session_ctx.from_arrow(pa.Table.from_pylist([row]))
+
+        raise ValueError(
+            f"Metadata Primitives DataFrame fixtures are not implemented for platform '{adapter.platform_name}'."
+        )
+
+    @staticmethod
+    def _get_registered_dataframes(ctx: Any) -> dict[str, Any]:
+        """Extract native registered DataFrames from a benchmark context."""
+        if hasattr(ctx, "list_tables") and hasattr(ctx, "get_table"):
+            dataframes: dict[str, Any] = {}
+            for table_name in ctx.list_tables():
+                dataframe = ctx.get_table(table_name)
+                dataframes[table_name] = getattr(dataframe, "native", dataframe)
+            return dataframes
+
+        for attr_name in ("tables", "_tables"):
+            tables = getattr(ctx, attr_name, None)
+            if isinstance(tables, dict):
+                return {name: getattr(dataframe, "native", dataframe) for name, dataframe in tables.items()}
+
+        raise TypeError(
+            "Metadata Primitives DataFrame execution requires a context exposing "
+            "list_tables()/get_table() or a table dictionary."
+        )
+
     def run_dataframe_benchmark(
         self,
         platform_name: str,
@@ -1319,36 +1515,43 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         capabilities = manager.get_capabilities()
 
         # Determine which operations to run
-        operations_to_run: list[MetadataOperationType] = []
-
-        if categories:
-            # Filter by category
-            category_set = {MetadataOperationCategory(c.lower()) for c in categories}
-            for op in MetadataOperationType:
-                if OPERATION_CATEGORIES.get(op) in category_set:
-                    if capabilities.supports_operation(op):
-                        operations_to_run.append(op)
-        else:
-            # Run all supported operations
-            operations_to_run = capabilities.get_supported_operations()
+        operations_to_run = self._resolve_dataframe_operations(
+            capabilities=capabilities,
+            categories=categories,
+            operation_categories=OPERATION_CATEGORIES,
+            operation_type_cls=MetadataOperationType,
+            category_cls=MetadataOperationCategory,
+        )
 
         result = MetadataBenchmarkResult()
         all_results: list[MetadataQueryResult] = []
 
         # Schema introspection operations run on each DataFrame
-        schema_ops = {
+        dataframe_scoped_ops = {
             MetadataOperationType.LIST_COLUMNS,
             MetadataOperationType.GET_DTYPES,
             MetadataOperationType.GET_SCHEMA,
             MetadataOperationType.DESCRIBE_STATS,
             MetadataOperationType.ROW_COUNT,
             MetadataOperationType.COLUMN_COUNT,
+            MetadataOperationType.WIDE_TABLE_SCHEMA,
+            MetadataOperationType.COMPLEX_TYPE_INTROSPECTION,
+        }
+        catalog_global_ops = {
+            MetadataOperationType.LIST_DATABASES,
+            MetadataOperationType.LIST_TABLES,
+            MetadataOperationType.LARGE_CATALOG_LIST,
+        }
+        catalog_table_ops = {
+            MetadataOperationType.LIST_TABLE_COLUMNS,
+            MetadataOperationType.TABLE_EXISTS,
+            MetadataOperationType.GET_TABLE_INFO,
         }
 
         for _ in range(iterations):
             for op in operations_to_run:
-                if op in schema_ops:
-                    # Run schema ops on each DataFrame
+                if op in dataframe_scoped_ops:
+                    # Per-DataFrame introspection and complexity ops.
                     for table_name, df in dataframes.items():
                         df_result = self._execute_dataframe_operation(manager, op, df, table_name)
                         query_result = self._convert_df_result_to_query_result(df_result, table_name)
@@ -1360,10 +1563,7 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
                             result.failed_queries += 1
                         result.total_time_ms += query_result.execution_time_ms
 
-                elif op in {
-                    MetadataOperationType.LIST_DATABASES,
-                    MetadataOperationType.LIST_TABLES,
-                }:
+                elif op in catalog_global_ops:
                     # Catalog ops don't need a DataFrame
                     df_result = self._execute_catalog_operation(manager, op)
                     query_result = self._convert_df_result_to_query_result(df_result, "catalog")
@@ -1374,6 +1574,18 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
                     else:
                         result.failed_queries += 1
                     result.total_time_ms += query_result.execution_time_ms
+
+                elif op in catalog_table_ops:
+                    for table_name in dataframes:
+                        df_result = self._execute_catalog_operation(manager, op, table_name=table_name)
+                        query_result = self._convert_df_result_to_query_result(df_result, table_name)
+                        all_results.append(query_result)
+
+                        if query_result.success:
+                            result.successful_queries += 1
+                        else:
+                            result.failed_queries += 1
+                        result.total_time_ms += query_result.execution_time_ms
 
         result.total_queries = len(all_results)
         result.results = all_results
@@ -1412,6 +1624,8 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             MetadataOperationType.DESCRIBE_STATS: manager.execute_describe_stats,
             MetadataOperationType.ROW_COUNT: manager.execute_row_count,
             MetadataOperationType.COLUMN_COUNT: manager.execute_column_count,
+            MetadataOperationType.WIDE_TABLE_SCHEMA: manager.execute_wide_table_schema,
+            MetadataOperationType.COMPLEX_TYPE_INTROSPECTION: manager.execute_complex_type_introspection,
         }
 
         if operation in op_map:
@@ -1431,6 +1645,8 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         self,
         manager: Any,
         operation: Any,
+        *,
+        table_name: str | None = None,
     ) -> Any:
         """Execute a catalog metadata operation.
 
@@ -1447,8 +1663,16 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
 
         if operation == MetadataOperationType.LIST_DATABASES:
             return manager.execute_list_databases()
-        elif operation == MetadataOperationType.LIST_TABLES:
+        if operation == MetadataOperationType.LIST_TABLES:
             return manager.execute_list_tables()
+        if operation == MetadataOperationType.LARGE_CATALOG_LIST:
+            return manager.execute_large_catalog_list()
+        if operation == MetadataOperationType.LIST_TABLE_COLUMNS:
+            return manager.execute_list_table_columns(table_name or "")
+        if operation == MetadataOperationType.TABLE_EXISTS:
+            return manager.execute_table_exists(table_name or "")
+        if operation == MetadataOperationType.GET_TABLE_INFO:
+            return manager.execute_get_table_info(table_name or "")
 
         from benchbox.core.metadata_primitives.dataframe_operations import (
             DataFrameMetadataResult,
@@ -1458,6 +1682,54 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             operation,
             f"Catalog operation {operation.value} not implemented",
         )
+
+    @staticmethod
+    def _resolve_dataframe_operations(
+        *,
+        capabilities: Any,
+        categories: list[str] | None,
+        operation_categories: dict[Any, Any],
+        operation_type_cls: Any,
+        category_cls: Any,
+    ) -> list[Any]:
+        """Resolve benchmark-manageable DataFrame metadata operations.
+
+        The platform capability model is broader than the default benchmark
+        workload. Default execution stays focused on the core schema/catalog
+        subset, while explicit category selection can opt into additional
+        benchmark-manageable operations such as complexity probes.
+        """
+        default_operations = [
+            operation_type_cls.LIST_COLUMNS,
+            operation_type_cls.GET_DTYPES,
+            operation_type_cls.GET_SCHEMA,
+            operation_type_cls.DESCRIBE_STATS,
+            operation_type_cls.ROW_COUNT,
+            operation_type_cls.COLUMN_COUNT,
+            operation_type_cls.LIST_DATABASES,
+            operation_type_cls.LIST_TABLES,
+        ]
+        benchmark_managed_operations = {
+            *default_operations,
+            operation_type_cls.LIST_TABLE_COLUMNS,
+            operation_type_cls.TABLE_EXISTS,
+            operation_type_cls.GET_TABLE_INFO,
+            operation_type_cls.WIDE_TABLE_SCHEMA,
+            operation_type_cls.LARGE_CATALOG_LIST,
+            operation_type_cls.COMPLEX_TYPE_INTROSPECTION,
+        }
+
+        if categories:
+            category_set = {category_cls(c.lower()) for c in categories}
+            candidate_operations = [
+                op
+                for op in operation_type_cls
+                if op in benchmark_managed_operations and operation_categories.get(op) in category_set
+            ]
+        else:
+            candidate_operations = default_operations
+
+        return [op for op in candidate_operations if capabilities.supports_operation(op)]
 
     def _convert_df_result_to_query_result(
         self,

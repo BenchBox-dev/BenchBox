@@ -71,7 +71,7 @@ class TestBenchmarkSelection:
     @pytest.mark.e2e_quick
     @pytest.mark.tpcds
     def test_benchmark_tpcds(self, tmp_path: Path) -> None:
-        """Test --benchmark tpcds option (requires SF >= 1)."""
+        """Test --benchmark tpcds option with an unofficial subscale dry run."""
         output_dir = tmp_path / "dry_run"
         output_dir.mkdir()
 
@@ -83,13 +83,14 @@ class TestBenchmarkSelection:
                 "--benchmark",
                 "tpcds",
                 "--scale",
-                "1",  # TPC-DS requires SF >= 1
+                "0.01",
                 "--dry-run",
                 str(output_dir),
             ]
         )
 
         assert result.returncode == 0, f"Failed: {result.stdout}"
+        assert "UNOFFICIAL SUBSCALE RUN" in result.stdout
 
     @pytest.mark.e2e
     @pytest.mark.e2e_quick

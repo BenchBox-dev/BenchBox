@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .benchmark import TPCDSBenchmark
 from .c_tools import DSQGenBinary, TPCDSCTools, TPCDSError
+from .compliance import TpcdsComplianceClass, classify_tpcds_run, validate_tpcds_scale
 from .generator import TPCDSGenerator
 from .queries import TPCDSQueryManager
 
@@ -69,4 +70,7 @@ __all__ = [
     "DSQGenBinary",
     "TPCDSCTools",
     "TPCDSError",
+    "TpcdsComplianceClass",
+    "classify_tpcds_run",
+    "validate_tpcds_scale",
 ]

@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-# Default parameters — representative date range from the NYC Taxi dataset
+# Default parameters - representative date range from the NYC Taxi dataset
 NYCTAXI_DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
     "Q1": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
     "Q2": {"start_date": "2019-01-01", "end_date": "2019-12-31"},

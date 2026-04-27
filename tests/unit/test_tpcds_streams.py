@@ -25,7 +25,7 @@ pytestmark = [
 
 
 @pytest.fixture(autouse=True)
-def fake_tpcds_stream_environment(monkeypatch):
+def fake_tpcds_stream_environment(monkeypatch):  # noqa: C901
     """Stub TPC-DS stream dependencies so tests run without compiled binaries."""
 
     class FakeQuery:
@@ -251,7 +251,7 @@ class TestTPCDSStreamExecution:
         """Create mock stream files for testing."""
         stream_files = []
         for i in range(2):
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False, encoding="utf-8") as f:
                 f.write(f"""-- TPC-DS Stream {i}
 -- Scale Factor: 0.01
 -- RNG Seed: 42

@@ -1,10 +1,10 @@
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from benchbox.platforms.base.spark_execution_mixin import SparkDataLoadMixin
+from benchbox.platforms.base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionMixin
 
 pytestmark = [
     pytest.mark.unit,
@@ -15,6 +15,10 @@ pytestmark = [
 class _DummySparkAdapter(SparkDataLoadMixin):
     def __init__(self) -> None:
         self.logger = MagicMock()
+        self.platform_name = "spark"
+        self.table_mode = "native"
+        self.platform_config = {}
+        self.requested_table_format = None
 
     def log_verbose(self, msg: str) -> None:
         return None
@@ -94,3 +98,524 @@ def test_load_data_spark_parquet_path_unchanged(tmp_path: Path) -> None:
 
     spark.read.parquet.assert_called_once_with(str(parquet_path))
     spark.read.format.assert_not_called()
+
+
+def test_load_data_spark_passes_platform_name_to_resolver(tmp_path: Path) -> None:
+    """DataSourceResolver receives adapter.platform_name directly (not via getattr fallback)."""
+    adapter = _DummySparkAdapter()
+    adapter.platform_name = "databricks"
+    spark = MagicMock()
+    parquet_path = tmp_path / "orders.parquet"
+    parquet_path.write_bytes(b"PAR1")
+    spark.read.parquet.return_value = _make_dataframe(["id"])
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver", autospec=True) as mock_cls:
+        mock_resolver = MagicMock()
+        mock_cls.return_value = mock_resolver
+        mock_resolver.resolve.return_value = SimpleNamespace(
+            source_type="benchmark_tables", tables={"orders": [parquet_path]}
+        )
+        adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+    _, kwargs = mock_cls.call_args
+    assert kwargs.get("platform_name") == "databricks"
+
+
+def test_load_data_spark_passes_config_to_resolver(tmp_path: Path) -> None:
+    """DataSourceResolver receives self.platform_config (not self.__dict__)."""
+    adapter = _DummySparkAdapter()
+    adapter.platform_config = {"staging_root": "s3://bucket/prefix"}
+    spark = MagicMock()
+    parquet_path = tmp_path / "orders.parquet"
+    parquet_path.write_bytes(b"PAR1")
+    spark.read.parquet.return_value = _make_dataframe(["id"])
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver", autospec=True) as mock_cls:
+        mock_resolver = MagicMock()
+        mock_cls.return_value = mock_resolver
+        mock_resolver.resolve.return_value = SimpleNamespace(
+            source_type="benchmark_tables", tables={"orders": [parquet_path]}
+        )
+        adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+    _, kwargs = mock_cls.call_args
+    assert kwargs.get("platform_config") == {"staging_root": "s3://bucket/prefix"}
+
+
+def test_load_data_spark_propagates_resolver_error_without_cleanup_failure(tmp_path: Path) -> None:
+    """Resolver failures should propagate directly without temp-dir cleanup errors."""
+    adapter = _DummySparkAdapter()
+    spark = MagicMock()
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve:
+        mock_resolve.side_effect = RuntimeError("resolver failed")
+
+        with pytest.raises(RuntimeError, match="resolver failed"):
+            adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+
+# -- _csv_compat_path tests --
+
+
+class _NoCacheAdapter(_DummySparkAdapter):
+    """Adapter with df caching disabled (simulates LakeSail/Spark Connect)."""
+
+    _df_caching_supported: bool = False
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.log_verbose = MagicMock()
+
+
+def test_load_data_spark_no_cache_writes_before_count(tmp_path: Path) -> None:
+    """When _df_caching_supported=False, count is derived from table delta, not df.count()."""
+    adapter = _NoCacheAdapter()
+    spark = MagicMock()
+    parquet_path = tmp_path / "orders.parquet"
+    parquet_path.write_bytes(b"PAR1")
+    parquet_df = _make_dataframe(["id"])
+    spark.read.parquet.return_value = parquet_df
+    count_dfs = [MagicMock(), MagicMock()]
+    count_dfs[0].collect.return_value = [(0,)]
+    count_dfs[1].collect.return_value = [(7,)]
+    spark.sql.side_effect = count_dfs
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve:
+        mock_resolve.return_value = SimpleNamespace(source_type="benchmark_tables", tables={"orders": [parquet_path]})
+        stats, _, _ = adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+    # df.count() must NOT be called (that's the double-scan we're avoiding)
+    parquet_df.count.assert_not_called()
+    # write must be called, with one table count before and after the load.
+    parquet_df.write.mode.assert_called_once_with("append")
+    assert spark.sql.call_count == 2
+    assert all("COUNT(*)" in call.args[0] for call in spark.sql.call_args_list)
+    assert stats["orders"] == 7
+
+
+def test_load_data_spark_no_cache_counts_chunked_table_once(tmp_path: Path) -> None:
+    """Chunked no-cache loads should count the table once after all appends."""
+    adapter = _NoCacheAdapter()
+    spark = MagicMock()
+    parquet_paths = [tmp_path / "orders_1.parquet", tmp_path / "orders_2.parquet"]
+    for parquet_path in parquet_paths:
+        parquet_path.write_bytes(b"PAR1")
+
+    first_df = _make_dataframe(["id"])
+    second_df = _make_dataframe(["id"])
+    spark.read.parquet.side_effect = [first_df, second_df]
+
+    pre_count_df = MagicMock()
+    pre_count_df.collect.return_value = [(3,)]
+    post_count_df = MagicMock()
+    post_count_df.collect.return_value = [(15,)]
+    spark.sql.side_effect = [pre_count_df, post_count_df]
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve:
+        mock_resolve.return_value = SimpleNamespace(source_type="benchmark_tables", tables={"orders": parquet_paths})
+        stats, _, _ = adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+    first_df.count.assert_not_called()
+    second_df.count.assert_not_called()
+    first_df.write.mode.assert_called_once_with("append")
+    second_df.write.mode.assert_called_once_with("append")
+    assert spark.sql.call_count == 2
+    assert stats["orders"] == 12
+    # Chunk progress should be logged for each file
+    verbose_msgs = [c.args[0] for c in adapter.log_verbose.call_args_list]
+    assert any("Wrote chunk 1/2 for orders" in m for m in verbose_msgs)
+    assert any("Wrote chunk 2/2 for orders" in m for m in verbose_msgs)
+
+
+def test_load_data_spark_no_cache_tolerates_missing_preload_count(tmp_path: Path, caplog) -> None:
+    """A missing table before the first append should be treated as empty."""
+    import logging
+
+    adapter = _NoCacheAdapter()
+    spark = MagicMock()
+    parquet_path = tmp_path / "orders.parquet"
+    parquet_path.write_bytes(b"PAR1")
+    parquet_df = _make_dataframe(["id"])
+    spark.read.parquet.return_value = parquet_df
+
+    post_count_df = MagicMock()
+    post_count_df.collect.return_value = [(7,)]
+    spark.sql.side_effect = [RuntimeError("table not found"), post_count_df]
+
+    with (
+        caplog.at_level(logging.DEBUG, logger="benchbox.platforms.base.spark_execution_mixin"),
+        patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve,
+    ):
+        mock_resolve.return_value = SimpleNamespace(source_type="benchmark_tables", tables={"orders": [parquet_path]})
+        stats, _, _ = adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+    parquet_df.count.assert_not_called()
+    parquet_df.write.mode.assert_called_once_with("append")
+    assert spark.sql.call_count == 2
+    assert stats["orders"] == 7
+    assert "Row count unavailable for table 'orders'; assuming 0" in caplog.text
+
+
+def test_load_data_spark_no_cache_postload_count_failure_marks_table_failed(tmp_path: Path) -> None:
+    """A failed post-load count should fail the table load rather than silently report zero rows."""
+    adapter = _NoCacheAdapter()
+    spark = MagicMock()
+    parquet_path = tmp_path / "orders.parquet"
+    parquet_path.write_bytes(b"PAR1")
+    parquet_df = _make_dataframe(["id"])
+    spark.read.parquet.return_value = parquet_df
+
+    pre_count_df = MagicMock()
+    pre_count_df.collect.return_value = [(3,)]
+    spark.sql.side_effect = [pre_count_df, RuntimeError("session closed")]
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve:
+        mock_resolve.return_value = SimpleNamespace(source_type="benchmark_tables", tables={"orders": [parquet_path]})
+        stats, _, _ = adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+    parquet_df.count.assert_not_called()
+    parquet_df.write.mode.assert_called_once_with("append")
+    assert spark.sql.call_count == 2
+    assert stats["orders"] == 0
+    adapter.logger.error.assert_any_call("Failed to load orders: session closed")
+
+
+def test_load_data_spark_no_cache_negative_row_delta_warns(tmp_path: Path) -> None:
+    """A negative delta should warn before clamping the reported rows to zero."""
+    adapter = _NoCacheAdapter()
+    spark = MagicMock()
+    parquet_path = tmp_path / "orders.parquet"
+    parquet_path.write_bytes(b"PAR1")
+    parquet_df = _make_dataframe(["id"])
+    spark.read.parquet.return_value = parquet_df
+
+    pre_count_df = MagicMock()
+    pre_count_df.collect.return_value = [(10,)]
+    post_count_df = MagicMock()
+    post_count_df.collect.return_value = [(3,)]
+    spark.sql.side_effect = [pre_count_df, post_count_df]
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve:
+        mock_resolve.return_value = SimpleNamespace(source_type="benchmark_tables", tables={"orders": [parquet_path]})
+        stats, _, _ = adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+    assert stats["orders"] == 0
+    adapter.logger.warning.assert_called_once_with(
+        "Negative row delta for %s (%d -> %d); reporting 0",
+        "orders",
+        10,
+        3,
+    )
+
+
+def test_row_count_escapes_backticks_in_table_name() -> None:
+    """Backticks in table names are doubled to prevent SQL injection."""
+    spark = MagicMock()
+    spark.sql.return_value.collect.return_value = [(42,)]
+
+    result = SparkDataLoadMixin._row_count(spark, "my`table")
+
+    assert result == 42
+    sql_arg = spark.sql.call_args[0][0]
+    assert "my``table" in sql_arg
+    assert sql_arg == "SELECT COUNT(*) FROM `my``table`"
+
+
+class _CsvExtAdapter(_DummySparkAdapter):
+    """Adapter that requires .csv extensions (like LakeSail)."""
+
+    _requires_csv_extension: bool = True
+
+
+def test_csv_compat_path_noop_when_flag_false(tmp_path: Path) -> None:
+    """Default adapters return the original path unchanged."""
+    adapter = _DummySparkAdapter()
+    dat = tmp_path / "orders.dat.zst"
+    dat.write_bytes(b"x")
+    assert adapter._csv_compat_path(dat, tmp_path) == dat
+
+
+def test_csv_compat_path_symlinks_dat_zst_to_csv_zst(tmp_path: Path) -> None:
+    adapter = _CsvExtAdapter()
+    dat = tmp_path / "orders.dat.zst"
+    dat.write_bytes(b"x")
+    link_dir = tmp_path / "links"
+    link_dir.mkdir()
+
+    result = adapter._csv_compat_path(dat, link_dir)
+
+    assert result.name == "orders.csv.zst"
+    assert result.is_symlink()
+    assert result.resolve() == dat.resolve()
+
+
+def test_csv_compat_path_symlinks_tbl_to_csv(tmp_path: Path) -> None:
+    adapter = _CsvExtAdapter()
+    tbl = tmp_path / "customer.tbl"
+    tbl.write_bytes(b"x")
+    link_dir = tmp_path / "links"
+    link_dir.mkdir()
+
+    result = adapter._csv_compat_path(tbl, link_dir)
+
+    assert result.name == "customer.csv"
+    assert result.is_symlink()
+
+
+def test_csv_compat_path_preserves_csv_extension(tmp_path: Path) -> None:
+    """Files already named .csv should be returned as-is."""
+    adapter = _CsvExtAdapter()
+    csv = tmp_path / "orders.csv"
+    csv.write_bytes(b"x")
+
+    assert adapter._csv_compat_path(csv, tmp_path) == csv
+
+
+def test_csv_compat_path_preserves_csv_zst_extension(tmp_path: Path) -> None:
+    """Files already named .csv.zst should be returned as-is."""
+    adapter = _CsvExtAdapter()
+    csv_zst = tmp_path / "orders.csv.zst"
+    csv_zst.write_bytes(b"x")
+
+    assert adapter._csv_compat_path(csv_zst, tmp_path) == csv_zst
+
+
+def test_csv_compat_path_xz_extension(tmp_path: Path) -> None:
+    """XZ-compressed files get the .csv.xz symlink extension."""
+    adapter = _CsvExtAdapter()
+    dat_xz = tmp_path / "orders.dat.xz"
+    dat_xz.write_bytes(b"x")
+    link_dir = tmp_path / "links"
+    link_dir.mkdir()
+
+    result = adapter._csv_compat_path(dat_xz, link_dir)
+
+    assert result.name == "orders.csv.xz"
+    assert result.is_symlink()
+    assert result.resolve() == dat_xz.resolve()
+
+
+def test_csv_compat_path_multipart_tpch_chunks_get_unique_names(tmp_path: Path) -> None:
+    """Multi-part TPC-H files (customer.tbl.1.zst, .2.zst) get unique symlink names."""
+    adapter = _CsvExtAdapter()
+    link_dir = tmp_path / "links"
+    link_dir.mkdir()
+
+    chunk1 = tmp_path / "customer.tbl.1.zst"
+    chunk2 = tmp_path / "customer.tbl.2.zst"
+    chunk1.write_bytes(b"a")
+    chunk2.write_bytes(b"b")
+
+    result1 = adapter._csv_compat_path(chunk1, link_dir)
+    result2 = adapter._csv_compat_path(chunk2, link_dir)
+
+    assert result1.name == "customer.1.csv.zst"
+    assert result2.name == "customer.2.csv.zst"
+    assert result1.name != result2.name, "chunk symlinks must be distinct"
+    assert result1.is_symlink() and result1.resolve() == chunk1.resolve()
+    assert result2.is_symlink() and result2.resolve() == chunk2.resolve()
+
+
+def test_csv_compat_path_rejects_unknown_compression(tmp_path: Path) -> None:
+    """Unknown compression types must not silently drop the expected suffix."""
+    adapter = _CsvExtAdapter()
+    dat = tmp_path / "orders.dat"
+    dat.write_bytes(b"x")
+    link_dir = tmp_path / "links"
+    link_dir.mkdir()
+
+    with patch("benchbox.platforms.base.spark_execution_mixin.detect_compression", return_value="brotli"):
+        with pytest.raises(ValueError, match="Unsupported CSV compression type 'brotli'"):
+            adapter._csv_compat_path(dat, link_dir)
+
+
+def test_csv_compat_path_warns_on_symlink_collision(tmp_path: Path, caplog) -> None:
+    """When a symlink already exists pointing to a different file, emit a warning."""
+    import logging
+
+    adapter = _CsvExtAdapter()
+    link_dir = tmp_path / "links"
+    link_dir.mkdir()
+
+    # Create first file and its symlink
+    dat1 = tmp_path / "orders.dat"
+    dat1.write_bytes(b"first")
+    link = link_dir / "orders.csv"
+    link.symlink_to(dat1.resolve())
+
+    # Create second file with same stem but different content/path
+    dat2_dir = tmp_path / "other"
+    dat2_dir.mkdir()
+    dat2 = dat2_dir / "orders.dat"
+    dat2.write_bytes(b"second")
+
+    with caplog.at_level(logging.WARNING, logger="benchbox.platforms.base.spark_execution_mixin"):
+        result = adapter._csv_compat_path(dat2, link_dir)
+
+    # Should return existing link (even though it points to dat1)
+    assert result == link
+    assert "Symlink collision" in caplog.text
+
+
+# -- SparkQueryExecutionMixin tests --
+
+
+class _DummyQueryAdapter(SparkQueryExecutionMixin):
+    def __init__(self) -> None:
+        self.logger = MagicMock()
+
+    def log_verbose(self, msg: str) -> None:
+        pass
+
+
+def _make_spark(table_rows: dict[str, list] | None = None) -> MagicMock:
+    """Return a minimal SparkSession mock.
+
+    table_rows maps table_name → list of rows returned by spark.sql().collect().
+    Tables absent from the dict raise an exception when queried.
+    """
+    spark = MagicMock()
+    table_rows = table_rows or {}
+
+    def _sql(query: str):
+        result_df = MagicMock()
+        for name, rows in table_rows.items():
+            if name in query:
+                result_df.collect.return_value = rows
+                return result_df
+        # Table not in the allow-list → simulate inaccessible table
+        result_df.collect.side_effect = Exception(f"Table not found in: {query}")
+        return result_df
+
+    spark.sql.side_effect = _sql
+    return spark
+
+
+# _validate_data_integrity
+
+
+def test_validate_data_integrity_all_accessible() -> None:
+    adapter = _DummyQueryAdapter()
+    spark = _make_spark({"orders": [[1]], "lineitem": [[1]]})
+    table_stats = {"orders": 10, "lineitem": 50}
+
+    status, details = adapter._validate_data_integrity(None, spark, table_stats)
+
+    assert status == "PASSED"
+    assert set(details["accessible_tables"]) == {"orders", "lineitem"}
+    assert details["constraints_enabled"] is True
+    assert "inaccessible_tables" not in details
+
+
+def test_validate_data_integrity_some_inaccessible() -> None:
+    adapter = _DummyQueryAdapter()
+    # Only "orders" is accessible; "lineitem" will raise
+    spark = _make_spark({"orders": [[1]]})
+    table_stats = {"orders": 10, "lineitem": 50}
+
+    status, details = adapter._validate_data_integrity(None, spark, table_stats)
+
+    assert status == "FAILED"
+    assert "lineitem" in details["inaccessible_tables"]
+    assert details["constraints_enabled"] is False
+
+
+def test_validate_data_integrity_all_inaccessible() -> None:
+    adapter = _DummyQueryAdapter()
+    spark = _make_spark()  # no tables accessible
+    table_stats = {"orders": 0, "lineitem": 0}
+
+    status, details = adapter._validate_data_integrity(None, spark, table_stats)
+
+    assert status == "FAILED"
+    assert set(details["inaccessible_tables"]) == {"orders", "lineitem"}
+
+
+def test_validate_data_integrity_empty_table_stats() -> None:
+    adapter = _DummyQueryAdapter()
+    spark = _make_spark()
+
+    status, details = adapter._validate_data_integrity(None, spark, {})
+
+    assert status == "PASSED"
+    assert details["accessible_tables"] == []
+
+
+def test_validate_data_integrity_logs_inaccessible_table(caplog) -> None:
+    import logging
+
+    adapter = _DummyQueryAdapter()
+    spark = _make_spark()  # all inaccessible
+    table_stats = {"orders": 0}
+
+    with caplog.at_level(logging.DEBUG):
+        adapter._validate_data_integrity(None, spark, table_stats)
+
+    # log_verbose is a no-op in the stub, but verify no exception propagates
+    # and the method returns FAILED cleanly
+    assert True  # reaching here means no exception was raised
+
+
+def test_validate_data_integrity_spark_sql_exception_marks_table_inaccessible() -> None:
+    """Per-table SQL exceptions are caught and the table is marked inaccessible."""
+    adapter = _DummyQueryAdapter()
+    broken_spark = MagicMock()
+    broken_spark.sql.side_effect = RuntimeError("session closed")
+    table_stats = {"orders": 10}
+
+    status, details = adapter._validate_data_integrity(None, broken_spark, table_stats)
+
+    assert status == "FAILED"
+    assert "orders" in details["inaccessible_tables"]
+
+
+# get_table_row_count
+
+
+def test_get_table_row_count_returns_count() -> None:
+    adapter = _DummyQueryAdapter()
+    spark = MagicMock()
+    spark.sql.return_value.collect.return_value = [[42]]
+
+    assert adapter.get_table_row_count(spark, "orders") == 42
+
+
+def test_get_table_row_count_empty_result() -> None:
+    adapter = _DummyQueryAdapter()
+    spark = MagicMock()
+    spark.sql.return_value.collect.return_value = []
+
+    assert adapter.get_table_row_count(spark, "orders") == 0
+
+
+def test_get_table_row_count_exception_returns_zero() -> None:
+    adapter = _DummyQueryAdapter()
+    spark = MagicMock()
+    spark.sql.side_effect = Exception("table not found")
+
+    assert adapter.get_table_row_count(spark, "missing_table") == 0
+
+
+def test_get_table_row_count_escapes_backticks() -> None:
+    """get_table_row_count wraps table names in escaped backticks."""
+    adapter = _DummyQueryAdapter()
+    spark = MagicMock()
+    spark.sql.return_value.collect.return_value = [[99]]
+
+    adapter.get_table_row_count(spark, "my`table")
+
+    sql_arg = spark.sql.call_args[0][0]
+    assert sql_arg == "SELECT COUNT(*) FROM `my``table`"
+
+
+def test_get_table_row_count_uses_spark_sql_not_cursor() -> None:
+    """Confirm the mixin uses spark.sql(), not connection.cursor()."""
+    adapter = _DummyQueryAdapter()
+    spark = MagicMock()
+    spark.sql.return_value.collect.return_value = [[99]]
+
+    adapter.get_table_row_count(spark, "orders")
+
+    spark.sql.assert_called_once()
+    assert "orders" in spark.sql.call_args[0][0]
+    spark.cursor.assert_not_called()

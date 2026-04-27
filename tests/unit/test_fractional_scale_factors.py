@@ -71,7 +71,7 @@ class TestFractionalScaleFactors:
             for table_name in test_tables:
                 if table_name in files:
                     table_file = files[table_name]
-                    with open(table_file) as f:
+                    with open(table_file, encoding="utf-8") as f:
                         lines = f.readlines()[:10]  # Check first 10 lines
 
                     for i, line in enumerate(lines):
@@ -108,7 +108,7 @@ class TestFractionalScaleFactors:
                 if table_name in files:
                     # TPC-DS returns list[Path], get first file
                     table_file = files[table_name][0]
-                    with open(table_file) as f:
+                    with open(table_file, encoding="utf-8") as f:
                         lines = f.readlines()[:10]  # Check first 10 lines
 
                     for i, line in enumerate(lines):
@@ -144,7 +144,7 @@ class TestFractionalScaleFactors:
             for table_name, expected_count in expected_columns.items():
                 if table_name in files:
                     table_file = files[table_name]
-                    with open(table_file) as f:
+                    with open(table_file, encoding="utf-8") as f:
                         lines = f.readlines()[:5]  # Check first 5 lines
 
                     for i, line in enumerate(lines):

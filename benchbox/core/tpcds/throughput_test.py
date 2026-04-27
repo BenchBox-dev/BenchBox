@@ -12,7 +12,6 @@ This implementation is based on the TPC-DS specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-import concurrent.futures
 import logging
 import sqlite3
 from dataclasses import dataclass, field
@@ -20,6 +19,8 @@ from datetime import datetime
 from typing import Any, Callable, Optional
 
 from benchbox.core.connection import DatabaseConnection
+from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
+from benchbox.core.throughput.runner import StreamRunner
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
@@ -40,37 +41,15 @@ class TPCDSThroughputTestConfig:
     enable_preflight: bool = True
 
 
-@dataclass
-class TPCDSThroughputStreamResult:
-    """Result of a single TPC-DS throughput test stream."""
-
-    stream_id: int
-    start_time: float
-    end_time: float
-    duration: float
-    queries_executed: int
-    queries_successful: int
-    queries_failed: int
-    query_results: list[dict[str, Any]] = field(default_factory=list)
-    success: bool = True
-    error: Optional[str] = None
+# Backward-compatibility alias - ThroughputStreamResult is the canonical type.
+TPCDSThroughputStreamResult = ThroughputStreamResult
 
 
 @dataclass
-class TPCDSThroughputTestResult:
+class TPCDSThroughputTestResult(ThroughputResult):
     """Result of TPC-DS Throughput Test."""
 
-    config: TPCDSThroughputTestConfig
-    start_time: str
-    end_time: str
-    total_time: float
-    throughput_at_size: float
-    streams_executed: int
-    streams_successful: int
-    stream_results: list[TPCDSThroughputStreamResult] = field(default_factory=list)
-    query_throughput: float = 0.0
-    success: bool = True
-    errors: list[str] = field(default_factory=list)
+    config: TPCDSThroughputTestConfig = field(kw_only=True)
 
     @property
     def scale_factor(self) -> float:
@@ -185,9 +164,6 @@ class TPCDSThroughputTest:
                 self.logger.info(f"Number of streams: {config.num_streams}")
                 self.logger.info(f"Scale factor: {config.scale_factor}")
 
-            # Execute concurrent streams
-            max_workers = config.max_workers or config.num_streams
-
             # Preflight: validate that selected query subsets in all streams can be generated
         except Exception:
             # Reraise any logging/prep errors
@@ -198,87 +174,18 @@ class TPCDSThroughputTest:
             self._preflight_validate_generation(config)
 
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Track future -> stream_id mapping for timeout error reporting
-                future_to_stream_id = {}
-
-                for stream_id in range(config.num_streams):
-                    future = executor.submit(
-                        self._execute_stream,
-                        stream_id,
-                        config.base_seed + stream_id,
-                        config,
-                    )
-                    future_to_stream_id[future] = stream_id
-
-                # Wait for all streams to complete with per-stream timeout enforcement
-                # Note: Timed-out streams continue executing in background (Python threading limitation)
-                timeout = config.stream_timeout if config.stream_timeout > 0 else None
-
-                for future in concurrent.futures.as_completed(future_to_stream_id.keys()):
-                    stream_id = future_to_stream_id[future]
-
-                    try:
-                        # Enforce per-stream timeout
-                        stream_result = future.result(timeout=timeout)
-                        result.stream_results.append(stream_result)
-                        result.streams_executed += 1
-
-                        if stream_result.success:
-                            result.streams_successful += 1
-                        else:
-                            result.errors.append(f"Stream {stream_result.stream_id} failed: {stream_result.error}")
-
-                        if config.verbose:
-                            self.logger.info(
-                                f"Stream {stream_result.stream_id}: "
-                                f"{stream_result.queries_successful}/{stream_result.queries_executed} successful"
-                            )
-
-                    except concurrent.futures.TimeoutError:
-                        result.streams_executed += 1
-                        error_msg = f"Stream {stream_id} timeout after {timeout}s"
-                        result.errors.append(error_msg)
-                        if config.verbose:
-                            self.logger.error(error_msg)
-
-                    except Exception as e:
-                        result.streams_executed += 1
-                        result.errors.append(f"Stream {stream_id} execution failed: {e}")
-                        if config.verbose:
-                            self.logger.error(f"Stream {stream_id} execution failed: {e}")
+            # Execute concurrent streams
+            StreamRunner.execute(self._execute_stream, config, result, self.logger)
 
             # Calculate metrics
-            result.end_time = datetime.now().isoformat()
-
-            # Per TPC-DS specification: Total Test Time (TTT) is measured from when the
-            # first stream begins execution until the last stream completes execution.
-            # This is the actual concurrent execution time, excluding setup/teardown overhead.
-            if result.stream_results:
-                first_stream_start = min(sr.start_time for sr in result.stream_results)
-                last_stream_end = max(sr.end_time for sr in result.stream_results)
-                total_time = last_stream_end - first_stream_start
-            else:
-                # Fallback if no streams executed (shouldn't happen in normal operation)
-                total_time = elapsed_seconds(start_time)
-
-            result.total_time = total_time
-
-            if total_time > 0:
-                # Throughput@Size = S × 3600 × SF / TTT
-                # where S = num_streams, SF = scale_factor, TTT = total_test_time (concurrent execution)
-                result.throughput_at_size = (config.num_streams * 3600.0 * config.scale_factor) / total_time
-
-                # Calculate query throughput
-                total_queries = sum(sr.queries_executed for sr in result.stream_results)
-                result.query_throughput = total_queries / total_time
+            StreamRunner.compute_metrics(result, config, start_time)
 
             # TPC-DS success criteria: at least 70% of streams must succeed
             success_rate = result.streams_successful / max(config.num_streams, 1)
             result.success = success_rate >= 0.7
 
             if config.verbose:
-                self.logger.info(f"Throughput Test completed in {total_time:.3f}s")
+                self.logger.info(f"Throughput Test completed in {result.total_time:.3f}s")
                 self.logger.info(f"Successful streams: {result.streams_successful}/{config.num_streams}")
                 self.logger.info(f"Stream success rate: {success_rate:.2%}")
                 self.logger.info(f"Throughput@Size: {result.throughput_at_size:.2f}")
@@ -338,21 +245,163 @@ class TPCDSThroughputTest:
             )
             raise RuntimeError(msg)
 
+    def _resolve_available_query_ids(self) -> list[int]:
+        try:
+            all_queries = self.benchmark.get_queries()
+            ids = [int(k) for k in all_queries if k.isdigit()]
+            return ids if ids else list(range(1, 100))
+        except Exception:
+            return list(range(1, 100))
+
+    def _resolve_query_manager(self):
+        if hasattr(self.benchmark, "query_manager"):
+            return self.benchmark.query_manager
+        if hasattr(self.benchmark, "_impl") and hasattr(self.benchmark._impl, "query_manager"):
+            return self.benchmark._impl.query_manager
+        raise RuntimeError("No query_manager found - ThroughputTest requires a TPCDSBenchmark instance")
+
+    def _build_stream_queries(self, stream_id: int, seed: int, config: TPCDSThroughputTestConfig) -> list:
+        from benchbox.core.tpcds.streams import create_standard_streams
+
+        available_query_ids = self._resolve_available_query_ids()
+        query_manager = self._resolve_query_manager()
+
+        query_range = (min(available_query_ids), max(available_query_ids)) if available_query_ids else (1, 99)
+        stream_manager = create_standard_streams(
+            query_manager=query_manager,
+            num_streams=stream_id + 1,
+            query_range=query_range,
+            base_seed=seed + stream_id,
+        )
+
+        streams = stream_manager.generate_streams()
+        all_queries = streams.get(stream_id, [])
+
+        if config.queries_per_stream is not None:
+            subset = all_queries[: min(config.queries_per_stream, len(all_queries))]
+            if config.verbose:
+                self.logger.info(
+                    f"Stream {stream_id} using TPC-DS permutation with {len(subset)} queries "
+                    f"(limited by queries_per_stream={config.queries_per_stream})"
+                )
+            return subset
+        if config.verbose:
+            self.logger.info(
+                f"Stream {stream_id} using TPC-DS permutation with {len(all_queries)} queries (full query set)"
+            )
+        return all_queries
+
+    def _get_stream_query_text(self, query_id: int, variant, stream_seed: int, scale_factor) -> str:
+        if variant is not None:
+            return self.benchmark.get_query(
+                query_id,
+                seed=stream_seed,
+                scale_factor=scale_factor,
+                variant=variant,
+                dialect=self.target_dialect,
+            )
+        return self.benchmark.get_query(
+            query_id, seed=stream_seed, scale_factor=scale_factor, dialect=self.target_dialect
+        )
+
+    def _run_single_stream_query(self, connection, query_text: str, query_display_id: str, stream_id: int) -> None:
+        if hasattr(connection, "set_query_context"):
+            connection.set_query_context(query_display_id, stream_id=stream_id)
+        cursor = connection.execute(query_text)
+        if hasattr(cursor, "fetchall"):
+            cursor.fetchall()
+        if hasattr(connection, "commit"):
+            connection.commit()
+
+    def _execute_single_query(
+        self,
+        connection,
+        stream_id: int,
+        position: int,
+        stream_query,
+        seed: int,
+        config: TPCDSThroughputTestConfig,
+        stream_result: TPCDSThroughputStreamResult,
+    ) -> None:
+        query_id = stream_query.query_id
+        variant = stream_query.variant
+        query_display_id = f"{query_id}{variant}" if variant else str(query_id)
+        query_start = mono_time()
+        query_result = {
+            "query_id": query_display_id,
+            "position": position + 1,
+            "stream_id": stream_id,
+            "execution_time_seconds": 0.0,
+            "success": False,
+            "error": None,
+            "result_count": 0,
+        }
+
+        try:
+            stream_seed = seed + stream_id * 1000 + position
+            query_text = self._get_stream_query_text(query_id, variant, stream_seed, config.scale_factor)
+            label = f"Stream_{stream_id}_Position_{position + 1}_Query_{query_display_id}"
+            try:
+                self._run_single_stream_query(connection, query_text, query_display_id, stream_id)
+            finally:
+                with self._capture_lock:
+                    self.captured_items.append((label, query_text))
+
+            query_result.update(
+                {
+                    "execution_time_seconds": elapsed_seconds(query_start),
+                    "success": True,
+                    "result_count": 0,
+                }
+            )
+            stream_result.queries_successful += 1
+        except Exception as e:
+            query_result.update(
+                {
+                    "execution_time_seconds": elapsed_seconds(query_start),
+                    "success": False,
+                    "error": str(e),
+                }
+            )
+            stream_result.queries_failed += 1
+            if "Template substitution error" not in str(e) and config.verbose:
+                self.logger.warning(f"Stream {stream_id} Query {query_id} failed: {e}")
+
+        stream_result.query_results.append(query_result)
+        stream_result.queries_executed += 1
+
+    def _finalize_stream_success(
+        self, stream_id: int, stream_result: TPCDSThroughputStreamResult, config: TPCDSThroughputTestConfig
+    ) -> None:
+        if stream_result.queries_executed == 0:
+            stream_result.success = False
+            if config.verbose:
+                self.logger.info(f"Stream {stream_id} completed: no queries executed")
+            return
+
+        success_rate = stream_result.queries_successful / stream_result.queries_executed
+        stream_result.success = success_rate >= 0.7
+        if config.verbose:
+            self.logger.info(
+                f"Stream {stream_id} completed: "
+                f"{stream_result.queries_successful}/{stream_result.queries_executed} successful "
+                f"(success rate: {success_rate:.2%})"
+            )
+
+    def _close_stream_connection(self, connection, stream_id: int, config: TPCDSThroughputTestConfig) -> None:
+        if connection is None:
+            return
+        try:
+            connection.close()
+        except Exception as close_error:
+            if config.verbose:
+                self.logger.warning(f"Failed to close connection for stream {stream_id}: {close_error}")
+
     def _execute_stream(
         self, stream_id: int, seed: int, config: TPCDSThroughputTestConfig
     ) -> TPCDSThroughputStreamResult:
-        """Execute a single TPC-DS throughput test stream.
-
-        Args:
-            stream_id: Stream identifier
-            seed: Random seed for this stream
-            config: Test configuration
-
-        Returns:
-            Stream execution result
-        """
+        """Execute a single TPC-DS throughput test stream."""
         start_time = mono_time()
-
         stream_result = TPCDSThroughputStreamResult(
             stream_id=stream_id,
             start_time=start_time,
@@ -368,185 +417,20 @@ class TPCDSThroughputTest:
             if config.verbose:
                 self.logger.info(f"Starting stream {stream_id} with seed {seed}")
 
-            # Create connection for this stream
             connection = self.connection_factory()
-
-            # Get available queries and execute them in random order
-            try:
-                all_queries = self.benchmark.get_queries()
-                available_query_ids = [int(k) for k in all_queries if k.isdigit()]
-                if not available_query_ids:
-                    # Fallback if no digit-only query IDs found
-                    available_query_ids = list(range(1, 100))
-            except Exception:
-                # Fallback: assume queries 1-99 are available
-                available_query_ids = list(range(1, 100))
-
-            # Use proper TPC-DS stream permutation for throughput testing
-            from benchbox.core.tpcds.streams import (
-                create_standard_streams,
-            )
-
-            # Get the query manager - handle both direct TPCDSBenchmark and TPCDS wrapper
-            query_manager = None
-            if hasattr(self.benchmark, "query_manager"):
-                # Direct TPCDSBenchmark instance
-                query_manager = self.benchmark.query_manager
-            elif hasattr(self.benchmark, "_impl") and hasattr(self.benchmark._impl, "query_manager"):
-                # TPCDS wrapper instance
-                query_manager = self.benchmark._impl.query_manager
-            else:
-                raise RuntimeError("No query_manager found - ThroughputTest requires a TPCDSBenchmark instance")
-
-            # Create stream manager for proper permutation
-            stream_manager = create_standard_streams(
-                query_manager=query_manager,
-                num_streams=stream_id + 1,  # Ensure we have enough streams
-                query_range=(min(available_query_ids), max(available_query_ids)) if available_query_ids else (1, 99),
-                base_seed=seed + stream_id,
-            )
-
-            # Generate the streams to get proper permutation
-            streams = stream_manager.generate_streams()
-            stream_queries = streams.get(stream_id, [])
-
-            # Execute all queries including multi-part variants (14a/b, 23a/b, 24a/b, 39a/b)
-            # TPC-DS specifies 99 query templates, but 4 of them (14, 23, 24, 39) have 2 parts each
-            # Total: 95 single queries + 8 variant queries = 103 queries per stream
-            all_queries = stream_queries
-
-            # Apply query subset limit if configured
-            if config.queries_per_stream is not None:
-                query_subset = all_queries[: min(config.queries_per_stream, len(all_queries))]
-                if config.verbose:
-                    self.logger.info(
-                        f"Stream {stream_id} using TPC-DS permutation with {len(query_subset)} queries "
-                        f"(limited by queries_per_stream={config.queries_per_stream})"
-                    )
-            else:
-                # Execute all queries (full TPC-DS compliance)
-                query_subset = all_queries
-                if config.verbose:
-                    self.logger.info(
-                        f"Stream {stream_id} using TPC-DS permutation with {len(query_subset)} queries (full query set)"
-                    )
+            query_subset = self._build_stream_queries(stream_id, seed, config)
 
             for position, stream_query in enumerate(query_subset):
-                query_id = stream_query.query_id
-                variant = stream_query.variant
-                # Display ID includes variant suffix (e.g., "14a", "23b")
-                query_display_id = f"{query_id}{variant}" if variant else str(query_id)
-                query_start = mono_time()
-                query_result = {
-                    "query_id": query_display_id,
-                    "position": position + 1,
-                    "stream_id": stream_id,
-                    "execution_time_seconds": 0.0,
-                    "success": False,
-                    "error": None,
-                    "result_count": 0,
-                }
+                self._execute_single_query(connection, stream_id, position, stream_query, seed, config, stream_result)
 
-                try:
-                    # Get the query with stream-specific parameters
-                    # Use stream and position-specific seed as per TPC-DS specification
-                    stream_seed = seed + stream_id * 1000 + position
-                    # Pass variant parameter for multi-part queries (14a/b, 23a/b, 24a/b, 39a/b)
-                    if variant is not None:
-                        query_text = self.benchmark.get_query(
-                            query_id,
-                            seed=stream_seed,
-                            scale_factor=config.scale_factor,
-                            variant=variant,
-                            dialect=self.target_dialect,
-                        )
-                    else:
-                        query_text = self.benchmark.get_query(
-                            query_id, seed=stream_seed, scale_factor=config.scale_factor, dialect=self.target_dialect
-                        )
-
-                    # Execute the actual query to enable dry-run capture via platform adapter
-                    label = f"Stream_{stream_id}_Position_{position + 1}_Query_{query_display_id}"
-                    try:
-                        # Set query context before execution for validation and error reporting
-                        if hasattr(connection, "set_query_context"):
-                            connection.set_query_context(query_display_id, stream_id=stream_id)
-                        cursor = connection.execute(query_text)
-                        # Fetch to complete execution in non-dry-run
-                        if hasattr(cursor, "fetchall"):
-                            cursor.fetchall()
-                        if hasattr(connection, "commit"):
-                            connection.commit()
-                    finally:
-                        # Record labeled SQL for preview
-                        with self._capture_lock:
-                            self.captured_items.append((label, query_text))
-
-                    execution_time = elapsed_seconds(query_start)
-
-                    query_result.update(
-                        {
-                            "execution_time_seconds": execution_time,
-                            "success": True,
-                            "result_count": 0,
-                        }
-                    )
-
-                    stream_result.queries_successful += 1
-
-                except Exception as e:
-                    execution_time = elapsed_seconds(query_start)
-                    query_result.update(
-                        {
-                            "execution_time_seconds": execution_time,
-                            "success": False,
-                            "error": str(e),
-                        }
-                    )
-
-                    stream_result.queries_failed += 1
-
-                    # Don't log template substitution errors as failures - they're expected
-                    if "Template substitution error" not in str(e) and config.verbose:
-                        self.logger.warning(f"Stream {stream_id} Query {query_id} failed: {e}")
-
-                stream_result.query_results.append(query_result)
-                stream_result.queries_executed += 1
-
-            # TPC-DS success criteria: at least 70% of queries must succeed in each stream
-            if stream_result.queries_executed > 0:
-                success_rate = stream_result.queries_successful / stream_result.queries_executed
-                stream_result.success = success_rate >= 0.7
-
-                if config.verbose:
-                    self.logger.info(
-                        f"Stream {stream_id} completed: "
-                        f"{stream_result.queries_successful}/{stream_result.queries_executed} successful "
-                        f"(success rate: {success_rate:.2%})"
-                    )
-            else:
-                stream_result.success = False
-
-                if config.verbose:
-                    self.logger.info(f"Stream {stream_id} completed: no queries executed")
-
+            self._finalize_stream_success(stream_id, stream_result, config)
         except Exception as e:
             stream_result.error = str(e)
             stream_result.success = False
-
             if config.verbose:
                 self.logger.error(f"Stream {stream_id} failed: {e}")
-
         finally:
-            # Ensure connection is always closed, even on exception
-            if connection is not None:
-                try:
-                    connection.close()
-                except Exception as close_error:
-                    if config.verbose:
-                        self.logger.warning(f"Failed to close connection for stream {stream_id}: {close_error}")
-
-            # Record end time and duration
+            self._close_stream_connection(connection, stream_id, config)
             stream_result.end_time = mono_time()
             stream_result.duration = stream_result.end_time - stream_result.start_time
 

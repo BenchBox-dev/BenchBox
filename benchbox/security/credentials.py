@@ -50,14 +50,14 @@ class CredentialManager:
             return {}
 
         try:
-            with open(self.credentials_path) as f:
+            with open(self.credentials_path, encoding="utf-8") as f:
                 raw_data = yaml.safe_load(f) or {}
 
             # Substitute environment variables
             return self._substitute_env_vars(raw_data)
 
         except Exception as e:
-            raise ValueError(f"Failed to load credentials from {self.credentials_path}: {e}")
+            raise ValueError(f"Failed to load credentials from {self.credentials_path}: {e}") from e
 
     def _substitute_env_vars(self, data: Any) -> Any:
         """Recursively substitute environment variables in credential data.
@@ -93,7 +93,7 @@ class CredentialManager:
         }
 
         # Write to file
-        with open(self.credentials_path, "w") as f:
+        with open(self.credentials_path, "w", encoding="utf-8") as f:
             yaml.dump(data_to_save, f, default_flow_style=False, sort_keys=False)
 
         # Set secure file permissions (owner read/write only)

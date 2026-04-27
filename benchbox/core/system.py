@@ -86,7 +86,7 @@ class SystemProfiler:
                 return f"{platform.machine()} CPU"
         elif platform.system() == "Linux":
             try:
-                with open("/proc/cpuinfo") as f:
+                with open("/proc/cpuinfo", encoding="utf-8") as f:
                     for line in f:
                         if line.startswith("model name"):
                             return line.split(":", 1)[1].strip()

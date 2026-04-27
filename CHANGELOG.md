@@ -5,25 +5,162 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.1] - 2026-04-26
+
+### New
+
+- **Benchmarks**
+  - **Vector Search** - 6 kNN/ANN queries with recall@k and latency metrics;
+    dialect variants for DuckDB, pgvector, Snowflake, ClickHouse, StarRocks,
+    and Doris.
+  - **FlightData** - 20 analytical queries over US BTS on-time aviation data
+    with DataFrame support.
+  - **NYC Taxi expansion** - Green Taxi, For-Hire Vehicle (FHV), and
+    High-Volume FHV trip records now supported alongside Yellow Taxi; select
+    via `--benchmark-option taxi_types=…`.
+- **Platform adapters**
+  - **Apache Doris** - Open-source MPP database powering real-time analytics at
+    Baidu, Meituan, and JD.com; Uses the MySQL wire protocol.
+  - **CedarDB** - HTAP engine (transactional + analytical) based on research from
+    TU Munich (formerly Umbra). JIT-compiled queries. PostgreSQL wire compatible.
+  - **StarRocks** - Sub-second columnar OLAP with best-in-class materialized
+    views and data-lake federation
+  - **SingleStore** - HTAP engine with unified row-store + columnstore for real-time
+    ingest and simultaneous analytical queries without ETL; cloud and self-managed.
+  - **QuestDB** - New time-series database with designated timestamps, automatic
+    time partitioning, and millions-of-rows-per-second ingestion.
+  - **Apache Gluten + Velox** - Spark accelerator, replaces JVM operators with
+    Meta's C++ Velox engine to provide speedup with no application rewrites.
+  - **Snowpark Connect and Onehouse Quanton restored** - Both platforms are
+    back in the supported list after being removed in v0.2.0.
+
+### Added
+
+- **Scale factor harmonization** - Benchmarks with adjustable scale factors now
+  target roughly 1 GB of uncompressed CSV data at SF=1, giving BenchBox a more
+  consistent scale model. Output sizes at a given SF will change for affected
+  benchmarks. Spec-locked benchmarks such as TPC-H, TPC-DS, SSB, ClickBench,
+  and DataVault are unchanged.
+- **Unofficial TPC-DS scales** (SF < 1) now work out of the box, backed by
+  patched `dsdgen` binaries bundled with BenchBox. Runs are non-comparable to
+  published TPC-DS results.
+- **DataFrame execution coverage** - DataFrame mode now works on Metadata
+  Primitives, Transaction Primitives, TPC-Havoc, FlightData, and JoinOrder.
+- **New CLI flags** - `--benchmark-option K=V` (repeatable, for
+  benchmark-specific parameters such as `taxi_types=yellow,green`) and
+  `--iterations` (power-test measurement count).
+- **HTTP TLS certificate validation** for HTTP-based data loading.
+- **Advanced pg_mooncake and pg_duckdb benchmarking options.**
+- **SQL compatibility subsystem** - Added `benchbox/sql_compat/` to centralize
+  benchmark gating, query variants, query rewrites, schema emission, and DDL
+  optimization.
+- **Extended compressed data generation** - TSBS, FlightData, and NYC Taxi
+  generators now support BenchBox compression options and write compression
+  metadata manifests.
+- **Broader platform coverage** - Added Docker-based live smoke tests for
+  Firebolt Core and added SHA-256 DataVault hash-key support in the SQL ETL
+  path.
+
+### Fixed
+
+- **Interactive `benchbox run` wizard** - Resolved phase-vs-query prompt
+  confusion, `Q`-prefix query ID mismatches, invalid scale-factor
+  recommendations, misleading tuning preview, and dead Test Execution Type
+  input.
+- **Platform config credential precedence** - Saved credentials now correctly
+  override registered defaults across all builders.
+- **Platform format preference defaults** - Data format selection now
+  correctly defaults to each platform's preferred format.
+- **ClickHouse correctness** - TPC-DS power tests now report `FAILED` when no
+  queries execute (previously passed silently); added dialect overrides for
+  `tpcdi`, `coffeeshop`, `h2odb` Q9, `nyctaxi` EXTRACT, `tpchavoc` Q6, and
+  `read_primitives`; query error messages are now surfaced in results (pattern
+  also extended to Redshift and Firebolt).
+- **Apache Doris and StarRocks stability** - Hardened bulk loading, SQL
+  compatibility, Docker startup, ARM64 support, timeouts, and type handling
+  across `tpcdi`, `tpcds_obt`, `vector_search`, ClickBench, NYC Taxi, and
+  primitives workloads.
+- **QuestDB compatibility and loading** - Expanded query rewrites, improved
+  `/imp` CSV loading with zstd and multi-chunk support, added platform option
+  registration and HTTPS support, and stabilized table reuse.
+- **Cross-adapter correctness fixes** - Resolved CedarDB benchmark failures,
+  improved LakeSail local-mode startup and file scanning, added Firebolt S3
+  staging and better load errors, improved Databend connection and cache
+  behavior, and hardened pg_mooncake/pg_duckdb columnstore migration.
+- **Dependency and test reliability** - Migrated pg-family adapters to
+  psycopg3, relaxed a DataFusion v53 ordering assertion, raised the
+  `pyarrow` cap to `<25.0.0`, and restored benchmark timeout enforcement on
+  macOS.
+- **Velox adapter** local mode now sets `spark.driver.extraClassPath` and
+  `spark.executor.extraClassPath` alongside `spark.jars`. The Gluten plugin
+  is loaded by `SparkContext.initializeSparkContext` before `spark.jars`
+  promotions reach the executor classpath, so without these entries the
+  plugin silently no-ops and queries run on plain Spark. The Docker entrypoint
+  was already setting these for the server-mode path; adapter local mode is
+  now consistent.
+- **Velox adapter** error message for missing `gluten_jar_path` no longer
+  references the removed `--velox-jar` legacy flag; it now points at the
+  canonical `--platform-option gluten_jar_path=…` syntax.
+
+### Changed
+
+- **ClickHouse split into three platforms** - `clickhouse-local`,
+  `clickhouse-server`, and `clickhouse-cloud` replace the single `clickhouse`
+  platform, driven by a standardized `deployment_mode` contract.
+- **TPC-DS-OBT now defaults to `parquet` output** - BenchBox now writes OBT
+  artifacts as parquet by default for much smaller output size and better
+  handling of wide, sparse tables. Use `--benchmark-option output_format=dat`
+  to keep the old behavior.
+- **Platform config builders consolidated** - Databend, Spark, ClickHouse
+  Cloud, Snowflake, Databricks, and the remaining builders now share
+  `build_platform_config()` with a consistent merge order.
+- **Docker test platform image upgrades** - Local test platform images
+  updated to latest stable versions. PostgreSQL and pg_duckdb have been
+  upgraded to v18; all other images track their current stable releases.
+- **Spark adapter** (`--platform spark`) now strips `PRIMARY KEY`, `FOREIGN KEY`,
+  `UNIQUE` (both inline column-level and table-level), and `CHECK` constraints
+  (including those with nested-paren expressions like `CHECK ((a > 0) AND (b > 0))`)
+  from `CREATE TABLE` statements when running with `--table-format parquet`
+  or `orc`, and rewrites `SMALLINT` to `INT` to avoid `CAST_INVALID_INPUT`
+  on values above 32767. This unlocks benchmarks whose schemas carry these
+  constraints (`write_primitives`, `metadata_primitives`,
+  `transaction_primitives`, `datavault`, ClickBench) on Spark V1 datasource
+  tables for the first time. `--table-format delta` and `iceberg` (V2 catalog
+  tables) preserve constraints and `SMALLINT` as before.
+- **LakeSail adapter** picks up the same constraint stripping and `SMALLINT`
+  upcast through the shared Spark helpers; previously these benchmarks failed
+  at `CREATE TABLE`. The orphaned-warehouse pre-purge that the Velox adapter
+  introduced is now wired into LakeSail too, defending long-running pysail
+  servers against `LOCATION_ALREADY_EXISTS` from prior on-disk warehouse data.
+
+### Internal
+
+- Lifted the three identical `apply_constraint_configuration`,
+  `apply_unified_tuning`, and `apply_platform_optimizations` bodies from
+  spark / lakesail / velox into a `SparkLikeAdapterMixin` next to the
+  existing Spark helpers.
+- The `optimize_spark_table_definition` helper now uses balanced-paren
+  matching for table-level constraints so DDL with nested-paren CHECK
+  clauses no longer corrupts when stripped.
+
 
 ## [0.2.0] - 2026-04-01
 
 ### Added
 
-- **On-demand TPC answer file downloads** — Wheel installs now fetch missing
+- **On-demand TPC answer file downloads** - Wheel installs now fetch missing
   TPC-H and TPC-DS answer files automatically for row-count validation, or
   pre-populate the cache with `benchbox download-answers` for offline and
   air-gapped environments. Supports `--benchmark tpch|tpcds|all`, `--force`,
   `--show-cache-dir`, SHA-256 verification, retries, and `BENCHBOX_NO_DOWNLOAD=1`.
-- **Adaptive Redshift connection timeout** — Connection timeout now adjusts to
+- **Adaptive Redshift connection timeout** - Connection timeout now adjusts to
   deployment state: paused or resuming provisioned clusters get a longer timeout,
   and Serverless gets a cold-start floor to reduce spurious connection failures.
-- **Cloud platform live integration tests** — Added live smoke tests for
+- **Cloud platform live integration tests** - Added live smoke tests for
   Firebolt, Starburst Galaxy, MotherDuck, pg_duckdb, and pg_mooncake with
   per-platform markers, fixtures, Makefile targets, Docker Compose harness for
   PostgreSQL extensions, and multi-extension comparison orchestration.
-- **Read Primitives Redshift dialect coverage** — Expanded Redshift Read
+- **Read Primitives Redshift dialect coverage** - Expanded Redshift Read
   Primitives support from 0 to 40+ queries with dialect-specific rewrites for
   window functions, fulltext operators, array operations, and statistical
   functions. Queries without semantically-exact Redshift equivalents are skipped
@@ -31,57 +168,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Redshift data-loading reliability** — Fixed S3 upload retry failures caused
+- **Redshift data-loading reliability** - Fixed S3 upload retry failures caused
   by botocore stream rewind errors, `DROP DATABASE` timeouts (extended socket
   timeout to 300 s and pre-terminate active connections), `Is a directory` errors
   with multi-format manifests, stale native datagen reuse, Serverless-compatible
   system table queries (`sys_serverless_usage` vs `stv_cluster_configuration`),
   and `pg_stat_activity` column references (`procpid` vs `pid`). Platform format
   preferences now take priority over manifest defaults.
-- **Dask DataFrame `.isin()` runtime errors** — Seven TPC-H queries (Q4, Q16,
+- **Dask DataFrame `.isin()` runtime errors** - Seven TPC-H queries (Q4, Q16,
   Q18, Q20, Q21, Q22) and five TPC-DS queries (Q37, Q41, Q45, Q82, Q83) passed
   lazy Dask Series to `.isin()`, causing `TypeError` at runtime. All call sites
   now materialize via `.compute()` before `.isin()`.
-- **BigQuery and format loading correctness** — Standardized text files (`.tbl`)
+- **BigQuery and format loading correctness** - Standardized text files (`.tbl`)
   as the default load source for SQL platforms while preserving columnar
   preferences for catalog platforms. Enabled parquet-first native loads on
   BigQuery and fixed GCS blob naming to preserve compound suffixes
   (`.parquet.zst` not `.zst`).
-- **Data-source database resolution** — Shared-data benchmarks (e.g. Read
+- **Data-source database resolution** - Shared-data benchmarks (e.g. Read
   Primitives) now resolve the source benchmark's database name instead of
   generating independent empty databases, fixing silent failures in
   multi-benchmark workflows.
-- **TPC-H validation noise on measurement runs** — Non-stream-0 power runs no
+- **TPC-H validation noise on measurement runs** - Non-stream-0 power runs no
   longer emit spurious "Validation skipped" warnings for all 22 queries on every
   measurement iteration.
-- **Monitoring without optional extras** — Benchmark execution and progress
+- **Monitoring without optional extras** - Benchmark execution and progress
   reporting now degrade gracefully when the monitoring extra is not installed
   instead of failing during import.
-- **Redshift adapter-only validation** — Repaired live test guard and validation
+- **Redshift adapter-only validation** - Repaired live test guard and validation
   logic so adapter-only (non-admin) Redshift connections no longer crash during
   row-count validation.
 
 ### Changed
 
-- **Project status promoted to Beta** — BenchBox is now `Development Status ::
+- **Project status promoted to Beta** - BenchBox is now `Development Status ::
   4 - Beta` in package metadata.
-- **Release-quality hardening** — Raised the coverage threshold to 80%, added
+- **Release-quality hardening** - Raised the coverage threshold to 80%, added
   behavioral coverage across adapter SQL generation, CLI paths, credential
   prompts, and adapter lifecycle flows, removed unreachable code, cleaned up
   tautological assertions and overspecified mocks, and accelerated
   `coverage-fast` runs with parallel execution.
-- **Dead code cleanup** — Removed 9 unused platform imports and prefixed 12
+- **Dead code cleanup** - Removed 9 unused platform imports and prefixed 12
   unused function parameters with `_` across the adapter layer.
-- **Redshift format selection logic** — Scoped Redshift-specific format
+- **Redshift format selection logic** - Scoped Redshift-specific format
   overrides to native COPY loads only and added platform-preference priority over
   manifest preferences, fixing incorrect format choices in mixed-format
   environments.
 
 ### Removed
 
-- **Legacy `plot` CLI command** — Removed `benchbox plot` and its undeclared
+- **Legacy `plot` CLI command** - Removed `benchbox plot` and its undeclared
   matplotlib dependency. Use `benchbox visualize` for terminal chart rendering.
-- **Snowpark Connect and Onehouse Quanton platforms** — Removed from the
+- **Snowpark Connect and Onehouse Quanton platforms** - Removed from the
   supported SQL platform list (31 → 29).
 
 ## [0.1.5] - 2026-03-10
@@ -268,8 +405,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Four platform drivers moved to optional extras** — DuckDB (`benchbox[duckdb]`), Polars
-  (`benchbox[polars]`), ClickHouse Connect (`benchbox[clickhouse-connect]`), and psycopg2
+- **Four platform drivers moved to optional extras** - DuckDB (`benchbox[duckdb]`), Polars
+  (`benchbox[polars]`), ClickHouse Cloud (`benchbox[clickhouse-cloud]`), and psycopg2
   (`benchbox[postgresql]`) are no longer hard dependencies. Users installing BenchBox now get
   a leaner core and can pin each driver independently. `pip install benchbox[all]` restores
   the previous behaviour.
@@ -433,7 +570,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **Issues**: [Report bugs and request features](https://github.com/joeharris76/benchbox/issues)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/joeharris76/benchbox/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/joeharris76/benchbox/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/joeharris76/benchbox/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/joeharris76/benchbox/compare/v0.1.3...v0.1.4

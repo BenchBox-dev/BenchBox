@@ -32,7 +32,7 @@ def test_validate_row_counts_pass_with_warnings_only():
     # Adapter returns a connection that yields counts we expect
     class Adapter:
         platform_name = "duckdb"
-        config = {}
+        platform_config = {}
 
         def create_connection(self, **_):
             return FakeConn(0)  # value ignored in _get_table_row_count path
@@ -61,7 +61,7 @@ def test_validate_row_counts_pass_with_warnings_only():
 def test_validate_row_counts_fail_with_exceeded_tolerance():
     class Adapter:
         platform_name = "duckdb"
-        config = {}
+        platform_config = {}
 
         def create_connection(self, **_):
             return FakeConn(0)
@@ -85,7 +85,7 @@ def test_validate_row_counts_fail_with_exceeded_tolerance():
 def test_validate_row_counts_connection_error():
     class Adapter:
         platform_name = "duckdb"
-        config = {}
+        platform_config = {}
 
         def create_connection(self, **_):
             raise RuntimeError("boom")

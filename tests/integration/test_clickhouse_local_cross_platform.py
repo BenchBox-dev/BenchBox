@@ -20,7 +20,7 @@ pytestmark = [
 
 
 # Skip all tests if chdb is not available
-chdb = pytest.importorskip("chdb")
+chdb = pytest.importorskip("chdb", exc_type=ImportError)
 
 
 class TestClickHouseLocalCrossPlatform:
@@ -71,7 +71,7 @@ class TestClickHouseLocalCrossPlatform:
             # Clean up if test fails
             if temp_path.exists():
                 shutil.rmtree(temp_path)
-            raise Exception(f"Database directory removal failed: {e}")
+            raise Exception(f"Database directory removal failed: {e}") from e
 
     def test_local_client_session_handling(self):
         """Test that ClickHouse local client handles sessions properly."""

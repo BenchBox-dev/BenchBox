@@ -93,7 +93,7 @@ def export_json(results, output_dir: Path):
     results_dict = results.model_dump()
 
     # Write JSON file
-    with open(json_file, "w") as f:
+    with open(json_file, "w", encoding="utf-8") as f:
         json.dump(results_dict, f, indent=2)
 
     print(f"✓ JSON exported to: {json_file}")
@@ -150,7 +150,7 @@ def export_csv(results, output_dir: Path):
     csv_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Write CSV file
-    with open(csv_file, "w", newline="") as f:
+    with open(csv_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
 
         # Header row
@@ -365,7 +365,7 @@ def export_html(results, output_dir: Path):
 """
 
     # Write HTML file
-    with open(html_file, "w") as f:
+    with open(html_file, "w", encoding="utf-8") as f:
         f.write(html_content)
 
     print(f"✓ HTML exported to: {html_file}")

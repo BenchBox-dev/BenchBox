@@ -122,7 +122,7 @@ class TestFinWireProcessor:
 
         sample_records = [cmp_record, sec_record, fin_record]
 
-        with open(finwire_file, "w") as f:
+        with open(finwire_file, "w", encoding="utf-8") as f:
             for record in sample_records:
                 f.write(record + "\n")
 
@@ -197,7 +197,7 @@ class TestFinWireProcessor:
         files = []
         for i in range(3):
             finwire_file = tmp_path / f"finwire_batch_{i}.txt"
-            with open(finwire_file, "w") as f:
+            with open(finwire_file, "w", encoding="utf-8") as f:
                 f.write(
                     f"20230101123045 CMP{i:015d}COMPANY_{i}             TECH               AAA       CEO_{i}     \n"
                 )
@@ -213,7 +213,7 @@ class TestFinWireProcessor:
         """Test error handling for malformed FinWire data."""
         # file with invalid data
         invalid_file = tmp_path / "invalid_finwire.txt"
-        with open(invalid_file, "w") as f:
+        with open(invalid_file, "w", encoding="utf-8") as f:
             f.write("INVALID_DATA\n")
 
         results = finwire_processor.process_file(invalid_file)
@@ -261,7 +261,7 @@ class TestCustomerManagementProcessor:
             </TPCDI:Action>
         </TPCDI:Actions>"""
 
-        with open(xml_file, "w") as f:
+        with open(xml_file, "w", encoding="utf-8") as f:
             f.write(xml_content)
 
         return xml_file
@@ -275,7 +275,7 @@ class TestCustomerManagementProcessor:
 Doe,Jane,B,F,789 Pine St,,12345,Anytown,NY,USA,555-5678,75000,2,1,M,35,750,O,ACME Corp,3,500000
 Smith,Bob,C,M,321 Elm St,,54321,Other City,CA,USA,555-9012,85000,1,2,M,42,800,R,Tech Inc,2,750000"""
 
-        with open(csv_file, "w") as f:
+        with open(csv_file, "w", encoding="utf-8") as f:
             f.write(csv_content)
 
         return csv_file
@@ -1045,7 +1045,7 @@ class TestPhase3Integration:
         """Test simulated end-to-end ETL workflow using Phase 3 components."""
         # sample data files - properly formatted FinWire CMP record
         finwire_file = tmp_path / "finwire.txt"
-        with open(finwire_file, "w") as f:
+        with open(finwire_file, "w", encoding="utf-8") as f:
             # a properly formatted CMP record with correct field positions
             # Parser expects: PTS(0-14, 15 chars) + REC(15-17, 3 chars) + CompanyName(18-77, 60 chars) + etc.
             cmp_record = (
@@ -1069,7 +1069,7 @@ class TestPhase3Integration:
             f.write(cmp_record + "\n")
 
         customer_xml = tmp_path / "customer.xml"
-        with open(customer_xml, "w") as f:
+        with open(customer_xml, "w", encoding="utf-8") as f:
             f.write(
                 '<?xml version="1.0"?><TPCDI:Actions xmlns:TPCDI="http://www.tpc.org/tpc-di"><TPCDI:Action ActionType="NEW" ActionTS="2023-01-01T00:00:00"><Customer C_ID="1001"><Name C_L_NAME="Test" C_F_NAME="Customer" /></Customer></TPCDI:Action></TPCDI:Actions>'
             )

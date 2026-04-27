@@ -21,25 +21,3 @@ __all__ = [
     "check_platform_dependencies",
     "get_dependency_error_message",
 ]
-
-# Register CLI platform options
-try:
-    from benchbox.cli.platform_hooks import PlatformHookRegistry, PlatformOptionSpec
-
-    PlatformHookRegistry.register_option_specs(
-        "clickhouse",
-        PlatformOptionSpec(
-            name="deployment_mode",
-            choices=["server", "local"],
-            default="server",
-            help="ClickHouse deployment mode: 'server' for remote/local server, 'local' for embedded chDB",
-        ),
-        PlatformOptionSpec(
-            name="data_path",
-            default=None,
-            help="Path to chdb database file (local mode only)",
-        ),
-    )
-except ImportError:
-    # CLI module not available (e.g., when using core modules without CLI)
-    pass

@@ -169,7 +169,7 @@ class TestResolveExecutionMode:
 
 
 # ---------------------------------------------------------------------------
-# DryRunExecutor._extract_queries – dataframe / maintenance branches
+# DryRunExecutor._extract_queries - dataframe / maintenance branches
 # ---------------------------------------------------------------------------
 
 
@@ -238,7 +238,7 @@ class TestGenerateDataframeSchema:
 
 
 # ---------------------------------------------------------------------------
-# save_dry_run_results – additional edge cases
+# save_dry_run_results - additional edge cases
 # ---------------------------------------------------------------------------
 
 
@@ -315,7 +315,7 @@ class TestSaveDryRunResultsExtended:
 
 
 # ---------------------------------------------------------------------------
-# DryRunExecutor._estimate_data_size – additional benchmarks
+# DryRunExecutor._estimate_data_size - additional benchmarks
 # ---------------------------------------------------------------------------
 
 

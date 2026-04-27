@@ -24,20 +24,19 @@ pytestmark = [
 
 @pytest.fixture()
 def pg_duckdb_stubs(monkeypatch):
-    """Patch psycopg2 objects so tests don't require the real driver.
+    """Patch psycopg objects so tests don't require the real driver.
 
     Must patch both pg_duckdb and postgresql modules since PgDuckDBAdapter
-    inherits from PostgreSQLAdapter which checks for psycopg2 in its __init__.
+    inherits from PostgreSQLAdapter which checks for psycopg in its __init__.
     """
-    mock_psycopg2 = Mock()
-    mock_psycopg2.__version__ = "2.9.9"
-    mock_psycopg2.extras = Mock()
+    mock_psycopg = Mock()
+    mock_psycopg.__version__ = "3.1.0"
 
     # Patch both modules - parent checks in postgresql module
-    monkeypatch.setattr(pg_duckdb_module, "psycopg2", mock_psycopg2)
-    monkeypatch.setattr(postgresql_module, "psycopg2", mock_psycopg2)
+    monkeypatch.setattr(pg_duckdb_module, "psycopg", mock_psycopg)
+    monkeypatch.setattr(postgresql_module, "psycopg", mock_psycopg)
 
-    return mock_psycopg2
+    return mock_psycopg
 
 
 class TestPgDuckDBAdapter:
@@ -362,13 +361,12 @@ class TestPgDuckDBMotherDuckMode:
         token_set = any("motherduck_token" in call for call in calls)
         assert token_set
 
-    def test_create_connection_mogrify_uses_existing_cursor(self, pg_duckdb_stubs, monkeypatch):
-        """mogrify() should use existing cursor, not create a new orphaned one."""
+    def test_create_connection_token_set_uses_sql_literal(self, pg_duckdb_stubs, monkeypatch):
+        """SET duckdb.motherduck_token should use psycopg.sql.Literal, not f-string."""
         monkeypatch.delenv("MOTHERDUCK_TOKEN", raising=False)
 
         mock_conn = Mock()
         mock_cursor = Mock()
-        mock_cursor.mogrify.return_value = b"'md_token_789'"
         mock_conn.cursor.return_value = mock_cursor
 
         mock_cursor.fetchone.side_effect = [
@@ -391,8 +389,15 @@ class TestPgDuckDBMotherDuckMode:
         ):
             adapter.create_connection()
 
-        # mogrify should be called on the same cursor, not via conn.cursor().mogrify()
-        mock_cursor.mogrify.assert_called_once()
+        # Verify execute was called with a psycopg.sql.Composed object (not an f-string)
+        from psycopg import sql as psycopg_sql
+
+        set_calls = [
+            call
+            for call in mock_cursor.execute.call_args_list
+            if isinstance(call[0][0], (psycopg_sql.Composed, psycopg_sql.SQL))
+        ]
+        assert len(set_calls) >= 1, "Expected at least one psycopg.sql.Composed execute call for token SET"
 
 
 class TestPgDuckDBRegistration:
@@ -427,33 +432,41 @@ class TestPgDuckDBConfigBuilder:
         """Config builder should produce correct configuration."""
         from benchbox.platforms.pg_duckdb import _build_pg_duckdb_config
 
-        benchmark_config = {"scale_factor": 1.0}
-        platform_options = {
+        options = {
             "host": "localhost",
             "port": 5432,
             "force_execution": True,
             "postgres_scan_threads": 4,
         }
+        overrides = {"scale_factor": 1.0}
 
-        config = _build_pg_duckdb_config(benchmark_config, platform_options)
+        config = _build_pg_duckdb_config("pg-duckdb", options, overrides, None)
 
-        assert config["host"] == "localhost"
-        assert config["port"] == 5432
-        assert config["force_execution"] is True
-        assert config["postgres_scan_threads"] == 4
-        assert config["scale_factor"] == 1.0
+        assert config.host == "localhost"
+        assert config.port == 5432
+        assert config.force_execution is True
+        assert config.postgres_scan_threads == 4
+        assert config.scale_factor == 1.0
 
     def test_config_builder_defaults(self, pg_duckdb_stubs):
         """Config builder should apply defaults for missing options."""
         from benchbox.platforms.pg_duckdb import _build_pg_duckdb_config
 
-        config = _build_pg_duckdb_config({}, {})
+        config = _build_pg_duckdb_config("pg-duckdb", {}, {}, None)
 
-        assert config["host"] == "localhost"
-        assert config["port"] == 5432
-        assert config["username"] == "postgres"
-        assert config["force_execution"] is True
-        assert config["postgres_scan_threads"] == 0
+        assert config.host == "localhost"
+        assert config.port == 5432
+        assert config.username == "postgres"
+        assert config.admin_database == "postgres"
+        assert config.sslmode == "prefer"
+        assert config.work_mem == "256MB"
+        assert config.maintenance_work_mem == "512MB"
+        assert config.effective_cache_size == "1GB"
+        assert config.max_parallel_workers_per_gather == 2
+        assert config.force_execution is True
+        assert config.postgres_scan_threads == 0
+        assert config.compare_native is False
+        assert config.options["schema"] == "public"
 
 
 class TestPgDuckDBFromConfigPassthrough:
@@ -501,3 +514,126 @@ class TestPgDuckDBCreateConnectionReraise:
         with patch.object(type(adapter).__bases__[0], "create_connection", return_value=mock_conn):
             with pytest.raises(RuntimeError, match="pg_duckdb configuration failed"):
                 adapter.create_connection()
+
+
+class TestPgDuckDBNativeComparison:
+    """Tests for run_native_comparison() pg_duckdb vs native DuckDB comparison."""
+
+    def test_returns_none_when_compare_native_false(self, pg_duckdb_stubs):
+        """run_native_comparison should return None when compare_native is False."""
+        adapter = PgDuckDBAdapter()
+        assert adapter.compare_native is False
+
+        result = adapter.run_native_comparison([], {}, scale_factor=1.0)
+
+        assert result is None
+
+    def test_compare_native_flag_from_string_true(self, pg_duckdb_stubs):
+        """compare_native should be True when passed as string 'true' via platform-option."""
+        adapter = PgDuckDBAdapter.from_config({"compare_native": "true"})
+
+        assert adapter.compare_native is True
+
+    def test_compare_native_flag_from_string_false(self, pg_duckdb_stubs):
+        """compare_native should be False when passed as string 'false'."""
+        adapter = PgDuckDBAdapter.from_config({"compare_native": "false"})
+
+        assert adapter.compare_native is False
+
+    def test_duckdb_db_path_stored(self, pg_duckdb_stubs):
+        """duckdb_db_path should be stored from config."""
+        adapter = PgDuckDBAdapter.from_config({"duckdb_db_path": "/tmp/test.duckdb"})
+
+        assert adapter.duckdb_db_path == "/tmp/test.duckdb"
+
+    def test_returns_none_when_no_matching_query_results(self, pg_duckdb_stubs):
+        """run_native_comparison should return None when no results match query_sql_map."""
+        adapter = PgDuckDBAdapter(compare_native=True)
+
+        # query_results has entries but none match the query_sql_map keys
+        query_results = [{"query_id": "Q99", "ms": 100.0, "run_type": "measurement"}]
+        query_sql_map = {"Q1": "SELECT 1"}
+
+        # Import duckdb stub to avoid the ImportError path
+        mock_duckdb = Mock()
+        mock_conn = Mock()
+        mock_duckdb.connect.return_value = mock_conn
+
+        with patch.dict("sys.modules", {"duckdb": mock_duckdb}):
+            result = adapter.run_native_comparison(query_results, query_sql_map, scale_factor=1.0)
+
+        assert result is None
+
+    def test_config_builder_passes_compare_native(self, pg_duckdb_stubs):
+        """Config builder should pass compare_native and duckdb_db_path through."""
+        from benchbox.platforms.pg_duckdb import _build_pg_duckdb_config
+
+        config = _build_pg_duckdb_config(
+            "pg-duckdb",
+            {"compare_native": "true", "duckdb_db_path": "/data/tpch.duckdb"},
+            {},
+            None,
+        )
+
+        assert config.compare_native == "true"
+        assert config.duckdb_db_path == "/data/tpch.duckdb"
+
+    def test_native_comparison_with_duckdb(self, pg_duckdb_stubs):
+        """run_native_comparison should produce NativeComparison when duckdb is available."""
+        from benchbox.core.results.models import NativeComparison
+
+        adapter = PgDuckDBAdapter(compare_native=True)
+
+        query_results = [
+            {"query_id": "Q1", "ms": 100.0, "run_type": "measurement"},
+            {"query_id": "Q6", "ms": 50.0, "run_type": "measurement"},
+        ]
+        query_sql_map = {"Q1": "SELECT 1", "Q6": "SELECT 2+2"}
+
+        mock_duckdb = Mock()
+        mock_conn = Mock()
+        mock_duckdb.connect.return_value = mock_conn
+        mock_conn.execute.return_value.fetchall.return_value = []
+
+        with patch.dict("sys.modules", {"duckdb": mock_duckdb}):
+            result = adapter.run_native_comparison(query_results, query_sql_map, scale_factor=1.0)
+
+        assert isinstance(result, NativeComparison)
+        assert result.total_queries == 2
+        assert result.scale_factor == 1.0
+        assert len(result.entries) == 2
+        entry_ids = {e.query_id for e in result.entries}
+        assert entry_ids == {"Q1", "Q6"}
+
+    def test_warmup_rows_excluded_from_comparison(self, pg_duckdb_stubs):
+        """Warmup query_results rows should be excluded from the comparison."""
+        adapter = PgDuckDBAdapter(compare_native=True)
+
+        query_results = [
+            {"query_id": "Q1", "ms": 200.0, "run_type": "warmup"},
+            {"query_id": "Q1", "ms": 100.0, "run_type": "measurement"},
+        ]
+        query_sql_map = {"Q1": "SELECT 1"}
+
+        mock_duckdb = Mock()
+        mock_conn = Mock()
+        mock_duckdb.connect.return_value = mock_conn
+        mock_conn.execute.return_value.fetchall.return_value = []
+
+        with patch.dict("sys.modules", {"duckdb": mock_duckdb}):
+            result = adapter.run_native_comparison(query_results, query_sql_map, scale_factor=0.1)
+
+        # Only one entry (warmup excluded); pg_duckdb_ms should be 100.0 not 150.0
+        assert result is not None
+        assert result.entries[0].pg_duckdb_ms == 100.0
+
+    def test_returns_none_when_duckdb_not_importable(self, pg_duckdb_stubs):
+        """run_native_comparison should return None gracefully when duckdb is missing."""
+        adapter = PgDuckDBAdapter(compare_native=True)
+        query_results = [{"query_id": "Q1", "ms": 100.0, "run_type": "measurement"}]
+        query_sql_map = {"Q1": "SELECT 1"}
+
+        with patch.dict("sys.modules", {"duckdb": None}):
+            result = adapter.run_native_comparison(query_results, query_sql_map, scale_factor=1.0)
+
+        assert result is None

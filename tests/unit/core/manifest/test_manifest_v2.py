@@ -144,7 +144,7 @@ class TestManifestIO:
         }
 
         manifest_path = tmp_path / "manifest.json"
-        with open(manifest_path, "w") as f:
+        with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest_data, f)
 
         manifest = load_manifest(manifest_path)
@@ -165,7 +165,7 @@ class TestManifestIO:
         }
 
         manifest_path = tmp_path / "manifest.json"
-        with open(manifest_path, "w") as f:
+        with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest_data, f)
 
         manifest = load_manifest(manifest_path)
@@ -186,7 +186,7 @@ class TestManifestIO:
         write_manifest(manifest, manifest_path)
 
         # Read back and verify
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["benchmark"] == "tpch"
@@ -211,7 +211,7 @@ class TestManifestIO:
         write_manifest(manifest, manifest_path)
 
         # Read back and verify
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["version"] == 2
@@ -251,7 +251,7 @@ class TestManifestIO:
         write_manifest(manifest, manifest_path)
 
         # Read back and verify conversion metadata
-        with open(manifest_path) as f:
+        with open(manifest_path, encoding="utf-8") as f:
             data = json.load(f)
 
         parquet_files = data["tables"]["customer"]["formats"]["parquet"]

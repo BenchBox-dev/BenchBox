@@ -602,7 +602,7 @@ class BenchmarkValidator:
 
                 # Basic file content validation
                 if file_path.suffix.lower() == ".csv":
-                    with open(file_path) as f:
+                    with open(file_path, encoding="utf-8") as f:
                         first_line = f.readline().strip()
                         if len(first_line) == 0:
                             report.errors.append(
@@ -1052,7 +1052,7 @@ Examples:
 
     # Output report
     if args.output_file:
-        with open(args.output_file, "w") as f:
+        with open(args.output_file, "w", encoding="utf-8") as f:
             f.write(report)
         print(f"Validation report written to {args.output_file}")
     else:

@@ -1,7 +1,7 @@
 """Tests for the monitoring optional-import gate.
 
 Verifies that runner.py, dataframe_runner.py, and progress.py degrade
-gracefully when benchbox.monitoring is not importable — i.e. when
+gracefully when benchbox.monitoring is not importable - i.e. when
 _MONITORING_AVAILABLE is False.
 """
 
@@ -60,7 +60,7 @@ class TestRunnerMonitoringGate:
                 phases=phases,
             )
 
-        # attach_snapshot_to_result must not be called — monitor is None
+        # attach_snapshot_to_result must not be called - monitor is None
         mock_attach.assert_not_called()
 
     def test_monitor_none_skips_resource_monitoring(self):
@@ -165,8 +165,9 @@ class TestDataFrameRunnerMonitoringGate:
 
         mock_benchmark_config = MagicMock()
         mock_benchmark_config.options = {}
+        mock_benchmark_config.name = "tpch"
 
-        # Should not raise — monitor=None is safe even with no queries
+        # Should not raise - monitor=None is safe even with no queries
         result = _execute_dataframe_queries(
             adapter=mock_adapter,
             ctx=mock_ctx,

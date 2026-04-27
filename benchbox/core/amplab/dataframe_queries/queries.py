@@ -31,7 +31,7 @@ from .parameters import get_parameters
 from .registry import register_query
 
 # =============================================================================
-# Q1: Scan Query — filter rankings by pageRank
+# Q1: Scan Query - filter rankings by pageRank
 # =============================================================================
 
 

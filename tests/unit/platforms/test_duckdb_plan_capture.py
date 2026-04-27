@@ -57,7 +57,7 @@ class TestDuckDBPlanCapture:
             plan = result["query_plan"]
             assert plan is not None
             assert plan.logical_root is not None
-            # Default capture uses EXPLAIN (ANALYZE, FORMAT JSON) — physical operator must carry timing
+            # Default capture uses EXPLAIN (ANALYZE, FORMAT JSON) - physical operator must carry timing
             phys = plan.logical_root.physical_operator
             assert phys is not None, "physical_operator should always be present"
             assert phys.properties.get("timing") is not None, "EXPLAIN ANALYZE should populate timing"
@@ -164,7 +164,7 @@ class TestDuckDBPlanCapture:
             adapter_with_capture.close_connection(connection)
 
     def test_plan_capture_succeeds_for_join_query(self, adapter_with_capture):
-        """Multi-JOIN queries must be parseable — the branching-structure error must not occur."""
+        """Multi-JOIN queries must be parseable - the branching-structure error must not occur."""
         connection = adapter_with_capture.create_connection()
         try:
             connection.execute("CREATE TABLE a (id INTEGER, x INTEGER)")
@@ -180,7 +180,7 @@ class TestDuckDBPlanCapture:
                 query_id="join_test",
             )
 
-            # Must not fail — plan should be captured for a branching query
+            # Must not fail - plan should be captured for a branching query
             assert plan is not None, (
                 "Plan capture returned None for a multi-JOIN query. "
                 "Likely still using text-box EXPLAIN which rejects branching structures."
@@ -222,7 +222,7 @@ class TestDuckDBPlanCapture:
             adapter_without_capture.close_connection(conn_without)
 
     def test_analyze_plans_false_produces_no_timing(self):
-        """With analyze_plans=False, captured plans use EXPLAIN (FORMAT JSON) — no timing data.
+        """With analyze_plans=False, captured plans use EXPLAIN (FORMAT JSON) - no timing data.
 
         This verifies the opt-out path for users who want structural-only plan capture
         without the re-execution overhead of EXPLAIN ANALYZE.

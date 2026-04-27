@@ -116,7 +116,8 @@ DataFrame mode also supports TPC-DS (99 queries):
 benchbox run --platform polars-df --benchmark tpcds --scale 1
 ```
 
-Note: TPC-DS requires scale factor >= 1 due to data generator constraints.
+Note: TPC-DS also supports sub-SF1 development runs with the patched generator,
+but those runs remain unofficial.
 
 ## Programmatic Usage
 

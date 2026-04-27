@@ -1,4 +1,4 @@
-"""PostgreSQL integration smoke tests with stubbed psycopg2."""
+"""PostgreSQL integration smoke tests with stubbed psycopg."""
 
 import pytest
 

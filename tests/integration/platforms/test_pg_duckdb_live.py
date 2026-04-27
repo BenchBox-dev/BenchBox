@@ -9,7 +9,7 @@ Setup (self-hosted mode):
     make test-docker-up-pg-extensions
     # or: docker compose -f docker/postgres-extensions/docker-compose.yml up -d --wait
 
-Setup (MotherDuck mode — also requires MOTHERDUCK_TOKEN):
+Setup (MotherDuck mode - also requires MOTHERDUCK_TOKEN):
     export MOTHERDUCK_TOKEN=your_token
     make test-docker-up-pg-extensions
 
@@ -184,7 +184,7 @@ class TestLivePgDuckDBS3LakeQueries:
 
         yield {"bucket": bucket, "key": key, "row_count": row_count}
 
-        # Teardown — delete the object
+        # Teardown - delete the object
         try:
             s3.delete_object(Bucket=bucket, Key=key)
         except Exception:

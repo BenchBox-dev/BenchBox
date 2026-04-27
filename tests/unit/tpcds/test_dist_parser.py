@@ -294,7 +294,7 @@ add ("Midway", 1, 2);
 add ("Fairview", 3, 4);
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -330,7 +330,7 @@ set weights = 1; -- Number of weight sets
 add ("Test", 1); -- Add an entry
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -364,7 +364,7 @@ add ("State1", 1, 2);
 add ("State2", 3, 4);
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -397,7 +397,7 @@ set names = (name:usgs, uniform, large, medium, small, unified);
 add ("Value1", 1, 2, 3, 4, 5, 6);
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -427,7 +427,7 @@ add ("Value:With:Colons":100, 1, 2);
 add ("Another:Value":200, 3, 4);
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -450,7 +450,7 @@ add ("Another:Value":200, 3, 4);
         """Test parsing empty file."""
         content = ""
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -469,7 +469,7 @@ add ("Another:Value":200, 3, 4);
 --
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -488,7 +488,7 @@ set weights = 1;
 add ("Test", 1);
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -507,7 +507,7 @@ set weights = 1;
 add ("Test", 1);
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -658,7 +658,7 @@ set weights = 1;
 add ("Test", 1);
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -680,7 +680,7 @@ add ("Test", 1);
    add   (   "Test"   ,   1   )   ;
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -707,7 +707,7 @@ SET WEIGHTS = 1;
 ADD ("Test", 1);
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -730,7 +730,7 @@ set weights = 1
 add ("Test", 1)
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 
@@ -755,7 +755,7 @@ set weights = 0;
 set names = ();
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
             f.write(content)
             temp_file = f.name
 

@@ -1057,7 +1057,7 @@ See Also
 
 - :doc:`results` - Result models and data structures
 - :doc:`/usage/examples` - Usage examples
-- :doc:`/TROUBLESHOOTING` - Troubleshooting guide
+- :doc:`/usage/troubleshooting` - Troubleshooting guide
 - :doc:`utilities` - Other utility functions
 - :doc:`/testing` - Testing and validation
 

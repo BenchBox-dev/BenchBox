@@ -67,7 +67,7 @@ class TestExampleScriptConstraintRemoval:
 
         for example_file in example_files:
             if Path(example_file).exists():
-                with open(example_file) as f:
+                with open(example_file, encoding="utf-8") as f:
                     content = f.read()
 
                 # Check that constraint parameters are not in argument parser
@@ -94,7 +94,7 @@ class TestTuningFileConstraintConfiguration:
 
         for tuning_file in tuning_files:
             if Path(tuning_file).exists():
-                with open(tuning_file) as f:
+                with open(tuning_file, encoding="utf-8") as f:
                     content = f.read()
 
                 # Check that constraint settings are explicitly configured

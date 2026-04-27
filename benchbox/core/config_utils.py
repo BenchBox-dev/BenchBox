@@ -12,6 +12,7 @@ from typing import Any, Optional, Union
 
 import yaml
 
+from benchbox.platforms.clickhouse.deployment_mode import resolve_clickhouse_deployment_mode
 from benchbox.utils.database_naming import generate_database_filename
 from benchbox.utils.output_path import normalize_output_root
 from benchbox.utils.printing import emit
@@ -57,7 +58,7 @@ def load_config_file(config_path: Union[str, Path]) -> dict[str, Any]:
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
     try:
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             file_content = f.read()
 
         # Try to determine file format and parse
@@ -75,9 +76,9 @@ def load_config_file(config_path: Union[str, Path]) -> dict[str, Any]:
         return config_data or {}
 
     except (yaml.YAMLError, json.JSONDecodeError) as e:
-        raise ValueError(f"Failed to parse configuration file: {e}")
+        raise ValueError(f"Failed to parse configuration file: {e}") from e
     except Exception as e:
-        raise ValueError(f"Error loading configuration: {e}")
+        raise ValueError(f"Error loading configuration: {e}") from e
 
 
 def save_config_file(config_data: dict[str, Any], config_path: Union[str, Path], format: str = "yaml") -> None:
@@ -97,7 +98,7 @@ def save_config_file(config_data: dict[str, Any], config_path: Union[str, Path],
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        with open(config_path, "w") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             if format.lower() == "json":
                 json.dump(config_data, f, indent=2)
             elif format.lower() in ["yaml", "yml"]:
@@ -106,7 +107,7 @@ def save_config_file(config_data: dict[str, Any], config_path: Union[str, Path],
                 raise ValueError(f"Unsupported format: {format}")
 
     except Exception as e:
-        raise ValueError(f"Failed to save configuration: {e}")
+        raise ValueError(f"Failed to save configuration: {e}") from e
 
 
 def build_benchmark_config(
@@ -249,11 +250,22 @@ def build_platform_adapter_config(
             }
         )
 
-    elif platform == "clickhouse":
-        cfg["mode"] = get_value("mode", "local")
+    elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
+        if platform == "clickhouse-local":
+            cfg["deployment_mode"] = "local"
+        elif platform == "clickhouse-server":
+            cfg["deployment_mode"] = "server"
+        else:
+            cfg["deployment_mode"] = resolve_clickhouse_deployment_mode(
+                {
+                    "deployment_mode": get_value("deployment_mode"),
+                    "mode": get_value("mode"),
+                    "embedded": get_value("embedded"),
+                }
+            )
         cfg["data_path"] = get_value("data_path", "/tmp/benchbox_ch_local")
 
-        if cfg["mode"] == "server":
+        if cfg["deployment_mode"] == "server":
             cfg.update(
                 {
                     "host": get_value("host", "localhost"),
@@ -335,7 +347,7 @@ def _get_default_output_dir(
 
         data_dir = get_benchmark_runs_datagen_path(benchmark_name, scale_factor)
         return str(data_dir)
-    elif platform.lower() == "clickhouse":
+    elif platform.lower() in {"clickhouse", "clickhouse-local"}:
         return data_path or "/tmp/benchbox_ch_local"
     else:
         return None
@@ -371,7 +383,7 @@ def load_platform_config(platform: str, config_path: Optional[str] = None, verbo
             return config
 
     try:
-        with open(config_file) as f:
+        with open(config_file, encoding="utf-8") as f:
             yaml_config = yaml.safe_load(f)
             if yaml_config and isinstance(yaml_config, dict):
                 # Extract connection and settings from YAML structure
@@ -427,7 +439,7 @@ def load_tuning_config(
         source = f"custom file: {tuning_mode}"
 
     try:
-        with open(config_file) as f:
+        with open(config_file, encoding="utf-8") as f:
             config = yaml.safe_load(f)
             if verbose and config:
                 tuning_type = config.get("_metadata", {}).get("configuration_type", "unknown")
@@ -540,10 +552,10 @@ def get_builtin_defaults(platform: str, benchmark: str) -> dict[str, Any]:
                 "access_token": None,
             }
         )
-    elif platform == "clickhouse":
+    elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
         defaults.update(
             {
-                "mode": "local",
+                "deployment_mode": "local" if platform in {"clickhouse", "clickhouse-local"} else "server",
                 "data_path": "/tmp/benchbox_ch_local",
             }
         )

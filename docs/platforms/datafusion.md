@@ -555,6 +555,16 @@ if validation.warnings:
 # Check query compatibility with PostgreSQL dialect
 ```
 
+#### Mixed-Case Column Names
+
+**Problem**: Queries fail with `Schema error: No field named <lowercase_column>` even though the column exists in the table.
+
+**Root cause**: DataFusion lowercases all unquoted SQL identifiers at parse time (e.g. `AdvEngineID` in a query becomes `advengineid`). If the underlying parquet file or schema retains the original mixed-case column names, every column lookup fails.
+
+**How BenchBox handles it**: The DataFusion adapter automatically lowercases all column names across every data-loading path - CSV-to-Parquet conversion (`_convert_and_register_parquet`), pre-existing Parquet files (`_register_parquet_files`), Delta Lake tables (`_load_table_delta`), Iceberg tables (`_load_table_iceberg`), and empty schema tables (`_create_empty_schema_tables`). Benchmarks whose SQL schemas define mixed-case column names - such as ClickBench (`WatchID`, `AdvEngineID`, etc.) and AMPLab (`pageURL`, `pageRank`, `sourceIP`, etc.) - are transparently normalized so that DataFusion's identifier lowercasing and the stored schema always agree.
+
+**Important**: All BenchBox SQL queries targeting DataFusion must use unquoted identifiers. DataFusion does support quoted case-sensitive identifiers (e.g. `SELECT "AdvEngineID" FROM hits`), but the adapter normalizes stored column names to lowercase, so quoted mixed-case lookups will fail at query time.
+
 #### Trailing Delimiter Issues
 
 **Problem**: TPC files with trailing pipe delimiters cause extra columns

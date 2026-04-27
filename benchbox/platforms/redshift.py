@@ -32,19 +32,19 @@ from ..utils.dependencies import (
     get_dependency_error_message,
     get_dependency_group_packages,
 )
-from ..utils.file_format import detect_compression, get_delimiter_for_file, is_parquet_format
+from ..utils.file_format import detect_compression, is_parquet_format
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import DataSourceResolver, FileFormatRegistry, ManifestFileSource
+from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, FileFormatRegistry, resolve_csv_dialect
 
 try:
     import redshift_connector
 except ImportError:
     try:
-        import psycopg2
+        import psycopg
 
         redshift_connector = None
     except ImportError:
-        psycopg2 = None
+        psycopg = None
         redshift_connector = None
 
 try:
@@ -66,8 +66,8 @@ class RedshiftAdapter(PlatformAdapter):
 
         dependency_packages = get_dependency_group_packages("redshift")
 
-        # Check dependencies - prefer redshift-connector, fallback to psycopg2
-        if not redshift_connector and not psycopg2:
+        # Check dependencies - prefer redshift-connector, fallback to psycopg
+        if not redshift_connector and not psycopg:
             available, missing = check_platform_dependencies("redshift")
             if not available:
                 error_msg = get_dependency_error_message("redshift", missing)
@@ -281,6 +281,142 @@ class RedshiftAdapter(PlatformAdapter):
 
         return cls(**adapter_config)
 
+    def _detect_client_library_version(self) -> str | None:
+        if redshift_connector:
+            return getattr(redshift_connector, "__version__", None)
+        try:
+            import psycopg
+
+            return getattr(psycopg, "__version__", None)
+        except ImportError:
+            return None
+
+    def _apply_serverless_metadata(
+        self, platform_info: dict[str, Any], metadata: dict[str, Any], identifier: str | None
+    ) -> None:
+        config = platform_info["configuration"]
+        config["workgroup_name"] = metadata.get("workgroup_name", identifier)
+        config["namespace_name"] = metadata.get("namespace_name")
+        config["base_capacity_rpu"] = metadata.get("base_capacity_rpu")
+        config["max_capacity_rpu"] = metadata.get("max_capacity_rpu")
+        config["enhanced_vpc_routing"] = metadata.get("enhanced_vpc_routing")
+        config["encrypted"] = metadata.get("encrypted")
+
+    def _apply_provisioned_metadata(
+        self, platform_info: dict[str, Any], metadata: dict[str, Any], identifier: str | None
+    ) -> None:
+        config = platform_info["configuration"]
+        config["cluster_identifier"] = metadata.get("cluster_identifier", identifier)
+        config["node_type"] = metadata.get("node_type")
+        config["number_of_nodes"] = metadata.get("number_of_nodes")
+        config["total_storage_capacity_mb"] = metadata.get("total_storage_capacity_mb")
+        config["enhanced_vpc_routing"] = metadata.get("enhanced_vpc_routing")
+        config["encrypted"] = metadata.get("encrypted")
+
+        platform_info["compute_configuration"] = {
+            "node_type": metadata.get("node_type"),
+            "cluster_version": metadata.get("cluster_version"),
+            "num_compute_nodes": metadata.get("number_of_nodes"),
+        }
+
+    def _collect_deployment_metadata(
+        self, cursor: Any, deployment_type: str, identifier: str | None, region: str | None
+    ) -> dict[str, Any]:
+        """Collect API-first deployment metadata, falling back to SQL."""
+        metadata: dict[str, Any] = {}
+        if deployment_type == "serverless":
+            api_fn = self._get_serverless_metadata_api
+            sql_fn = self._get_serverless_metadata_sql
+            log_label = "Serverless"
+        elif deployment_type == "provisioned":
+            api_fn = self._get_provisioned_metadata_api
+            sql_fn = self._get_provisioned_metadata_sql
+            log_label = "Provisioned"
+        else:
+            return metadata
+
+        if identifier and region:
+            api_metadata = api_fn(identifier, region)
+            if api_metadata:
+                metadata.update(api_metadata)
+                self.logger.debug(f"Using {log_label} metadata from AWS API")
+
+        if not metadata:
+            sql_metadata = sql_fn(cursor)
+            if sql_metadata:
+                metadata.update(sql_metadata)
+                self.logger.debug(f"Using {log_label} metadata from SQL queries")
+
+        return metadata
+
+    def _collect_wlm_configuration(self, cursor: Any, platform_info: dict[str, Any]) -> None:
+        try:
+            cursor.execute("""
+                SELECT
+                    service_class,
+                    num_query_tasks,
+                    query_working_mem,
+                    max_execution_time,
+                    user_group_wild_card,
+                    query_group_wild_card
+                FROM stv_wlm_service_class_config
+                WHERE service_class >= 6
+                ORDER BY service_class
+                LIMIT 5
+            """)
+            wlm_results = cursor.fetchall()
+        except Exception as e:
+            self.logger.debug(f"Could not query Redshift WLM configuration: {e}")
+            return
+
+        if not wlm_results:
+            return
+
+        platform_info.setdefault("compute_configuration", {})
+        platform_info["compute_configuration"]["wlm_queues"] = [
+            {
+                "service_class": row[0] if len(row) > 0 else None,
+                "num_query_tasks": row[1] if len(row) > 1 else None,
+                "query_working_mem_mb": row[2] if len(row) > 2 else None,
+                "max_execution_time_ms": row[3] if len(row) > 3 else None,
+            }
+            for row in wlm_results
+        ]
+        self.logger.debug("Successfully captured Redshift WLM configuration")
+
+    def _enrich_platform_info_from_connection(
+        self,
+        connection: Any,
+        platform_info: dict[str, Any],
+        deployment_type: str,
+        identifier: str | None,
+        region: str | None,
+    ) -> None:
+        cursor = None
+        try:
+            cursor = connection.cursor()
+
+            cursor.execute("SELECT version()")
+            result = cursor.fetchone()
+            platform_info["platform_version"] = result[0] if result else None
+            platform_info["engine_version"] = platform_info["platform_version"]
+            platform_info["engine_version_source"] = "sql_query"
+
+            metadata = self._collect_deployment_metadata(cursor, deployment_type, identifier, region)
+            if metadata and deployment_type == "serverless":
+                self._apply_serverless_metadata(platform_info, metadata, identifier)
+            elif metadata and deployment_type == "provisioned":
+                self._apply_provisioned_metadata(platform_info, metadata, identifier)
+
+            self._collect_wlm_configuration(cursor, platform_info)
+        except Exception as e:
+            self.logger.debug(f"Error collecting Redshift platform info: {e}")
+            if platform_info.get("platform_version") is None:
+                platform_info["platform_version"] = None
+        finally:
+            if cursor:
+                cursor.close()
+
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Redshift platform information.
 
@@ -295,12 +431,11 @@ class RedshiftAdapter(PlatformAdapter):
         Uses fallback chain: AWS API → SQL queries → hostname parsing
         Gracefully degrades if permissions are insufficient or AWS credentials unavailable.
         """
-        # Step 1: Use cached deployment type
         deployment_type = self.deployment_type
         region = self._extract_region_from_hostname(self.host, deployment_type) or self.aws_region
         identifier = self._extract_identifier_from_hostname(self.host, deployment_type)
 
-        platform_info = {
+        platform_info: dict[str, Any] = {
             "platform_type": "redshift",
             "platform_name": "Redshift",
             "connection_mode": "remote",
@@ -316,148 +451,11 @@ class RedshiftAdapter(PlatformAdapter):
                 "result_cache_enabled": not self.disable_result_cache,
                 "deployment_type": deployment_type,
             },
+            "client_library_version": self._detect_client_library_version(),
         }
 
-        # Get client library version
-        if redshift_connector:
-            try:
-                platform_info["client_library_version"] = redshift_connector.__version__
-            except AttributeError:
-                platform_info["client_library_version"] = None
-        else:
-            try:
-                import psycopg2
-
-                platform_info["client_library_version"] = psycopg2.__version__
-            except (ImportError, AttributeError):
-                platform_info["client_library_version"] = None
-
-        # Try to get Redshift version and extended metadata from connection
         if connection:
-            cursor = None
-            try:
-                cursor = connection.cursor()
-
-                # Get Redshift version
-                cursor.execute("SELECT version()")
-                result = cursor.fetchone()
-                platform_info["platform_version"] = result[0] if result else None
-                platform_info["engine_version"] = platform_info["platform_version"]
-                platform_info["engine_version_source"] = "sql_query"
-
-                # Step 2: Collect deployment-specific metadata using fallback chain
-                deployment_metadata = {}
-
-                if deployment_type == "serverless":
-                    # Try API first (most complete)
-                    if identifier and region:
-                        api_metadata = self._get_serverless_metadata_api(identifier, region)
-                        if api_metadata:
-                            deployment_metadata.update(api_metadata)
-                            self.logger.debug("Using Serverless metadata from AWS API")
-
-                    # Fall back to SQL if API didn't provide data
-                    if not deployment_metadata:
-                        sql_metadata = self._get_serverless_metadata_sql(cursor)
-                        if sql_metadata:
-                            deployment_metadata.update(sql_metadata)
-                            self.logger.debug("Using Serverless metadata from SQL queries")
-
-                    # Add serverless-specific fields to configuration
-                    if deployment_metadata:
-                        platform_info["configuration"]["workgroup_name"] = deployment_metadata.get(
-                            "workgroup_name", identifier
-                        )
-                        platform_info["configuration"]["namespace_name"] = deployment_metadata.get("namespace_name")
-                        platform_info["configuration"]["base_capacity_rpu"] = deployment_metadata.get(
-                            "base_capacity_rpu"
-                        )
-                        platform_info["configuration"]["max_capacity_rpu"] = deployment_metadata.get("max_capacity_rpu")
-                        platform_info["configuration"]["enhanced_vpc_routing"] = deployment_metadata.get(
-                            "enhanced_vpc_routing"
-                        )
-                        platform_info["configuration"]["encrypted"] = deployment_metadata.get("encrypted")
-
-                elif deployment_type == "provisioned":
-                    # Try API first (most complete)
-                    if identifier and region:
-                        api_metadata = self._get_provisioned_metadata_api(identifier, region)
-                        if api_metadata:
-                            deployment_metadata.update(api_metadata)
-                            self.logger.debug("Using Provisioned metadata from AWS API")
-
-                    # Fall back to SQL if API didn't provide data
-                    if not deployment_metadata:
-                        sql_metadata = self._get_provisioned_metadata_sql(cursor)
-                        if sql_metadata:
-                            deployment_metadata.update(sql_metadata)
-                            self.logger.debug("Using Provisioned metadata from SQL queries")
-
-                    # Add provisioned-specific fields to configuration
-                    if deployment_metadata:
-                        platform_info["configuration"]["cluster_identifier"] = deployment_metadata.get(
-                            "cluster_identifier", identifier
-                        )
-                        platform_info["configuration"]["node_type"] = deployment_metadata.get("node_type")
-                        platform_info["configuration"]["number_of_nodes"] = deployment_metadata.get("number_of_nodes")
-                        platform_info["configuration"]["total_storage_capacity_mb"] = deployment_metadata.get(
-                            "total_storage_capacity_mb"
-                        )
-                        platform_info["configuration"]["enhanced_vpc_routing"] = deployment_metadata.get(
-                            "enhanced_vpc_routing"
-                        )
-                        platform_info["configuration"]["encrypted"] = deployment_metadata.get("encrypted")
-
-                        # Legacy compute_configuration field for backward compatibility
-                        platform_info["compute_configuration"] = {
-                            "node_type": deployment_metadata.get("node_type"),
-                            "cluster_version": deployment_metadata.get("cluster_version"),
-                            "num_compute_nodes": deployment_metadata.get("number_of_nodes"),
-                        }
-
-                # Try to get WLM (Workload Management) configuration
-                try:
-                    cursor.execute("""
-                        SELECT
-                            service_class,
-                            num_query_tasks,
-                            query_working_mem,
-                            max_execution_time,
-                            user_group_wild_card,
-                            query_group_wild_card
-                        FROM stv_wlm_service_class_config
-                        WHERE service_class >= 6
-                        ORDER BY service_class
-                        LIMIT 5
-                    """)
-                    wlm_results = cursor.fetchall()
-
-                    if wlm_results:
-                        if "compute_configuration" not in platform_info:
-                            platform_info["compute_configuration"] = {}
-
-                        platform_info["compute_configuration"]["wlm_queues"] = []
-                        for row in wlm_results:
-                            platform_info["compute_configuration"]["wlm_queues"].append(
-                                {
-                                    "service_class": row[0] if len(row) > 0 else None,
-                                    "num_query_tasks": row[1] if len(row) > 1 else None,
-                                    "query_working_mem_mb": row[2] if len(row) > 2 else None,
-                                    "max_execution_time_ms": row[3] if len(row) > 3 else None,
-                                }
-                            )
-
-                        self.logger.debug("Successfully captured Redshift WLM configuration")
-                except Exception as e:
-                    self.logger.debug(f"Could not query Redshift WLM configuration: {e}")
-
-            except Exception as e:
-                self.logger.debug(f"Error collecting Redshift platform info: {e}")
-                if platform_info.get("platform_version") is None:
-                    platform_info["platform_version"] = None
-            finally:
-                if cursor:
-                    cursor.close()
+            self._enrich_platform_info_from_connection(connection, platform_info, deployment_type, identifier, region)
         else:
             platform_info["platform_version"] = None
 
@@ -758,7 +756,7 @@ class RedshiftAdapter(PlatformAdapter):
 
             return redshift_connector.connect(**connect_kwargs)
 
-        # psycopg2 supports keepalives/keepalives_idle/keepalives_interval/keepalives_count
+        # psycopg supports keepalives/keepalives_idle/keepalives_interval/keepalives_count
         # but the old code never passed them; tcp_keepalive params are silently ignored here.
         connect_kwargs = {
             "host": params["host"],
@@ -775,7 +773,7 @@ class RedshiftAdapter(PlatformAdapter):
         if self.sslrootcert:
             connect_kwargs["sslrootcert"] = self.sslrootcert
 
-        return psycopg2.connect(**connect_kwargs)
+        return psycopg.connect(**connect_kwargs)
 
     def _resolve_connect_timeout(self) -> int:
         """Determine appropriate connection timeout based on cluster state.
@@ -820,7 +818,7 @@ class RedshiftAdapter(PlatformAdapter):
                     if status == "available":
                         return self.connect_timeout
                     elif status in ("resuming", "rebooting"):
-                        self.log_verbose(f"Provisioned cluster is {status} — using extended timeout (120s)")
+                        self.log_verbose(f"Provisioned cluster is {status} - using extended timeout (120s)")
                         return max(self.connect_timeout, 120)
                     elif status == "paused":
                         self.logger.warning(
@@ -934,13 +932,16 @@ class RedshiftAdapter(PlatformAdapter):
         """Drop database in Redshift cluster.
 
         Connects to admin database to drop the target database.
-        Note: DROP DATABASE must run with autocommit enabled.
-        Note: Redshift doesn't support IF EXISTS for DROP DATABASE, so we check first.
-        Note: If DROP DATABASE fails with SQLSTATE 55006 (database still has active connections),
-              the method terminates backends again and retries on a *fresh* connection.
-              redshift_connector v2.1.x enters an aborted transaction state after a failed DDL
-              even with autocommit=True, causing any subsequent DDL on the same connection to
-              fail with error 25001.  Opening a new connection guarantees clean driver state.
+
+        Notes:
+            - DROP DATABASE must run with autocommit enabled.
+            - Redshift doesn't support IF EXISTS for DROP DATABASE, so we check first.
+            - If DROP DATABASE fails with SQLSTATE 55006 (database still has active
+              connections), the method terminates backends again and retries on a
+              fresh connection. redshift_connector v2.1.x enters an aborted
+              transaction state after a failed DDL even with autocommit=True,
+              causing any subsequent DDL on the same connection to fail with
+              error 25001. Opening a new connection guarantees clean driver state.
         """
         database = connection_config.get("database", self.database)
 
@@ -950,7 +951,7 @@ class RedshiftAdapter(PlatformAdapter):
             return
 
         try:
-            # Connect to admin database with extended timeout — DROP DATABASE
+            # Connect to admin database with extended timeout - DROP DATABASE
             # can take 30-120+ seconds on Redshift depending on cluster state.
             connection = self._create_admin_connection(connect_timeout=self._long_running_timeout())
             connection.autocommit = True  # Enable autocommit for DROP DATABASE
@@ -975,7 +976,7 @@ class RedshiftAdapter(PlatformAdapter):
             except Exception as drop_error:
                 # Re-raise if not SQLSTATE 55006 (object_in_use / database has active connections).
                 # Check structured error code first (redshift_connector stores the server dict in
-                # args[0] with key 'C'; psycopg2 exposes it as pgcode).  Fall back to substring
+                # args[0] with key 'C'; psycopg exposes it as pgcode).  Fall back to substring
                 # matching only for unknown exception types so future driver versions don't silently
                 # skip the retry.
                 sqlstate = None
@@ -983,16 +984,16 @@ class RedshiftAdapter(PlatformAdapter):
                 if isinstance(first_arg, dict):
                     sqlstate = first_arg.get("C")  # redshift_connector wire-protocol dict
                 if sqlstate is None:
-                    sqlstate = getattr(drop_error, "pgcode", None)  # psycopg2
+                    sqlstate = getattr(drop_error, "pgcode", None)  # psycopg
                 if sqlstate is not None:
                     if sqlstate != "55006":
                         raise
                 else:
-                    # Unknown driver — fall back to message text
+                    # Unknown driver - fall back to message text
                     error_msg = str(drop_error).lower()
                     if "active connection" not in error_msg and "being accessed" not in error_msg:
                         raise
-                # Retry with a fresh connection — redshift_connector can enter an aborted
+                # Retry with a fresh connection - redshift_connector can enter an aborted
                 # transaction state after a failed DDL, causing subsequent DDL to fail with
                 # error 25001 even when autocommit=True.  A fresh connection guarantees clean state.
                 self.log_verbose("Database still has active connections after terminate, retrying...")
@@ -1142,23 +1143,24 @@ class RedshiftAdapter(PlatformAdapter):
                 # Normalize table names to lowercase for Redshift consistency
                 # This ensures CREATE, COPY, and SELECT all use the same case
                 statement = self._normalize_table_name_in_sql(statement)
+                is_create_table = statement.upper().startswith("CREATE TABLE")
 
                 # Ensure idempotency with DROP TABLE IF EXISTS
                 # (Redshift doesn't support CREATE OR REPLACE TABLE)
-                if statement.upper().startswith("CREATE TABLE"):
+                if is_create_table:
                     # Extract table name from CREATE TABLE statement
                     table_name = self._extract_table_name(statement)
                     if table_name:
                         # Ensure table name is lowercase
                         table_name_lower = table_name.strip('"').lower()
                         drop_statement = f"DROP TABLE IF EXISTS {table_name_lower}"
+                        self.log_notice(f"Executing destructive schema reset: {drop_statement}")
                         cursor.execute(drop_statement)
-                        self.logger.debug(f"Executed: {drop_statement}")
 
                 # Optimize table definition for Redshift
                 statement = self._optimize_table_definition(statement)
                 cursor.execute(statement)
-                self.logger.debug(f"Executed schema statement: {statement[:100]}...")
+                self.logger.info(f"Executed schema statement: {statement[:100]}...")
 
             self.logger.info("Schema created")
 
@@ -1170,50 +1172,23 @@ class RedshiftAdapter(PlatformAdapter):
 
         return elapsed_seconds(start_time)
 
-    def _resolve_data_files(self, benchmark, data_dir: Path) -> dict:
+    def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
         """Resolve data files from benchmark tables or manifest fallback."""
         resolver = DataSourceResolver(
             platform_name=self.platform_name,
-            table_mode=getattr(self, "table_mode", "native"),
-            platform_config=getattr(self, "__dict__", None),
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
         )
         data_source = resolver.resolve(benchmark, data_dir)
-        if self._should_use_manifest_selected_files(data_source):
-            manifest_source = next((p for p in resolver.providers if isinstance(p, ManifestFileSource)), None)
-            if manifest_source is not None:
-                manifest_data_source = manifest_source.get_data_source(benchmark, data_dir)
-                if manifest_data_source and manifest_data_source.tables:
-                    self.log_verbose(
-                        "Redshift native mode detected directory-valued benchmark tables; "
-                        "using manifest-selected native files instead"
-                    )
-                    data_source = manifest_data_source
         if not data_source or not data_source.tables:
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source.tables
-
-    def _should_use_manifest_selected_files(self, data_source: Any) -> bool:
-        """Use manifest-selected files when native benchmark tables only point at directories."""
-        if getattr(self, "table_mode", "native") == "external":
-            return False
-        if not data_source or getattr(data_source, "source_type", None) not in {
-            "benchmark_tables",
-            "benchmark_impl_tables",
-        }:
-            return False
-
-        for table_paths in data_source.tables.values():
-            normalized_paths = table_paths if isinstance(table_paths, list) else [table_paths]
-            for path_like in normalized_paths:
-                path = Path(path_like)
-                if path.exists() and path.is_dir():
-                    return True
-        return False
+        return data_source
 
     def _create_s3_client(self):
         """Create S3 client with explicit error handling."""
         try:
-            # XOR check: reject partial credentials — both key ID and secret must be
+            # XOR check: reject partial credentials - both key ID and secret must be
             # provided together, or both omitted (to fall back to environment/IAM).
             if bool(self.aws_access_key_id) != bool(self.aws_secret_access_key):
                 raise ValueError(
@@ -1333,7 +1308,16 @@ class RedshiftAdapter(PlatformAdapter):
             self.log_verbose("No explicit credentials configured for COPY; using cluster default IAM role")
             return ""
 
-    def _load_table_via_s3(self, cursor, s3_client, table_name: str, valid_files: list[Path], connection: Any) -> int:
+    def _load_table_via_s3(
+        self,
+        cursor,
+        s3_client,
+        table_name: str,
+        valid_files: list[Path],
+        connection: Any,
+        data_source: Any | None = None,
+        benchmark: Any | None = None,
+    ) -> int:
         """Upload files to S3 and load a single table via COPY command. Returns row count."""
         table_name_lower = table_name.lower()
         parquet_modes = {is_parquet_format(file_path) for file_path in valid_files}
@@ -1373,7 +1357,11 @@ class RedshiftAdapter(PlatformAdapter):
                 FORMAT AS PARQUET
             """
         else:
-            delimiter = get_delimiter_for_file(valid_files[0])
+            dialect_source = data_source or DataSource(source_type="redshift_s3", tables={})
+            dialect = resolve_csv_dialect(
+                dialect_source, table_name, valid_files[0], benchmark if benchmark is not None else NO_BENCHMARK
+            )
+            delimiter = dialect.delimiter
             copy_sql = f"""
                 COPY {qualified_table}
                 FROM '{copy_from_path}'
@@ -1401,7 +1389,15 @@ class RedshiftAdapter(PlatformAdapter):
 
         return row_count
 
-    def _load_table_via_insert(self, cursor, table_name: str, valid_files: list[Path], connection: Any) -> int:
+    def _load_table_via_insert(
+        self,
+        cursor,
+        table_name: str,
+        valid_files: list[Path],
+        connection: Any,
+        data_source: Any | None = None,
+        benchmark: Any | None = None,
+    ) -> int:
         """Load a single table via INSERT statements. Returns total rows loaded."""
         table_name_lower = table_name.lower()
         total_rows_loaded = 0
@@ -1410,7 +1406,11 @@ class RedshiftAdapter(PlatformAdapter):
             chunk_info = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
             self.log_very_verbose(f"Loading {table_name}{chunk_info} from {file_path.name}")
 
-            delimiter = get_delimiter_for_file(file_path)
+            dialect_source = data_source or DataSource(source_type="redshift_insert", tables={})
+            dialect = resolve_csv_dialect(
+                dialect_source, table_name, file_path, benchmark if benchmark is not None else NO_BENCHMARK
+            )
+            delimiter = dialect.delimiter
             compression_handler = FileFormatRegistry.get_compression_handler(file_path)
 
             with compression_handler.open(file_path) as f:
@@ -1420,11 +1420,21 @@ class RedshiftAdapter(PlatformAdapter):
 
                 for line in f:
                     line = line.strip()
-                    if line and line.endswith(delimiter):
+                    if dialect.null_marker is not None and line and line.endswith(delimiter):
                         line = line[:-1]
 
                     values = line.split(delimiter)
-                    escaped_values = ["'" + str(v).replace("'", "''") + "'" for v in values]
+                    if dialect.null_marker is None:
+                        escaped_values = ["'" + str(v).replace("'", "''") + "'" for v in values]
+                    else:
+                        # Honor the resolved null marker (e.g. "" for TPC-style data) by
+                        # emitting SQL NULL instead of a quoted empty literal. Mirrors the
+                        # Firebolt INSERT path so both fallback loaders treat empty TPC
+                        # cells the same way.
+                        escaped_values = [
+                            "NULL" if v == dialect.null_marker else "'" + str(v).replace("'", "''") + "'"
+                            for v in values
+                        ]
                     batch_data.append(f"({', '.join(escaped_values)})")
 
                     if len(batch_data) >= batch_size:
@@ -1456,7 +1466,7 @@ class RedshiftAdapter(PlatformAdapter):
         valid_files = []
         for file_path in file_paths:
             file_path = Path(file_path)
-            if file_path.exists() and file_path.stat().st_size > 0:
+            if file_path.exists() and (file_path.is_dir() or file_path.stat().st_size > 0):
                 valid_files.append(file_path)
         return valid_files
 
@@ -1570,7 +1580,9 @@ class RedshiftAdapter(PlatformAdapter):
         cursor = connection.cursor()
 
         try:
-            data_files = self._resolve_data_files(benchmark, data_dir)
+            data_source = self._resolve_data_files(benchmark, data_dir)
+            if not isinstance(data_source, DataSource):
+                data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
             s3_client = self._create_s3_client()
 
             cursor.execute(
@@ -1583,7 +1595,7 @@ class RedshiftAdapter(PlatformAdapter):
                 """
             )
 
-            for table_name, file_paths in data_files.items():
+            for table_name, file_paths in data_source.tables.items():
                 table_name_lower = table_name.lower()
                 valid_files = self._filter_valid_files(file_paths)
                 delta_dirs = [path for path in valid_files if path.is_dir() and (path / "_delta_log").is_dir()]
@@ -1602,6 +1614,9 @@ class RedshiftAdapter(PlatformAdapter):
 
                 column_defs = self._build_external_column_definitions(benchmark, table_name_lower)
 
+                self.log_notice(
+                    f"Dropping existing Redshift external table before recreate: {external_schema}.{table_name_lower}"
+                )
                 cursor.execute(f"DROP TABLE IF EXISTS {external_schema}.{table_name_lower}")
                 if source_format == "delta":
                     cursor.execute(
@@ -1642,13 +1657,15 @@ class RedshiftAdapter(PlatformAdapter):
         cursor = connection.cursor()
 
         try:
-            data_files = self._resolve_data_files(benchmark, data_dir)
+            data_source = self._resolve_data_files(benchmark, data_dir)
+            if not isinstance(data_source, DataSource):
+                data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
 
             # Upload files to S3 and load via COPY command
             if self.s3_bucket and boto3:
                 s3_client = self._create_s3_client()
 
-                for table_name, file_paths in data_files.items():
+                for table_name, file_paths in data_source.tables.items():
                     valid_files = self._filter_valid_files(file_paths)
 
                     if not valid_files:
@@ -1661,7 +1678,9 @@ class RedshiftAdapter(PlatformAdapter):
 
                     try:
                         load_start = mono_time()
-                        row_count = self._load_table_via_s3(cursor, s3_client, table_name, valid_files, connection)
+                        row_count = self._load_table_via_s3(
+                            cursor, s3_client, table_name, valid_files, connection, data_source, benchmark
+                        )
                         table_stats[table_name.lower()] = row_count
 
                         load_time = elapsed_seconds(load_start)
@@ -1670,14 +1689,15 @@ class RedshiftAdapter(PlatformAdapter):
                         )
 
                     except Exception as e:
-                        self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
+                        error_message = str(e) or repr(e) or type(e).__name__
+                        self.logger.error(f"Failed to load {table_name}: {error_message}")
                         table_stats[table_name.lower()] = 0
 
             else:
                 # Direct loading without S3 (less efficient)
                 self.logger.warning("No S3 bucket configured, using direct INSERT loading")
 
-                for table_name, file_paths in data_files.items():
+                for table_name, file_paths in data_source.tables.items():
                     valid_files = self._filter_valid_files(file_paths)
 
                     if not valid_files:
@@ -1689,7 +1709,9 @@ class RedshiftAdapter(PlatformAdapter):
                         self.log_verbose(f"Direct loading data for table: {table_name}")
                         load_start = mono_time()
 
-                        total_rows_loaded = self._load_table_via_insert(cursor, table_name, valid_files, connection)
+                        total_rows_loaded = self._load_table_via_insert(
+                            cursor, table_name, valid_files, connection, data_source, benchmark
+                        )
                         table_stats[table_name.lower()] = total_rows_loaded
 
                         load_time = elapsed_seconds(load_start)
@@ -1699,7 +1721,8 @@ class RedshiftAdapter(PlatformAdapter):
                         )
 
                     except Exception as e:
-                        self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
+                        error_message = str(e) or repr(e) or type(e).__name__
+                        self.logger.error(f"Failed to load {table_name}: {error_message}")
                         table_stats[table_name.lower()] = 0
 
             total_time = elapsed_seconds(start_time)
@@ -1767,7 +1790,7 @@ class RedshiftAdapter(PlatformAdapter):
             # These operations use a **separate connection** because they are
             # long-running DDL operations that can trigger socket-level timeouts
             # (e.g. on paused serverless clusters).  A socket timeout permanently
-            # breaks the underlying TCP connection — rollback() cannot recover it
+            # breaks the underlying TCP connection - rollback() cannot recover it
             # because the socket itself is dead.  By isolating VACUUM/ANALYZE on
             # their own connection, a timeout only destroys the disposable
             # connection while the main benchmark connection stays healthy.
@@ -1805,7 +1828,7 @@ class RedshiftAdapter(PlatformAdapter):
             return
 
         # Create a separate connection for VACUUM/ANALYZE.
-        # The finally block is the single owner of cleanup — error paths
+        # The finally block is the single owner of cleanup - error paths
         # just return and let finally close the connection.
         maint_conn = None
         try:
@@ -1831,7 +1854,7 @@ class RedshiftAdapter(PlatformAdapter):
                     except Exception as e:
                         self.logger.warning(f"{op_name} failed for {table}: {e}")
                         self.logger.warning(
-                            f"Maintenance connection lost during {op_name} — skipping remaining VACUUM/ANALYZE"
+                            f"Maintenance connection lost during {op_name} - skipping remaining VACUUM/ANALYZE"
                         )
                         return
 
@@ -1952,14 +1975,18 @@ class RedshiftAdapter(PlatformAdapter):
 
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
+            error_type = type(e).__name__
+            # Always populate `error` with a non-empty string - some driver
+            # exceptions raise with no message and yield an empty str(e).
+            error_message = str(e) or repr(e) or error_type
 
             return {
                 "query_id": query_id,
                 "status": "FAILED",
                 "execution_time_seconds": execution_time,
                 "rows_returned": 0,
-                "error": str(e),
-                "error_type": type(e).__name__,
+                "error": error_message,
+                "error_type": error_type,
             }
         finally:
             cursor.close()
@@ -2563,67 +2590,38 @@ def _build_redshift_config(
     Returns:
         DatabaseConfig with credentials loaded
     """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
+    from benchbox.platforms.base.config_utils import build_platform_config
 
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("redshift") or {}
-
-    # Build merged options: saved_creds < options < overrides
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    # Extract credential fields for DatabaseConfig
-    name = info.display_name if info else "Amazon Redshift"
-    driver_package = info.driver_package if info else "redshift-connector"
-
-    # Build config dict with platform-specific fields at top-level
-    # This allows RedshiftAdapter.__init__() and from_config() to access them via config.get()
-    config_dict = {
-        "type": "redshift",
-        "name": name,
-        "options": merged_options or {},  # Ensure options is never None (Pydantic v2 uses None if explicitly passed)
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields at top-level (adapters expect these here)
-        "host": merged_options.get("host"),
-        "port": merged_options.get("port"),
-        # NOTE: database is NOT included here - from_config() generates it from benchmark context
-        # Only explicit overrides (via --platform-option database=...) should bypass generation
-        "username": merged_options.get("username"),
-        "password": merged_options.get("password"),
-        "schema": merged_options.get("schema"),
-        # S3 and AWS configuration
-        "s3_bucket": merged_options.get("s3_bucket"),
-        "s3_prefix": merged_options.get("s3_prefix"),
-        "staging_root": merged_options.get("staging_root"),
-        "iam_role": merged_options.get("iam_role"),
-        "aws_access_key_id": merged_options.get("aws_access_key_id"),
-        "aws_secret_access_key": merged_options.get("aws_secret_access_key"),
-        "aws_session_token": merged_options.get("aws_session_token"),
-        "aws_region": merged_options.get("aws_region"),
-        # Optional settings
-        "cluster_identifier": merged_options.get("cluster_identifier"),
-        "admin_database": merged_options.get("admin_database", "dev"),
-        "connect_timeout": merged_options.get("connect_timeout"),
-        "statement_timeout": merged_options.get("statement_timeout"),
-        "sslmode": merged_options.get("sslmode"),
-        # Benchmark context for config-aware database naming (from overrides)
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    # Only include explicit database override if provided via CLI or overrides
-    # Saved credentials should NOT override generated database names
-    if "database" in overrides and overrides["database"]:
-        config_dict["database"] = overrides["database"]
-
-    return DatabaseConfig(**config_dict)
+    return build_platform_config(
+        platform_type="redshift",
+        credential_key="redshift",
+        default_display_name="Amazon Redshift",
+        default_driver_package="redshift-connector",
+        base_options={"admin_database": "dev"},
+        platform_fields=[
+            "host",
+            "port",
+            "username",
+            "password",
+            "schema",
+            "s3_bucket",
+            "s3_prefix",
+            "staging_root",
+            "iam_role",
+            "aws_access_key_id",
+            "aws_secret_access_key",
+            "aws_session_token",
+            "aws_region",
+            "cluster_identifier",
+            "admin_database",
+            "connect_timeout",
+            "statement_timeout",
+            "sslmode",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 # Register the config builder with the platform hook registry

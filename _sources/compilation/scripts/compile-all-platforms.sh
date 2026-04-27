@@ -78,6 +78,43 @@ compile_tpch_macos_native() {
     log_success "TPC-H native macOS ARM64 compilation completed"
 }
 
+# Deploy freshly compiled TPC-DS binaries into benchbox/_binaries/ so that
+# ensure_tpc_binaries() picks them up at runtime (priority-1 path).
+# Must be called after checksums.md5 has been generated in the build dir.
+_deploy_tpcds_to_package() {
+    local platform_name="$1"  # e.g., darwin-arm64, linux-x86_64, windows-x86_64
+    local source_dir="$PROJECT_ROOT/_binaries/tpc-ds/${platform_name}"
+    local package_dir="$PROJECT_ROOT/benchbox/_binaries/tpc-ds/${platform_name}"
+
+    # Windows binaries use .exe extension
+    local exe_ext=""
+    if echo "$platform_name" | grep -q "windows"; then
+        exe_ext=".exe"
+    fi
+
+    log_info "Deploying TPC-DS binaries to package dir: benchbox/_binaries/tpc-ds/${platform_name}"
+    mkdir -p "$package_dir"
+
+    cp "$source_dir/dsdgen${exe_ext}"  "$package_dir/dsdgen${exe_ext}"
+    cp "$source_dir/dsqgen${exe_ext}"  "$package_dir/dsqgen${exe_ext}"
+    cp "$source_dir/tpcds.dst"         "$package_dir/tpcds.dst"
+    cp "$source_dir/tpcds.idx"         "$package_dir/tpcds.idx"
+    if [ -z "$exe_ext" ]; then
+        chmod +x "$package_dir/dsdgen" "$package_dir/dsqgen"
+    fi
+
+    # Regenerate checksums.md5 for the package directory
+    cd "$package_dir"
+    if command -v md5sum >/dev/null 2>&1; then
+        md5sum "dsdgen${exe_ext}" "dsqgen${exe_ext}" tpcds.dst tpcds.idx > checksums.md5
+    else
+        md5 -r "dsdgen${exe_ext}" "dsqgen${exe_ext}" tpcds.dst tpcds.idx > checksums.md5
+    fi
+    cd "$PROJECT_ROOT"
+
+    log_success "Deployed to benchbox/_binaries/tpc-ds/${platform_name}"
+}
+
 # Function to compile TPC-DS for macOS ARM64 natively
 compile_tpcds_macos_native() {
     log_info "Compiling TPC-DS natively for macOS ARM64..."
@@ -119,6 +156,9 @@ compile_tpcds_macos_native() {
 
     # Cleanup
     rm -rf "$temp_build"
+
+    # Deploy into the benchbox package directory (runtime priority-1 path)
+    _deploy_tpcds_to_package "darwin-arm64"
 
     log_success "TPC-DS native macOS ARM64 compilation completed"
 }
@@ -238,6 +278,9 @@ compile_tpcds_macos_cross() {
     # Clean up
     rm -rf "$build_dir"
 
+    # Deploy into the benchbox package directory (runtime priority-1 path)
+    _deploy_tpcds_to_package "darwin-${target_arch}"
+
     log_success "TPC-DS cross-compilation completed for macOS ${target_arch}"
 }
 
@@ -263,6 +306,8 @@ compile_with_docker() {
         compile_tpch_docker "$platform" "$arch" "$image_name" "$platform_dir"
     else
         compile_tpcds_docker "$platform" "$arch" "$image_name" "$platform_dir"
+        # Deploy into the benchbox package directory (runtime priority-1 path)
+        _deploy_tpcds_to_package "${platform}-${arch}"
     fi
 }
 
@@ -327,36 +372,35 @@ compile_tpcds_docker() {
             # Set compilation parameters based on platform
             make clean || true
             if [ '$platform' = 'windows' ]; then
-                # Start Xvfb for Wine headless operation
-                Xvfb :99 -screen 0 1024x768x16 &
-                XVFB_PID=\$!
+                # Windows cross-compilation strategy:
+                # mkheader and distcomp are build-time host tools that generate header files
+                # and the tpcds.idx index. They must run natively on the build host (Linux),
+                # so we compile them with native GCC first, run them, then cross-compile
+                # dsdgen/dsqgen for Windows with MinGW.
 
-                # Initialize Wine prefix for cross-compilation
-                wineboot --init 2>/dev/null || true
+                # Step 1: Build native host tools (mkheader, distcomp) with native GCC
+                make CC=gcc mkheader CFLAGS='-O2 -DLINUX -DMAXINT=INT_MAX -fcommon'
+                ./mkheader column_list.txt
 
-                # Windows cross-compilation with MinGW and Wine emulation for build tools
-                # First, build mkheader and run it with Wine
-                make CC=\$CROSS_CC mkheader.exe CFLAGS='-O2 -DWIN32 -DMAXINT=INT_MAX -fcommon' || \
-                make CC=\$CROSS_CC mkheader CFLAGS='-O2 -DWIN32 -DMAXINT=INT_MAX -fcommon'
+                make CC=gcc distcomp CFLAGS='-O2 -DLINUX -DMAXINT=INT_MAX -fcommon'
+                ./distcomp -i tpcds.dst -o tpcds.idx
 
-                # Run mkheader with Wine to generate headers
-                if [ -f mkheader.exe ]; then
-                    wine mkheader.exe column_list.txt 2>/dev/null || wine mkheader column_list.txt 2>/dev/null
-                elif [ -f mkheader ]; then
-                    wine mkheader column_list.txt 2>/dev/null
-                fi
+                # Step 2: Remove only .o files so MinGW rebuilds them cleanly.
+                # Keeping generated headers (tables.h, columns.h, streams.h, tpcds.idx.h)
+                # prevents Make from trying to re-run mkheader or distcomp as Windows .exe.
+                rm -f *.o
 
-                # Build distcomp and generate tpcds.idx
-                make CC=\$CROSS_CC distcomp CFLAGS='-O2 -DWIN32 -DMAXINT=INT_MAX -fcommon' LDFLAGS='-static'
-                wine ./distcomp -i tpcds.dst -o tpcds.idx 2>/dev/null || ./distcomp -i tpcds.dst -o tpcds.idx
+                # Step 3: Cross-compile dsdgen/dsqgen for Windows with MinGW.
+                # -o distcomp: treat distcomp as already-built (old) - prevents Make from
+                #   trying to cross-link distcomp.exe which we don't need.
+                # LIBS overrides the Makefile's link-time libs; -lws2_32 provides ntohl
+                #   (from dist.c) and must appear after the object files.
+                make CC=\$CROSS_CC -o distcomp dsdgen dsqgen \
+                  CFLAGS='-O2 -DWIN32 -DMAXINT=INT_MAX -fcommon' \
+                  LDFLAGS='-static' \
+                  LIBS='-lws2_32 -lm'
 
-                # Now build the main binaries
-                make CC=\$CROSS_CC dsdgen dsqgen CFLAGS='-O2 -DWIN32 -DMAXINT=INT_MAX -fcommon' LDFLAGS='-static'
-
-                # Kill Xvfb
-                kill \$XVFB_PID 2>/dev/null || true
-
-                cp dsdgen.exe dsqgen.exe tpcds.dst tpcds.idx /build/output/ || cp dsdgen dsqgen tpcds.dst tpcds.idx /build/output/
+                cp dsdgen.exe dsqgen.exe tpcds.dst tpcds.idx /build/output/
             else
                 # Linux compilation with GCC 9 for TPC-DS compatibility
                 # First build distcomp to generate tpcds.idx
@@ -373,10 +417,30 @@ compile_tpcds_docker() {
 
             # Generate checksums
             cd /build/output
-            find . -type f -name '*.dst' -o -name '*.idx' -o -name '*gen' | xargs md5sum > checksums.md5 2>/dev/null || true
+            find . -maxdepth 1 -type f \( -name '*.exe' -o -name '*.dst' -o -name '*.idx' -o -name '*gen' \) | sort | xargs md5sum > checksums.md5 2>/dev/null || true
         "
 
     log_success "TPC-DS Docker compilation completed for ${platform}-${arch}"
+}
+
+# Compile TPC binaries for the current host platform only (no Docker required).
+# Writes to _binaries/ and deploys to benchbox/_binaries/ for immediate use.
+compile_native_only() {
+    log_info "Compiling for native platform only (no Docker required)..."
+    cd "$PROJECT_ROOT"
+
+    if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
+        compile_tpch_macos_native
+        compile_tpcds_macos_native
+    elif [ "$(uname -s)" = "Darwin" ]; then
+        compile_tpch_macos_cross "$(uname -m)"
+        compile_tpcds_macos_cross "$(uname -m)"
+    else
+        log_error "Native-only mode is only supported on macOS. Use full compile mode for Linux/Windows."
+        exit 1
+    fi
+
+    log_success "Native compilation complete."
 }
 
 # Function to compile all platforms
@@ -508,6 +572,17 @@ display_summary() {
 
 # Main execution
 main() {
+    local mode="${1:-}"
+
+    # --native / --native-only: compile for the current host platform without Docker
+    if [[ "$mode" == "--native" || "$mode" == "--native-only" ]]; then
+        log_info "Starting native-only TPC binary compilation..."
+        cd "$PROJECT_ROOT"
+        compile_native_only
+        log_success "Build process completed successfully!"
+        return
+    fi
+
     log_info "Starting TPC binary compilation with TPC-DS fixes..."
 
     # Change to project root
@@ -516,6 +591,7 @@ main() {
     # Check Docker availability for Docker-based platforms
     if ! command -v docker &> /dev/null; then
         log_error "Docker is not installed or not available"
+        log_info "Tip: run with --native to compile for the current platform only (no Docker needed)"
         exit 1
     fi
 

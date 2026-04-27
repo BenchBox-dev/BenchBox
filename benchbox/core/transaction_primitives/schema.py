@@ -105,6 +105,29 @@ STAGING_TABLES = {
 }
 
 
+def _supports_primary_keys(dialect: str) -> bool:
+    """Return whether the target SQL dialect supports PRIMARY KEY in CREATE TABLE."""
+    import benchbox.sql_compat.rules.schema_emit.pk_capability_txn  # noqa: F401
+    from benchbox.sql_compat.actions import CompatAction
+    from benchbox.sql_compat.context import CompatibilityContext, Phase
+    from benchbox.sql_compat.registry import REGISTRY
+
+    ctx = CompatibilityContext(
+        platform=dialect.lower(),
+        platform_version=None,
+        benchmark="transaction_primitives",
+        query_id=None,
+        phase=Phase.SCHEMA_EMIT,
+        mode="sql",
+        dialect=dialect,
+    )
+    registry_decision = REGISTRY.resolve(ctx)
+
+    if registry_decision is not None:
+        return registry_decision.action == CompatAction.NATIVE
+    return True  # no rule: default to supported
+
+
 def get_create_table_sql(table_name: str, dialect: str = "standard", if_not_exists: bool = False) -> str:
     """Generate CREATE TABLE SQL for a given table.
 
@@ -122,19 +145,20 @@ def get_create_table_sql(table_name: str, dialect: str = "standard", if_not_exis
     if table_name not in STAGING_TABLES:
         raise ValueError(f"Unknown staging table: {table_name}. Use STAGING_TABLES only.")
 
+    supports_pk = _supports_primary_keys(dialect)
     table = STAGING_TABLES[table_name]
     columns: list[str] = []
 
     for col in table["columns"]:
         col_def = f"{col['name']} {col['type']}"
-        if col.get("primary_key"):
+        if supports_pk and col.get("primary_key"):
             col_def += " PRIMARY KEY"
         if not col.get("nullable", False) and not col.get("primary_key"):
             col_def += " NOT NULL"
         columns.append(col_def)
 
     # Handle composite primary keys
-    if "primary_key" in table and isinstance(table["primary_key"], list):
+    if supports_pk and "primary_key" in table and isinstance(table["primary_key"], list):
         pk_cols = ", ".join(table["primary_key"])
         columns.append(f"PRIMARY KEY ({pk_cols})")
 

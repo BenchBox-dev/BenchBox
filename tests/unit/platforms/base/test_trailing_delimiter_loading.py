@@ -8,12 +8,22 @@ Also tests CLI exit code propagation on benchmark failure.
 """
 
 import sys
+import sys as _sys
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
 
 from benchbox.platforms.base.data_loading import DuckDBNativeHandler
+
+# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
+# same name as the run submodule.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
+# the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.run")
+_run_module = _sys.modules["benchbox.cli.commands.run"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -397,7 +407,7 @@ class TestCLIExitCodeOnFailure:
         mock_result.validation_details = "Simulated failure"
 
         runner = CliRunner()
-        with patch("benchbox.cli.commands.run._execute_orchestrated_run", return_value=mock_result):
+        with patch.object(_run_module, "_execute_orchestrated_run", return_value=mock_result):
             result = runner.invoke(
                 cli,
                 ["run", "--platform", "duckdb", "--benchmark", "tpch", "--non-interactive", "--phases", "power"],

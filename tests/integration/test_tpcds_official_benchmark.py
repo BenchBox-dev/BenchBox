@@ -244,7 +244,9 @@ class TestTPCDSOfficialBenchmark:
         import os
         import tempfile
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix="_tpcds_audit_trail_test.txt", delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix="_tpcds_audit_trail_test.txt", delete=False, encoding="utf-8"
+        ) as tmp_file:
             audit_file = Path(tmp_file.name)
 
         try:

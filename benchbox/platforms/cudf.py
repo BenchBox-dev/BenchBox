@@ -22,6 +22,7 @@ from benchbox.experimental.gpu import (
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.no_constraint_mixin import NoConstraintEnforcementMixin
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +218,7 @@ class CuDFResultWrapper:
         return len(self._result)
 
 
-class CuDFAdapter(PlatformAdapter):
+class CuDFAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
     """RAPIDS cuDF platform adapter for GPU-accelerated DataFrame operations.
 
     Provides GPU-accelerated data processing using NVIDIA RAPIDS cuDF library.
@@ -419,7 +420,12 @@ class CuDFAdapter(PlatformAdapter):
         timing_details: dict[str, Any] = {}
 
         # Use DataSourceResolver for consistent data source resolution
-        resolver = DataSourceResolver()
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
         data_source = resolver.resolve(benchmark, Path(data_dir))
 
         if not data_source or not data_source.tables:
@@ -596,43 +602,6 @@ class CuDFAdapter(PlatformAdapter):
     def analyze_tables(self, connection: CuDFConnectionWrapper) -> None:
         """Analyze tables (no-op for cuDF)."""
         # cuDF doesn't have table statistics like traditional databases
-
-    def apply_constraint_configuration(
-        self,
-        primary_key_config,
-        foreign_key_config,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configuration (no-op for cuDF).
-
-        cuDF DataFrames don't support database-style constraints.
-        This method maintains interface compatibility with PlatformAdapter.
-
-        Args:
-            primary_key_config: Primary key configuration (ignored)
-            foreign_key_config: Foreign key configuration (ignored)
-            connection: cuDF connection wrapper
-        """
-        if primary_key_config and getattr(primary_key_config, "enabled", False):
-            self.log_verbose("cuDF does not enforce PRIMARY KEY constraints - configuration noted but not applied")
-        if foreign_key_config and getattr(foreign_key_config, "enabled", False):
-            self.log_verbose("cuDF does not enforce FOREIGN KEY constraints - configuration noted but not applied")
-
-    def apply_platform_optimizations(self, platform_config, connection: Any) -> None:
-        """Apply platform-specific optimizations (no-op for cuDF).
-
-        cuDF optimizations are handled at the RAPIDS/RMM level during initialization.
-        This method maintains interface compatibility with PlatformAdapter.
-
-        Args:
-            platform_config: Platform optimization configuration (ignored)
-            connection: cuDF connection wrapper
-        """
-        if platform_config:
-            self.log_verbose(
-                "cuDF optimizations are handled at RAPIDS/RMM level - "
-                "platform config noted but applied via GPU initialization"
-            )
 
     def cleanup(self) -> None:
         """Cleanup resources."""

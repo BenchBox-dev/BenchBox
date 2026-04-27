@@ -7,7 +7,7 @@ running these same tests against `textcharts` proves that rendering is unchanged
 Fixed options: ChartOptions(use_color=False, use_unicode=True, width=80)
 
 Usage:
-    # Normal run — compare against stored golden files
+    # Normal run - compare against stored golden files
     uv run -- python -m pytest tests/contracts/visualization/test_ascii_golden_output.py -q
 
     # Regenerate golden files after intentional rendering changes
@@ -47,7 +47,7 @@ pytestmark = pytest.mark.fast
 
 GOLDEN_DIR = Path(__file__).resolve().parent.parent.parent / "fixtures" / "golden" / "ascii"
 
-# Deterministic options — no color, unicode on, fixed width.
+# Deterministic options - no color, unicode on, fixed width.
 OPTS = ChartOptions(use_color=False, use_unicode=True, width=80)
 
 # Fixed capabilities so golden-output tests are platform-independent.
@@ -74,7 +74,7 @@ def update_golden(request: pytest.FixtureRequest) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Chart fixture builders — each returns (chart_name, rendered_string)
+# Chart fixture builders - each returns (chart_name, rendered_string)
 # ---------------------------------------------------------------------------
 
 
@@ -347,7 +347,7 @@ def test_golden_output(builder, update_golden: bool) -> None:
     if not golden_path.exists():
         golden_path.parent.mkdir(parents=True, exist_ok=True)
         golden_path.write_text(normalized, encoding="utf-8")
-        pytest.fail(f"Golden file did not exist — created {golden_path}. Re-run to verify parity.")
+        pytest.fail(f"Golden file did not exist - created {golden_path}. Re-run to verify parity.")
 
     expected = golden_path.read_text(encoding="utf-8")
     assert normalized == expected, (

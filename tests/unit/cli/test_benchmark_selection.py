@@ -447,7 +447,16 @@ class TestTwoPhaseSelectionFlow:
         """Test that CATEGORY_ORDER lists categories in popularity order."""
         manager = BenchmarkManager()
 
-        expected_order = ["TPC", "Primitives", "Industry", "Academic", "Time Series", "Real World", "Experimental"]
+        expected_order = [
+            "TPC",
+            "Primitives",
+            "Industry",
+            "Academic",
+            "Time Series",
+            "Real World",
+            "AI/ML",
+            "Experimental",
+        ]
         assert expected_order == manager.CATEGORY_ORDER
 
     def test_benchmark_order_defined_for_all_categories(self):

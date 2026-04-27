@@ -52,7 +52,7 @@ def assert_valid_sql(sql: str, connection=None) -> None:
         # DuckDB can parse SQL without executing by using EXPLAIN
         connection.execute(f"EXPLAIN {sql}")
     except Exception as e:
-        raise AssertionError(f"Invalid SQL: {e}")
+        raise AssertionError(f"Invalid SQL: {e}") from e
     finally:
         if close_connection:
             connection.close()
@@ -147,7 +147,7 @@ def generate_test_data(benchmark_type: str, scale: float = 0.1, output_dir: Opti
         return data_files
 
     except Exception as e:
-        raise RuntimeError(f"Data generation failed for {benchmark_type}: {e}")
+        raise RuntimeError(f"Data generation failed for {benchmark_type}: {e}") from e
 
 
 def assert_olap_features_supported(connection, features: list[str]) -> None:
@@ -337,7 +337,7 @@ def load_tpch_data_to_duckdb(connection, data_paths: dict[str, Path]) -> None:
                 warnings.warn(f"Table {table_name_lower} appears to be empty", stacklevel=2)
 
     except Exception as e:
-        raise RuntimeError(f"Failed to load TPC-H data into DuckDB: {e}")
+        raise RuntimeError(f"Failed to load TPC-H data into DuckDB: {e}") from e
 
 
 def setup_duckdb_extensions(connection) -> None:
@@ -439,7 +439,7 @@ def validate_query_result(
                     raise AssertionError(f"Expected columns {expected_columns}, got {actual_columns}")
 
     except Exception as e:
-        raise AssertionError(f"Query validation failed: {e}")
+        raise AssertionError(f"Query validation failed: {e}") from e
 
 
 def _benchmark_query_performance(connection, query: str, iterations: int = 3) -> dict[str, float]:

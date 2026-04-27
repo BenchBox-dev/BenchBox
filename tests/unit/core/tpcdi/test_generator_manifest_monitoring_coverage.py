@@ -53,8 +53,8 @@ def test_manifest_consistency_checks_and_writer(tmp_path: Path, monkeypatch: pyt
     harness = _ManifestHarness(compression=False)
     harness._write_manifest(tmp_path, {"T": str(data), "MISSING": str(tmp_path / "none.tbl")})
     manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["tables"]["T"][0]["row_count"] == 2
-    assert manifest["tables"]["MISSING"][0]["size_bytes"] == 0
+    assert manifest["tables"]["T"]["formats"]["tbl"][0]["row_count"] == 2
+    assert manifest["tables"]["MISSING"]["formats"]["tbl"][0]["size_bytes"] == 0
 
     gz = tmp_path / "rows.tbl.gz"
     with gzip.open(gz, "wt") as f:
@@ -62,7 +62,7 @@ def test_manifest_consistency_checks_and_writer(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr("benchbox.core.tpcdi.generator.manifest.detect_compression", lambda _p: "gzip")
     harness._write_manifest(tmp_path, {"GZ": str(gz)})
     manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["tables"]["GZ"][0]["row_count"] == 3
+    assert manifest["tables"]["GZ"]["formats"]["tbl"][0]["row_count"] == 3
 
 
 class _Logger:

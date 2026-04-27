@@ -276,7 +276,7 @@ def _export_and_build_payload(
         exported_files = exporter.export_result(result, formats=["json"])
         if "json" in exported_files:
             result_file_path = str(exported_files["json"])
-            with open(result_file_path) as handle:
+            with open(result_file_path, encoding="utf-8") as handle:
                 result_payload = json.load(handle)
     except Exception as export_err:
         logger.warning(f"Failed to export benchmark results: {export_err}")

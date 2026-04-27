@@ -251,7 +251,7 @@ class CustomerManagementXMLParser:
         except ET.ParseError as e:
             error_msg = f"XML parsing error in file {file_path}: {str(e)}"
             logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ValueError(error_msg) from e
         except Exception as e:
             error_msg = f"Error parsing CustomerMgmt.xml file {file_path}: {str(e)}"
             logger.error(error_msg)

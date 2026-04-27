@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -15,10 +16,10 @@ pytestmark = [
 ]
 
 
+@dataclass
 class _Point:
-    def __init__(self, label: str, value: float) -> None:
-        self.label = label
-        self.value = value
+    label: str
+    value: float
 
 
 def test_export_ascii_writes_with_expected_extension(tmp_path: Path) -> None:

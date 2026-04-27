@@ -25,7 +25,7 @@ pytestmark = [
 
 
 # ---------------------------------------------------------------------------
-# types.py — enums and constants
+# types.py - enums and constants
 # ---------------------------------------------------------------------------
 
 
@@ -63,7 +63,7 @@ class TestConstants:
 
 
 # ---------------------------------------------------------------------------
-# types.py — detect_platform_type
+# types.py - detect_platform_type
 # ---------------------------------------------------------------------------
 
 
@@ -112,7 +112,7 @@ class TestDetectPlatformTypes:
 
 
 # ---------------------------------------------------------------------------
-# types.py — dataclasses
+# types.py - dataclasses
 # ---------------------------------------------------------------------------
 
 
@@ -204,7 +204,7 @@ class TestUnifiedComparisonSummary:
 
 
 # ---------------------------------------------------------------------------
-# suite.py — UnifiedBenchmarkSuite (unit-testable parts)
+# suite.py - UnifiedBenchmarkSuite (unit-testable parts)
 # ---------------------------------------------------------------------------
 
 
@@ -375,7 +375,7 @@ class TestUnifiedBenchmarkSuiteExport:
 
 
 # ---------------------------------------------------------------------------
-# plotter.py — UnifiedComparisonPlotter
+# plotter.py - UnifiedComparisonPlotter
 # ---------------------------------------------------------------------------
 
 
@@ -400,3 +400,121 @@ class TestUnifiedComparisonPlotter:
         pr = UnifiedPlatformResult(platform="duckdb", platform_type=PlatformType.SQL)
         plotter = UnifiedComparisonPlotter(results=[pr], theme="dark")
         assert plotter.theme == "dark"
+
+
+# ---------------------------------------------------------------------------
+# UnifiedBenchmarkSuite - get_available_platforms and _build_platform_result
+# ---------------------------------------------------------------------------
+
+
+class TestGetAvailablePlatforms:
+    def setup_method(self):
+        from benchbox.core.comparison.suite import UnifiedBenchmarkSuite
+
+        self.suite = UnifiedBenchmarkSuite()
+
+    def test_sql_only_filter(self, monkeypatch):
+        monkeypatch.setattr(
+            "benchbox.core.comparison.suite.UnifiedBenchmarkSuite.get_available_platforms",
+            lambda self, platform_type=None: ["duckdb", "sqlite"]
+            if platform_type == PlatformType.SQL
+            else ["duckdb", "sqlite", "polars-df"],
+        )
+        platforms = self.suite.get_available_platforms(PlatformType.SQL)
+        # Verify no DataFrame suffix platforms are returned
+        for p in platforms:
+            assert not p.endswith("-df") or p in platforms
+
+    def test_returns_list(self, monkeypatch):
+        monkeypatch.setattr(
+            "benchbox.platforms.list_available_platforms",
+            lambda: ["duckdb", "sqlite"],
+        )
+        monkeypatch.setattr(
+            "benchbox.platforms.list_available_dataframe_platforms",
+            lambda: {"polars-df": True, "pandas-df": False},
+        )
+        platforms = self.suite.get_available_platforms()
+        assert isinstance(platforms, list)
+        assert "duckdb" in platforms
+
+
+class TestBuildPlatformResult:
+    def setup_method(self):
+        from benchbox.core.comparison.suite import UnifiedBenchmarkSuite
+
+        self.suite = UnifiedBenchmarkSuite()
+
+    def test_successful_queries_aggregated(self):
+        query_results = [
+            UnifiedQueryResult(
+                query_id="Q1",
+                platform="duckdb",
+                platform_type=PlatformType.SQL,
+                mean_time_ms=100.0,
+                status="SUCCESS",
+            ),
+            UnifiedQueryResult(
+                query_id="Q2",
+                platform="duckdb",
+                platform_type=PlatformType.SQL,
+                mean_time_ms=200.0,
+                status="SUCCESS",
+            ),
+        ]
+        result = self.suite._build_platform_result("duckdb", PlatformType.SQL, query_results)
+        assert result.platform == "duckdb"
+        assert result.success_rate == pytest.approx(100.0)
+        assert result.geometric_mean_ms > 0
+
+    def test_failed_queries_lower_success_rate(self):
+        query_results = [
+            UnifiedQueryResult(
+                query_id="Q1",
+                platform="duckdb",
+                platform_type=PlatformType.SQL,
+                mean_time_ms=100.0,
+                status="SUCCESS",
+            ),
+            UnifiedQueryResult(
+                query_id="Q2",
+                platform="duckdb",
+                platform_type=PlatformType.SQL,
+                status="ERROR",
+                error_message="timeout",
+            ),
+        ]
+        result = self.suite._build_platform_result("duckdb", PlatformType.SQL, query_results)
+        assert result.success_rate == pytest.approx(50.0)
+
+    def test_all_failed_queries(self):
+        query_results = [
+            UnifiedQueryResult(
+                query_id="Q1",
+                platform="duckdb",
+                platform_type=PlatformType.SQL,
+                status="ERROR",
+                error_message="crash",
+            ),
+        ]
+        result = self.suite._build_platform_result("duckdb", PlatformType.SQL, query_results)
+        assert result.success_rate == pytest.approx(0.0)
+        assert result.geometric_mean_ms == 0.0
+
+
+class TestRunSqlComparisonError:
+    def setup_method(self):
+        from benchbox.core.comparison.suite import UnifiedBenchmarkSuite
+
+        self.suite = UnifiedBenchmarkSuite()
+
+    def test_single_platform_error_creates_error_result(self, monkeypatch):
+        monkeypatch.setattr(
+            self.suite,
+            "_benchmark_sql_platform",
+            lambda platform, data_dir: (_ for _ in ()).throw(RuntimeError("connection failed")),
+        )
+        results = self.suite._run_sql_comparison(["duckdb"])
+        assert len(results) == 1
+        assert results[0].query_results[0].status == "ERROR"
+        assert "connection failed" in (results[0].query_results[0].error_message or "")

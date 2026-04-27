@@ -62,7 +62,7 @@ def _should_acquire_test_lock(config: pytest.Config) -> bool:
     when BENCHBOX_SKIP_TEST_LOCK is set in the environment.
     """
     if hasattr(config, "workerinput"):
-        return False  # xdist worker — the controller holds the lock on our behalf
+        return False  # xdist worker - the controller holds the lock on our behalf
     if os.environ.get("BENCHBOX_SKIP_TEST_LOCK"):
         return False  # explicit opt-out (e.g. intentional concurrent debug runs)
     try:
@@ -70,7 +70,7 @@ def _should_acquire_test_lock(config: pytest.Config) -> bool:
     except AttributeError:
         return False  # xdist not installed or numprocesses not yet registered
     # Lock for '-n auto' (string) or any explicit positive worker count.
-    # bool(0) is False so n != 0 would be redundant — bool(n) is sufficient.
+    # bool(0) is False so n != 0 would be redundant - bool(n) is sufficient.
     # Assumes numprocesses is None, 0, "auto", or a positive int (pytest-xdist contract).
     return bool(n)
 
@@ -111,7 +111,7 @@ def pytest_configure(config) -> None:
     # Root cause: xdist calls setproctitle() twice per test (running/idle)
     # via xdist.remote.worker_title().  At ~200 calls/second this triggers
     # macOS launchservicesd to rebuild its process registry continuously,
-    # consuming 200%+ CPU and ~900 MB RSS — the actual root cause of
+    # consuming 200%+ CPU and ~900 MB RSS - the actual root cause of
     # the macOS beachball during parallel test runs.
     #
     # In xdist workers, remote.py runs in an execnet __channelexec__
@@ -136,7 +136,7 @@ def pytest_configure(config) -> None:
 
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except (BlockingIOError, OSError):
-            # Another parallel run holds the lock — fail fast with a clear message.
+            # Another parallel run holds the lock - fail fast with a clear message.
             try:
                 holder_info = _TEST_LOCK_PATH.read_text().strip()
             except OSError:
@@ -209,6 +209,46 @@ def pytest_unconfigure(config) -> None:
         _test_lock_fd = None
 
 
+def _warn_on_unreasoned_skip_markers(items) -> None:
+    """Warn (don't fail) on skip/skipif/xfail markers missing a ``reason=``.
+
+    Every suppressed test should explain WHY in writing so it can be
+    triaged later. Called from ``pytest_collection_finish`` (read-only -
+    does NOT rewrite items; that would violate the no-collection-time-
+    marker-rewrite policy in tests/unit/test_marker_strategy.py). Set
+    ``BENCHBOX_SKIP_REASON_CHECK=1`` to bypass.
+    """
+    if os.environ.get("BENCHBOX_SKIP_REASON_CHECK"):
+        return
+    offenders: list[str] = []
+    for item in items:
+        for marker in item.iter_markers():
+            if marker.name not in {"skip", "skipif", "xfail"}:
+                continue
+            # pytest stores reason as kwarg OR (for skip/xfail) as first positional
+            if marker.kwargs.get("reason"):
+                continue
+            if marker.name in {"skip", "xfail"} and marker.args and isinstance(marker.args[0], str):
+                continue
+            offenders.append(f"{item.nodeid}: @pytest.mark.{marker.name} without reason=")
+    if offenders:
+        import warnings
+
+        for line in offenders[:20]:  # cap to keep output readable
+            warnings.warn(line, UserWarning, stacklevel=0)
+        if len(offenders) > 20:
+            warnings.warn(
+                f"... and {len(offenders) - 20} more skip/xfail markers without reason=",
+                UserWarning,
+                stacklevel=0,
+            )
+
+
+def pytest_collection_finish(session) -> None:
+    """Run read-only marker hygiene checks after collection completes."""
+    _warn_on_unreasoned_skip_markers(session.items)
+
+
 def pytest_runtest_setup(item) -> None:
     """Set up test-specific configurations based on markers."""
     # Set timeouts based on speed markers
@@ -278,13 +318,20 @@ def pytest_sessionfinish(session, exitstatus) -> None:
                 print(f"Warning: Could not remove {db_file}: {e}")
 
 
-def pytest_terminal_summary(terminalreporter, exitstatus) -> None:
+def pytest_terminal_summary(terminalreporter, config, exitstatus) -> None:
     """Emit a WARN (non-failing) when total coverage is below 80%.
 
     This reads the `.coverage` data file and computes overall coverage using
     the coverage.py API to avoid relying on pytest-cov's fail-under behavior.
     It does not fail the test run; it only prints a prominent warning line.
+
+    Only runs when pytest-cov is active (i.e. --cov was passed), so stale
+    .coverage files from prior runs don't produce misleading warnings.
     """
+    # Skip when pytest-cov wasn't active in this session
+    if not config.pluginmanager.hasplugin("_cov"):
+        return
+
     try:
         import io
 

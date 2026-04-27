@@ -27,10 +27,15 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import logging
+import tempfile
 from pathlib import Path
 from typing import Any
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
+from benchbox.utils.file_format import DATA_FORMAT_EXTENSIONS, detect_compression, strip_compression_suffix
+
+logger = logging.getLogger(__name__)
 
 
 class SparkDataLoadMixin:
@@ -41,6 +46,131 @@ class SparkDataLoadMixin:
         - self.log_verbose(msg)
         - self._normalize_and_validate_file_paths(file_paths)
     """
+
+    # Codecs that can be passed as the CSV reader's ``compression`` option.
+    # Spark 4's HadoopCompressionCodec enum only accepts these six; zstd is
+    # NOT in the enum and causes CODEC_NOT_AVAILABLE.  Apache Spark handles
+    # zstd via Hadoop auto-detection from the .zst extension instead.
+    # Subclasses whose engine accepts additional codecs (e.g. LakeSail/Sail)
+    # should override this set.
+    _csv_compression_codecs: frozenset[str] = frozenset({"gzip", "bzip2", "lz4", "snappy", "deflate"})
+
+    # When True, the CSV reader only accepts files with a ``.csv`` extension.
+    # Files with other extensions (e.g. ``.dat``, ``.tbl``) are symlinked to
+    # a temporary ``.csv`` (or ``.csv.zst``, etc.) path before loading.
+    # LakeSail/Sail requires this because its file scanner filters by extension.
+    _requires_csv_extension: bool = False
+
+    # When True, df.cache() / df.unpersist() work and the per-file row count
+    # is obtained from df.count() before writing (single scan via cache).
+    # Set False for Spark Connect platforms (e.g. LakeSail) where Persist is a
+    # no-op - without a working cache, count() + insertInto() each trigger a
+    # full parquet scan, doubling I/O and stalling loads for large tables.
+    # When False, all chunks are written first (single source scan per chunk),
+    # then the loaded-row delta is measured with one SQL COUNT(*) before/after
+    # the table load to avoid cumulative recounts.
+    _df_caching_supported: bool = True
+
+    # Compression-type → file extension mapping for symlink renaming.
+    _COMPRESSION_EXT: dict[str, str] = {
+        "zstd": ".zst",
+        "gzip": ".gz",
+        "bzip2": ".bz2",
+        "xz": ".xz",
+        "lz4": ".lz4",
+        "snappy": ".snappy",
+        "deflate": ".deflate",
+    }
+
+    @staticmethod
+    def _row_count(spark: Any, table_name: str) -> int:
+        """Return the current row count for a Spark table via SQL COUNT(*)."""
+        safe_name = table_name.replace("`", "``")
+        rows = spark.sql(f"SELECT COUNT(*) FROM `{safe_name}`").collect()
+        return rows[0][0] if rows else 0
+
+    @classmethod
+    def _safe_row_count(cls, spark: Any, table_name: str) -> int:
+        """Return the current row count for a pre-load probe, or 0 if the table is inaccessible.
+
+        Used only by the no-cache load path's before-load probe. A missing table
+        before the first append should be treated as empty, but post-load count
+        failures should still fail the table load.
+        """
+        try:
+            return cls._row_count(spark, table_name)
+        except Exception as exc:
+            logger.debug("Row count unavailable for table '%s'; assuming 0: %s", table_name, exc)
+            return 0
+
+    @classmethod
+    def _csv_extension_suffix(cls, compression: str | None) -> str:
+        """Return the filename suffix needed for a compressed CSV symlink."""
+        if compression is None:
+            return ""
+
+        try:
+            return cls._COMPRESSION_EXT[compression]
+        except KeyError as exc:
+            raise ValueError(f"Unsupported CSV compression type '{compression}' for Spark compatibility path") from exc
+
+    def _csv_compat_path(self, file_path: Path, temp_dir: Path | None, *, compression: str | None = None) -> Path:
+        """Return a path the CSV reader can open.
+
+        When ``_requires_csv_extension`` is True, files whose data-format
+        extension is not ``.csv`` (e.g. ``.dat``, ``.tbl``) are symlinked
+        into *temp_dir* with a ``.csv`` (+ compression) extension.
+        The original file is left untouched.
+        """
+        if not self._requires_csv_extension:
+            return file_path
+
+        if temp_dir is None:
+            raise ValueError("temp_dir is required when CSV extension compatibility is enabled")
+
+        compression = detect_compression(file_path) if compression is None else compression
+        base_path = strip_compression_suffix(file_path)
+
+        if base_path.suffix.lower() == ".csv":
+            return file_path
+
+        # Build a .csv name preserving the table stem and any trailing chunk
+        # suffixes (e.g. ".1" in customer.tbl.1.zst), but replacing the data
+        # format extension (.tbl, .dat) with .csv.
+        #   customer.tbl.zst   → customer.csv.zst
+        #   customer.tbl.1.zst → customer.1.csv.zst   (unique per chunk)
+        #   orders.dat.xz      → orders.csv.xz
+        p = base_path
+        trailing: list[str] = []
+        while p.suffix and p.suffix.lower() not in DATA_FORMAT_EXTENSIONS:
+            trailing.insert(0, p.suffix)
+            p = p.with_suffix("")
+        new_name = p.stem + "".join(trailing) + ".csv" + self._csv_extension_suffix(compression)
+
+        link = temp_dir / new_name
+        resolved_path = file_path.resolve()
+        # Chunked files get unique symlink names because trailing chunk suffixes
+        # (e.g. ".1" in customer.tbl.1.zst) are preserved in the symlink name.
+        # If a link already exists but points elsewhere, warn - loading would
+        # silently use stale data.
+        if link.exists() or link.is_symlink():
+            existing_target = None
+            if link.is_symlink():
+                try:
+                    existing_target = link.resolve()
+                except FileNotFoundError:
+                    existing_target = None
+
+            if not link.is_symlink() or existing_target != resolved_path:
+                logger.warning(
+                    "Symlink collision: %s already exists%s, expected %s",
+                    link,
+                    f" -> {existing_target}" if existing_target is not None else "",
+                    resolved_path,
+                )
+        else:
+            link.symlink_to(resolved_path)
+        return link
 
     @staticmethod
     def _detect_spark_table_format(path: Path) -> str | None:
@@ -74,7 +204,7 @@ class SparkDataLoadMixin:
         Returns:
             Tuple of (table_stats, total_time, per_table_timings).
         """
-        from benchbox.platforms.base.data_loading import DataSourceResolver
+        from benchbox.platforms.base.data_loading import DataSourceResolver, resolve_csv_dialect
         from benchbox.platforms.base.utils import detect_file_format
 
         start_time = mono_time()
@@ -85,9 +215,10 @@ class SparkDataLoadMixin:
 
         try:
             resolver = DataSourceResolver(
-                platform_name=getattr(self, "platform_name", None),
-                table_mode=getattr(self, "table_mode", "native"),
-                platform_config=getattr(self, "__dict__", None),
+                platform_name=self.platform_name,
+                table_mode=self.table_mode,
+                platform_config=self.platform_config,
+                requested_format=self.requested_table_format,
             )
             data_source = resolver.resolve(benchmark, Path(data_dir))
 
@@ -98,67 +229,116 @@ class SparkDataLoadMixin:
 
             self.log_verbose(f"Data source type: {data_source.source_type}")
 
-            for table_name, file_paths in data_source.tables.items():
-                valid_files = self._normalize_and_validate_file_paths(file_paths)
+            # Temp dir for CSV-extension symlinks (LakeSail); created after
+            # resolver validation so it's always cleaned up by the context manager.
+            with tempfile.TemporaryDirectory(prefix="benchbox_csv_") as csv_tmp_name:
+                csv_tmp_dir = Path(csv_tmp_name)
 
-                if not valid_files:
-                    self.logger.warning(f"Skipping {table_name} - no valid data files")
-                    table_stats[table_name.lower()] = 0
-                    continue
+                for table_name, file_paths in data_source.tables.items():
+                    valid_files = self._normalize_and_validate_file_paths(file_paths)
 
-                chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
-                self.log_verbose(f"Loading data for table: {table_name}{chunk_info}")
+                    if not valid_files:
+                        self.logger.warning(f"Skipping {table_name} - no valid data files")
+                        table_stats[table_name.lower()] = 0
+                        continue
 
-                try:
-                    load_start = mono_time()
-                    table_name_lower = table_name.lower()
-                    total_rows_loaded = 0
+                    chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
+                    self.log_verbose(f"Loading data for table: {table_name}{chunk_info}")
 
-                    table_schema = self._get_table_schema(spark, table_name_lower)
-                    format_info = detect_file_format(valid_files)
+                    try:
+                        load_start = mono_time()
+                        table_name_lower = table_name.lower()
+                        total_rows_loaded = 0
+                        table_start_row_count = (
+                            self._safe_row_count(spark, table_name_lower) if not self._df_caching_supported else 0
+                        )
 
-                    for raw_path in valid_files:
-                        file_path = Path(raw_path)
-                        table_format = self._detect_spark_table_format(file_path)
+                        table_schema = self._get_table_schema(spark, table_name_lower)
+                        format_info = detect_file_format(valid_files)
 
-                        if table_format is not None:
-                            df = spark.read.format(table_format).load(str(file_path))
-                        elif format_info.format_type == "parquet":
-                            df = spark.read.parquet(str(file_path))
-                        else:
-                            df = (
-                                spark.read.option("header", "false")
-                                .option("delimiter", format_info.delimiter)
-                                .option("inferSchema", "false")
-                                .csv(str(file_path))
-                            )
+                        for file_idx, raw_path in enumerate(valid_files, start=1):
+                            file_path = Path(raw_path).resolve()
+                            table_format = self._detect_spark_table_format(file_path)
+
+                            if table_format is not None:
+                                df = spark.read.format(table_format).load(str(file_path))
+                            elif format_info.format_type == "parquet":
+                                df = spark.read.parquet(str(file_path))
+                            else:
+                                compression = detect_compression(file_path)
+                                # Engines that only accept .csv extensions (e.g.
+                                # LakeSail/Sail) get a symlink with the right name.
+                                csv_path = self._csv_compat_path(file_path, csv_tmp_dir, compression=compression)
+                                dialect = resolve_csv_dialect(data_source, table_name, file_path, benchmark)
+                                reader = (
+                                    spark.read.option("header", str(dialect.has_header).lower())
+                                    .option("delimiter", dialect.delimiter)
+                                    .option("inferSchema", "false")
+                                )
+                                if dialect.null_marker is not None:
+                                    reader = reader.option("nullValue", dialect.null_marker)
+                                # Tell the CSV reader to decompress - but only for
+                                # codecs it supports (see _csv_compression_codecs).
+                                # Unsupported codecs (e.g. zstd on Apache Spark)
+                                # are handled via Hadoop auto-detection from the
+                                # file extension instead.
+                                if compression is not None and compression in self._csv_compression_codecs:
+                                    reader = reader.option("compression", compression)
+                                df = reader.csv(str(csv_path))
+
+                                if table_schema:
+                                    existing_cols = [f.name for f in table_schema.fields]
+                                    # Rename all columns in one shot to produce a single
+                                    # flat WithColumnsRenamed protobuf node. The serial
+                                    # withColumnRenamed loop creates N nested nodes and
+                                    # hits LakeSail's protobuf recursion limit on wide tables.
+                                    new_names = [
+                                        existing_cols[i] if i < len(existing_cols) else df.columns[i]
+                                        for i in range(len(df.columns))
+                                    ]
+                                    df = df.toDF(*new_names)
 
                             if table_schema:
-                                existing_cols = [f.name for f in table_schema.fields]
-                                for i, col_name in enumerate(existing_cols):
-                                    if i < len(df.columns):
-                                        df = df.withColumnRenamed(df.columns[i], col_name)
+                                df = self._cast_dataframe_to_schema(df, table_schema)
 
-                        if table_schema:
-                            df = self._cast_dataframe_to_schema(df, table_schema)
+                            if self._df_caching_supported:
+                                # Cache lets count() and insertInto() share one scan.
+                                df.cache()
+                                row_count = df.count()
+                                df.write.mode("append").insertInto(table_name_lower)
+                                df.unpersist()
+                            else:
+                                # Platforms where df.cache() is a no-op (e.g. LakeSail/
+                                # Spark Connect): write the chunk and defer row counting
+                                # until every file has been appended.
+                                df.write.mode("append").insertInto(table_name_lower)
+                                self.log_verbose(f"Wrote chunk {file_idx}/{len(valid_files)} for {table_name_lower}")
+                                continue
+                            total_rows_loaded += row_count
 
-                        df.cache()
-                        row_count = df.count()
-                        df.write.mode("append").insertInto(table_name_lower)
-                        total_rows_loaded += row_count
-                        df.unpersist()
+                        if not self._df_caching_supported:
+                            table_end_row_count = self._row_count(spark, table_name_lower)
+                            row_delta = table_end_row_count - table_start_row_count
+                            if row_delta < 0:
+                                self.logger.warning(
+                                    "Negative row delta for %s (%d -> %d); reporting 0",
+                                    table_name_lower,
+                                    table_start_row_count,
+                                    table_end_row_count,
+                                )
+                            total_rows_loaded = max(0, row_delta)
 
-                    table_stats[table_name_lower] = total_rows_loaded
+                        table_stats[table_name_lower] = total_rows_loaded
 
-                    load_time = elapsed_seconds(load_start)
-                    per_table_timings[table_name_lower] = {"total_ms": load_time * 1000}
-                    self.logger.info(
-                        f"Loaded {total_rows_loaded:,} rows into {table_name_lower}{chunk_info} in {load_time:.2f}s"
-                    )
+                        load_time = elapsed_seconds(load_start)
+                        per_table_timings[table_name_lower] = {"total_ms": load_time * 1000}
+                        self.logger.info(
+                            f"Loaded {total_rows_loaded:,} rows into {table_name_lower}{chunk_info} in {load_time:.2f}s"
+                        )
 
-                except Exception as e:
-                    self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
-                    table_stats[table_name.lower()] = 0
+                    except Exception as e:
+                        self.logger.error(f"Failed to load {table_name}: {e}")
+                        table_stats[table_name.lower()] = 0
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
@@ -191,6 +371,11 @@ class SparkDataLoadMixin:
         Casts each column to the target data type and reorders columns
         to match the schema definition.
 
+        Uses a single select() with cast expressions to produce one flat
+        Project protobuf node. The serial withColumn approach creates N
+        nested WithColumns nodes and hits LakeSail's protobuf recursion
+        limit on wide tables.
+
         Args:
             df: PySpark DataFrame to cast.
             schema: Target StructType schema.
@@ -198,13 +383,16 @@ class SparkDataLoadMixin:
         Returns:
             DataFrame with columns cast and reordered.
         """
-        for field in schema.fields:
-            if field.name in df.columns:
-                df = df.withColumn(field.name, df[field.name].cast(field.dataType))
+        from pyspark.sql import functions as spark_funcs
 
-        ordered_columns = [field.name for field in schema.fields if field.name in df.columns]
-        if ordered_columns:
-            df = df.select(*ordered_columns)
+        df_cols = set(df.columns)
+        exprs = [
+            spark_funcs.col(field.name).cast(field.dataType).alias(field.name)
+            for field in schema.fields
+            if field.name in df_cols
+        ]
+        if exprs:
+            df = df.select(*exprs)
         return df
 
 
@@ -222,6 +410,11 @@ class SparkQueryExecutionMixin:
         - self._build_query_result_with_validation(...)
         - self._build_query_failure_result(query_id, start_time, exception)
     """
+
+    # When True, disable_cache also clears session caches before each query.
+    # Spark Connect backends like LakeSail do not implement ClearCache, so they
+    # override this flag to False and rely on session-level cache suppression.
+    _catalog_clear_cache_supported: bool = True
 
     def _execute_query_spark(
         self,
@@ -259,7 +452,7 @@ class SparkQueryExecutionMixin:
         spark = connection
 
         try:
-            if self.disable_cache:
+            if self.disable_cache and self._catalog_clear_cache_supported:
                 spark.catalog.clearCache()
 
             result_df = spark.sql(query)
@@ -308,3 +501,54 @@ class SparkQueryExecutionMixin:
 
         except Exception as e:
             return self._build_query_failure_result(query_id, start_time, e)
+
+    def _validate_data_integrity(
+        self, benchmark: Any, connection: Any, table_stats: dict[str, int]
+    ) -> tuple[str, dict[str, Any]]:
+        """Validate data integrity using SparkSession.sql() API.
+
+        Overrides the base class cursor-based implementation because
+        SparkSession doesn't implement the DB-API 2.0 cursor interface.
+        """
+        validation_details: dict[str, Any] = {}
+
+        try:
+            spark = connection
+            accessible_tables = []
+            inaccessible_tables = []
+
+            for table_name in table_stats:
+                try:
+                    safe_name = table_name.replace("`", "``")
+                    spark.sql(f"SELECT 1 FROM `{safe_name}` LIMIT 1").collect()
+                    accessible_tables.append(table_name)
+                except Exception as e:
+                    self.log_verbose(f"Table {table_name} inaccessible: {e}")
+                    inaccessible_tables.append(table_name)
+
+            if inaccessible_tables:
+                validation_details["inaccessible_tables"] = inaccessible_tables
+                validation_details["constraints_enabled"] = False
+                return "FAILED", validation_details
+            else:
+                validation_details["accessible_tables"] = accessible_tables
+                validation_details["constraints_enabled"] = True
+                return "PASSED", validation_details
+
+        except Exception as e:
+            validation_details["error"] = str(e)
+            return "FAILED", validation_details
+
+    def get_table_row_count(self, connection: Any, table: str) -> int:
+        """Get row count for a table using SparkSession.sql() API.
+
+        Overrides the base class cursor-based implementation because
+        SparkSession doesn't implement the DB-API 2.0 cursor interface.
+        """
+        try:
+            safe_name = table.replace("`", "``")
+            result = connection.sql(f"SELECT COUNT(*) FROM `{safe_name}`").collect()
+            return result[0][0] if result else 0
+        except Exception as e:
+            self.log_verbose(f"Could not get row count for {table}: {e}")
+            return 0

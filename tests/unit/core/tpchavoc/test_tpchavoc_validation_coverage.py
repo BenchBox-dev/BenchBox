@@ -129,3 +129,175 @@ def test_validation_report_no_performance_data_message() -> None:
     report.add_validation_result(3, 1, success=True)
 
     assert report.get_performance_summary() == {"message": "No performance data available"}
+
+
+# ---------------------------------------------------------------------------
+# TPCHavocBenchmark delegation to TPCHavocQueryManager
+# ---------------------------------------------------------------------------
+
+
+def _make_benchmark(tmp_path, monkeypatch):
+    """Create a TPCHavocBenchmark with a mocked query manager."""
+    from unittest.mock import MagicMock
+
+    from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
+
+    bench = TPCHavocBenchmark(scale_factor=0.01, output_dir=tmp_path)
+    mock_qm = MagicMock()
+    bench.query_manager = mock_qm
+    return bench, mock_qm
+
+
+def test_get_query_delegates_to_query_manager(tmp_path, monkeypatch) -> None:
+    bench, mock_qm = _make_benchmark(tmp_path, monkeypatch)
+    mock_qm.get_query.return_value = "SELECT 1"
+
+    result = bench.get_query(1)
+
+    mock_qm.get_query.assert_called_once_with(1, seed=None, scale_factor=pytest.approx(0.01))
+    assert result == "SELECT 1"
+
+
+def test_get_query_variant_delegates(tmp_path, monkeypatch) -> None:
+    bench, mock_qm = _make_benchmark(tmp_path, monkeypatch)
+    mock_qm.get_query_variant.return_value = "SELECT variant"
+
+    result = bench.get_query_variant(2, 3)
+
+    mock_qm.get_query_variant.assert_called_once_with(2, 3, None)
+    assert result == "SELECT variant"
+
+
+def test_get_all_variants_delegates(tmp_path, monkeypatch) -> None:
+    bench, mock_qm = _make_benchmark(tmp_path, monkeypatch)
+    mock_qm.get_all_variants.return_value = {1: "SELECT a", 2: "SELECT b"}
+
+    result = bench.get_all_variants(1)
+
+    assert result == {1: "SELECT a", 2: "SELECT b"}
+    mock_qm.get_all_variants.assert_called_once_with(1)
+
+
+def test_get_variant_description_delegates(tmp_path, monkeypatch) -> None:
+    bench, mock_qm = _make_benchmark(tmp_path, monkeypatch)
+    mock_qm.get_variant_description.return_value = "Uses window function"
+
+    result = bench.get_variant_description(5, 2)
+
+    assert result == "Uses window function"
+
+
+def test_get_implemented_queries_delegates(tmp_path, monkeypatch) -> None:
+    bench, mock_qm = _make_benchmark(tmp_path, monkeypatch)
+    mock_qm.get_implemented_queries.return_value = [1, 2, 3]
+
+    result = bench.get_implemented_queries()
+
+    assert result == [1, 2, 3]
+
+
+def test_get_all_variants_info_delegates(tmp_path, monkeypatch) -> None:
+    bench, mock_qm = _make_benchmark(tmp_path, monkeypatch)
+    mock_qm.get_all_variants_info.return_value = {1: {"sql": "..."}, 2: {"sql": "..."}}
+
+    result = bench.get_all_variants_info(3)
+
+    mock_qm.get_all_variants_info.assert_called_once_with(3)
+    assert 1 in result
+
+
+def test_validate_variant_equivalence_exact_path(tmp_path, monkeypatch) -> None:
+    bench, _ = _make_benchmark(tmp_path, monkeypatch)
+
+    from unittest.mock import MagicMock
+
+    mock_validator = MagicMock()
+    mock_validator.validate_results_exact.return_value = True
+    bench.validator = mock_validator
+
+    result = bench.validate_variant_equivalence(
+        query_id=5,
+        variant_id=1,
+        original_results=[(1,)],
+        variant_results=[(1,)],
+    )
+
+    assert result is True
+    mock_validator.validate_results_exact.assert_called_once()
+
+
+def test_validate_variant_equivalence_query1_path(tmp_path, monkeypatch) -> None:
+    bench, _ = _make_benchmark(tmp_path, monkeypatch)
+
+    from unittest.mock import MagicMock
+
+    mock_validator = MagicMock()
+    mock_validator.validate_query1_results.return_value = True
+    bench.validator = mock_validator
+
+    result = bench.validate_variant_equivalence(
+        query_id=1,
+        variant_id=2,
+        original_results=[(1,)],
+        variant_results=[(1,)],
+    )
+
+    assert result is True
+    mock_validator.validate_query1_results.assert_called_once()
+
+
+def test_validate_variant_equivalence_checksum_path(tmp_path, monkeypatch) -> None:
+    bench, _ = _make_benchmark(tmp_path, monkeypatch)
+
+    from unittest.mock import MagicMock
+
+    mock_validator = MagicMock()
+    mock_validator.validate_results_checksum.return_value = True
+    bench.validator = mock_validator
+
+    result = bench.validate_variant_equivalence(
+        query_id=3,
+        variant_id=1,
+        original_results=[(1,)],
+        variant_results=[(1,)],
+        use_checksum=True,
+    )
+
+    assert result is True
+    mock_validator.validate_results_checksum.assert_called_once()
+
+
+def test_get_benchmark_info_structure(tmp_path, monkeypatch) -> None:
+    bench, mock_qm = _make_benchmark(tmp_path, monkeypatch)
+    mock_qm.get_implemented_queries.return_value = [1, 6]
+    mock_qm.get_all_variants_info.return_value = {1: {"sql": "..."}}
+
+    info = bench.get_benchmark_info()
+
+    assert info["benchmark_name"] == "TPC-Havoc"
+    assert info["scale_factor"] == pytest.approx(0.01)
+    assert info["total_queries_with_variants"] == 2
+    assert info["variants_per_query"] == 10
+
+
+def test_export_variant_queries_creates_sql_files(tmp_path, monkeypatch) -> None:
+    bench, mock_qm = _make_benchmark(tmp_path, monkeypatch)
+    mock_qm.get_implemented_queries.return_value = [1]
+    mock_qm.get_all_variants.return_value = {1: "SELECT 1", 2: "SELECT 2"}
+    mock_qm.get_variant_description.return_value = "Uses CTE"
+
+    output_dir = tmp_path / "queries"
+    exported = bench.export_variant_queries(output_dir=output_dir, format="sql")
+
+    assert len(exported) == 2
+    assert (output_dir / "q1_variant_1.sql").exists()
+    assert (output_dir / "q1_variant_2.sql").exists()
+    content = (output_dir / "q1_variant_1.sql").read_text()
+    assert "TPC-Havoc Query 1 Variant 1" in content
+
+
+def test_export_variant_queries_invalid_format(tmp_path, monkeypatch) -> None:
+    bench, _ = _make_benchmark(tmp_path, monkeypatch)
+
+    with pytest.raises(ValueError, match="Unsupported"):
+        bench.export_variant_queries(output_dir=tmp_path, format="xml")

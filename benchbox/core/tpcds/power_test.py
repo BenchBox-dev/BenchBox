@@ -144,11 +144,9 @@ class TPCDSPowerTest:
             RuntimeError: If Power Test execution fails
         """
         start_time = mono_time()
-        start_time_str = datetime.now().isoformat()
-
         result = TPCDSPowerTestResult(
             config=self.config,
-            start_time=start_time_str,
+            start_time=datetime.now().isoformat(),
             end_time="",
             total_time=0.0,
             power_at_size=0.0,
@@ -159,240 +157,231 @@ class TPCDSPowerTest:
             errors=[],
         )
 
-        # Logging and setup
         if self.config.verbose:
             self.logger.info("Starting TPC-DS Power Test")
             self.logger.info(f"Scale factor: {self.config.scale_factor}")
             self.logger.info(f"Seed: {self.config.seed}")
 
-        # Determine available query IDs
-        try:
-            all_queries = self.benchmark.get_queries()
-            available_query_ids = [int(k) for k in all_queries if k.isdigit()]
-            available_query_ids.sort()
-            if not available_query_ids:
-                # Fallback if no digit-only query IDs found
-                available_query_ids = list(range(1, 100))
-        except Exception:
-            available_query_ids = list(range(1, 100))
-
+        available_query_ids = self._determine_available_query_ids()
         if self.config.verbose:
             self.logger.info(f"Found {len(available_query_ids)} queries to execute")
 
-        # Build the execution sequence
-        if self.config.query_subset:
-            # User specified specific queries - run in their order
-            queries_to_execute = [(int(qid) if str(qid).isdigit() else qid, None) for qid in self.config.query_subset]
-            if self.config.verbose:
-                self.logger.info(f"Using user-specified query subset: {[q[0] for q in queries_to_execute]}")
-            # Warn about compliance impact
-            self.logger.warning(
-                "⚠️  query_subset overrides standard query sequence - results may not be compliant. "
-                "Official TPC-DS benchmarks require running all queries in the specified order."
+        queries_to_execute = self._build_queries_to_execute(available_query_ids)
+
+        # Guard: zero queries cannot proceed - surface as explicit failure.
+        if not queries_to_execute:
+            error_msg = (
+                "TPC-DS power test generated zero queries - "
+                "dsqgen binary may be missing, the stream is empty, or "
+                "query generation failed for all queries. "
+                "Check dsqgen availability and benchmark configuration."
             )
-        elif hasattr(self, "_query_sequence"):
-            queries_to_execute = self._query_sequence
-            if self.config.verbose:
-                self.logger.info(f"Using custom query sequence: {queries_to_execute}")
-        else:
-            from benchbox.core.tpcds.streams import create_standard_streams
+            result.success = False
+            result.errors.append(error_msg)
+            result.end_time = datetime.now().isoformat()
+            result.total_time = elapsed_seconds(start_time)
+            self.logger.error(error_msg)
+            return result
 
-            # Get the query manager - handle both direct TPCDSBenchmark and TPCDS wrapper
-            query_manager = None
-            if hasattr(self.benchmark, "query_manager"):
-                query_manager = self.benchmark.query_manager
-            elif hasattr(self.benchmark, "_impl") and hasattr(self.benchmark._impl, "query_manager"):
-                query_manager = self.benchmark._impl.query_manager
-
-            if query_manager is None:
-                if self.config.verbose:
-                    self.logger.warning("No query_manager found, using sequential execution")
-                queries_to_execute = [(q, None) for q in available_query_ids]
-            else:
-                stream_id = getattr(self.config, "stream_id", 0)
-                stream_manager = create_standard_streams(
-                    query_manager=query_manager,
-                    num_streams=1,
-                    query_ids=available_query_ids if available_query_ids else None,
-                    query_range=(1, 99),  # Fallback range if query_ids is None
-                    base_seed=self.config.seed + stream_id,
-                )
-                streams = stream_manager.generate_streams()
-                stream_queries = streams.get(0, [])
-                queries_to_execute = []
-                for sq in stream_queries:
-                    if sq.variant is None:
-                        queries_to_execute.append((sq.query_id, None))
-                    else:
-                        queries_to_execute.append((sq.query_id, sq.variant))
-                if self.config.verbose:
-                    self.logger.info(f"Using TPC-DS stream {stream_id} with {len(queries_to_execute)} queries")
-                    self.logger.info(f"Query order (first 10): {queries_to_execute[:10]}")
-
-        # Preflight: validate that all queries can be generated for this stream/seed.
-        # Propagate preflight failures as RuntimeError to surface invalid configurations early.
+        # Preflight: surface invalid stream/seed configurations early.
         self._preflight_validate_generation(available_query_ids)
 
         try:
             connection = self.connection_factory()
-
-            # Calculate stream parameter seed ONCE for all queries in this stream
-            # Per TPC-DS specification: all queries in a stream use the same parameter seed
-            # This matches the stream manager's calculation: base_seed + stream_id + 1000
+            # Per TPC-DS spec: all queries in a stream share one parameter seed.
             stream_param_seed = self.config.seed + self.config.stream_id + 1000
-
             if self.config.verbose:
                 self.logger.info(f"Using parameter seed {stream_param_seed} for stream {self.config.stream_id}")
 
             for position, query_info in enumerate(queries_to_execute):
-                # Handle both old format (int) and new format (tuple)
-                if isinstance(query_info, tuple):
-                    query_id, variant = query_info
-                    query_display_id = f"{query_id}{variant}" if variant else str(query_id)
-                else:
-                    # Backward compatibility for old format
-                    query_id = query_info
-                    variant = None
-                    query_display_id = str(query_id)
-
-                query_start = mono_time()
-                query_result = {
-                    "query_id": query_display_id,
-                    "position": position + 1,
-                    "stream_id": self.config.stream_id,
-                    "execution_time_seconds": 0.0,
-                    "success": False,
-                    "error": None,
-                    "result_count": 0,
-                }
-
-                try:
-                    if self.config.verbose:
-                        self.logger.info(f"Executing Query {query_display_id} (position {position + 1})")
-
-                    # Call get_query with variant parameter if needed
-                    # Use stream_param_seed (same for all queries in this stream)
-                    if variant is not None:
-                        query_text = self.benchmark.get_query(
-                            query_id,
-                            seed=stream_param_seed,
-                            scale_factor=self.config.scale_factor,
-                            variant=variant,
-                            dialect=self.target_dialect,
-                        )
-                    else:
-                        query_text = self.benchmark.get_query(
-                            query_id,
-                            seed=stream_param_seed,
-                            scale_factor=self.config.scale_factor,
-                            dialect=self.target_dialect,
-                        )
-
-                    # Execute the actual query
-                    label = f"Position_{position + 1}_Query_{query_display_id}"
-                    try:
-                        # Set query context before execution for validation
-                        # NOTE: Answer files are only available for stream 0
-                        # Other streams use different seeds and will have different expected row counts
-                        if hasattr(connection, "set_query_context"):
-                            connection.set_query_context(query_display_id, stream_id=self.config.stream_id)
-
-                        cursor = connection.execute(query_text)
-                        # Fetch to complete execution in non-dry-run
-                        rows = cursor.fetchall() if hasattr(cursor, "fetchall") else []
-
-                        # Check if query failed validation
-                        if hasattr(cursor, "platform_result"):
-                            result_dict = cursor.platform_result
-                            if result_dict.get("status") == "FAILED":
-                                # Validation failed - treat as query failure
-                                error_msg = result_dict.get(
-                                    "error", result_dict.get("row_count_validation_error", "Query validation failed")
-                                )
-                                raise RuntimeError(error_msg)
-
-                        if hasattr(connection, "commit"):
-                            connection.commit()
-                    finally:
-                        # Record labeled SQL for preview
-                        self.captured_items.append((label, query_text))
-
-                    execution_time = elapsed_seconds(query_start)
-
-                    query_result.update(
-                        {
-                            "execution_time_seconds": execution_time,
-                            "success": True,
-                            "result_count": len(rows),
-                        }
-                    )
-
-                    result.queries_successful += 1
-
-                    if self.config.verbose:
-                        self.logger.info(f"Query {query_id} completed in {execution_time:.3f}s")
-
-                except Exception as e:
-                    execution_time = elapsed_seconds(query_start)
-                    query_result.update(
-                        {
-                            "execution_time_seconds": execution_time,
-                            "success": False,
-                            "error": str(e),
-                        }
-                    )
-
-                    # For TPC-DS, some queries may not be available, which is normal
-                    if "Template substitution error" not in str(e):
-                        result.errors.append(f"Query {query_id} failed: {e}")
-
-                    if self.config.verbose:
-                        self.logger.warning(f"Query {query_id} failed: {e}")
-
-                result.query_results.append(query_result)
-                result.queries_executed += 1
+                self._execute_one_query(position, query_info, connection, stream_param_seed, result)
 
             connection.close()
-
-            # Calculate Power@Size metric (geometric mean per TPC spec)
-            total_execution_time = elapsed_seconds(start_time)
-            exec_times = [
-                qr["execution_time_seconds"]
-                for qr in result.query_results
-                if qr.get("success", True) and qr.get("execution_time_seconds", 0) > 0
-            ]
-            if exec_times:
-                from benchbox.core.results.metrics import TPCMetricsCalculator
-
-                result.power_at_size = TPCMetricsCalculator.calculate_power_at_size(
-                    exec_times,
-                    self.config.scale_factor,
-                )
-
-            result.total_time = total_execution_time
-            result.end_time = datetime.now().isoformat()
-
-            # TPC-DS success criteria: at least 70% of queries must succeed
-            success_rate = result.queries_successful / max(result.queries_executed, 1)
-            result.success = success_rate >= 0.7
-
-            if self.config.verbose:
-                self.logger.info(f"Power Test completed in {total_execution_time:.3f}s")
-                self.logger.info(f"Successful queries: {result.queries_successful}/{result.queries_executed}")
-                self.logger.info(f"Success rate: {success_rate:.2%}")
-                self.logger.info(f"Power@Size: {result.power_at_size:.2f}")
-
+            self._finalize_power_metrics(result, start_time)
             return result
         except Exception as e:
             result.total_time = elapsed_seconds(start_time)
             result.end_time = datetime.now().isoformat()
             result.success = False
             result.errors.append(f"Power Test execution failed: {e}")
-
             if self.config.verbose:
                 self.logger.error(f"Power Test failed: {e}")
-
             return result
+
+    def _determine_available_query_ids(self) -> list[int]:
+        """Collect sorted digit-only query IDs from the benchmark, with 1-99 fallback."""
+        try:
+            all_queries = self.benchmark.get_queries()
+            available = sorted(int(k) for k in all_queries if k.isdigit())
+            return available if available else list(range(1, 100))
+        except Exception:
+            return list(range(1, 100))
+
+    def _build_queries_to_execute(self, available_query_ids: list[int]) -> list[tuple]:
+        """Return ordered (query_id, variant) pairs - subset / custom / stream-derived."""
+        if self.config.query_subset:
+            queries = [(int(qid) if str(qid).isdigit() else qid, None) for qid in self.config.query_subset]
+            if self.config.verbose:
+                self.logger.info(f"Using user-specified query subset: {[q[0] for q in queries]}")
+            self.logger.warning(
+                "⚠️  query_subset overrides standard query sequence - results may not be compliant. "
+                "Official TPC-DS benchmarks require running all queries in the specified order."
+            )
+            return queries
+
+        if hasattr(self, "_query_sequence"):
+            if self.config.verbose:
+                self.logger.info(f"Using custom query sequence: {self._query_sequence}")
+            return self._query_sequence
+
+        query_manager = self._resolve_query_manager()
+        if query_manager is None:
+            if self.config.verbose:
+                self.logger.warning("No query_manager found, using sequential execution")
+            return [(q, None) for q in available_query_ids]
+
+        from benchbox.core.tpcds.streams import create_standard_streams
+
+        stream_id = getattr(self.config, "stream_id", 0)
+        stream_manager = create_standard_streams(
+            query_manager=query_manager,
+            num_streams=1,
+            query_ids=available_query_ids or None,
+            query_range=(1, 99),
+            base_seed=self.config.seed + stream_id,
+        )
+        streams = stream_manager.generate_streams()
+        stream_queries = streams.get(0, [])
+        queries = [(sq.query_id, sq.variant) for sq in stream_queries]
+        if self.config.verbose:
+            self.logger.info(f"Using TPC-DS stream {stream_id} with {len(queries)} queries")
+            self.logger.info(f"Query order (first 10): {queries[:10]}")
+        return queries
+
+    def _resolve_query_manager(self) -> Any:
+        """Return the benchmark's query_manager, handling TPCDS wrapper indirection."""
+        if hasattr(self.benchmark, "query_manager"):
+            return self.benchmark.query_manager
+        impl = getattr(self.benchmark, "_impl", None)
+        if impl is not None and hasattr(impl, "query_manager"):
+            return impl.query_manager
+        return None
+
+    def _execute_one_query(
+        self,
+        position: int,
+        query_info: Any,
+        connection: Any,
+        stream_param_seed: int,
+        result: TPCDSPowerTestResult,
+    ) -> None:
+        """Generate, execute, and record a single query's result into ``result``."""
+        if isinstance(query_info, tuple):
+            query_id, variant = query_info
+            query_display_id = f"{query_id}{variant}" if variant else str(query_id)
+        else:
+            query_id = query_info
+            variant = None
+            query_display_id = str(query_id)
+
+        query_start = mono_time()
+        query_result: dict[str, Any] = {
+            "query_id": query_display_id,
+            "position": position + 1,
+            "stream_id": self.config.stream_id,
+            "execution_time_seconds": 0.0,
+            "success": False,
+            "error": None,
+            "result_count": 0,
+        }
+
+        try:
+            if self.config.verbose:
+                self.logger.info(f"Executing Query {query_display_id} (position {position + 1})")
+
+            get_query_kwargs: dict[str, Any] = {
+                "seed": stream_param_seed,
+                "scale_factor": self.config.scale_factor,
+                "dialect": self.target_dialect,
+            }
+            if variant is not None:
+                get_query_kwargs["variant"] = variant
+            query_text = self.benchmark.get_query(query_id, **get_query_kwargs)
+
+            label = f"Position_{position + 1}_Query_{query_display_id}"
+            try:
+                # Answer files are only available for stream 0 (other streams use different seeds).
+                if hasattr(connection, "set_query_context"):
+                    connection.set_query_context(query_display_id, stream_id=self.config.stream_id)
+                cursor = connection.execute(query_text)
+                rows = cursor.fetchall() if hasattr(cursor, "fetchall") else []
+
+                if hasattr(cursor, "platform_result"):
+                    result_dict = cursor.platform_result
+                    if result_dict.get("status") == "FAILED":
+                        error_msg = result_dict.get(
+                            "error", result_dict.get("row_count_validation_error", "Query validation failed")
+                        )
+                        raise RuntimeError(error_msg)
+
+                if hasattr(connection, "commit"):
+                    connection.commit()
+            finally:
+                self.captured_items.append((label, query_text))
+
+            execution_time = elapsed_seconds(query_start)
+            query_result.update(
+                {
+                    "execution_time_seconds": execution_time,
+                    "success": True,
+                    "result_count": len(rows),
+                }
+            )
+            result.queries_successful += 1
+            if self.config.verbose:
+                self.logger.info(f"Query {query_id} completed in {execution_time:.3f}s")
+
+        except Exception as e:
+            execution_time = elapsed_seconds(query_start)
+            query_result.update(
+                {
+                    "execution_time_seconds": execution_time,
+                    "success": False,
+                    "error": str(e),
+                }
+            )
+            # Template-substitution errors are expected when a variant isn't in this dsqgen build.
+            if "Template substitution error" not in str(e):
+                result.errors.append(f"Query {query_id} failed: {e}")
+            if self.config.verbose:
+                self.logger.warning(f"Query {query_id} failed: {e}")
+
+        result.query_results.append(query_result)
+        result.queries_executed += 1
+
+    def _finalize_power_metrics(self, result: TPCDSPowerTestResult, start_time: float) -> None:
+        """Compute Power@Size, total time, success flag - TPC-DS requires >=70% query success."""
+        total_execution_time = elapsed_seconds(start_time)
+        exec_times = [
+            qr["execution_time_seconds"]
+            for qr in result.query_results
+            if qr.get("success", True) and qr.get("execution_time_seconds", 0) > 0
+        ]
+        if exec_times:
+            from benchbox.core.results.metrics import TPCMetricsCalculator
+
+            result.power_at_size = TPCMetricsCalculator.calculate_power_at_size(exec_times, self.config.scale_factor)
+
+        result.total_time = total_execution_time
+        result.end_time = datetime.now().isoformat()
+        success_rate = result.queries_successful / max(result.queries_executed, 1)
+        result.success = success_rate >= 0.7
+
+        if self.config.verbose:
+            self.logger.info(f"Power Test completed in {total_execution_time:.3f}s")
+            self.logger.info(f"Successful queries: {result.queries_successful}/{result.queries_executed}")
+            self.logger.info(f"Success rate: {success_rate:.2%}")
+            self.logger.info(f"Power@Size: {result.power_at_size:.2f}")
 
     def _build_query_sequence(self, available_query_ids: list[int]) -> list[tuple]:
         """Build the power test query sequence including variants when available."""
@@ -699,7 +688,7 @@ class TPCDSPowerTest:
 
         result_dict["query_results"] = query_results_dict
 
-        with open(output_file, "w") as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             json.dump(result_dict, f, indent=2)
 
     def compare_results(self, result1: TPCDSPowerTestResult, result2: TPCDSPowerTestResult) -> dict[str, Any]:

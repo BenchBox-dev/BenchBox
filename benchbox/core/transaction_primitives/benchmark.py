@@ -9,21 +9,15 @@ This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Tr
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import datetime
+import shutil
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import Any, Optional, Union
 
-from benchbox.utils.clock import elapsed_seconds, mono_time
-
-if TYPE_CHECKING:
-    from cloudpathlib import CloudPath
-
-    from benchbox.utils.cloud_storage import DatabricksPath
-
-from benchbox.base import BaseBenchmark
 from benchbox.core.connection import DatabaseConnection
-from benchbox.core.operations import OperationExecutor
 from benchbox.core.primitives_benchmark_utils import (
     build_tpch_staging_tables_sql,
     quote_identifier,
@@ -32,14 +26,41 @@ from benchbox.core.primitives_benchmark_utils import (
 from benchbox.core.transaction_primitives.generator import TransactionPrimitivesDataGenerator
 from benchbox.core.transaction_primitives.operations import TransactionOperationsManager
 from benchbox.core.transaction_primitives.schema import STAGING_TABLES, get_all_staging_tables_sql, get_create_table_sql
-from benchbox.utils.cloud_storage import create_path_handler
+from benchbox.core.transactional.benchmark_base import TransactionalBenchmarkBase
+from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
-# DataFrame support - lazy import to avoid circular dependencies
-_dataframe_operations_module = None
 
-# Type alias for paths that could be local or cloud
-PathLike = Union[Path, "CloudPath", "DatabricksPath"]
+def _pk_lock_bypass_required(dialect: str) -> bool:
+    """Return True if PK-based lock DDL should be bypassed for this platform.
+
+    Consults the sql_compat registry (REGISTRY.resolve) for the platform decision.
+    Every transaction_primitives-capable platform must have a registered rule in
+    benchbox/sql_compat/rules/schema_emit/pk_capability_txn.py.
+
+    Args:
+        dialect: Platform dialect string (e.g. "starrocks", "snowflake").
+    """
+    import benchbox.sql_compat.rules.schema_emit.pk_capability_txn  # noqa: F401
+    from benchbox.sql_compat.actions import CompatAction
+    from benchbox.sql_compat.context import CompatibilityContext, Phase
+    from benchbox.sql_compat.registry import REGISTRY
+
+    ctx = CompatibilityContext(
+        platform=dialect.lower(),
+        platform_version=None,
+        benchmark="transaction_primitives",
+        query_id=None,
+        phase=Phase.SCHEMA_EMIT,
+        mode="sql",
+        dialect=dialect,
+    )
+    registry_decision = REGISTRY.resolve(ctx)
+
+    if registry_decision is not None:
+        return registry_decision.action != CompatAction.NATIVE
+    # No rule registered → platform enforces PK natively (e.g., duckdb, sqlite, postgres).
+    return False
 
 
 @dataclass
@@ -58,6 +79,8 @@ class OperationResult:
         cleanup_success: Whether cleanup succeeded
         error: Error message if operation failed
         cleanup_warning: Warning message for cleanup failures
+        status: Explicit status string ("SUCCESS", "FAILED", "SKIPPED"); derived from success if None
+        skip_reason: Human-readable explanation when status is "SKIPPED"; distinct from error
     """
 
     operation_id: str
@@ -71,9 +94,11 @@ class OperationResult:
     cleanup_success: bool
     error: Optional[str] = None
     cleanup_warning: Optional[str] = None
+    status: Optional[str] = None
+    skip_reason: Optional[str] = None
 
 
-class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
+class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
     """Transaction Primitives benchmark implementation.
 
     Tests database transaction semantics and overhead (COMMIT, ROLLBACK, savepoints,
@@ -89,6 +114,9 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         operations_manager: Operation manager
         data_generator: Data generator
     """
+
+    _benchmark_label = "Transaction Primitives"
+    _staging_tables = STAGING_TABLES
 
     def __init__(
         self,
@@ -127,96 +155,9 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         # Data files mapping
         self.tables: dict[str, Path] = {}
 
-    def get_data_source_benchmark(self) -> Optional[str]:
-        """Transaction Primitives benchmark shares TPC-H data.
-
-        Returns:
-            "tpch" to indicate data sharing
-        """
-        return "tpch"
-
-    @property
-    def output_dir(self) -> PathLike:
-        """Get the output directory.
-
-        Returns:
-            Output directory path
-        """
-        return self._output_dir
-
-    @output_dir.setter
-    def output_dir(self, value: Union[str, Path]) -> None:
-        """Set the output directory and update data generator.
-
-        Args:
-            value: New output directory path
-        """
-        self._output_dir = create_path_handler(value)
-        # Configure data generator with new path
-        if hasattr(self, "data_generator"):
-            self.data_generator.output_dir = self._output_dir
-            # Also update the underlying TPC-H generator
-            if hasattr(self.data_generator, "tpch_generator"):
-                self.data_generator.tpch_generator.output_dir = self._output_dir
-
-    def generate_data(self, tables: Optional[list[str]] = None) -> list[Union[str, Path]]:
-        """Generate Transaction Primitives data.
-
-        This generates/reuses TPC-H base data. Staging tables are created
-        during benchmark setup via SQL.
-
-        Args:
-            tables: Optional list of tables to generate. If None, generates all.
-
-        Returns:
-            List of paths to generated data files
-        """
-        self.log_verbose(f"Generating Transaction Primitives data at scale factor {self.scale_factor}...")
-
-        # Generate/reuse TPC-H base data
-        self.tables = self.data_generator.generate()
-
-        self.log_verbose(f"Base TPC-H data available: {len(self.tables)} tables")
-
-        return list(self.tables.values())
-
-    def ensure_auxiliary_data_files(self) -> None:
-        """Ensure auxiliary data files (bulk load test files) exist.
-
-        This is called by the runner when reusing data from manifest to ensure
-        that bulk load test files are present even if they weren't generated
-        during the original data generation.
-
-        Uses file locking to prevent concurrent generation conflicts.
-        """
-        self.log_verbose("Checking for auxiliary data files (bulk load files)...")
-
-        # Check if bulk load files exist, regenerate if missing
-        bulk_files_exist = self.data_generator.check_bulk_load_files_exist()
-
-        if not bulk_files_exist:
-            self.log_verbose("Bulk load files missing - generating now...")
-
-            # Acquire lock to prevent concurrent generation
-            if self.data_generator._acquire_bulk_load_lock(timeout=300):
-                try:
-                    # Double-check after acquiring lock
-                    if not self.data_generator.check_bulk_load_files_exist():
-                        bulk_files = self.data_generator.generate_bulk_load_files()
-                        self.log_verbose(f"✅ Generated {len(bulk_files)} bulk load files")
-                    else:
-                        self.log_verbose("✅ Files generated by another process")
-                except Exception as e:
-                    # Log warning but don't fail - some bulk load tests might not work
-                    self.log_verbose(f"⚠️ Warning: Failed to generate bulk load files: {e}")
-                finally:
-                    self.data_generator._release_bulk_load_lock()
-            else:
-                self.log_verbose("⚠️ Warning: Could not acquire lock for file generation (timeout)")
-        else:
-            self.log_verbose("✅ Bulk load files already exist")
-
-    def _acquire_setup_lock(self, connection: DatabaseConnection, timeout_seconds: int = 300) -> bool:
+    def _acquire_setup_lock(
+        self, connection: DatabaseConnection, timeout_seconds: int = 300, dialect: str = "standard"
+    ) -> bool:
         """Acquire an exclusive lock for staging table setup to prevent concurrent populations.
 
         Uses a dedicated lock table to prevent multiple processes from simultaneously
@@ -234,6 +175,9 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             Lock is automatically released on connection close/crash.
         """
         import time
+
+        if _pk_lock_bypass_required(dialect):
+            return True
 
         # Create lock table if it doesn't exist (atomic operation)
         try:
@@ -293,12 +237,15 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
 
         return False
 
-    def _release_setup_lock(self, connection: DatabaseConnection) -> None:
+    def _release_setup_lock(self, connection: DatabaseConnection, dialect: str = "standard") -> None:
         """Release the staging table setup lock.
 
         Args:
             connection: Database connection
+            dialect: SQL dialect (e.g. 'datafusion', 'clickhouse', 'standard')
         """
+        if _pk_lock_bypass_required(dialect):
+            return
         try:
             lock_name = "staging_table_setup"
             # Escape lock name for DELETE query
@@ -373,7 +320,7 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         connection.execute(populate_sql)
         self.log_verbose(f"{staging_table} populated successfully")
 
-    def setup(self, connection: DatabaseConnection, force: bool = False) -> dict[str, Any]:
+    def setup(self, connection: DatabaseConnection, force: bool = False, dialect: str = "standard") -> dict[str, Any]:
         """Setup benchmark for execution.
 
         Creates and populates staging tables from TPC-H base tables.
@@ -384,6 +331,7 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         Args:
             connection: Database connection
             force: If True, drop existing staging tables first
+            dialect: SQL dialect (e.g. 'clickhouse', 'standard')
 
         Returns:
             Dictionary with setup status and details
@@ -403,11 +351,11 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
                     f"Required TPC-H table '{table}' not found. "
                     f"Please load TPC-H data first using generate_data() and loading the files. "
                     f"Error: {e}"
-                )
+                ) from e
 
         # Acquire exclusive lock to prevent concurrent setup operations
         # This eliminates race conditions during staging table population
-        if not self._acquire_setup_lock(connection, timeout_seconds=300):
+        if not self._acquire_setup_lock(connection, timeout_seconds=300, dialect=dialect):
             raise RuntimeError(
                 "Could not acquire setup lock after 5 minutes. "
                 "Another process may be running setup, or a previous setup crashed. "
@@ -434,7 +382,7 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
                 table_existed = self._table_exists(connection, table_name)
 
                 # Create table if not exists (atomic operation)
-                create_sql = get_create_table_sql(table_name, if_not_exists=True)
+                create_sql = get_create_table_sql(table_name, dialect=dialect, if_not_exists=True)
                 try:
                     connection.execute(create_sql)
 
@@ -445,7 +393,7 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
                     else:
                         self.log_verbose(f"Table {table_name} already exists")
                 except Exception as e:
-                    raise RuntimeError(f"Failed to create {table_name}: {e}")
+                    raise RuntimeError(f"Failed to create {table_name}: {e}") from e
 
                 # Populate staging tables that are based on TPC-H tables
                 if table_name in ["txn_orders", "txn_lineitem", "txn_customer"]:
@@ -470,7 +418,7 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
                         except Exception as e:
                             raise RuntimeError(
                                 f"Cannot validate source table '{source_table}' before populating '{table_name}': {e}"
-                            )
+                            ) from e
 
                         if source_count == 0:
                             raise RuntimeError(
@@ -513,7 +461,7 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             }
         finally:
             # Always release lock, even if setup fails
-            self._release_setup_lock(connection)
+            self._release_setup_lock(connection, dialect=dialect)
 
     def teardown(self, connection: DatabaseConnection) -> None:
         """Clean up all staging tables.
@@ -551,7 +499,7 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             except Exception as e:
                 self.log_verbose(f"Warning: Could not remove auxiliary files: {e}")
 
-    def load_data(self, connection: DatabaseConnection, **kwargs) -> dict[str, Any]:
+    def load_data(self, connection: DatabaseConnection, **kwargs: Any) -> dict[str, Any]:
         """Load data into database (standard benchmark interface).
 
         For Transaction Primitives, data loading is handled by the platform adapter
@@ -560,13 +508,15 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
 
         Args:
             connection: Database connection
-            **kwargs: Additional arguments (unused)
+            **kwargs: ``dialect`` (str, default "standard") propagates to setup() so
+                the PK lock-bypass registry lookup matches the adapter's dialect.
 
         Returns:
             Dictionary with loading results
         """
-        # Verify that tables exist and have data
-        return self.setup(connection, force=False)
+        # Verify that tables exist and have data. Propagate dialect so cloud platforms
+        # (Snowflake, BigQuery, etc.) hit their registered PK lock-bypass rule.
+        return self.setup(connection, force=False, dialect=kwargs.get("dialect", "standard"))
 
     def reset(self, connection: DatabaseConnection) -> None:
         """Reset staging tables to initial state.
@@ -651,47 +601,6 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             sql = sql.replace("{file_path}", file_path)
         return sql
 
-    def get_operation(self, operation_id: str) -> Any:
-        """Get a specific write operation.
-
-        Args:
-            operation_id: Operation identifier
-
-        Returns:
-            WriteOperation object
-
-        Raises:
-            ValueError: If operation_id is invalid
-        """
-        return self.operations_manager.get_operation(operation_id)
-
-    def get_all_operations(self) -> dict[str, Any]:
-        """Get all available write operations.
-
-        Returns:
-            Dictionary mapping operation IDs to WriteOperation objects
-        """
-        return self.operations_manager.get_all_operations()
-
-    def get_operations_by_category(self, category: str) -> dict[str, Any]:
-        """Get operations filtered by category.
-
-        Args:
-            category: Category name (e.g., 'insert', 'update', 'delete')
-
-        Returns:
-            Dictionary mapping operation IDs to WriteOperation objects
-        """
-        return self.operations_manager.get_operations_by_category(category)
-
-    def get_operation_categories(self) -> list[str]:
-        """Get list of available operation categories.
-
-        Returns:
-            List of category names
-        """
-        return self.operations_manager.get_operation_categories()
-
     def get_schema(self, dialect: str = "standard") -> dict[str, dict]:
         """Get the Transaction Primitives schema definitions.
 
@@ -723,67 +632,11 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             get_staging_tables_sql=get_all_staging_tables_sql,
         )
 
-    def get_benchmark_info(self) -> dict[str, Any]:
-        """Get information about the benchmark.
-
-        Returns:
-            Dictionary containing benchmark metadata
-        """
-        return {
-            "name": self._name,
-            "version": self._version,
-            "description": self._description,
-            "scale_factor": self.scale_factor,
-            "total_operations": self.operations_manager.get_operation_count(),
-            "categories": self.get_operation_categories(),
-            "tables": list(STAGING_TABLES.keys()),
-            "data_source": "tpch",
-        }
-
-    def get_query(self, query_id: Union[int, str], **kwargs) -> str:
-        """Get write SQL for a specific operation.
-
-        Args:
-            query_id: Operation identifier
-            **kwargs: Additional parameters (not used for transaction primitives)
-
-        Returns:
-            Write SQL string
-
-        Raises:
-            ValueError: If query_id is invalid
-        """
-        operation = self.operations_manager.get_operation(str(query_id))
-        return operation.write_sql
-
-    def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
-        """Get all write operations SQL.
-
-        Args:
-            dialect: Target SQL dialect (not yet implemented for write operations)
-
-        Returns:
-            Dictionary mapping operation IDs to write SQL
-        """
-        operations = self.operations_manager.get_all_operations()
-        return {op_id: op.write_sql for op_id, op in operations.items()}
-
-    def get_queries_by_category(self, category: str) -> dict[str, str]:
-        """Get write operations SQL filtered by category.
-
-        Args:
-            category: Operation category (insert, update, delete, ddl, transaction)
-
-        Returns:
-            Dictionary mapping operation IDs to write SQL for the category
-        """
-        operations = self.operations_manager.get_operations_by_category(category)
-        return {op_id: op.write_sql for op_id, op in operations.items()}
-
     def execute_operation(
         self,
         operation_id: str,
         connection: DatabaseConnection,
+        **kwargs: Any,
     ) -> OperationResult:
         """Execute a transaction operation and validate results.
 
@@ -793,6 +646,9 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         Args:
             operation_id: ID of operation to execute
             connection: Database connection
+            **kwargs: Optional keyword arguments:
+                platform_key: Platform dialect key (e.g. 'datafusion', 'duckdb')
+                sql_override: Pre-processed SQL from adapter preprocessing
 
         Returns:
             OperationResult with execution metrics
@@ -801,28 +657,42 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             ValueError: If connection is invalid
             RuntimeError: If staging tables not initialized
         """
-        # Validate connection
-        if not connection:
-            raise ValueError("Connection is None")
-        if not hasattr(connection, "execute"):
-            raise ValueError(f"Invalid connection type: {type(connection).__name__}")
-
-        # Get operation to check if it requires setup
-        operation = self.operations_manager.get_operation(operation_id)
-
-        # Check staging tables exist and auto-initialize if needed
-        if operation.requires_setup and not self.is_setup(connection):
-            self.log_verbose("Staging tables not initialized - running setup() automatically...")
-            try:
-                self.setup(connection, force=False)
-                self.log_verbose("Setup completed successfully")
-            except Exception as e:
-                raise RuntimeError(f"Failed to initialize staging tables before executing '{operation_id}': {e}") from e
+        operation, platform_key, sql_override = self._prepare_operation(operation_id, connection, **kwargs)
 
         try:
+            # Resolve effective SQL respecting platform overrides
+            if sql_override is not None:
+                write_sql_raw = sql_override
+            elif (
+                platform_key
+                and hasattr(operation, "platform_overrides")
+                and operation.platform_overrides
+                and platform_key in operation.platform_overrides
+            ):
+                override = operation.platform_overrides[platform_key]
+                if override is None:
+                    skip_reason = f"Operation '{operation_id}' is unsupported on platform '{platform_key}'."
+                    self.log_verbose(f"Skipping operation {operation_id}: {skip_reason}")
+                    return OperationResult(
+                        operation_id=operation_id,
+                        success=True,
+                        write_duration_ms=0.0,
+                        rows_affected=0,
+                        validation_duration_ms=0.0,
+                        validation_passed=True,
+                        validation_results=[],
+                        cleanup_duration_ms=0.0,
+                        cleanup_success=True,
+                        status="SKIPPED",
+                        skip_reason=skip_reason,
+                    )
+                write_sql_raw = override
+            else:
+                write_sql_raw = operation.write_sql
+
             # Execute transaction SQL (operations already contain BEGIN/COMMIT/ROLLBACK)
             self.log_verbose(f"Executing transaction operation: {operation_id}")
-            write_sql = self._replace_placeholders(operation.write_sql)
+            write_sql = self._replace_placeholders(write_sql_raw)
             write_start = time.perf_counter()
             write_result = connection.execute(write_sql)
             write_duration_ms = (time.perf_counter() - write_start) * 1000
@@ -937,49 +807,6 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
                 cleanup_warning=cleanup_warning,
             )
 
-    def run_benchmark(
-        self,
-        connection: DatabaseConnection,
-        operation_ids: Optional[list[str]] = None,
-        categories: Optional[list[str]] = None,
-    ) -> list[OperationResult]:
-        """Run write operations benchmark.
-
-        Args:
-            connection: Database connection
-            operation_ids: Optional list of specific operations to run
-            categories: Optional list of categories to run
-
-        Returns:
-            List of OperationResult objects
-        """
-        # Determine which operations to run
-        if operation_ids:
-            operations = {op_id: self.get_operation(op_id) for op_id in operation_ids}
-        elif categories:
-            operations = {}
-            for category in categories:
-                operations.update(self.get_operations_by_category(category))
-        else:
-            operations = self.get_all_operations()
-
-        self.log_verbose(f"Running {len(operations)} write operations...")
-
-        # Execute each operation
-        results = []
-        for op_id in operations:
-            result = self.execute_operation(op_id, connection)
-            results.append(result)
-
-            # Log result
-            status = "✓" if result.success and result.validation_passed else "✗"
-            self.log_verbose(
-                f"{status} {op_id}: {result.write_duration_ms:.2f}ms write, "
-                f"{result.validation_duration_ms:.2f}ms validation"
-            )
-
-        return results
-
     # =========================================================================
     # DataFrame Support
     # =========================================================================
@@ -996,13 +823,11 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         Returns:
             True if platform supports DataFrame mode for transactions
         """
-        global _dataframe_operations_module
-        if _dataframe_operations_module is None:
-            from benchbox.core.transaction_primitives import dataframe_operations
+        from benchbox.core.transaction_primitives.dataframe_operations import (
+            validate_transaction_primitives_platform,
+        )
 
-            _dataframe_operations_module = dataframe_operations
-
-        is_valid, _ = _dataframe_operations_module.validate_transaction_primitives_platform(platform_name)
+        is_valid, _ = validate_transaction_primitives_platform(platform_name)
         return is_valid
 
     def get_dataframe_operations(self, platform_name: str, spark_session: Any = None) -> Any:
@@ -1021,20 +846,17 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         Raises:
             ValueError: If platform does not support transactions
         """
-        global _dataframe_operations_module
-        if _dataframe_operations_module is None:
-            from benchbox.core.transaction_primitives import dataframe_operations
-
-            _dataframe_operations_module = dataframe_operations
+        from benchbox.core.transaction_primitives.dataframe_operations import (
+            get_dataframe_transaction_manager,
+            validate_transaction_primitives_platform,
+        )
 
         # Validate platform first
-        is_valid, error_msg = _dataframe_operations_module.validate_transaction_primitives_platform(platform_name)
+        is_valid, error_msg = validate_transaction_primitives_platform(platform_name)
         if not is_valid:
             raise ValueError(error_msg)
 
-        manager = _dataframe_operations_module.get_dataframe_transaction_manager(
-            platform_name, spark_session=spark_session
-        )
+        manager = get_dataframe_transaction_manager(platform_name, spark_session=spark_session)
 
         if manager is None:
             raise ValueError(f"Could not create DataFrame transaction manager for {platform_name}")
@@ -1055,14 +877,12 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         Returns:
             Tuple of (is_valid, error_message)
         """
-        global _dataframe_operations_module
-        if _dataframe_operations_module is None:
-            from benchbox.core.transaction_primitives import dataframe_operations
-
-            _dataframe_operations_module = dataframe_operations
+        from benchbox.core.transaction_primitives.dataframe_operations import (
+            validate_transaction_primitives_platform,
+        )
 
         # First check if platform is potentially valid
-        is_valid, error_msg = _dataframe_operations_module.validate_transaction_primitives_platform(platform_name)
+        is_valid, error_msg = validate_transaction_primitives_platform(platform_name)
         if not is_valid:
             return False, error_msg
 
@@ -1075,6 +895,296 @@ class TransactionPrimitivesBenchmark(BaseBenchmark, OperationExecutor):
                 )
 
         return True, ""
+
+    def skip_dataframe_data_loading(self) -> bool:
+        """Transaction Primitives DataFrame execution manages its own Delta/Iceberg table lifecycle."""
+        return True
+
+    def _create_test_orders_df(self, spark_session: Any, start_key: int, count: int) -> Any:
+        """Create a small synthetic TPC-H ORDERS DataFrame for test operations.
+
+        Uses PySpark createDataFrame when a SparkSession is available, otherwise
+        falls back to a pandas DataFrame for delta-rs paths.
+
+        Args:
+            spark_session: SparkSession instance, or None for pandas fallback
+            start_key: Starting o_orderkey value (use range 8000001-9000000)
+            count: Number of rows to generate
+
+        Returns:
+            DataFrame compatible with the platform's write operations
+        """
+        rows = [
+            {
+                "o_orderkey": start_key + i,
+                "o_custkey": 1000 + (i % 100),
+                "o_orderstatus": "O",
+                "o_totalprice": round(1000.00 + i * 10.5, 2),
+                "o_orderdate": "1998-01-01",
+                "o_orderpriority": "3-MEDIUM",
+                "o_clerk": f"Clerk#{i:010d}",
+                "o_shippriority": 0,
+                "o_comment": f"benchbox test row {i}",
+            }
+            for i in range(count)
+        ]
+        if spark_session is not None:
+            return spark_session.createDataFrame(rows)
+        import pandas as pd
+
+        return pd.DataFrame(rows)
+
+    def _setup_transaction_table(self, spark_session: Any, table_path: Path) -> None:
+        """Create (or recreate) the initial Delta table with synthetic TPC-H ORDERS data.
+
+        Writes 100 rows with o_orderkey in the 1-100 range as a stable baseline.
+        Any prior table at table_path is removed first so each iteration starts clean.
+
+        Args:
+            spark_session: SparkSession instance, or None for delta-rs path
+            table_path: Directory path for the Delta table
+        """
+        if table_path.exists():
+            shutil.rmtree(str(table_path))
+
+        initial_rows = [
+            {
+                "o_orderkey": i + 1,
+                "o_custkey": 1000 + (i % 100),
+                "o_orderstatus": "O",
+                "o_totalprice": round(1000.00 + i * 10.5, 2),
+                "o_orderdate": "1998-01-01",
+                "o_orderpriority": "3-MEDIUM",
+                "o_clerk": f"Clerk#{i:010d}",
+                "o_shippriority": 0,
+                "o_comment": f"benchbox initial row {i}",
+            }
+            for i in range(100)
+        ]
+        table_path_str = str(table_path)
+
+        if spark_session is not None:
+            df = spark_session.createDataFrame(initial_rows)
+            df.write.format("delta").mode("overwrite").save(table_path_str)
+        else:
+            import pyarrow as pa
+            from deltalake.writer import write_deltalake
+
+            keys = [r["o_orderkey"] for r in initial_rows]
+            table = pa.table(
+                {
+                    "o_orderkey": pa.array(keys, type=pa.int64()),
+                    "o_custkey": pa.array([r["o_custkey"] for r in initial_rows], type=pa.int64()),
+                    "o_orderstatus": pa.array([r["o_orderstatus"] for r in initial_rows], type=pa.string()),
+                    "o_totalprice": pa.array([r["o_totalprice"] for r in initial_rows], type=pa.float64()),
+                    "o_orderdate": pa.array([r["o_orderdate"] for r in initial_rows], type=pa.string()),
+                    "o_orderpriority": pa.array([r["o_orderpriority"] for r in initial_rows], type=pa.string()),
+                    "o_clerk": pa.array([r["o_clerk"] for r in initial_rows], type=pa.string()),
+                    "o_shippriority": pa.array([r["o_shippriority"] for r in initial_rows], type=pa.int32()),
+                    "o_comment": pa.array([r["o_comment"] for r in initial_rows], type=pa.string()),
+                }
+            )
+            write_deltalake(table_path_str, table, mode="overwrite")
+
+    def execute_dataframe_workload(
+        self,
+        *,
+        ctx: Any,
+        adapter: Any,
+        benchmark_config: Any,
+        query_filter: set[str] | None = None,
+        monitor: Any | None = None,  # noqa: ARG002
+        run_options: Any | None = None,  # noqa: ARG002
+    ) -> list[dict[str, Any]]:
+        """Execute Transaction Primitives in DataFrame mode.
+
+        This hook is called by the DataFrame adapter to execute ACID transaction
+        operations on supported platforms (e.g., PySpark + Delta Lake).
+
+        Implements Pattern B (native DataFrame execution): calls
+        get_dataframe_operations() to obtain a DataFrameTransactionOperationsManager,
+        creates a temporary Delta table, then executes 12 operation types in three
+        dependency-ordered phases:
+          Phase A - Write operations (atomic_insert/update/delete/merge)
+          Phase B - Version operations (rollback_to_version/timestamp, time_travel, version_compare)
+          Phase C - Concurrency/isolation (concurrent_write, conflict_resolution,
+                     snapshot_isolation, read_your_writes)
+
+        CRITICAL: Every SUCCESS result row has execution_time_seconds > 0 because each
+        row comes from a real manager.execute_*() call with measured timing.
+        A zero-time SUCCESS would indicate the phantom-data anti-pattern from the
+        prior defect - guarded against in w3 behavioral tests.
+        """
+        from benchbox.core.transaction_primitives.dataframe_operations import (
+            TransactionOperationType,
+        )
+
+        platform_name = adapter.platform_name
+        spark_session = getattr(ctx, "spark_session", None)
+
+        config_options = getattr(benchmark_config, "options", {}) or {}
+        iterations = int(config_options.get("power_iterations", 1) or 1)
+
+        manager = self.get_dataframe_operations(platform_name, spark_session)
+
+        output: list[dict[str, Any]] = []
+        op_iteration_counts: dict[str, int] = {}
+
+        table_dir = tempfile.mkdtemp(prefix="benchbox_txn_")
+        table_path = Path(table_dir) / "orders"
+
+        try:
+            for _iteration in range(1, iterations + 1):
+                # Reset table to clean baseline for each iteration
+                self._setup_transaction_table(
+                    spark_session=spark_session,
+                    table_path=table_path,
+                )
+
+                # Capture pre-phase timestamp before any writes (used by rollback_to_timestamp)
+                pre_phase_timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+                # Ordered dispatch: each tuple is (operation_type, zero-arg callable).
+                # Lambdas close over stable per-iteration values (self, spark_session,
+                # table_path, manager). pre_phase_timestamp uses a default-arg to make the
+                # capture explicit. DataFrames are constructed inside lambdas so operations
+                # skipped by query_filter never trigger _create_test_orders_df calls.
+                # Phase A must run before Phase B (version ops need history created by writes).
+                dispatch: list[tuple[Any, Any]] = [
+                    # --- Phase A: Write operations (each creates a new Delta version) ---
+                    (
+                        TransactionOperationType.ATOMIC_INSERT,
+                        lambda: manager.execute_atomic_insert(
+                            table_path,
+                            self._create_test_orders_df(spark_session, start_key=8_000_001, count=20),
+                        ),
+                    ),
+                    (
+                        TransactionOperationType.ATOMIC_UPDATE,
+                        lambda: manager.execute_atomic_update(
+                            table_path, "o_orderkey > 8000000", {"o_orderpriority": "1-URGENT"}
+                        ),
+                    ),
+                    (
+                        TransactionOperationType.ATOMIC_DELETE,
+                        lambda: manager.execute_atomic_delete(
+                            table_path, "o_orderkey >= 8000001 AND o_orderkey <= 8000010"
+                        ),
+                    ),
+                    (
+                        TransactionOperationType.ATOMIC_MERGE,
+                        lambda: manager.execute_atomic_merge(
+                            table_path,
+                            self._create_test_orders_df(spark_session, start_key=8_000_001, count=10),
+                            "target.o_orderkey = source.o_orderkey",
+                            when_matched={"o_orderpriority": "1-URGENT"},
+                            when_not_matched=None,
+                        ),
+                    ),
+                    # --- Phase B: Version operations (depend on history from Phase A) ---
+                    (
+                        TransactionOperationType.ROLLBACK_TO_VERSION,
+                        lambda: manager.execute_rollback_to_version(table_path, version=0),
+                    ),
+                    (
+                        TransactionOperationType.ROLLBACK_TO_TIMESTAMP,
+                        lambda _ts=pre_phase_timestamp: manager.execute_rollback_to_timestamp(table_path, _ts),
+                    ),
+                    (
+                        TransactionOperationType.TIME_TRAVEL_QUERY,
+                        lambda: manager.execute_time_travel_query(table_path, version=0),
+                    ),
+                    (
+                        TransactionOperationType.VERSION_COMPARE,
+                        lambda: manager.execute_version_compare(table_path, version1=0, version2=1),
+                    ),
+                    # --- Phase C: Concurrency/isolation operations ---
+                    (
+                        TransactionOperationType.CONCURRENT_WRITE,
+                        lambda: manager.execute_concurrent_write(
+                            table_path,
+                            [
+                                self._create_test_orders_df(spark_session, start_key=8_000_100 + i * 100, count=5)
+                                for i in range(3)
+                            ],
+                        ),
+                    ),
+                    (
+                        TransactionOperationType.CONFLICT_RESOLUTION,
+                        lambda: manager.execute_conflict_resolution(
+                            table_path,
+                            self._create_test_orders_df(spark_session, start_key=8_000_200, count=5),
+                            resolution_strategy="retry",
+                        ),
+                    ),
+                    (
+                        TransactionOperationType.SNAPSHOT_ISOLATION,
+                        lambda: manager.execute_snapshot_isolation(table_path),
+                    ),
+                    (
+                        TransactionOperationType.READ_YOUR_WRITES,
+                        lambda: manager.execute_read_your_writes(
+                            table_path,
+                            self._create_test_orders_df(spark_session, start_key=8_000_300, count=5),
+                        ),
+                    ),
+                ]
+
+                for op_type, op_callable in dispatch:
+                    query_id: str = op_type.value
+
+                    if query_filter and query_id.upper() not in query_filter:
+                        continue
+
+                    op_iteration_counts[query_id] = op_iteration_counts.get(query_id, 0) + 1
+                    op_iter = op_iteration_counts[query_id]
+
+                    if not manager.supports_operation(op_type):
+                        output.append(
+                            {
+                                "query_id": query_id,
+                                "status": "SKIPPED",
+                                "execution_time_seconds": 0.0,
+                                "rows_returned": 0,
+                                "iteration": op_iter,
+                                "run_type": "measurement",
+                            }
+                        )
+                        continue
+
+                    _t0 = time.perf_counter()
+                    try:
+                        result = op_callable()
+                    except Exception as exc:  # noqa: BLE001
+                        output.append(
+                            {
+                                "query_id": query_id,
+                                "status": "FAILED",
+                                "execution_time_seconds": time.perf_counter() - _t0,
+                                "rows_returned": 0,
+                                "iteration": op_iter,
+                                "run_type": "measurement",
+                                "error": str(exc),
+                            }
+                        )
+                        continue
+
+                    row: dict[str, Any] = {
+                        "query_id": query_id,
+                        "status": "SUCCESS" if result.success else "FAILED",
+                        "execution_time_seconds": result.duration_ms / 1000.0,
+                        "rows_returned": result.rows_affected,
+                        "iteration": op_iter,
+                        "run_type": "measurement",
+                    }
+                    if result.error_message:
+                        row["error"] = result.error_message
+                    output.append(row)
+
+        finally:
+            shutil.rmtree(table_dir, ignore_errors=True)
+
+        return output
 
 
 __all__ = ["TransactionPrimitivesBenchmark", "OperationResult"]

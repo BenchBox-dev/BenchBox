@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +33,8 @@ class StubTransformer:
 
     def transform(self, **kwargs: Any) -> dict[str, Any]:
         self.calls.append(kwargs)
-        table_path = self.base_dir / f"{OBT_TABLE_NAME}.dat"
+        fmt = kwargs.get("output_format", "parquet")
+        table_path = self.base_dir / f"{OBT_TABLE_NAME}.{fmt}"
         manifest_path = self.base_dir / f"{OBT_TABLE_NAME}_manifest.json"
         table_path.parent.mkdir(parents=True, exist_ok=True)
         table_path.write_text("data\n")
@@ -54,6 +56,7 @@ class StubCursor:
 
 
 def test_generate_data_invokes_generator_and_transformer(tmp_path: Path) -> None:
+    """Explicit dat format: generator and transformer are invoked correctly."""
     benchmark = TPCDSOBTBenchmark(
         scale_factor=1.0,
         output_dir=tmp_path / "out",
@@ -67,7 +70,7 @@ def test_generate_data_invokes_generator_and_transformer(tmp_path: Path) -> None
     benchmark._data_generator = stub_generator  # type: ignore[assignment]
     benchmark._obt_transformer = stub_transformer  # type: ignore[assignment]
 
-    result = benchmark.generate_data()
+    result = benchmark.generate_data(output_format="dat")
 
     assert stub_generator.called is True
     assert len(stub_transformer.calls) == 1
@@ -77,6 +80,59 @@ def test_generate_data_invokes_generator_and_transformer(tmp_path: Path) -> None
     assert result["table"].exists()
     assert benchmark.tables["tpcds_sales_returns_obt"] == result["table"]
     assert benchmark.manifest == result["manifest"]
+
+
+def test_generate_data_default_format_is_parquet(tmp_path: Path) -> None:
+    """Default output_format should produce a .parquet artifact."""
+    benchmark = TPCDSOBTBenchmark(
+        scale_factor=1.0,
+        output_dir=tmp_path / "out",
+        force_regenerate=True,
+    )
+    stub_generator = StubGenerator(tmp_path)
+    stub_transformer = StubTransformer(tmp_path)
+    benchmark._data_generator = stub_generator  # type: ignore[assignment]
+    benchmark._obt_transformer = stub_transformer  # type: ignore[assignment]
+
+    result = benchmark.generate_data()
+
+    assert benchmark.output_format == "parquet"
+    assert result["table"].suffix == ".parquet"
+    assert result["table"].exists()
+
+
+def test_existing_obt_logs_stale_dat_when_parquet_requested(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """_existing_obt should log an INFO message when a stale .dat is found but parquet was requested."""
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    stale_dat = out_dir / "tpcds_sales_returns_obt.dat"
+    stale_dat.write_text("old data\n")
+
+    benchmark = TPCDSOBTBenchmark(scale_factor=1.0, output_dir=out_dir)
+
+    with caplog.at_level(logging.INFO, logger="benchbox.core.tpcds_obt.benchmark"):
+        result = benchmark._existing_obt("parquet")
+
+    assert result is False
+    assert any("stale .dat" in m for m in caplog.messages)
+
+
+def test_existing_obt_logs_when_dat_requested_but_parquet_exists(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """_existing_obt should log an INFO message when parquet exists but dat was explicitly requested."""
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    existing_parquet = out_dir / "tpcds_sales_returns_obt.parquet"
+    existing_parquet.write_text("parquet data\n")
+
+    benchmark = TPCDSOBTBenchmark(scale_factor=1.0, output_dir=out_dir)
+
+    with caplog.at_level(logging.INFO, logger="benchbox.core.tpcds_obt.benchmark"):
+        result = benchmark._existing_obt("dat")
+
+    assert result is False
+    assert any("Regenerating as dat" in m for m in caplog.messages)
 
 
 class TestDataFrameMode:

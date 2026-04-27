@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # Common parameter patterns found across TPC-DS queries.
 # Each pattern maps a regex against SQL text to extract a (key, value) pair.
-# These are applied generically to any query — the TPCDS_DEFAULT_PARAMS dict
+# These are applied generically to any query - the TPCDS_DEFAULT_PARAMS dict
 # determines which keys are relevant for each query_id.
 
 _YEAR_PATTERN = re.compile(r"d_year\s*=\s*(\d{4})", re.IGNORECASE)

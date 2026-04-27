@@ -78,25 +78,30 @@ def normalize_benchmark_id(name: str) -> str:
         >>> normalize_benchmark_id("TPC-DS")
         'tpcds'
     """
-    # Strip " Benchmark" suffix if present
-    short_name = name[:-10] if name.lower().endswith(" benchmark") else name
-    lowered = short_name.lower()
+    import re
 
-    # Canonical ID mappings for known benchmarks
+    # Strip parenthetical suffixes like "(heavy)" and trailing " Benchmark"
+    cleaned = re.sub(r"\s*\([^)]*\)\s*$", "", name).strip()
+    if cleaned.lower().endswith(" benchmark"):
+        cleaned = cleaned[:-10]
+    lowered = cleaned.lower().strip()
+
+    # Canonical ID mappings for known benchmarks.
     # Each tuple contains variant spellings that map to the canonical ID.
-    # IMPORTANT: Derived benchmarks (tpcds_obt, tpch_skew) MUST appear before
-    # their parent patterns to prevent false substring matches.
+    # Matching is exact - no substring checks - so each display form that
+    # callers may pass must be enumerated explicitly.
     benchmark_mappings: list[tuple[str, tuple[str, ...]]] = [
         ("tpcds_obt", ("tpcds_obt", "tpcds-obt", "tpc-ds obt", "tpc-ds one big table")),
+        ("tpchavoc", ("tpchavoc", "tpch-avoc", "tpch_avoc", "tpc-havoc", "tpc-h avoc")),
         ("tpch_skew", ("tpch_skew", "tpch-skew", "tpc-h skew")),
         ("tpch", ("tpch", "tpc-h", "tpc_h")),
         ("tpcds", ("tpcds", "tpc-ds", "tpc_ds")),
-        ("ssb", ("ssb",)),
+        ("ssb", ("ssb", "star schema")),
         ("clickbench", ("clickbench",)),
     ]
 
     for canonical_id, variants in benchmark_mappings:
-        if any(v in lowered for v in variants):
+        if any(lowered == v for v in variants):
             return canonical_id
 
     # Generic normalization: lowercase with underscores
@@ -104,6 +109,25 @@ def normalize_benchmark_id(name: str) -> str:
     while "__" in normalized:
         normalized = normalized.replace("__", "_")
     return normalized
+
+
+# Family mapping: canonical benchmark ID → parent family for dialect selection.
+# Single source of truth - used by adapter routing and dialect inference.
+_BENCHMARK_FAMILY: dict[str, str] = {
+    "tpch": "tpch",
+    "tpch_skew": "tpch",
+    "tpchavoc": "tpch",
+    "tpcds": "tpcds",
+    "tpcds_obt": "tpcds",
+}
+
+
+def benchmark_family(benchmark_id: str) -> str:
+    """Return the parent family for a canonical benchmark ID.
+
+    Returns "tpch", "tpcds", or "generic".
+    """
+    return _BENCHMARK_FAMILY.get(benchmark_id, "generic")
 
 
 @dataclass
@@ -115,6 +139,7 @@ class BenchmarkInfoInput:
     test_type: str = "power"  # "power", "throughput", "standard", "combined"
     benchmark_id: str | None = None
     display_name: str | None = None  # Optional full display name
+    compliance_class: str | None = None  # e.g., "official", "unofficial_nonstandard", "unofficial_subscale"
 
 
 @dataclass
@@ -490,14 +515,19 @@ class ResultBuilder:
         avg_time = timing_stats.get("avg_s", 0.0)
         geometric_mean = timing_stats.get("geometric_mean_s", 0.0)
 
-        # Calculate TPC metrics only when all queries succeeded
-        if failed_queries:
+        # Calculate TPC metrics only when all queries succeeded and run is official-comparable
+        _is_unofficial = self._benchmark.compliance_class == "unofficial_subscale" or (
+            hasattr(self._benchmark.compliance_class, "value")
+            and self._benchmark.compliance_class.value == "unofficial_subscale"
+        )
+        if failed_queries or _is_unofficial:
             tpc_metrics = {
                 "power_at_size": None,
                 "throughput_at_size": None,
                 "qph_at_size": None,
             }
-            geometric_mean = 0.0
+            if failed_queries:
+                geometric_mean = 0.0
         else:
             tpc_metrics = self._calculate_tpc_metrics()
 
@@ -576,6 +606,12 @@ class ResultBuilder:
             # Cost
             cost_summary=self._cost_summary,
             _benchmark_id_override=self._benchmark.benchmark_id,
+            # Methodology/comparability classification
+            compliance_class=(
+                self._benchmark.compliance_class.value
+                if hasattr(self._benchmark.compliance_class, "value")
+                else self._benchmark.compliance_class
+            ),
         )
 
     def _calculate_duration(self) -> float:

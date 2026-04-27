@@ -28,7 +28,7 @@ class TestCredentialManager:
     @pytest.fixture
     def temp_creds_file(self):
         """Create a temporary credentials file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as f:
             path = Path(f.name)
         yield path
         # Cleanup
@@ -211,7 +211,7 @@ class TestCredentialManager:
         manager.set_platform_credentials("databricks", {"test": "value"})
         manager.save_credentials()
 
-        with open(temp_creds_file) as f:
+        with open(temp_creds_file, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert "_metadata" in data
@@ -260,7 +260,7 @@ class TestEnvironmentVariableSubstitution:
     @pytest.fixture
     def temp_creds_file(self):
         """Create a temporary credentials file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as f:
             path = Path(f.name)
         yield path
         if path.exists():
@@ -272,7 +272,7 @@ class TestEnvironmentVariableSubstitution:
         os.environ["TEST_TOKEN"] = "secret_token_123"
 
         # Write credentials with env var references
-        with open(temp_creds_file, "w") as f:
+        with open(temp_creds_file, "w", encoding="utf-8") as f:
             yaml.dump(
                 {
                     "databricks": {
@@ -297,7 +297,7 @@ class TestEnvironmentVariableSubstitution:
         """Test $VAR syntax substitution."""
         os.environ["TEST_USER"] = "test_user"
 
-        with open(temp_creds_file, "w") as f:
+        with open(temp_creds_file, "w", encoding="utf-8") as f:
             yaml.dump({"snowflake": {"user": "$TEST_USER"}}, f)
 
         manager = CredentialManager(credentials_path=temp_creds_file)
@@ -309,7 +309,7 @@ class TestEnvironmentVariableSubstitution:
 
     def test_missing_env_var_keeps_original(self, temp_creds_file):
         """Test that missing env vars keep original reference."""
-        with open(temp_creds_file, "w") as f:
+        with open(temp_creds_file, "w", encoding="utf-8") as f:
             yaml.dump({"platform": {"value": "${NONEXISTENT_VAR}"}}, f)
 
         manager = CredentialManager(credentials_path=temp_creds_file)
@@ -321,7 +321,7 @@ class TestEnvironmentVariableSubstitution:
         """Test env var substitution in nested structures."""
         os.environ["TEST_CATALOG"] = "production"
 
-        with open(temp_creds_file, "w") as f:
+        with open(temp_creds_file, "w", encoding="utf-8") as f:
             yaml.dump(
                 {
                     "databricks": {
@@ -346,7 +346,7 @@ class TestEnvironmentVariableSubstitution:
         """Test env var substitution in list values."""
         os.environ["TEST_ROLE"] = "ROLE1"
 
-        with open(temp_creds_file, "w") as f:
+        with open(temp_creds_file, "w", encoding="utf-8") as f:
             yaml.dump({"snowflake": {"roles": ["${TEST_ROLE}", "ROLE2"]}}, f)
 
         manager = CredentialManager(credentials_path=temp_creds_file)
@@ -389,7 +389,7 @@ class TestCredentialManagerEdgeCases:
     @pytest.fixture
     def temp_creds_file(self):
         """Create a temporary credentials file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as f:
             path = Path(f.name)
         yield path
         if path.exists():
@@ -397,7 +397,7 @@ class TestCredentialManagerEdgeCases:
 
     def test_load_invalid_yaml(self, temp_creds_file):
         """Test loading credentials from invalid YAML file."""
-        with open(temp_creds_file, "w") as f:
+        with open(temp_creds_file, "w", encoding="utf-8") as f:
             f.write("invalid: yaml: content:\n  - broken")
 
         with pytest.raises(ValueError):

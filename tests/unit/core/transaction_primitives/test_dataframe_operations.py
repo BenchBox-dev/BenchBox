@@ -528,3 +528,72 @@ class TestBenchmarkIntegration:
         is_valid, error_msg = benchmark.validate_dataframe_configuration("pyspark-df")
         assert is_valid is False
         assert "SparkSession" in error_msg
+
+
+class TestNewOperationTypes:
+    """Tests for the four additional operation type implementations."""
+
+    def test_all_12_operation_types_present(self):
+        assert len(TransactionOperationType) == 12
+
+    def test_concurrent_write_in_enum(self):
+        assert TransactionOperationType.CONCURRENT_WRITE.value == "concurrent_write"
+
+    def test_conflict_resolution_in_enum(self):
+        assert TransactionOperationType.CONFLICT_RESOLUTION.value == "conflict_resolution"
+
+    def test_snapshot_isolation_in_enum(self):
+        assert TransactionOperationType.SNAPSHOT_ISOLATION.value == "snapshot_isolation"
+
+    def test_read_your_writes_in_enum(self):
+        assert TransactionOperationType.READ_YOUR_WRITES.value == "read_your_writes"
+
+    def test_execute_concurrent_write_rejects_unsupported_platform(self):
+        """Polars cannot run concurrent write - should return failure result."""
+        manager = DataFrameTransactionOperationsManager("polars-df", POLARS_TRANSACTION_CAPABILITIES)
+        result = manager.execute_concurrent_write("/tmp/fake_table", [])
+        assert result.success is False
+        assert "concurrent_write" in result.error_message.lower() or "not supported" in result.error_message.lower()
+
+    def test_execute_conflict_resolution_rejects_unsupported_platform(self):
+        """Pandas cannot run conflict resolution - should return failure result."""
+        manager = DataFrameTransactionOperationsManager("pandas-df", PANDAS_TRANSACTION_CAPABILITIES)
+        result = manager.execute_conflict_resolution("/tmp/fake_table", None)
+        assert result.success is False
+
+    def test_execute_snapshot_isolation_rejects_unsupported_platform(self):
+        """Polars has NONE isolation - should return failure result."""
+        manager = DataFrameTransactionOperationsManager("polars-df", POLARS_TRANSACTION_CAPABILITIES)
+        result = manager.execute_snapshot_isolation("/tmp/fake_table")
+        assert result.success is False
+
+    def test_execute_read_your_writes_rejects_unsupported_platform(self):
+        """Polars has no transaction support - should return failure result."""
+        manager = DataFrameTransactionOperationsManager("polars-df", POLARS_TRANSACTION_CAPABILITIES)
+        result = manager.execute_read_your_writes("/tmp/fake_table", None)
+        assert result.success is False
+
+    def test_delta_capabilities_support_all_new_operations(self):
+        """Delta Lake capabilities should support all 4 new operation types."""
+        assert DELTA_LAKE_TRANSACTION_CAPABILITIES.supports_operation(TransactionOperationType.CONCURRENT_WRITE)
+        assert DELTA_LAKE_TRANSACTION_CAPABILITIES.supports_operation(TransactionOperationType.CONFLICT_RESOLUTION)
+        assert DELTA_LAKE_TRANSACTION_CAPABILITIES.supports_operation(TransactionOperationType.SNAPSHOT_ISOLATION)
+        assert DELTA_LAKE_TRANSACTION_CAPABILITIES.supports_operation(TransactionOperationType.READ_YOUR_WRITES)
+
+
+class TestBenchmarkRegistryDataframeFlag:
+    """Tests that benchmark_registry correctly reports transaction_primitives DataFrame support.
+
+    execute_dataframe_workload() is now fully implemented (three-phase Delta Lake
+    execution via DataFrameTransactionOperationsManager), so the flag is True.
+    """
+
+    def test_transaction_primitives_supports_dataframe(self):
+        from benchbox.core.benchmark_registry import BENCHMARK_METADATA
+
+        assert BENCHMARK_METADATA["transaction_primitives"]["supports_dataframe"] is True
+
+    def test_transaction_primitives_num_queries_is_12(self):
+        from benchbox.core.benchmark_registry import BENCHMARK_METADATA
+
+        assert BENCHMARK_METADATA["transaction_primitives"]["num_queries"] == 12

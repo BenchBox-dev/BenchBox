@@ -11,7 +11,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -28,8 +27,8 @@ if TYPE_CHECKING:
     )
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
-from ..utils.file_format import get_delimiter_for_file
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
 
 # Azure Synapse uses T-SQL dialect (compatible with SQL Server)
 SYNAPSE_DIALECT = "tsql"
@@ -361,7 +360,7 @@ class AzureSynapseAdapter(PlatformAdapter):
             connection.close()
 
         except Exception as e:
-            raise RuntimeError(f"Failed to drop Azure Synapse database {database}: {e}")
+            raise RuntimeError(f"Failed to drop Azure Synapse database {database}: {e}") from e
 
     def create_connection(self, **connection_config) -> Any:
         """Create optimized Azure Synapse connection."""
@@ -450,6 +449,7 @@ class AzureSynapseAdapter(PlatformAdapter):
                     continue
 
                 # Drop table if exists
+                self.log_notice(f"Dropping table if it exists: {self.schema}.{table_name}")
                 cursor.execute(
                     f"""
                     IF OBJECT_ID('{self.schema}.{table_name}', 'U') IS NOT NULL
@@ -460,7 +460,7 @@ class AzureSynapseAdapter(PlatformAdapter):
                 # Optimize for Azure Synapse
                 optimized_statement = self._optimize_table_definition(statement)
                 cursor.execute(optimized_statement)
-                self.logger.debug(f"Created table: {table_name}")
+                self.logger.info(f"Created table: {table_name}")
 
             self.logger.info("Schema created")
 
@@ -485,42 +485,15 @@ class AzureSynapseAdapter(PlatformAdapter):
         cursor = connection.cursor()
 
         try:
-            # Get data files from benchmark or manifest
-            if hasattr(benchmark, "tables") and benchmark.tables:
-                data_files = benchmark.tables
-            else:
-                data_files = None
-                try:
-                    manifest_path = Path(data_dir) / "_datagen_manifest.json"
-                    if manifest_path.exists():
-                        with open(manifest_path) as f:
-                            manifest = json.load(f)
-                        tables = manifest.get("tables") or {}
-                        mapping = {}
-                        for table, entries in tables.items():
-                            if entries:
-                                chunk_paths = []
-                                for entry in entries:
-                                    rel = entry.get("path")
-                                    if rel:
-                                        chunk_paths.append(Path(data_dir) / rel)
-                                if chunk_paths:
-                                    mapping[table] = chunk_paths
-                        if mapping:
-                            data_files = mapping
-                except Exception as e:
-                    self.logger.debug(f"Manifest fallback failed: {e}")
-
-                if not data_files:
-                    raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
+            data_source = self._resolve_data_files(benchmark, data_dir)
 
             # Check if storage is configured
             if self.storage_account and self.container:
-                table_stats = self._load_data_via_blob(cursor, data_files, data_dir)
+                table_stats = self._load_data_via_blob(cursor, data_source, data_dir, benchmark)
             else:
                 # Fall back to bulk insert (less efficient)
                 self.logger.warning("No Azure storage configured, using BULK INSERT")
-                table_stats = self._load_data_direct(cursor, data_files, data_dir)
+                table_stats = self._load_data_direct(cursor, data_source, data_dir, benchmark)
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
@@ -537,16 +510,19 @@ class AzureSynapseAdapter(PlatformAdapter):
 
         return table_stats, elapsed_seconds(start_time), None
 
-    def _load_data_via_blob(self, cursor: Any, data_files: dict[str, Any], data_dir: Path) -> dict[str, int]:
+    def _load_data_via_blob(
+        self, cursor: Any, data_source: DataSource, data_dir: Path, benchmark: Any = None
+    ) -> dict[str, int]:
         """Load data via Azure Blob Storage using COPY INTO."""
         table_stats = {}
         effective_tuning = self.get_effective_tuning_configuration()
+        bm = benchmark if benchmark is not None else NO_BENCHMARK
 
         # Set up external data source if not exists
         self._setup_external_data_source(cursor)
 
         # Upload files and load
-        for table_name, file_paths in data_files.items():
+        for table_name, file_paths in data_source.tables.items():
             if not isinstance(file_paths, list):
                 file_paths = [file_paths]
 
@@ -563,9 +539,9 @@ class AzureSynapseAdapter(PlatformAdapter):
                 # Upload files to blob storage
                 blob_paths = self._upload_to_blob(table_name, valid_files)
 
-                # Determine file format
+                # Determine field terminator via resolver
                 first_file = valid_files[0]
-                field_terminator = get_delimiter_for_file(first_file)
+                field_terminator = resolve_csv_dialect(data_source, table_name, first_file, bm).delimiter
 
                 # Use COPY INTO for loading
                 qualified_table = f"[{self.schema}].[{table_name}]"
@@ -611,12 +587,15 @@ class AzureSynapseAdapter(PlatformAdapter):
 
         return table_stats
 
-    def _load_data_direct(self, cursor: Any, data_files: dict[str, Any], data_dir: Path) -> dict[str, int]:
+    def _load_data_direct(
+        self, cursor: Any, data_source: DataSource, data_dir: Path, benchmark: Any = None
+    ) -> dict[str, int]:
         """Load data directly via INSERT statements (fallback method)."""
         table_stats = {}
         effective_tuning = self.get_effective_tuning_configuration()
+        bm = benchmark if benchmark is not None else NO_BENCHMARK
 
-        for table_name, file_paths in data_files.items():
+        for table_name, file_paths in data_source.tables.items():
             if not isinstance(file_paths, list):
                 file_paths = [file_paths]
 
@@ -634,9 +613,9 @@ class AzureSynapseAdapter(PlatformAdapter):
                 qualified_table = f"[{self.schema}].[{table_name}]"
 
                 for file_path in valid_files:
-                    delimiter = get_delimiter_for_file(file_path)
+                    delimiter = resolve_csv_dialect(data_source, table_name, file_path, bm).delimiter
 
-                    with open(file_path) as f:
+                    with open(file_path, encoding="utf-8") as f:
                         batch_size = 1000
                         batch_data = []
 
@@ -751,36 +730,20 @@ class AzureSynapseAdapter(PlatformAdapter):
                 valid_files.append(path)
         return valid_files
 
-    def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> dict[str, Any]:
-        """Resolve benchmark data files from benchmark tables or manifest."""
-        if hasattr(benchmark, "tables") and benchmark.tables:
-            return benchmark.tables
+    def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> DataSource:
+        """Resolve benchmark data files via DataSourceResolver."""
+        from benchbox.platforms.base.data_loading import DataSourceResolver
 
-        data_files = None
-        try:
-            manifest_path = Path(data_dir) / "_datagen_manifest.json"
-            if manifest_path.exists():
-                with open(manifest_path) as f:
-                    manifest = json.load(f)
-                tables = manifest.get("tables") or {}
-                mapping = {}
-                for table, entries in tables.items():
-                    if entries:
-                        chunk_paths = []
-                        for entry in entries:
-                            rel = entry.get("path")
-                            if rel:
-                                chunk_paths.append(Path(data_dir) / rel)
-                        if chunk_paths:
-                            mapping[table] = chunk_paths
-                if mapping:
-                    data_files = mapping
-        except Exception as e:
-            self.logger.debug(f"Manifest fallback failed: {e}")
-
-        if not data_files:
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
+        data_source = resolver.resolve(benchmark, data_dir)
+        if not data_source or not data_source.tables:
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_files
+        return data_source
 
     def _upload_external_parquet_to_blob(self, table_name: str, files: list[Path]) -> str:
         """Upload Parquet files for external mode and return Synapse LOCATION path."""
@@ -1003,7 +966,7 @@ class AzureSynapseAdapter(PlatformAdapter):
         except ImportError:
             raise ImportError(
                 "Azure Storage SDK required for blob uploads. Install with: pip install azure-storage-blob azure-identity"
-            )
+            ) from None
 
         return blob_paths
 
@@ -1339,7 +1302,7 @@ def _build_synapse_config(
     info: Any,
 ) -> Any:
     """Build Azure Synapse database configuration with credential loading."""
-    from benchbox.platforms.azure.config_utils import build_platform_config
+    from benchbox.platforms.base.config_utils import build_platform_config
 
     return build_platform_config(
         platform_type="synapse",

@@ -9,19 +9,19 @@ name: Upload TPC Answer Files
 # package versions.
 #
 # Uploaded assets:
-#   tpch-answers.tar.gz   — 22 TPC-H answer files (q1.out … q22.out)
-#   tpcds-answers.tar.gz  — TPC-DS answer files (*.ans) from answer_sets/
-#   checksums.sha256      — SHA256 digests for both archives
+#   tpch-answers.tar.gz   - 22 TPC-H answer files (q1.out … q22.out)
+#   tpcds-answers.tar.gz  - TPC-DS answer files (*.ans) from answer_sets/
+#   checksums.sha256      - SHA256 digests for both archives
 #
 # Run this workflow:
-#   1. When answer files are updated in _sources/ (rare — TPC spec changes)
+#   1. When answer files are updated in _sources/ (rare - TPC spec changes)
 #   2. After initial repository setup (create the answers-v1 release for the first time)
 
 on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry run — build archives but do not upload"
+        description: "Dry run - build archives but do not upload"
         required: false
         default: false
         type: boolean
@@ -30,7 +30,7 @@ jobs:
   upload-answers:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Required to create/update releases and upload assets
+      contents: write # Required to create/update releases and upload assets
 
     steps:
       - name: Checkout code
@@ -103,7 +103,7 @@ jobs:
               --title "TPC Answer Files" \
               --notes "$(cat <<'EOF'
           Stable release containing TPC-H and TPC-DS answer files for
-          row-count validation. This tag is not versioned — answer files
+          row-count validation. This tag is not versioned - answer files
           are TPC specification data that rarely change.
 
           These files are downloaded automatically by BenchBox when running
@@ -135,7 +135,7 @@ jobs:
       - name: Dry run summary
         if: ${{ inputs.dry_run }}
         run: |
-          echo "DRY RUN — archives were built but not uploaded."
+          echo "DRY RUN - archives were built but not uploaded."
           echo ""
           echo "Archives:"
           ls -lh dist-answers/

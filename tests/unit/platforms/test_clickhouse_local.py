@@ -18,7 +18,7 @@ pytestmark = [
 ]
 
 
-pytest.importorskip("chdb", reason="ClickHouse local mode requires chdb for these tests")
+pytest.importorskip("chdb", reason="ClickHouse local mode requires chdb for these tests", exc_type=ImportError)
 
 # Include the project root to the Python path
 project_root = Path(__file__).parent.parent.parent.parent

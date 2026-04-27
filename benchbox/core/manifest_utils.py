@@ -13,6 +13,7 @@ def write_generator_manifest(
     benchmark_name: str,
     table_paths: dict[str, Path],
     row_counts: dict[str, int],
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """Write a :class:`DataGenerationManifest` for a generator run.
 
@@ -25,6 +26,10 @@ def write_generator_manifest(
         benchmark_name: Short benchmark identifier (e.g. ``"amplab"``).
         table_paths: Mapping of table name → file path produced by the generator.
         row_counts: Mapping of table name → row count produced by the generator.
+        metadata: Optional CSV dialect metadata applied to every table entry.
+            Keys follow the DataGenerationManifest.add_entry() metadata contract
+            (csv_delimiter, csv_has_header, csv_null_marker, csv_normalize_booleans,
+            csv_quote). When None, no metadata is recorded.
     """
     if not table_paths:
         return
@@ -40,6 +45,6 @@ def write_generator_manifest(
 
     for table, path in table_paths.items():
         row_count = row_counts.get(table, 0)
-        manifest.add_entry(table, path, row_count=row_count)
+        manifest.add_entry(table, path, row_count=row_count, metadata=metadata)
 
     manifest.write()

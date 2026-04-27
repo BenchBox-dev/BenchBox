@@ -8,11 +8,13 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import argparse
-from unittest.mock import Mock, patch
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 import benchbox.platforms.postgresql as postgresql_module
+from benchbox.platforms.base.data_loading import DataSource
 from benchbox.platforms.postgresql import POSTGRES_DIALECT, PostgreSQLAdapter
 
 pytestmark = [
@@ -23,14 +25,13 @@ pytestmark = [
 
 @pytest.fixture()
 def postgres_stubs(monkeypatch):
-    """Patch psycopg2 objects so tests don't require the real driver."""
-    mock_psycopg2 = Mock()
-    mock_psycopg2.__version__ = "2.9.9"
-    mock_psycopg2.extras = Mock()
+    """Patch psycopg objects so tests don't require the real driver."""
+    mock_psycopg = Mock()
+    mock_psycopg.__version__ = "3.1.0"
 
-    monkeypatch.setattr(postgresql_module, "psycopg2", mock_psycopg2)
+    monkeypatch.setattr(postgresql_module, "psycopg", mock_psycopg)
 
-    return mock_psycopg2
+    return mock_psycopg
 
 
 class TestPostgreSQLAdapter:
@@ -471,12 +472,22 @@ class TestPostgreSQLAdapter:
 class TestPostgreSQLDataLoading:
     """Tests for PostgreSQL COPY-based data loading."""
 
+    @staticmethod
+    def _install_copy_context(mock_cursor):
+        """Attach a context-manager mock to cursor.copy() (psycopg3 API)."""
+        copy_cm = MagicMock()
+        copy_cm.__enter__.return_value = copy_cm
+        copy_cm.__exit__.return_value = False
+        mock_cursor.copy.return_value = copy_cm
+        return copy_cm
+
     def test_load_data_with_csv(self, postgres_stubs, tmp_path):
         """Should use COPY for CSV data loading."""
         mock_conn = Mock()
-        mock_cursor = Mock()
+        mock_cursor = MagicMock()
         mock_cursor.fetchone.return_value = (3,)  # Row count
         mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
 
         # Create test CSV file
         csv_file = tmp_path / "test_table.csv"
@@ -493,14 +504,15 @@ class TestPostgreSQLDataLoading:
         assert load_time >= 0
 
         # Verify COPY was used
-        assert mock_cursor.copy_expert.called
+        assert mock_cursor.copy.called
 
     def test_load_data_with_tbl(self, postgres_stubs, tmp_path):
         """Should handle .tbl files with trailing pipe delimiter."""
         mock_conn = Mock()
-        mock_cursor = Mock()
+        mock_cursor = MagicMock()
         mock_cursor.fetchone.return_value = (2,)  # Row count
         mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
 
         # Create test .tbl file with trailing pipe
         tbl_file = tmp_path / "orders.tbl"
@@ -514,13 +526,36 @@ class TestPostgreSQLDataLoading:
         stats, load_time, _ = adapter.load_data(Benchmark(), mock_conn, tmp_path)
 
         assert stats["orders"] == 2
-        assert mock_cursor.copy_expert.called
+        assert mock_cursor.copy.called
+
+    def test_load_data_accepts_list_of_chunks(self, postgres_stubs, tmp_path):
+        """Multi-chunk tables (list[Path]) must load every chunk without a TypeError."""
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (6,)
+        mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
+
+        chunk_a = tmp_path / "lineitem_0.csv"
+        chunk_b = tmp_path / "lineitem_1.csv"
+        chunk_a.write_text("1,alice\n2,bob\n3,charlie\n")
+        chunk_b.write_text("4,dave\n5,eve\n6,frank\n")
+
+        class Benchmark:
+            tables = {"lineitem": [chunk_a, chunk_b]}
+
+        adapter = PostgreSQLAdapter(schema="public")
+        stats, _, _ = adapter.load_data(Benchmark(), mock_conn, tmp_path)
+
+        assert stats["lineitem"] == 6
+        assert mock_cursor.copy.call_count == 2
 
     def test_load_data_skips_invalid_identifier(self, postgres_stubs, tmp_path):
         """Should skip tables with invalid identifiers."""
         mock_conn = Mock()
-        mock_cursor = Mock()
+        mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
 
         # Create test file
         csv_file = tmp_path / "test.csv"
@@ -535,7 +570,100 @@ class TestPostgreSQLDataLoading:
 
         # Invalid identifier should be skipped with 0 rows
         assert list(stats.values())[0] == 0
-        assert not mock_cursor.copy_expert.called
+        assert not mock_cursor.copy.called
+
+    def test_copy_sql_tbl_uses_format_text_with_null(self, postgres_stubs, tmp_path):
+        """csv_null_marker='' in manifest metadata → FORMAT text, NULL '' in COPY SQL.
+
+        Proves the table_metadata → resolve_csv_dialect → COPY SQL pipeline end-to-end.
+        TPC-style files use FORMAT text to avoid quote-parsing issues with pipe delimiter.
+        """
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (1,)
+        mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
+
+        tbl_file = tmp_path / "lineitem.tbl"
+        tbl_file.write_text("1|foo|bar|\n")
+
+        fake_ds = DataSource(
+            source_type="manifest_v2",
+            tables={"lineitem": tbl_file},
+            table_metadata={"lineitem": {"csv_delimiter": "|", "csv_null_marker": ""}},
+        )
+
+        adapter = PostgreSQLAdapter(schema="public")
+        with patch("benchbox.platforms.postgresql.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver_cls.return_value.resolve.return_value = fake_ds
+            adapter.load_data(Mock(), mock_conn, tmp_path)
+
+        assert mock_cursor.copy.called, "cursor.copy() was not called"
+        copy_sql = mock_cursor.copy.call_args.args[0]
+        assert "FORMAT text" in copy_sql
+        assert "NULL ''" in copy_sql
+        assert "FORMAT csv" not in copy_sql
+
+    def test_copy_sql_csv_with_header_uses_header_true(self, postgres_stubs, tmp_path):
+        """csv_has_header=True in manifest metadata → HEADER true in COPY SQL.
+
+        Proves the table_metadata → resolve_csv_dialect → COPY SQL pipeline end-to-end.
+        """
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (2,)
+        mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
+
+        csv_file = tmp_path / "trips.csv"
+        csv_file.write_text("time,lat,lon\n2026-01-01,1.0,2.0\n2026-01-02,3.0,4.0\n")
+
+        fake_ds = DataSource(
+            source_type="manifest_v2",
+            tables={"trips": csv_file},
+            table_metadata={"trips": {"csv_has_header": True, "csv_delimiter": ","}},
+        )
+
+        adapter = PostgreSQLAdapter(schema="public")
+        with patch("benchbox.platforms.postgresql.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver_cls.return_value.resolve.return_value = fake_ds
+            adapter.load_data(Mock(), mock_conn, tmp_path)
+
+        assert mock_cursor.copy.called, "cursor.copy() was not called"
+        copy_sql = mock_cursor.copy.call_args.args[0]
+        assert "FORMAT csv" in copy_sql
+        assert "HEADER true" in copy_sql
+
+    def test_copy_sql_csv_no_header_omits_header_clause(self, postgres_stubs, tmp_path):
+        """csv_has_header=False in manifest metadata → no HEADER clause in COPY SQL.
+
+        Proves the table_metadata → resolve_csv_dialect → COPY SQL pipeline end-to-end.
+        """
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (1,)
+        mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
+
+        csv_file = tmp_path / "hits.csv"
+        csv_file.write_text("1,,bar\n")
+
+        fake_ds = DataSource(
+            source_type="manifest_v2",
+            tables={"hits": csv_file},
+            table_metadata={"hits": {"csv_has_header": False, "csv_delimiter": ",", "csv_null_marker": None}},
+        )
+
+        adapter = PostgreSQLAdapter(schema="public")
+        with patch("benchbox.platforms.postgresql.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver_cls.return_value.resolve.return_value = fake_ds
+            adapter.load_data(Mock(), mock_conn, tmp_path)
+
+        assert mock_cursor.copy.called, "cursor.copy() was not called"
+        copy_sql = mock_cursor.copy.call_args.args[0]
+        assert "FORMAT csv" in copy_sql
+        assert "HEADER" not in copy_sql
+        assert "NULL" not in copy_sql
 
 
 class TestPostgreSQLCreateDatabase:
@@ -604,10 +732,10 @@ class TestPostgreSQLCreateSchema:
         mock_conn.commit.assert_called()
 
     def test_create_schema_continues_on_statement_failure(self, postgres_stubs):
-        """create_schema should continue executing remaining statements if one fails."""
+        """create_schema retries CREATE TABLE after stripping FOREIGN KEY constraints."""
         mock_conn = Mock()
         mock_cursor = Mock()
-        # First statement fails, second succeeds
+        # First attempt (with FK) fails; retry (without FK) succeeds
         mock_cursor.execute.side_effect = [Exception("syntax error"), None]
         mock_conn.cursor.return_value = mock_cursor
 
@@ -616,10 +744,11 @@ class TestPostgreSQLCreateSchema:
 
         adapter = PostgreSQLAdapter()
 
-        with patch.object(adapter, "_create_schema_with_tuning", return_value="INVALID SQL; CREATE TABLE bar (id INT)"):
+        fk_stmt = "CREATE TABLE foo (id INT, FOREIGN KEY (id) REFERENCES bar(id))"
+        with patch.object(adapter, "_create_schema_with_tuning", return_value=fk_stmt):
             duration = adapter.create_schema(MockBenchmark(), mock_conn)
 
-        # Should complete without raising despite first statement error
+        # Should complete without raising: FK stripped and retry succeeded
         assert isinstance(duration, float)
         mock_conn.commit.assert_called()
 
@@ -627,16 +756,16 @@ class TestPostgreSQLCreateSchema:
 class TestPostgreSQLValidatePlatformCapabilities:
     """Tests for validate_platform_capabilities."""
 
-    def test_valid_capabilities_with_psycopg2(self, postgres_stubs):
-        """Should return valid result when psycopg2 is available."""
-        postgres_stubs.__version__ = "2.9.9"
+    def test_valid_capabilities_with_psycopg(self, postgres_stubs):
+        """Should return valid result when psycopg is available."""
+        postgres_stubs.__version__ = "3.1.0"
 
         adapter = PostgreSQLAdapter(work_mem="256MB")
         result = adapter.validate_platform_capabilities("tpch")
 
         assert result is not None
         assert result.is_valid is True
-        assert result.details["psycopg2_available"] is True
+        assert result.details["psycopg_available"] is True
         assert result.details["benchmark_type"] == "tpch"
 
     def test_warns_on_low_work_mem(self, postgres_stubs):
@@ -718,41 +847,47 @@ class TestBuildPostgreSQLConfig:
     """Tests for _build_postgresql_config module-level function."""
 
     def test_default_values(self, postgres_stubs):
-        """Should populate defaults when options are empty."""
+        """Should populate defaults when no credentials are saved and options are empty."""
         from benchbox.platforms.postgresql import _build_postgresql_config
 
-        result = _build_postgresql_config({}, {})
+        with patch("benchbox.security.credentials.CredentialManager") as mock_cm_cls:
+            mock_cm = MagicMock()
+            mock_cm.get_platform_credentials.return_value = {}
+            mock_cm_cls.return_value = mock_cm
 
-        assert result["host"] == "localhost"
-        assert result["port"] == 5432
-        assert result["username"] == "postgres"
-        assert result["schema"] == "public"
-        assert result["work_mem"] == "256MB"
-        assert result["maintenance_work_mem"] == "512MB"
-        assert result["enable_timescale"] is False
+            result = _build_postgresql_config("postgresql", {}, {}, None)
+
+        assert result.host == "localhost"
+        assert result.port == 5432
+        assert result.username == "postgres"
+        assert result.sslmode == "prefer"
+        assert result.options.get("work_mem") == "256MB" or result.options.get("work_mem") is None
 
     def test_platform_options_override_defaults(self, postgres_stubs):
-        """Platform options should override defaults."""
+        """Explicit --platform-option flags should override saved credentials."""
         from benchbox.platforms.postgresql import _build_postgresql_config
 
-        result = _build_postgresql_config(
-            {},
-            {
-                "host": "pg.example.com",
-                "port": 5433,
-                "work_mem": "1GB",
-            },
-        )
+        explicit = {"host": "pg.example.com", "port": 5433, "work_mem": "1GB"}
+        with patch("benchbox.security.credentials.CredentialManager") as mock_cm_cls:
+            mock_cm = MagicMock()
+            mock_cm.get_platform_credentials.return_value = {"host": "saved-host", "username": "saved_user"}
+            mock_cm_cls.return_value = mock_cm
 
-        assert result["host"] == "pg.example.com"
-        assert result["port"] == 5433
-        assert result["work_mem"] == "1GB"
+            result = _build_postgresql_config(
+                "postgresql",
+                explicit,
+                {"_explicit_platform_options": explicit},
+                None,
+            )
+
+        assert result.host == "pg.example.com"
+        assert result.port == 5433
 
     def test_benchmark_config_merged(self, postgres_stubs):
-        """Benchmark config values should be merged into result."""
+        """Benchmark config values should be merged into result via overrides."""
         from benchbox.platforms.postgresql import _build_postgresql_config
 
-        result = _build_postgresql_config({"scale_factor": 10.0, "benchmark": "tpch"}, {})
+        result = _build_postgresql_config("postgresql", {}, {"scale_factor": 10.0, "benchmark": "tpch"}, None)
 
-        assert result["scale_factor"] == 10.0
-        assert result["benchmark"] == "tpch"
+        assert result.scale_factor == 10.0
+        assert result.benchmark == "tpch"

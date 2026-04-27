@@ -1,0 +1,290 @@
+{
+  "chart": "rank_table",
+  "version": 1,
+  "cases": [
+    {
+      "id": "no_ties",
+      "input": {
+        "queryIds": [
+          "Q1",
+          "Q2",
+          "Q3"
+        ],
+        "timingsByPlatform": [
+          {
+            "Q1": 100.0,
+            "Q2": 50.0,
+            "Q3": 200.0
+          },
+          {
+            "Q1": 200.0,
+            "Q2": 25.0,
+            "Q3": 100.0
+          },
+          {
+            "Q1": 300.0,
+            "Q2": 75.0,
+            "Q3": 50.0
+          }
+        ]
+      },
+      "expected": {
+        "ranks": {
+          "Q1": [
+            1,
+            2,
+            3
+          ],
+          "Q2": [
+            2,
+            1,
+            3
+          ],
+          "Q3": [
+            3,
+            2,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "two_way_tie",
+      "input": {
+        "queryIds": [
+          "Q1"
+        ],
+        "timingsByPlatform": [
+          {
+            "Q1": 100.0
+          },
+          {
+            "Q1": 100.0
+          },
+          {
+            "Q1": 200.0
+          }
+        ]
+      },
+      "expected": {
+        "ranks": {
+          "Q1": [
+            1,
+            1,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "id": "all_tied",
+      "input": {
+        "queryIds": [
+          "Q1"
+        ],
+        "timingsByPlatform": [
+          {
+            "Q1": 100.0
+          },
+          {
+            "Q1": 100.0
+          },
+          {
+            "Q1": 100.0
+          }
+        ]
+      },
+      "expected": {
+        "ranks": {
+          "Q1": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "mixed_nulls",
+      "input": {
+        "queryIds": [
+          "Q1",
+          "Q2"
+        ],
+        "timingsByPlatform": [
+          {
+            "Q1": 100.0,
+            "Q2": null
+          },
+          {
+            "Q1": null,
+            "Q2": 50.0
+          },
+          {
+            "Q1": 200.0,
+            "Q2": 50.0
+          }
+        ]
+      },
+      "expected": {
+        "ranks": {
+          "Q1": [
+            1,
+            null,
+            2
+          ],
+          "Q2": [
+            null,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "zero_and_negative_are_null",
+      "input": {
+        "queryIds": [
+          "Q1"
+        ],
+        "timingsByPlatform": [
+          {
+            "Q1": 0.0
+          },
+          {
+            "Q1": -5.0
+          },
+          {
+            "Q1": 100.0
+          },
+          {
+            "Q1": 50.0
+          }
+        ]
+      },
+      "expected": {
+        "ranks": {
+          "Q1": [
+            null,
+            null,
+            2,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "tpch_realistic_4q_4p",
+      "input": {
+        "queryIds": [
+          "Q1",
+          "Q2",
+          "Q3",
+          "Q4"
+        ],
+        "timingsByPlatform": [
+          {
+            "Q1": 120.5,
+            "Q2": 450.2,
+            "Q3": 88.1,
+            "Q4": 234.7
+          },
+          {
+            "Q1": 103.4,
+            "Q2": 290.8,
+            "Q3": 145.6,
+            "Q4": 678.9
+          },
+          {
+            "Q1": 97.3,
+            "Q2": 445.7,
+            "Q3": 167.2,
+            "Q4": 389.5
+          },
+          {
+            "Q1": 120.5,
+            "Q2": 78.4,
+            "Q3": 534.1,
+            "Q4": 201.3
+          }
+        ]
+      },
+      "expected": {
+        "ranks": {
+          "Q1": [
+            3,
+            2,
+            1,
+            3
+          ],
+          "Q2": [
+            4,
+            2,
+            3,
+            1
+          ],
+          "Q3": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "Q4": [
+            2,
+            4,
+            3,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "empty_query_ids",
+      "input": {
+        "queryIds": [],
+        "timingsByPlatform": []
+      },
+      "expected": {
+        "ranks": {}
+      }
+    },
+    {
+      "id": "no_platforms",
+      "input": {
+        "queryIds": [
+          "Q1"
+        ],
+        "timingsByPlatform": []
+      },
+      "expected": {
+        "ranks": {
+          "Q1": []
+        }
+      }
+    },
+    {
+      "id": "all_null_for_query",
+      "input": {
+        "queryIds": [
+          "Q1"
+        ],
+        "timingsByPlatform": [
+          {
+            "Q1": null
+          },
+          {
+            "Q1": null
+          }
+        ]
+      },
+      "expected": {
+        "ranks": {
+          "Q1": [
+            null,
+            null
+          ]
+        }
+      }
+    }
+  ]
+}

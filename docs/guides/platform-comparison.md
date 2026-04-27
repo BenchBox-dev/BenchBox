@@ -84,7 +84,8 @@ SQL Platforms:
     duckdb           (embedded, analytical)
     sqlite           (embedded, transactional)
     postgresql       (server, transactional)
-    clickhouse       (server, analytical)
+    clickhouse-local (embedded, analytical)
+    clickhouse-server (server, analytical)
 
   Cloud (requires configuration):
     snowflake        (cloud, analytical)

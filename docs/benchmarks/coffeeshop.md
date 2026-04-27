@@ -5,7 +5,7 @@
 ```{tags} beginner, concept, coffeeshop, custom-benchmark
 ```
 
-> **CLI name:** `coffeeshop` — use `benchbox run --benchmark coffeeshop`
+> **CLI name:** `coffeeshop` - use `benchbox run --benchmark coffeeshop`
 
 ## Overview
 
@@ -118,13 +118,13 @@ print(result)
 
 ## Scale Factors
 
-The scale factor controls the volume of data generated:
+The scale factor controls the volume of data generated. SF=1 targets approximately 1 GB of uncompressed CSV data, consistent with other BenchBox benchmarks.
 
-- **0.001**: ~1,000 orders (development/testing)
-- **0.01**: ~10,000 orders (CI/CD, quick validation)
-- **0.1**: ~100,000 orders (integration testing)
-- **1.0**: ~1,000,000 orders (standard benchmark)
-- **10.0**: ~10,000,000 orders (large-scale testing)
+- **0.001**: ~8,500 orders (development/testing)
+- **0.01**: ~85,000 orders (CI/CD, quick validation)
+- **0.1**: ~850,000 orders (integration testing)
+- **1.0**: ~8,500,000 orders (standard benchmark, ~1 GB)
+- **10.0**: ~85,000,000 orders (large-scale testing)
 
 ## CLI Usage
 
@@ -230,11 +230,11 @@ ORDER BY revenue DESC;
 
 | Scale Factor | Orders | Order Lines | Data Size |
 |--------------|--------|-------------|-----------|
-| 0.001 | ~1K | ~3K | <1MB |
-| 0.01 | ~10K | ~30K | ~5MB |
-| 0.1 | ~100K | ~300K | ~50MB |
-| 1.0 | ~1M | ~3M | ~500MB |
-| 10.0 | ~10M | ~30M | ~5GB |
+| 0.001 | ~8.5K | ~13K | ~1 MB |
+| 0.01 | ~85K | ~133K | ~10 MB |
+| 0.1 | ~850K | ~1.3M | ~100 MB |
+| 1.0 | ~8.5M | ~13.3M | ~1 GB |
+| 10.0 | ~85M | ~133M | ~10 GB |
 
 ## API Reference
 

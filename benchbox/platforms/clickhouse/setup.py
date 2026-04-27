@@ -45,6 +45,7 @@ class ClickHouseSetupMixin:
         """Setup configuration for local mode."""
         # Local mode settings
         self.data_path = config.get("data_path", None)  # Optional data path for file operations
+        self.database_path = config.get("database_path", None)  # Persistent chdb storage path (set by from_config)
 
         # Performance settings for local mode
         self.max_memory_usage = config.get("max_memory_usage", "8GB")  # Sufficient with uncompressed cache disabled
@@ -88,7 +89,7 @@ class ClickHouseSetupMixin:
         # OAuth token authentication (alternative to password)
         self.oauth_token = config.get("oauth_token") or os.environ.get("CLICKHOUSE_CLOUD_OAUTH_TOKEN")
 
-        # Validate required credentials — either password or OAuth token must be provided
+        # Validate required credentials - either password or OAuth token must be provided
         if not self.host:
             raise ValueError(
                 "ClickHouse Cloud requires host configuration.\n"
@@ -189,7 +190,7 @@ class ClickHouseSetupMixin:
         elif self.deployment_mode == "cloud":
             return self._create_cloud_connection(**connection_config)
         else:
-            raise ValueError(f"Unknown ClickHouse mode: {self.deployment_mode}")
+            raise ValueError(f"Unknown ClickHouse deployment mode: {self.deployment_mode}")
 
     def _create_server_connection(self, **connection_config) -> Any:
         """Create server mode ClickHouse connection."""

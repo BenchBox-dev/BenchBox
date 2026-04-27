@@ -71,7 +71,7 @@ def validate_benchmark_changes():
                 validation_results.append({"benchmark": benchmark["name"], "passed": False})
                 continue
 
-            with open(summary_file) as f:
+            with open(summary_file, encoding="utf-8") as f:
                 summary = json.load(f)
 
             queries = summary.get("queries", {})

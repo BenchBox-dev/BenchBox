@@ -302,4 +302,280 @@ class TestMotherDuckGetPlatformInfo:
         adapter = MotherDuckAdapter(token="tok")
         info = adapter.get_platform_info()
         assert info["platform_name"] == "MotherDuck"
-        assert "platform_version" in info
+
+    def test_get_platform_info_with_active_connection(self):
+        """Platform version is probed when a connection is available."""
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchone.return_value = ("v24.1.0",)
+
+        info = adapter.get_platform_info(connection=mock_conn)
+
+        assert info["platform_version"] == "v24.1.0"
+        assert info["engine_version"] == "v24.1.0"
+
+    def test_get_platform_info_version_probe_exception_silenced(self):
+        """Version probe failure does not raise."""
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.side_effect = RuntimeError("no response")
+
+        info = adapter.get_platform_info(connection=mock_conn)
+        assert info["platform_name"] == "MotherDuck"
+
+
+class TestMotherDuckExecuteQuery:
+    """Test execute_query method."""
+
+    def test_execute_query_success(self):
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = [(1,), (2,)]
+
+        result = adapter.execute_query(mock_conn, "SELECT 1", "Q1")
+
+        assert result["status"] == "SUCCESS"
+        assert result["rows_returned"] == 2
+        assert result["query_id"] == "Q1"
+        assert result["execution_time_seconds"] >= 0.0
+
+    def test_execute_query_creates_connection_when_none(self):
+        """execute_query falls back to self.connection then create_connection when both are None."""
+        from unittest.mock import MagicMock, patch
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchall.return_value = []
+
+        with patch.object(adapter, "create_connection", return_value=mock_conn) as mock_create:
+            result = adapter.execute_query(None, "SELECT 1", "Q1")
+
+        mock_create.assert_called_once()
+        assert result["status"] == "SUCCESS"
+        assert result["rows_returned"] == 0
+
+    def test_execute_query_returns_failed_dict_on_exception(self):
+        """execute_query returns a FAILED dict instead of propagating the exception."""
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.side_effect = RuntimeError("query failed")
+
+        result = adapter.execute_query(mock_conn, "SELECT bad", "Q_err")
+
+        assert result["status"] == "FAILED"
+        assert "query failed" in result["error"]
+        assert result["error_type"] == "RuntimeError"
+
+
+class TestMotherDuckTestConnection:
+    def test_test_connection_success(self):
+        from unittest.mock import MagicMock, patch
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchone.return_value = (1,)
+
+        with patch.object(adapter, "create_connection", return_value=mock_conn):
+            assert adapter.test_connection() is True
+
+    def test_test_connection_failure(self):
+        from unittest.mock import patch
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+
+        with patch.object(adapter, "create_connection", side_effect=ConnectionError("refused")):
+            assert adapter.test_connection() is False
+
+
+class TestMotherDuckConfigureForBenchmark:
+    def test_configure_sets_memory_limit(self):
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok", memory_limit="8GB")
+        mock_conn = MagicMock()
+
+        adapter.configure_for_benchmark(mock_conn, "olap")
+
+        mock_conn.execute.assert_called_once_with("SET memory_limit = '8GB'")
+
+    def test_configure_silences_set_error(self):
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.side_effect = RuntimeError("read-only")
+
+        # Should not raise
+        adapter.configure_for_benchmark(mock_conn, "olap")
+
+
+class TestMotherDuckCloseConnection:
+    def test_close_external_connection_does_not_clear_self(self):
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        internal_conn = MagicMock()
+        adapter.connection = internal_conn
+        external_conn = MagicMock()
+
+        adapter.close_connection(connection=external_conn)
+
+        external_conn.close.assert_called_once()
+        # self.connection should NOT be cleared (we passed an external conn)
+        assert adapter.connection is internal_conn
+
+    def test_close_self_connection_clears_state(self):
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        adapter.connection = mock_conn
+
+        adapter.close_connection()
+
+        mock_conn.close.assert_called_once()
+        assert adapter.connection is None
+
+
+class TestMotherDuckCoverageW15:
+    """Additional coverage for w15: connection errors, version probing, load_data."""
+
+    def test_create_connection_failure_raises_connection_error(self):
+        from unittest.mock import MagicMock, patch
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="bad_token")
+
+        with patch("benchbox.platforms.motherduck.duckdb") as mock_duckdb:
+            mock_duckdb.connect.side_effect = RuntimeError("invalid token")
+            with pytest.raises(ConnectionError, match="Failed to connect to MotherDuck"):
+                adapter.create_connection()
+
+    def test_close_connection_logs_on_error(self):
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.close.side_effect = RuntimeError("already closed")
+        adapter.connection = mock_conn
+        # Should not raise - logs warning and clears connection
+        adapter.close_connection()
+        assert adapter.connection is None
+
+    def test_get_platform_info_with_connection_version_probe(self):
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchone.return_value = ("v1.2.3",)
+
+        info = adapter.get_platform_info(connection=mock_conn)
+        assert info["platform_version"] == "v1.2.3"
+
+    def test_get_platform_info_version_probe_exception_ignored(self):
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.side_effect = RuntimeError("no connection")
+
+        # Should not raise
+        info = adapter.get_platform_info(connection=mock_conn)
+        assert info["platform_type"] == "motherduck"
+
+    def test_get_platform_metadata_with_connection(self):
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchone.return_value = ("v23.1.0",)
+        adapter.connection = mock_conn
+
+        metadata = adapter.get_platform_metadata()
+        assert metadata["duckdb_version"] == "v23.1.0"
+
+    def test_get_platform_metadata_version_error_silenced(self):
+        from unittest.mock import MagicMock
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.side_effect = RuntimeError("fail")
+        adapter.connection = mock_conn
+
+        metadata = adapter.get_platform_metadata()
+        assert "duckdb_version" not in metadata
+
+    def test_load_data_inserts_parquet_files(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="tok")
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.fetchone.return_value = (42,)
+
+        # Create fake parquet files
+        (tmp_path / "lineitem.parquet").write_bytes(b"fake")
+        (tmp_path / "orders.parquet").write_bytes(b"fake")
+
+        mock_benchmark = MagicMock()
+
+        row_counts, load_time, manifest = adapter.load_data(mock_benchmark, mock_conn, tmp_path)
+
+        assert "lineitem" in row_counts
+        assert "orders" in row_counts
+        assert row_counts["lineitem"] == 42
+        assert load_time >= 0.0
+
+    def test_from_config_maps_token_and_database(self):
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter.from_config(
+            {
+                "motherduck_token": "my_token",
+                "motherduck_database": "my_db",
+            }
+        )
+        assert adapter.token == "my_token"
+        assert adapter.database == "my_db"

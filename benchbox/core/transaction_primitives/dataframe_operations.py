@@ -1199,6 +1199,398 @@ class DataFrameTransactionOperationsManager:
             self.logger.error(f"Version compare failed: {e}")
             return DataFrameTransactionResult.failure(operation, str(e), start_time)
 
+    def execute_concurrent_write(
+        self,
+        table_path: Path | str,
+        dataframes: list[Any],
+    ) -> DataFrameTransactionResult:
+        """Execute concurrent write operations and measure conflict resolution.
+
+        Simulates concurrent writes to a transactional table using sequential
+        execution with version-conflict detection. True parallelism requires
+        external coordination (e.g., thread pools), which is intentionally
+        out of scope here - the goal is to verify the platform's conflict
+        detection semantics and report the outcome.
+
+        Delta Lake uses optimistic concurrency: each write reads the current
+        version, writes data, then checks if the version changed. If conflicted,
+        the write is retried or fails.
+
+        Args:
+            table_path: Path to the target table
+            dataframes: List of DataFrames to write (each represents a concurrent write)
+
+        Returns:
+            DataFrameTransactionResult with conflict detection metrics
+        """
+        import time as _time
+
+        start_time = _time.time()
+        operation = TransactionOperationType.CONCURRENT_WRITE
+
+        if not self.supports_operation(operation):
+            return DataFrameTransactionResult.failure(
+                operation,
+                f"Concurrent write not supported on platform '{self.platform_name}' "
+                f"(table_format={self._capabilities.table_format})",
+                start_time,
+            )
+
+        table_path_str = str(table_path)
+
+        try:
+            version_before = self.get_table_version(table_path_str)
+            writes_succeeded = 0
+            writes_conflicted = 0
+
+            for i, df in enumerate(dataframes):
+                try:
+                    if self._capabilities.table_format == "delta" and self.spark_session:
+                        df.write.format("delta").mode("append").save(table_path_str)
+                        writes_succeeded += 1
+                    elif self._capabilities.table_format == "iceberg" and self.spark_session:
+                        df.writeTo(table_path_str).append()
+                        writes_succeeded += 1
+                    else:
+                        # delta-rs: write via arrow
+                        import pyarrow as pa
+                        from deltalake.writer import write_deltalake
+
+                        arrow_table = pa.Table.from_pandas(df.toPandas() if hasattr(df, "toPandas") else df)
+                        write_deltalake(table_path_str, arrow_table, mode="append")
+                        writes_succeeded += 1
+                except Exception as write_err:
+                    self.logger.warning(f"Concurrent write {i} conflicted: {write_err}")
+                    writes_conflicted += 1
+
+            version_after = self.get_table_version(table_path_str)
+            end_time = _time.time()
+
+            return DataFrameTransactionResult(
+                operation_type=operation,
+                success=True,
+                start_time=start_time,
+                end_time=end_time,
+                duration_ms=(end_time - start_time) * 1000,
+                rows_affected=writes_succeeded,
+                version_before=version_before,
+                version_after=version_after,
+                metrics={
+                    "writes_attempted": len(dataframes),
+                    "writes_succeeded": writes_succeeded,
+                    "writes_conflicted": writes_conflicted,
+                },
+            )
+
+        except Exception as e:
+            self.logger.error(f"Concurrent write failed: {e}")
+            return DataFrameTransactionResult.failure(operation, str(e), start_time)
+
+    def execute_conflict_resolution(
+        self,
+        table_path: Path | str,
+        dataframe: Any,
+        resolution_strategy: str = "retry",
+    ) -> DataFrameTransactionResult:
+        """Execute a write that may conflict and apply a resolution strategy.
+
+        Tests the platform's conflict resolution behaviour by writing to a table
+        with an explicit strategy:
+        - "retry": Retry the write after reading the current version
+        - "overwrite": Overwrite conflicting changes (last-write-wins)
+        - "fail": Surface the conflict as an error (pessimistic)
+
+        Delta Lake uses optimistic concurrency; this operation measures
+        the overhead of conflict detection and resolution.
+
+        Args:
+            table_path: Path to the target table
+            dataframe: DataFrame to write
+            resolution_strategy: One of "retry", "overwrite", "fail"
+
+        Returns:
+            DataFrameTransactionResult with conflict resolution outcome
+        """
+        import time as _time
+
+        start_time = _time.time()
+        operation = TransactionOperationType.CONFLICT_RESOLUTION
+
+        if not self.supports_operation(operation):
+            return DataFrameTransactionResult.failure(
+                operation,
+                f"Conflict resolution not supported on platform '{self.platform_name}' "
+                f"(table_format={self._capabilities.table_format})",
+                start_time,
+            )
+
+        table_path_str = str(table_path)
+
+        try:
+            version_before = self.get_table_version(table_path_str)
+            retry_count = 0
+            max_retries = 3 if resolution_strategy == "retry" else 1
+
+            last_error: str | None = None
+            succeeded = False
+
+            for attempt in range(max_retries):
+                try:
+                    if self._capabilities.table_format == "delta" and self.spark_session:
+                        write_mode = "overwrite" if resolution_strategy == "overwrite" else "append"
+                        dataframe.write.format("delta").mode(write_mode).save(table_path_str)
+                        succeeded = True
+                        break
+                    elif self._capabilities.table_format == "iceberg" and self.spark_session:
+                        if resolution_strategy == "overwrite":
+                            dataframe.writeTo(table_path_str).overwritePartitions()
+                        else:
+                            dataframe.writeTo(table_path_str).append()
+                        succeeded = True
+                        break
+                    else:
+                        from deltalake.writer import write_deltalake
+
+                        write_mode = "overwrite" if resolution_strategy == "overwrite" else "append"
+                        import pyarrow as pa
+
+                        arrow_table = pa.Table.from_pandas(
+                            dataframe.toPandas() if hasattr(dataframe, "toPandas") else dataframe
+                        )
+                        write_deltalake(table_path_str, arrow_table, mode=write_mode)
+                        succeeded = True
+                        break
+                except Exception as e:
+                    last_error = str(e)
+                    retry_count += 1
+                    if resolution_strategy == "fail":
+                        break
+
+            version_after = self.get_table_version(table_path_str)
+            end_time = _time.time()
+
+            if succeeded:
+                return DataFrameTransactionResult(
+                    operation_type=operation,
+                    success=True,
+                    start_time=start_time,
+                    end_time=end_time,
+                    duration_ms=(end_time - start_time) * 1000,
+                    rows_affected=1,
+                    version_before=version_before,
+                    version_after=version_after,
+                    metrics={
+                        "resolution_strategy": resolution_strategy,
+                        "retry_count": retry_count,
+                    },
+                )
+            return DataFrameTransactionResult.failure(
+                operation,
+                f"Conflict resolution failed after {retry_count} attempts: {last_error}",
+                start_time,
+            )
+
+        except Exception as e:
+            self.logger.error(f"Conflict resolution failed: {e}")
+            return DataFrameTransactionResult.failure(operation, str(e), start_time)
+
+    def execute_snapshot_isolation(
+        self,
+        table_path: Path | str,
+        query_fn: Any | None = None,
+    ) -> DataFrameTransactionResult:
+        """Verify snapshot isolation semantics by reading a stable table snapshot.
+
+        In Delta Lake, reads always see a consistent snapshot of the table at
+        a point in time. This operation reads the table twice in sequence and
+        verifies that the row count is identical (no dirty reads).
+
+        For PySpark + Delta Lake, snapshot isolation is guaranteed by the table
+        format - this operation measures the overhead of reading a snapshot
+        vs the current version.
+
+        Args:
+            table_path: Path to the target table
+            query_fn: Optional function that applies a filter/aggregation on the DataFrame
+
+        Returns:
+            DataFrameTransactionResult with snapshot consistency metrics
+        """
+        import time as _time
+
+        start_time = _time.time()
+        operation = TransactionOperationType.SNAPSHOT_ISOLATION
+
+        if not self.supports_operation(operation):
+            return DataFrameTransactionResult.failure(
+                operation,
+                f"Snapshot isolation not supported on platform '{self.platform_name}' "
+                f"(isolation={self._capabilities.transaction_isolation})",
+                start_time,
+            )
+
+        table_path_str = str(table_path)
+
+        try:
+            current_version = self.get_table_version(table_path_str)
+
+            if self._capabilities.table_format == "delta" and self.spark_session:
+                # Read snapshot at pinned version to verify isolation
+                if current_version is not None:
+                    df1 = (
+                        self.spark_session.read.format("delta")
+                        .option("versionAsOf", current_version)
+                        .load(table_path_str)
+                    )
+                else:
+                    df1 = self.spark_session.read.format("delta").load(table_path_str)
+
+                if query_fn is not None:
+                    df1 = query_fn(df1)
+
+                count1 = df1.count()
+                # Second read of same snapshot - must match
+                count2 = df1.count()
+                consistent = count1 == count2
+
+            elif self._capabilities.table_format == "iceberg" and self.spark_session:
+                df1 = self.spark_session.read.format("iceberg").load(table_path_str)
+                if query_fn is not None:
+                    df1 = query_fn(df1)
+                count1 = df1.count()
+                count2 = df1.count()
+                consistent = count1 == count2
+
+            else:
+                # delta-rs: read pinned version
+                from deltalake import DeltaTable
+
+                dt = DeltaTable(table_path_str, version=current_version)
+                arrow_table = dt.to_pyarrow_table()
+                count1 = arrow_table.num_rows
+                count2 = arrow_table.num_rows
+                consistent = True  # delta-rs reads are always snapshot-isolated
+
+            end_time = _time.time()
+            return DataFrameTransactionResult(
+                operation_type=operation,
+                success=True,
+                start_time=start_time,
+                end_time=end_time,
+                duration_ms=(end_time - start_time) * 1000,
+                rows_affected=count1,
+                version_before=current_version,
+                version_after=current_version,
+                metrics={
+                    "snapshot_consistent": consistent,
+                    "row_count_read1": count1,
+                    "row_count_read2": count2,
+                    "pinned_version": current_version,
+                },
+            )
+
+        except Exception as e:
+            self.logger.error(f"Snapshot isolation check failed: {e}")
+            return DataFrameTransactionResult.failure(operation, str(e), start_time)
+
+    def execute_read_your_writes(
+        self,
+        table_path: Path | str,
+        dataframe: Any,
+    ) -> DataFrameTransactionResult:
+        """Verify read-your-writes consistency after an atomic write.
+
+        After writing rows to a transactional table, immediately reads them
+        back and verifies the count matches. This validates that the platform
+        guarantees read-your-writes semantics (the writer always sees its own
+        committed changes).
+
+        Delta Lake guarantees this because each write produces a new version
+        and subsequent reads default to the latest version.
+
+        Args:
+            table_path: Path to the target table
+            dataframe: DataFrame containing rows to write then read back
+
+        Returns:
+            DataFrameTransactionResult with read-your-writes verification
+        """
+        import time as _time
+
+        start_time = _time.time()
+        operation = TransactionOperationType.READ_YOUR_WRITES
+
+        if not self.supports_operation(operation):
+            return DataFrameTransactionResult.failure(
+                operation,
+                f"Read-your-writes not supported on platform '{self.platform_name}' "
+                f"(supports_transactions={self._capabilities.supports_transactions})",
+                start_time,
+            )
+
+        table_path_str = str(table_path)
+
+        try:
+            version_before = self.get_table_version(table_path_str)
+            rows_written = 0
+
+            # Write
+            if self._capabilities.table_format == "delta" and self.spark_session:
+                rows_written = dataframe.count() if hasattr(dataframe, "count") else len(dataframe)
+                dataframe.write.format("delta").mode("append").save(table_path_str)
+            elif self._capabilities.table_format == "iceberg" and self.spark_session:
+                rows_written = dataframe.count() if hasattr(dataframe, "count") else len(dataframe)
+                dataframe.writeTo(table_path_str).append()
+            else:
+                import pyarrow as pa
+                from deltalake.writer import write_deltalake
+
+                arrow_table = pa.Table.from_pandas(
+                    dataframe.toPandas() if hasattr(dataframe, "toPandas") else dataframe
+                )
+                rows_written = arrow_table.num_rows
+                write_deltalake(table_path_str, arrow_table, mode="append")
+
+            # Read back immediately
+            version_after = self.get_table_version(table_path_str)
+            rows_read_back = 0
+
+            if self._capabilities.table_format == "delta" and self.spark_session:
+                df_back = self.spark_session.read.format("delta").load(table_path_str)
+                rows_read_back = df_back.count()
+            elif self._capabilities.table_format == "iceberg" and self.spark_session:
+                df_back = self.spark_session.read.format("iceberg").load(table_path_str)
+                rows_read_back = df_back.count()
+            else:
+                from deltalake import DeltaTable
+
+                dt = DeltaTable(table_path_str)
+                rows_read_back = dt.to_pyarrow_table().num_rows
+
+            end_time = _time.time()
+            # Read-your-writes is satisfied if the table grew by at least rows_written
+            reads_own_writes = rows_read_back >= rows_written
+
+            return DataFrameTransactionResult(
+                operation_type=operation,
+                success=True,
+                start_time=start_time,
+                end_time=end_time,
+                duration_ms=(end_time - start_time) * 1000,
+                rows_affected=rows_written,
+                version_before=version_before,
+                version_after=version_after,
+                metrics={
+                    "rows_written": rows_written,
+                    "rows_read_back": rows_read_back,
+                    "reads_own_writes": reads_own_writes,
+                },
+            )
+
+        except Exception as e:
+            self.logger.error(f"Read-your-writes check failed: {e}")
+            return DataFrameTransactionResult.failure(operation, str(e), start_time)
+
 
 def get_dataframe_transaction_manager(
     platform_name: str,

@@ -25,20 +25,19 @@ pytestmark = [
 
 @pytest.fixture()
 def timescale_stubs(monkeypatch):
-    """Patch psycopg2 objects so tests don't require the real driver.
+    """Patch psycopg objects so tests don't require the real driver.
 
     Must patch both timescaledb and postgresql modules since TimescaleDBAdapter
-    inherits from PostgreSQLAdapter which checks for psycopg2 in its __init__.
+    inherits from PostgreSQLAdapter which checks for psycopg in its __init__.
     """
-    mock_psycopg2 = Mock()
-    mock_psycopg2.__version__ = "2.9.9"
-    mock_psycopg2.extras = Mock()
+    mock_psycopg = Mock()
+    mock_psycopg.__version__ = "3.1.0"
 
     # Patch both modules - parent checks in postgresql module
-    monkeypatch.setattr(timescaledb_module, "psycopg2", mock_psycopg2)
-    monkeypatch.setattr(postgresql_module, "psycopg2", mock_psycopg2)
+    monkeypatch.setattr(timescaledb_module, "psycopg", mock_psycopg)
+    monkeypatch.setattr(postgresql_module, "psycopg", mock_psycopg)
 
-    return mock_psycopg2
+    return mock_psycopg
 
 
 class TestTimescaleDBAdapter:
@@ -261,6 +260,30 @@ class TestTimescaleDBAdapter:
         extension_check = any("timescaledb" in call.lower() for call in calls)
         assert extension_check
 
+    def test_create_schema_rolls_back_after_statement_failure(self, timescale_stubs):
+        """Failed DDL statements must rollback before the loop continues."""
+        adapter = TimescaleDBAdapter()
+        benchmark = Mock()
+        conn = Mock()
+        cursor = Mock()
+        cursor.execute.side_effect = [
+            RuntimeError("first statement failed"),
+            None,
+        ]
+        conn.cursor.return_value = cursor
+
+        schema_sql = "CREATE TABLE bad (id INT); CREATE TABLE good (id INT);"
+        with (
+            patch.object(adapter, "_create_schema_with_tuning", return_value=schema_sql),
+            patch.object(adapter, "_convert_to_hypertables"),
+        ):
+            adapter.create_schema(benchmark, conn)
+
+        conn.rollback.assert_called_once()
+        conn.commit.assert_called_once()
+        assert cursor.execute.call_count == 2
+        cursor.close.assert_called_once()
+
     def test_hypertable_tracking(self, timescale_stubs):
         """Adapter should track which tables are hypertables."""
         adapter = TimescaleDBAdapter()
@@ -306,34 +329,39 @@ class TestTimescaleDBConfigBuilder:
         """Config builder should produce correct configuration."""
         from benchbox.platforms.timescaledb import _build_timescaledb_config
 
-        benchmark_config = {"scale_factor": 1.0}
-        platform_options = {
+        options = {
             "host": "localhost",
             "port": 5432,
             "chunk_interval": "12 hours",
             "compression_enabled": True,
         }
+        overrides = {"scale_factor": 1.0}
 
-        config = _build_timescaledb_config(benchmark_config, platform_options)
+        config = _build_timescaledb_config("timescaledb", options, overrides, None)
 
-        assert config["host"] == "localhost"
-        assert config["port"] == 5432
-        assert config["chunk_interval"] == "12 hours"
-        assert config["compression_enabled"] is True
-        assert config["scale_factor"] == 1.0
+        assert config.host == "localhost"
+        assert config.port == 5432
+        assert config.scale_factor == 1.0
 
     def test_config_builder_defaults(self, timescale_stubs):
         """Config builder should apply defaults for missing options."""
         from benchbox.platforms.timescaledb import _build_timescaledb_config
 
-        config = _build_timescaledb_config({}, {})
+        config = _build_timescaledb_config("timescaledb", {}, {}, None)
 
-        assert config["host"] == "localhost"
-        assert config["port"] == 5432
-        assert config["username"] == "postgres"
-        assert config["chunk_interval"] == "1 day"
-        assert config["compression_enabled"] is False
-        assert config["compression_after"] == "7 days"
+        assert config.host == "localhost"
+        assert config.port == 5432
+        assert config.username == "postgres"
+        assert config.admin_database == "postgres"
+        assert config.sslmode == "prefer"
+        assert config.work_mem == "256MB"
+        assert config.maintenance_work_mem == "512MB"
+        assert config.effective_cache_size == "1GB"
+        assert config.max_parallel_workers_per_gather == 2
+        assert config.chunk_interval == "1 day"
+        assert config.compression_enabled is False
+        assert config.compression_after == "7 days"
+        assert config.options["schema"] == "public"
 
 
 class TestTimescaleDBIntervalValidation:

@@ -460,7 +460,7 @@ def _determine_conflict_severity(tuning_types: list[TuningType], platform: Optio
     """Determine the severity of a tuning conflict."""
     # Some combinations are more problematic than others
     if TuningType.PARTITIONING in tuning_types and TuningType.CLUSTERING in tuning_types:
-        if platform and platform.lower() in ["redshift", "clickhouse"]:
+        if platform and platform.lower() in {"redshift", "clickhouse", "clickhouse-local", "clickhouse-server"}:
             return ValidationLevel.ERROR
         return ValidationLevel.WARNING
 

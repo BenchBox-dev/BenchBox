@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import csv
 import json
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import (
@@ -60,6 +61,22 @@ from benchbox.core.tpcdi.validation import DataQualityResult, TPCDIValidator
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.printing import emit
 
+# Pre-compiled for translate_query_text() - avoids recompilation on every call.
+_JULIANDAY_DIFF_RE = re.compile(
+    r"JULIANDAY\s*\(([^)]+(?:\([^)]*\)[^)]*)*)\)\s*-\s*JULIANDAY\s*\(([^)]+(?:\([^)]*\)[^)]*)*)\)",
+    re.IGNORECASE,
+)
+_DATE_INTERVAL_RE = re.compile(
+    r"DATE\s*\(\s*['\"]now['\"]\s*,\s*['\"]?-(\d+)\s+days?['\"]?\s*\)",
+    re.IGNORECASE,
+)
+_DATE_NOW_RE = re.compile(r"DATE\s*\(\s*['\"]now['\"]\s*\)", re.IGNORECASE)
+_DOUBLE_COUNT_RE = re.compile(
+    r"\(\s*SELECT\s+COUNT\s*\(\s*\*\s*\)\s+FROM\s+\(\s*(?:(?:/\*[^*]*\*/|--[^\n]*)\s*)?"
+    r"SELECT\s+COUNT\s*\(\s*\*\s*\)\s+AS\s+\w+\s+(FROM\s+[^)]+)\)\s*\)",
+    re.IGNORECASE,
+)
+
 
 class TPCDIBenchmark(BaseBenchmark):
     """TPC-DI (Data Integration) benchmark implementation.
@@ -72,6 +89,10 @@ class TPCDIBenchmark(BaseBenchmark):
     - Comprehensive data quality validation framework
     - Official TPC-DI metrics calculation and reporting
     - Database-agnostic implementation with SQLGlot translation
+
+    ClickHouse dialect notes:
+    - AQ6 uses SUM(SUM(x)) OVER () nested window aggregate - unsupported in ClickHouse.
+      Replaced with a CROSS JOIN pre-computed total.
 
     Integrated systems:
     - TPCDISchemaManager: Database-agnostic schema management
@@ -120,6 +141,11 @@ class TPCDIBenchmark(BaseBenchmark):
         self._name = "TPC-DI Benchmark"
         self._version = "1.0"
         self._description = "TPC-DI (Data Integration) Benchmark - Tests ETL and data integration performance"
+
+        # TPC-DI generates BOOLEAN columns as literal 'True'/'False' strings.
+        # Adapters with strict numeric-boolean parsing (e.g. SingleStore
+        # STRICT_ALL_TABLES) need to rewrite these to '1'/'0' before load.
+        self.csv_normalize_booleans: bool = True
 
         # Use unified configuration if provided, otherwise create from parameters
         if config is None:
@@ -262,6 +288,53 @@ class TPCDIBenchmark(BaseBenchmark):
             translated_queries = {}
             for query_id, query_sql in queries.items():
                 translated_queries[query_id] = self.translate_query_text(query_sql, dialect)
+
+            # Apply post-translation platform variants via the compat registry.
+            import benchbox.sql_compat.rules.query_source.tpcdi_variants  # noqa: F401
+            from benchbox.sql_compat.actions import CompatAction
+            from benchbox.sql_compat.context import CompatibilityContext, Phase
+            from benchbox.sql_compat.registry import REGISTRY
+            from benchbox.sql_compat.rules.query_source.tpcdi_variants import (
+                CLICKHOUSE_AQ6_SQL,
+                DORIS_EQ7_SQL,
+                STARROCKS_EQ7_SQL,
+            )
+
+            d = dialect.lower()
+            _variants: dict[str, dict[str, str]] = {
+                "clickhouse": {"AQ6": CLICKHOUSE_AQ6_SQL},
+                "starrocks": {"EQ7": STARROCKS_EQ7_SQL},
+                "doris": {"EQ7": DORIS_EQ7_SQL},
+            }
+            for platform, platform_variants in _variants.items():
+                if platform not in d:
+                    continue
+                for query_id, legacy_sql in platform_variants.items():
+                    if query_id not in translated_queries:
+                        continue
+                    ctx = CompatibilityContext(
+                        platform=platform,
+                        platform_version=None,
+                        benchmark="tpcdi",
+                        query_id=query_id,
+                        phase=Phase.QUERY_SOURCE,
+                        mode="sql",
+                        dialect=dialect,
+                    )
+                    registry_decision = REGISTRY.resolve(ctx)
+                    if registry_decision is not None:
+                        if registry_decision.action is CompatAction.SELECT_VARIANT:
+                            variant_sql = registry_decision.payload.variant_sql  # type: ignore[union-attr]
+                        else:
+                            continue  # registry says NATIVE - keep translated SQL
+                    else:
+                        variant_sql = legacy_sql  # no rule: use legacy SQL
+                    if query_id == "AQ6":  # AQ6 is a template; EQ7 is complete SQL with no placeholders
+                        params = self.query_manager._generate_default_params(query_id)
+                        translated_queries[query_id] = variant_sql.format(**params)
+                    else:
+                        translated_queries[query_id] = variant_sql
+
             return translated_queries
 
         return queries
@@ -277,53 +350,70 @@ class TPCDIBenchmark(BaseBenchmark):
             Translated SQL query text
 
         """
-        import re
-
         from benchbox.utils.dialect_utils import translate_sql_query
 
         # Apply platform-specific pre-processing before SQLGlot translation
         if target_dialect == "duckdb":
-            # Replace SQLite's JULIANDAY function with DuckDB date arithmetic
-            # Pattern: JULIANDAY(expr1) - JULIANDAY(expr2) → (expr1 - expr2)
-            # DuckDB's date subtraction returns days as an integer
-
-            # Replace SQLite's DATE('now', '-N days') FIRST (before DATE('now') replacement)
-            # Pattern: DATE('now', '-90 days') → (CURRENT_DATE - INTERVAL '90 days')
-            def replace_date_interval(match):
-                days = match.group(1)
-                return f"(CURRENT_DATE - INTERVAL '{days} days')"
-
-            query_text = re.sub(
-                r"DATE\s*\(\s*['\"]now['\"]\s*,\s*'-(\d+)\s+days?'\s*\)",
-                replace_date_interval,
+            query_text = _DATE_INTERVAL_RE.sub(
+                lambda m: f"(CURRENT_DATE - INTERVAL '{m.group(1)} days')",
                 query_text,
-                flags=re.IGNORECASE,
+            )
+            query_text = _DATE_NOW_RE.sub("CURRENT_DATE", query_text)
+            query_text = _JULIANDAY_DIFF_RE.sub(
+                lambda m: f"({m.group(1).strip()}::DATE - {m.group(2).strip()}::DATE)",
+                query_text,
             )
 
-            # Then replace simple DATE('now') with CURRENT_DATE for DuckDB compatibility
-            query_text = re.sub(r"DATE\s*\(\s*['\"]now['\"]\s*\)", "CURRENT_DATE", query_text, flags=re.IGNORECASE)
-
-            # Replace JULIANDAY(expr1) - JULIANDAY(expr2) with (expr1::DATE - expr2::DATE)
-            # This pattern matches nested parentheses and function calls
-            def replace_julianday_diff(match):
-                expr1 = match.group(1).strip()
-                expr2 = match.group(2).strip()
-                # Cast to DATE to ensure proper date arithmetic
-                return f"({expr1}::DATE - {expr2}::DATE)"
-
-            # Match JULIANDAY(...) - JULIANDAY(...) patterns
-            # Use a regex that handles nested parentheses for function calls like MIN(), MAX()
-            julianday_pattern = (
-                r"JULIANDAY\s*\(([^)]+(?:\([^)]*\)[^)]*)*)\)\s*-\s*JULIANDAY\s*\(([^)]+(?:\([^)]*\)[^)]*)*)\)"
-            )
-            query_text = re.sub(julianday_pattern, replace_julianday_diff, query_text, flags=re.IGNORECASE)
+        elif (
+            "clickhouse" in target_dialect.lower()
+            or "starrocks" in target_dialect.lower()
+            or "doris" in target_dialect.lower()
+        ):
+            # Flatten double-nested scalar COUNT in EQ3 before SQLGlot (all three dialects):
+            #   (SELECT COUNT(*) FROM (SELECT COUNT(*) AS x FROM tbl WHERE ...))
+            # → (SELECT COUNT(*) FROM tbl WHERE ...)
+            query_text = _DOUBLE_COUNT_RE.sub(r"(SELECT COUNT(*) \1)", query_text)
 
         # TPC-DI queries use modern SQL (netezza/postgres) as source dialect
-        return translate_sql_query(
+        query_text = translate_sql_query(
             query=query_text,
             target_dialect=target_dialect,
             source_dialect="netezza",
         )
+
+        if "clickhouse" in target_dialect.lower():
+            # dateDiff('day', start, end) returns end − start days.
+            query_text = _JULIANDAY_DIFF_RE.sub(
+                lambda m: f"dateDiff('day', {m.group(2).strip()}, {m.group(1).strip()})",
+                query_text,
+            )
+            # Must come before DATE('now') replacement
+            query_text = _DATE_INTERVAL_RE.sub(lambda m: f"(today() - {m.group(1)})", query_text)
+            query_text = _DATE_NOW_RE.sub("today()", query_text)
+
+            # FROM VALUES (N) AS alias → FROM (SELECT N) AS alias
+            # ClickHouse does not support VALUES(...) as a table expression in FROM.
+            query_text = re.sub(
+                r"\bFROM\s*\(?\s*VALUES\s*\((\d+)\)\s*\)?\s*(?:AS\s+)?(\w+)",
+                r"FROM (SELECT \1) AS \2",
+                query_text,
+                flags=re.IGNORECASE,
+            )
+
+        elif "starrocks" in target_dialect.lower() or "doris" in target_dialect.lower():
+            # Doris is MySQL-compatible; same date-function rewrites as StarRocks.
+            query_text = _JULIANDAY_DIFF_RE.sub(
+                lambda m: f"DATEDIFF({m.group(1).strip()}, {m.group(2).strip()})",
+                query_text,
+            )
+            # Must come before DATE('now') replacement
+            query_text = _DATE_INTERVAL_RE.sub(
+                lambda m: f"DATE_SUB(CURDATE(), INTERVAL {m.group(1)} DAY)",
+                query_text,
+            )
+            query_text = _DATE_NOW_RE.sub("CURDATE()", query_text)
+
+        return query_text
 
     def get_all_queries(self) -> dict[str, str]:
         """Get all available TPC-DI queries.
@@ -443,7 +533,7 @@ class TPCDIBenchmark(BaseBenchmark):
         _path = self.tables[table_name]
         table_schema = TABLES[table_name]
 
-        with open(_path) as f:
+        with open(_path, encoding="utf-8") as f:
             reader = csv.reader(f, delimiter="|")
 
             columns = [cast(str, col["name"]) for col in cast(list[dict[str, Any]], table_schema["columns"])]
@@ -1110,7 +1200,7 @@ class TPCDIBenchmark(BaseBenchmark):
 
             # Generate security data in fixed-width format
             security_file = batch_dir / f"securities_{batch_type}.txt"
-            with open(security_file, "w") as f:
+            with open(security_file, "w", encoding="utf-8") as f:
                 num_securities = int(500 * self.scale_factor)
                 if batch_type == "incremental":
                     num_securities = int(num_securities * 0.1)
@@ -1165,7 +1255,7 @@ class TPCDIBenchmark(BaseBenchmark):
                 }
                 accounts.append(account)
 
-            with open(account_file, "w") as f:
+            with open(account_file, "w", encoding="utf-8") as f:
                 json.dump(accounts, f, indent=2)
 
             json_files.append(str(account_file))
@@ -2485,7 +2575,7 @@ class TPCDIBenchmark(BaseBenchmark):
         num_securities = max(1, int(500 * self.scale_factor))
         num_financials = max(1, int(200 * self.scale_factor))
 
-        with open(finwire_file, "w") as f:
+        with open(finwire_file, "w", encoding="utf-8") as f:
             # Generate Company Fundamental records (CMP)
             for i in range(num_companies):
                 pts = "20230101000000"
@@ -2538,7 +2628,7 @@ class TPCDIBenchmark(BaseBenchmark):
         customer_xml = customer_dir / "CustomerMgmt.xml"
         num_customers = max(1, int(50 * self.scale_factor))
 
-        with open(customer_xml, "w") as f:
+        with open(customer_xml, "w", encoding="utf-8") as f:
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
             f.write('<TPCDI:Actions xmlns:TPCDI="http://www.tpc.org/tpc-di">\n')
 
@@ -2568,7 +2658,7 @@ class TPCDIBenchmark(BaseBenchmark):
         prospect_csv = customer_dir / "Prospect.csv"
         num_prospects = max(1, int(20 * self.scale_factor))
 
-        with open(prospect_csv, "w") as f:
+        with open(prospect_csv, "w", encoding="utf-8") as f:
             # CSV header
             f.write(
                 "LastName,FirstName,MiddleInitial,Gender,AddressLine1,AddressLine2,PostalCode,City,StateProv,Country,Phone,Income,NumberCars,NumberChildren,MaritalStatus,Age,CreditRating,OwnOrRentFlag,Employer,NumberCreditCards,NetWorth\n"
@@ -2581,3 +2671,32 @@ class TPCDIBenchmark(BaseBenchmark):
 
         customer_files.append(prospect_csv)
         return customer_files
+
+
+# ---------------------------------------------------------------------------
+# Register benchmark-specific CLI option specs
+# ---------------------------------------------------------------------------
+
+from benchbox.cli.benchmark_hooks import (  # noqa: E402
+    BenchmarkHookRegistry,
+    BenchmarkOptionSpec,
+    parse_bool,
+    parse_int,
+)
+
+BenchmarkHookRegistry.register_option_specs(
+    "tpcdi",
+    BenchmarkOptionSpec(
+        name="enable_parallel",
+        parser=parse_bool,
+        default=False,
+        help="Enable parallel processing for ETL",
+        aliases=("enable-parallel",),
+    ),
+    BenchmarkOptionSpec(
+        name="max_workers",
+        parser=parse_int,
+        help="Maximum number of parallel workers",
+        aliases=("max-workers",),
+    ),
+)

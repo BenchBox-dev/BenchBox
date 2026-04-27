@@ -242,7 +242,7 @@ class DataValidationEngine:
 
         # Load and parse manifest
         try:
-            with open(manifest_path) as f:
+            with open(manifest_path, encoding="utf-8") as f:
                 manifest = json.load(f)
         except json.JSONDecodeError as e:
             return ValidationResult(

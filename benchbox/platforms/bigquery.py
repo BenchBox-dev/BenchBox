@@ -27,12 +27,12 @@ if TYPE_CHECKING:
     )
 
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
-from benchbox.utils.file_format import detect_compression, detect_data_format, get_delimiter_for_file
+from benchbox.utils.file_format import detect_compression, detect_data_format
 from benchbox.utils.printing import emit
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
-from .base.data_loading import DataSourceResolver
+from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, resolve_csv_dialect
 
 try:
     import google.auth
@@ -202,6 +202,88 @@ class BigQueryAdapter(PlatformAdapter):
     def platform_name(self) -> str:
         return "BigQuery"
 
+    def _detect_bigquery_client_version(self) -> str | None:
+        """Return the google-cloud-bigquery client version, or None if unavailable."""
+        try:
+            import google.cloud.bigquery
+
+            return getattr(google.cloud.bigquery, "__version__", None)
+        except (ImportError, AttributeError):
+            return None
+
+    def _collect_bigquery_dataset_metadata(self, connection: Any) -> dict[str, Any] | None:
+        """Fetch dataset metadata from the BigQuery client; returns None on failure."""
+        try:
+            dataset_ref = f"{self.project_id}.{self.dataset_id}"
+            dataset = connection.get_dataset(dataset_ref)
+            self.logger.debug(f"Successfully captured BigQuery dataset metadata for {dataset_ref}")
+            return {
+                "dataset_location": dataset.location,
+                "dataset_default_table_expiration_ms": dataset.default_table_expiration_ms,
+                "dataset_default_partition_expiration_ms": dataset.default_partition_expiration_ms,
+                "dataset_created": dataset.created.isoformat() if dataset.created else None,
+                "dataset_modified": dataset.modified.isoformat() if dataset.modified else None,
+            }
+        except Exception as e:
+            self.logger.debug(f"Could not fetch BigQuery dataset metadata: {e}")
+            return None
+
+    @staticmethod
+    def _determine_bigquery_pricing(
+        reservation_info: dict[str, Any] | None,
+        commitment_info: dict[str, Any] | None,
+    ) -> tuple[str, str]:
+        """Derive (pricing_model, edition) from reservation + commitment info."""
+        if not reservation_info:
+            return "on-demand", "ON_DEMAND"
+
+        edition = reservation_info.get("edition") or "STANDARD"
+        if not commitment_info:
+            return "flat-rate", edition
+
+        commitment_plan_map = {
+            "FLEX": "flex-slots",
+            "MONTHLY": "monthly-commitment",
+            "ANNUAL": "annual-commitment",
+            "THREE_YEAR": "three-year-commitment",
+        }
+        pricing_model = commitment_plan_map.get(commitment_info.get("commitment_plan", ""), "flat-rate")
+        return pricing_model, edition
+
+    def _apply_bigquery_compute_configuration(
+        self,
+        platform_info: dict[str, Any],
+        dataset_metadata: dict[str, Any] | None,
+        reservation_info: dict[str, Any] | None,
+        commitment_info: dict[str, Any] | None,
+        assignment_info: dict[str, Any] | None,
+    ) -> None:
+        """Merge compute_configuration block onto platform_info in place."""
+        compute: dict[str, Any] = dict(dataset_metadata) if dataset_metadata else {}
+        pricing_model, edition = self._determine_bigquery_pricing(reservation_info, commitment_info)
+        self.logger.debug(f"Detected BigQuery pricing model: {pricing_model}, edition: {edition}")
+
+        compute["pricing_model"] = pricing_model
+        compute["edition"] = edition
+        compute["slot_capacity"] = reservation_info.get("slot_capacity") if reservation_info else None
+        compute["autoscale_max_slots"] = reservation_info.get("autoscale_max_slots") if reservation_info else None
+
+        if reservation_info:
+            compute["reservation_details"] = {
+                "name": reservation_info.get("reservation_name"),
+                "slot_capacity": reservation_info.get("slot_capacity"),
+                "ignore_idle_slots": reservation_info.get("ignore_idle_slots"),
+                "autoscale_max_slots": reservation_info.get("autoscale_max_slots"),
+                "creation_time": reservation_info.get("creation_time"),
+                "update_time": reservation_info.get("update_time"),
+            }
+        if commitment_info:
+            compute["capacity_commitment"] = commitment_info
+        if assignment_info:
+            compute["assignment"] = assignment_info
+
+        platform_info["compute_configuration"] = compute
+
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get BigQuery platform information.
 
@@ -214,7 +296,7 @@ class BigQueryAdapter(PlatformAdapter):
         BigQuery doesn't expose a version number as it's a fully managed service.
         Gracefully degrades if permissions are insufficient for metadata queries.
         """
-        platform_info = {
+        platform_info: dict[str, Any] = {
             "platform_type": "bigquery",
             "platform_name": "BigQuery",
             "connection_mode": "remote",
@@ -228,40 +310,14 @@ class BigQueryAdapter(PlatformAdapter):
                 "job_priority": self.job_priority,
                 "query_cache_enabled": self.query_cache,
             },
+            "client_library_version": self._detect_bigquery_client_version(),
+            "platform_version": None,
         }
 
-        # Get client library version
-        try:
-            import google.cloud.bigquery
-
-            platform_info["client_library_version"] = getattr(google.cloud.bigquery, "__version__", None)
-        except (ImportError, AttributeError):
-            platform_info["client_library_version"] = None
-
-        # BigQuery doesn't expose server version info (fully managed service)
-        platform_info["platform_version"] = None
-
-        # Try to get extended metadata from BigQuery client
         if connection:
             try:
-                # Get dataset metadata
-                try:
-                    dataset_ref = f"{self.project_id}.{self.dataset_id}"
-                    dataset = connection.get_dataset(dataset_ref)
+                dataset_metadata = self._collect_bigquery_dataset_metadata(connection)
 
-                    platform_info["compute_configuration"] = {
-                        "dataset_location": dataset.location,
-                        "dataset_default_table_expiration_ms": dataset.default_table_expiration_ms,
-                        "dataset_default_partition_expiration_ms": dataset.default_partition_expiration_ms,
-                        "dataset_created": dataset.created.isoformat() if dataset.created else None,
-                        "dataset_modified": dataset.modified.isoformat() if dataset.modified else None,
-                    }
-
-                    self.logger.debug(f"Successfully captured BigQuery dataset metadata for {dataset_ref}")
-                except Exception as e:
-                    self.logger.debug(f"Could not fetch BigQuery dataset metadata: {e}")
-
-                # Try to get slot reservation information (enhanced with edition and autoscaling)
                 reservation_info = None
                 try:
                     # Query INFORMATION_SCHEMA for reservation info if available
@@ -416,71 +472,13 @@ class BigQueryAdapter(PlatformAdapter):
                     else:
                         self.logger.debug(f"Could not fetch reservation assignment info: {e}")
 
-                # Determine granular pricing model and edition
-                pricing_model = "on-demand"
-                edition = "ON_DEMAND"
-
-                if reservation_info:
-                    # Extract edition from reservation
-                    edition = reservation_info.get("edition") or "STANDARD"
-
-                    # Determine pricing model from commitment plan
-                    if commitment_info:
-                        commitment_plan = commitment_info.get("commitment_plan", "")
-
-                        if commitment_plan == "FLEX":
-                            pricing_model = "flex-slots"
-                        elif commitment_plan == "MONTHLY":
-                            pricing_model = "monthly-commitment"
-                        elif commitment_plan == "ANNUAL":
-                            pricing_model = "annual-commitment"
-                        elif commitment_plan == "THREE_YEAR":
-                            pricing_model = "three-year-commitment"
-                        else:
-                            # Has reservation but no recognized commitment
-                            pricing_model = "flat-rate"
-                    else:
-                        # Has reservation but no commitment info (legacy or couldn't query)
-                        pricing_model = "flat-rate"
-                else:
-                    # No reservation = on-demand
-                    pricing_model = "on-demand"
-                    edition = "ON_DEMAND"
-
-                self.logger.debug(f"Detected BigQuery pricing model: {pricing_model}, edition: {edition}")
-
-                # Update compute_configuration with hybrid structure (flat key fields + nested details)
-                if "compute_configuration" not in platform_info:
-                    platform_info["compute_configuration"] = {}
-
-                # Add key fields (flat for easy access)
-                platform_info["compute_configuration"]["pricing_model"] = pricing_model
-                platform_info["compute_configuration"]["edition"] = edition
-                platform_info["compute_configuration"]["slot_capacity"] = (
-                    reservation_info.get("slot_capacity") if reservation_info else None
+                self._apply_bigquery_compute_configuration(
+                    platform_info,
+                    dataset_metadata,
+                    reservation_info,
+                    commitment_info,
+                    assignment_info,
                 )
-                platform_info["compute_configuration"]["autoscale_max_slots"] = (
-                    reservation_info.get("autoscale_max_slots") if reservation_info else None
-                )
-
-                # Add detailed reservation info (nested)
-                if reservation_info:
-                    platform_info["compute_configuration"]["reservation_details"] = {
-                        "name": reservation_info.get("reservation_name"),
-                        "slot_capacity": reservation_info.get("slot_capacity"),
-                        "ignore_idle_slots": reservation_info.get("ignore_idle_slots"),
-                        "autoscale_max_slots": reservation_info.get("autoscale_max_slots"),
-                        "creation_time": reservation_info.get("creation_time"),
-                        "update_time": reservation_info.get("update_time"),
-                    }
-
-                # Add capacity commitment info (nested)
-                if commitment_info:
-                    platform_info["compute_configuration"]["capacity_commitment"] = commitment_info
-
-                # Add assignment info (nested)
-                if assignment_info:
-                    platform_info["compute_configuration"]["assignment"] = assignment_info
 
             except Exception as e:
                 self.logger.debug(f"Error collecting BigQuery platform info: {e}")
@@ -557,7 +555,7 @@ class BigQueryAdapter(PlatformAdapter):
             client.delete_dataset(dataset_ref, delete_contents=True, not_found_ok=True)
 
         except Exception as e:
-            raise RuntimeError(f"Failed to drop BigQuery dataset {dataset_id}: {e}")
+            raise RuntimeError(f"Failed to drop BigQuery dataset {dataset_id}: {e}") from e
 
     def _validate_database_compatibility(self, **connection_config):
         """Validate database compatibility with BigQuery-specific empty table detection.
@@ -920,15 +918,17 @@ class BigQueryAdapter(PlatformAdapter):
         total_time = 0.0
 
         try:
-            data_files = self._resolve_data_files(benchmark, data_dir)
-            self._validate_compression_support(data_files, benchmark)
+            data_source = self._resolve_data_files(benchmark, data_dir)
+            if not isinstance(data_source, DataSource):
+                data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
+            self._validate_compression_support(data_source.tables, benchmark)
 
             if self.storage_bucket:
                 bucket = self._create_storage_bucket()
-                table_stats = self._load_tables_via_cloud_storage(connection, data_files, bucket)
+                table_stats = self._load_tables_via_cloud_storage(connection, data_source, bucket, benchmark)
             else:
                 self.logger.warning("No Cloud Storage bucket configured, using direct loading")
-                table_stats = self._load_tables_direct(connection, data_files)
+                table_stats = self._load_tables_direct(connection, data_source, benchmark)
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
@@ -957,10 +957,12 @@ class BigQueryAdapter(PlatformAdapter):
 
         start_time = mono_time()
         table_stats: dict[str, int] = {}
-        data_files = self._resolve_data_files(benchmark, data_dir)
+        data_source = self._resolve_data_files(benchmark, data_dir)
+        if not isinstance(data_source, DataSource):
+            data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
         bucket = self._create_storage_bucket()
 
-        for table_name, file_paths in data_files.items():
+        for table_name, file_paths in data_source.tables.items():
             table_name_upper = table_name.upper()
             source_format, uris = self._prepare_external_table_uris(bucket, table_name, file_paths)
             if not uris:
@@ -990,17 +992,18 @@ class BigQueryAdapter(PlatformAdapter):
         total_time = elapsed_seconds(start_time)
         return table_stats, total_time, None
 
-    def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> dict[str, Any]:
+    def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> Any:
         """Resolve benchmark data files from benchmark tables or manifest."""
         resolver = DataSourceResolver(
             platform_name=self.platform_name,
-            table_mode=getattr(self, "table_mode", "native"),
-            platform_config=getattr(self, "__dict__", None),
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
         )
         data_source = resolver.resolve(benchmark, data_dir)
         if not data_source or not data_source.tables:
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_source.tables
+        return data_source
 
     @staticmethod
     def _ensure_file_list(file_paths: Any) -> list[Any]:
@@ -1015,7 +1018,7 @@ class BigQueryAdapter(PlatformAdapter):
                 valid_files.append(file_path)
                 continue
             path = Path(file_path)
-            if path.exists() and path.stat().st_size > 0:
+            if path.exists() and (path.is_dir() or path.stat().st_size > 0):
                 valid_files.append(path)
         return valid_files
 
@@ -1063,6 +1066,8 @@ class BigQueryAdapter(PlatformAdapter):
         bucket: Any,
         table_name: str,
         valid_files: list[Any],
+        data_source: Any | None = None,
+        benchmark: Any | None = None,
     ) -> int:
         """Load one table through GCS staging."""
         table_name_upper = table_name.upper()
@@ -1083,6 +1088,9 @@ class BigQueryAdapter(PlatformAdapter):
                 file_path,
                 write_disposition=write_disposition,
                 allow_quoted_newlines=True,
+                table_name=table_name,
+                data_source=data_source,
+                benchmark=benchmark,
             )
             uri = f"gs://{self.storage_bucket}/{blob_name}"
             load_job = connection.load_table_from_uri(uri, table_ref, job_config=job_config)
@@ -1090,7 +1098,14 @@ class BigQueryAdapter(PlatformAdapter):
 
         return self._get_table_row_count(connection, table_name_upper)
 
-    def _load_table_direct(self, connection: Any, table_name: str, valid_files: list[Path]) -> int:
+    def _load_table_direct(
+        self,
+        connection: Any,
+        table_name: str,
+        valid_files: list[Path],
+        data_source: Any | None = None,
+        benchmark: Any | None = None,
+    ) -> int:
         """Load one table directly from local files."""
         table_name_upper = table_name.upper()
         table_ref = connection.dataset(self.dataset_id).table(table_name_upper)
@@ -1101,7 +1116,13 @@ class BigQueryAdapter(PlatformAdapter):
             write_disposition = (
                 bigquery.WriteDisposition.WRITE_TRUNCATE if file_idx == 0 else bigquery.WriteDisposition.WRITE_APPEND
             )
-            job_config = self._build_load_job_config(file_path, write_disposition=write_disposition)
+            job_config = self._build_load_job_config(
+                file_path,
+                write_disposition=write_disposition,
+                table_name=table_name,
+                data_source=data_source,
+                benchmark=benchmark,
+            )
             with open(file_path, "rb") as source_file:
                 load_job = connection.load_table_from_file(source_file, table_ref, job_config=job_config)
             load_job.result()
@@ -1114,6 +1135,9 @@ class BigQueryAdapter(PlatformAdapter):
         *,
         write_disposition: bigquery.WriteDisposition,
         allow_quoted_newlines: bool = False,
+        table_name: str | None = None,
+        data_source: Any | None = None,
+        benchmark: Any | None = None,
     ) -> bigquery.LoadJobConfig:
         """Build a native BigQuery load job config for parquet or delimited text.
 
@@ -1129,18 +1153,27 @@ class BigQueryAdapter(PlatformAdapter):
 
         if data_format not in self._DELIMITED_FORMATS:
             self.logger.warning(
-                "Unrecognized data format %r for %s — falling back to CSV load job config",
+                "Unrecognized data format %r for %s - falling back to CSV load job config",
                 data_format,
                 Path(file_path).name,
             )
 
+        dialect_source = data_source or DataSource(source_type="bigquery_load_job", tables={})
+        dialect = resolve_csv_dialect(
+            dialect_source,
+            table_name or Path(file_path).stem,
+            Path(file_path),
+            benchmark if benchmark is not None else NO_BENCHMARK,
+        )
         config_kwargs: dict[str, Any] = {
             "source_format": bigquery.SourceFormat.CSV,
-            "field_delimiter": get_delimiter_for_file(file_path),
-            "skip_leading_rows": 0,
+            "field_delimiter": dialect.delimiter,
+            "skip_leading_rows": 1 if dialect.has_header else 0,
             "autodetect": False,
             "write_disposition": write_disposition,
         }
+        if dialect.null_marker is not None:
+            config_kwargs["null_marker"] = dialect.null_marker
         if allow_quoted_newlines:
             config_kwargs["allow_quoted_newlines"] = True
         return bigquery.LoadJobConfig(**config_kwargs)
@@ -1148,14 +1181,18 @@ class BigQueryAdapter(PlatformAdapter):
     def _load_tables_via_cloud_storage(
         self,
         connection: Any,
-        data_files: dict[str, Any],
+        data_source: Any,
         bucket: Any,
+        benchmark: Any | None = None,
     ) -> dict[str, int]:
         """Load all tables using GCS staging."""
         logger = logging.getLogger(__name__)
         table_stats: dict[str, int] = {}
 
-        for table_name, file_paths in data_files.items():
+        if not isinstance(data_source, DataSource):
+            data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
+
+        for table_name, file_paths in data_source.tables.items():
             valid_files = self._filter_valid_files(file_paths, allow_cloud=True)
             if not valid_files:
                 self.logger.warning(f"Skipping {table_name} - no valid data files")
@@ -1166,7 +1203,9 @@ class BigQueryAdapter(PlatformAdapter):
             try:
                 self.log_verbose(f"Loading data for table: {table_name}")
                 load_start = mono_time()
-                row_count = self._load_table_via_cloud_storage(connection, bucket, table_name, valid_files)
+                row_count = self._load_table_via_cloud_storage(
+                    connection, bucket, table_name, valid_files, data_source, benchmark
+                )
                 table_name_upper = table_name.upper()
                 table_stats[table_name_upper] = row_count
                 chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
@@ -1180,11 +1219,14 @@ class BigQueryAdapter(PlatformAdapter):
 
         return table_stats
 
-    def _load_tables_direct(self, connection: Any, data_files: dict[str, Any]) -> dict[str, int]:
+    def _load_tables_direct(self, connection: Any, data_source: Any, benchmark: Any | None = None) -> dict[str, int]:
         """Load all tables directly from local files."""
         table_stats: dict[str, int] = {}
 
-        for table_name, file_paths in data_files.items():
+        if not isinstance(data_source, DataSource):
+            data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
+
+        for table_name, file_paths in data_source.tables.items():
             valid_files_any = self._filter_valid_files(file_paths, allow_cloud=False)
             valid_files = [file_path for file_path in valid_files_any if isinstance(file_path, Path)]
             if not valid_files:
@@ -1195,7 +1237,7 @@ class BigQueryAdapter(PlatformAdapter):
             try:
                 self.log_verbose(f"Direct loading data for table: {table_name}")
                 load_start = mono_time()
-                row_count = self._load_table_direct(connection, table_name, valid_files)
+                row_count = self._load_table_direct(connection, table_name, valid_files, data_source, benchmark)
                 table_name_upper = table_name.upper()
                 table_stats[table_name_upper] = row_count
                 chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
@@ -1775,7 +1817,7 @@ class BigQueryAdapter(PlatformAdapter):
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
         except Exception as e:
-            raise ValueError(f"Failed to apply tunings to BigQuery table {table_name}: {e}")
+            raise ValueError(f"Failed to apply tunings to BigQuery table {table_name}: {e}") from e
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to BigQuery.
@@ -1860,65 +1902,45 @@ def _build_bigquery_config(
     Returns:
         DatabaseConfig with credentials loaded and platform-specific fields at top-level
     """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
+    from benchbox.platforms.base.config_utils import build_platform_config
 
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("bigquery") or {}
+    config = build_platform_config(
+        platform_type="bigquery",
+        credential_key="bigquery",
+        default_display_name="Google BigQuery",
+        default_driver_package="google-cloud-bigquery",
+        platform_fields=[
+            "project_id",
+            "dataset_id",
+            "location",
+            "credentials_path",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
-    # Build merged options: saved_creds < options < overrides
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    # Extract credential fields for DatabaseConfig
-    name = info.display_name if info else "Google BigQuery"
-    driver_package = info.driver_package if info else "google-cloud-bigquery"
-
-    # Handle staging_root from orchestrator (overrides) or fall back to default_output_location
-    staging_root = overrides.get("staging_root")
+    staging_root = config.options.get("staging_root")
     if not staging_root:
-        # Fall back to default_output_location from credentials/options
-        default_output = merged_options.get("default_output_location")
-        if default_output and isinstance(default_output, str) and default_output.startswith("gs://"):
+        default_output = config.options.get("default_output_location")
+        if isinstance(default_output, str) and default_output.startswith("gs://"):
             staging_root = default_output
 
-    # Parse staging_root to extract storage_bucket and storage_prefix
-    storage_bucket = merged_options.get("storage_bucket")
-    storage_prefix = merged_options.get("storage_prefix")
-
+    storage_bucket = config.options.get("storage_bucket")
+    storage_prefix = config.options.get("storage_prefix")
     if staging_root:
         try:
             path_info = get_cloud_path_info(staging_root)
             if path_info and path_info.get("bucket"):
                 storage_bucket = path_info["bucket"]
                 storage_prefix = path_info.get("path", "")
-        except Exception:
-            # If parsing fails, fall back to merged_options values
+        except (ValueError, TypeError):
             pass
 
-    # Build config dict with platform-specific fields at top-level
-    # This allows BigQueryAdapter.__init__() to access them via config.get()
-    config_dict = {
-        "type": "bigquery",
-        "name": name,
-        "options": merged_options or {},  # Ensure options is never None (Pydantic v2 uses None if explicitly passed)
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields at top-level (adapters expect these here)
-        "project_id": merged_options.get("project_id"),
-        "dataset_id": merged_options.get("dataset_id"),
-        "location": merged_options.get("location"),
-        "credentials_path": merged_options.get("credentials_path"),
-        "staging_root": staging_root,  # Pass through staging_root
-        "storage_bucket": storage_bucket,  # Use parsed bucket or fallback
-        "storage_prefix": storage_prefix,  # Use parsed prefix or fallback
-    }
-
-    return DatabaseConfig(**config_dict)
+    config.staging_root = staging_root
+    config.storage_bucket = storage_bucket
+    config.storage_prefix = storage_prefix
+    return config
 
 
 # Register the config builder with the platform hook registry

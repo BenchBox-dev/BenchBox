@@ -103,7 +103,7 @@ class AnonymizationManager:
         for machine_id_path in ["/etc/machine-id", "/var/lib/dbus/machine-id"]:
             try:
                 if os.path.exists(machine_id_path):
-                    with open(machine_id_path) as f:
+                    with open(machine_id_path, encoding="utf-8") as f:
                         machine_id = f.read().strip()
                         if machine_id:
                             logger.debug(f"Found Linux machine-id from {machine_id_path}")

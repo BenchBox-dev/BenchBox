@@ -31,7 +31,7 @@ class TestDependencyValidation:
         result = PlatformAdapter._check_import("definitely_nonexistent_module_xyz")
         assert result is False
 
-    @patch("benchbox.platforms.base.PlatformAdapter._check_import")
+    @patch("benchbox.platforms.base.connection_lifecycle.ConnectionLifecycleMixin._check_import")
     def test_validate_platform_dependencies(self, mock_check_import):
         """Test validation of all platform dependencies."""
         # Mock all dependencies as available
@@ -57,7 +57,7 @@ class TestDependencyValidation:
         # Verify that _check_import was called for non-Databricks dependencies
         assert mock_check_import.call_count >= 5  # Should be called for most dependencies
 
-    @patch("benchbox.platforms.base.PlatformAdapter._check_import")
+    @patch("benchbox.platforms.base.connection_lifecycle.ConnectionLifecycleMixin._check_import")
     def test_validate_platform_dependencies_mixed(self, mock_check_import):
         """Test validation with mixed available/unavailable dependencies."""
 
@@ -79,7 +79,7 @@ class TestDependencyValidation:
         assert result["cloudpathlib"] is False
         assert result["snowflake"] is False
 
-    @patch("benchbox.platforms.base.PlatformAdapter._check_import")
+    @patch("benchbox.platforms.base.connection_lifecycle.ConnectionLifecycleMixin._check_import")
     def test_check_databricks_dependencies(self, mock_check_import):
         """Test Databricks-specific dependency checking."""
         # Test when all Databricks modules are available
@@ -93,7 +93,7 @@ class TestDependencyValidation:
         expected_calls = [call("databricks.sql"), call("databricks.sdk")]
         mock_check_import.assert_has_calls(expected_calls, any_order=True)
 
-    @patch("benchbox.platforms.base.PlatformAdapter._check_import")
+    @patch("benchbox.platforms.base.connection_lifecycle.ConnectionLifecycleMixin._check_import")
     def test_check_databricks_dependencies_partial(self, mock_check_import):
         """Test Databricks dependency checking with partial availability."""
 
@@ -115,8 +115,8 @@ class TestDependencyValidation:
         assert PlatformAdapter._get_install_command("psutil") == "uv add psutil"
         assert PlatformAdapter._get_install_command("unknown_dependency") is None
 
-    @patch("benchbox.platforms.base.adapter.quiet_console")
-    @patch("benchbox.platforms.base.PlatformAdapter.validate_platform_dependencies")
+    @patch("benchbox.platforms.base.connection_lifecycle.quiet_console")
+    @patch("benchbox.platforms.base.connection_lifecycle.ConnectionLifecycleMixin.validate_platform_dependencies")
     @patch("sys.exit")
     def test_require_dependencies_all_available(self, mock_exit, mock_validate, mock_console):
         """Test require_dependencies when all dependencies are available."""
@@ -134,9 +134,9 @@ class TestDependencyValidation:
             "✅ All required dependencies are available" in str(call) for call in mock_console.print.call_args_list
         )
 
-    @patch("benchbox.platforms.base.adapter.quiet_console")
-    @patch("benchbox.platforms.base.PlatformAdapter.validate_platform_dependencies")
-    @patch("benchbox.platforms.base.PlatformAdapter._get_install_command")
+    @patch("benchbox.platforms.base.connection_lifecycle.quiet_console")
+    @patch("benchbox.platforms.base.connection_lifecycle.ConnectionLifecycleMixin.validate_platform_dependencies")
+    @patch("benchbox.platforms.base.connection_lifecycle.ConnectionLifecycleMixin._get_install_command")
     @patch("sys.exit")
     def test_require_dependencies_missing_with_exit(self, mock_exit, mock_get_install, mock_validate, mock_console):
         """Test require_dependencies with missing dependencies and exit enabled."""
@@ -154,8 +154,8 @@ class TestDependencyValidation:
         assert any("❌ Missing required dependencies:" in call for call in console_calls)
         assert any("duckdb" in call for call in console_calls)
 
-    @patch("benchbox.platforms.base.adapter.quiet_console")
-    @patch("benchbox.platforms.base.PlatformAdapter.validate_platform_dependencies")
+    @patch("benchbox.platforms.base.connection_lifecycle.quiet_console")
+    @patch("benchbox.platforms.base.connection_lifecycle.ConnectionLifecycleMixin.validate_platform_dependencies")
     @patch("sys.exit")
     def test_require_dependencies_missing_no_exit(self, mock_exit, mock_validate, mock_console):
         """Test require_dependencies with missing dependencies and exit disabled."""
@@ -174,10 +174,12 @@ class TestDependencyValidation:
 
     def test_require_dependencies_empty_list(self):
         """Test require_dependencies with empty requirements list."""
-        with patch("benchbox.platforms.base.PlatformAdapter.validate_platform_dependencies") as mock_validate:
+        with patch(
+            "benchbox.platforms.base.connection_lifecycle.ConnectionLifecycleMixin.validate_platform_dependencies"
+        ) as mock_validate:
             mock_validate.return_value = {}
 
-            with patch("benchbox.platforms.base.adapter.quiet_console") as mock_console:
+            with patch("benchbox.platforms.base.connection_lifecycle.quiet_console") as mock_console:
                 result = PlatformAdapter.require_dependencies([])
 
             # Should succeed and print success message

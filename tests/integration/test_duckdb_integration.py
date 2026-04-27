@@ -1195,7 +1195,7 @@ class TestPerformanceValidation:
             ],
         ]
 
-        with open(customer_file, "w", newline="") as f:
+        with open(customer_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
             writer.writerows(customer_data)
 

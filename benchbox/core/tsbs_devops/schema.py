@@ -17,6 +17,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from typing import Any
 
+from benchbox.sql_compat.local_exemptions import compat_local
+
 # Schema definition with column specifications
 TSBS_DEVOPS_SCHEMA = {
     "tags": {
@@ -155,6 +157,17 @@ def get_create_tables_sql(
     return "\n\n".join(statements)
 
 
+@compat_local(
+    kind="storage_layout",
+    platform_specific=True,
+    reason=(
+        "Emits engine-specific DDL extensions: ClickHouse MergeTree+ORDER BY, "
+        "TimescaleDB create_hypertable(), DuckDB partition comment. "
+        "Policy branches (clickhouse/timescale) are registered in "
+        "sql_compat/rules/schema_emit/tsbs_devops_ddl.py. "
+        "The DuckDB comment-only branch is legitimate local rendering."
+    ),
+)
 def _generate_create_table(
     table_name: str,
     table_def: dict[str, Any],
@@ -203,6 +216,11 @@ def _generate_create_table(
     return sql + ";"
 
 
+@compat_local(
+    kind="type_mapping",
+    platform_specific=True,
+    reason="Maps generic SQL types to ClickHouse / DuckDB / TimescaleDB / InfluxDB equivalents.",
+)
 def _map_type_to_dialect(type_name: str, dialect: str) -> str:
     """Map generic SQL types to dialect-specific types."""
     type_upper = type_name.upper()

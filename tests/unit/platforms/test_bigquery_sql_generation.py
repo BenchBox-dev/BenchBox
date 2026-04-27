@@ -1,4 +1,4 @@
-"""Tests for BigQuery SQL generation branches — coverage extension.
+"""Tests for BigQuery SQL generation branches - coverage extension.
 
 Targets: generate_tuning_clause partitioning/clustering paths,
 _convert_to_bigquery_table three-part reference, type mapping, dialect.

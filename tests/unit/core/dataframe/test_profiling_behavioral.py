@@ -45,7 +45,7 @@ pytestmark = [
 
 
 # ---------------------------------------------------------------------------
-# Plan analysis – _analyze_polars_plan
+# Plan analysis - _analyze_polars_plan
 # ---------------------------------------------------------------------------
 
 
@@ -99,7 +99,7 @@ class TestAnalyzePolarisPlan:
 
 
 # ---------------------------------------------------------------------------
-# Plan analysis – _analyze_datafusion_plan
+# Plan analysis - _analyze_datafusion_plan
 # ---------------------------------------------------------------------------
 
 
@@ -130,7 +130,7 @@ class TestAnalyzeDatafusionPlan:
 
 
 # ---------------------------------------------------------------------------
-# Plan analysis – _analyze_pyspark_plan
+# Plan analysis - _analyze_pyspark_plan
 # ---------------------------------------------------------------------------
 
 
@@ -160,7 +160,7 @@ class TestAnalyzePysparkPlan:
 
 
 # ---------------------------------------------------------------------------
-# capture_query_plan – platform dispatching
+# capture_query_plan - platform dispatching
 # ---------------------------------------------------------------------------
 
 
@@ -208,7 +208,7 @@ class TestCaptureQueryPlanDispatching:
 
 
 # ---------------------------------------------------------------------------
-# capture_datafusion_plan – explain fallback
+# capture_datafusion_plan - explain fallback
 # ---------------------------------------------------------------------------
 
 
@@ -241,7 +241,7 @@ class TestCaptureDatafusionPlan:
 
 
 # ---------------------------------------------------------------------------
-# capture_pyspark_plan – error handling
+# capture_pyspark_plan - error handling
 # ---------------------------------------------------------------------------
 
 
@@ -259,7 +259,7 @@ class TestCapturePysparkPlan:
 
 
 # ---------------------------------------------------------------------------
-# compare_execution_modes – note generation
+# compare_execution_modes - note generation
 # ---------------------------------------------------------------------------
 
 
@@ -318,7 +318,7 @@ class TestCompareExecutionModesNotes:
 
 
 # ---------------------------------------------------------------------------
-# ComparisonResult – __post_init__ edge cases
+# ComparisonResult - __post_init__ edge cases
 # ---------------------------------------------------------------------------
 
 
@@ -348,7 +348,7 @@ class TestComparisonResultEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# DataFrameProfiler – statistics with lazy evaluation
+# DataFrameProfiler - statistics with lazy evaluation
 # ---------------------------------------------------------------------------
 
 
@@ -425,7 +425,7 @@ class TestProfilerLazyEvaluationStats:
 
 
 # ---------------------------------------------------------------------------
-# MemoryTracker – edge cases
+# MemoryTracker - edge cases
 # ---------------------------------------------------------------------------
 
 
@@ -458,7 +458,7 @@ class TestMemoryTrackerEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# track_memory context manager – exception safety
+# track_memory context manager - exception safety
 # ---------------------------------------------------------------------------
 
 
@@ -477,7 +477,7 @@ class TestTrackMemoryExceptionSafety:
 
 
 # ---------------------------------------------------------------------------
-# profile_query_execution – error paths
+# profile_query_execution - error paths
 # ---------------------------------------------------------------------------
 
 
@@ -545,7 +545,7 @@ class TestProfileQueryExecutionErrorPaths:
 
 
 # ---------------------------------------------------------------------------
-# ProfiledExecutionResult – property coverage
+# ProfiledExecutionResult - property coverage
 # ---------------------------------------------------------------------------
 
 
@@ -574,7 +574,7 @@ class TestProfiledExecutionResultProperties:
 
 
 # ---------------------------------------------------------------------------
-# QueryProfileContext – end_planning without start
+# QueryProfileContext - end_planning without start
 # ---------------------------------------------------------------------------
 
 
@@ -604,7 +604,7 @@ class TestQueryProfileContextEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# QueryPlan – plan_data field
+# QueryPlan - plan_data field
 # ---------------------------------------------------------------------------
 
 

@@ -110,7 +110,45 @@ class H2OBenchmark(TranslatableQueryMixin, DataGenerationMixin, BaseBenchmark):
         Returns:
             A dictionary mapping query identifiers to their SQL text
         """
-        return get_queries_with_translation(self.query_manager, dialect, self.translate_query_text)
+        import benchbox.sql_compat.rules.query_source.h2odb_variants  # noqa: F401
+        from benchbox.sql_compat.actions import CompatAction
+        from benchbox.sql_compat.context import CompatibilityContext, Phase
+        from benchbox.sql_compat.registry import REGISTRY
+        from benchbox.sql_compat.rules.query_source.h2odb_variants import (
+            CLICKHOUSE_Q9_SQL,
+            STARROCKS_Q9_SQL,
+        )
+
+        queries = get_queries_with_translation(self.query_manager, dialect, self.translate_query_text)
+        if not dialect:
+            return queries
+
+        d = dialect.lower()
+        # Q9 variant platforms: map platform substring → legacy SQL
+        _q9_variants: dict[str, str] = {
+            "clickhouse": CLICKHOUSE_Q9_SQL,
+            "starrocks": STARROCKS_Q9_SQL,
+        }
+        for platform, legacy_sql in _q9_variants.items():
+            if platform not in d:
+                continue
+            ctx = CompatibilityContext(
+                platform=platform,
+                platform_version=None,
+                benchmark="h2odb",
+                query_id="Q9",
+                phase=Phase.QUERY_SOURCE,
+                mode="sql",
+                dialect=dialect,
+            )
+            registry_decision = REGISTRY.resolve(ctx)
+            if registry_decision is not None:
+                if registry_decision.action is CompatAction.SELECT_VARIANT:
+                    queries["Q9"] = registry_decision.payload.variant_sql  # type: ignore[union-attr]
+            else:
+                queries["Q9"] = legacy_sql  # no rule: use legacy SQL
+
+        return queries
 
     # translate_query_text() is inherited from TranslatableQueryMixin
 

@@ -659,8 +659,10 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
         "redshift": RedshiftDDLGenerator,
         "postgresql": PostgreSQLDDLGenerator,
         "timescaledb": TimescaleDBDDLGenerator,
-        # ClickHouse
+        # ClickHouse (all three first-class platform names map to the shared generator)
         "clickhouse": ClickHouseDDLGenerator,
+        "clickhouse-local": ClickHouseDDLGenerator,
+        "clickhouse-server": ClickHouseDDLGenerator,
         "chdb": ClickHouseDDLGenerator,
         # Firebolt
         "firebolt": FireboltDDLGenerator,

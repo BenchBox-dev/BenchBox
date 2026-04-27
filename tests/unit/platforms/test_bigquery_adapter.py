@@ -6,7 +6,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import logging
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -282,7 +281,7 @@ class TestBigQueryAdapter:
         mock_benchmark = Mock()
 
         # Create temporary test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("id,name\n1,test1\n2,test2\n")
             temp_path = Path(f.name)
 
@@ -325,7 +324,7 @@ class TestBigQueryAdapter:
         mock_benchmark = Mock()
 
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".parquet", delete=False) as f:
-            f.write(b"PAR1")  # content irrelevant — format detected from .parquet suffix
+            f.write(b"PAR1")  # content irrelevant - format detected from .parquet suffix
             temp_path = Path(f.name)
 
         try:
@@ -398,7 +397,7 @@ class TestBigQueryAdapter:
         mock_bucket = Mock()
 
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".parquet", delete=False) as f:
-            f.write(b"PAR1")  # content irrelevant — format detected from .parquet suffix
+            f.write(b"PAR1")  # content irrelevant - format detected from .parquet suffix
             temp_path = Path(f.name)
 
         try:
@@ -429,7 +428,7 @@ class TestBigQueryAdapter:
         """Unrecognized format should warn and fall back to CSV load job config."""
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # .vortex is a recognized format that is neither parquet nor delimited text —
+        # .vortex is a recognized format that is neither parquet nor delimited text -
         # detect_data_format returns "vortex", which is not in _DELIMITED_FORMATS
         with tempfile.NamedTemporaryFile(suffix=".vortex", delete=False) as f:
             temp_path = Path(f.name)
@@ -1621,9 +1620,6 @@ class TestBigQuerySqlGenerationHelpers:
         )
         assert "benchbox-data/orders/orders.csv" not in uploaded_blobs
 
-    @pytest.mark.skipif(
-        sys.platform == "win32", reason="Windows reports st_size=0 for directories, breaking _filter_valid_files"
-    )
     def test_prepare_external_table_uris_requires_biglake_for_delta(self, dependencies_available):
         bucket = Mock()
         uploaded_blobs = {}
@@ -2482,7 +2478,7 @@ class TestBuildBigqueryConfig:
         assert config.staging_root == "gs://my-bucket/my-prefix"
 
     def test_saved_creds_merged_with_options(self):
-        """Saved credentials are merged, with options taking precedence."""
+        """Saved credentials are merged, with saved creds taking precedence over registered defaults."""
         from benchbox.platforms.bigquery import _build_bigquery_config
 
         mock_info = Mock()
@@ -2502,8 +2498,8 @@ class TestBuildBigqueryConfig:
                 info=mock_info,
             )
 
-        # CLI option should override saved credentials
-        assert config.project_id == "cli-proj"
+        # Saved credentials override registered defaults (options)
+        assert config.project_id == "saved-proj"
         # Saved location should be preserved
         assert config.location == "US"
 

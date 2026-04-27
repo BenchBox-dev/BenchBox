@@ -7,7 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -251,9 +251,8 @@ class TestDataFusionAdapter:
 
     @patch("benchbox.platforms.datafusion.SessionContext")
     @patch("pyarrow.csv.read_csv")
-    @patch("pyarrow.parquet.write_table")
-    @patch("pyarrow.concat_tables")
-    def test_load_table_parquet(self, mock_concat_tables, mock_write_table, mock_read_csv, mock_session_context):
+    @patch("pyarrow.parquet.ParquetWriter")
+    def test_load_table_parquet(self, mock_parquet_writer, mock_read_csv, mock_session_context):
         """Test loading table by converting CSV to Parquet."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a test CSV file
@@ -266,7 +265,6 @@ class TestDataFusionAdapter:
             mock_table = Mock()
             mock_table.num_rows = 2
             mock_read_csv.return_value = mock_table
-            mock_concat_tables.return_value = mock_table
 
             # Mock connection
             mock_conn = Mock()
@@ -274,8 +272,8 @@ class TestDataFusionAdapter:
             row_count = adapter._load_table_parquet(mock_conn, "test_table", [csv_file], Path(tmpdir))
 
             assert row_count == 2
-            # Verify Parquet file was written
-            mock_write_table.assert_called_once()
+            # Verify ParquetWriter was opened
+            mock_parquet_writer.assert_called_once()
             # Verify table was registered
             mock_conn.register_parquet.assert_called_once()
 
@@ -354,19 +352,45 @@ class TestDataFusionAdapter:
                 mock_resolver.resolve.return_value = None
                 mock_resolver_cls.return_value = mock_resolver
 
-                with pytest.raises(ValueError, match="No data files found"):
-                    adapter.load_data(mock_benchmark, Mock(), Path(tmpdir))
+                result = adapter.load_data(mock_benchmark, Mock(), Path(tmpdir))
 
                 # Verify platform_name was passed (lowercase)
-                mock_resolver_cls.assert_called_once_with(platform_name="datafusion")
+                assert mock_resolver_cls.call_args.kwargs.get("platform_name") == "datafusion"
+                # When resolver returns None (no data files), load_data returns empty stats
+                assert result == ({}, 0.0, None)
+
+    @patch("benchbox.platforms.datafusion.SessionContext")
+    def test_load_data_uses_mixed_case_table_format_hint(self, mock_session_context):
+        """Format hints keyed by either benchmark casing or normalized casing should reach CSV loading."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_file = Path(tmpdir) / "DimCustomer.csv"
+            csv_file.write_text("1,test\n")
+
+            adapter = DataFusionAdapter(working_dir=tmpdir, data_format="csv")
+            mock_conn = Mock()
+            mock_benchmark = Mock()
+            for table_formats in ({"DimCustomer": "csv"}, {"dimcustomer": "csv"}):
+                mock_data_source = Mock()
+                mock_data_source.tables = {"DimCustomer": [csv_file]}
+                mock_data_source.table_formats = table_formats
+
+                with (
+                    patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_resolver_cls,
+                    patch.object(adapter, "_load_table_csv", return_value=1) as mock_load_csv,
+                ):
+                    mock_resolver = Mock()
+                    mock_resolver.resolve.return_value = mock_data_source
+                    mock_resolver_cls.return_value = mock_resolver
+
+                    result = adapter.load_data(mock_benchmark, mock_conn, Path(tmpdir))
+
+                assert result[0] == {"dimcustomer": 1}
+                assert mock_load_csv.call_args.kwargs["csv_format"] == "csv"
 
     @patch("benchbox.platforms.datafusion.SessionContext")
     @patch("pyarrow.csv.read_csv")
-    @patch("pyarrow.parquet.write_table")
-    @patch("pyarrow.concat_tables")
-    def test_load_table_parquet_with_csv_input(
-        self, mock_concat_tables, mock_write_table, mock_read_csv, mock_session_context
-    ):
+    @patch("pyarrow.parquet.ParquetWriter")
+    def test_load_table_parquet_with_csv_input(self, mock_parquet_writer, mock_read_csv, mock_session_context):
         """Test that CSV files still go through conversion when data_format is parquet."""
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_file = Path(tmpdir) / "test.csv"
@@ -377,7 +401,6 @@ class TestDataFusionAdapter:
             mock_table = Mock()
             mock_table.num_rows = 2
             mock_read_csv.return_value = mock_table
-            mock_concat_tables.return_value = mock_table
             mock_conn = Mock()
 
             row_count = adapter._load_table_parquet(mock_conn, "test_table", [csv_file], Path(tmpdir))
@@ -385,7 +408,7 @@ class TestDataFusionAdapter:
             assert row_count == 2
             # Should have gone through CSV→Parquet conversion
             mock_read_csv.assert_called_once()
-            mock_write_table.assert_called_once()
+            mock_parquet_writer.assert_called_once()
             mock_conn.register_parquet.assert_called_once()
 
     def test_detect_directory_format_delta(self, tmp_path):
@@ -860,12 +883,8 @@ class TestDataFusionColumnTypeMapping:
             mock_conn = Mock()
 
             with patch("pyarrow.csv.read_csv", side_effect=capture_read_csv):
-                with patch("pyarrow.concat_tables") as mock_concat:
-                    mock_combined = Mock()
-                    mock_combined.num_rows = 2
-                    mock_concat.return_value = mock_combined
-                    with patch("pyarrow.parquet.write_table"):
-                        adapter._load_table_parquet(mock_conn, "customer_address", [csv_file], Path(tmpdir))
+                with patch("pyarrow.parquet.ParquetWriter"):
+                    adapter._load_table_parquet(mock_conn, "customer_address", [csv_file], Path(tmpdir))
 
             # Verify column types were correctly mapped
             assert "column_types" in captured_convert_options
@@ -879,8 +898,10 @@ class TestDataFusionColumnTypeMapping:
             assert "ca_street" in col_types
             assert col_types["ca_street"] == pa.string()
 
-            # ca_address_sk (INTEGER) should not be in column_types - uses auto-inference
-            assert "ca_address_sk" not in col_types
+            # ca_address_sk (INTEGER) is explicitly mapped to int32 to prevent
+            # streaming inference errors (all-null early batches → pa.null() type)
+            assert "ca_address_sk" in col_types
+            assert col_types["ca_address_sk"] == pa.int32()
 
     @patch("benchbox.platforms.datafusion.SessionContext")
     def test_column_type_mapping_char_variants(self, mock_session_context):
@@ -919,10 +940,8 @@ class TestDataFusionColumnTypeMapping:
             csv_file.write_text("a|b|c|d|e|f\n")
 
             with patch("pyarrow.csv.read_csv", side_effect=capture_read_csv):
-                with patch("pyarrow.concat_tables") as mock_concat:
-                    mock_concat.return_value = Mock(num_rows=1)
-                    with patch("pyarrow.parquet.write_table"):
-                        adapter._load_table_parquet(mock_conn, "test_table", [csv_file], Path(tmpdir))
+                with patch("pyarrow.parquet.ParquetWriter"):
+                    adapter._load_table_parquet(mock_conn, "test_table", [csv_file], Path(tmpdir))
 
             # All string-type columns should map to pa.string()
             for col_name in [
@@ -968,10 +987,8 @@ class TestDataFusionColumnTypeMapping:
             csv_file.write_text("2024-01-01|2024-01-05\n")
 
             with patch("pyarrow.csv.read_csv", side_effect=capture_read_csv):
-                with patch("pyarrow.concat_tables") as mock_concat:
-                    mock_concat.return_value = Mock(num_rows=1)
-                    with patch("pyarrow.parquet.write_table"):
-                        adapter._load_table_parquet(mock_conn, "test_table", [csv_file], Path(tmpdir))
+                with patch("pyarrow.parquet.ParquetWriter"):
+                    adapter._load_table_parquet(mock_conn, "test_table", [csv_file], Path(tmpdir))
 
             assert "order_date" in captured_types
             assert captured_types["order_date"] == pa.date32()
@@ -1010,10 +1027,8 @@ class TestDataFusionColumnTypeMapping:
             csv_file.write_text("99.99|5.50\n")
 
             with patch("pyarrow.csv.read_csv", side_effect=capture_read_csv):
-                with patch("pyarrow.concat_tables") as mock_concat:
-                    mock_concat.return_value = Mock(num_rows=1)
-                    with patch("pyarrow.parquet.write_table"):
-                        adapter._load_table_parquet(mock_conn, "test_table", [csv_file], Path(tmpdir))
+                with patch("pyarrow.parquet.ParquetWriter"):
+                    adapter._load_table_parquet(mock_conn, "test_table", [csv_file], Path(tmpdir))
 
             assert "price" in captured_types
             assert captured_types["price"] == pa.float64()
@@ -1022,7 +1037,9 @@ class TestDataFusionColumnTypeMapping:
 
     @patch("benchbox.platforms.datafusion.SessionContext")
     def test_column_type_mapping_integer_uses_inference(self, mock_session_context):
-        """Test that INTEGER types are not explicitly mapped (use PyArrow inference)."""
+        """Test that INTEGER/BIGINT/SMALLINT types are explicitly mapped to prevent streaming inference errors."""
+        import pyarrow as pa
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = DataFusionAdapter(working_dir=tmpdir, data_format="parquet")
 
@@ -1051,15 +1068,17 @@ class TestDataFusionColumnTypeMapping:
             csv_file.write_text("1|100|5\n")
 
             with patch("pyarrow.csv.read_csv", side_effect=capture_read_csv):
-                with patch("pyarrow.concat_tables") as mock_concat:
-                    mock_concat.return_value = Mock(num_rows=1)
-                    with patch("pyarrow.parquet.write_table"):
-                        adapter._load_table_parquet(mock_conn, "test_table", [csv_file], Path(tmpdir))
+                with patch("pyarrow.parquet.ParquetWriter"):
+                    adapter._load_table_parquet(mock_conn, "test_table", [csv_file], Path(tmpdir))
 
-            # Integer types should NOT be in column_types - they use auto-inference
-            assert "id" not in captured_types
-            assert "quantity" not in captured_types
-            assert "small_num" not in captured_types
+            # Integer types ARE explicitly mapped to prevent streaming inference
+            # errors where early all-null batches cause a column to be typed as pa.null()
+            assert "id" in captured_types
+            assert captured_types["id"] == pa.int32()
+            assert "quantity" in captured_types
+            assert captured_types["quantity"] == pa.int64()
+            assert "small_num" in captured_types
+            assert captured_types["small_num"] == pa.int32()
 
     @patch("benchbox.platforms.datafusion.SessionContext")
     def test_no_schema_uses_no_column_types(self, mock_session_context):
@@ -1085,12 +1104,202 @@ class TestDataFusionColumnTypeMapping:
             csv_file.write_text("1|test|2024-01-01\n")
 
             with patch("pyarrow.csv.read_csv", side_effect=capture_read_csv):
-                with patch("pyarrow.concat_tables") as mock_concat:
-                    mock_concat.return_value = Mock(num_rows=1)
-                    with patch("pyarrow.parquet.write_table"):
-                        adapter._load_table_parquet(mock_conn, "unknown_table", [csv_file], Path(tmpdir))
+                with patch("pyarrow.parquet.ParquetWriter"):
+                    adapter._load_table_parquet(mock_conn, "unknown_table", [csv_file], Path(tmpdir))
 
             assert captured_types["called"]
             # column_types should be None or empty when no schema
             col_types = captured_types.get("column_types")
             assert col_types is None or len(col_types) == 0
+
+
+# ---------------------------------------------------------------------------
+# _detect_csv_format - manifest format hint parameter
+# ---------------------------------------------------------------------------
+class TestDetectCsvFormatHint:
+    """_detect_csv_format uses csv_format hint before falling back to extension."""
+
+    @pytest.fixture()
+    def adapter(self):
+        with patch("benchbox.platforms.datafusion.SessionContext"), tempfile.TemporaryDirectory() as tmpdir:
+            yield DataFusionAdapter(working_dir=tmpdir)
+
+    def test_tbl_hint_returns_pipe(self, adapter):
+        assert adapter._detect_csv_format([], csv_format="tbl") == "|"
+
+    def test_csv_hint_returns_comma(self, adapter):
+        assert adapter._detect_csv_format([], csv_format="csv") == ","
+
+    def test_none_hint_falls_back_to_extension(self, adapter, tmp_path):
+        tbl_file = tmp_path / "data.tbl"
+        tbl_file.write_text("1|hello\n")
+        delimiter = adapter._detect_csv_format([tbl_file], csv_format=None)
+        assert delimiter == "|"
+
+    def test_none_hint_no_files_defaults_comma(self, adapter):
+        delimiter = adapter._detect_csv_format([], csv_format=None)
+        assert delimiter == ","
+
+    def test_tbl_hint_overrides_csv_extension(self, adapter, tmp_path):
+        """A .csv file with tbl format hint should return pipe, not comma."""
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text("1,hello\n")
+        delimiter = adapter._detect_csv_format([csv_file], csv_format="tbl")
+        assert delimiter == "|"
+
+    def test_csv_hint_overrides_tbl_extension(self, adapter, tmp_path):
+        """A .tbl file with csv format hint should return comma, not pipe."""
+        tbl_file = tmp_path / "data.tbl"
+        tbl_file.write_text("1|hello\n")
+        delimiter = adapter._detect_csv_format([tbl_file], csv_format="csv")
+        assert delimiter == ","
+
+
+# ---------------------------------------------------------------------------
+# _create_empty_schema_tables
+# ---------------------------------------------------------------------------
+class TestCreateEmptySchema:
+    """_create_empty_schema_tables creates DDL from _table_schemas and returns {}."""
+
+    @pytest.fixture()
+    def adapter(self):
+        with patch("benchbox.platforms.datafusion.SessionContext"), tempfile.TemporaryDirectory() as tmpdir:
+            a = DataFusionAdapter(working_dir=tmpdir)
+            yield a
+
+    def test_returns_empty_dict(self, adapter):
+        adapter._table_schemas = {"orders": {"columns": [{"name": "id", "type": "INTEGER"}]}}
+        conn = MagicMock()
+        result = adapter._create_empty_schema_tables(conn)
+        assert result == {}
+
+    def test_executes_create_table_for_each_schema(self, adapter):
+        adapter._table_schemas = {
+            "orders": {"columns": [{"name": "id", "type": "INTEGER"}]},
+            "customers": {"columns": [{"name": "name", "type": "VARCHAR"}]},
+        }
+        conn = MagicMock()
+        adapter._create_empty_schema_tables(conn)
+        assert conn.execute.call_count == 2
+
+    def test_ddl_contains_table_name(self, adapter):
+        adapter._table_schemas = {"my_table": {"columns": [{"name": "col", "type": "BIGINT"}]}}
+        conn = MagicMock()
+        adapter._create_empty_schema_tables(conn)
+        ddl = conn.execute.call_args[0][0]
+        assert "my_table" in ddl
+
+    def test_ddl_maps_integer_to_int(self, adapter):
+        adapter._table_schemas = {"t": {"columns": [{"name": "n", "type": "INTEGER"}]}}
+        conn = MagicMock()
+        adapter._create_empty_schema_tables(conn)
+        ddl = conn.execute.call_args[0][0]
+        assert '"n" INT' in ddl
+
+    def test_ddl_maps_bigint(self, adapter):
+        adapter._table_schemas = {"t": {"columns": [{"name": "n", "type": "BIGINT"}]}}
+        conn = MagicMock()
+        adapter._create_empty_schema_tables(conn)
+        ddl = conn.execute.call_args[0][0]
+        assert '"n" BIGINT' in ddl
+
+    def test_ddl_maps_varchar_as_default(self, adapter):
+        adapter._table_schemas = {
+            "t": {"columns": [{"name": "s", "type": "TEXT"}]}  # TEXT not in type_map → VARCHAR
+        }
+        conn = MagicMock()
+        adapter._create_empty_schema_tables(conn)
+        ddl = conn.execute.call_args[0][0]
+        assert '"s" VARCHAR' in ddl
+
+    def test_ddl_handles_parameterised_decimal(self, adapter):
+        adapter._table_schemas = {"t": {"columns": [{"name": "price", "type": "DECIMAL(10,2)"}]}}
+        conn = MagicMock()
+        adapter._create_empty_schema_tables(conn)
+        ddl = conn.execute.call_args[0][0]
+        assert '"price" DECIMAL(10,2)' in ddl
+
+    def test_skips_tables_with_no_columns(self, adapter):
+        adapter._table_schemas = {
+            "empty_table": {"columns": []},
+            "real_table": {"columns": [{"name": "id", "type": "INTEGER"}]},
+        }
+        conn = MagicMock()
+        adapter._create_empty_schema_tables(conn)
+        # Only real_table should generate DDL
+        assert conn.execute.call_count == 1
+
+    def test_tolerates_execute_exception(self, adapter):
+        """Individual table DDL failures are swallowed - method doesn't raise."""
+        adapter._table_schemas = {"t": {"columns": [{"name": "id", "type": "INTEGER"}]}}
+        conn = MagicMock()
+        conn.execute.side_effect = Exception("DDL error")
+        # Should not raise
+        result = adapter._create_empty_schema_tables(conn)
+        assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# _get_benchmark_schema - OBTTable dataclass-style schema
+# ---------------------------------------------------------------------------
+class TestGetBenchmarkSchemaOBTTable:
+    """_get_benchmark_schema handles OBTTable dataclass objects (no 'columns' dict key)."""
+
+    @pytest.fixture()
+    def adapter(self):
+        with patch("benchbox.platforms.datafusion.SessionContext"), tempfile.TemporaryDirectory() as tmpdir:
+            yield DataFusionAdapter(working_dir=tmpdir)
+
+    def test_extracts_columns_from_dataclass_style_table(self, adapter):
+        """Table def has .columns attribute with .name and .sql_type() per column."""
+        col1 = Mock()
+        col1.name = "sale_id"
+        col1.sql_type = Mock(return_value="BIGINT")
+
+        col2 = Mock()
+        col2.name = "amount"
+        col2.sql_type = Mock(return_value="DECIMAL(18,2)")
+
+        table_def = Mock()
+        table_def.columns = [col1, col2]
+        # Mock is not a dict, so isinstance(table_def, dict) is False → hits hasattr branch
+
+        mock_benchmark = Mock()
+        mock_benchmark.get_schema.return_value = {"sales": table_def}
+
+        schemas = adapter._get_benchmark_schema(mock_benchmark)
+
+        assert "sales" in schemas
+        assert len(schemas["sales"]["columns"]) == 2
+        assert schemas["sales"]["columns"][0] == {"name": "sale_id", "type": "BIGINT"}
+        assert schemas["sales"]["columns"][1] == {"name": "amount", "type": "DECIMAL(18,2)"}
+
+    def test_dataclass_column_without_sql_type_defaults_to_varchar(self, adapter):
+        col = Mock(spec=["name"])  # no sql_type method
+        col.name = "notes"
+
+        table_def = Mock()
+        table_def.columns = [col]
+
+        mock_benchmark = Mock()
+        mock_benchmark.get_schema.return_value = {"info": table_def}
+
+        schemas = adapter._get_benchmark_schema(mock_benchmark)
+
+        assert schemas["info"]["columns"][0] == {"name": "notes", "type": "VARCHAR"}
+
+    def test_table_name_normalized_to_lowercase(self, adapter):
+        col = Mock()
+        col.name = "id"
+        col.sql_type = Mock(return_value="INTEGER")
+
+        table_def = Mock()
+        table_def.columns = [col]
+
+        mock_benchmark = Mock()
+        mock_benchmark.get_schema.return_value = {"DimCustomer": table_def}
+
+        schemas = adapter._get_benchmark_schema(mock_benchmark)
+
+        assert "dimcustomer" in schemas
+        assert "DimCustomer" not in schemas

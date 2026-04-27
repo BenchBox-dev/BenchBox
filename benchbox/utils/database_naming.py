@@ -328,6 +328,7 @@ def generate_database_filename(
         "sqlite": ".sqlite",
         "sqlite3": ".sqlite",
         "clickhouse": ".chdb",
+        "clickhouse-local": ".chdb",
         # DataFrame platforms (SQL mode) - directory-based storage
         "datafusion": ".datafusion",
         "polars": ".polars",

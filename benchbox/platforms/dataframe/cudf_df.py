@@ -58,7 +58,7 @@ from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
 from benchbox.platforms.dataframe.pandas_family import (
     PandasFamilyAdapter,
 )
-from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter, is_tpc_format
+from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +208,7 @@ class CuDFDataFrameAdapter(PandasFamilyAdapter[CuDFDF]):
         delimiter: str = ",",
         header: int | None = 0,
         names: list[str] | None = None,
+        null_marker: str | None = None,
     ) -> CuDFDF:
         """Read a CSV file into a cuDF DataFrame.
 
@@ -216,6 +217,7 @@ class CuDFDataFrameAdapter(PandasFamilyAdapter[CuDFDF]):
             delimiter: Field delimiter
             header: Row to use as header (None for no header)
             names: Column names (if header is None)
+            null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
 
         Returns:
             cuDF DataFrame with the file contents
@@ -234,8 +236,8 @@ class CuDFDataFrameAdapter(PandasFamilyAdapter[CuDFDF]):
         if names:
             read_kwargs["names"] = names
 
-        # Handle TPC format files (.tbl, .dat) with trailing delimiter
-        if is_tpc_format(path) and names and has_trailing_delimiter(path, delimiter, names):
+        # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
+        if null_marker is not None and names and has_trailing_delimiter(path, delimiter, names):
             extended_names = names + [TRAILING_DUMMY_COLUMN]
             read_kwargs["names"] = extended_names
 

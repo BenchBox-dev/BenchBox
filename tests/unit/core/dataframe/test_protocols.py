@@ -136,7 +136,7 @@ class TestDataFrameOpsProtocol:
         """Test that DataFrameOps is runtime checkable via isinstance()."""
         assert isinstance(DataFrameOps, type), "DataFrameOps should be a type (protocol class)"
 
-    def test_mock_implementation_satisfies_protocol(self):
+    def test_mock_implementation_satisfies_protocol(self):  # noqa: C901
         """Test that a mock implementation satisfies the protocol."""
 
         class MockDataFrame:

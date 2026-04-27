@@ -50,11 +50,11 @@ class TestGeneratorConfiguration:
             gen = TSBSDevOpsDataGenerator(scale_factor=2.0, output_dir=tmpdir)
             assert gen.num_hosts == int(DEFAULT_HOSTS * 2.0)
 
-    def test_scale_factor_affects_duration(self):
-        """Scale factor should affect duration."""
+    def test_duration_fixed_regardless_of_scale_factor(self):
+        """Duration should be fixed at DEFAULT_DURATION_DAYS (only hosts scale)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             gen = TSBSDevOpsDataGenerator(scale_factor=3.0, output_dir=tmpdir)
-            assert gen.duration_days == int(DEFAULT_DURATION_DAYS * 3.0)
+            assert gen.duration_days == DEFAULT_DURATION_DAYS
 
     def test_explicit_num_hosts_overrides_scale(self):
         """Explicit num_hosts should override scale factor."""

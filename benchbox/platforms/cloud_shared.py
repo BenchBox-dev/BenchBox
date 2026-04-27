@@ -41,7 +41,7 @@ def validate_session_cache_control(
         setting_key: Name of the setting in the result dict (e.g. ``USE_CACHED_RESULT``).
         disabled_value: Value when cache is off (e.g. ``"off"`` or ``"FALSE"``).
         enabled_value: Value when cache is on (e.g. ``"on"`` or ``"TRUE"``).
-        normalize: ``"lower"`` or ``"upper"`` — how to normalize the raw value.
+        normalize: ``"lower"`` or ``"upper"`` - how to normalize the raw value.
         platform_name: Human-readable platform name for error messages.
         disable_result_cache: Whether the adapter expects cache to be disabled.
         strict_validation: If True, raise ConfigurationError on mismatch.

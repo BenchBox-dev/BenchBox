@@ -132,8 +132,37 @@ benchbox run --platform pandas-df --benchmark tpch --scale 1
 | **Pandas** | `pandas-df` | Data science prototyping, compatibility | SF 10 (memory-bound) |
 | **PySpark** | `pyspark-df` | Distributed processing, big data | SF 1000+ (cluster) |
 | **DataFusion** | `datafusion-df` | Arrow-native workflows, Rust performance | SF 50+ |
+| **LakeSail** | `lakesail-df` | Rust Spark replacement (DataFusion core) via Spark Connect | SF 100+ |
 
 For detailed DataFrame platform documentation, see the [DataFrame Platforms Guide](dataframe.md).
+
+## Spark-Compatible Engines (Non-JVM or Accelerated)
+
+Two native-code engines speak the Spark SQL / DataFrame API without running Spark's full JVM execution path. Both use the standard `pyspark` client via Spark Connect.
+
+| Platform | CLI Name | Execution Model | Local Platform Support | When to Pick |
+|----------|----------|-----------------|------------------------|--------------|
+| **LakeSail Sail** | `lakesail` (SQL) / `lakesail-df` (DF) | Rust/DataFusion - full drop-in replacement, no JVM | Linux, macOS | You want to migrate off Spark with zero code changes, or benchmark SQL + DataFrame on the same engine. |
+| **Apache Gluten + Velox** | `velox` | Plugin - Spark keeps its scheduler; Velox runs the physical plan in C++ | **Linux only** (Docker on macOS/Windows) | You want to accelerate an existing Spark deployment without changing client code; unsupported operators fall back to JVM. |
+
+```bash
+# LakeSail (SQL)
+benchbox run --platform lakesail --benchmark tpch --scale 1.0
+
+# LakeSail (DataFrame)
+benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
+
+# Velox - local (Linux) with a Gluten bundle jar
+benchbox run --platform velox --benchmark tpch --scale 0.1 \
+    --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar
+
+# Velox - remote (connect to a Gluten-enabled Spark Connect server, e.g. via Docker)
+benchbox run --platform velox --velox-deployment remote \
+    --velox-endpoint sc://localhost:50051 \
+    --benchmark tpch --scale 0.1
+```
+
+See [LakeSail Platform Guide](lakesail.md), [Velox Platform Guide](velox.md), and the [Comparison Matrix](comparison-matrix.md#spark-compatible-engines) for deeper architectural and deployment detail.
 
 ---
 
@@ -912,11 +941,16 @@ Platform selection depends on your specific requirements. Common platform choice
 - **Cloud-native deployments**: BigQuery, Databricks SQL, Redshift, Snowflake (managed services)
 - **Self-hosted deployments**: ClickHouse, DuckDB (full control)
 
+### Spark-Compatible Engines
+- **Drop-in Spark replacement (no JVM)**: LakeSail Sail (`lakesail`, `lakesail-df`) - Rust/DataFusion engine via Spark Connect
+- **Accelerate existing Spark jobs**: Apache Gluten + Velox (`velox`) - native C++ operators, Linux-only local mode (Docker on macOS/Windows)
+
 ### DataFrame Platforms
 - **Single-node analytics**: Polars-df (multi-threaded, lazy evaluation)
 - **Data science prototyping**: Pandas-df (familiar API, ecosystem compatibility)
 - **Distributed big data**: PySpark-df (cluster-scale processing)
 - **Arrow-native workflows**: DataFusion-df (Rust-based, Arrow integration)
+- **Spark-compatible Rust engine**: LakeSail-df (via Spark Connect, DataFusion core)
 - **GPU acceleration**: cuDF-df (NVIDIA RAPIDS, coming soon)
 
 Install BenchBox with the `[duckdb]` extra for SQL benchmarking. Polars is included for DataFrame benchmarking. Cloud platforms and additional DataFrame libraries can be added as requirements grow.

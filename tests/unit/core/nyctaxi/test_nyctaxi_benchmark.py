@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
-from benchbox.core.nyctaxi.schema import NYC_TAXI_SCHEMA
+from benchbox.core.nyctaxi.schema import NYC_TAXI_SCHEMA, TaxiType
 
 pytestmark = [
     pytest.mark.unit,
@@ -149,16 +149,19 @@ class TestGetSchema:
     """Tests for schema retrieval."""
 
     def test_get_schema_returns_dict(self):
-        """get_schema should return schema dictionary."""
+        """get_schema should return schema dictionary for active taxi types."""
         bm = NYCTaxiBenchmark()
         schema = bm.get_schema()
-        assert schema == NYC_TAXI_SCHEMA
+        assert isinstance(schema, dict)
+        # Default (Yellow-only) returns trips + taxi_zones
+        assert set(schema.keys()) == {"trips", "taxi_zones"}
 
     def test_get_schema_has_all_tables(self):
-        """Schema should have all tables."""
-        bm = NYCTaxiBenchmark()
+        """Schema should include all tables when all taxi types are active."""
+        bm = NYCTaxiBenchmark(taxi_types=[TaxiType.YELLOW, TaxiType.GREEN, TaxiType.HVFHV])
         schema = bm.get_schema()
-        assert set(schema.keys()) == {"trips", "taxi_zones"}
+        required = {"trips", "taxi_zones", "green_trips", "hvfhv_trips"}
+        assert required.issubset(set(schema.keys()))
 
 
 class TestGetCreateTablesSql:

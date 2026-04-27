@@ -81,7 +81,7 @@ class DataGenerationMixin:
 
         file_path = self.tables[table_name]
 
-        with open(file_path) as handle:
+        with open(file_path, encoding="utf-8") as handle:
             reader = csv.reader(handle, delimiter="|")
 
             columns = [col["name"] for col in table_def["columns"]]

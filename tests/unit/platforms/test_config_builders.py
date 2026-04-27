@@ -90,6 +90,41 @@ class TestAzureConfigUtils:
         config = self._call(overrides={"database": "mydb", "benchmark": "tpch", "scale_factor": 1})
         assert config.database == "mydb"
 
+    @patch("benchbox.security.credentials.CredentialManager")
+    def test_base_options_seed_value_appears_in_result(self, MockCM):
+        # Use model_dump() - "schema" conflicts with Pydantic's deprecated .schema classmethod
+        # when accessed as an attribute, but survives the model_dump() path used in production.
+        MockCM.return_value.get_platform_credentials.return_value = {}
+        config = self._call(
+            platform_fields=["schema"],
+            base_options={"schema": "public"},
+            options={},
+            overrides={"benchmark": "tpch", "scale_factor": 1},
+        )
+        assert config.model_dump()["schema"] == "public"
+
+    @patch("benchbox.security.credentials.CredentialManager")
+    def test_base_options_overridden_by_saved_creds(self, MockCM):
+        MockCM.return_value.get_platform_credentials.return_value = {"schema": "custom"}
+        config = self._call(
+            platform_fields=["schema"],
+            base_options={"schema": "public"},
+            options={},
+            overrides={"benchmark": "tpch", "scale_factor": 1},
+        )
+        assert config.model_dump()["schema"] == "custom"
+
+    @patch("benchbox.security.credentials.CredentialManager")
+    def test_base_options_overridden_by_options(self, MockCM):
+        MockCM.return_value.get_platform_credentials.return_value = {}
+        config = self._call(
+            platform_fields=["schema"],
+            base_options={"schema": "public"},
+            options={"schema": "registry_default"},
+            overrides={"benchmark": "tpch", "scale_factor": 1},
+        )
+        assert config.model_dump()["schema"] == "registry_default"
+
 
 class TestDatabendConfigBuilder:
     """Tests for benchbox.platforms.databend._build_databend_config."""

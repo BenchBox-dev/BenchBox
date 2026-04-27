@@ -67,12 +67,12 @@ class TestVacuumAnalyzeConnectionIsolation:
         """Main connection cursor is never used for VACUUM/ANALYZE."""
         adapter = _make_adapter(auto_vacuum=True, auto_analyze=False)
 
-        # Main connection — its cursor should only do the table list query
+        # Main connection - its cursor should only do the table list query
         main_conn = Mock()
         main_cursor = _make_smart_cursor(tables=[("public", "orders")])
         main_conn.cursor.return_value = main_cursor
 
-        # Maintenance connection — will timeout on VACUUM
+        # Maintenance connection - will timeout on VACUUM
         maint_conn = Mock()
         maint_conn.autocommit = True
         maint_cursor = _make_smart_cursor(fail_on={"VACUUM"})

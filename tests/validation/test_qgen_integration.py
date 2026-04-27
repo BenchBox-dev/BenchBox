@@ -207,7 +207,7 @@ class TestQGenBinaryIntegration:
                 result2 = qgen.generate(1, seed=88888)
                 assert result == result2
             finally:
-                # Restore CWD before TemporaryDirectory cleanup —
+                # Restore CWD before TemporaryDirectory cleanup -
                 # on Windows, the CWD holds a lock that prevents deletion.
                 os.chdir(original_cwd)
 

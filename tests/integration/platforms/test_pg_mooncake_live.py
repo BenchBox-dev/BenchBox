@@ -24,6 +24,11 @@ import pytest
 
 from .conftest import get_env_or_skip, skip_unless_docker_service
 
+try:
+    from psycopg import sql as psycopg_sql
+except ImportError:
+    psycopg_sql = None  # type: ignore[assignment]
+
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.docker_integration,
@@ -121,7 +126,9 @@ class TestLivePgMooncakeObjectStorage:
         connection = live_pg_mooncake_adapter.create_connection()
         try:
             cursor = connection.cursor()
-            cursor.execute(f"SET mooncake.default_bucket = '{s3_mooncake_bucket}'")
+            cursor.execute(
+                psycopg_sql.SQL("SET mooncake.default_bucket = {}").format(psycopg_sql.Literal(s3_mooncake_bucket))
+            )
             cursor.execute("DROP TABLE IF EXISTS benchbox_s3_smoke_test")
             cursor.execute("CREATE TABLE benchbox_s3_smoke_test (id INT, value DOUBLE PRECISION) USING columnstore")
             cursor.execute("INSERT INTO benchbox_s3_smoke_test VALUES (1, 42.0)")

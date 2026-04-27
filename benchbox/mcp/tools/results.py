@@ -117,7 +117,7 @@ def _list_recent_runs_impl(
     runs = []
     for file_path in sorted(result_files, key=lambda p: p.stat().st_mtime, reverse=True):
         try:
-            with open(file_path) as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             run_platform = data.get("platform", {}).get("name", "unknown")

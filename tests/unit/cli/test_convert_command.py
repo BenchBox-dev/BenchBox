@@ -2,12 +2,22 @@
 
 import json
 import sys
+import sys as _sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
 from benchbox.cli.commands.convert import convert
+
+# benchbox.cli.commands.__init__ re-exports `convert` (a Click Command) under
+# the same name as the convert submodule.  On Python 3.10 mock's string-based
+# patch() resolves the target via getattr(benchbox.cli.commands, "convert"),
+# which returns the Command object, not the submodule.  Seeding sys.modules
+# here via __import__ and using patch.object() avoids the ambiguity on all
+# Python versions.
+__import__("benchbox.cli.commands.convert")
+_convert_module = _sys.modules["benchbox.cli.commands.convert"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -60,7 +70,7 @@ def mock_manifest_v2(tmp_path):
     }
 
     manifest_path = tmp_path / "_datagen_manifest.json"
-    with open(manifest_path, "w") as f:
+    with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest_data, f)
 
     return tmp_path
@@ -119,12 +129,12 @@ class TestConvertCommand:
 
     def test_convert_partition_multiple(self, cli_runner, mock_manifest_v2):
         """Test that multiple partition columns can be specified."""
-        with patch("benchbox.cli.commands.convert._get_schemas_from_manifest") as mock_schemas:
+        with patch.object(_convert_module, "_get_schemas_from_manifest") as mock_schemas:
             mock_schemas.return_value = {
                 "customer": {"columns": [{"name": "c_custkey", "type": "INTEGER"}]},
             }
 
-            with patch("benchbox.cli.commands.convert.FormatConversionOrchestrator") as mock_orch:
+            with patch.object(_convert_module, "FormatConversionOrchestrator") as mock_orch:
                 mock_instance = MagicMock()
                 mock_instance.convert_benchmark_tables.return_value = {}
                 mock_orch.return_value = mock_instance
@@ -150,12 +160,12 @@ class TestConvertCommand:
 
     def test_convert_validate_flag(self, cli_runner, mock_manifest_v2):
         """Test that --validate and --no-validate flags work."""
-        with patch("benchbox.cli.commands.convert._get_schemas_from_manifest") as mock_schemas:
+        with patch.object(_convert_module, "_get_schemas_from_manifest") as mock_schemas:
             mock_schemas.return_value = {
                 "customer": {"columns": [{"name": "c_custkey", "type": "INTEGER"}]},
             }
 
-            with patch("benchbox.cli.commands.convert.FormatConversionOrchestrator") as mock_orch:
+            with patch.object(_convert_module, "FormatConversionOrchestrator") as mock_orch:
                 mock_instance = MagicMock()
                 mock_instance.convert_benchmark_tables.return_value = {}
                 mock_orch.return_value = mock_instance
@@ -177,12 +187,12 @@ class TestConvertCommand:
 
     def test_convert_verbose_flag(self, cli_runner, mock_manifest_v2):
         """Test that --verbose flag works."""
-        with patch("benchbox.cli.commands.convert._get_schemas_from_manifest") as mock_schemas:
+        with patch.object(_convert_module, "_get_schemas_from_manifest") as mock_schemas:
             mock_schemas.return_value = {
                 "customer": {"columns": [{"name": "c_custkey", "type": "INTEGER"}]},
             }
 
-            with patch("benchbox.cli.commands.convert.FormatConversionOrchestrator") as mock_orch:
+            with patch.object(_convert_module, "FormatConversionOrchestrator") as mock_orch:
                 mock_instance = MagicMock()
                 mock_instance.convert_benchmark_tables.return_value = {}
                 mock_orch.return_value = mock_instance

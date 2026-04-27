@@ -94,12 +94,4 @@ def mock_platform_dependency_checks():
         except ImportError:
             pass
 
-        try:
-            from benchbox.platforms.redshift import RedshiftAdapter
-
-            RedshiftAdapter.add_cli_arguments = staticmethod(lambda parser: None)
-            # Don't stub from_config - we want to test the real implementation
-        except ImportError:
-            pass
-
         yield

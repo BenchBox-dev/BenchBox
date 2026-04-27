@@ -190,7 +190,18 @@ class TestRelationshipTables:
 
     def test_all_relationship_tables_present(self, gen: JoinOrderGenerator, dimension_data: dict):
         data = gen._generate_relationship_tables(dimension_data)
-        expected = {"cast_info", "movie_companies", "movie_info", "movie_info_idx", "movie_keyword"}
+        expected = {
+            "cast_info",
+            "movie_companies",
+            "movie_info",
+            "movie_info_idx",
+            "movie_keyword",
+            "movie_link",
+            "person_info",
+            "complete_cast",
+            "aka_name",
+            "aka_title",
+        }
         assert set(data.keys()) == expected
 
 
@@ -277,3 +288,143 @@ class TestGenerateData:
         assert len(gen._manifest_row_counts) > 10
         for table_name, count in gen._manifest_row_counts.items():
             assert count > 0, f"{table_name} has 0 rows in manifest"
+
+
+# ---------------------------------------------------------------------------
+# New relationship table methods (5 tables added for DataFusion compatibility)
+# ---------------------------------------------------------------------------
+class TestNewRelationshipTables:
+    @pytest.fixture()
+    def gen(self, tmp_path: Path) -> JoinOrderGenerator:
+        return JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
+
+    # --- _generate_movie_link ---
+
+    def test_movie_link_row_count(self, gen: JoinOrderGenerator):
+        rows = gen._generate_movie_link(count=50, max_title_id=100)
+        assert len(rows) == 50
+
+    def test_movie_link_column_count(self, gen: JoinOrderGenerator):
+        rows = gen._generate_movie_link(count=5, max_title_id=100)
+        assert all(len(row) == 4 for row in rows)
+
+    def test_movie_link_ids_sequential(self, gen: JoinOrderGenerator):
+        rows = gen._generate_movie_link(count=10, max_title_id=100)
+        assert [r[0] for r in rows] == list(range(1, 11))
+
+    def test_movie_link_type_id_in_range(self, gen: JoinOrderGenerator):
+        rows = gen._generate_movie_link(count=100, max_title_id=200)
+        for row in rows:
+            assert 1 <= row[3] <= 18, f"link_type_id {row[3]} out of 1-18 range"
+
+    def test_movie_link_title_ids_in_range(self, gen: JoinOrderGenerator):
+        max_id = 50
+        rows = gen._generate_movie_link(count=100, max_title_id=max_id)
+        for row in rows:
+            assert 1 <= row[1] <= max_id, f"movie_id {row[1]} out of range"
+            assert 1 <= row[2] <= max_id, f"linked_movie_id {row[2]} out of range"
+
+    # --- _generate_person_info ---
+
+    def test_person_info_row_count(self, gen: JoinOrderGenerator):
+        rows = gen._generate_person_info(count=30, max_name_id=50)
+        assert len(rows) == 30
+
+    def test_person_info_column_count(self, gen: JoinOrderGenerator):
+        rows = gen._generate_person_info(count=5, max_name_id=50)
+        assert all(len(row) == 5 for row in rows)
+
+    def test_person_info_ids_sequential(self, gen: JoinOrderGenerator):
+        rows = gen._generate_person_info(count=10, max_name_id=50)
+        assert [r[0] for r in rows] == list(range(1, 11))
+
+    def test_person_info_type_id_in_range(self, gen: JoinOrderGenerator):
+        rows = gen._generate_person_info(count=100, max_name_id=100)
+        for row in rows:
+            assert 1 <= row[2] <= 113, f"info_type_id {row[2]} out of 1-113 range"
+
+    def test_person_info_person_id_in_range(self, gen: JoinOrderGenerator):
+        max_id = 40
+        rows = gen._generate_person_info(count=100, max_name_id=max_id)
+        for row in rows:
+            assert 1 <= row[1] <= max_id
+
+    # --- _generate_complete_cast ---
+
+    def test_complete_cast_row_count(self, gen: JoinOrderGenerator):
+        rows = gen._generate_complete_cast(count=20, max_title_id=50)
+        assert len(rows) == 20
+
+    def test_complete_cast_column_count(self, gen: JoinOrderGenerator):
+        rows = gen._generate_complete_cast(count=5, max_title_id=50)
+        assert all(len(row) == 4 for row in rows)
+
+    def test_complete_cast_ids_sequential(self, gen: JoinOrderGenerator):
+        rows = gen._generate_complete_cast(count=10, max_title_id=50)
+        assert [r[0] for r in rows] == list(range(1, 11))
+
+    def test_complete_cast_subject_status_in_range(self, gen: JoinOrderGenerator):
+        rows = gen._generate_complete_cast(count=100, max_title_id=100)
+        for row in rows:
+            assert 1 <= row[2] <= 4, f"subject_id {row[2]} out of 1-4 range"
+            assert 1 <= row[3] <= 4, f"status_id {row[3]} out of 1-4 range"
+
+    # --- _generate_aka_name ---
+
+    def test_aka_name_row_count(self, gen: JoinOrderGenerator):
+        rows = gen._generate_aka_name(count=25, max_name_id=50)
+        assert len(rows) == 25
+
+    def test_aka_name_column_count(self, gen: JoinOrderGenerator):
+        rows = gen._generate_aka_name(count=5, max_name_id=50)
+        assert all(len(row) == 8 for row in rows)
+
+    def test_aka_name_ids_sequential(self, gen: JoinOrderGenerator):
+        rows = gen._generate_aka_name(count=10, max_name_id=50)
+        assert [r[0] for r in rows] == list(range(1, 11))
+
+    def test_aka_name_person_id_in_range(self, gen: JoinOrderGenerator):
+        max_id = 30
+        rows = gen._generate_aka_name(count=50, max_name_id=max_id)
+        for row in rows:
+            assert 1 <= row[1] <= max_id
+
+    def test_aka_name_has_string_name(self, gen: JoinOrderGenerator):
+        rows = gen._generate_aka_name(count=10, max_name_id=50)
+        for row in rows:
+            assert isinstance(row[2], str) and len(row[2]) > 0
+
+    # --- _generate_aka_title ---
+
+    def test_aka_title_row_count(self, gen: JoinOrderGenerator):
+        rows = gen._generate_aka_title(count=15, max_title_id=50)
+        assert len(rows) == 15
+
+    def test_aka_title_column_count(self, gen: JoinOrderGenerator):
+        rows = gen._generate_aka_title(count=5, max_title_id=50)
+        assert all(len(row) == 12 for row in rows)
+
+    def test_aka_title_ids_sequential(self, gen: JoinOrderGenerator):
+        rows = gen._generate_aka_title(count=10, max_title_id=50)
+        assert [r[0] for r in rows] == list(range(1, 11))
+
+    def test_aka_title_movie_id_in_range(self, gen: JoinOrderGenerator):
+        max_id = 40
+        rows = gen._generate_aka_title(count=50, max_title_id=max_id)
+        for row in rows:
+            assert 1 <= row[1] <= max_id
+
+    def test_aka_title_has_string_title(self, gen: JoinOrderGenerator):
+        rows = gen._generate_aka_title(count=10, max_title_id=50)
+        for row in rows:
+            assert isinstance(row[2], str) and len(row[2]) > 0
+
+    # --- integration: all 5 new tables appear in _generate_relationship_tables ---
+
+    def test_new_tables_present_in_relationship_tables(self, gen: JoinOrderGenerator):
+        lookup = gen._generate_lookup_tables()
+        dim = gen._generate_dimension_tables(lookup)
+        rel = gen._generate_relationship_tables(dim)
+        for table in ("movie_link", "person_info", "complete_cast", "aka_name", "aka_title"):
+            assert table in rel, f"{table} missing from relationship tables"
+            assert len(rel[table]) > 0, f"{table} has 0 rows"

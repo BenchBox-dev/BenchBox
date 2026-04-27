@@ -154,10 +154,13 @@ def _derive_tpc_metrics(
     power_at_size = power_metrics.get("power_at_size")
     throughput_at_size = throughput_metrics.get("throughput_at_size")
 
+    _compliance_class = power_data.get("benchmark", {}).get("compliance_class")
+    _is_subscale = _compliance_class == "unofficial_subscale"
+
     if power_at_size is None or throughput_at_size is None:
         from benchbox.core.results.metrics import TPCMetricsCalculator
 
-        if power_at_size is None:
+        if power_at_size is None and not _is_subscale:
             power_query_times = [
                 q["ms"] / 1000.0
                 for q in power_data.get("queries", [])
@@ -166,7 +169,7 @@ def _derive_tpc_metrics(
             if power_query_times:
                 power_at_size = TPCMetricsCalculator.calculate_power_at_size(power_query_times, scale_factor)
 
-        if throughput_at_size is None:
+        if throughput_at_size is None and not _is_subscale:
             t_summary = throughput_data.get("summary", {}).get("queries", {})
             total_queries = t_summary.get("total")
             t_time_ms = throughput_data.get("summary", {}).get("timing", {}).get("total_ms")

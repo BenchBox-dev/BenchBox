@@ -23,6 +23,8 @@ jobs:
             python-version: '3.12'
           - os: windows-latest
             python-version: '3.12'
+          - os: windows-latest
+            python-version: '3.10'
 
     steps:
       - name: Checkout code
@@ -47,6 +49,7 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
+          uv run -- python scripts/check_windows_antipatterns.py
 
       - name: Run type checking
         run: |
@@ -64,6 +67,26 @@ jobs:
           file: ./coverage.xml
           fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  # Check for unsafe patch() string paths in test files.
+  # Catches the pattern patch("benchbox.cli.commands.<module>.<attr>") where
+  # <module> is re-exported by __init__.py under the same name, shadowing the
+  # submodule and causing Python 3.10 failures or order-dependent 3.12 passes.
+  check-test-patterns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run patch safety check
+        # Bare python is intentional: this job skips uv setup for speed since
+        # check_patch_safety.py is stdlib-only (no third-party imports).
+        run: python scripts/check_patch_safety.py
 
   # Security audit
   security:
@@ -91,7 +114,7 @@ jobs:
       - name: Run security audit
         run: |
           if [ -n "${PIP_AUDIT_IGNORE_VULNS}" ]; then
-            IGNORE_ARGS=$(printf '%s' "${PIP_AUDIT_IGNORE_VULNS}" | tr ',' '\n' | sed '/^$/d;s/^/--ignore-vuln /' | tr '\n' ' ')
+            IGNORE_ARGS=$(printf '%s' "${PIP_AUDIT_IGNORE_VULNS}" | tr ',' '\n' | sed '/^$/d;s/^[[:space:]]*//;s/[[:space:]]*$//;/^$/d;s/^/--ignore-vuln /' | tr '\n' ' ')
             uvx pip-audit ${IGNORE_ARGS}
           else
             uvx pip-audit
@@ -99,15 +122,23 @@ jobs:
 
   # Quick integration smoke tests - runs on ALL PRs
   integration-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: '3.12'
+          - os: windows-latest
+            python-version: '3.12'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -174,7 +205,54 @@ jobs:
 
   # Package build and install test
   test-package:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: '3.12'
+          - os: windows-latest
+            python-version: '3.12'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build package
+        run: |
+          uv build
+
+      - name: Test package installation
+        shell: bash
+        run: |
+          # Use bash on all platforms so glob expansion works cross-platform.
+          # GitHub Actions Windows runners have Git Bash available.
+          uv venv test-venv
+          uv pip install --python test-venv dist/*.whl
+          uv run --python test-venv python -c "import benchbox; print('Package installation successful')"
+          uv run --python test-venv benchbox --help
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-build-dist-${{ matrix.os }}
+          path: dist/
+          retention-days: 7  # Shorter retention for test artifacts
+
+  # CLI↔explorer visualization parity check.
+  # Verifies that the checked-in JSON fixtures in tests/parity/fixtures/
+  # match the current Python implementations, AND that the Vitest suite passes.
+  parity:
     runs-on: ubuntu-latest
+    if: false  # results-explorer is not included in the public release
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -187,25 +265,24 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Build package
-        run: |
-          uv build
-
-      - name: Test package installation
-        run: |
-          # Create a fresh venv for testing the installed package
-          uv venv test-venv
-          source test-venv/bin/activate
-          uv pip install dist/*.whl
-          python -c "import benchbox; print('Package installation successful')"
-          benchbox --help
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          name: test-build-dist
-          path: dist/
-          retention-days: 7  # Shorter retention for test artifacts
+          node-version: '20'
+
+      - name: Install Python dependencies
+        run: uv sync --group dev
+
+      - name: Install Node dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Verify parity fixtures match Python source
+        run: make parity-check
+
+      - name: Run Vitest parity suite
+        run: npm test -- --reporter=verbose
+        working-directory: results-explorer
 
   # PySpark tests - requires Java, runs separately
   # Non-blocking: PySpark setup can be fragile

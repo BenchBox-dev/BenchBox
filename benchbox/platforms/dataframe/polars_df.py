@@ -256,6 +256,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         delimiter: str = ",",
         has_header: bool = True,
         column_names: list[str] | None = None,
+        null_marker: str | None = None,
     ) -> PolarsLazyDF:
         """Read a CSV file into a Polars LazyFrame.
 
@@ -264,6 +265,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             delimiter: Field delimiter
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
+            null_marker: Unused for Polars (truncate_ragged_lines handles trailing delimiters natively).
 
         Returns:
             Polars LazyFrame with the file contents
@@ -538,7 +540,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         """Shared Polars rank-window implementation.
 
         Args:
-            method: Polars rank method — ``"min"`` (RANK), ``"ordinal"``
+            method: Polars rank method - ``"min"`` (RANK), ``"ordinal"``
                 (ROW_NUMBER), or ``"dense"`` (DENSE_RANK).
             order_by: List of (column_name, ascending) tuples for ordering.
             partition_by: Columns to partition by (optional).

@@ -213,7 +213,7 @@ def test_all_registered_adapters_declare_capability():
     """Every registered adapter must have a driver_isolation_capability (own or inherited).
 
     Adapters that inherit from a parent with an explicit declaration (e.g.
-    PgDuckDBAdapter → PostgreSQLAdapter) are valid — the capability propagates
+    PgDuckDBAdapter → PostgreSQLAdapter) are valid - the capability propagates
     through MRO.  Only adapters whose MRO chain never sets the attribute beyond
     the base PlatformAdapter default are flagged.
     """

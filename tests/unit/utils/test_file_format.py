@@ -22,6 +22,7 @@ from benchbox.utils.file_format import (
     detect_compression,
     detect_data_format,
     get_base_name_without_compression,
+    get_data_extension,
     get_delimiter_for_file,
     is_compression_extension,
     is_csv_format,
@@ -509,3 +510,68 @@ class TestGetDelimiterForFile:
         """Test sharded TPC file returns pipe delimiter."""
         assert get_delimiter_for_file("customer.tbl.1") == "|"
         assert get_delimiter_for_file("customer.tbl.1.zst") == "|"
+
+
+class TestGetDataExtension:
+    """Tests for get_data_extension function."""
+
+    @pytest.mark.parametrize(
+        ("filename", "expected"),
+        [
+            # Uncompressed formats
+            ("lineitem.tbl", ".tbl"),
+            ("store_sales.dat", ".dat"),
+            ("data.csv", ".csv"),
+            ("data.parquet", ".parquet"),
+            ("data.vortex", ".vortex"),
+            # Compressed formats
+            ("store_sales.dat.zst", ".dat"),
+            ("lineitem.tbl.gz", ".tbl"),
+            ("data.csv.bz2", ".csv"),
+            ("data.parquet.lz4", ".parquet"),
+            ("data.vortex.xz", ".vortex"),
+        ],
+    )
+    def test_basic_formats(self, filename, expected):
+        assert get_data_extension(Path(filename)) == expected
+
+    def test_numeric_shard_single_digit(self):
+        """Shard suffix (.7) is skipped to reveal the data extension."""
+        assert get_data_extension(Path("customer.tbl.7.zst")) == ".tbl"
+
+    def test_numeric_shard_multi_digit(self):
+        """Multi-digit shard suffix (.10) is skipped."""
+        assert get_data_extension(Path("customer.tbl.10.zst")) == ".tbl"
+
+    def test_numeric_shard_uncompressed(self):
+        """Shard without compression wrapper is handled."""
+        assert get_data_extension(Path("customer.tbl.7")) == ".tbl"
+
+    def test_multiple_compression_layers(self):
+        """Multiple compression suffixes are all skipped."""
+        assert get_data_extension(Path("hits.csv.gz.bz2")) == ".csv"
+
+    def test_unknown_suffix_skipped(self):
+        """Unrecognized suffixes (e.g. .bak) are skipped, not treated as a stop."""
+        assert get_data_extension(Path("data.tbl.bak")) == ".tbl"
+
+    def test_no_extension(self):
+        assert get_data_extension(Path("README")) is None
+
+    def test_only_compression_suffix(self):
+        assert get_data_extension(Path("file.zst")) is None
+
+    def test_unknown_suffix_only(self):
+        assert get_data_extension(Path("file.txt")) is None
+
+    def test_accepts_string_path(self):
+        assert get_data_extension("lineitem.tbl.zst") == ".tbl"
+
+    def test_case_insensitive(self):
+        assert get_data_extension(Path("DATA.TBL.ZST")) == ".tbl"
+        assert get_data_extension(Path("store_sales.DAT.GZ")) == ".dat"
+
+    def test_dat_not_collapsed_to_tbl(self):
+        """Critical: .dat must be returned as '.dat', not '.tbl' (unlike detect_data_format)."""
+        assert get_data_extension(Path("store_sales.dat")) == ".dat"
+        assert get_data_extension(Path("store_sales.dat")) != ".tbl"

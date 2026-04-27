@@ -586,7 +586,7 @@ def test_tpcds_c_tools_and_dsqgen_helpers(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert "interval '3 day'" in out_sql.lower()
 
 
-def test_tpch_maintenance_helpers_and_integrity(monkeypatch: pytest.MonkeyPatch):
+def test_tpch_maintenance_helpers_and_integrity(monkeypatch: pytest.MonkeyPatch):  # noqa: C901
     class FakeCursor:
         def __init__(self, rows=None, rowcount=0):
             self._rows = rows or []

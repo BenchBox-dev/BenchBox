@@ -450,6 +450,54 @@ Automatically detect performance regressions across recent runs.
 
 ---
 
+#### `validate_results`
+
+Validate integrity, completeness, and believability of benchmark result JSON files. Runs a three-tier validation pipeline (structural, completeness, believability) with 20 checks total.
+
+**Parameters:**
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `result_file` | string | No* | "" | Path to a single result JSON file |
+| `directory` | string | No* | "" | Path to a directory of result JSON files (batch mode) |
+| `verbose` | bool | No | false | Include PASS checks in output (default: WARN+FAIL only) |
+
+*One of `result_file` or `directory` must be provided.
+
+**Returns (single file):**
+- `file`: Result file path
+- `benchmark_id`: Benchmark identifier
+- `platform`: Platform name
+- `scale_factor`: Scale factor
+- `overall_status`: "PASS", "WARN", or "FAIL"
+- `summary`: Check counts by status
+- `checks`: List of check results with category, name, status, message, and details
+
+**Returns (directory):**
+- `total`: Number of files validated
+- `pass`: Count of files with PASS status
+- `warn`: Count of files with WARN status
+- `fail`: Count of files with FAIL status
+- `files`: List of per-file summaries (file, benchmark_id, platform, overall_status)
+
+**Example:**
+```json
+{
+  "file": "tpch_duckdb_sf1_20260401.json",
+  "benchmark_id": "tpch",
+  "platform": "DuckDB",
+  "scale_factor": 1.0,
+  "overall_status": "PASS",
+  "summary": {"PASS": 20, "WARN": 0, "FAIL": 0},
+  "checks": []
+}
+```
+
+**Severity levels:**
+- **FAIL**: Mathematical impossibility or data corruption (e.g., passed + failed != total)
+- **WARN**: Suspicious but plausible (e.g., timing outlier > 30 minutes, missing tables)
+
+---
+
 ### Visualization Tools
 
 #### `suggest_charts`

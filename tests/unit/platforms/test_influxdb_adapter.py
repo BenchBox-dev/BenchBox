@@ -11,7 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import os
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -444,3 +444,103 @@ class TestInfluxDBConnectionWrite:
 
         with pytest.raises(RuntimeError, match="Write operations require influxdb3-python"):
             conn.write_line_protocol(["cpu,host=a value=1.0"])
+
+
+class TestInfluxDBTlsCertValidation:
+    """Tests for verify_ssl and ca_cert_path TLS options on InfluxDB adapter and connection."""
+
+    def test_connection_defaults_verify_ssl_true_no_ca_cert(self):
+        """InfluxDBConnection defaults verify_ssl=True, ca_cert_path=None."""
+        conn = InfluxDBConnection(host="localhost", token="tok", database="db")
+        assert conn.verify_ssl is True
+        assert conn.ca_cert_path is None
+
+    def test_connection_accepts_verify_ssl_false(self):
+        """InfluxDBConnection stores verify_ssl=False for self-signed cert environments."""
+        conn = InfluxDBConnection(host="localhost", token="tok", database="db", verify_ssl=False)
+        assert conn.verify_ssl is False
+
+    def test_connection_accepts_ca_cert_path(self):
+        """InfluxDBConnection stores ca_cert_path for custom CA bundle."""
+        conn = InfluxDBConnection(host="localhost", token="tok", database="db", ca_cert_path="/etc/ssl/ca.crt")
+        assert conn.ca_cert_path == "/etc/ssl/ca.crt"
+
+    def test_adapter_defaults_verify_ssl_true_no_ca_cert(self):
+        """InfluxDB adapter stores verify_ssl=True and ca_cert_path=None by default."""
+        try:
+            from benchbox.platforms.influxdb import InfluxDBAdapter
+
+            adapter = InfluxDBAdapter(token="test")
+            assert adapter.verify_ssl is True
+            assert adapter.ca_cert_path is None
+        except ImportError:
+            pytest.skip("InfluxDB client not installed")
+
+    def test_adapter_accepts_verify_ssl_false(self):
+        """InfluxDB adapter propagates verify_ssl=False through _setup_connection_params."""
+        try:
+            from benchbox.platforms.influxdb import InfluxDBAdapter
+
+            adapter = InfluxDBAdapter(token="test", verify_ssl=False)
+            assert adapter.verify_ssl is False
+        except ImportError:
+            pytest.skip("InfluxDB client not installed")
+
+    def test_adapter_from_config_passes_tls_options(self):
+        """from_config propagates verify_ssl and ca_cert_path to the adapter."""
+        try:
+            from benchbox.platforms.influxdb import InfluxDBAdapter
+
+            config = {
+                "token": "test-token",
+                "host": "influxdb.example.com",
+                "verify_ssl": False,
+                "ca_cert_path": "/etc/ssl/my-ca.crt",
+            }
+            adapter = InfluxDBAdapter.from_config(config)
+            assert adapter.verify_ssl is False
+            assert adapter.ca_cert_path == "/etc/ssl/my-ca.crt"
+        except ImportError:
+            pytest.skip("InfluxDB client not installed")
+
+    def test_influxdb3_client_receives_verify_ssl_false(self):
+        """verify_ssl=False is passed as verify_ssl kwarg to InfluxDBClient3."""
+        conn = InfluxDBConnection(host="localhost", token="tok", database="db", verify_ssl=False)
+        mock_client = Mock()
+        with patch("benchbox.platforms.influxdb.client.InfluxDBClient3", mock_client):
+            with patch("benchbox.platforms.influxdb.client.INFLUXDB3_AVAILABLE", True):
+                conn._connect_influxdb3()
+                _, kwargs = mock_client.call_args
+                assert kwargs["verify_ssl"] is False
+
+    def test_influxdb3_client_receives_ca_cert_path(self):
+        """ca_cert_path is passed as ssl_ca_cert kwarg to InfluxDBClient3."""
+        conn = InfluxDBConnection(host="localhost", token="tok", database="db", ca_cert_path="/etc/ssl/ca.crt")
+        mock_client = Mock()
+        with patch("benchbox.platforms.influxdb.client.InfluxDBClient3", mock_client):
+            with patch("benchbox.platforms.influxdb.client.INFLUXDB3_AVAILABLE", True):
+                conn._connect_influxdb3()
+                _, kwargs = mock_client.call_args
+                assert kwargs["ssl_ca_cert"] == "/etc/ssl/ca.crt"
+
+    def test_influxdb3_client_omits_tls_kwargs_when_defaults(self):
+        """Default verify_ssl=True and ca_cert_path=None should not pass extra kwargs."""
+        conn = InfluxDBConnection(host="localhost", token="tok", database="db")
+        mock_client = Mock()
+        with patch("benchbox.platforms.influxdb.client.InfluxDBClient3", mock_client):
+            with patch("benchbox.platforms.influxdb.client.INFLUXDB3_AVAILABLE", True):
+                conn._connect_influxdb3()
+                _, kwargs = mock_client.call_args
+                assert "verify_ssl" not in kwargs
+                assert "ssl_ca_cert" not in kwargs
+
+    def test_flightsql_client_receives_disable_server_verification(self):
+        """verify_ssl=False is passed as disable_server_verification=True to FlightSQLClient."""
+        conn = InfluxDBConnection(host="localhost", token="tok", database="db", verify_ssl=False)
+        mock_client = Mock()
+        with patch("benchbox.platforms.influxdb.client.FlightSQLClient", mock_client):
+            with patch("benchbox.platforms.influxdb.client.INFLUXDB3_AVAILABLE", False):
+                with patch("benchbox.platforms.influxdb.client.FLIGHTSQL_AVAILABLE", True):
+                    conn._connect_flightsql()
+                    _, kwargs = mock_client.call_args
+                    assert kwargs["disable_server_verification"] is True

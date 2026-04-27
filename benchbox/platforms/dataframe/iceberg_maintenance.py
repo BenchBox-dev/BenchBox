@@ -350,7 +350,7 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
                         except ValueError:
                             pass  # Keep as string
 
-                    return op_class(column, value)
+                    return op_class(column, value)  # ty: ignore[too-many-positional-arguments]
 
         # If we can't parse, log warning and return AlwaysTrue
         # (delete all is safer than failing silently)

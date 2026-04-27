@@ -991,6 +991,13 @@ class TestBenchmarkDataFrameIntegration:
         benchmark = MetadataPrimitivesBenchmark()
         assert benchmark.supports_dataframe_mode() is True
 
+    def test_skip_dataframe_data_loading(self):
+        """Metadata Primitives should bypass the generic file-backed loader."""
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+
+        benchmark = MetadataPrimitivesBenchmark()
+        assert benchmark.skip_dataframe_data_loading() is True
+
     def test_get_dataframe_operations(self):
         """Test getting DataFrame operations from benchmark."""
         from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
@@ -1020,6 +1027,17 @@ class TestBenchmarkDataFrameIntegration:
         assert caps is not None
         assert caps.supports_schema_introspection is True
 
+    def test_benchmark_registry_metadata_matches_metadata_catalog(self):
+        """Registry metadata should track the benchmark's current catalog size."""
+        from benchbox.core.benchmark_registry import BENCHMARK_METADATA
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+
+        benchmark = MetadataPrimitivesBenchmark()
+        metadata = BENCHMARK_METADATA["metadata_primitives"]
+
+        assert metadata["num_queries"] == len(benchmark.get_queries())
+        assert "DataFrame mode runs platform-specific metadata operation subsets" in metadata["query_description"]
+
     def test_run_dataframe_benchmark_polars(self):
         """Test running DataFrame benchmark with Polars."""
         try:
@@ -1042,3 +1060,274 @@ class TestBenchmarkDataFrameIntegration:
         assert result.total_queries > 0
         assert result.successful_queries > 0
         assert "schema" in result.category_summary
+
+    def test_run_dataframe_benchmark_catalog_category_executes_table_scoped_catalog_ops(self, monkeypatch):
+        """Catalog category should dispatch benchmark-manageable per-table catalog ops."""
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+
+        benchmark = MetadataPrimitivesBenchmark()
+        calls: list[tuple[str, str | None]] = []
+
+        class FakeCapabilities:
+            supported = {
+                MetadataOperationType.LIST_DATABASES,
+                MetadataOperationType.LIST_TABLES,
+                MetadataOperationType.LIST_TABLE_COLUMNS,
+                MetadataOperationType.TABLE_EXISTS,
+                MetadataOperationType.GET_TABLE_INFO,
+            }
+
+            def supports_operation(self, operation: MetadataOperationType) -> bool:
+                return operation in self.supported
+
+        class FakeManager:
+            def get_capabilities(self) -> FakeCapabilities:
+                return FakeCapabilities()
+
+            def execute_list_databases(self) -> DataFrameMetadataResult:
+                calls.append(("list_databases", None))
+                return DataFrameMetadataResult.success_result(
+                    MetadataOperationType.LIST_DATABASES,
+                    start_time=time.time(),
+                    result_count=1,
+                )
+
+            def execute_list_tables(self) -> DataFrameMetadataResult:
+                calls.append(("list_tables", None))
+                return DataFrameMetadataResult.success_result(
+                    MetadataOperationType.LIST_TABLES,
+                    start_time=time.time(),
+                    result_count=2,
+                )
+
+            def execute_list_table_columns(self, table_name: str) -> DataFrameMetadataResult:
+                calls.append(("list_table_columns", table_name))
+                return DataFrameMetadataResult.success_result(
+                    MetadataOperationType.LIST_TABLE_COLUMNS,
+                    start_time=time.time(),
+                    result_count=3,
+                )
+
+            def execute_table_exists(self, table_name: str) -> DataFrameMetadataResult:
+                calls.append(("table_exists", table_name))
+                return DataFrameMetadataResult.success_result(
+                    MetadataOperationType.TABLE_EXISTS,
+                    start_time=time.time(),
+                    result_count=1,
+                    result_data=True,
+                )
+
+            def execute_get_table_info(self, table_name: str) -> DataFrameMetadataResult:
+                calls.append(("get_table_info", table_name))
+                return DataFrameMetadataResult.success_result(
+                    MetadataOperationType.GET_TABLE_INFO,
+                    start_time=time.time(),
+                    result_count=1,
+                )
+
+        monkeypatch.setattr(benchmark, "get_dataframe_operations", lambda *_args, **_kwargs: FakeManager())
+
+        result = benchmark.run_dataframe_benchmark(
+            platform_name="pyspark-df",
+            dataframes={"orders": object(), "lineitem": object()},
+            categories=["catalog"],
+            iterations=1,
+        )
+
+        assert result.total_queries == 8
+        assert calls == [
+            ("list_databases", None),
+            ("list_tables", None),
+            ("list_table_columns", "orders"),
+            ("list_table_columns", "lineitem"),
+            ("table_exists", "orders"),
+            ("table_exists", "lineitem"),
+            ("get_table_info", "orders"),
+            ("get_table_info", "lineitem"),
+        ]
+
+    def test_execute_dataframe_workload_complexity_category_runs_complexity_ops(self):
+        """Explicit complexity selection should execute benchmark-manageable complexity ops."""
+        pytest.importorskip("polars")
+
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        benchmark = MetadataPrimitivesBenchmark()
+        adapter = PolarsDataFrameAdapter()
+        ctx = adapter.create_context()
+
+        rows = benchmark.execute_dataframe_workload(
+            ctx=ctx,
+            adapter=adapter,
+            benchmark_config=SimpleNamespace(options={"power_iterations": 1, "metadata_categories": ["complexity"]}),
+        )
+
+        assert len(rows) == len(benchmark.get_table_names()) * 2
+        assert all(
+            row["query_id"].startswith("df_wide_table_schema_")
+            or row["query_id"].startswith("df_complex_type_introspection_")
+            for row in rows
+        )
+
+    def test_execute_dataframe_workload_uses_registered_context_tables(self, monkeypatch):
+        """execute_dataframe_workload should extract native tables from the context contract."""
+        import polars as pl
+
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.core.metadata_primitives.benchmark import MetadataBenchmarkResult
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        benchmark = MetadataPrimitivesBenchmark()
+        adapter = PolarsDataFrameAdapter()
+        ctx = adapter.create_context()
+        native_df = pl.DataFrame({"a": [1, 2, 3]})
+        ctx.register_table("test_table", native_df)
+
+        captured: dict[str, object] = {}
+
+        def fake_run_dataframe_benchmark(
+            platform_name: str,
+            dataframes: dict[str, object],
+            spark_session=None,
+            categories=None,
+            iterations: int = 1,
+        ) -> MetadataBenchmarkResult:
+            _ = (spark_session, categories, iterations)
+            captured["platform_name"] = platform_name
+            captured["dataframes"] = dataframes
+            return MetadataBenchmarkResult(results=[], total_queries=0)
+
+        monkeypatch.setattr(benchmark, "run_dataframe_benchmark", fake_run_dataframe_benchmark)
+
+        results = benchmark.execute_dataframe_workload(
+            ctx=ctx,
+            adapter=adapter,
+            benchmark_config=SimpleNamespace(options={}),
+            query_filter=None,
+            monitor=None,
+            run_options=None,
+        )
+
+        assert results == []
+        assert captured["platform_name"] == adapter.platform_name
+        assert captured["dataframes"] == {"test_table": native_df}
+
+    def test_execute_dataframe_workload_bootstraps_schema_fixtures_for_empty_context(self):
+        """Empty DataFrame contexts should be populated with in-memory metadata fixtures."""
+        pytest.importorskip("polars")
+
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        benchmark = MetadataPrimitivesBenchmark()
+        adapter = PolarsDataFrameAdapter()
+        ctx = adapter.create_context()
+
+        rows = benchmark.execute_dataframe_workload(
+            ctx=ctx,
+            adapter=adapter,
+            benchmark_config=SimpleNamespace(options={"power_iterations": 1}),
+        )
+
+        assert set(ctx.list_tables()) == set(benchmark.get_table_names())
+        assert len(rows) == len(benchmark.get_table_names()) * 6
+        assert all(row["status"] == "SUCCESS" for row in rows)
+
+    def test_execute_dataframe_workload_returns_adapter_row_format(self, monkeypatch):
+        """execute_dataframe_workload output rows must match the adapter-compatible dict contract."""
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.core.metadata_primitives.benchmark import MetadataBenchmarkResult, MetadataQueryResult
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        benchmark = MetadataPrimitivesBenchmark()
+        adapter = PolarsDataFrameAdapter()
+        ctx = adapter.create_context()
+
+        fake_results = [
+            MetadataQueryResult(
+                query_id="schema_list_tables",
+                category="schema",
+                execution_time_ms=5.0,
+                row_count=3,
+                success=True,
+            ),
+            MetadataQueryResult(
+                query_id="schema_get_columns",
+                category="schema",
+                execution_time_ms=2.0,
+                row_count=0,
+                success=False,
+                error="not supported",
+            ),
+        ]
+
+        def fake_run(platform_name, dataframes, spark_session=None, categories=None, iterations=1):
+            return MetadataBenchmarkResult(results=fake_results, total_queries=2)
+
+        monkeypatch.setattr(benchmark, "run_dataframe_benchmark", fake_run)
+
+        rows = benchmark.execute_dataframe_workload(
+            ctx=ctx,
+            adapter=adapter,
+            benchmark_config=SimpleNamespace(options={}),
+        )
+
+        assert len(rows) == 2
+
+        row0 = rows[0]
+        assert row0["query_id"] == "schema_list_tables"
+        assert row0["status"] == "SUCCESS"
+        assert abs(row0["execution_time_seconds"] - 0.005) < 1e-9
+        assert row0["rows_returned"] == 3
+        assert row0["iteration"] == 1
+        assert row0["run_type"] == "measurement"
+        assert row0["error"] is None
+
+        row1 = rows[1]
+        assert row1["query_id"] == "schema_get_columns"
+        assert row1["status"] == "FAILED"
+        assert row1["error"] == "not supported"
+        assert row1["iteration"] == 1
+
+    def test_execute_dataframe_workload_query_filter_excludes_non_matching(self, monkeypatch):
+        """query_filter must exclude query IDs not in the filter set."""
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.core.metadata_primitives.benchmark import MetadataBenchmarkResult, MetadataQueryResult
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        benchmark = MetadataPrimitivesBenchmark()
+        adapter = PolarsDataFrameAdapter()
+        ctx = adapter.create_context()
+
+        fake_results = [
+            MetadataQueryResult(
+                query_id="schema_list_tables",
+                category="schema",
+                execution_time_ms=1.0,
+                row_count=1,
+                success=True,
+            ),
+            MetadataQueryResult(
+                query_id="schema_get_columns",
+                category="schema",
+                execution_time_ms=1.0,
+                row_count=1,
+                success=True,
+            ),
+        ]
+
+        def fake_run(platform_name, dataframes, spark_session=None, categories=None, iterations=1):
+            return MetadataBenchmarkResult(results=fake_results, total_queries=2)
+
+        monkeypatch.setattr(benchmark, "run_dataframe_benchmark", fake_run)
+
+        rows = benchmark.execute_dataframe_workload(
+            ctx=ctx,
+            adapter=adapter,
+            benchmark_config=SimpleNamespace(options={}),
+            query_filter={"SCHEMA_LIST_TABLES"},
+        )
+
+        assert len(rows) == 1
+        assert rows[0]["query_id"] == "schema_list_tables"

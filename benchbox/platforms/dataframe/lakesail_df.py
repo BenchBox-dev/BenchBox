@@ -67,7 +67,7 @@ from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
 from benchbox.platforms.dataframe.expression_family import (
     ExpressionFamilyAdapter,
 )
-from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter, is_tpc_format
+from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter
 
 if TYPE_CHECKING:
     from pyspark.sql.window import WindowSpec
@@ -321,13 +321,15 @@ class LakeSailDataFrameAdapter(ExpressionFamilyAdapter[LakeSailDF, LakeSailLazyD
         delimiter: str = ",",
         has_header: bool = True,
         column_names: list[str] | None = None,
+        null_marker: str | None = None,
     ) -> LakeSailLazyDF:
         """Read a CSV file into a DataFrame via Spark Connect."""
         path_str = str(path)
 
         reader = self.spark.read.option("delimiter", delimiter).option("header", str(has_header).lower())
 
-        if is_tpc_format(path) and column_names and has_trailing_delimiter(path, delimiter, column_names):
+        # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
+        if null_marker is not None and column_names and has_trailing_delimiter(path, delimiter, column_names):
             extended_names = column_names + [TRAILING_DUMMY_COLUMN]
             schema = self._build_schema(extended_names)
             df = reader.schema(schema).csv(path_str)

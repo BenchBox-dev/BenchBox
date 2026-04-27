@@ -12,8 +12,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from benchbox.platforms.base.cloud_spark.staging import (
+    AzureADLSStaging,
+    AzureBlobStaging,
     CloudProvider,
     CloudSparkStaging,
+    DBFSStaging,
+    GCSStaging,
     LocalStaging,
     S3Staging,
     StagingConfig,
@@ -87,43 +91,25 @@ class TestCloudSparkStagingFromUri:
 
     def test_from_uri_gcs(self):
         """Test GCS URI parsing."""
-        with patch(
-            "benchbox.platforms.base.cloud_spark.staging.GCSStaging.__init__",
-            return_value=None,
-        ) as mock_init:
-            CloudSparkStaging.from_uri("gs://my-bucket/data")
-            # Verify __init__ was called with correct config
-            call_args = mock_init.call_args
-            config = call_args[0][0]  # First positional arg
-            assert config.provider == CloudProvider.GCS
-            assert config.bucket == "my-bucket"
+        result = CloudSparkStaging.from_uri("gs://my-bucket/data")
+        assert isinstance(result, GCSStaging)
+        assert result.config.provider == CloudProvider.GCS
+        assert result.config.bucket == "my-bucket"
 
     def test_from_uri_azure_adls(self):
         """Test Azure ADLS URI parsing."""
         uri = "abfss://container@account.dfs.core.windows.net/path"
-        with patch(
-            "benchbox.platforms.base.cloud_spark.staging.AzureADLSStaging.__init__",
-            return_value=None,
-        ) as mock_init:
-            CloudSparkStaging.from_uri(uri)
-            # Verify __init__ was called with correct config
-            call_args = mock_init.call_args
-            config = call_args[0][0]  # First positional arg
-            assert config.provider == CloudProvider.AZURE_ADLS
-            assert "container@account" in config.bucket
+        result = CloudSparkStaging.from_uri(uri)
+        assert isinstance(result, AzureADLSStaging)
+        assert result.config.provider == CloudProvider.AZURE_ADLS
+        assert "container@account" in result.config.bucket
 
     def test_from_uri_dbfs(self):
         """Test DBFS URI parsing."""
-        with patch(
-            "benchbox.platforms.base.cloud_spark.staging.DBFSStaging.__init__",
-            return_value=None,
-        ) as mock_init:
-            CloudSparkStaging.from_uri("dbfs:/Volumes/catalog/schema/volume/data")
-            # Verify __init__ was called with correct config
-            call_args = mock_init.call_args
-            config = call_args[0][0]  # First positional arg
-            assert config.provider == CloudProvider.DBFS
-            assert "Volumes" in config.prefix
+        result = CloudSparkStaging.from_uri("dbfs:/Volumes/catalog/schema/volume/data")
+        assert isinstance(result, DBFSStaging)
+        assert result.config.provider == CloudProvider.DBFS
+        assert "Volumes" in result.config.prefix
 
     def test_from_uri_local(self):
         """Test local file URI parsing."""
@@ -254,6 +240,69 @@ class TestLocalStaging:
             assert "orders" in uploaded
             assert (staging_dir / "lineitem").exists()
             assert (staging_dir / "orders").exists()
+
+    def test_upload_data_files(self):
+        """Explicit file mappings should upload without table-name globbing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = Path(tmpdir) / "source"
+            staging_dir = Path(tmpdir) / "staging"
+            source_dir.mkdir()
+
+            lineitem = source_dir / "lineitem.parquet"
+            orders_part1 = source_dir / "orders.parquet.1"
+            orders_part2 = source_dir / "orders.parquet.2"
+            lineitem.write_text("lineitem data")
+            orders_part1.write_text("orders part 1")
+            orders_part2.write_text("orders part 2")
+
+            config = StagingConfig(
+                uri=f"file://{staging_dir}",
+                provider=CloudProvider.LOCAL,
+                bucket="",
+                prefix=str(staging_dir),
+            )
+            staging = LocalStaging(config)
+
+            uploaded = staging.upload_data_files(
+                {
+                    "lineitem": lineitem,
+                    "orders": [orders_part1, orders_part2],
+                }
+            )
+
+            assert uploaded["lineitem"].endswith("/lineitem/")
+            assert uploaded["orders"].endswith("/orders/")
+            assert (staging_dir / "lineitem" / "lineitem.parquet").exists()
+            assert (staging_dir / "orders" / "orders.parquet.1").exists()
+            assert (staging_dir / "orders" / "orders.parquet.2").exists()
+
+    def test_upload_data_files_preserves_nested_relative_paths(self):
+        """Explicit file mappings should preserve nested layouts and duplicate basenames."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = Path(tmpdir) / "source"
+            staging_dir = Path(tmpdir) / "staging"
+            asia_dir = source_dir / "orders" / "region=ASIA"
+            europe_dir = source_dir / "orders" / "region=EUROPE"
+            asia_dir.mkdir(parents=True)
+            europe_dir.mkdir(parents=True)
+
+            asia_part = asia_dir / "part-00000.parquet"
+            europe_part = europe_dir / "part-00000.parquet"
+            asia_part.write_text("asia orders")
+            europe_part.write_text("europe orders")
+
+            config = StagingConfig(
+                uri=f"file://{staging_dir}",
+                provider=CloudProvider.LOCAL,
+                bucket="",
+                prefix=str(staging_dir),
+            )
+            staging = LocalStaging(config)
+
+            staging.upload_data_files({"orders": [asia_part, europe_part]})
+
+            assert (staging_dir / "orders" / "region=ASIA" / "part-00000.parquet").read_text() == "asia orders"
+            assert (staging_dir / "orders" / "region=EUROPE" / "part-00000.parquet").read_text() == "europe orders"
 
     def test_tables_exist(self):
         """Test checking if tables exist in staging."""
@@ -408,3 +457,380 @@ class TestStagingConfig:
         assert config.region == "us-west-2"
         assert config.compression == "zstd"
         assert config.parallel_uploads == 8
+
+
+class TestUploadProgressBoundaries:
+    """Additional boundary tests for UploadProgress.percent_complete."""
+
+    def test_percent_complete_exactly_full(self):
+        """When bytes_uploaded == total_bytes, result is 100.0."""
+        progress = UploadProgress(
+            table_name="t",
+            file_name="f.parquet",
+            bytes_uploaded=1024,
+            total_bytes=1024,
+            files_completed=1,
+            total_files=1,
+        )
+        assert progress.percent_complete == 100.0
+
+    def test_percent_complete_zero_uploaded(self):
+        """When bytes_uploaded is 0 but total > 0, result is 0.0."""
+        progress = UploadProgress(
+            table_name="t",
+            file_name="f.parquet",
+            bytes_uploaded=0,
+            total_bytes=512,
+            files_completed=0,
+            total_files=1,
+        )
+        assert progress.percent_complete == 0.0
+
+
+class TestCloudSparkStagingFromUriExtra:
+    """Additional from_uri tests for less-common schemes."""
+
+    def test_from_uri_wasbs(self):
+        """wasbs:// scheme maps to AZURE_BLOB."""
+        result = CloudSparkStaging.from_uri("wasbs://container@account.blob.core.windows.net/path")
+        assert isinstance(result, AzureBlobStaging)
+        assert result.config.provider == CloudProvider.AZURE_BLOB
+
+    def test_from_uri_bare_local_path(self):
+        """A path without a URI scheme (empty scheme) maps to LOCAL."""
+        staging = CloudSparkStaging.from_uri("/tmp/benchbox/data")
+        assert isinstance(staging, LocalStaging)
+        assert staging.config.provider == CloudProvider.LOCAL
+
+    def test_parse_uri_s3_bucket_and_prefix(self):
+        """_parse_uri correctly splits bucket and prefix for s3 URI."""
+        bucket, prefix = CloudSparkStaging._parse_uri("s3://my-bucket/path/to/prefix", CloudProvider.AWS_S3)
+        assert bucket == "my-bucket"
+        assert prefix == "path/to/prefix"
+
+    def test_parse_uri_gcs_bucket_and_prefix(self):
+        """_parse_uri correctly splits bucket and prefix for gs URI."""
+        bucket, prefix = CloudSparkStaging._parse_uri("gs://gcs-bucket/benchbox/data", CloudProvider.GCS)
+        assert bucket == "gcs-bucket"
+        assert prefix == "benchbox/data"
+
+
+# ---------------------------------------------------------------------------
+# S3Staging provider methods
+# ---------------------------------------------------------------------------
+
+
+def _s3_config(prefix: str | None = "data") -> StagingConfig:
+    from benchbox.platforms.base.cloud_spark.staging import CloudProvider, StagingConfig
+
+    return StagingConfig(
+        uri="s3://my-bucket/data",
+        provider=CloudProvider.AWS_S3,
+        bucket="my-bucket",
+        prefix=prefix or "",
+    )
+
+
+class TestS3StagingMethods:
+    def _provider(self, prefix=None):
+        from benchbox.platforms.base.cloud_spark.staging import S3Staging
+
+        s = S3Staging(_s3_config(prefix))
+        s._client = MagicMock()
+        return s
+
+    def test_upload_file(self, tmp_path):
+        p = self._provider()
+        f = tmp_path / "lineitem.parquet"
+        f.write_bytes(b"data")
+        uri = p.upload_file(f, "lineitem/lineitem.parquet")
+        p._client.upload_file.assert_called_once()
+        assert "my-bucket" in uri
+
+    def test_upload_file_gzip_encoding(self, tmp_path):
+        from benchbox.platforms.base.cloud_spark.staging import S3Staging
+
+        config = _s3_config()
+        config.compression = "gzip"
+        s = S3Staging(config)
+        s._client = MagicMock()
+        f = tmp_path / "data.parquet"
+        f.write_bytes(b"data")
+        s.upload_file(f, "tables/data.parquet")
+        call_kwargs = s._client.upload_file.call_args[1]
+        assert call_kwargs.get("ExtraArgs") == {"ContentEncoding": "gzip"}
+
+    def test_file_exists_found(self):
+        p = self._provider()
+        p._client.head_object.return_value = {}
+        p._client.exceptions.ClientError = Exception
+        assert p.file_exists("lineitem/lineitem.parquet") is True
+
+    def test_file_exists_not_found(self):
+        p = self._provider()
+        p._client.exceptions.ClientError = Exception
+        p._client.head_object.side_effect = p._client.exceptions.ClientError
+        assert p.file_exists("missing.parquet") is False
+
+    def test_delete_path_single_file(self):
+        p = self._provider(prefix=None)  # no prefix → key is passed as-is
+        p.delete_path("tables/data.parquet", recursive=False)
+        p._client.delete_object.assert_called_once_with(Bucket="my-bucket", Key="tables/data.parquet")
+
+    def test_full_key_no_prefix(self):
+        p = self._provider(prefix=None)
+        assert p._full_key("tables/data") == "tables/data"
+
+
+# ---------------------------------------------------------------------------
+# GCSStaging provider methods
+# ---------------------------------------------------------------------------
+
+
+class TestGCSStagingMethods:
+    def _provider(self, prefix="data"):
+        from benchbox.platforms.base.cloud_spark.staging import CloudProvider, GCSStaging, StagingConfig
+
+        config = StagingConfig(
+            uri="gs://gcs-bucket/data", provider=CloudProvider.GCS, bucket="gcs-bucket", prefix=prefix
+        )
+        s = GCSStaging(config)
+        s._client = MagicMock()
+        return s
+
+    def test_upload_file(self, tmp_path):
+        p = self._provider()
+        mock_blob = MagicMock()
+        p._client.bucket.return_value.blob.return_value = mock_blob
+        f = tmp_path / "data.parquet"
+        f.write_bytes(b"data")
+        uri = p.upload_file(f, "tables/data.parquet")
+        mock_blob.upload_from_filename.assert_called_once()
+        assert "gcs-bucket" in uri
+
+    def test_file_exists(self):
+        p = self._provider()
+        mock_blob = MagicMock()
+        mock_blob.exists.return_value = True
+        p._client.bucket.return_value.blob.return_value = mock_blob
+        assert p.file_exists("tables/data.parquet") is True
+
+    def test_list_files(self):
+        p = self._provider()
+        mock_blobs = [MagicMock(name="data/tables/a.parquet"), MagicMock(name="data/tables/b.parquet")]
+        p._client.bucket.return_value.list_blobs.return_value = mock_blobs
+        files = p.list_files("tables/")
+        assert len(files) == 2
+
+    def test_delete_path_recursive(self):
+        p = self._provider()
+        blob1, blob2 = MagicMock(), MagicMock()
+        p._client.bucket.return_value.list_blobs.return_value = [blob1, blob2]
+        p.delete_path("tables/", recursive=True)
+        blob1.delete.assert_called_once()
+        blob2.delete.assert_called_once()
+
+    def test_delete_path_single(self):
+        p = self._provider()
+        mock_blob = MagicMock()
+        p._client.bucket.return_value.blob.return_value = mock_blob
+        p.delete_path("tables/data.parquet", recursive=False)
+        mock_blob.delete.assert_called_once()
+
+    def test_get_client_caches(self):
+        p = self._provider()
+        # Already has _client set, should return it
+        client = p._get_client()
+        assert client is p._client
+
+
+# ---------------------------------------------------------------------------
+# AzureADLSStaging provider methods
+# ---------------------------------------------------------------------------
+
+
+class TestAzureADLSStagingMethods:
+    def _provider(self):
+        from benchbox.platforms.base.cloud_spark.staging import AzureADLSStaging, CloudProvider, StagingConfig
+
+        config = StagingConfig(
+            uri="abfss://container@account.dfs.core.windows.net/prefix",
+            provider=CloudProvider.AZURE_ADLS,
+            bucket="container@account.dfs.core.windows.net",
+            prefix="prefix",
+        )
+        s = AzureADLSStaging(config)
+        s._client = MagicMock()
+        return s
+
+    def test_full_path_with_prefix(self):
+        p = self._provider()
+        assert p._full_path("tables/data") == "prefix/tables/data"
+
+    def test_upload_file(self, tmp_path):
+        p = self._provider()
+        mock_file_client = MagicMock()
+        p._client.get_file_client.return_value = mock_file_client
+        f = tmp_path / "data.parquet"
+        f.write_bytes(b"data")
+        p.upload_file(f, "tables/data.parquet")
+        mock_file_client.upload_data.assert_called_once()
+
+    def test_file_exists_found(self):
+        p = self._provider()
+        mock_fc = MagicMock()
+        mock_fc.get_file_properties.return_value = {}
+        p._client.get_file_client.return_value = mock_fc
+        assert p.file_exists("tables/data.parquet") is True
+
+    def test_file_exists_not_found(self):
+        p = self._provider()
+        mock_fc = MagicMock()
+        mock_fc.get_file_properties.side_effect = Exception("not found")
+        p._client.get_file_client.return_value = mock_fc
+        assert p.file_exists("tables/data.parquet") is False
+
+    def test_list_files(self):
+        p = self._provider()
+        paths = [
+            MagicMock(name="prefix/tables/a.parquet", is_directory=False),
+            MagicMock(is_directory=True),
+        ]
+        p._client.get_paths.return_value = paths
+        files = p.list_files("tables/")
+        assert len(files) == 1
+
+    def test_delete_path_recursive(self):
+        p = self._provider()
+        mock_dir = MagicMock()
+        p._client.get_directory_client.return_value = mock_dir
+        p.delete_path("tables/", recursive=True)
+        mock_dir.delete_directory.assert_called_once()
+
+    def test_delete_path_single(self):
+        p = self._provider()
+        mock_fc = MagicMock()
+        p._client.get_file_client.return_value = mock_fc
+        p.delete_path("tables/data.parquet", recursive=False)
+        mock_fc.delete_file.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# AzureBlobStaging provider methods
+# ---------------------------------------------------------------------------
+
+
+class TestAzureBlobStagingMethods:
+    def _provider(self):
+        from benchbox.platforms.base.cloud_spark.staging import AzureBlobStaging, CloudProvider, StagingConfig
+
+        config = StagingConfig(
+            uri="wasbs://container@account.blob.core.windows.net/prefix",
+            provider=CloudProvider.AZURE_BLOB,
+            bucket="container@account.blob.core.windows.net",
+            prefix="prefix",
+        )
+        s = AzureBlobStaging(config)
+        s._client = MagicMock()
+        return s
+
+    def test_full_path_with_prefix(self):
+        p = self._provider()
+        assert p._full_path("tables/data") == "prefix/tables/data"
+
+    def test_upload_file(self, tmp_path):
+        p = self._provider()
+        mock_blob = MagicMock()
+        p._client.get_blob_client.return_value = mock_blob
+        f = tmp_path / "data.parquet"
+        f.write_bytes(b"data")
+        p.upload_file(f, "tables/data.parquet")
+        mock_blob.upload_blob.assert_called_once()
+
+    def test_file_exists(self):
+        p = self._provider()
+        mock_blob = MagicMock()
+        mock_blob.exists.return_value = True
+        p._client.get_blob_client.return_value = mock_blob
+        assert p.file_exists("tables/data.parquet") is True
+
+    def test_list_files(self):
+        p = self._provider()
+        p._client.list_blobs.return_value = [MagicMock(name="prefix/tables/a.parquet")]
+        files = p.list_files("tables/")
+        assert len(files) == 1
+
+    def test_delete_path_recursive(self):
+        p = self._provider()
+        p._client.list_blobs.return_value = [MagicMock(name="prefix/tables/a.parquet")]
+        p.delete_path("tables/", recursive=True)
+        p._client.delete_blob.assert_called_once()
+
+    def test_delete_path_single(self):
+        p = self._provider()
+        p.delete_path("tables/data.parquet", recursive=False)
+        p._client.delete_blob.assert_called_once_with("prefix/tables/data.parquet")
+
+
+# ---------------------------------------------------------------------------
+# DBFSStaging provider methods
+# ---------------------------------------------------------------------------
+
+
+class TestDBFSStagingMethods:
+    def _provider(self, prefix="benchbox"):
+        from benchbox.platforms.base.cloud_spark.staging import CloudProvider, DBFSStaging, StagingConfig
+
+        config = StagingConfig(
+            uri="dbfs:/benchbox",
+            provider=CloudProvider.DBFS,
+            bucket="",
+            prefix=prefix,
+        )
+        s = DBFSStaging(config)
+        s._client = MagicMock()
+        return s
+
+    def test_full_path_with_prefix(self):
+        p = self._provider()
+        assert p._full_path("tables/data") == "/benchbox/tables/data"
+
+    def test_full_path_no_prefix(self):
+        p = self._provider(prefix="")
+        assert p._full_path("tables/data") == "/tables/data"
+
+    def test_upload_file(self, tmp_path):
+        p = self._provider()
+        f = tmp_path / "data.parquet"
+        f.write_bytes(b"data")
+        uri = p.upload_file(f, "tables/data.parquet")
+        p._client.dbfs.upload.assert_called_once()
+        assert "dbfs:" in uri
+
+    def test_file_exists_found(self):
+        p = self._provider()
+        p._client.dbfs.get_status.return_value = {}
+        assert p.file_exists("tables/data.parquet") is True
+
+    def test_file_exists_not_found(self):
+        p = self._provider()
+        p._client.dbfs.get_status.side_effect = Exception("not found")
+        assert p.file_exists("tables/data.parquet") is False
+
+    def test_list_files(self):
+        p = self._provider()
+        files = [MagicMock(path="/benchbox/tables/a.parquet", is_dir=False), MagicMock(is_dir=True)]
+        p._client.dbfs.list.return_value = files
+        result = p.list_files("tables/")
+        assert len(result) == 1
+
+    def test_list_files_empty(self):
+        p = self._provider()
+        p._client.dbfs.list.side_effect = Exception("no such path")
+        result = p.list_files("tables/")
+        assert result == []
+
+    def test_delete_path(self):
+        p = self._provider()
+        p.delete_path("tables/", recursive=True)
+        p._client.dbfs.delete.assert_called_once_with("/benchbox/tables/", recursive=True)

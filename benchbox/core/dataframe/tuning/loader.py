@@ -104,7 +104,7 @@ class DataFrameTuningLoader:
         """
         suffix = path.suffix.lower()
 
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             if suffix in {".yaml", ".yml"}:
                 data = yaml.safe_load(f)
             elif suffix == ".json":
@@ -168,7 +168,7 @@ class DataFrameTuningLoader:
         # Ensure parent directory exists
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             if suffix in {".yaml", ".yml"}:
                 yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
             elif suffix == ".json":

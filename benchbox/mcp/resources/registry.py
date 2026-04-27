@@ -162,7 +162,7 @@ def _build_platform_detail(name: str) -> str:
 def _parse_result_file_metadata(file_path: Path) -> dict | None:
     """Parse a single result file into run metadata, or None on failure."""
     try:
-        with open(file_path) as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
 
         benchmark_block = data.get("benchmark", {}) if isinstance(data.get("benchmark"), dict) else {}

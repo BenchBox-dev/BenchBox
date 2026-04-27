@@ -359,7 +359,7 @@ class EnhancedSCDType2Processor:
             new_bk_index = new_data.set_index(business_keys) if len(business_keys) > 0 else new_data
         except KeyError as e:
             logger.error(f"Business key column not found: {str(e)}")
-            raise ValueError(f"Business key column missing: {str(e)}")
+            raise ValueError(f"Business key column missing: {str(e)}") from e
 
         # Identify new records (business keys not in current data)
         new_bk_values = new_bk_index.index
@@ -791,7 +791,7 @@ class EnhancedSCDType2Processor:
 
             # Export based on format
             if format.lower() == "json":
-                with open(output_path, "w") as f:
+                with open(output_path, "w", encoding="utf-8") as f:
                     json.dump(serializable_trail, f, indent=2)
             else:
                 raise ValueError(f"Unsupported export format: {format}")

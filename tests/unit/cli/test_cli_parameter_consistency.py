@@ -5,10 +5,20 @@ Tests the new unified parameter structure that aligns with unified_runner.
 """
 
 import sys
+import sys as _sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
+
+# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
+# same name as the run submodule.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
+# the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.run")
+_run_module = _sys.modules["benchbox.cli.commands.run"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -47,7 +57,7 @@ class TestCLIParameterConsistency:
     @pytest.fixture
     def mock_orchestrator(self):
         """Mock orchestrator for testing."""
-        with patch("benchbox.cli.commands.run.BenchmarkOrchestrator") as mock_class:
+        with patch.object(_run_module, "BenchmarkOrchestrator") as mock_class:
             mock_instance = MagicMock()
             mock_class.return_value = mock_instance
 
@@ -63,10 +73,10 @@ class TestCLIParameterConsistency:
     def mock_dependencies(self, mock_orchestrator):
         """Mock all CLI dependencies."""
         with (
-            patch("benchbox.cli.commands.run.DatabaseManager") as mock_db,
-            patch("benchbox.cli.commands.run.BenchmarkManager") as mock_bench,
-            patch("benchbox.cli.commands.run.SystemProfiler") as mock_system,
-            patch("benchbox.cli.commands.run.get_platform_manager") as mock_platform,
+            patch.object(_run_module, "DatabaseManager") as mock_db,
+            patch.object(_run_module, "BenchmarkManager") as mock_bench,
+            patch.object(_run_module, "SystemProfiler") as mock_system,
+            patch.object(_run_module, "get_platform_manager") as mock_platform,
             patch("benchbox.cli.main.ResultExporter") as mock_exporter,
         ):
             # Setup database manager
@@ -418,11 +428,11 @@ class TestGlobalCacheCLIFlag:
         mock_result.execution_id = "test-123"
 
         with (
-            patch("benchbox.cli.commands.run.BenchmarkOrchestrator") as mock_orch,
-            patch("benchbox.cli.commands.run.DatabaseManager"),
-            patch("benchbox.cli.commands.run.BenchmarkManager") as mock_bench,
-            patch("benchbox.cli.commands.run.SystemProfiler"),
-            patch("benchbox.cli.commands.run.get_platform_manager"),
+            patch.object(_run_module, "BenchmarkOrchestrator") as mock_orch,
+            patch.object(_run_module, "DatabaseManager"),
+            patch.object(_run_module, "BenchmarkManager") as mock_bench,
+            patch.object(_run_module, "SystemProfiler"),
+            patch.object(_run_module, "get_platform_manager"),
             patch("benchbox.cli.main.ResultExporter"),
         ):
             mock_bench_instance = MagicMock()

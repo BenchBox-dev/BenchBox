@@ -13,8 +13,10 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
+import os
+from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import urlparse
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
@@ -35,7 +37,7 @@ from benchbox.utils.dependencies import (
     get_dependency_error_message,
     get_package_install_message,
 )
-from benchbox.utils.file_format import COMPRESSION_EXTENSIONS, is_tpc_format
+from benchbox.utils.file_format import COMPRESSION_EXTENSIONS
 
 try:
     from databricks import sql as databricks_sql
@@ -543,7 +545,7 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.execute(f"DROP SCHEMA IF EXISTS {catalog}.{schema} CASCADE")
 
         except Exception as e:
-            raise RuntimeError(f"Failed to drop Databricks schema {catalog}.{schema}: {e}")
+            raise RuntimeError(f"Failed to drop Databricks schema {catalog}.{schema}: {e}") from e
         finally:
             if "connection" in locals():
                 connection.close()
@@ -652,10 +654,11 @@ class DatabricksAdapter(PlatformAdapter):
                 self.logger.error(f"Raw schema SQL (first 500 chars): {schema_sql[:500]}")
                 raise RuntimeError("Schema SQL produced no executable statements")
 
+            # Apply Databricks DDL optimization (DDL_OPTIMIZE rule: convert_to_delta_table)
+            statements = [self._convert_to_delta_table(s) for s in statements]
+
             # Execute statements with error handling from base adapter
-            tables_created, failed_tables = self._execute_schema_statements(
-                statements, cursor, platform_transform_fn=self._convert_to_delta_table
-            )
+            tables_created, failed_tables = self._execute_schema_statements(statements, cursor)
 
             duration = elapsed_seconds(start_time)
             self.log_operation_complete("Schema creation", duration, f"{tables_created} Delta Lake tables created")
@@ -720,7 +723,7 @@ class DatabricksAdapter(PlatformAdapter):
                         f"Permission denied creating schema: {catalog}.{schema}. "
                         f"Ensure you have CREATE SCHEMA permission on catalog {catalog}. "
                         f"Or create it manually: CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}"
-                    )
+                    ) from None
                 raise
 
             # Now create the volume (IF NOT EXISTS is safe)
@@ -742,13 +745,13 @@ class DatabricksAdapter(PlatformAdapter):
                     f"Permission denied creating UC Volume: {catalog}.{schema}.{volume}. "
                     f"Ensure you have CREATE VOLUME permission on schema {catalog}.{schema}. "
                     f"Or create it manually: CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.{volume}"
-                )
+                ) from e
 
             # Generic error
             raise ValueError(
                 f"Failed to create UC Volume {catalog}.{schema}.{volume}: {e}. "
                 f"Try creating manually: CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.{volume}"
-            )
+            ) from e
 
     def _upload_to_uc_volume(
         self,
@@ -780,7 +783,7 @@ class DatabricksAdapter(PlatformAdapter):
         except ImportError:
             raise ImportError(
                 get_package_install_message("databricks-sdk", "databricks-sdk required for UC Volume uploads.")
-            )
+            ) from None
 
         workspace = WorkspaceClient(
             host=f"https://{self.server_hostname}",
@@ -808,32 +811,18 @@ class DatabricksAdapter(PlatformAdapter):
             except Exception as e:
                 self.logger.warning(f"Failed to upload manifest to UC Volume: {e}")
 
-        uploaded_files = {}
+        upload_root = self._resolve_local_upload_root(data_dir)
+        uploaded_files: dict[str, Any] = {}
         for table_name, file_path in data_files.items():
-            local_path = Path(file_path) if not isinstance(file_path, Path) else file_path
-            if not local_path.is_absolute():
-                local_path = local_path.resolve()
-
-            if not local_path.exists():
-                self.logger.error(f"File not found for table {table_name}: {local_path}")
-                self.logger.error(f"  Checked path: {local_path.absolute()}")
-                self.logger.error(f"  CWD: {Path.cwd()}")
+            local_paths = self._collect_local_paths_for_table(table_name, file_path)
+            if not local_paths:
                 continue
-
-            file_size = local_path.stat().st_size
-            self.log_very_verbose(f"Found {local_path.name} ({file_size:,} bytes) at {local_path}")
-
-            is_sharded, pattern, chunk_files = self._detect_sharded_files(local_path, table_name)
-
-            if is_sharded and chunk_files:
-                self._upload_sharded_files(chunk_files, volume_path, uc_volume_path, workspace)
-                wildcard_uri = f"dbfs:{volume_path}/{pattern}"
-                uploaded_files[table_name] = wildcard_uri
-                self.log_verbose(f"Uploaded {len(chunk_files)} chunks for {table_name}, using wildcard: {wildcard_uri}")
-            else:
-                uri = self._upload_single_file(local_path, volume_path, uc_volume_path, workspace)
-                if uri is not None:
-                    uploaded_files[table_name] = uri
+            upload_entries = self._build_uc_upload_entries(local_paths, upload_root)
+            result = self._upload_table_to_uc(
+                table_name, local_paths, upload_entries, volume_path, uc_volume_path, workspace, upload_root
+            )
+            if result is not None:
+                uploaded_files[table_name] = result
 
         # Upload manifest last if present
         if manifest_path.exists():
@@ -844,21 +833,190 @@ class DatabricksAdapter(PlatformAdapter):
 
         return uploaded_files
 
+    def _collect_local_paths_for_table(self, table_name: str, file_path: Any) -> list[Path]:
+        """Resolve and validate candidate local paths for a single table's data file(s)."""
+        local_paths: list[Path] = []
+        for candidate in self._normalize_table_file_inputs(file_path):
+            local_path = Path(candidate) if not isinstance(candidate, Path) else candidate
+            if not local_path.is_absolute():
+                local_path = local_path.resolve()
+            if not local_path.exists():
+                self.logger.error(f"File not found for table {table_name}: {local_path}")
+                self.logger.error(f"  Checked path: {local_path.absolute()}")
+                self.logger.error(f"  CWD: {Path.cwd()}")
+                continue
+            self.log_very_verbose(f"Found {local_path.name} ({local_path.stat().st_size:,} bytes) at {local_path}")
+            local_paths.append(local_path)
+        return local_paths
+
+    def _upload_table_to_uc(
+        self,
+        table_name: str,
+        local_paths: list[Path],
+        upload_entries: list[tuple[Path, str]],
+        volume_path: str,
+        uc_volume_path: str,
+        workspace: Any,
+        upload_root: Path,
+    ) -> Any:
+        """Upload one table's file(s) to UC Volume; returns the URI, list of URIs, or None."""
+        if len(local_paths) == 1:
+            return self._upload_single_table_path(
+                table_name, local_paths[0], upload_entries[0][1], volume_path, uc_volume_path, workspace, upload_root
+            )
+        return self._upload_multi_table_paths(table_name, upload_entries, volume_path, uc_volume_path, workspace)
+
+    def _upload_single_table_path(
+        self,
+        table_name: str,
+        local_path: Path,
+        remote_path: str,
+        volume_path: str,
+        uc_volume_path: str,
+        workspace: Any,
+        upload_root: Path,
+    ) -> Any:
+        """Upload exactly one file for a table, auto-expanding to sharded chunks if detected."""
+        is_sharded, _pattern, chunk_files = self._detect_sharded_files(local_path, table_name)
+        if is_sharded and chunk_files:
+            sharded_entries = self._build_uc_upload_entries(chunk_files, upload_root)
+            sharded_targets = [rp for _lp, rp in sharded_entries]
+            self._upload_sharded_files(
+                chunk_files, volume_path, uc_volume_path, workspace, remote_paths=sharded_targets
+            )
+            wildcard = self._detect_manifest_wildcard(sharded_targets)
+            if wildcard:
+                uri = self._join_uri_path(f"dbfs:{volume_path}", wildcard)
+                self.log_verbose(f"Uploaded {len(chunk_files)} chunks for {table_name}, using wildcard: {uri}")
+                return uri
+            return [self._join_uri_path(f"dbfs:{volume_path}", rp) for rp in sharded_targets]
+        return self._upload_single_file(local_path, volume_path, uc_volume_path, workspace, remote_path=remote_path)
+
+    def _upload_multi_table_paths(
+        self,
+        table_name: str,
+        upload_entries: list[tuple[Path, str]],
+        volume_path: str,
+        uc_volume_path: str,
+        workspace: Any,
+    ) -> Any:
+        """Upload multiple files for a table; returns wildcard URI or list of URIs."""
+        wildcard = self._detect_manifest_wildcard([rp for _lp, rp in upload_entries])
+        uploaded_uris: list[str] = []
+        for local_path, remote_path in upload_entries:
+            uri = self._upload_single_file(local_path, volume_path, uc_volume_path, workspace, remote_path=remote_path)
+            if uri is not None:
+                uploaded_uris.append(uri)
+        if wildcard:
+            wildcard_uri = self._join_uri_path(f"dbfs:{volume_path}", wildcard)
+            self.log_verbose(
+                f"Uploaded {len(uploaded_uris)} files for {table_name}, using wildcard pattern: {wildcard_uri}"
+            )
+            return wildcard_uri
+        return uploaded_uris or None
+
     def _resolve_uc_manifest_path(self, data_dir: Path) -> Path:
         """Determine local manifest path for UC Volume upload validation."""
         try:
             from benchbox.utils.cloud_storage import DatabricksPath
         except Exception:
-            DatabricksPath = None  # type: ignore
+            DatabricksPath = None
 
         if DatabricksPath is not None and isinstance(data_dir, DatabricksPath):
             return data_dir._path / MANIFEST_FILENAME
         else:
             return Path(data_dir) / MANIFEST_FILENAME
 
+    def _resolve_local_upload_root(self, data_dir: Path) -> Path:
+        """Resolve the local root whose relative paths should be preserved in UC Volumes."""
+        try:
+            from benchbox.utils.cloud_storage import DatabricksPath
+        except Exception:
+            DatabricksPath = None
+
+        if DatabricksPath is not None and isinstance(data_dir, DatabricksPath):
+            return data_dir._path.resolve()
+        return Path(data_dir).resolve()
+
+    @staticmethod
+    def _build_uc_upload_entries(local_paths: list[Path], upload_root: Path) -> list[tuple[Path, str]]:
+        """Build manifest-stable relative targets for UC Volume uploads.
+
+        Uses a single root for all paths: upload_root if every path is under it,
+        otherwise the common parent of all paths. This avoids mixed-strategy
+        collisions when only some paths fall outside upload_root.
+        """
+        all_under_root = all(path.is_relative_to(upload_root) for path in local_paths)
+
+        if all_under_root:
+            root = upload_root
+        else:
+            root = Path(os.path.commonpath([str(path.parent) for path in local_paths]))
+
+        entries = [(path, path.relative_to(root).as_posix()) for path in local_paths]
+
+        seen_targets: set[str] = set()
+        for _local_path, remote_path in entries:
+            if remote_path in seen_targets:
+                raise ValueError(f"UC Volume upload would overwrite duplicate remote path '{remote_path}'")
+            seen_targets.add(remote_path)
+
+        return entries
+
+    @staticmethod
+    def _join_uri_path(root: str, relative_path: str) -> str:
+        """Join a URI/path root with a relative POSIX path."""
+        cleaned = relative_path.lstrip("/")
+        if not cleaned:
+            return root.rstrip("/")
+        return f"{root.rstrip('/')}/{cleaned}"
+
+    @staticmethod
+    def _split_remote_path(path_like: Any) -> tuple[str, PurePosixPath] | None:
+        """Split a remote URI into its anchor and POSIX path."""
+        raw = str(path_like).rstrip("/")
+        if raw.startswith("dbfs:/"):
+            suffix = raw[len("dbfs:/") :].lstrip("/")
+            return "dbfs:/", PurePosixPath("/") / suffix if suffix else PurePosixPath("/")
+
+        parsed = urlparse(raw)
+        if parsed.scheme and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}", PurePosixPath(parsed.path or "/")
+
+        return None
+
+    def _common_remote_directory(self, file_paths: list[Any]) -> str | None:
+        """Return a shared remote directory for a list of cloud/DBFS file URIs."""
+        raw_split_paths = [self._split_remote_path(path_like) for path_like in file_paths]
+        if not raw_split_paths or any(item is None for item in raw_split_paths):
+            return None
+
+        split_paths = cast(list[tuple[str, PurePosixPath]], raw_split_paths)
+        anchors = {anchor for anchor, _path in split_paths}
+        if len(anchors) != 1:
+            return None
+
+        anchor = split_paths[0][0]
+        parent_parts = [path.parent.parts for _anchor, path in split_paths]
+
+        common_parts: list[str] = []
+        for segments in zip(*parent_parts):
+            if all(segment == segments[0] for segment in segments):
+                common_parts.append(segments[0])
+            else:
+                break
+
+        if not common_parts:
+            return anchor
+
+        common_path = PurePosixPath(*common_parts).as_posix().lstrip("/")
+        if anchor == "dbfs:/":
+            return f"dbfs:/{common_path}" if common_path else "dbfs:/"
+        return f"{anchor}/{common_path}" if common_path else anchor
+
     def _try_reuse_uc_volume_data(
         self, uc_volume_path: str, manifest_path: Path, force_upload: bool
-    ) -> dict[str, str] | None:
+    ) -> dict[str, Any] | None:
         """Check if existing UC Volume data can be reused. Returns mapping or None."""
         if force_upload or not manifest_path.exists():
             return None
@@ -934,10 +1092,18 @@ class DatabricksAdapter(PlatformAdapter):
         self.log_very_verbose(f"Successfully uploaded {file_path.name} ({len(content):,} bytes)")
 
     def _upload_sharded_files(
-        self, chunk_files: list[Path], volume_path: str, uc_volume_path: str, workspace: Any
+        self,
+        chunk_files: list[Path],
+        volume_path: str,
+        uc_volume_path: str,
+        workspace: Any,
+        remote_paths: list[str] | None = None,
     ) -> None:
         """Upload all chunk files for a sharded table."""
-        for chunk_file in chunk_files:
+        if remote_paths is not None and len(remote_paths) != len(chunk_files):
+            raise ValueError("remote_paths length must match chunk_files length")
+
+        for index, chunk_file in enumerate(chunk_files):
             if not chunk_file.exists():
                 self.logger.error(f"Chunk file disappeared: {chunk_file}")
                 continue
@@ -947,17 +1113,23 @@ class DatabricksAdapter(PlatformAdapter):
                 self.logger.warning(f"Skipping empty chunk file: {chunk_file.name}")
                 continue
 
-            target_path = f"{volume_path}/{chunk_file.name}"
+            target_relative = remote_paths[index] if remote_paths is not None else chunk_file.name
+            target_path = self._join_uri_path(volume_path, target_relative)
             self.log_very_verbose(f"Uploading {chunk_file.name} ({chunk_size:,} bytes) to {target_path}")
 
             try:
                 self._upload_file_content_to_uc(chunk_file, target_path, uc_volume_path, workspace)
             except Exception as e:
                 self.logger.error(f"Failed to upload {chunk_file.name} to UC Volume: {e}")
-                raise RuntimeError(f"Failed to upload {chunk_file.name} to {uc_volume_path}: {e}")
+                raise RuntimeError(f"Failed to upload {chunk_file.name} to {uc_volume_path}: {e}") from e
 
     def _upload_single_file(
-        self, local_path: Path, volume_path: str, uc_volume_path: str, workspace: Any
+        self,
+        local_path: Path,
+        volume_path: str,
+        uc_volume_path: str,
+        workspace: Any,
+        remote_path: str | None = None,
     ) -> str | None:
         """Upload a single (non-sharded) file to UC Volume. Returns dbfs URI or None."""
         single_file_size = local_path.stat().st_size
@@ -965,7 +1137,8 @@ class DatabricksAdapter(PlatformAdapter):
             self.logger.warning(f"Skipping empty file: {local_path.name}")
             return None
 
-        target_path = f"{volume_path}/{local_path.name}"
+        target_relative = remote_path or local_path.name
+        target_path = self._join_uri_path(volume_path, target_relative)
         self.log_verbose(f"Uploading {local_path.name} ({single_file_size:,} bytes) to {target_path}")
 
         try:
@@ -973,7 +1146,7 @@ class DatabricksAdapter(PlatformAdapter):
             return f"dbfs:{target_path}"
         except Exception as e:
             self.logger.error(f"Failed to upload {local_path.name} to UC Volume: {e}")
-            raise RuntimeError(f"Failed to upload {local_path.name} to {uc_volume_path}: {e}")
+            raise RuntimeError(f"Failed to upload {local_path.name} to {uc_volume_path}: {e}") from e
 
     def _upload_manifest_to_uc_volume(self, manifest_path: Path, uc_volume_path: str, workspace: Any) -> None:
         """Upload the manifest JSON to the UC Volume root."""
@@ -995,14 +1168,14 @@ class DatabricksAdapter(PlatformAdapter):
             except Exception:
                 self.logger.info(f"Uploaded manifest to {uc_volume_path}")
         except Exception as e:
-            raise RuntimeError(f"Manifest upload failed: {e}")
+            raise RuntimeError(f"Manifest upload failed: {e}") from e
 
-    def _get_remote_file_uris_from_manifest(self, uc_volume_path: str, remote_manifest: dict) -> dict[str, str]:
+    def _get_remote_file_uris_from_manifest(self, uc_volume_path: str, remote_manifest: dict) -> dict[str, Any]:
         """Build UC Volume file URI map per table from manifest entries.
 
         For sharded tables, return a wildcard pattern like customer.tbl.*.zst
         """
-        mapping: dict[str, str] = {}
+        mapping: dict[str, Any] = {}
         tables = remote_manifest.get("tables") or {}
         for table, entries in tables.items():
             if not entries:
@@ -1010,17 +1183,31 @@ class DatabricksAdapter(PlatformAdapter):
             if len(entries) == 1:
                 rel = entries[0].get("path")
                 if rel:
-                    mapping[table] = f"{uc_volume_path.rstrip('/')}/{rel}"
+                    mapping[table] = self._join_uri_path(uc_volume_path.rstrip("/"), str(rel))
                 continue
             names = [str(e.get("path")) for e in entries if e.get("path")]
             if not names:
                 continue
             wildcard = self._detect_manifest_wildcard(names)
             if wildcard:
-                mapping[table] = f"{uc_volume_path.rstrip('/')}/{wildcard}"
+                mapping[table] = self._join_uri_path(uc_volume_path.rstrip("/"), wildcard)
             else:
-                mapping[table] = f"{uc_volume_path.rstrip('/')}/{names[0]}"
+                mapping[table] = [self._join_uri_path(uc_volume_path.rstrip("/"), name) for name in names]
         return mapping
+
+    @staticmethod
+    def _is_manifest_shard_name(name: str) -> bool:
+        """Check if a filename looks like a TPC shard (e.g. customer.tbl.1, lineitem.tbl.3.zst).
+
+        Note: names with purely numeric stems (e.g. "123.parquet") will match
+        the trailing-digit heuristic. This is acceptable because such names do
+        not appear in TPC benchmark manifests.
+        """
+        parts = Path(name).name.split(".")
+        compression_exts_nodot = {ext.lstrip(".") for ext in COMPRESSION_EXTENSIONS}
+        if len(parts) >= 4 and parts[-1] in compression_exts_nodot and parts[-2].isdigit():
+            return True
+        return len(parts) >= 2 and parts[-1].isdigit()
 
     @staticmethod
     def _manifest_pattern_for_name(name: str) -> tuple[str, str]:
@@ -1033,12 +1220,33 @@ class DatabricksAdapter(PlatformAdapter):
         return stem, Path(name).suffix
 
     def _detect_manifest_wildcard(self, names: list[str]) -> str | None:
+        if not names or not all(self._is_manifest_shard_name(name) for name in names):
+            return None
         base0, ext0 = self._manifest_pattern_for_name(names[0])
         for name in names[1:]:
             base, ext = self._manifest_pattern_for_name(name)
             if base != base0 or ext != ext0:
                 return None
         return f"{base0}.*{ext0}"
+
+    @staticmethod
+    def _normalize_table_file_inputs(file_paths: Any) -> list[Any]:
+        """Normalize single-path or multi-path table inputs to a list."""
+        if isinstance(file_paths, (str, Path)):
+            return [file_paths]
+        return list(file_paths)
+
+    @staticmethod
+    def _path_name(path_like: Any) -> str:
+        """Return the basename for a local path or cloud URI."""
+        import os
+
+        path_str = str(path_like).rstrip("/")
+        # Cloud URIs (dbfs:/, s3://, etc.) always use forward-slash separators.
+        # For local paths, os.path.basename handles both / and \ on Windows.
+        if "://" in path_str or path_str.startswith("dbfs:/"):
+            return path_str.split("/")[-1]
+        return os.path.basename(path_str)
 
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
@@ -1056,9 +1264,13 @@ class DatabricksAdapter(PlatformAdapter):
         cursor = connection.cursor()
 
         try:
-            data_files = self._resolve_databricks_data_files(benchmark, data_dir)
+            from benchbox.platforms.base.data_loading import DataSource
+
+            data_source = self._resolve_databricks_data_files(benchmark, data_dir)
+            if not isinstance(data_source, DataSource):
+                data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
             stage_root = self._resolve_stage_root(data_dir)
-            data_files = self._maybe_upload_to_uc_volume(data_files, stage_root, data_dir, connection)
+            data_source.tables = self._maybe_upload_to_uc_volume(data_source.tables, stage_root, data_dir, connection)
 
             # Ensure we're in the correct schema context for table operations
             cursor.execute(f"USE CATALOG {self.catalog}")
@@ -1071,7 +1283,7 @@ class DatabricksAdapter(PlatformAdapter):
             self.log_very_verbose(f"Found {len(existing_tables)} existing tables in {self.catalog}.{self.schema}")
 
             # Load data for each table using COPY INTO
-            for table_name, file_path in data_files.items():
+            for table_name, file_path in data_source.tables.items():
                 try:
                     load_start = mono_time()
                     row_count, copy_time, optimize_time = self._load_single_table(
@@ -1082,6 +1294,7 @@ class DatabricksAdapter(PlatformAdapter):
                         file_path,
                         stage_root,
                         existing_tables,
+                        data_source,
                     )
                     table_stats[table_name.upper()] = row_count
                     load_time = elapsed_seconds(load_start)
@@ -1116,37 +1329,33 @@ class DatabricksAdapter(PlatformAdapter):
 
         return table_stats, total_time, per_table_timings
 
-    def _resolve_databricks_data_files(self, benchmark, data_dir: Path) -> dict:
-        """Resolve data files from benchmark tables or manifest fallback."""
-        data_files = None
-        if hasattr(benchmark, "tables") and benchmark.tables:
-            data_files = benchmark.tables
-        elif hasattr(benchmark, "_impl") and hasattr(benchmark._impl, "tables") and benchmark._impl.tables:
-            data_files = benchmark._impl.tables
+    def _resolve_databricks_data_files(self, benchmark, data_dir: Path):
+        """Resolve data files via DataSourceResolver."""
+        from benchbox.platforms.base.data_loading import DataSource, DataSourceResolver
 
-        if not data_files:
-            try:
-                import json
-
-                manifest_path = Path(data_dir) / "_datagen_manifest.json"
-                if manifest_path.exists():
-                    with open(manifest_path) as f:
-                        manifest = json.load(f)
-                    tables = manifest.get("tables") or {}
-                    mapping = {}
-                    for table, entries in tables.items():
-                        if entries:
-                            rel = entries[0].get("path")
-                            if rel:
-                                mapping[table] = Path(data_dir) / rel
-                    if mapping:
-                        data_files = mapping
-                        self.logger.debug("Using data files from _datagen_manifest.json")
-            except Exception as e:
-                self.logger.debug(f"Manifest fallback failed: {e}")
-        if not data_files:
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
+        data_source = resolver.resolve(benchmark, data_dir)
+        if not data_source or not data_source.tables:
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_files
+
+        normalized: dict[str, Any] = {}
+        for table_name, table_files in data_source.tables.items():
+            candidates = self._normalize_table_file_inputs(table_files)
+            normalized[table_name] = candidates[0] if len(candidates) == 1 else candidates
+        # Return a fresh DataSource so we don't mutate the resolver-owned object;
+        # table_metadata is forwarded so the COPY INTO delimiter resolver still
+        # sees manifest annotations.
+        return DataSource(
+            source_type=data_source.source_type,
+            tables=normalized,
+            table_formats=dict(data_source.table_formats),
+            table_metadata=dict(data_source.table_metadata),
+        )
 
     @staticmethod
     def _is_cloud_uri(s: str) -> bool:
@@ -1208,34 +1417,77 @@ class DatabricksAdapter(PlatformAdapter):
 
         return data_files
 
-    def _resolve_file_uri_and_delimiter(self, file_path, stage_root: str) -> tuple[str, str, str]:
+    def _resolve_file_uri_and_delimiter(
+        self,
+        file_path,
+        stage_root: str,
+        *,
+        table_name: str | None = None,
+        data_source: Any | None = None,
+        benchmark: Any | None = None,
+    ) -> tuple[str, str, str]:
         """Resolve file URI, filename, and delimiter for a table's data file.
 
         Returns:
             Tuple of (file_uri, filename, delimiter)
         """
+        if isinstance(file_path, list):
+            if not file_path:
+                raise ValueError("No data files were provided for Databricks COPY INTO")
+            if len(file_path) == 1:
+                file_path = file_path[0]
+            else:
+                # Pre-initialize so the wildcard branch can fall through to
+                # filename_for_format with a known value (None → use wildcard name).
+                common_dir = None
+                wildcard = self._detect_manifest_wildcard([self._path_name(path_like) for path_like in file_path])
+                if wildcard:
+                    first_path = str(file_path[0])
+                    if first_path.startswith("dbfs:/Volumes/"):
+                        file_uri = f"{first_path.rsplit('/', 1)[0]}/{wildcard}"
+                    else:
+                        file_uri = f"{stage_root}/{wildcard}"
+                    filename = wildcard
+                else:
+                    common_dir = self._common_remote_directory(file_path)
+                    if common_dir is None:
+                        raise ValueError(
+                            "Databricks COPY INTO requires a single file, a remote directory, or a "
+                            "shard-compatible file set per table."
+                        )
+                    file_uri = common_dir
+                    filename = common_dir.rstrip("/").split("/")[-1]
+                filename_for_format = (
+                    self._path_name(file_path[0]) if common_dir is not None else filename.replace(".*", "")
+                )
+                dialect_path = Path(self._path_name(file_path[0]))
+                delimiter = self._resolve_csv_delimiter(
+                    data_source, table_name or dialect_path.stem, dialect_path, benchmark
+                )
+                return file_uri, filename, delimiter
+
         if isinstance(file_path, str) and file_path.startswith("dbfs:/Volumes/"):
             file_uri = file_path
             uri_path = file_path.replace("dbfs:", "")
             filename = uri_path.split("/")[-1]
         else:
-            if hasattr(file_path, "name"):
-                rel = getattr(file_path, "name", None)
-            else:
-                rel = Path(str(file_path)).name
-            filename = rel
-            file_uri = f"{stage_root}/{rel}"
+            filename = self._path_name(file_path)
+            file_uri = f"{stage_root}/{filename}"
 
         # Strip wildcard component for format detection
         filename_for_format = filename.replace(".*", "")
-        file_path_obj = Path(filename_for_format)
-
-        base_name = filename_for_format
-        if file_path_obj.suffix in COMPRESSION_EXTENSIONS:
-            base_name = file_path_obj.stem
-
-        delimiter = "|" if is_tpc_format(base_name) else ","
+        dialect_path = Path(filename_for_format)
+        delimiter = self._resolve_csv_delimiter(data_source, table_name or dialect_path.stem, dialect_path, benchmark)
         return file_uri, filename, delimiter
+
+    def _resolve_csv_delimiter(self, data_source: Any, table_name: str, file_path: Path, benchmark: Any | None) -> str:
+        """Resolve Databricks COPY INTO delimiter through the shared CSV dialect pipeline."""
+        from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
+
+        dialect_source = data_source or DataSource(source_type="databricks_copy_into", tables={})
+        return resolve_csv_dialect(
+            dialect_source, table_name, file_path, benchmark if benchmark is not None else NO_BENCHMARK
+        ).delimiter
 
     def _get_column_list_for_table(self, benchmark, table_name: str) -> str:
         """Get explicit column mapping from benchmark schema for COPY INTO."""
@@ -1270,6 +1522,7 @@ class DatabricksAdapter(PlatformAdapter):
         file_path,
         stage_root: str,
         existing_tables: set[str],
+        data_source: Any | None = None,
     ) -> tuple[int, float, float]:
         """Load a single table via COPY INTO. Returns (row_count, copy_time, optimize_time)."""
         table_name_upper = table_name.upper()
@@ -1282,7 +1535,13 @@ class DatabricksAdapter(PlatformAdapter):
                 f"Ensure schema creation completed successfully before loading data."
             )
 
-        file_uri, filename, delimiter = self._resolve_file_uri_and_delimiter(file_path, stage_root)
+        file_uri, filename, delimiter = self._resolve_file_uri_and_delimiter(
+            file_path,
+            stage_root,
+            table_name=table_name,
+            data_source=data_source,
+            benchmark=benchmark,
+        )
         column_list = self._get_column_list_for_table(benchmark, table_name)
 
         copy_sql = (
@@ -1326,20 +1585,27 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _external_location_from_file_uri(file_uri: str) -> str:
-        """Resolve LOCATION path for CREATE TABLE ... USING PARQUET."""
-        normalized_uri = file_uri.strip()
-        lowered_uri = normalized_uri.lower()
-        if ".parquet" not in lowered_uri:
+        """Resolve LOCATION path for CREATE TABLE ... USING PARQUET.
+
+        For .parquet files or wildcard patterns, returns the parent directory.
+        For suffix-less URIs (directories of Parquet files), returns the URI as-is.
+        Raises ValueError for non-Parquet file extensions.
+        """
+        normalized_uri = file_uri.strip().rstrip("/")
+        if "*" in normalized_uri:
+            return normalized_uri.rsplit("/", 1)[0]
+
+        suffix = Path(normalized_uri).suffix.lower()
+        if suffix == ".parquet":
+            return normalized_uri.rsplit("/", 1)[0]
+
+        if suffix:
             raise ValueError(
                 f"Databricks external mode requires Parquet sources, got '{file_uri}'. "
                 "Provide Parquet input files for --table-mode external."
             )
 
-        if "*" in normalized_uri:
-            return normalized_uri.rsplit("/", 1)[0]
-        if normalized_uri.endswith("/"):
-            return normalized_uri.rstrip("/")
-        return normalized_uri.rsplit("/", 1)[0]
+        return normalized_uri
 
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
@@ -1350,16 +1616,20 @@ class DatabricksAdapter(PlatformAdapter):
         cursor = connection.cursor()
 
         try:
-            data_files = self._resolve_databricks_data_files(benchmark, data_dir)
+            from benchbox.platforms.base.data_loading import DataSource
+
+            data_source = self._resolve_databricks_data_files(benchmark, data_dir)
+            if not isinstance(data_source, DataSource):
+                data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
             stage_root = self._resolve_stage_root(data_dir)
-            data_files = self._maybe_upload_to_uc_volume(data_files, stage_root, data_dir, connection)
+            data_source.tables = self._maybe_upload_to_uc_volume(data_source.tables, stage_root, data_dir, connection)
 
             cursor.execute(f"USE CATALOG {self.catalog}")
             cursor.execute(f"USE SCHEMA {self.schema}")
             cursor.execute(f"SHOW TABLES IN {self.catalog}.{self.schema}")
             existing_tables = {row[1].lower() for row in cursor.fetchall()}
 
-            for table_name, file_path in data_files.items():
+            for table_name, file_path in data_source.tables.items():
                 table_name_upper = table_name.upper()
                 table_name_lower = table_name.lower()
                 if table_name_lower not in existing_tables:
@@ -1833,107 +2103,124 @@ class DatabricksAdapter(PlatformAdapter):
             liquid_enabled = bool(getattr(platform_opts, "liquid_clustering_enabled", False))
             liquid_columns = list(getattr(platform_opts, "liquid_clustering_columns", []))
 
-            # Handle clustering via Z-ORDER optimization or Liquid Clustering
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
             distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
-
-            # Combine clustering and distribution columns for Z-ORDER
-            zorder_columns = []
-            if cluster_columns:
-                sorted_cols = sorted(cluster_columns, key=lambda col: col.order)
-                zorder_columns.extend([col.name for col in sorted_cols])
-
-            if distribution_columns:
-                sorted_cols = sorted(distribution_columns, key=lambda col: col.order)
-                # Include distribution columns if not already in clustering
-                for col in sorted_cols:
-                    if col.name not in zorder_columns:
-                        zorder_columns.append(col.name)
-
-            if clustering_strategy == "liquid_clustering" or liquid_enabled:
-                if not liquid_columns:
-                    liquid_columns = list(zorder_columns)
-                if not liquid_columns and sort_columns:
-                    sorted_cols = sorted(sort_columns, key=lambda col: col.order)
-                    liquid_columns = [col.name for col in sorted_cols]
-
-                if liquid_columns and is_delta_table:
-                    liquid_clause = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(liquid_columns)})"
-                    try:
-                        cursor.execute(liquid_clause)
-                        self._liquid_clustering_operations.append(
-                            {
-                                "table": table_name,
-                                "columns": list(liquid_columns),
-                                "statement": liquid_clause,
-                            }
-                        )
-                        self.logger.info(f"Applied Liquid Clustering to {table_name}: {', '.join(liquid_columns)}")
-                    except Exception as e:
-                        self.logger.warning(f"Failed to apply Liquid Clustering to {table_name}: {e}")
-                elif is_delta_table:
-                    self.logger.info(
-                        f"Liquid Clustering selected for {table_name} but no clustering columns were available"
-                    )
-            elif zorder_columns and is_delta_table:
-                # Apply Z-ORDER optimization
-                zorder_clause = f"OPTIMIZE {table_name} ZORDER BY ({', '.join(zorder_columns)})"
-                try:
-                    cursor.execute(zorder_clause)
-                    self._z_order_operations.append(
-                        {
-                            "table": table_name,
-                            "columns": list(zorder_columns),
-                            "statement": zorder_clause,
-                        }
-                    )
-                    self.logger.info(f"Applied Z-ORDER optimization to {table_name}: {', '.join(zorder_columns)}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to apply Z-ORDER optimization to {table_name}: {e}")
-
-            # Handle partitioning information (logging only, as it's defined at CREATE TABLE time)
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
-            if partition_columns:
-                sorted_cols = sorted(partition_columns, key=lambda col: col.order)
-                column_names = [col.name for col in sorted_cols]
-                self.logger.info(
-                    f"Partitioning strategy for {table_name}: {', '.join(column_names)} (defined at CREATE TABLE time)"
-                )
 
-            # Handle sorting through clustering/Z-ORDER
-            if sort_columns:
-                sorted_cols = sorted(sort_columns, key=lambda col: col.order)
-                column_names = [col.name for col in sorted_cols]
-                mechanism = (
-                    "Liquid Clustering"
-                    if (clustering_strategy == "liquid_clustering" or liquid_enabled)
-                    else "Z-ORDER clustering"
-                )
-                self.logger.info(
-                    f"Sorting in Databricks achieved via {mechanism} for table {table_name}: {', '.join(column_names)}"
-                )
-
-            # Perform general Delta Lake optimizations
+            zorder_columns = self._build_zorder_columns(cluster_columns, distribution_columns)
+            use_liquid = clustering_strategy == "liquid_clustering" or liquid_enabled
+            self._apply_clustering_strategy(
+                cursor,
+                table_name,
+                is_delta_table,
+                use_liquid,
+                liquid_columns,
+                zorder_columns,
+                sort_columns,
+            )
+            self._log_partitioning_and_sorting(
+                table_name,
+                partition_columns,
+                sort_columns,
+                use_liquid,
+            )
             if is_delta_table and self.enable_delta_optimization:
-                try:
-                    # Run OPTIMIZE to compact small files
-                    cursor.execute(f"OPTIMIZE {table_name}")
-                    self.logger.info(f"Optimized Delta table {table_name}")
-
-                    # Refresh table statistics
-                    cursor.execute(f"ANALYZE TABLE {table_name} COMPUTE STATISTICS")
-                    self.logger.info(f"Updated statistics for {table_name}")
-
-                except Exception as e:
-                    self.logger.warning(f"Failed to optimize Delta table {table_name}: {e}")
+                self._apply_delta_optimize(cursor, table_name)
 
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
         except Exception as e:
-            raise ValueError(f"Failed to apply tunings to Databricks table {table_name}: {e}")
+            raise ValueError(f"Failed to apply tunings to Databricks table {table_name}: {e}") from e
         finally:
             cursor.close()
+
+    @staticmethod
+    def _build_zorder_columns(cluster_columns, distribution_columns) -> list[str]:
+        """Merge clustering + distribution columns (in order) for Z-ORDER / Liquid Clustering."""
+        cols: list[str] = []
+        if cluster_columns:
+            cols.extend(col.name for col in sorted(cluster_columns, key=lambda c: c.order))
+        if distribution_columns:
+            for col in sorted(distribution_columns, key=lambda c: c.order):
+                if col.name not in cols:
+                    cols.append(col.name)
+        return cols
+
+    def _apply_clustering_strategy(
+        self,
+        cursor: Any,
+        table_name: str,
+        is_delta_table: bool,
+        use_liquid: bool,
+        liquid_columns: list[str],
+        zorder_columns: list[str],
+        sort_columns,
+    ) -> None:
+        """Apply either Liquid Clustering or Z-ORDER to the table."""
+        if use_liquid:
+            self._apply_liquid_clustering(
+                cursor, table_name, is_delta_table, liquid_columns, zorder_columns, sort_columns
+            )
+        elif zorder_columns and is_delta_table:
+            self._apply_zorder_optimization(cursor, table_name, zorder_columns)
+
+    def _apply_liquid_clustering(
+        self,
+        cursor: Any,
+        table_name: str,
+        is_delta_table: bool,
+        liquid_columns: list[str],
+        zorder_columns: list[str],
+        sort_columns,
+    ) -> None:
+        if not liquid_columns:
+            liquid_columns = list(zorder_columns)
+        if not liquid_columns and sort_columns:
+            liquid_columns = [col.name for col in sorted(sort_columns, key=lambda c: c.order)]
+        if liquid_columns and is_delta_table:
+            clause = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(liquid_columns)})"
+            try:
+                cursor.execute(clause)
+                self._liquid_clustering_operations.append(
+                    {"table": table_name, "columns": list(liquid_columns), "statement": clause}
+                )
+                self.logger.info(f"Applied Liquid Clustering to {table_name}: {', '.join(liquid_columns)}")
+            except Exception as e:
+                self.logger.warning(f"Failed to apply Liquid Clustering to {table_name}: {e}")
+        elif is_delta_table:
+            self.logger.info(f"Liquid Clustering selected for {table_name} but no clustering columns were available")
+
+    def _apply_zorder_optimization(self, cursor: Any, table_name: str, zorder_columns: list[str]) -> None:
+        clause = f"OPTIMIZE {table_name} ZORDER BY ({', '.join(zorder_columns)})"
+        try:
+            cursor.execute(clause)
+            self._z_order_operations.append({"table": table_name, "columns": list(zorder_columns), "statement": clause})
+            self.logger.info(f"Applied Z-ORDER optimization to {table_name}: {', '.join(zorder_columns)}")
+        except Exception as e:
+            self.logger.warning(f"Failed to apply Z-ORDER optimization to {table_name}: {e}")
+
+    def _log_partitioning_and_sorting(self, table_name: str, partition_columns, sort_columns, use_liquid: bool) -> None:
+        if partition_columns:
+            names = [col.name for col in sorted(partition_columns, key=lambda c: c.order)]
+            self.logger.info(
+                f"Partitioning strategy for {table_name}: {', '.join(names)} (defined at CREATE TABLE time)"
+            )
+        if sort_columns:
+            names = [col.name for col in sorted(sort_columns, key=lambda c: c.order)]
+            mechanism = "Liquid Clustering" if use_liquid else "Z-ORDER clustering"
+            self.logger.info(
+                f"Sorting in Databricks achieved via {mechanism} for table {table_name}: {', '.join(names)}"
+            )
+
+    def _apply_delta_optimize(self, cursor: Any, table_name: str) -> None:
+        try:
+            cursor.execute(f"OPTIMIZE {table_name}")
+            self.logger.info(f"Optimized Delta table {table_name}")
+            cursor.execute(f"ANALYZE TABLE {table_name} COMPUTE STATISTICS")
+            self.logger.info(f"Updated statistics for {table_name}")
+        except Exception as e:
+            self.logger.warning(f"Failed to optimize Delta table {table_name}: {e}")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to Databricks.

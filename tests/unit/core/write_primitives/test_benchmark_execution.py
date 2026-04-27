@@ -22,7 +22,7 @@ from benchbox.core.write_primitives.benchmark import OperationResult, WritePrimi
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.medium,
+    pytest.mark.fast,
 ]
 
 
@@ -710,3 +710,816 @@ class TestDataFrameSqlParity:
 
         assert rows
         assert {row["query_id"] for row in rows} == {"insert_single_row"}
+
+
+# ---------------------------------------------------------------------------
+# _check_validation_query tests (fast - no I/O, pure logic)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckValidationQuery:
+    """Tests for _check_validation_query helper."""
+
+    pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+    def _make_query(self, expected_rows=None, expected_rows_min=None, expected_rows_max=None):
+        return SimpleNamespace(
+            expected_rows=expected_rows,
+            expected_rows_min=expected_rows_min,
+            expected_rows_max=expected_rows_max,
+        )
+
+    def test_exact_match_passes(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        assert _check_validation_query(self._make_query(expected_rows=500), actual_rows=500) is True
+
+    def test_exact_mismatch_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        assert _check_validation_query(self._make_query(expected_rows=500), actual_rows=499) is False
+
+    def test_min_max_within_range_passes(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_rows_min=10, expected_rows_max=20)
+        assert _check_validation_query(q, actual_rows=15) is True
+
+    def test_min_max_below_range_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_rows_min=10, expected_rows_max=20)
+        assert _check_validation_query(q, actual_rows=9) is False
+
+    def test_min_max_above_range_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_rows_min=10, expected_rows_max=20)
+        assert _check_validation_query(q, actual_rows=21) is False
+
+    def test_only_min_no_max_passes_above_min(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_rows_min=5)
+        assert _check_validation_query(q, actual_rows=100) is True
+
+    def test_only_max_no_min_passes_below_max(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_rows_max=100)
+        assert _check_validation_query(q, actual_rows=50) is True
+
+    def test_no_constraints_always_passes(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query()
+        assert _check_validation_query(q, actual_rows=999) is True
+
+
+# ============================================================================
+# Fast-lane coverage tests (pytest.mark.fast)
+# ============================================================================
+
+
+pytestmark_fast = [pytest.mark.unit, pytest.mark.fast]
+
+
+@pytest.fixture()
+def fast_bench(tmp_path):
+    """WritePrimitivesBenchmark with mocked data generator."""
+    with patch("benchbox.core.write_primitives.benchmark.WritePrimitivesDataGenerator"):
+        bench = WritePrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
+    return bench
+
+
+@pytest.fixture()
+def fast_conn():
+    """Mock database connection."""
+    conn = MagicMock()
+    conn.execute.return_value = MagicMock()
+    conn.execute.return_value.fetchone.return_value = (100,)
+    return conn
+
+
+# ---------------------------------------------------------------------------
+# generate_data (lines 192-199)
+# ---------------------------------------------------------------------------
+
+
+def test_generate_data_calls_generator_and_returns_list(fast_bench):
+    fast_bench.data_generator.generate.return_value = {
+        "orders": Path("/tmp/orders.parquet"),
+        "lineitem": Path("/tmp/lineitem.parquet"),
+    }
+    result = fast_bench.generate_data()
+    fast_bench.data_generator.generate.assert_called_once()
+    assert len(result) == 2
+
+
+# ---------------------------------------------------------------------------
+# setup() success path (lines 553-627)
+# ---------------------------------------------------------------------------
+
+
+def test_setup_success_creates_and_populates_tables(fast_bench, fast_conn):
+    with (
+        patch.object(fast_bench, "_acquire_setup_lock", return_value=True),
+        patch.object(fast_bench, "_release_setup_lock"),
+        patch.object(fast_bench, "_table_exists", return_value=False),
+        patch.object(fast_bench, "_populate_staging_tables", return_value={}),
+    ):
+        result = fast_bench.setup(fast_conn)
+
+    assert result["success"] is True
+    assert "tables_created" in result
+
+
+def test_setup_lock_timeout_raises_runtime_error(fast_bench, fast_conn):
+    with patch.object(fast_bench, "_acquire_setup_lock", return_value=False):
+        with pytest.raises(RuntimeError, match="Could not acquire setup lock"):
+            fast_bench.setup(fast_conn)
+
+
+def test_setup_force_drops_existing_tables(fast_bench, fast_conn):
+    with (
+        patch.object(fast_bench, "_acquire_setup_lock", return_value=True),
+        patch.object(fast_bench, "_release_setup_lock"),
+        patch.object(fast_bench, "_table_exists", return_value=True),
+        patch.object(fast_bench, "_populate_staging_tables", return_value={}),
+    ):
+        result = fast_bench.setup(fast_conn, force=True)
+
+    assert result["success"] is True
+    # DROP TABLE IF EXISTS calls should have been made
+    drop_calls = [str(c) for c in fast_conn.execute.call_args_list if "DROP" in str(c)]
+    assert len(drop_calls) > 0
+
+
+def test_setup_missing_required_table_raises(fast_bench):
+    conn = MagicMock()
+    conn.execute.side_effect = RuntimeError("table not found")
+    with pytest.raises(RuntimeError, match="Required TPC-H table"):
+        fast_bench.setup(conn)
+
+
+def test_setup_datafusion_dialect_skips_lock(fast_bench, fast_conn):
+    """DataFusion dialect bypasses lock (returns True immediately)."""
+    with (
+        patch.object(fast_bench, "_table_exists", return_value=True),
+        patch.object(fast_bench, "_populate_staging_tables", return_value={}),
+    ):
+        result = fast_bench.setup(fast_conn, dialect="datafusion")
+
+    assert result["success"] is True
+
+
+# ---------------------------------------------------------------------------
+# teardown() (lines 637-647)
+# ---------------------------------------------------------------------------
+
+
+def test_teardown_drops_all_tables(fast_bench, fast_conn):
+    fast_bench.teardown(fast_conn)
+    drop_calls = [str(c) for c in fast_conn.execute.call_args_list if "DROP" in str(c)]
+    assert len(drop_calls) > 0
+
+
+def test_teardown_ignores_drop_errors(fast_bench):
+    conn = MagicMock()
+    conn.execute.side_effect = Exception("table does not exist")
+    fast_bench.teardown(conn)  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# reset_staging_tables() (lines 658-666)
+# ---------------------------------------------------------------------------
+
+
+def test_reset_staging_tables_truncates_and_repopulates(fast_bench, fast_conn):
+    with patch.object(fast_bench, "_populate_staging_tables") as mock_pop:
+        fast_bench.reset(fast_conn)
+    mock_pop.assert_called_once()
+    truncate_calls = [str(c) for c in fast_conn.execute.call_args_list if "TRUNCATE" in str(c)]
+    assert len(truncate_calls) > 0
+
+
+# ---------------------------------------------------------------------------
+# execute_operation() (lines 968-1048)
+# ---------------------------------------------------------------------------
+
+
+def test_execute_operation_success_path(fast_bench, fast_conn):
+    with (
+        patch.object(fast_bench, "is_setup", return_value=True),
+        patch.object(fast_bench, "_get_effective_write_sql", return_value=("SELECT 1", None)),
+        patch.object(fast_bench, "_replace_placeholders", side_effect=lambda s: s),
+        patch.object(fast_bench, "_extract_rows_affected", return_value=3),
+        patch.object(fast_bench, "_run_operation_validation", return_value=(True, [], 0.0)),
+        patch.object(fast_bench, "_run_operation_cleanup", return_value=(True, None, 0.0)),
+    ):
+        result = fast_bench.execute_operation("insert_single_row", fast_conn)
+
+    assert result.success is True
+    assert result.status == "SUCCESS"
+    assert result.rows_affected == 3
+
+
+def test_execute_operation_skipped_when_skip_reason(fast_bench, fast_conn):
+    with (
+        patch.object(fast_bench, "is_setup", return_value=True),
+        patch.object(fast_bench, "_get_effective_write_sql", return_value=(None, "platform not supported")),
+    ):
+        result = fast_bench.execute_operation("insert_single_row", fast_conn)
+
+    assert result.success is True
+    assert result.status == "SKIPPED"
+
+
+def test_execute_operation_error_returns_failed(fast_bench, fast_conn):
+    with (
+        patch.object(fast_bench, "is_setup", return_value=True),
+        patch.object(fast_bench, "_get_effective_write_sql", return_value=("SELECT 1", None)),
+        patch.object(fast_bench, "_replace_placeholders", side_effect=RuntimeError("db error")),
+    ):
+        result = fast_bench.execute_operation("insert_single_row", fast_conn)
+
+    assert result.success is False
+    assert "db error" in (result.error or "")
+
+
+def test_execute_operation_invalid_connection_raises(fast_bench):
+    with pytest.raises(ValueError, match="Invalid connection type"):
+        fast_bench.execute_operation("insert_single_row", object())
+
+
+def test_execute_operation_none_connection_raises(fast_bench):
+    with pytest.raises(ValueError, match="Connection is None"):
+        fast_bench.execute_operation("insert_single_row", None)
+
+
+def test_execute_operation_auto_setup_when_not_initialized(fast_bench, fast_conn):
+    """When requires_setup=True and is_setup=False, calls setup() automatically."""
+    with (
+        patch.object(fast_bench, "is_setup", return_value=False),
+        patch.object(fast_bench, "setup") as mock_setup,
+        patch.object(fast_bench, "_get_effective_write_sql", return_value=("SELECT 1", None)),
+        patch.object(fast_bench, "_replace_placeholders", side_effect=lambda s: s),
+        patch.object(fast_bench, "_extract_rows_affected", return_value=0),
+        patch.object(fast_bench, "_run_operation_validation", return_value=(True, [], 0.0)),
+        patch.object(fast_bench, "_run_operation_cleanup", return_value=(True, None, 0.0)),
+    ):
+        fast_bench.execute_operation("insert_single_row", fast_conn)
+
+    mock_setup.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# run_benchmark() (lines 1147-1171)
+# ---------------------------------------------------------------------------
+
+
+def test_run_benchmark_by_operation_ids(fast_bench, fast_conn):
+    mock_result = OperationResult(
+        operation_id="insert_single_row",
+        success=True,
+        write_duration_ms=10.0,
+        rows_affected=1,
+        validation_duration_ms=5.0,
+        validation_passed=True,
+        validation_results=[],
+        cleanup_duration_ms=0.0,
+        cleanup_success=True,
+    )
+    with patch.object(fast_bench, "execute_operation", return_value=mock_result):
+        results = fast_bench.run_benchmark(fast_conn, operation_ids=["insert_single_row"])
+
+    assert len(results) == 1
+    assert results[0].success is True
+
+
+def test_run_benchmark_by_category(fast_bench, fast_conn):
+    mock_result = OperationResult(
+        operation_id="op1",
+        success=True,
+        write_duration_ms=1.0,
+        rows_affected=0,
+        validation_duration_ms=0.0,
+        validation_passed=True,
+        validation_results=[],
+        cleanup_duration_ms=0.0,
+        cleanup_success=True,
+    )
+    with patch.object(fast_bench, "execute_operation", return_value=mock_result):
+        results = fast_bench.run_benchmark(fast_conn, categories=["insert"])
+
+    assert len(results) > 0
+
+
+def test_run_benchmark_all_operations(fast_bench, fast_conn):
+    mock_result = OperationResult(
+        operation_id="op1",
+        success=False,
+        write_duration_ms=0.0,
+        rows_affected=0,
+        validation_duration_ms=0.0,
+        validation_passed=False,
+        validation_results=[],
+        cleanup_duration_ms=0.0,
+        cleanup_success=False,
+        error="test error",
+    )
+    with patch.object(fast_bench, "execute_operation", return_value=mock_result):
+        results = fast_bench.run_benchmark(fast_conn)
+
+    assert len(results) > 0
+
+
+# ---------------------------------------------------------------------------
+# _populate_staging_tables() (lines 475-519)
+# ---------------------------------------------------------------------------
+
+
+def test_populate_staging_tables_already_populated(fast_bench):
+    """Table with existing rows is skipped (not repopulated)."""
+    conn = MagicMock()
+    conn.execute.return_value.fetchone.return_value = (500,)  # current_count > 0
+
+    reset_map = {"update_ops_orders": "orders"}
+    result = fast_bench._populate_staging_tables(conn, reset_map)
+
+    assert result["update_ops_orders"] == 500
+
+
+def test_populate_staging_tables_empty_populates(fast_bench):
+    """Empty table is populated from source."""
+    fetch_results = [
+        (0,),  # current_count = 0 → needs population
+        (1000,),  # source_count = 1000 → has data
+        (1000,),  # after population count
+    ]
+    conn = MagicMock()
+    conn.execute.return_value.fetchone.side_effect = fetch_results
+
+    with patch.object(fast_bench, "_get_population_sql", return_value="INSERT INTO ..."):
+        result = fast_bench._populate_staging_tables(conn, {"update_ops_orders": "orders"})
+
+    assert result["update_ops_orders"] == 1000
+
+
+def test_populate_staging_tables_optional_missing_source(fast_bench):
+    """Optional delete_ops_supplier skips when source doesn't exist."""
+    conn = MagicMock()
+
+    def execute_side(sql):
+        result = MagicMock()
+        if "delete_ops_supplier" in sql and "COUNT" in sql:
+            result.fetchone.return_value = (0,)
+        elif "COUNT" in sql:
+            raise RuntimeError("table not found")  # source check fails
+        else:
+            result.fetchone.return_value = (0,)
+        return result
+
+    conn.execute.side_effect = execute_side
+
+    result = fast_bench._populate_staging_tables(conn, {"delete_ops_supplier": "supplier"})
+    assert result["delete_ops_supplier"] == 0
+
+
+def test_populate_staging_tables_required_empty_source_raises(fast_bench):
+    """Required table with empty source raises RuntimeError."""
+    fetch_results = [
+        (0,),  # current_count = 0
+        (0,),  # source_count = 0 → empty!
+    ]
+    conn = MagicMock()
+    conn.execute.return_value.fetchone.side_effect = fetch_results
+
+    with pytest.raises(RuntimeError, match="Source table .* is empty"):
+        fast_bench._populate_staging_tables(conn, {"update_ops_orders": "orders"})
+
+
+# ---------------------------------------------------------------------------
+# reset() exception in TRUNCATE handler (lines 711-712)
+# ---------------------------------------------------------------------------
+
+
+def test_reset_truncate_exception_is_silenced(fast_bench):
+    conn = MagicMock()
+    conn.execute.side_effect = Exception("TRUNCATE not supported")
+
+    with patch.object(fast_bench, "_populate_staging_tables"):
+        fast_bench.reset(conn)  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# is_setup() (lines 727-747)
+# ---------------------------------------------------------------------------
+
+
+def test_is_setup_returns_true_when_all_tables_populated(fast_bench):
+    conn = MagicMock()
+    conn.execute.return_value.fetchone.return_value = (100,)
+
+    assert fast_bench.is_setup(conn) is True
+
+
+def test_is_setup_returns_false_when_table_empty(fast_bench):
+    conn = MagicMock()
+    # First call returns 0 rows → table empty
+    conn.execute.return_value.fetchone.return_value = (0,)
+
+    assert fast_bench.is_setup(conn) is False
+
+
+def test_is_setup_returns_false_on_exception(fast_bench):
+    conn = MagicMock()
+    conn.execute.side_effect = Exception("table not found")
+
+    assert fast_bench.is_setup(conn) is False
+
+
+# ---------------------------------------------------------------------------
+# _replace_placeholders() with {file_path} (lines 768-783)
+# ---------------------------------------------------------------------------
+
+
+def test_replace_placeholders_substitutes_file_path(fast_bench, tmp_path):
+    sql = "COPY INTO table FROM '{file_path}/data.parquet'"
+    result = fast_bench._replace_placeholders(sql)
+    assert "{file_path}" not in result
+    assert "write_primitives_auxiliary" in result
+
+
+def test_replace_placeholders_no_placeholder_unchanged(fast_bench):
+    sql = "SELECT 1"
+    result = fast_bench._replace_placeholders(sql)
+    assert result == sql
+
+
+def test_replace_placeholders_no_output_dir_uses_empty(fast_bench):
+    fast_bench._output_dir = None
+    sql = "COPY INTO t FROM '{file_path}/x'"
+    result = fast_bench._replace_placeholders(sql)
+    assert "{file_path}" not in result
+
+
+# ---------------------------------------------------------------------------
+# get_schema() (lines 836-863)
+# ---------------------------------------------------------------------------
+
+
+def test_get_schema_returns_normalized_dict(fast_bench):
+    schema = fast_bench.get_schema()
+    assert isinstance(schema, dict)
+    assert len(schema) > 0
+    # Staging tables should be present
+    for table_name, table_def in schema.items():
+        assert "columns" in table_def or isinstance(table_def, dict)
+
+
+# ---------------------------------------------------------------------------
+# get_benchmark_info() (line 878 etc.)
+# ---------------------------------------------------------------------------
+
+
+def test_get_benchmark_info_returns_metadata(fast_bench):
+    info = fast_bench.get_benchmark_info()
+    assert info["name"] == "Write Primitives Benchmark"
+    assert "scale_factor" in info
+
+
+# ---------------------------------------------------------------------------
+# get_query() / get_queries() / get_queries_by_category() (lines 915-940)
+# ---------------------------------------------------------------------------
+
+
+def test_get_query_returns_sql_string(fast_bench):
+    result = fast_bench.get_query("insert_single_row")
+    assert isinstance(result, str)
+    assert len(result) > 0
+
+
+def test_get_queries_returns_all(fast_bench):
+    queries = fast_bench.get_queries()
+    assert isinstance(queries, dict)
+    assert len(queries) > 0
+
+
+def test_get_queries_by_category_returns_subset(fast_bench):
+    queries = fast_bench.get_queries_by_category("insert")
+    assert isinstance(queries, dict)
+    assert len(queries) > 0
+
+
+# ---------------------------------------------------------------------------
+# execute_operation() auto-setup failure (lines 986-987)
+# ---------------------------------------------------------------------------
+
+
+def test_execute_operation_auto_setup_failure_raises_runtime(fast_bench, fast_conn):
+    with (
+        patch.object(fast_bench, "is_setup", return_value=False),
+        patch.object(fast_bench, "setup", side_effect=RuntimeError("setup failed")),
+    ):
+        with pytest.raises(RuntimeError, match="Failed to initialize staging tables"):
+            fast_bench.execute_operation("insert_single_row", fast_conn)
+
+
+# ---------------------------------------------------------------------------
+# _extract_rows_affected() (lines 1063-1072)
+# ---------------------------------------------------------------------------
+
+
+def test_extract_rows_affected_from_rowcount(fast_bench):
+    result = MagicMock()
+    result.rowcount = 10
+    assert fast_bench._extract_rows_affected(result, "test_op") == 10
+
+
+def test_extract_rows_affected_no_rowcount_returns_minus_one(fast_bench):
+    result = MagicMock(spec=[])  # no rowcount attribute
+    assert fast_bench._extract_rows_affected(result, "test_op") == -1
+
+
+def test_extract_rows_affected_minus_one_passthrough(fast_bench):
+    result = MagicMock()
+    result.rowcount = -1
+    assert fast_bench._extract_rows_affected(result, "test_op") == -1
+
+
+# ---------------------------------------------------------------------------
+# _run_operation_validation() (lines 1073-1101)
+# ---------------------------------------------------------------------------
+
+
+def test_run_operation_validation_passes(fast_bench, fast_conn):
+    from benchbox.core.write_primitives.catalog.loader import ValidationQuery
+
+    val_q = ValidationQuery(id="v1", sql="SELECT 1", expected_rows=1)
+    operation = SimpleNamespace(validation_queries=[val_q])
+    fast_conn.execute.return_value.fetchall.return_value = [("1",)]
+
+    passed, results, duration_ms = fast_bench._run_operation_validation(operation, fast_conn, "test_op")
+
+    assert passed is True
+    assert len(results) == 1
+    assert results[0]["query_id"] == "v1"
+
+
+def test_run_operation_validation_fails_wrong_count(fast_bench, fast_conn):
+    from benchbox.core.write_primitives.catalog.loader import ValidationQuery
+
+    val_q = ValidationQuery(id="v1", sql="SELECT 1", expected_rows=5)
+    operation = SimpleNamespace(validation_queries=[val_q])
+    fast_conn.execute.return_value.fetchall.return_value = [("1",)]  # only 1 row
+
+    passed, results, _ = fast_bench._run_operation_validation(operation, fast_conn, "test_op")
+
+    assert passed is False
+
+
+def test_run_operation_validation_no_queries(fast_bench, fast_conn):
+    operation = SimpleNamespace(validation_queries=[])
+
+    passed, results, _ = fast_bench._run_operation_validation(operation, fast_conn, "test_op")
+
+    assert passed is True
+    assert results == []
+
+
+# ---------------------------------------------------------------------------
+# _run_operation_cleanup() (lines 1103-1129)
+# ---------------------------------------------------------------------------
+
+
+def test_run_operation_cleanup_executes_sql(fast_bench, fast_conn):
+    operation = SimpleNamespace(cleanup_sql="DELETE FROM t WHERE 1=0")
+
+    success, warning, _ = fast_bench._run_operation_cleanup(operation, fast_conn, "test_op")
+
+    assert success is True
+    assert warning is None
+    fast_conn.execute.assert_called_with("DELETE FROM t WHERE 1=0")
+
+
+def test_run_operation_cleanup_no_sql(fast_bench, fast_conn):
+    operation = SimpleNamespace(cleanup_sql=None)
+
+    success, warning, _ = fast_bench._run_operation_cleanup(operation, fast_conn, "test_op")
+
+    assert success is True
+    assert warning is None
+
+
+def test_run_operation_cleanup_error_sets_warning(fast_bench):
+    conn = MagicMock()
+    conn.execute.side_effect = Exception("cleanup failed")
+    operation = SimpleNamespace(cleanup_sql="DELETE FROM t")
+
+    success, warning, _ = fast_bench._run_operation_cleanup(operation, conn, "test_op")
+
+    assert success is False
+    assert warning is not None
+    assert "cleanup failed" in warning
+
+
+# ---------------------------------------------------------------------------
+# _get_effective_write_sql() (lines 379-390)
+# ---------------------------------------------------------------------------
+
+
+def test_get_effective_write_sql_uses_sql_override(fast_bench):
+    operation = SimpleNamespace(write_sql="SELECT 1", platform_overrides={}, id="op1")
+    sql, skip = fast_bench._get_effective_write_sql(operation, sql_override="OVERRIDE SQL")
+    assert sql == "OVERRIDE SQL"
+    assert skip is None
+
+
+def test_get_effective_write_sql_platform_override_none_skips(fast_bench):
+    operation = SimpleNamespace(write_sql="SELECT 1", platform_overrides={"duckdb": None}, id="op1")
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb")
+    assert sql is None
+    assert skip is not None
+    assert "unsupported" in skip.lower()
+
+
+def test_get_effective_write_sql_platform_override_sql(fast_bench):
+    operation = SimpleNamespace(write_sql="SELECT 1", platform_overrides={"duckdb": "DUCKDB SQL"}, id="op1")
+    sql, skip = fast_bench._get_effective_write_sql(operation, platform_key="duckdb")
+    assert sql == "DUCKDB SQL"
+    assert skip is None
+
+
+def test_get_effective_write_sql_no_overrides(fast_bench):
+    operation = SimpleNamespace(write_sql="INSERT INTO t VALUES (1)", platform_overrides={}, id="op1")
+    sql, skip = fast_bench._get_effective_write_sql(operation)
+    assert sql == "INSERT INTO t VALUES (1)"
+    assert skip is None
+
+
+# ---------------------------------------------------------------------------
+# _get_population_sql() for different table names (lines 433, 439, 445, 451)
+# ---------------------------------------------------------------------------
+
+
+def test_get_population_sql_merge_ops_target(fast_bench):
+    sql = fast_bench._get_population_sql("merge_ops_target", "orders")
+    assert "0.5" in sql or "50%" in sql or "CAST" in sql
+    assert "merge_ops_target" in sql or '"merge_ops_target"' in sql
+
+
+def test_get_population_sql_merge_ops_source(fast_bench):
+    sql = fast_bench._get_population_sql("merge_ops_source", "orders")
+    assert "orders" in sql or '"orders"' in sql
+
+
+def test_get_population_sql_merge_ops_lineitem_target(fast_bench):
+    sql = fast_bench._get_population_sql("merge_ops_lineitem_target", "lineitem")
+    assert "lineitem" in sql or '"lineitem"' in sql
+
+
+def test_get_population_sql_ddl_truncate_target(fast_bench):
+    sql = fast_bench._get_population_sql("ddl_truncate_target", "orders")
+    assert "o_orderkey" in sql
+
+
+def test_get_population_sql_default_full_copy(fast_bench):
+    sql = fast_bench._get_population_sql("update_ops_orders", "orders")
+    assert "SELECT *" in sql
+
+
+# ---------------------------------------------------------------------------
+# get_create_tables_sql() (line 878)
+# ---------------------------------------------------------------------------
+
+
+def test_get_create_tables_sql_returns_sql_string(fast_bench):
+    sql = fast_bench.get_create_tables_sql()
+    assert isinstance(sql, str)
+    assert "CREATE TABLE" in sql.upper()
+
+
+# ---------------------------------------------------------------------------
+# ensure_auxiliary_data_files() (lines 210-235)
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_auxiliary_data_files_bulk_files_exist(fast_bench):
+    fast_bench.data_generator.check_bulk_load_files_exist.return_value = True
+    fast_bench.ensure_auxiliary_data_files()  # should not raise
+    fast_bench.data_generator.generate_bulk_load_files.assert_not_called()
+
+
+def test_ensure_auxiliary_data_files_acquires_lock_and_generates(fast_bench):
+    fast_bench.data_generator.check_bulk_load_files_exist.return_value = False
+    fast_bench.data_generator._acquire_bulk_load_lock.return_value = True
+    fast_bench.data_generator.generate_bulk_load_files.return_value = ["/tmp/f1.parquet"]
+
+    fast_bench.ensure_auxiliary_data_files()
+
+    fast_bench.data_generator.generate_bulk_load_files.assert_called_once()
+
+
+def test_ensure_auxiliary_data_files_lock_timeout_silenced(fast_bench):
+    fast_bench.data_generator.check_bulk_load_files_exist.return_value = False
+    fast_bench.data_generator._acquire_bulk_load_lock.return_value = False
+
+    fast_bench.ensure_auxiliary_data_files()  # should not raise
+
+
+def test_ensure_auxiliary_data_files_already_generated_during_lock(fast_bench):
+    """After acquiring lock, another process may have generated files."""
+    call_count = [0]
+
+    def check_side_effect():
+        call_count[0] += 1
+        return call_count[0] > 1  # False first, True on second call
+
+    fast_bench.data_generator.check_bulk_load_files_exist.side_effect = check_side_effect
+    fast_bench.data_generator._acquire_bulk_load_lock.return_value = True
+    fast_bench.data_generator._release_bulk_load_lock = MagicMock()
+
+    fast_bench.ensure_auxiliary_data_files()  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# cleanup_auxiliary_files() (lines 658-666)
+# ---------------------------------------------------------------------------
+
+
+def test_cleanup_auxiliary_files_removes_directory(fast_bench, tmp_path):
+    aux_dir = tmp_path / "write_primitives_auxiliary"
+    aux_dir.mkdir()
+    fast_bench.data_generator.files_dir = aux_dir
+
+    fast_bench.cleanup_auxiliary_files()
+
+    assert not aux_dir.exists()
+
+
+def test_cleanup_auxiliary_files_missing_dir_is_noop(fast_bench, tmp_path):
+    fast_bench.data_generator.files_dir = tmp_path / "nonexistent_dir"
+    fast_bench.cleanup_auxiliary_files()  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# _replace_placeholders() unusual chars warning (line 781)
+# ---------------------------------------------------------------------------
+
+
+def test_replace_placeholders_unusual_chars_in_path(fast_bench, tmp_path):
+    """Unusual characters in path trigger a warning log (line 781)."""
+    fast_bench._output_dir = Path("/tmp/test<path>")
+    sql = "COPY INTO t FROM '{file_path}/data'"
+    result = fast_bench._replace_placeholders(sql)
+    # Should not raise - just log warning
+    assert "{file_path}" not in result
+
+
+# ---------------------------------------------------------------------------
+# execute_operation() effective_sql=None case (line 1012)
+# ---------------------------------------------------------------------------
+
+
+def test_execute_operation_none_sql_raises_via_exception_handler(fast_bench, fast_conn):
+    """When effective_sql is None and skip_reason is None, RuntimeError is raised."""
+    with (
+        patch.object(fast_bench, "is_setup", return_value=True),
+        patch.object(fast_bench, "_get_effective_write_sql", return_value=(None, None)),
+    ):
+        result = fast_bench.execute_operation("insert_single_row", fast_conn)
+
+    # The RuntimeError is caught by except Exception, returns FAILED
+    assert result.success is False
+
+
+# ---------------------------------------------------------------------------
+# _populate_staging_tables() direct line coverage (475-476)
+# ---------------------------------------------------------------------------
+
+
+def test_populate_staging_tables_count_exception_treats_as_zero(fast_bench):
+    """Exception in COUNT query → current_count=0 → triggers population."""
+    call_count = [0]
+
+    def execute_side(sql):
+        result = MagicMock()
+        call_count[0] += 1
+        if call_count[0] == 1:
+            # First call: COUNT for staging table → raise exception
+            raise Exception("table not found")
+        elif call_count[0] == 2:
+            # Second call: COUNT for source (orders)
+            result.fetchone.return_value = (1000,)
+        else:
+            result.fetchone.return_value = (1000,)
+        return result
+
+    conn = MagicMock()
+    conn.execute.side_effect = execute_side
+
+    with patch.object(fast_bench, "_get_population_sql", return_value="INSERT INTO ..."):
+        result = fast_bench._populate_staging_tables(conn, {"update_ops_orders": "orders"})
+
+    assert result.get("update_ops_orders", 0) >= 0

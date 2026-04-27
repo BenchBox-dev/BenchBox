@@ -13,11 +13,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-__import__("benchbox.cli.commands.tuning_group")
-_tuning_module = _sys.modules["benchbox.cli.commands.tuning_group"]
-
 from benchbox.cli.commands.tuning_group import tuning_group
 from benchbox.cli.config import ConfigManager
+
+# benchbox.cli.commands.__init__ re-exports `tuning_group` (a Click Command)
+# under the same name as the tuning_group submodule.  On Python 3.10 mock's
+# string-based patch() resolves via getattr(benchbox.cli.commands,
+# "tuning_group"), returning the Command, not the submodule.  Seeding
+# sys.modules here avoids the ambiguity on all Python versions.
+__import__("benchbox.cli.commands.tuning_group")
+_tuning_group_module = _sys.modules["benchbox.cli.commands.tuning_group"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -32,7 +37,7 @@ def _obj():
 class TestTuningInitSqlMode:
     def test_init_sql_exits_zero(self, tmp_path):
         runner = CliRunner()
-        with patch.object(_tuning_module, "console"):
+        with patch.object(_tuning_group_module, "console"):
             mock_cm = MagicMock()
             with patch("benchbox.cli.config.ConfigManager.create_sample_unified_tuning_config", mock_cm):
                 result = runner.invoke(
@@ -44,7 +49,7 @@ class TestTuningInitSqlMode:
 
     def test_init_sql_output_mentions_created(self):
         runner = CliRunner()
-        with patch.object(_tuning_module, "console") as mock_console:
+        with patch.object(_tuning_group_module, "console") as mock_console:
             calls = []
             mock_console.print.side_effect = lambda *a, **k: calls.append(str(a))
             with patch("benchbox.cli.config.ConfigManager.create_sample_unified_tuning_config"):
@@ -57,7 +62,7 @@ class TestTuningInitSqlMode:
 
     def test_init_sql_output_mentions_run_hint(self):
         runner = CliRunner()
-        with patch.object(_tuning_module, "console") as mock_console:
+        with patch.object(_tuning_group_module, "console") as mock_console:
             calls = []
             mock_console.print.side_effect = lambda *a, **k: calls.append(str(a))
             with patch("benchbox.cli.config.ConfigManager.create_sample_unified_tuning_config"):
@@ -70,7 +75,7 @@ class TestTuningInitSqlMode:
 
     def test_init_dataframe_mode_on_sql_platform_fails(self):
         runner = CliRunner()
-        with patch.object(_tuning_module, "console") as mock_console:
+        with patch.object(_tuning_group_module, "console") as mock_console:
             calls = []
             mock_console.print.side_effect = lambda *a, **k: calls.append(str(a))
             result = runner.invoke(
@@ -82,7 +87,7 @@ class TestTuningInitSqlMode:
 
     def test_init_dataframe_mode_on_sql_platform_shows_df_platforms(self):
         runner = CliRunner()
-        with patch.object(_tuning_module, "console") as mock_console:
+        with patch.object(_tuning_group_module, "console") as mock_console:
             calls = []
             mock_console.print.side_effect = lambda *a, **k: calls.append(str(a))
             runner.invoke(
@@ -97,8 +102,8 @@ class TestTuningInitDataframeMode:
     def test_init_polars_dataframe_mode_exits_zero(self):
         runner = CliRunner()
         with (
-            patch.object(_tuning_module, "console"),
-            patch.object(_tuning_module, "save_dataframe_tuning"),
+            patch.object(_tuning_group_module, "console"),
+            patch.object(_tuning_group_module, "save_dataframe_tuning"),
         ):
             result = runner.invoke(
                 tuning_group,
@@ -117,11 +122,11 @@ class TestTuningInitDataframeMode:
             "has_gpu": False,
         }
         with (
-            patch.object(_tuning_module, "console") as mock_console,
-            patch.object(_tuning_module, "save_dataframe_tuning"),
-            patch.object(_tuning_module, "detect_system_profile", return_value=mock_profile),
-            patch.object(_tuning_module, "get_profile_summary", return_value=mock_summary),
-            patch.object(_tuning_module, "get_smart_defaults", return_value=MagicMock()),
+            patch.object(_tuning_group_module, "console") as mock_console,
+            patch.object(_tuning_group_module, "save_dataframe_tuning"),
+            patch.object(_tuning_group_module, "detect_system_profile", return_value=mock_profile),
+            patch.object(_tuning_group_module, "get_profile_summary", return_value=mock_summary),
+            patch.object(_tuning_group_module, "get_smart_defaults", return_value=MagicMock()),
         ):
             calls = []
             mock_console.print.side_effect = lambda *a, **k: calls.append(str(a))
@@ -147,9 +152,9 @@ class TestTuningValidate:
             "has_gpu": False,
         }
         with (
-            patch.object(_tuning_module, "console") as mock_console,
-            patch.object(_tuning_module, "load_dataframe_tuning", return_value=mock_config),
-            patch.object(_tuning_module, "validate_dataframe_tuning", return_value=[]),
+            patch.object(_tuning_group_module, "console") as mock_console,
+            patch.object(_tuning_group_module, "load_dataframe_tuning", return_value=mock_config),
+            patch.object(_tuning_group_module, "validate_dataframe_tuning", return_value=[]),
         ):
             calls = []
             mock_console.print.side_effect = lambda *a, **k: calls.append(str(a))
@@ -169,11 +174,11 @@ class TestTuningValidate:
         mock_config = MagicMock()
         mock_issues = [MagicMock(level="error", message="workers must be positive")]
         with (
-            patch.object(_tuning_module, "console") as mock_console,
-            patch.object(_tuning_module, "load_dataframe_tuning", return_value=mock_config),
-            patch.object(_tuning_module, "validate_dataframe_tuning", return_value=mock_issues),
-            patch.object(_tuning_module, "has_errors", return_value=True),
-            patch.object(_tuning_module, "format_issues", return_value="error: workers must be positive"),
+            patch.object(_tuning_group_module, "console") as mock_console,
+            patch.object(_tuning_group_module, "load_dataframe_tuning", return_value=mock_config),
+            patch.object(_tuning_group_module, "validate_dataframe_tuning", return_value=mock_issues),
+            patch.object(_tuning_group_module, "has_errors", return_value=True),
+            patch.object(_tuning_group_module, "format_issues", return_value="error: workers must be positive"),
         ):
             calls = []
             mock_console.print.side_effect = lambda *a, **k: calls.append(str(a))
@@ -198,10 +203,10 @@ class TestTuningDefaults:
             "has_gpu": False,
         }
         with (
-            patch.object(_tuning_module, "console"),
-            patch.object(_tuning_module, "get_smart_defaults", return_value=real_config),
-            patch.object(_tuning_module, "detect_system_profile", return_value=MagicMock()),
-            patch.object(_tuning_module, "get_profile_summary", return_value=mock_summary),
+            patch.object(_tuning_group_module, "console"),
+            patch.object(_tuning_group_module, "get_smart_defaults", return_value=real_config),
+            patch.object(_tuning_group_module, "detect_system_profile", return_value=MagicMock()),
+            patch.object(_tuning_group_module, "get_profile_summary", return_value=mock_summary),
         ):
             result = runner.invoke(
                 tuning_group,
@@ -215,8 +220,8 @@ class TestTuningList:
     def test_list_exits_zero(self):
         runner = CliRunner()
         with (
-            patch.object(_tuning_module, "console"),
-            patch.object(_tuning_module, "display_tuning_list"),
+            patch.object(_tuning_group_module, "console"),
+            patch.object(_tuning_group_module, "display_tuning_list"),
         ):
             result = runner.invoke(
                 tuning_group,
@@ -234,9 +239,9 @@ class TestTuningShow:
         mock_resolution = MagicMock()
         mock_resolution.config_file = None  # no file to load
         with (
-            patch.object(_tuning_module, "console"),
-            patch.object(_tuning_module, "display_tuning_show") as mock_show,
-            patch.object(_tuning_module, "resolve_tuning", return_value=mock_resolution),
+            patch.object(_tuning_group_module, "console"),
+            patch.object(_tuning_group_module, "display_tuning_show") as mock_show,
+            patch.object(_tuning_group_module, "resolve_tuning", return_value=mock_resolution),
         ):
             result = runner.invoke(
                 tuning_group,

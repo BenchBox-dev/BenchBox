@@ -78,6 +78,16 @@ class TestLiveDorisConnection:
         assert info is not None
         assert info["platform_type"] == "doris"
 
+    def test_platform_version_is_4_x(self, doris_adapter):
+        """Verify the checked-in Docker stack is exercising Doris 4.x."""
+        connection = doris_adapter.create_connection()
+        try:
+            info = doris_adapter.get_platform_info(connection)
+            version = str(info.get("platform_version", ""))
+            assert version.startswith("4."), f"Expected Doris 4.x from docker/doris/docker-compose.yml, got {version!r}"
+        finally:
+            doris_adapter.close_connection(connection)
+
 
 class TestLiveDorisQueryExecution:
     """Test query execution against a live Doris instance."""

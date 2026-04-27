@@ -25,13 +25,13 @@ class SimpleBenchmarkMixin:
     """Mixin providing shared run_benchmark and _load_data for simple benchmarks.
 
     Consuming classes must provide:
-    - ``_benchmark_label``: str — human-readable benchmark name for result dicts (e.g. "AMPLab")
-    - ``_table_load_order``: list[str] — ordered table names for _load_data
+    - ``_benchmark_label``: str - human-readable benchmark name for result dicts (e.g. "AMPLab")
+    - ``_table_load_order``: list[str] - ordered table names for _load_data
     - ``query_manager`` with ``get_all_queries()`` returning dict[str, str]
     - ``get_query(query_id, *, params=None)`` returning str
     - ``execute_query(query_id, connection, params=None)`` returning results
     - ``get_create_tables_sql()`` returning str
-    - ``tables``: dict[str, Any] — mapping of table name to data file path
+    - ``tables``: dict[str, Any] - mapping of table name to data file path
     - ``scale_factor``: float
     - ``_get_table_schema()`` returning dict[str, dict] with "columns" key per table
     """

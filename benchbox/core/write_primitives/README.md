@@ -166,17 +166,17 @@ Operations use SQLGlot dialect translation by default, with `platform_overrides`
 a platform override is `null`, `_get_effective_write_sql()` returns a skip reason and
 the operation is recorded as `SKIPPED` in results.
 
-### DataFusion (v51.0.0) — 62 Skipped Operations
+### DataFusion (v51.0.0) - 62 Skipped Operations
 
 DataFusion is an Arrow-native query engine that operates on **immutable record batches**.
 This architecture provides excellent read/scan performance but means row-level mutation
-(UPDATE, DELETE) is not implemented — there is no write path for existing data. MERGE
+(UPDATE, DELETE) is not implemented - there is no write path for existing data. MERGE
 depends on UPDATE/DELETE and is therefore also unsupported.
 
 All 62 skips fall into categories dictated by this architectural constraint. None have
 viable alternative SQL syntax within DataFusion's current capability set.
 
-#### UPDATE — 15 operations (queries 13–27)
+#### UPDATE - 15 operations (queries 13-27)
 
 `NotImplemented("Unsupported logical plan: Dml(Update)")`
 
@@ -184,21 +184,21 @@ Row-level mutation is architecturally impossible on immutable Arrow record batch
 CTAS-based workaround would measure fundamentally different performance (full table
 rewrite vs. in-place update) and is therefore not substituted.
 
-#### DELETE — 14 operations (queries 28–39, 94–95)
+#### DELETE - 14 operations (queries 28-39, 94-95)
 
 `NotImplemented("Unsupported logical plan: Dml(Delete)")`
 
 Same architectural constraint as UPDATE. Includes the 2 GDPR-pattern deletes
-(queries 94–95) which also require DELETE.
+(queries 94-95) which also require DELETE.
 
-#### MERGE — 20 operations (queries 76–93, 96–97)
+#### MERGE - 20 operations (queries 76-93, 96-97)
 
 `NotImplemented("Unsupported SQL statement: MERGE INTO...")`
 
 MERGE requires UPDATE and/or DELETE capabilities, neither of which DataFusion supports.
 Covers all upsert patterns, conditional update/insert, ETL aggregation, and deduplication.
 
-#### DDL Mutations — 8 operations
+#### DDL Mutations - 8 operations
 
 | Operation | Reason |
 |-----------|--------|
@@ -211,14 +211,14 @@ Covers all upsert patterns, conditional update/insert, ETL aggregation, and dedu
 | `ddl_create_index_on_existing` | No indexing support |
 | `ddl_drop_index` | No indexing support |
 
-#### INSERT Edge Cases — 2 operations
+#### INSERT Edge Cases - 2 operations
 
 | Operation | Reason |
 |-----------|--------|
-| `insert_on_conflict_ignore` | `Plan("Insert-on clause not supported")` — no constraint enforcement makes ON CONFLICT meaningless |
+| `insert_on_conflict_ignore` | `Plan("Insert-on clause not supported")` - no constraint enforcement makes ON CONFLICT meaningless |
 | `insert_returning_clause` | `Plan("Insert-returning clause not supported")` |
 
-#### BULK_LOAD Edge Cases — 3 operations
+#### BULK_LOAD Edge Cases - 3 operations
 
 | Operation | Reason |
 |-----------|--------|

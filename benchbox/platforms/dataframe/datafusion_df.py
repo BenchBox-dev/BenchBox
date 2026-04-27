@@ -499,6 +499,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         delimiter: str = ",",
         has_header: bool = True,
         column_names: list[str] | None = None,
+        null_marker: str | None = None,
     ) -> DataFusionLazyDF:
         """Read a CSV file into a DataFusion DataFrame.
 
@@ -507,6 +508,9 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
             delimiter: Field delimiter
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
+            null_marker: Unused for DataFusion — TPC-style trailing delimiters are handled
+                via detect_data_format() which routes .tbl/.dat files through
+                _read_tbl_via_datafusion / _read_tbl_via_pyarrow above.
 
         Returns:
             DataFusion DataFrame with the file contents
@@ -538,10 +542,6 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         except TypeError:
             # Fall back to simpler API
             df = self.session_ctx.read_csv(path_str)
-
-        # Handle TPC .tbl/.dat files with trailing delimiter
-        if format_type == "tbl" and column_names:
-            df = self._apply_tbl_column_names(df, column_names)
 
         return df
 

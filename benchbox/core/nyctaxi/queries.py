@@ -545,15 +545,482 @@ QUERIES = {
     },
 }
 
+# ==== Green Taxi queries (borough-focused, requires green_trips table) ====
+GREEN_QUERIES = {
+    "green-borough-trips": {
+        "id": "G1",
+        "name": "Green Taxi Borough Patterns",
+        "description": "Trip patterns by outer borough for Green Taxi (outer-borough specialist)",
+        "category": "green-geographic",
+        "sql": """
+            SELECT
+                z.borough,
+                COUNT(*) as trip_count,
+                AVG(g.trip_distance) as avg_distance,
+                AVG(g.total_amount) as avg_fare,
+                AVG(g.tip_amount) as avg_tip,
+                SUM(g.total_amount) as total_revenue
+            FROM green_trips g
+            LEFT JOIN taxi_zones z ON g.pickup_location_id = z.location_id
+            WHERE g.pickup_datetime >= '{start_date}'
+              AND g.pickup_datetime < '{end_date}'
+              AND z.borough IS NOT NULL
+            GROUP BY z.borough
+            ORDER BY trip_count DESC
+        """,
+        "params": {"duration_days": 90},
+    },
+    "green-airport-outer-boro": {
+        "id": "G2",
+        "name": "Green Taxi Airport Pickups from Outer Boroughs",
+        "description": "Airport-bound trips originating in outer boroughs (Green Taxi specialty)",
+        "category": "green-geographic",
+        "sql": """
+            SELECT
+                pz.borough as pickup_borough,
+                pz.zone as pickup_zone,
+                dz.zone as dropoff_zone,
+                COUNT(*) as trip_count,
+                AVG(g.trip_distance) as avg_distance,
+                AVG(g.total_amount) as avg_fare
+            FROM green_trips g
+            LEFT JOIN taxi_zones pz ON g.pickup_location_id = pz.location_id
+            LEFT JOIN taxi_zones dz ON g.dropoff_location_id = dz.location_id
+            WHERE g.pickup_datetime >= '{start_date}'
+              AND g.pickup_datetime < '{end_date}'
+              AND dz.service_zone = 'Airports'
+              AND pz.borough NOT IN ('Manhattan', 'Unknown')
+            GROUP BY pz.borough, pz.zone, dz.zone
+            ORDER BY trip_count DESC
+            LIMIT 30
+        """,
+        "params": {"duration_days": 90},
+    },
+    "green-trip-type-split": {
+        "id": "G3",
+        "name": "Green Taxi Street-Hail vs Dispatch",
+        "description": "Split of Green Taxi trips by type (1=street-hail, 2=dispatch)",
+        "category": "green-characteristics",
+        "sql": """
+            SELECT
+                trip_type,
+                COUNT(*) as trip_count,
+                AVG(trip_distance) as avg_distance,
+                AVG(total_amount) as avg_fare,
+                AVG(tip_amount) as avg_tip,
+                AVG(passenger_count) as avg_passengers
+            FROM green_trips
+            WHERE pickup_datetime >= '{start_date}'
+              AND pickup_datetime < '{end_date}'
+              AND trip_type IN (1, 2)
+            GROUP BY trip_type
+            ORDER BY trip_type
+        """,
+        "params": {"duration_days": 90},
+    },
+    "green-top-zones": {
+        "id": "G4",
+        "name": "Green Taxi Top Pickup Zones",
+        "description": "Most popular Green Taxi pickup zones (outer-borough focus)",
+        "category": "green-geographic",
+        "sql": """
+            SELECT
+                g.pickup_location_id,
+                z.zone,
+                z.borough,
+                z.service_zone,
+                COUNT(*) as trip_count,
+                AVG(g.total_amount) as avg_fare
+            FROM green_trips g
+            LEFT JOIN taxi_zones z ON g.pickup_location_id = z.location_id
+            WHERE g.pickup_datetime >= '{start_date}'
+              AND g.pickup_datetime < '{end_date}'
+            GROUP BY g.pickup_location_id, z.zone, z.borough, z.service_zone
+            ORDER BY trip_count DESC
+            LIMIT 25
+        """,
+        "params": {"duration_days": 30},
+    },
+}
+
+# ==== HVFHV queries (rideshare-specific, requires hvfhv_trips table) ====
+HVFHV_QUERIES = {
+    "hvfhv-shared-ride-rate": {
+        "id": "H1",
+        "name": "HVFHV Shared Ride Adoption Rate",
+        "description": "Shared ride request and match rates by HVFHV base (Uber/Lyft)",
+        "category": "hvfhv-rideshare",
+        "sql": """
+            SELECT
+                hvfhs_license_num,
+                COUNT(*) as total_trips,
+                SUM(CASE WHEN shared_request_flag = 'Y' THEN 1 ELSE 0 END) as shared_requests,
+                SUM(CASE WHEN shared_match_flag = 'Y' THEN 1 ELSE 0 END) as shared_matches,
+                ROUND(
+                    SUM(CASE WHEN shared_request_flag = 'Y' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2
+                ) as shared_request_pct,
+                ROUND(
+                    SUM(CASE WHEN shared_match_flag = 'Y' THEN 1 ELSE 0 END) * 100.0 /
+                    NULLIF(SUM(CASE WHEN shared_request_flag = 'Y' THEN 1 ELSE 0 END), 0), 2
+                ) as shared_match_rate_pct
+            FROM hvfhv_trips
+            WHERE pickup_datetime >= '{start_date}'
+              AND pickup_datetime < '{end_date}'
+            GROUP BY hvfhs_license_num
+            ORDER BY total_trips DESC
+        """,
+        "params": {"duration_days": 30},
+    },
+    "hvfhv-base-dispatch-patterns": {
+        "id": "H2",
+        "name": "HVFHV Base Dispatch Patterns",
+        "description": "Trip metrics by dispatching base (Uber HV0003, Lyft HV0005, etc.)",
+        "category": "hvfhv-rideshare",
+        "sql": """
+            SELECT
+                hvfhs_license_num,
+                COUNT(*) as trip_count,
+                AVG(trip_miles) as avg_miles,
+                AVG(trip_time / 60.0) as avg_duration_min,
+                AVG(base_passenger_fare) as avg_passenger_fare,
+                AVG(driver_pay) as avg_driver_pay,
+                ROUND(AVG(driver_pay / NULLIF(base_passenger_fare, 0)) * 100, 2) as driver_share_pct,
+                SUM(base_passenger_fare) as total_revenue
+            FROM hvfhv_trips
+            WHERE pickup_datetime >= '{start_date}'
+              AND pickup_datetime < '{end_date}'
+              AND base_passenger_fare > 0
+            GROUP BY hvfhs_license_num
+            ORDER BY trip_count DESC
+        """,
+        "params": {"duration_days": 30},
+    },
+    "hvfhv-driver-pay-analysis": {
+        "id": "H3",
+        "name": "HVFHV Driver Pay vs Passenger Fare",
+        "description": "Distribution of driver pay relative to passenger fare",
+        "category": "hvfhv-financial",
+        "sql": """
+            SELECT
+                FLOOR(base_passenger_fare / 5) * 5 as fare_bucket,
+                COUNT(*) as trip_count,
+                AVG(driver_pay) as avg_driver_pay,
+                AVG(tips) as avg_tips,
+                AVG(congestion_surcharge) as avg_congestion,
+                ROUND(AVG(driver_pay / NULLIF(base_passenger_fare, 0)) * 100, 2) as avg_driver_share_pct
+            FROM hvfhv_trips
+            WHERE pickup_datetime >= '{start_date}'
+              AND pickup_datetime < '{end_date}'
+              AND base_passenger_fare BETWEEN 2 AND 100
+            GROUP BY FLOOR(base_passenger_fare / 5) * 5
+            ORDER BY fare_bucket
+        """,
+        "params": {"duration_days": 30},
+    },
+    "hvfhv-wait-time-analysis": {
+        "id": "H4",
+        "name": "HVFHV Wait Time Analysis",
+        "description": "Passenger wait time (request to pickup) by time of day and base",
+        "category": "hvfhv-service",
+        "sql": """
+            SELECT
+                hvfhs_license_num,
+                EXTRACT(HOUR FROM pickup_datetime) as hour,
+                COUNT(*) as trip_count,
+                AVG(EXTRACT(EPOCH FROM (pickup_datetime - request_datetime)) / 60) as avg_wait_min,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (
+                    ORDER BY EXTRACT(EPOCH FROM (pickup_datetime - request_datetime)) / 60
+                ) as median_wait_min
+            FROM hvfhv_trips
+            WHERE pickup_datetime >= '{start_date}'
+              AND pickup_datetime < '{end_date}'
+              AND request_datetime < pickup_datetime
+              AND EXTRACT(EPOCH FROM (pickup_datetime - request_datetime)) BETWEEN 60 AND 1800
+            GROUP BY hvfhs_license_num, EXTRACT(HOUR FROM pickup_datetime)
+            ORDER BY hvfhs_license_num, hour
+        """,
+        "params": {"duration_days": 30},
+    },
+}
+
+# ==== Cross-type comparison queries (requires trips + green_trips + hvfhv_trips) ====
+CROSS_TYPE_QUERIES = {
+    # w8: Market share, geography, pricing
+    "cross-market-share": {
+        "id": "X1",
+        "name": "Cross-Type Market Share by Month",
+        "description": "Monthly trip volume and market share for Yellow, Green, and HVFHV",
+        "category": "cross-market",
+        "sql": """
+            WITH monthly_counts AS (
+                SELECT
+                    DATE_TRUNC('month', pickup_datetime) as month,
+                    'yellow' as taxi_type,
+                    COUNT(*) as trip_count
+                FROM trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                GROUP BY DATE_TRUNC('month', pickup_datetime)
+
+                UNION ALL
+
+                SELECT
+                    DATE_TRUNC('month', pickup_datetime) as month,
+                    'green' as taxi_type,
+                    COUNT(*) as trip_count
+                FROM green_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                GROUP BY DATE_TRUNC('month', pickup_datetime)
+
+                UNION ALL
+
+                SELECT
+                    DATE_TRUNC('month', pickup_datetime) as month,
+                    'hvfhv' as taxi_type,
+                    COUNT(*) as trip_count
+                FROM hvfhv_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                GROUP BY DATE_TRUNC('month', pickup_datetime)
+            ),
+            monthly_totals AS (
+                SELECT month, SUM(trip_count) as total_trips
+                FROM monthly_counts
+                GROUP BY month
+            )
+            SELECT
+                mc.month,
+                mc.taxi_type,
+                mc.trip_count,
+                ROUND(mc.trip_count * 100.0 / mt.total_trips, 2) as market_share_pct
+            FROM monthly_counts mc
+            JOIN monthly_totals mt ON mc.month = mt.month
+            ORDER BY mc.month, mc.taxi_type
+        """,
+        "params": {"duration_days": 365},
+    },
+    "cross-geographic-coverage": {
+        "id": "X2",
+        "name": "Cross-Type Geographic Coverage by Borough",
+        "description": "Borough-level trip distribution for each taxi type",
+        "category": "cross-geographic",
+        "sql": """
+            SELECT
+                z.borough,
+                SUM(CASE WHEN src.taxi_type = 'yellow' THEN src.trip_count ELSE 0 END) as yellow_trips,
+                SUM(CASE WHEN src.taxi_type = 'green' THEN src.trip_count ELSE 0 END) as green_trips,
+                SUM(CASE WHEN src.taxi_type = 'hvfhv' THEN src.trip_count ELSE 0 END) as hvfhv_trips,
+                SUM(src.trip_count) as total_trips
+            FROM (
+                SELECT pickup_location_id, 'yellow' as taxi_type, COUNT(*) as trip_count
+                FROM trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                GROUP BY pickup_location_id
+
+                UNION ALL
+
+                SELECT pickup_location_id, 'green' as taxi_type, COUNT(*) as trip_count
+                FROM green_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                GROUP BY pickup_location_id
+
+                UNION ALL
+
+                SELECT pickup_location_id, 'hvfhv' as taxi_type, COUNT(*) as trip_count
+                FROM hvfhv_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                GROUP BY pickup_location_id
+            ) src
+            JOIN taxi_zones z ON src.pickup_location_id = z.location_id
+            GROUP BY z.borough
+            ORDER BY total_trips DESC
+        """,
+        "params": {"duration_days": 30},
+    },
+    "cross-fare-comparison": {
+        "id": "X3",
+        "name": "Cross-Type Fare Comparison",
+        "description": "Average fare comparison across taxi types (metered vs app-based pricing)",
+        "category": "cross-financial",
+        "sql": """
+            SELECT
+                taxi_type,
+                COUNT(*) as trip_count,
+                AVG(fare) as avg_fare,
+                AVG(distance) as avg_distance,
+                AVG(fare / NULLIF(distance, 0)) as avg_fare_per_mile,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY fare) as median_fare
+            FROM (
+                SELECT 'yellow' as taxi_type, total_amount as fare, trip_distance as distance
+                FROM trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                  AND total_amount BETWEEN 2.50 AND 200
+
+                UNION ALL
+
+                SELECT 'green' as taxi_type, total_amount as fare, trip_distance as distance
+                FROM green_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                  AND total_amount BETWEEN 2.50 AND 200
+
+                UNION ALL
+
+                SELECT 'hvfhv' as taxi_type,
+                       base_passenger_fare + tips + tolls + congestion_surcharge as fare,
+                       trip_miles as distance
+                FROM hvfhv_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                  AND base_passenger_fare BETWEEN 2.50 AND 200
+            ) all_trips
+            WHERE distance > 0
+            GROUP BY taxi_type
+            ORDER BY avg_fare DESC
+        """,
+        "params": {"duration_days": 30},
+    },
+    # w9: Temporal patterns, trends
+    "cross-peak-hour-patterns": {
+        "id": "X4",
+        "name": "Cross-Type Peak Hour Patterns",
+        "description": "Hourly trip demand comparison across Yellow, Green, and HVFHV",
+        "category": "cross-temporal",
+        "sql": """
+            SELECT
+                hour,
+                SUM(CASE WHEN taxi_type = 'yellow' THEN trip_count ELSE 0 END) as yellow_trips,
+                SUM(CASE WHEN taxi_type = 'green' THEN trip_count ELSE 0 END) as green_trips,
+                SUM(CASE WHEN taxi_type = 'hvfhv' THEN trip_count ELSE 0 END) as hvfhv_trips
+            FROM (
+                SELECT EXTRACT(HOUR FROM pickup_datetime) as hour, 'yellow' as taxi_type, COUNT(*) as trip_count
+                FROM trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                GROUP BY EXTRACT(HOUR FROM pickup_datetime)
+
+                UNION ALL
+
+                SELECT EXTRACT(HOUR FROM pickup_datetime) as hour, 'green' as taxi_type, COUNT(*) as trip_count
+                FROM green_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                GROUP BY EXTRACT(HOUR FROM pickup_datetime)
+
+                UNION ALL
+
+                SELECT EXTRACT(HOUR FROM pickup_datetime) as hour, 'hvfhv' as taxi_type, COUNT(*) as trip_count
+                FROM hvfhv_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+                GROUP BY EXTRACT(HOUR FROM pickup_datetime)
+            ) hourly
+            GROUP BY hour
+            ORDER BY hour
+        """,
+        "params": {"duration_days": 30},
+    },
+    "cross-weekday-weekend": {
+        "id": "X5",
+        "name": "Cross-Type Weekday vs Weekend Demand",
+        "description": "Weekday vs weekend trip volume shift by taxi type",
+        "category": "cross-temporal",
+        "sql": """
+            SELECT
+                CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE 'weekday' END as day_type,
+                taxi_type,
+                COUNT(*) as trip_count,
+                AVG(distance) as avg_distance
+            FROM (
+                SELECT pickup_datetime, 'yellow' as taxi_type, trip_distance as distance
+                FROM trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+
+                UNION ALL
+
+                SELECT pickup_datetime, 'green' as taxi_type, trip_distance as distance
+                FROM green_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+
+                UNION ALL
+
+                SELECT pickup_datetime, 'hvfhv' as taxi_type, trip_miles as distance
+                FROM hvfhv_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+            ) all_trips
+            GROUP BY
+                CASE WHEN EXTRACT(DOW FROM pickup_datetime) IN (0, 6) THEN 'weekend' ELSE 'weekday' END,
+                taxi_type
+            ORDER BY day_type, taxi_type
+        """,
+        "params": {"duration_days": 90},
+    },
+    "cross-volume-trends": {
+        "id": "X6",
+        "name": "Cross-Type Volume Trends",
+        "description": "Year-over-year volume trends showing Yellow decline vs HVFHV growth",
+        "category": "cross-temporal",
+        "sql": """
+            SELECT
+                EXTRACT(YEAR FROM pickup_datetime) as year,
+                EXTRACT(MONTH FROM pickup_datetime) as month,
+                taxi_type,
+                COUNT(*) as trip_count
+            FROM (
+                SELECT pickup_datetime, 'yellow' as taxi_type
+                FROM trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+
+                UNION ALL
+
+                SELECT pickup_datetime, 'green' as taxi_type
+                FROM green_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+
+                UNION ALL
+
+                SELECT pickup_datetime, 'hvfhv' as taxi_type
+                FROM hvfhv_trips
+                WHERE pickup_datetime >= '{start_date}'
+                  AND pickup_datetime < '{end_date}'
+            ) all_trips
+            GROUP BY
+                EXTRACT(YEAR FROM pickup_datetime),
+                EXTRACT(MONTH FROM pickup_datetime),
+                taxi_type
+            ORDER BY year, month, taxi_type
+        """,
+        "params": {"duration_days": 730},
+    },
+}
+
 
 class NYCTaxiQueryManager:
-    """Manages NYC Taxi benchmark queries."""
+    """Manages NYC Taxi benchmark queries.
+
+    By default only exposes the 25 Yellow Taxi queries (QUERIES) for backwards
+    compatibility. Pass taxi_type_queries=True to also include Green, HVFHV, and
+    cross-type queries.
+    """
 
     def __init__(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         seed: Optional[int] = None,
+        include_green_queries: bool = False,
+        include_hvfhv_queries: bool = False,
+        include_cross_type_queries: bool = False,
     ) -> None:
         """Initialize query manager.
 
@@ -561,6 +1028,9 @@ class NYCTaxiQueryManager:
             start_date: Start date for the dataset
             end_date: End date for the dataset
             seed: Random seed for parameter generation
+            include_green_queries: Include Green Taxi-specific queries
+            include_hvfhv_queries: Include HVFHV-specific queries
+            include_cross_type_queries: Include cross-type comparison queries
         """
         self.start_date = start_date or datetime(2019, 1, 1)
         self.end_date = end_date or datetime(2019, 12, 31)
@@ -568,6 +1038,15 @@ class NYCTaxiQueryManager:
 
         # Popular zone IDs for point queries
         self.popular_zones = [132, 138, 161, 162, 163, 164, 186, 230, 234, 236, 237, 239, 261, 262, 263]
+
+        # Build active query registry
+        self._active_queries: dict[str, Any] = dict(QUERIES)
+        if include_green_queries:
+            self._active_queries.update(GREEN_QUERIES)
+        if include_hvfhv_queries:
+            self._active_queries.update(HVFHV_QUERIES)
+        if include_cross_type_queries:
+            self._active_queries.update(CROSS_TYPE_QUERIES)
 
     def get_query(
         self,
@@ -586,10 +1065,10 @@ class NYCTaxiQueryManager:
         Raises:
             ValueError: If query_id is unknown
         """
-        if query_id not in QUERIES:
-            raise ValueError(f"Unknown query: {query_id}. Available: {list(QUERIES.keys())}")
+        if query_id not in self._active_queries:
+            raise ValueError(f"Unknown query: {query_id}. Available: {list(self._active_queries.keys())}")
 
-        query_def = QUERIES[query_id]
+        query_def = self._active_queries[query_id]
         sql = query_def["sql"].strip()
 
         # Build parameters
@@ -642,12 +1121,12 @@ class NYCTaxiQueryManager:
         return params
 
     def get_queries(self) -> dict[str, str]:
-        """Get all queries with generated parameters.
+        """Get all active queries with generated parameters.
 
         Returns:
             Dictionary mapping query IDs to query strings
         """
-        return {qid: self.get_query(qid) for qid in QUERIES}
+        return {qid: self.get_query(qid) for qid in self._active_queries}
 
     def get_query_info(self, query_id: str) -> dict[str, Any]:
         """Get query metadata.
@@ -658,9 +1137,9 @@ class NYCTaxiQueryManager:
         Returns:
             Query metadata dictionary
         """
-        if query_id not in QUERIES:
+        if query_id not in self._active_queries:
             raise ValueError(f"Unknown query: {query_id}")
-        return QUERIES[query_id]
+        return self._active_queries[query_id]
 
     def get_queries_by_category(self, category: str) -> list[str]:
         """Get query IDs for a specific category.
@@ -671,22 +1150,20 @@ class NYCTaxiQueryManager:
         Returns:
             List of query IDs
         """
-        return [qid for qid, qdef in QUERIES.items() if qdef.get("category") == category]
+        return [qid for qid, qdef in self._active_queries.items() if qdef.get("category") == category]
 
-    @staticmethod
-    def get_categories() -> list[str]:
-        """Get all query categories.
+    def get_categories(self) -> list[str]:
+        """Get all active query categories.
 
         Returns:
             List of unique categories
         """
-        return list({str(qdef["category"]) for qdef in QUERIES.values()})
+        return list({str(qdef["category"]) for qdef in self._active_queries.values()})
 
-    @staticmethod
-    def get_query_count() -> int:
-        """Get total number of queries.
+    def get_query_count(self) -> int:
+        """Get total number of active queries.
 
         Returns:
             Number of queries
         """
-        return len(QUERIES)
+        return len(self._active_queries)

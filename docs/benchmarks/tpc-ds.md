@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, tpc-ds
 ```
 
-> **CLI name:** `tpcds` — use `benchbox run --benchmark tpcds`
+> **CLI name:** `tpcds` - use `benchbox run --benchmark tpcds`
 
 ## Overview
 
@@ -312,6 +312,50 @@ query_stream = tpcds.get_query(42,
 | Recursive Queries | Very High | Very High | Complex | Recursive plan optimization |
 | Data Mining | Very High | Very High | Mixed | Statistical computation |
 
+## Official TPC-DS Metrics
+
+BenchBox computes the TPC-DS composite metric family when the `power`, `throughput`,
+and `maintenance` phases run successfully. Values are surfaced in the executive
+summary (`Power@Size`, `Throughput@Size`, `QphDS@Size`) and in the JSON results.
+
+| Metric | Meaning | Source |
+|--------|---------|--------|
+| **Power@Size** | Single-stream power test throughput at the given scale factor | `power_at_size` - computed from the 99-query power stream |
+| **Throughput@Size** | Multi-stream throughput at the given scale factor | `throughput_at_size` - computed across parallel streams |
+| **QphDS@Size** | Final composite metric: `sqrt(Power@Size × Throughput@Size)` | `qphds_at_size` - the headline figure |
+
+Implementation: `benchbox/core/tpcds/reporting.py` (surfacing) and
+`benchbox/core/tpcds/power_test.py` / `TPCMetricsCalculator` (computation).
+
+### Throughput Permutation
+
+Throughput streams are generated with a configurable permutation mode
+(`benchbox/core/tpcds/streams.py::PermutationMode`):
+
+| Mode | Behaviour |
+|------|-----------|
+| `sequential` | Queries run in ID order (1, 2, 3, …). Useful for debugging. |
+| `random` | Uniform random permutation, seeded for reproducibility. |
+| `tpcds` | TPC-DS standard permutation algorithm (default for compliance runs). |
+
+Per-stream ordering is emitted via `TPCDSStreamManager` so runs are reproducible
+with a fixed `base_seed`.
+
+### Maintenance Operations
+
+When the `maintenance` phase is included, BenchBox runs the TPC-DS-prescribed
+INSERT/UPDATE/DELETE operations between the power and throughput streams
+(`benchbox/core/tpcds/maintenance_operations.py`):
+
+- **Inserts**: `store_sales`, `catalog_sales`, `web_sales`, and their return tables
+- **Updates**: `customer`, `item`, `inventory`
+- **Deletes**: expired sales and returns rows
+- **Bulk**: inventory-wide updates
+
+The maintenance runner (`benchbox/core/tpcds/maintenance_test.py`) reports a
+pass/fail outcome that is reflected in the executive summary alongside the
+composite metrics.
+
 ## Configuration Options
 
 ### Scale Factor Guidelines
@@ -324,6 +368,11 @@ query_stream = tpcds.get_query(42,
 | 10 | ~10 GB | Performance testing |
 | 100 | ~100 GB | Enterprise simulation |
 | 1000+ | ~1+ TB | Large-scale testing |
+
+**Subscale behavior:** Scale factors below 1 are supported for development use
+with the patched `dsdgen` bundled under `_binaries/tpc-ds/` (see
+`patch-and-redistribute-tpcds-dsdgen-subscale-support`). Runs at SF < 1 are
+allowed by default, but remain unofficial and are not compliance-valid.
 
 **Note:** Query execution times depend on platform, hardware, query complexity, and configuration. Run benchmarks to establish baselines for your environment.
 

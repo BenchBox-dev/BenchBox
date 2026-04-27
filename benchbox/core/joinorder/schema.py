@@ -9,6 +9,8 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from benchbox.sql_compat.local_exemptions import compat_local
+
 
 class JoinOrderSchema:
     """Schema manager for the Join Order Benchmark."""
@@ -279,6 +281,15 @@ class JoinOrderSchema:
 
         return tables
 
+    @compat_local(
+        kind="type_mapping",
+        platform_specific=True,
+        reason=(
+            "Substitutes dialect-specific type tokens: VARCHAR→CHARACTER VARYING for postgres, "
+            "TEXT→TEXT CHARACTER SET utf8mb4 for mysql. "
+            "Pure column-type translation - no engine/layout policy."
+        ),
+    )
     def get_create_table_sql(self, table_name: str, dialect: str = "sqlite") -> str:
         """Generate CREATE TABLE SQL for a specific table.
 

@@ -509,7 +509,7 @@ class TestDataCache:
             old_cache_path = tmpdir / "tpch" / "sf_1.0" / "parquet"
             old_cache_path.mkdir(parents=True)
             (old_cache_path / "customer.parquet").touch()
-            with open(old_cache_path / "_manifest.json", "w") as f:
+            with open(old_cache_path / "_manifest.json", "w", encoding="utf-8") as f:
                 json.dump(
                     {
                         "benchmark": "tpch",
@@ -557,7 +557,7 @@ class TestDataCache:
                 },
             }
 
-            with open(cache_path / "_manifest.json", "w") as f:
+            with open(cache_path / "_manifest.json", "w", encoding="utf-8") as f:
                 json.dump(manifest, f)
 
             assert cache.has_cached_data("tpch", 1.0, DataFormat.PARQUET) is True
@@ -585,7 +585,7 @@ class TestDataCache:
                 },
             }
 
-            with open(cache_path / "_manifest.json", "w") as f:
+            with open(cache_path / "_manifest.json", "w", encoding="utf-8") as f:
                 json.dump(manifest, f)
 
             assert cache.has_cached_data("tpch", 1.0, DataFormat.PARQUET) is False
@@ -609,7 +609,7 @@ class TestDataCache:
                 "tables": {"test": {"file": "test.parquet"}},
             }
 
-            with open(cache_path / "_manifest.json", "w") as f:
+            with open(cache_path / "_manifest.json", "w", encoding="utf-8") as f:
                 json.dump(manifest, f)
 
             # Different hash should invalidate cache
@@ -635,7 +635,7 @@ class TestDataCache:
                 },
             }
 
-            with open(cache_path / "_manifest.json", "w") as f:
+            with open(cache_path / "_manifest.json", "w", encoding="utf-8") as f:
                 json.dump(manifest, f)
 
             files = cache.get_cached_files("tpch", 1.0, DataFormat.PARQUET)
@@ -661,7 +661,7 @@ class TestDataCache:
             manifest_path = cache.get_manifest_path("tpch", 1.0, DataFormat.PARQUET)
             assert manifest_path.exists()
 
-            with open(manifest_path) as f:
+            with open(manifest_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             assert data["benchmark"] == "tpch"
@@ -842,7 +842,7 @@ class TestDataFrameDataLoader:
                 "source_hash": "any_hash",
                 "tables": {"customer": {"file": "customer.parquet"}},
             }
-            with open(cache_path / "_manifest.json", "w") as f:
+            with open(cache_path / "_manifest.json", "w", encoding="utf-8") as f:
                 json.dump(manifest, f)
 
             # Setup benchmark

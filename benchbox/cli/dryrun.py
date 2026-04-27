@@ -35,6 +35,7 @@ def generate_cli_command(
     queries: list[str] | None = None,
     tuning: str | None = None,
     seed: int | None = None,
+    iterations: int | None = None,
     output: str | None = None,
     table_mode: str | None = None,
     table_format: str | None = None,
@@ -51,6 +52,10 @@ def generate_cli_command(
     sorted_ingestion_mode: str | None = None,
     sorted_ingestion_method: str | None = None,
     global_cache: bool = False,
+    publish: bool = False,
+    publish_target: str | None = None,
+    publish_label: str | None = None,
+    benchmark_options: dict[str, str] | None = None,
 ) -> str:
     """Generate equivalent CLI command from interactive wizard configuration.
 
@@ -78,6 +83,9 @@ def generate_cli_command(
         sorted_ingestion_mode: Cloud sorted-ingestion strategy (off, auto, force)
         sorted_ingestion_method: Cloud sorted-ingestion method override
         global_cache: Use global DataFrame cache
+        publish: Publish the exported result bundle after a successful run
+        publish_target: Destination for --publish (local dir or cloud URI)
+        publish_label: Trust label for --publish
 
     Returns:
         Complete CLI command string
@@ -89,7 +97,7 @@ def generate_cli_command(
     if scale != 0.01:
         parts.append(f"--scale {scale}")
 
-    # List-value flags: (value, flag, skip_value) — joined with comma
+    # List-value flags: (value, flag, skip_value) - joined with comma
     _LIST_PARAMS = [
         (phases, "--phases", ["power"]),
         (queries, "--queries", None),
@@ -102,6 +110,7 @@ def generate_cli_command(
     _VALUE_PARAMS = [
         (tuning, "--tuning", "notuning"),
         (seed, "--seed", None),
+        (iterations, "--iterations", None),
         (output, "--output", None),
         (table_mode, "--table-mode", "native"),
         (table_format, "--table-format", None),
@@ -123,15 +132,27 @@ def generate_cli_command(
         for key, val in sorted(platform_options.items()):
             parts.append(f"--platform-option {key}={val}")
 
+    if benchmark_options:
+        for key, val in sorted(benchmark_options.items()):
+            parts.append(f"--benchmark-option {key}={val}")
+
     # Boolean flags: (value, flag)
     _BOOL_PARAMS = [
         (official, "--official"),
         (capture_plans, "--capture-plans"),
         (global_cache, "--global-cache"),
+        (publish, "--publish"),
     ]
     for flag_value, flag in _BOOL_PARAMS:
         if flag_value:
             parts.append(flag)
+
+    # Publish target/label only meaningful when --publish is set
+    if publish:
+        if publish_target and publish_target != "benchmark_runs/published":
+            parts.append(f"--publish-target {publish_target}")
+        if publish_label and publish_label != "maintainer-run":
+            parts.append(f"--publish-label {publish_label}")
 
     # Verbose flags (-v, -vv)
     if verbose > 0:
@@ -188,6 +209,7 @@ def display_interactive_preview(
     sorted_ingestion_mode: str | None = None,
     sorted_ingestion_method: str | None = None,
     global_cache: bool = False,
+    benchmark_options: dict[str, str] | None = None,
 ) -> None:
     """Display a preview summary for interactive wizard users.
 
@@ -328,6 +350,7 @@ def display_interactive_preview(
         sorted_ingestion_mode=sorted_ingestion_mode,
         sorted_ingestion_method=sorted_ingestion_method,
         global_cache=global_cache,
+        benchmark_options=benchmark_options,
     )
 
     display_console.print(f"[dim]{cli_cmd}[/dim]")

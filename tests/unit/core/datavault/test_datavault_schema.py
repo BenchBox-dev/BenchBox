@@ -193,9 +193,9 @@ class TestDataTypeHandling:
     """Tests for data type handling."""
 
     def test_hashkey_type(self):
-        """HASHKEY type should render as VARCHAR(32)."""
+        """HASHKEY type should render as VARCHAR(64) to accommodate SHA-256."""
         col = Column("test_hk", DataType.HASHKEY)
-        assert col.get_sql_type() == "VARCHAR(32)"
+        assert col.get_sql_type() == "VARCHAR(64)"
 
     def test_timestamp_type(self):
         """TIMESTAMP type should render correctly."""
@@ -211,3 +211,10 @@ class TestDataTypeHandling:
         """DECIMAL type should include precision."""
         col = Column("test_dec", DataType.DECIMAL)
         assert "DECIMAL" in col.get_sql_type()
+
+    def test_hashkey_column_width_in_ddl(self):
+        """Hub DDL should use VARCHAR(64) for hash key columns."""
+        hub = TABLES_BY_NAME["hub_customer"]
+        ddl = hub.get_create_table_sql(enable_primary_keys=False, enable_foreign_keys=False)
+        assert "VARCHAR(64)" in ddl
+        assert "VARCHAR(32)" not in ddl

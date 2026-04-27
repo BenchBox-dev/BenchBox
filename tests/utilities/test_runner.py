@@ -91,7 +91,7 @@ class ResultCache:
         self.cache = {}
         if self.cache_file.exists():
             try:
-                with open(self.cache_file) as f:
+                with open(self.cache_file, encoding="utf-8") as f:
                     self.cache = json.load(f)
             except (OSError, json.JSONDecodeError):
                 self.cache = {}
@@ -99,7 +99,7 @@ class ResultCache:
     def _save_cache(self) -> None:
         """Save cache to disk."""
         try:
-            with open(self.cache_file, "w") as f:
+            with open(self.cache_file, "w", encoding="utf-8") as f:
                 json.dump(self.cache, f, indent=2)
         except OSError:
             pass
@@ -200,7 +200,7 @@ class BenchmarkRunner:
     def _is_slow_test(self, test_file: Path) -> bool:
         """Check if test file contains slow tests."""
         try:
-            content = test_file.read_text()
+            content = test_file.read_text(encoding="utf-8")
             return "@pytest.mark.slow" in content or "slow" in str(test_file)
         except OSError:
             return False
@@ -562,7 +562,7 @@ def main():
 
         # Save report to file
         report_file = Path("test_execution_report.md")
-        report_file.write_text(report)
+        report_file.write_text(report, encoding="utf-8")
         print(f"\nReport saved to: {report_file}")
 
     # Exit with appropriate code

@@ -171,3 +171,31 @@ class TestGetTableFilesDirectorySkipping:
         )
         result = get_table_files(manifest, "orders", skip_directory_only_formats=True)
         assert result == mixed_entries
+
+
+class TestGetTableFilesV1Manifest:
+    """Verify that V1 manifests (flat list entries) are handled correctly."""
+
+    def test_v1_manifest_returns_entries(self):
+        """V1 manifest stores table entries as a flat list, not a dict with formats."""
+        manifest = {
+            "benchmark": "tpcds",
+            "scale_factor": 1.0,
+            "tables": {
+                "orders": [
+                    {"path": "orders_1_10.dat.zst", "size_bytes": 1024, "row_count": 100},
+                    {"path": "orders_2_10.dat.zst", "size_bytes": 2048, "row_count": 200},
+                ],
+            },
+        }
+        result = get_table_files(manifest, "orders")
+        assert len(result) == 2
+        assert result[0]["path"] == "orders_1_10.dat.zst"
+
+    def test_v1_manifest_missing_table(self):
+        manifest = {
+            "tables": {
+                "orders": [{"path": "orders.dat.zst", "size_bytes": 100, "row_count": 10}],
+            },
+        }
+        assert get_table_files(manifest, "nonexistent") == []

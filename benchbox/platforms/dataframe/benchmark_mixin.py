@@ -16,6 +16,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from unittest.mock import DEFAULT
 
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
@@ -51,6 +52,64 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 console = quiet_console
+
+
+def _benchmark_defines_hook(benchmark: Any | None, hook_name: str) -> bool:
+    """Return True when a benchmark explicitly defines a hook.
+
+    This accepts real class-defined hooks and explicitly configured mock hooks,
+    while rejecting synthetic MagicMock attributes created via ``__getattr__``.
+    """
+    if benchmark is None:
+        return False
+
+    hook = type(benchmark).__dict__.get(hook_name)
+    if callable(hook):
+        return True
+
+    instance_hook = benchmark.__dict__.get(hook_name)
+    if callable(instance_hook):
+        return True
+
+    mock_children = getattr(benchmark, "_mock_children", None)
+    if not isinstance(mock_children, dict):
+        return False
+
+    child = mock_children.get(hook_name)
+    if child is None:
+        return False
+
+    return (
+        getattr(child, "_mock_return_value", DEFAULT) is not DEFAULT
+        or getattr(child, "_mock_side_effect", None) is not None
+        or getattr(child, "_mock_wraps", None) is not None
+    )
+
+
+def _benchmark_manages_dataframe_loading(benchmark: Any | None) -> bool:
+    """Return True when a benchmark explicitly owns DataFrame loading.
+
+    Use class-level hook detection so dynamic test doubles such as MagicMock do
+    not accidentally appear to implement the hook via ``__getattr__``.
+    """
+    if not _benchmark_defines_hook(benchmark, "skip_dataframe_data_loading"):
+        return False
+
+    return bool(benchmark.skip_dataframe_data_loading())
+
+
+def _benchmark_supports_dataframe_workload(benchmark: Any | None) -> bool:
+    """Return True when a benchmark defines a custom DataFrame workload hook.
+
+    Use class-level hook detection so dynamic test doubles such as MagicMock do
+    not accidentally appear to implement the hook via ``__getattr__``.
+    """
+    return _benchmark_defines_hook(benchmark, "execute_dataframe_workload")
+
+
+def _benchmark_provides_dataframe_queries(benchmark: Any | None) -> bool:
+    """Return True when a benchmark defines a DataFrame query provider hook."""
+    return _benchmark_defines_hook(benchmark, "get_dataframe_queries")
 
 
 @dataclass
@@ -250,11 +309,7 @@ class BenchmarkExecutionMixin:
             # Create execution context
             ctx = self.create_context()
 
-            skip_data_loading = bool(
-                benchmark
-                and hasattr(benchmark, "skip_dataframe_data_loading")
-                and benchmark.skip_dataframe_data_loading()  # type: ignore[no-untyped-call]
-            )
+            skip_data_loading = _benchmark_manages_dataframe_loading(benchmark)
 
             # Load phase
             if phases.load and not skip_data_loading:
@@ -451,10 +506,10 @@ class BenchmarkExecutionMixin:
         """Resolve data paths from available sources (tables, data_dir, or generation).
 
         Priority order (highest to lowest):
-        1. benchmark_instance.tables — authoritative if populated (even after force_regenerate,
+        1. benchmark_instance.tables - authoritative if populated (even after force_regenerate,
            since generate_data() populates .tables as a side effect)
-        2. data_dir discovery — scan filesystem for data files
-        3. benchmark_instance.generate_data() — last resort, generate from scratch
+        2. data_dir discovery - scan filesystem for data files
+        3. benchmark_instance.generate_data() - last resort, generate from scratch
         """
         data_paths: dict[str, Path | list[Path]] = {}
 
@@ -499,19 +554,11 @@ class BenchmarkExecutionMixin:
         benchmark_id = normalize_benchmark_id(benchmark_config.name)
         if benchmark_id != "tpch" and benchmark_instance is not None:
             source_benchmark = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
-            if source_benchmark is None:
-                impl = getattr(benchmark_instance, "_impl", None)
-                if impl is not None:
-                    source_benchmark = getattr(impl, "get_data_source_benchmark", lambda: None)()
             if source_benchmark == "tpch":
                 benchmark_id = "tpch"
         column_names_map = get_tpch_column_names() if benchmark_id == "tpch" else {}
 
         csv_delimiter = getattr(benchmark_instance, "csv_delimiter", None)
-        if csv_delimiter is None and benchmark_instance is not None:
-            impl = getattr(benchmark_instance, "_impl", None)
-            if impl is not None:
-                csv_delimiter = getattr(impl, "csv_delimiter", None)
 
         return column_names_map, csv_delimiter
 
@@ -674,7 +721,7 @@ class BenchmarkExecutionMixin:
         query_filter = self._build_query_filter(benchmark_config)
 
         # Benchmark-specific DataFrame workload hook for non-query style benchmarks
-        if benchmark_instance and hasattr(benchmark_instance, "execute_dataframe_workload"):
+        if _benchmark_supports_dataframe_workload(benchmark_instance):
             return benchmark_instance.execute_dataframe_workload(
                 ctx=ctx,
                 adapter=self,
@@ -777,11 +824,19 @@ class BenchmarkExecutionMixin:
 
         if (
             hasattr(self, "platform_name")
-            and self.platform_name == "DataFusion"
             and benchmark_instance
-            and hasattr(benchmark_instance, "get_datafusion_skip_queries")
+            and hasattr(benchmark_instance, "get_platform_skip_queries")
         ):
-            df_skip_ids = benchmark_instance.get_datafusion_skip_queries()
+            platform_skip_ids = benchmark_instance.get_platform_skip_queries(self.platform_name)
+            skip_query_ids |= {str(query_id).strip().upper() for query_id in platform_skip_ids}
+
+        # Platform-specific skips for DataFrame mode only
+        if (
+            hasattr(self, "platform_name")
+            and benchmark_instance
+            and hasattr(benchmark_instance, "get_df_platform_skip_queries")
+        ):
+            df_skip_ids = benchmark_instance.get_df_platform_skip_queries(self.platform_name)
             skip_query_ids |= {str(query_id).strip().upper() for query_id in df_skip_ids}
 
         return skip_query_ids
@@ -1106,7 +1161,7 @@ class BenchmarkExecutionMixin:
             return CLICKBENCH_DATAFRAME_QUERIES.get_all_queries()
 
         # Try benchmark instance
-        if benchmark_instance and hasattr(benchmark_instance, "get_dataframe_queries"):
+        if _benchmark_provides_dataframe_queries(benchmark_instance):
             benchmark_queries = benchmark_instance.get_dataframe_queries()  # type: ignore[no-untyped-call]
             if isinstance(benchmark_queries, list):
                 return benchmark_queries

@@ -272,26 +272,45 @@ def regressions(
     type=click.Path(path_type=Path),
     help="Path to result database",
 )
+@click.option(
+    "--include-unofficial",
+    is_flag=True,
+    default=False,
+    help="Include unofficial TPC-DS results (compliance_class != official). Excluded by default.",
+)
 def import_results(
     directory: Path,
     pattern: str,
     db_path: Path | None,
+    include_unofficial: bool,
 ) -> None:
     """Import benchmark results from a directory.
 
     Scans a directory for JSON result files and imports them into the
     historical database for analysis.
 
+    By default, unofficial TPC-DS results (subscale or non-standard scale factor)
+    are excluded from the database to prevent contamination of comparative rankings.
+    Use --include-unofficial to import them explicitly.
+
     Examples:
         benchbox report import benchmark_runs/results/
         benchbox report import ./results --pattern "*.json"
+        benchbox report import ./results --include-unofficial
     """
     db = ResultDatabase(db_path)
 
     with console.status("Importing results..."):
-        imported, skipped = db.import_results_from_directory(directory, pattern)
+        imported, skipped, excluded = db.import_results_from_directory(
+            directory, pattern, include_unofficial=include_unofficial
+        )
 
     console.print(f"[green]Imported: {imported}[/green]")
+    if excluded > 0:
+        console.print(
+            f"[yellow]Excluded (unofficial TPC-DS): {excluded}[/yellow] "
+            "[dim](use --include-unofficial to import these)[/dim]"
+        )
     if skipped > 0:
         console.print(f"[yellow]Skipped (duplicates/invalid): {skipped}[/yellow]")
 

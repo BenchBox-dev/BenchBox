@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import sys as _sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -8,6 +9,15 @@ from unittest.mock import Mock, patch
 import pytest
 
 from benchbox.cli.commands.run import _export_orchestrated_result
+
+# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
+# same name as the run submodule.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
+# the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.run")
+_run_module = _sys.modules["benchbox.cli.commands.run"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -27,7 +37,7 @@ def test_export_helper_applies_directory_manager_naming_and_output_dir() -> None
     orchestrator.directory_manager.get_result_path.return_value = result_path
     orchestrator.directory_manager.results_dir = Path("/tmp/results")
 
-    with patch("benchbox.cli.commands.run.ResultExporter") as exporter_cls:
+    with patch.object(_run_module, "ResultExporter") as exporter_cls:
         exporter = exporter_cls.return_value
         exporter.export_result.return_value = {"json": str(result_path)}
 
@@ -60,7 +70,7 @@ def test_export_helper_defaults_to_json_format() -> None:
     orchestrator.directory_manager.get_result_path.return_value = result_path
     orchestrator.directory_manager.results_dir = Path("/tmp/results")
 
-    with patch("benchbox.cli.commands.run.ResultExporter") as exporter_cls:
+    with patch.object(_run_module, "ResultExporter") as exporter_cls:
         exporter = exporter_cls.return_value
         exporter.export_result.return_value = {"json": str(result_path)}
         _export_orchestrated_result(

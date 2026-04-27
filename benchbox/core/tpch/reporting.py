@@ -128,7 +128,7 @@ class TPCHReportGenerator:
             include_certification_info,
         )
 
-        with open(report_file, "w") as f:
+        with open(report_file, "w", encoding="utf-8") as f:
             f.write(html_content)
 
         return report_file
@@ -148,7 +148,7 @@ class TPCHReportGenerator:
         validation = self._validate_result(result)
         metrics = self._calculate_performance_metrics(result)
 
-        with open(report_file, "w") as f:
+        with open(report_file, "w", encoding="utf-8") as f:
             f.write("TPC-H BENCHMARK CERTIFICATION REPORT\n")
             f.write("=" * 60 + "\n\n")
 
@@ -238,7 +238,7 @@ class TPCHReportGenerator:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         csv_file = self.output_dir / f"tpch_performance_data_{timestamp}.csv"
 
-        with open(csv_file, "w", newline="") as f:
+        with open(csv_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
             # Write header
@@ -347,7 +347,7 @@ class TPCHReportGenerator:
         # Generate HTML comparison report
         html_content = self._generate_comparison_html(baseline_result, current_result, comparison, report_title)
 
-        with open(report_file, "w") as f:
+        with open(report_file, "w", encoding="utf-8") as f:
             f.write(html_content)
 
         return report_file

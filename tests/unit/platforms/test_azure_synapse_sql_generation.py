@@ -1,4 +1,4 @@
-"""Tests for Azure Synapse SQL generation branches — coverage extension.
+"""Tests for Azure Synapse SQL generation branches - coverage extension.
 
 Targets: generate_tuning_clause with various distribution types,
 _optimize_table_definition variants, external data source/file format DDL,

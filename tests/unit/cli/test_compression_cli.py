@@ -6,6 +6,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import sys
+import sys as _sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,6 +14,15 @@ from click.testing import CliRunner
 
 from benchbox.cli.benchmarks import BenchmarkConfig
 from benchbox.cli.main import cli
+
+# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
+# same name as the run submodule.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
+# the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.run")
+_run_module = _sys.modules["benchbox.cli.commands.run"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -32,10 +42,10 @@ class TestCompressionCLI:
         reason="Click command mock.patch requires Python 3.11+ for attribute access",
     )
     @patch("benchbox.cli.main.get_config_manager")
-    @patch("benchbox.cli.commands.run.BenchmarkOrchestrator")
-    @patch("benchbox.cli.commands.run.DatabaseManager")
-    @patch("benchbox.cli.commands.run.BenchmarkManager")
-    @patch("benchbox.cli.commands.run.SystemProfiler")
+    @patch.object(_run_module, "BenchmarkOrchestrator")
+    @patch.object(_run_module, "DatabaseManager")
+    @patch.object(_run_module, "BenchmarkManager")
+    @patch.object(_run_module, "SystemProfiler")
     def test_cli_compression_options(
         self, mock_profiler, mock_bench_manager, mock_db_manager, mock_orchestrator, mock_get_cfg
     ):
@@ -110,10 +120,10 @@ class TestCompressionCLI:
         reason="Click command mock.patch requires Python 3.11+ for attribute access",
     )
     @patch("benchbox.cli.main.get_config_manager")
-    @patch("benchbox.cli.commands.run.BenchmarkOrchestrator")
-    @patch("benchbox.cli.commands.run.DatabaseManager")
-    @patch("benchbox.cli.commands.run.BenchmarkManager")
-    @patch("benchbox.cli.commands.run.SystemProfiler")
+    @patch.object(_run_module, "BenchmarkOrchestrator")
+    @patch.object(_run_module, "DatabaseManager")
+    @patch.object(_run_module, "BenchmarkManager")
+    @patch.object(_run_module, "SystemProfiler")
     def test_cli_compression_defaults(
         self, mock_profiler, mock_bench_manager, mock_db_manager, mock_orchestrator, mock_get_cfg
     ):
@@ -210,9 +220,9 @@ class TestCompressionCLI:
     )
     @patch("benchbox.cli.main.get_config_manager")
     @patch("benchbox.cli.dryrun.DryRunExecutor")
-    @patch("benchbox.cli.commands.run.DatabaseManager")
-    @patch("benchbox.cli.commands.run.BenchmarkManager")
-    @patch("benchbox.cli.commands.run.SystemProfiler")
+    @patch.object(_run_module, "DatabaseManager")
+    @patch.object(_run_module, "BenchmarkManager")
+    @patch.object(_run_module, "SystemProfiler")
     def test_dry_run_with_compression_options(
         self, mock_profiler, mock_bench_manager, mock_db_manager, mock_dry_run, mock_get_cfg
     ):

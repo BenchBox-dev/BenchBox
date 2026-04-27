@@ -70,13 +70,13 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             --platform-option host=abc123.us-east-2.aws.clickhouse.cloud \\
             --platform-option password=my-password
 
-        # With OAuth token
+        # With OAuth token (alternative to --platform-option password=...)
         benchbox run --platform clickhouse-cloud --benchmark tpch \\
-            --clickhouse-cloud-oauth-token=my-token
+            --platform-option oauth_token=my-token
 
         # With S3 staging for data loading
         benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1 \\
-            --clickhouse-cloud-s3-staging-url=s3://my-bucket/benchbox-staging/
+            --platform-option s3_staging_url=s3://my-bucket/benchbox-staging/
     """
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
@@ -563,85 +563,46 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         Raises:
             ValueError: If no data files are found.
         """
-        import json
-
         from benchbox.platforms.base.data_loading import DataSourceResolver
 
         resolver = DataSourceResolver(
             platform_name=self.platform_name,
-            table_mode=getattr(self, "table_mode", "native"),
-            platform_config=getattr(self, "__dict__", None),
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
         )
         data_source = resolver.resolve(benchmark, data_dir)
-        if data_source and data_source.tables:
-            return {table: [Path(p) for p in paths] for table, paths in data_source.tables.items()}
-
-        data_files = None
-        try:
-            manifest_path = Path(data_dir) / "_datagen_manifest.json"
-            if manifest_path.exists():
-                with open(manifest_path) as f:
-                    manifest = json.load(f)
-                tables = manifest.get("tables") or {}
-                mapping = {}
-                for table, entries in tables.items():
-                    if entries:
-                        chunk_paths = []
-                        for entry in entries:
-                            rel = entry.get("path")
-                            if rel:
-                                chunk_paths.append(Path(data_dir) / rel)
-                        if chunk_paths:
-                            mapping[table] = chunk_paths
-                if mapping:
-                    data_files = mapping
-        except Exception as exc:
-            self.logger.debug(f"Manifest fallback failed: {exc}")
-
-        if not data_files:
+        if not data_source or not data_source.tables:
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        return data_files
+        return {table: [Path(p) for p in paths] for table, paths in data_source.tables.items()}
 
-    def _load_data_via_s3(
-        self, benchmark, connection: Any, data_dir: Path
+    def _load_data_via_object_storage(
+        self,
+        benchmark,
+        connection: Any,
+        data_dir: Path,
+        *,
+        kind: str,
+        staging_url: str,
+        sql_fn: str,
+        creds: tuple[str, str],
+        upload_fn: Any,
+        extra_metadata: dict[str, Any] | None = None,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data via S3 staging using ClickHouse's s3() table function.
+        """Shared core for S3 and GCS staging loads.
 
-        Workflow per table:
-        1. Upload local CSV/TSV file(s) to S3 staging location
-        2. Execute INSERT INTO ... SELECT * FROM s3(...) to ingest from S3
-        3. Track row counts from COUNT(*)
-
-        AWS credentials are resolved from:
-        1. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY environment variables
-        2. boto3 default credential chain (IAM role, ~/.aws/credentials, etc.)
-
-        Requires boto3 to be installed (lazy import with helpful error message).
+        Args:
+            kind: Provider label for log messages (``"s3"`` or ``"gcs"``).
+            staging_url: Full staging URL (e.g. ``s3://bucket/prefix/``).
+            sql_fn: ClickHouse table function name (``"s3"`` or ``"gcs"``).
+            creds: (key, secret) pair, already SQL-quote-escaped.
+            upload_fn: Callable ``(file_path, table_name_lower, file_name) -> sql_url``.
+                       Uploads the file and returns the URL to embed in the SQL statement.
+            extra_metadata: Additional keys to merge into the returned loading_metadata dict.
         """
-        try:
-            import boto3
-        except ImportError:
-            raise ImportError(
-                "boto3 is required for S3 staging data loading.\n"
-                "Install with: uv add boto3\n"
-                "Alternatively, remove --clickhouse-cloud-s3-staging-url to use INSERT batching."
-            ) from None
-
         start_time = mono_time()
         table_stats: dict[str, int] = {}
-
-        # Resolve AWS credentials for the ClickHouse s3() function
-        aws_key_id = os.environ.get("AWS_ACCESS_KEY_ID", "")
-        aws_secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
-
-        # Create S3 client for file uploads
-        s3_client_kwargs: dict[str, Any] = {}
-        if getattr(self, "s3_region", None):
-            s3_client_kwargs["region_name"] = self.s3_region
-        s3_client = boto3.client("s3", **s3_client_kwargs)
-
-        # Parse S3 staging URL into bucket and prefix
-        s3_bucket, s3_prefix = self._parse_s3_url(self.s3_staging_url)
+        safe_key, safe_secret = creds
 
         try:
             data_files = self._resolve_cloud_data_files(benchmark, data_dir)
@@ -650,7 +611,6 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                 if not isinstance(file_paths, list):
                     file_paths = [file_paths]
 
-                # Filter valid files
                 valid_files = [Path(fp) for fp in file_paths if Path(fp).exists() and Path(fp).stat().st_size > 0]
 
                 if not valid_files:
@@ -659,7 +619,7 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                     continue
 
                 chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
-                self.log_verbose(f"Loading data for table (S3 staging): {table_name}{chunk_info}")
+                self.log_verbose(f"Loading data for table ({kind.upper()} staging): {table_name}{chunk_info}")
 
                 try:
                     load_start = mono_time()
@@ -667,28 +627,17 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                     total_rows_loaded = 0
 
                     for file_path in valid_files:
-                        # Determine S3 key for this file
-                        s3_key = f"{s3_prefix}{table_name_lower}/{file_path.name}"
-                        s3_file_url = f"s3://{s3_bucket}/{s3_key}"
-
-                        # Upload file to S3
                         upload_start = mono_time()
-                        self.log_verbose(f"Uploading {file_path.name} to {s3_file_url}")
-                        s3_client.upload_file(str(file_path), s3_bucket, s3_key)
+                        self.log_verbose(f"Uploading {file_path.name} to {kind.upper()} staging")
+                        sql_url = upload_fn(file_path, table_name_lower, file_path.name)
                         upload_time = elapsed_seconds(upload_start)
                         self.log_verbose(f"Uploaded {file_path.name} in {upload_time:.2f}s")
 
-                        # Build the INSERT INTO ... SELECT FROM s3() statement
-                        # ClickHouse s3() function: s3(url, aws_key_id, aws_secret_key, format)
-                        # Escape single quotes in credentials for SQL safety
-                        safe_key_id = aws_key_id.replace("'", "''")
-                        safe_secret = aws_secret_key.replace("'", "''")
-
                         ingest_sql = (
                             f"INSERT INTO {table_name_lower} "
-                            f"SELECT * FROM s3("
-                            f"'{s3_file_url}', "
-                            f"'{safe_key_id}', "
+                            f"SELECT * FROM {sql_fn}("
+                            f"'{sql_url}', "
+                            f"'{safe_key}', "
                             f"'{safe_secret}', "
                             f"'CSVWithNames'"
                             f")"
@@ -698,12 +647,9 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                         connection.execute(ingest_sql)
                         ingest_time = elapsed_seconds(ingest_start)
 
-                        # Get row count via COUNT(*)
                         count_result = connection.execute(f"SELECT COUNT(*) FROM {table_name_lower}")
-                        rows_loaded = count_result[0][0] if count_result and count_result[0] else 0
-
-                        total_rows_loaded = rows_loaded  # COUNT(*) gives total, not incremental
-                        self.log_verbose(f"Ingested from {file_path.name} via S3 in {ingest_time:.2f}s")
+                        total_rows_loaded = count_result[0][0] if count_result and count_result[0] else 0
+                        self.log_verbose(f"Ingested from {file_path.name} via {kind.upper()} in {ingest_time:.2f}s")
 
                     table_stats[table_name_lower] = total_rows_loaded
 
@@ -714,47 +660,81 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                     load_time = elapsed_seconds(load_start)
                     self.logger.info(
                         f"Loaded {total_rows_loaded:,} rows into {table_name_lower}{chunk_info} "
-                        f"via S3 staging in {load_time:.2f}s"
+                        f"via {kind.upper()} staging in {load_time:.2f}s"
                     )
 
                 except Exception as e:
-                    self.logger.error(f"Failed to load {table_name} via S3: {str(e)[:200]}...")
+                    self.logger.error(f"Failed to load {table_name} via {kind.upper()}: {str(e)[:200]}...")
                     table_stats[table_name.lower()] = 0
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
-            self.logger.info(f"Loaded {total_rows:,} total rows via S3 staging in {total_time:.2f}s")
+            self.logger.info(f"Loaded {total_rows:,} total rows via {kind.upper()} staging in {total_time:.2f}s")
 
         except Exception as e:
-            self.logger.error(f"S3 staging data loading failed: {e}")
+            self.logger.error(f"{kind.upper()} staging data loading failed: {e}")
             raise
 
-        loading_metadata = {
-            "loading_method": "s3_staging",
-            "s3_staging_url": self.s3_staging_url,
-            "s3_region": getattr(self, "s3_region", None),
+        loading_metadata: dict[str, Any] = {
+            "loading_method": f"{kind}_staging",
+            f"{kind}_staging_url": staging_url,
         }
+        if extra_metadata:
+            loading_metadata.update(extra_metadata)
 
         return table_stats, total_time, loading_metadata
+
+    def _load_data_via_s3(
+        self, benchmark, connection: Any, data_dir: Path
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
+        """Load data via S3 staging using ClickHouse's s3() table function.
+
+        AWS credentials are resolved from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+        Requires boto3 (lazy import).
+        """
+        try:
+            import boto3
+        except ImportError:
+            raise ImportError(
+                "boto3 is required for S3 staging data loading.\n"
+                "Install with: uv add boto3\n"
+                "Alternatively, remove --platform-option s3_staging_url to use INSERT batching."
+            ) from None
+
+        aws_key_id = os.environ.get("AWS_ACCESS_KEY_ID", "")
+        aws_secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+
+        s3_client_kwargs: dict[str, Any] = {}
+        if getattr(self, "s3_region", None):
+            s3_client_kwargs["region_name"] = self.s3_region
+        s3_client = boto3.client("s3", **s3_client_kwargs)
+        s3_bucket, s3_prefix = self._parse_s3_url(self.s3_staging_url)
+
+        def upload_to_s3(file_path: Path, table_name_lower: str, file_name: str) -> str:
+            s3_key = f"{s3_prefix}{table_name_lower}/{file_name}"
+            s3_url = f"s3://{s3_bucket}/{s3_key}"
+            s3_client.upload_file(str(file_path), s3_bucket, s3_key)
+            return s3_url
+
+        return self._load_data_via_object_storage(
+            benchmark,
+            connection,
+            data_dir,
+            kind="s3",
+            staging_url=self.s3_staging_url,
+            sql_fn="s3",
+            creds=(aws_key_id.replace("'", "''"), aws_secret_key.replace("'", "''")),
+            upload_fn=upload_to_s3,
+            extra_metadata={"s3_region": getattr(self, "s3_region", None)},
+        )
 
     def _load_data_via_gcs(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Load data via GCS staging using ClickHouse's gcs() table function.
 
-        Workflow per table:
-        1. Upload local CSV/TSV file(s) to GCS staging location
-        2. Execute INSERT INTO ... SELECT * FROM gcs(...) to ingest from GCS
-        3. Track row counts from COUNT(*)
-
-        GCS credentials are resolved from:
-        1. GOOGLE_APPLICATION_CREDENTIALS environment variable (service account JSON)
-        2. google-cloud-storage default credential chain
-
-        For the ClickHouse gcs() table function, HMAC keys are used:
-        1. GCS_HMAC_ACCESS_KEY / GCS_HMAC_SECRET environment variables
-
-        Requires google-cloud-storage to be installed (lazy import with helpful error message).
+        GCS HMAC credentials are resolved from GCS_HMAC_ACCESS_KEY / GCS_HMAC_SECRET.
+        Requires google-cloud-storage (lazy import).
         """
         try:
             from google.cloud import storage as gcs_storage
@@ -762,119 +742,33 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             raise ImportError(
                 "google-cloud-storage is required for GCS staging data loading.\n"
                 "Install with: uv add google-cloud-storage\n"
-                "Alternatively, remove --clickhouse-cloud-gcs-staging-url to use INSERT batching."
+                "Alternatively, remove --platform-option gcs_staging_url to use INSERT batching."
             ) from None
 
-        start_time = mono_time()
-        table_stats: dict[str, int] = {}
-
-        # Resolve GCS HMAC credentials for the ClickHouse gcs() function
         gcs_hmac_key = os.environ.get("GCS_HMAC_ACCESS_KEY", "")
         gcs_hmac_secret = os.environ.get("GCS_HMAC_SECRET", "")
 
-        # Create GCS client for file uploads (uses Application Default Credentials)
         gcs_client = gcs_storage.Client()
-
-        # Parse GCS staging URL into bucket and prefix
         gcs_bucket_name, gcs_prefix = self._parse_gcs_url(self.gcs_staging_url)
-        gcs_bucket = gcs_client.bucket(gcs_bucket_name)
+        gcs_bucket_obj = gcs_client.bucket(gcs_bucket_name)
 
-        try:
-            data_files = self._resolve_cloud_data_files(benchmark, data_dir)
+        def upload_to_gcs(file_path: Path, table_name_lower: str, file_name: str) -> str:
+            blob_name = f"{gcs_prefix}{table_name_lower}/{file_name}"
+            blob = gcs_bucket_obj.blob(blob_name)
+            blob.upload_from_filename(str(file_path))
+            # ClickHouse gcs() requires https:// URL, not gs://
+            return f"https://storage.googleapis.com/{gcs_bucket_name}/{blob_name}"
 
-            for table_name, file_paths in data_files.items():
-                if not isinstance(file_paths, list):
-                    file_paths = [file_paths]
-
-                # Filter valid files
-                valid_files = [Path(fp) for fp in file_paths if Path(fp).exists() and Path(fp).stat().st_size > 0]
-
-                if not valid_files:
-                    self.logger.warning(f"Skipping {table_name} - no valid data files")
-                    table_stats[table_name.lower()] = 0
-                    continue
-
-                chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
-                self.log_verbose(f"Loading data for table (GCS staging): {table_name}{chunk_info}")
-
-                try:
-                    load_start = mono_time()
-                    table_name_lower = table_name.lower()
-                    total_rows_loaded = 0
-
-                    for file_path in valid_files:
-                        # Determine GCS blob name
-                        blob_name = f"{gcs_prefix}{table_name_lower}/{file_path.name}"
-                        gcs_file_url = f"gs://{gcs_bucket_name}/{blob_name}"
-
-                        # Upload file to GCS
-                        upload_start = mono_time()
-                        self.log_verbose(f"Uploading {file_path.name} to {gcs_file_url}")
-                        blob = gcs_bucket.blob(blob_name)
-                        blob.upload_from_filename(str(file_path))
-                        upload_time = elapsed_seconds(upload_start)
-                        self.log_verbose(f"Uploaded {file_path.name} in {upload_time:.2f}s")
-
-                        # Build the INSERT INTO ... SELECT FROM gcs() statement
-                        # ClickHouse gcs() function: gcs(url, hmac_key, hmac_secret, format)
-                        # Escape single quotes in credentials for SQL safety
-                        safe_hmac_key = gcs_hmac_key.replace("'", "''")
-                        safe_hmac_secret = gcs_hmac_secret.replace("'", "''")
-
-                        # Use https:// URL format for ClickHouse gcs() function
-                        gcs_https_url = f"https://storage.googleapis.com/{gcs_bucket_name}/{blob_name}"
-
-                        ingest_sql = (
-                            f"INSERT INTO {table_name_lower} "
-                            f"SELECT * FROM gcs("
-                            f"'{gcs_https_url}', "
-                            f"'{safe_hmac_key}', "
-                            f"'{safe_hmac_secret}', "
-                            f"'CSVWithNames'"
-                            f")"
-                        )
-
-                        ingest_start = mono_time()
-                        connection.execute(ingest_sql)
-                        ingest_time = elapsed_seconds(ingest_start)
-
-                        # Get row count via COUNT(*)
-                        count_result = connection.execute(f"SELECT COUNT(*) FROM {table_name_lower}")
-                        rows_loaded = count_result[0][0] if count_result and count_result[0] else 0
-
-                        total_rows_loaded = rows_loaded  # COUNT(*) gives total, not incremental
-                        self.log_verbose(f"Ingested from {file_path.name} via GCS in {ingest_time:.2f}s")
-
-                    table_stats[table_name_lower] = total_rows_loaded
-
-                    effective_tuning = self.get_effective_tuning_configuration()
-                    if effective_tuning is not None:
-                        self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
-
-                    load_time = elapsed_seconds(load_start)
-                    self.logger.info(
-                        f"Loaded {total_rows_loaded:,} rows into {table_name_lower}{chunk_info} "
-                        f"via GCS staging in {load_time:.2f}s"
-                    )
-
-                except Exception as e:
-                    self.logger.error(f"Failed to load {table_name} via GCS: {str(e)[:200]}...")
-                    table_stats[table_name.lower()] = 0
-
-            total_time = elapsed_seconds(start_time)
-            total_rows = sum(table_stats.values())
-            self.logger.info(f"Loaded {total_rows:,} total rows via GCS staging in {total_time:.2f}s")
-
-        except Exception as e:
-            self.logger.error(f"GCS staging data loading failed: {e}")
-            raise
-
-        loading_metadata = {
-            "loading_method": "gcs_staging",
-            "gcs_staging_url": self.gcs_staging_url,
-        }
-
-        return table_stats, total_time, loading_metadata
+        return self._load_data_via_object_storage(
+            benchmark,
+            connection,
+            data_dir,
+            kind="gcs",
+            staging_url=self.gcs_staging_url,
+            sql_fn="gcs",
+            creds=(gcs_hmac_key.replace("'", "''"), gcs_hmac_secret.replace("'", "''")),
+            upload_fn=upload_to_gcs,
+        )
 
     @staticmethod
     def _parse_s3_url(s3_url: str) -> tuple[str, str]:
@@ -897,63 +791,31 @@ def _build_clickhouse_cloud_config(
     overrides: dict[str, Any],
     info: Any,
 ) -> Any:
-    """Build ClickHouse Cloud database configuration with credential loading.
+    from benchbox.platforms.base.config_utils import build_platform_config
 
-    Args:
-        platform: Platform name (should be 'clickhouse-cloud')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded
-    """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("clickhouse-cloud") or {}
-
-    # Build merged options: saved_creds < options < overrides
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "ClickHouse Cloud"
-    driver_package = info.driver_package if info else "clickhouse-connect"
-
-    config_dict = {
-        "type": "clickhouse-cloud",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields at top-level
-        "host": merged_options.get("host"),
-        "password": merged_options.get("password"),
-        "username": merged_options.get("username"),
-        "database": merged_options.get("database"),
-        # OAuth token
-        "oauth_token": merged_options.get("oauth_token"),
-        # Cloud storage staging
-        "s3_staging_url": merged_options.get("s3_staging_url"),
-        "s3_region": merged_options.get("s3_region"),
-        "gcs_staging_url": merged_options.get("gcs_staging_url"),
-        # Optional settings
-        "max_memory_usage": merged_options.get("max_memory_usage"),
-        "max_execution_time": merged_options.get("max_execution_time"),
-        "disable_result_cache": merged_options.get("disable_result_cache"),
-        "compression": merged_options.get("compression"),
-        # Benchmark context
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    return DatabaseConfig(**config_dict)
+    return build_platform_config(
+        platform_type="clickhouse-cloud",
+        credential_key="clickhouse-cloud",
+        default_display_name="ClickHouse Cloud",
+        default_driver_package="clickhouse-connect",
+        platform_fields=[
+            "host",
+            "password",
+            "username",
+            "database",
+            "oauth_token",
+            "s3_staging_url",
+            "s3_region",
+            "gcs_staging_url",
+            "max_memory_usage",
+            "max_execution_time",
+            "disable_result_cache",
+            "compression",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 # Register the config builder with the platform hook registry

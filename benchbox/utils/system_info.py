@@ -54,7 +54,7 @@ def get_system_info() -> SystemInfo:
         if not cpu_model or cpu_model == "":
             # Fallback for some systems
             try:
-                with open("/proc/cpuinfo") as f:
+                with open("/proc/cpuinfo", encoding="utf-8") as f:
                     for line in f:
                         if "model name" in line:
                             cpu_model = line.split(":")[1].strip()

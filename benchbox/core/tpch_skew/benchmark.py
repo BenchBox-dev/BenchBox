@@ -311,6 +311,7 @@ class TPCHSkewBenchmark(TPCHBenchmark):
         try:
             run_results = adapter.run_benchmark(
                 benchmark,
+                benchmark_name="tpch_skew",
                 query_subset=query_subset,
                 test_execution_type="standard",
             )
@@ -447,3 +448,30 @@ class TPCHSkewBenchmark(TPCHBenchmark):
         if preset_lower not in descriptions:
             raise ValueError(f"Unknown preset: {preset_name}. Valid: {list(descriptions.keys())}")
         return descriptions[preset_lower]
+
+
+# ---------------------------------------------------------------------------
+# Register benchmark-specific CLI option specs
+# ---------------------------------------------------------------------------
+
+from benchbox.cli.benchmark_hooks import (  # noqa: E402
+    BenchmarkHookRegistry,
+    BenchmarkOptionSpec,
+)
+
+BenchmarkHookRegistry.register_option_specs(
+    "tpch_skew",
+    BenchmarkOptionSpec(
+        name="skew_preset",
+        default="moderate",
+        help="Skew distribution preset",
+        choices=("none", "light", "moderate", "heavy", "extreme", "realistic"),
+        aliases=("skew-preset",),
+    ),
+    BenchmarkOptionSpec(
+        name="force_regenerate",
+        parser=lambda v: v.strip().lower() in ("true", "1", "yes"),
+        help="Force data regeneration",
+        aliases=("force-regenerate",),
+    ),
+)

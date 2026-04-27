@@ -768,11 +768,13 @@ class TestResolveBenchmarkTableNames:
         result = _resolve_benchmark_table_names(benchmark)
         assert sorted(result) == ["customer", "nation"]
 
-    def test_falls_back_to_impl_tables(self):
+    def test_returns_empty_when_tables_is_none(self):
+        # _resolve_benchmark_table_names no longer inspects _impl directly;
+        # BaseBenchmark.tables property handles _impl delegation transparently.
         impl = SimpleNamespace(tables=["region", "supplier"])
         benchmark = SimpleNamespace(tables=None, _impl=impl)
         result = _resolve_benchmark_table_names(benchmark)
-        assert sorted(result) == ["region", "supplier"]
+        assert result == []
 
     def test_returns_empty_when_no_tables(self):
         benchmark = SimpleNamespace(tables=None, _impl=None)

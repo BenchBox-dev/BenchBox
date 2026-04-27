@@ -111,7 +111,7 @@ class TPCDSReportGenerator:
         """Generate executive summary report."""
         report_path = self.reports_dir / "executive_summary.txt"
 
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write("TPC-DS BENCHMARK EXECUTIVE SUMMARY\n")
             f.write("=" * 50 + "\n\n")
 
@@ -187,7 +187,7 @@ class TPCDSReportGenerator:
         """Generate detailed analysis report."""
         report_path = self.reports_dir / "detailed_analysis.txt"
 
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write("TPC-DS BENCHMARK DETAILED ANALYSIS\n")
             f.write("=" * 50 + "\n\n")
 
@@ -240,7 +240,7 @@ class TPCDSReportGenerator:
         """Generate query-level analysis report."""
         report_path = self.reports_dir / "query_analysis.txt"
 
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write("TPC-DS QUERY-LEVEL ANALYSIS\n")
             f.write("=" * 50 + "\n\n")
 
@@ -313,7 +313,7 @@ class TPCDSReportGenerator:
 
         result_dict = process_dict(result_dict)
 
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             json.dump(result_dict, f, indent=2, default=str)
 
         return report_path
@@ -322,7 +322,7 @@ class TPCDSReportGenerator:
         """Generate CSV export of query results."""
         report_path = self.reports_dir / "query_results.csv"
 
-        with open(report_path, "w", newline="") as f:
+        with open(report_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
             # Write header
@@ -368,7 +368,7 @@ class TPCDSReportGenerator:
         """Generate HTML report."""
         report_path = self.reports_dir / "benchmark_report.html"
 
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write(self._generate_html_content(result))
 
         return report_path
@@ -377,7 +377,7 @@ class TPCDSReportGenerator:
         """Generate TPC-DS compliance report."""
         report_path = self.reports_dir / "compliance_report.txt"
 
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write("TPC-DS COMPLIANCE REPORT\n")
             f.write("=" * 50 + "\n\n")
 
@@ -436,7 +436,7 @@ class TPCDSReportGenerator:
         """Generate performance summary report."""
         report_path = self.reports_dir / "performance_summary.txt"
 
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write("TPC-DS PERFORMANCE SUMMARY\n")
             f.write("=" * 50 + "\n\n")
 

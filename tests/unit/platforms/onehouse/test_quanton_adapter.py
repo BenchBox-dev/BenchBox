@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,6 +16,10 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def _benchmark(*tables: str) -> SimpleNamespace:
+    return SimpleNamespace(get_table_names=lambda: list(tables))
 
 
 class TestQuantonAdapterInitialization:
@@ -251,13 +256,12 @@ class TestQuantonAdapterDataLoading:
                 s3_staging_dir="s3://bucket/data",
             )
 
-            result = adapter.load_data(
-                tables=["lineitem", "orders"],
-                source_dir=source_dir,
-            )
+            stats, _, metadata = adapter.load_data(_benchmark("lineitem", "orders"), None, source_dir)
 
-            assert "lineitem" in result
-            assert "orders" in result
+            assert "lineitem" in stats
+            assert "orders" in stats
+            assert metadata is not None
+            assert "lineitem" in metadata["table_uris"]
             mock_staging_instance.upload_tables.assert_not_called()
 
 
@@ -557,7 +561,8 @@ class TestQuantonAdapterCreateSchema:
                 s3_staging_dir="s3://bucket/data",
             )
 
-            adapter.create_schema("test_schema")
+            adapter.database = "test_schema"
+            adapter.create_schema(_benchmark(), None)
 
             mock_client.create_database.assert_called_once()
             call_args = mock_client.create_database.call_args
@@ -581,7 +586,7 @@ class TestQuantonAdapterCreateSchema:
                 database="my_db",
             )
 
-            adapter.create_schema()
+            adapter.create_schema(_benchmark(), None)
 
             call_args = mock_client.create_database.call_args
             assert call_args[0][0] == "my_db"
@@ -605,7 +610,8 @@ class TestQuantonAdapterCreateSchema:
             )
 
             # Should not raise
-            adapter.create_schema("existing_db")
+            adapter.database = "existing_db"
+            adapter.create_schema(_benchmark(), None)
 
     def test_create_schema_other_error(self):
         """Test create_schema logs warning on other errors."""
@@ -626,7 +632,8 @@ class TestQuantonAdapterCreateSchema:
                 s3_staging_dir="s3://bucket/data",
             )
 
-            adapter.create_schema("new_db")
+            adapter.database = "new_db"
+            adapter.create_schema(_benchmark(), None)
 
             # Should log warning
             mock_logger.warning.assert_called()
@@ -753,9 +760,10 @@ class TestQuantonAdapterExecuteQuery:
                 s3_staging_dir="s3://bucket/data",
             )
 
-            results = adapter.execute_query("SELECT * FROM test")
+            result = adapter.execute_query(None, "SELECT * FROM test", "q1")
 
-            assert len(results) == 2
+            assert result["status"] == "SUCCESS"
+            assert len(result["results"]) == 2
             assert adapter._query_count == 1
             assert adapter._total_job_duration_seconds == 5.5
 
@@ -792,9 +800,10 @@ class TestQuantonAdapterExecuteQuery:
                 s3_staging_dir="s3://bucket/data",
             )
 
-            results = adapter.execute_query("SELECT * FROM test")
+            result = adapter.execute_query(None, "SELECT * FROM test", "q1")
 
-            assert len(results) == 2
+            assert result["status"] == "SUCCESS"
+            assert len(result["results"]) == 2
 
 
 class TestQuantonAdapterLoadDataFull:
@@ -827,12 +836,11 @@ class TestQuantonAdapterLoadDataFull:
                 s3_staging_dir="s3://bucket/data",
             )
 
-            result = adapter.load_data(
-                tables=["lineitem"],
-                source_dir=source_dir,
-            )
+            stats, _, metadata = adapter.load_data(_benchmark("lineitem"), None, source_dir)
 
-            assert "lineitem" in result
+            assert "lineitem" in stats
+            assert metadata is not None
+            assert "lineitem" in metadata["table_uris"]
             mock_staging_instance.upload_tables.assert_called_once()
 
     def test_load_data_source_not_found(self, tmp_path):
@@ -850,10 +858,7 @@ class TestQuantonAdapterLoadDataFull:
             )
 
             with pytest.raises(ConfigurationError, match="not found"):
-                adapter.load_data(
-                    tables=["lineitem"],
-                    source_dir=tmp_path / "nonexistent",
-                )
+                adapter.load_data(_benchmark("lineitem"), None, tmp_path / "nonexistent")
 
     def test_load_data_table_creation_error(self, tmp_path):
         """Test load_data handles table creation errors gracefully."""
@@ -881,12 +886,11 @@ class TestQuantonAdapterLoadDataFull:
             )
 
             # Should not raise, just log warning
-            result = adapter.load_data(
-                tables=["lineitem"],
-                source_dir=source_dir,
-            )
+            stats, _, metadata = adapter.load_data(_benchmark("lineitem"), None, source_dir)
 
-            assert "lineitem" in result
+            assert "lineitem" in stats
+            assert metadata is not None
+            assert "lineitem" in metadata["table_uris"]
             mock_logger.warning.assert_called()
 
 

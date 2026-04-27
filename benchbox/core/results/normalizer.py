@@ -106,6 +106,9 @@ class NormalizedResultDict:
     # Per-query details
     queries: list[NormalizedQuery] = field(default_factory=list)
 
+    # Methodology/comparability classification (e.g., "official", "unofficial_subscale")
+    compliance_class: str | None = None
+
     # Original data (for fields not normalized)
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -231,6 +234,7 @@ def _normalize_v2(
         success_rate=success_rate,
         cost_total=cost_total,
         queries=queries,
+        compliance_class=benchmark_block.get("compliance_class"),
         raw=data,
     )
 

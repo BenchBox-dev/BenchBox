@@ -101,7 +101,7 @@ class TestTPCDSRegression:
         }
 
         reference_file = temp_dir / "reference_params.json"
-        with open(reference_file, "w") as f:
+        with open(reference_file, "w", encoding="utf-8") as f:
             json.dump(reference_params, f, indent=2)
 
         return temp_dir

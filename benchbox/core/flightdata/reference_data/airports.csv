@@ -1,0 +1,51 @@
+code,name,city,state,latitude,longitude
+ATL,Hartsfield-Jackson Atlanta International,Atlanta,GA,33.6407,-84.4277
+LAX,Los Angeles International,Los Angeles,CA,33.9425,-118.4081
+ORD,O'Hare International,Chicago,IL,41.9742,-87.9073
+DFW,Dallas/Fort Worth International,Dallas,TX,32.8998,-97.0403
+DEN,Denver International,Denver,CO,39.8561,-104.6737
+JFK,John F. Kennedy International,New York,NY,40.6413,-73.7781
+SFO,San Francisco International,San Francisco,CA,37.6213,-122.3790
+SEA,Seattle-Tacoma International,Seattle,WA,47.4502,-122.3088
+LAS,Harry Reid International,Las Vegas,NV,36.0840,-115.1537
+MCO,Orlando International,Orlando,FL,28.4294,-81.3089
+EWR,Newark Liberty International,Newark,NJ,40.6895,-74.1745
+PHX,Phoenix Sky Harbor International,Phoenix,AZ,33.4373,-112.0078
+IAH,George Bush Intercontinental,Houston,TX,29.9902,-95.3368
+MIA,Miami International,Miami,FL,25.7959,-80.2870
+BOS,Logan International,Boston,MA,42.3656,-71.0096
+MSP,Minneapolis-St. Paul International,Minneapolis,MN,44.8820,-93.2218
+DTW,Detroit Metropolitan,Detroit,MI,42.2124,-83.3534
+FLL,Fort Lauderdale-Hollywood International,Fort Lauderdale,FL,26.0726,-80.1527
+PHL,Philadelphia International,Philadelphia,PA,39.8721,-75.2441
+LGA,LaGuardia,New York,NY,40.7773,-73.8726
+BWI,Baltimore/Washington International,Baltimore,MD,39.1754,-76.6683
+SLC,Salt Lake City International,Salt Lake City,UT,40.7884,-111.9778
+CLT,Charlotte Douglas International,Charlotte,NC,35.2140,-80.9431
+HNL,Daniel K. Inouye International,Honolulu,HI,21.3245,-157.9251
+IAD,Washington Dulles International,Washington,DC,38.9531,-77.4565
+DCA,Ronald Reagan Washington National,Arlington,VA,38.8521,-77.0377
+MDW,Chicago Midway International,Chicago,IL,41.7868,-87.7522
+TPA,Tampa International,Tampa,FL,27.9755,-82.5332
+PDX,Portland International,Portland,OR,45.5887,-122.5975
+HOU,William P. Hobby,Houston,TX,29.6454,-95.2789
+SAN,San Diego International,San Diego,CA,32.7338,-117.1933
+MCI,Kansas City International,Kansas City,MO,39.2976,-94.7139
+STL,St. Louis Lambert International,St. Louis,MO,38.7487,-90.3700
+OAK,Oakland Metropolitan International,Oakland,CA,37.7213,-122.2208
+DAL,Dallas Love Field,Dallas,TX,32.8471,-96.8518
+SJC,Norman Y. Mineta San Jose International,San Jose,CA,37.3626,-121.9290
+AUS,Austin-Bergstrom International,Austin,TX,30.1975,-97.6664
+BNA,Nashville International,Nashville,TN,36.1245,-86.6782
+RDU,Raleigh-Durham International,Raleigh,NC,35.8776,-78.7875
+SMF,Sacramento International,Sacramento,CA,38.6954,-121.5908
+MSY,Louis Armstrong New Orleans International,New Orleans,LA,29.9934,-90.2580
+CLE,Cleveland Hopkins International,Cleveland,OH,41.4117,-81.8498
+CMH,John Glenn Columbus International,Columbus,OH,39.9980,-82.8919
+IND,Indianapolis International,Indianapolis,IN,39.7173,-86.2944
+PIT,Pittsburgh International,Pittsburgh,PA,40.4915,-80.2329
+SNA,John Wayne Airport,Santa Ana,CA,33.6757,-117.8676
+MKE,General Mitchell International,Milwaukee,WI,42.9472,-87.8966
+OGG,Kahului Airport,Kahului,HI,20.8986,-156.4305
+ABQ,Albuquerque International Sunport,Albuquerque,NM,35.0402,-106.6090
+BDL,Bradley International,Windsor Locks,CT,41.9388,-72.6832

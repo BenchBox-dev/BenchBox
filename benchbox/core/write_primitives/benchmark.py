@@ -16,22 +16,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 if TYPE_CHECKING:
-    from cloudpathlib import CloudPath
-
     from benchbox.core.write_primitives.dataframe_operations import (
         DataFrameWriteCapabilities,
         DataFrameWriteOperationsManager,
     )
-    from benchbox.utils.cloud_storage import DatabricksPath
 
-from benchbox.base import BaseBenchmark
 from benchbox.core.connection import DatabaseConnection
-from benchbox.core.operations import OperationExecutor
 from benchbox.core.primitives_benchmark_utils import (
     build_tpch_staging_tables_sql,
     quote_identifier,
     table_exists,
 )
+from benchbox.core.transactional.benchmark_base import TransactionalBenchmarkBase
 from benchbox.core.write_primitives.generator import WritePrimitivesDataGenerator
 from benchbox.core.write_primitives.operations import WriteOperationsManager
 from benchbox.core.write_primitives.schema import (
@@ -41,11 +37,40 @@ from benchbox.core.write_primitives.schema import (
     get_create_table_sql,
 )
 from benchbox.utils.clock import elapsed_seconds, mono_time
-from benchbox.utils.cloud_storage import create_path_handler
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
-# Type alias for paths that could be local or cloud
-PathLike = Union[Path, "CloudPath", "DatabricksPath"]
+
+def _pk_lock_bypass_required(dialect: str) -> bool:
+    """Return True if PK-based lock DDL should be bypassed for this platform.
+
+    Consults the sql_compat registry (REGISTRY.resolve) for the platform decision.
+    Every write_primitives-capable platform must have a registered rule in
+    benchbox/sql_compat/rules/schema_emit/pk_capability.py.
+
+    Args:
+        dialect: Platform dialect string (e.g. "starrocks", "snowflake").
+    """
+    # Load PK capability rules into REGISTRY on first call (idempotent).
+    import benchbox.sql_compat.rules.schema_emit.pk_capability  # noqa: F401
+    from benchbox.sql_compat.actions import CompatAction
+    from benchbox.sql_compat.context import CompatibilityContext, Phase
+    from benchbox.sql_compat.registry import REGISTRY
+
+    ctx = CompatibilityContext(
+        platform=dialect.lower(),
+        platform_version=None,
+        benchmark="write_primitives",
+        query_id=None,
+        phase=Phase.SCHEMA_EMIT,
+        mode="sql",
+        dialect=dialect,
+    )
+    registry_decision = REGISTRY.resolve(ctx)
+
+    if registry_decision is not None:
+        return registry_decision.action != CompatAction.NATIVE
+    # No rule registered → platform enforces PK natively (e.g., duckdb, sqlite, postgres).
+    return False
 
 
 @dataclass
@@ -78,6 +103,7 @@ class OperationResult:
     status: str = "SUCCESS"
     error: Optional[str] = None
     cleanup_warning: Optional[str] = None
+    skip_reason: Optional[str] = None
 
 
 def _check_validation_query(val_query: Any, actual_rows: int) -> bool:
@@ -92,7 +118,7 @@ def _check_validation_query(val_query: Any, actual_rows: int) -> bool:
     return True
 
 
-class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
+class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
     """Write Primitives benchmark implementation.
 
     Tests fundamental write operations (INSERT, UPDATE, DELETE, BULK_LOAD,
@@ -107,6 +133,9 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         operations_manager: Operation manager
         data_generator: Data generator
     """
+
+    _benchmark_label = "Write Primitives"
+    _staging_tables = STAGING_TABLES
 
     def __init__(
         self,
@@ -145,94 +174,10 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         # Data files mapping
         self.tables: dict[str, Path] = {}
 
-    def get_data_source_benchmark(self) -> Optional[str]:
-        """Write Primitives benchmark shares TPC-H data.
-
-        Returns:
-            "tpch" to indicate data sharing
-        """
-        return "tpch"
-
-    @property
-    def output_dir(self) -> PathLike:
-        """Get the output directory.
-
-        Returns:
-            Output directory path
-        """
-        return self._output_dir
-
-    @output_dir.setter
-    def output_dir(self, value: Union[str, Path]) -> None:
-        """Set the output directory and update data generator.
-
-        Args:
-            value: New output directory path
-        """
-        self._output_dir = create_path_handler(value)
-        # Configure data generator with new path
-        if hasattr(self, "data_generator"):
-            self.data_generator.output_dir = self._output_dir
-            # Also update the underlying TPC-H generator
-            if hasattr(self.data_generator, "tpch_generator"):
-                self.data_generator.tpch_generator.output_dir = self._output_dir
-
-    def generate_data(self, tables: Optional[list[str]] = None) -> list[Union[str, Path]]:
-        """Generate Write Primitives data.
-
-        This generates/reuses TPC-H base data. Staging tables are created
-        during benchmark setup via SQL.
-
-        Args:
-            tables: Optional list of tables to generate. If None, generates all.
-
-        Returns:
-            List of paths to generated data files
-        """
-        self.log_verbose(f"Generating Write Primitives data at scale factor {self.scale_factor}...")
-
-        # Generate/reuse TPC-H base data
-        self.tables = self.data_generator.generate()
-
-        self.log_verbose(f"Base TPC-H data available: {len(self.tables)} tables")
-
-        return list(self.tables.values())
-
-    def ensure_auxiliary_data_files(self) -> None:
-        """Ensure auxiliary data files (bulk load test files) exist.
-
-        This is called by the runner when reusing data from manifest to ensure
-        that bulk load test files are present even if they weren't generated
-        during the original data generation.
-
-        Uses file locking to prevent concurrent generation conflicts.
-        """
-        self.log_verbose("Checking for auxiliary data files (bulk load files)...")
-
-        # Check if bulk load files exist, regenerate if missing
-        bulk_files_exist = self.data_generator.check_bulk_load_files_exist()
-
-        if not bulk_files_exist:
-            self.log_verbose("Bulk load files missing - generating now...")
-
-            # Acquire lock to prevent concurrent generation
-            if self.data_generator._acquire_bulk_load_lock(timeout=300):
-                try:
-                    # Double-check after acquiring lock
-                    if not self.data_generator.check_bulk_load_files_exist():
-                        bulk_files = self.data_generator.generate_bulk_load_files()
-                        self.log_verbose(f"✅ Generated {len(bulk_files)} bulk load files")
-                    else:
-                        self.log_verbose("✅ Files generated by another process")
-                except Exception as e:
-                    # Log warning but don't fail - some bulk load tests might not work
-                    self.log_verbose(f"⚠️ Warning: Failed to generate bulk load files: {e}")
-                finally:
-                    self.data_generator._release_bulk_load_lock()
-            else:
-                self.log_verbose("⚠️ Warning: Could not acquire lock for file generation (timeout)")
-        else:
-            self.log_verbose("✅ Bulk load files already exist")
+        # Tracks the SQL dialect from the most recent setup() call so that
+        # _quote_identifier() can use the correct quoting character (e.g. backticks
+        # for StarRocks which uses MySQL mode where double-quotes are string literals).
+        self._setup_dialect: str = "standard"
 
     def _acquire_setup_lock(
         self, connection: DatabaseConnection, timeout_seconds: int = 300, dialect: str = "standard"
@@ -254,9 +199,7 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             Caller must call _release_setup_lock() when done, preferably in a finally block.
             Lock is automatically released on connection close/crash.
         """
-        # DataFusion does not support PRIMARY KEY constraints in CREATE TABLE.
-        # Skip SQL-table lock there; setup runs on a single benchmark connection.
-        if dialect == "datafusion":
+        if _pk_lock_bypass_required(dialect):
             return True
 
         # Create lock table if it doesn't exist (atomic operation)
@@ -324,7 +267,7 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             connection: Database connection
             dialect: SQL dialect (e.g. 'datafusion', 'standard')
         """
-        if dialect == "datafusion":
+        if _pk_lock_bypass_required(dialect):
             return
 
         try:
@@ -339,8 +282,8 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
     def _quote_identifier(self, identifier: str) -> str:
         """Quote SQL identifier to prevent SQL injection.
 
-        Uses double quotes (SQL standard) which work in DuckDB, PostgreSQL, SQLite.
-        For compatibility, validates identifier first.
+        Uses double quotes (SQL standard) for most dialects. Uses backticks for
+        StarRocks, which runs in MySQL mode where double-quotes are string literals.
 
         Args:
             identifier: Table, column, or schema name
@@ -350,12 +293,10 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
 
         Raises:
             ValueError: If identifier contains dangerous characters
-
-        Security:
-            - Validates identifier contains only safe characters
-            - Quotes with double quotes (SQL standard for identifiers)
-            - Escapes any existing double quotes by doubling them
         """
+        if self._setup_dialect == "starrocks":
+            escaped = identifier.replace("`", "``")
+            return f"`{escaped}`"
         return quote_identifier(identifier)
 
     def _get_effective_write_sql(
@@ -493,7 +434,7 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
                     else:
                         raise RuntimeError(
                             f"Cannot validate source table '{source_table}' before populating '{table_name}': {e}"
-                        )
+                        ) from e
 
                 if source_count == 0:
                     # Required tables (orders, lineitem) must have data
@@ -543,6 +484,9 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
         Raises:
             RuntimeError: If required tables don't exist or setup fails
         """
+        # Set dialect first so any downstream call to _quote_identifier() (including
+        # teardown paths reached if validation below raises) uses the correct quoting.
+        self._setup_dialect = dialect
         self.log_verbose("Setting up Write Primitives benchmark...")
 
         # Validate TPC-H base tables exist
@@ -555,7 +499,7 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
                     f"Required TPC-H table '{table}' not found. "
                     f"Please load TPC-H data first using generate_data() and loading the files. "
                     f"Error: {e}"
-                )
+                ) from e
 
         # Acquire exclusive lock to prevent concurrent setup operations
         # This eliminates race conditions during staging table population
@@ -590,7 +534,7 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
                     else:
                         self.log_verbose(f"Table {table_name} already exists")
                 except Exception as e:
-                    raise RuntimeError(f"Failed to create {table_name}: {e}")
+                    raise RuntimeError(f"Failed to create {table_name}: {e}") from e
 
             # Populate staging tables from TPC-H base tables
             table_population_map = {
@@ -665,7 +609,7 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             except Exception as e:
                 self.log_verbose(f"Warning: Could not remove auxiliary files: {e}")
 
-    def load_data(self, connection: DatabaseConnection, **kwargs) -> dict[str, Any]:
+    def load_data(self, connection: DatabaseConnection, **kwargs: Any) -> dict[str, Any]:
         """Load data into database (standard benchmark interface).
 
         For Write Primitives, data loading is handled by the platform adapter
@@ -674,13 +618,15 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
 
         Args:
             connection: Database connection
-            **kwargs: Additional arguments (unused)
+            **kwargs: ``dialect`` (str, default "standard") propagates to setup() so
+                the PK lock-bypass registry lookup matches the adapter's dialect.
 
         Returns:
             Dictionary with loading results
         """
-        # Verify that tables exist and have data
-        return self.setup(connection, force=False)
+        # Verify that tables exist and have data. Propagate dialect so cloud platforms
+        # (Snowflake, BigQuery, etc.) hit their registered PK lock-bypass rule.
+        return self.setup(connection, force=False, dialect=kwargs.get("dialect", "standard"))
 
     def reset(self, connection: DatabaseConnection) -> None:
         """Reset staging tables to initial state.
@@ -783,47 +729,6 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             sql = sql.replace("{file_path}", file_path)
         return sql
 
-    def get_operation(self, operation_id: str) -> Any:
-        """Get a specific write operation.
-
-        Args:
-            operation_id: Operation identifier
-
-        Returns:
-            WriteOperation object
-
-        Raises:
-            ValueError: If operation_id is invalid
-        """
-        return self.operations_manager.get_operation(operation_id)
-
-    def get_all_operations(self) -> dict[str, Any]:
-        """Get all available write operations.
-
-        Returns:
-            Dictionary mapping operation IDs to WriteOperation objects
-        """
-        return self.operations_manager.get_all_operations()
-
-    def get_operations_by_category(self, category: str) -> dict[str, Any]:
-        """Get operations filtered by category.
-
-        Args:
-            category: Category name (e.g., 'insert', 'update', 'delete')
-
-        Returns:
-            Dictionary mapping operation IDs to WriteOperation objects
-        """
-        return self.operations_manager.get_operations_by_category(category)
-
-    def get_operation_categories(self) -> list[str]:
-        """Get list of available operation categories.
-
-        Returns:
-            List of category names
-        """
-        return self.operations_manager.get_operation_categories()
-
     def get_schema(self, dialect: str = "standard") -> dict[str, dict]:
         """Get the Write Primitives schema definitions.
 
@@ -882,63 +787,6 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             get_staging_tables_sql=get_all_staging_tables_sql,
         )
 
-    def get_benchmark_info(self) -> dict[str, Any]:
-        """Get information about the benchmark.
-
-        Returns:
-            Dictionary containing benchmark metadata
-        """
-        return {
-            "name": self._name,
-            "version": self._version,
-            "description": self._description,
-            "scale_factor": self.scale_factor,
-            "total_operations": self.operations_manager.get_operation_count(),
-            "categories": self.get_operation_categories(),
-            "tables": list(STAGING_TABLES.keys()),
-            "data_source": "tpch",
-        }
-
-    def get_query(self, query_id: Union[int, str], **kwargs) -> str:
-        """Get write SQL for a specific operation.
-
-        Args:
-            query_id: Operation identifier
-            **kwargs: Additional parameters (not used for write primitives)
-
-        Returns:
-            Write SQL string
-
-        Raises:
-            ValueError: If query_id is invalid
-        """
-        operation = self.operations_manager.get_operation(str(query_id))
-        return operation.write_sql
-
-    def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
-        """Get all write operations SQL.
-
-        Args:
-            dialect: Target SQL dialect (not yet implemented for write operations)
-
-        Returns:
-            Dictionary mapping operation IDs to write SQL
-        """
-        operations = self.operations_manager.get_all_operations()
-        return {op_id: op.write_sql for op_id, op in operations.items()}
-
-    def get_queries_by_category(self, category: str) -> dict[str, str]:
-        """Get write operations SQL filtered by category.
-
-        Args:
-            category: Operation category (insert, update, delete, ddl, transaction)
-
-        Returns:
-            Dictionary mapping operation IDs to write SQL for the category
-        """
-        operations = self.operations_manager.get_operations_by_category(category)
-        return {op_id: op.write_sql for op_id, op in operations.items()}
-
     def execute_operation(
         self,
         operation_id: str,
@@ -964,27 +812,7 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
             ValueError: If connection is invalid
             RuntimeError: If staging tables not initialized
         """
-        # Validate connection
-        if not connection:
-            raise ValueError("Connection is None")
-        if not hasattr(connection, "execute"):
-            raise ValueError(f"Invalid connection type: {type(connection).__name__}")
-
-        platform_key = kwargs.get("platform_key")
-        sql_override = kwargs.get("sql_override")
-
-        # Get operation to check if it requires setup
-        operation = self.operations_manager.get_operation(operation_id)
-
-        # Check staging tables exist and auto-initialize if needed
-        if operation.requires_setup and not self.is_setup(connection):
-            self.log_verbose("Staging tables not initialized - running setup() automatically...")
-            try:
-                dialect = platform_key if platform_key else "standard"
-                self.setup(connection, force=False, dialect=dialect)
-                self.log_verbose("Setup completed successfully")
-            except Exception as e:
-                raise RuntimeError(f"Failed to initialize staging tables before executing '{operation_id}': {e}") from e
+        operation, platform_key, sql_override = self._prepare_operation(operation_id, connection, **kwargs)
 
         try:
             effective_sql, skip_reason = self._get_effective_write_sql(
@@ -1126,49 +954,6 @@ class WritePrimitivesBenchmark(BaseBenchmark, OperationExecutor):
 
         cleanup_duration_ms = (time.perf_counter() - cleanup_start) * 1000
         return cleanup_success, cleanup_warning, cleanup_duration_ms
-
-    def run_benchmark(
-        self,
-        connection: DatabaseConnection,
-        operation_ids: Optional[list[str]] = None,
-        categories: Optional[list[str]] = None,
-    ) -> list[OperationResult]:
-        """Run write operations benchmark.
-
-        Args:
-            connection: Database connection
-            operation_ids: Optional list of specific operations to run
-            categories: Optional list of categories to run
-
-        Returns:
-            List of OperationResult objects
-        """
-        # Determine which operations to run
-        if operation_ids:
-            operations = {op_id: self.get_operation(op_id) for op_id in operation_ids}
-        elif categories:
-            operations = {}
-            for category in categories:
-                operations.update(self.get_operations_by_category(category))
-        else:
-            operations = self.get_all_operations()
-
-        self.log_verbose(f"Running {len(operations)} write operations...")
-
-        # Execute each operation
-        results = []
-        for op_id in operations:
-            result = self.execute_operation(op_id, connection)
-            results.append(result)
-
-            # Log result
-            status = "✓" if result.success and result.validation_passed else "✗"
-            self.log_verbose(
-                f"{status} {op_id}: {result.write_duration_ms:.2f}ms write, "
-                f"{result.validation_duration_ms:.2f}ms validation"
-            )
-
-        return results
 
     # ========================================================================
     # DataFrame Mode Support

@@ -111,9 +111,9 @@ class TestCoffeeShopGenerator:
                 assert _hash_file(seed_path) == expected_hash
 
     def test_calculate_order_count(self):
-        assert CoffeeShopDataGenerator.calculate_order_count(0.001) == 50_000
-        assert CoffeeShopDataGenerator.calculate_order_count(0.01) == 500_000
-        assert CoffeeShopDataGenerator.calculate_order_count(1.0) == 50_000_000
+        assert CoffeeShopDataGenerator.calculate_order_count(0.001) == 8_500
+        assert CoffeeShopDataGenerator.calculate_order_count(0.01) == 85_000
+        assert CoffeeShopDataGenerator.calculate_order_count(1.0) == 8_500_000
 
     def test_daily_weighting_bias(self):
         generator = CoffeeShopDataGenerator(scale_factor=0.001, output_dir=Path.cwd(), compress_data=False)
@@ -150,8 +150,8 @@ class TestCoffeeShopGenerator:
 
             south_lines = 0
             west_lines = 0
-            with open(tables["order_lines"]) as handle:
-                reader = csv.reader(handle, delimiter="|")
+            with open(tables["order_lines"], encoding="utf-8") as handle:
+                reader = csv.reader(handle)
                 for row in reader:
                     region = row[-1]
                     if region == "South":
@@ -220,7 +220,7 @@ class TestCoffeeShopGenerator:
 
         package_root = resources.files("benchbox.data.coffeeshop")
         for table in ("dim_locations", "dim_products"):
-            generated_rows = _read_delimited_rows(Path(tables[table]), "|")
+            generated_rows = _read_delimited_rows(Path(tables[table]), ",")
             with resources.as_file(package_root.joinpath(f"{table}.csv")) as seed_path:
                 seed_rows = _read_delimited_rows(seed_path, ",", skip_header=True)
             if table == "dim_products":
@@ -352,7 +352,7 @@ class TestCoffeeShopErrors:
 
 
 def _count_pipe_rows(path: Path) -> int:
-    with open(path) as handle:
+    with open(path, encoding="utf-8") as handle:
         return sum(1 for _ in handle)
 
 
@@ -365,7 +365,7 @@ def _hash_file(path: Path) -> str:
 
 
 def _read_delimited_rows(path: Path, delimiter: str, *, skip_header: bool = False) -> list[tuple[str, ...]]:
-    with open(path, newline="") as handle:
+    with open(path, newline="", encoding="utf-8") as handle:
         reader = csv.reader(handle, delimiter=delimiter)
         rows = [tuple(row) for row in reader]
     if skip_header and rows:

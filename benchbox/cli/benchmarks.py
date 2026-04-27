@@ -35,9 +35,6 @@ console = quiet_console
 class BenchmarkManager:
     """Benchmark selection and configuration management with intelligent guidance."""
 
-    # Execution types supported by TPC benchmarks
-    TPC_EXECUTION_TYPES = ["standard", "power", "throughput", "maintenance", "combined"]
-
     # Category and benchmark ordering imported from core registry
     CATEGORY_ORDER = CATEGORY_ORDER
     BENCHMARK_ORDER = BENCHMARK_ORDER
@@ -68,7 +65,6 @@ class BenchmarkManager:
         Raises:
             ValueError: If scale factor violates benchmark constraints
         """
-        # Delegate to core registry validation
         core_validate_scale_factor(benchmark_id, scale_factor)
 
     def list_available_benchmarks(self):
@@ -566,9 +562,10 @@ class BenchmarkManager:
         concurrency = self._prompt_concurrency(benchmark_info, system_profile)
         queries = None  # Users should use smaller scales or different benchmarks for faster tests
         compress_data, compression_type, compression_level = self._prompt_compression()
-        test_execution_type = self._prompt_execution_type(benchmark_id, benchmark_info)
 
-        # Final summary
+        # Final summary - execution type is derived from the phases selected in the
+        # following prompt_phases() call (see run.py phase->execution-type mapping),
+        # so it is not displayed here.
         self._display_configuration_summary(
             benchmark_id,
             benchmark_info,
@@ -578,7 +575,6 @@ class BenchmarkManager:
             compress_data,
             compression_type,
             compression_level,
-            test_execution_type,
         )
 
         config = BenchmarkConfig(
@@ -595,7 +591,6 @@ class BenchmarkManager:
             compress_data=compress_data,
             compression_type=compression_type,
             compression_level=compression_level,
-            test_execution_type=test_execution_type,
         )
 
         config.options.update(self.verbosity.to_config())
@@ -674,19 +669,6 @@ class BenchmarkManager:
 
         return True, compression_type, compression_level
 
-    def _prompt_execution_type(self, benchmark_id: str, benchmark_info: dict[str, Any]) -> str:
-        """Prompt for test execution type if applicable."""
-        if not benchmark_id.startswith("tpc"):
-            return "standard"
-
-        console.print("\n[bold cyan]Test Execution Type[/bold cyan]")
-        console.print("Choose benchmark execution mode:")
-        for i, etype in enumerate(self.TPC_EXECUTION_TYPES, 1):
-            console.print(f"  {i}. {etype}")
-
-        choice = IntPrompt.ask("Execution type", choices=[str(i) for i in range(1, 6)], default=1)
-        return self.TPC_EXECUTION_TYPES[choice - 1]
-
     def _display_configuration_summary(
         self,
         benchmark_id: str,
@@ -697,7 +679,6 @@ class BenchmarkManager:
         compress_data: bool,
         compression_type: str,
         compression_level: Optional[int],
-        test_execution_type: str,
     ):
         """Display final configuration summary."""
         console.print("\n[bold green]Configuration Summary[/bold green]")
@@ -709,7 +690,6 @@ class BenchmarkManager:
         table.add_row("Benchmark:", benchmark_info["display_name"])
         table.add_row("Scale Factor:", str(scale_factor))
         table.add_row("Complexity:", benchmark_info["complexity"])
-        table.add_row("Execution Type:", test_execution_type)
 
         if concurrency > 1:
             table.add_row("Concurrency:", f"{concurrency} streams")
@@ -758,7 +738,7 @@ class BenchmarkManager:
         if memory_gb >= 32:
             return max([s for s in scale_options if s <= 1.0], default=scale_options[0])
         elif memory_gb >= 16:
-            return max([s for s in scale_options if s <= 0.1], default=0.01)
+            return max([s for s in scale_options if s <= 0.1], default=scale_options[0])
         else:
             return min(scale_options)
 
@@ -859,7 +839,7 @@ class BenchmarkManager:
         """Validate scale factor choice and provide warnings."""
         from rich.prompt import Confirm
 
-        # Check minimum scale factor requirement (e.g., TPC-DS requires SF >= 1.0)
+        # Check benchmark-specific minimum scale requirements when present.
         min_scale = benchmark_info.get("min_scale")
         if min_scale is not None and scale_factor < min_scale:
             console.print(
@@ -946,6 +926,10 @@ def prompt_phases(default_phases: list[str] | None = None) -> list[str]:
 def _prompt_custom_phases(valid_phases: list[str]) -> list[str]:
     """Display phase menu and parse user input (numbers or names) into deduplicated phase list."""
     console.print("\n[bold]Available phases:[/bold]")
+    console.print(
+        f"[dim]Enter phase numbers (1-{len(valid_phases)}) or phase names - not query numbers. "
+        "If you select power or standard query phases, query subset selection comes after this step.[/dim]"
+    )
     descriptions = {
         "generate": "Generate benchmark data files",
         "load": "Load data into the database",
@@ -962,7 +946,12 @@ def _prompt_custom_phases(valid_phases: list[str]) -> list[str]:
 
     selected = _parse_phase_input(custom_input, valid_phases)
     if not selected:
-        console.print("[yellow]No valid phases selected, defaulting to 'power'[/yellow]")
+        console.print(
+            f"[yellow]No valid phases selected from '{custom_input}' "
+            f"(valid: 1-{len(valid_phases)} or phase names). "
+            "If you meant query IDs, query selection is only shown later for power or standard phases. "
+            "Defaulting to 'power'.[/yellow]"
+        )
         return ["power"]
     return selected
 

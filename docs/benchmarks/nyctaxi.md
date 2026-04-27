@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, nyctaxi, custom-benchmark
 ```
 
-> **CLI name:** `nyctaxi` — use `benchbox run --benchmark nyctaxi`
+> **CLI name:** `nyctaxi` - use `benchbox run --benchmark nyctaxi`
 
 ## Overview
 
@@ -19,7 +19,7 @@ The benchmark is ideal for testing analytical database performance on real-world
 - **Multi-dimensional analysis** - Temporal, geographic, and financial dimensions
 - **25 OLAP queries** - Comprehensive query coverage across 9 categories
 - **Zone-based geography** - 265 NYC taxi zones for geographic analytics
-- **Flexible scale factors** - From testing (0.01) to production scale (100+)
+- **Flexible scale factors** - From testing (0.01) to full-dataset (SF=10 ceiling)
 - **Date range filtering** - Configurable year and month selection
 - **Standard SQL** - Queries work across multiple database platforms
 
@@ -40,7 +40,7 @@ The NYC Taxi benchmark uses a star schema with a fact table (trips) and dimensio
 
 | Table | Purpose | Approximate Rows (SF 1) |
 |-------|---------|-------------------------|
-| **trips** | Trip fact records with fare and location data | ~30,000,000 |
+| **trips** | Trip fact records with fare and location data | ~9,600,000 |
 | **taxi_zones** | NYC taxi zone dimension table | 265 |
 
 ### taxi_zones Table Structure
@@ -227,15 +227,124 @@ info = nyctaxi.get_query_info("trips-per-hour")
 print(f"Query info: {info}")
 ```
 
+## CLI Options (`--benchmark-option`)
+
+Configure NYC Taxi data generation via `--benchmark-option KEY=VALUE`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `taxi_types` | all | Comma-separated taxi types: `yellow`, `green`, `hvfhv` |
+| `year` | `2019` | Year of TLC data to load (2019-2025) |
+| `months` | all | Comma-separated months to include (1-12) |
+| `seed` | - | Random seed for reproducibility |
+| `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+
+Options accept hyphenated aliases (e.g. `taxi-types` for `taxi_types`).
+
+```bash
+# Load only yellow and green trips from Jan-Mar 2022
+benchbox run --platform duckdb --benchmark nyctaxi --scale 1 \
+  --benchmark-option taxi_types=yellow,green \
+  --benchmark-option year=2022 \
+  --benchmark-option months=1,2,3
+```
+
+## Spatial Queries
+
+The NYC Taxi benchmark includes a geospatial layer
+(`benchbox/core/nyctaxi/spatial.py`) that exposes platform-specific spatial
+queries against a companion `taxi_zones_spatial` table. These queries are
+**not** automatically included in a standard benchmark run - they require a
+spatial extension on the target platform and are retrieved via the spatial
+API rather than through `--benchmark-option`.
+
+### Platform Support
+
+`check_spatial_support(platform)` returns the matrix of capabilities used to
+decide which queries are runnable on a given platform:
+
+| Platform | Extension | Distance fns | Geohash | H3 | Notes |
+|----------|-----------|--------------|---------|----|-------|
+| DuckDB | `duckdb_spatial` | `ST_Distance`, `ST_Point`, `ST_Centroid`, `ST_Collect` | No | No | Basic Euclidean operations |
+| PostgreSQL | PostGIS | Full ST_* including `ST_DWithin`, `ST_ConvexHull`, `geography` | Yes | Via extension | Most complete support |
+| ClickHouse | Native geo | `geoDistance` (no `ST_*`) | Yes | Yes | Different API surface |
+
+Platforms not listed return `{"basic_spatial": False}`.
+
+### Query Catalogs
+
+Each platform exposes a subset of spatial query IDs from
+`spatial.py` (10 DuckDB / 4 PostGIS / 4 ClickHouse):
+
+| Category | DuckDB | PostGIS | ClickHouse |
+|----------|--------|---------|------------|
+| `spatial-distance-top-routes` | ✅ | ✅ | ✅ |
+| `spatial-radius-search` | ✅ | ✅ | ✅ |
+| `spatial-airport-distance` | ✅ | ✅ | - |
+| `spatial-borough-centroids` | ✅ | - | - |
+| `spatial-cross-borough` | ✅ | - | - |
+| `spatial-zone-clustering` | ✅ | - | - |
+| `spatial-manhattan-grid` | ✅ | - | - |
+| `spatial-boundary-box` | ✅ | - | - |
+| `spatial-nearest-zones` | ✅ | - | - |
+| `spatial-trip-direction` | ✅ | - | - |
+| `spatial-convex-hull` | - | ✅ | - |
+| `spatial-geohash-aggregation` | - | - | ✅ |
+| `spatial-h3-aggregation` | - | - | ✅ |
+
+### Reference Data
+
+`TAXI_ZONE_CENTROIDS` in `spatial.py` provides representative
+`(longitude, latitude)` points for the NYC TLC zones most commonly referenced
+by the spatial queries (airports, Manhattan neighborhoods, key Brooklyn and
+Queens zones). The full zone geometry is not included - callers materialize
+centroids into the `taxi_zones_spatial` table at setup time and the geometry
+column is populated per-platform.
+
+### API Reference
+
+```python
+from benchbox.core.nyctaxi import (
+    get_spatial_queries,
+    get_spatial_create_table_sql,
+    check_spatial_support,
+)
+```
+
+- **`get_spatial_queries(platform: str) -> dict`** - returns the spatial query
+  catalog for `platform` (`duckdb`, `postgres`/`postgresql`/`postgis`, or any
+  ClickHouse variant). Unknown platforms return an empty dict.
+- **`get_spatial_create_table_sql(dialect: str = "duckdb") -> str`** -
+  returns the `CREATE TABLE taxi_zones_spatial` statement in the requested
+  dialect. PostgreSQL output includes a generated `geom` column (PostGIS
+  `GEOMETRY(POINT, 4326)`) and a GIST index.
+- **`check_spatial_support(platform: str) -> dict[str, bool]`** - capability
+  map (keys: `basic_spatial`, `st_distance`, `st_point`, `st_centroid`,
+  `geohash`, `h3`, `geography`, …). Use this to filter query catalogs before
+  execution.
+
+The spatial layer is not currently wired to a `--benchmark-option` flag; it
+is accessed programmatically via the functions above.
+
 ## Scale Factor Guidelines
 
 | Scale Factor | Trips | Data Size | Memory Usage | Use Case |
 |-------------|-------|-----------|--------------|----------|
-| 0.01 | ~300K | ~11 MB | < 100 MB | Quick testing |
-| 0.1 | ~3M | ~110 MB | < 500 MB | Development |
-| 1.0 | ~30M | ~1.1 GB | < 4 GB | Standard benchmark |
-| 10.0 | ~300M | ~11 GB | < 20 GB | Performance testing |
-| 100.0 | ~3B | ~111 GB | < 150 GB | Production simulation |
+| 0.01 | ~96K | ~10 MB | < 100 MB | Quick testing |
+| 0.1 | ~960K | ~96 MB | < 500 MB | Development |
+| 1.0 | ~9.6M | ~0.96 GB | < 4 GB | Standard benchmark |
+| 10.0 | ~96M | ~9.6 GB | < 20 GB | Performance testing (ceiling) |
+| 100.0 | ~96M | ~9.6 GB | < 20 GB | ⚠️ Saturated - same as SF=10 |
+
+> **Note:** Each taxi type's sample rate saturates at 1.0 when SF ≥ 10. Beyond SF=10, the full
+> available dataset is used and no additional scaling occurs. This applies independently to each
+> taxi type (Yellow, Green, HVFHV).
+>
+> **Why not extend beyond the ceiling with synthetic data?** NYC Taxi is a *real-data* benchmark -
+> its value comes from actual trip distributions, fare structures, and temporal patterns that
+> synthetic generators cannot faithfully replicate. Mixing synthetic rows into real data would
+> compromise the benchmark's core purpose: evaluating database performance against authentic
+> workload characteristics. For larger synthetic datasets, use TPC-H or CoffeeShop instead.
 
 ## Performance Characteristics
 
@@ -334,5 +443,5 @@ nyctaxi = NYCTaxi(year=2023, months=[1])  # January 2023
 ## External Resources
 
 - [NYC TLC Trip Record Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) - Official data source
-- [NYC Taxi Zones](https://catalog.data.gov/dataset/nyc-taxi-zones-131e4) - Zone geography
+- [NYC Taxi Zones](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) - Zone geography
 - [TLC Data Dictionary](https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf) - Column definitions

@@ -20,7 +20,7 @@ class DimensionGenerationMixin:
         end_date = datetime(2025, 12, 31)
         total_days = (end_date - start_date).days + 1
 
-        with open(file_path, "w", newline="", buffering=self.buffer_size) as f:
+        with open(file_path, "w", newline="", buffering=self.buffer_size, encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             current_date = start_date
@@ -101,7 +101,7 @@ class DimensionGenerationMixin:
         """Generate the DimTime dimension data."""
         file_path = self.output_dir / "DimTime.tbl"
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             sk_time_id = 1
@@ -143,7 +143,7 @@ class DimensionGenerationMixin:
         file_path = self.output_dir / "DimCompany.tbl"
         num_companies = int(self.base_companies * self.scale_factor)
 
-        with open(file_path, "w", newline="", buffering=self.buffer_size) as f:
+        with open(file_path, "w", newline="", buffering=self.buffer_size, encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             # Process in chunks to manage memory
@@ -232,7 +232,7 @@ class DimensionGenerationMixin:
         num_securities = int(self.base_securities * self.scale_factor)
         num_companies = int(self.base_companies * self.scale_factor)
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             for i in range(1, num_securities + 1):
@@ -285,7 +285,7 @@ class DimensionGenerationMixin:
         file_path = self.output_dir / "DimCustomer.tbl"
         num_customers = int(self.base_customers * self.scale_factor)
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             for i in range(1, num_customers + 1):
@@ -382,7 +382,7 @@ class DimensionGenerationMixin:
         num_accounts = int(self.base_accounts * self.scale_factor)
         num_customers = int(self.base_customers * self.scale_factor)
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             for i in range(1, num_accounts + 1):
@@ -422,7 +422,7 @@ class DimensionGenerationMixin:
         """Generate Industry reference data."""
         file_path = self.output_dir / "Industry.tbl"
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             industry_data = self.financial_patterns.get_industry_data()
@@ -438,7 +438,7 @@ class DimensionGenerationMixin:
         """Generate StatusType reference data."""
         file_path = self.output_dir / "StatusType.tbl"
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             status_data = self.financial_patterns.get_status_types()
@@ -454,7 +454,7 @@ class DimensionGenerationMixin:
         """Generate TaxRate reference data."""
         file_path = self.output_dir / "TaxRate.tbl"
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             tax_data = generate_realistic_tax_rates()
@@ -470,7 +470,7 @@ class DimensionGenerationMixin:
         """Generate TradeType reference data."""
         file_path = self.output_dir / "TradeType.tbl"
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             trade_data = self.financial_patterns.get_trade_types()
@@ -487,7 +487,7 @@ class DimensionGenerationMixin:
         file_path = self.output_dir / "DimBroker.tbl"
         num_brokers = max(100, int(self.scale_factor * 50))  # Minimum 100 brokers
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             # Generate manager hierarchy

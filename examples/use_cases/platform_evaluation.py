@@ -214,7 +214,7 @@ class PlatformEvaluator:
             ]
         }
 
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
 
         print(f"✓ Evaluation report saved to: {report_path}")

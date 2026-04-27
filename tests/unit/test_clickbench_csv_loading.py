@@ -148,3 +148,108 @@ class TestClickBenchDataIntegrity:
         # Verify CSV config contains expected values
         assert "nullstr='__NULL__'" in csv_config
         assert "delim='|'" in csv_config
+
+
+class TestClickBenchSchemaRanges:
+    """Guard: schema numeric types must be wide enough for their source ClickHouse values.
+
+    BenchBox intentionally uses a synthetic generator that caps UInt16 columns at
+    values well below SMALLINT_MAX (32 767).  Three columns are exceptions: Interests,
+    RefererCategoryID, and URLCategoryID — the BenchBox generator produces the full
+    UInt16 range for those, so they are widened to INTEGER.
+
+    The remaining UInt16 columns remain SMALLINT because the BenchBox generator caps
+    them well below SMALLINT_MAX.  BOUNDED_UINT16_COLUMNS documents those caps; the
+    test below verifies the schema still declares them as SMALLINT (not accidentally
+    widened) and that the caps are genuinely below SMALLINT_MAX.
+
+    If loading real ClickHouse-exported data (not BenchBox-generated), these columns
+    may require widening to INTEGER.  See schema.py for the full type-width notes.
+    """
+
+    # Columns whose ClickHouse source type is UInt16 (0-65 535) and BenchBox generates
+    # the full range → must be wider than SMALLINT.
+    UINT16_COLUMNS = {"Interests", "RefererCategoryID", "URLCategoryID"}
+    SMALLINT_MAX = 32_767
+
+    # UInt16 in ClickHouse but BenchBox generator caps well below SMALLINT_MAX.
+    # Values are (ClickHouse source type, BenchBox generator max).
+    BOUNDED_UINT16_COLUMNS: dict[str, tuple[str, int]] = {
+        "UserAgent": ("UInt16", 1_000),
+        "ResolutionWidth": ("UInt16", 1_920),
+        "ResolutionHeight": ("UInt16", 1_200),
+        "UserAgentMajor": ("UInt16", 100),
+        "SearchEngineID": ("UInt16", 50),
+        "WindowClientWidth": ("UInt16", 1_920),
+        "WindowClientHeight": ("UInt16", 1_200),
+        "SilverlightVersion2": ("UInt16", 50),
+        "SilverlightVersion4": ("UInt16", 100),
+        "HistoryLength": ("UInt16", 100),
+        "HTTPError": ("UInt16", 500),
+        "ParamCurrencyID": ("UInt16", 10),
+    }
+
+    def _col_map(self):
+        from benchbox.core.clickbench.schema import HITS_TABLE
+
+        return {c["name"]: c["type"] for c in HITS_TABLE["columns"]}
+
+    def test_uint16_columns_are_not_smallint(self):
+        """UInt16 source columns whose generator produces the full range must not be SMALLINT."""
+        col_map = self._col_map()
+        for col in self.UINT16_COLUMNS:
+            assert col in col_map, f"Column {col} missing from schema"
+            assert col_map[col].upper() != "SMALLINT", (
+                f"{col} is UInt16 in ClickHouse (0-65535) but declared as SMALLINT "
+                f"(max {self.SMALLINT_MAX}); use INTEGER or wider"
+            )
+
+    def test_bounded_uint16_columns_remain_smallint(self):
+        """UInt16 columns whose BenchBox generator caps below SMALLINT_MAX stay SMALLINT.
+
+        These columns are intentionally kept as SMALLINT because the synthetic generator
+        limits them to safe ranges.  This test guards against accidental widening.
+        It also asserts the documented BenchBox cap is genuinely below SMALLINT_MAX,
+        so the table above stays accurate.
+        """
+        col_map = self._col_map()
+        for col, (ch_type, benchbox_max) in self.BOUNDED_UINT16_COLUMNS.items():
+            assert col in col_map, f"Column {col} missing from schema"
+            assert col_map[col].upper() == "SMALLINT", (
+                f"{col} ({ch_type} in ClickHouse, BenchBox max={benchbox_max}) should remain "
+                f"SMALLINT — only widen if the generator range is updated to exceed {self.SMALLINT_MAX}"
+            )
+            assert benchbox_max <= self.SMALLINT_MAX, (
+                f"BOUNDED_UINT16_COLUMNS entry for {col} documents BenchBox max={benchbox_max} "
+                f"which exceeds SMALLINT_MAX={self.SMALLINT_MAX}; the column needs widening to INTEGER"
+            )
+
+    def test_generator_interests_values_fit_integer_and_exceed_smallint(self):
+        """Interests generator must produce values in [0, 65535] including values > SMALLINT_MAX.
+
+        This double-checks both that INTEGER is wide enough (range test) and that SMALLINT
+        would genuinely overflow (at least one value > 32 767 across 200 records), confirming
+        the INTEGER widening is load-bearing and not cosmetic.
+
+        P(all 200 values ≤ 32 767) = (0.5)^200 ≈ 10^-60 — effectively impossible.
+        """
+        import tempfile
+        from datetime import datetime
+        from pathlib import Path
+
+        from benchbox.core.clickbench.generator import ClickBenchDataGenerator
+        from benchbox.core.clickbench.schema import HITS_TABLE
+
+        with tempfile.TemporaryDirectory() as td:
+            gen = ClickBenchDataGenerator(scale_factor=0.0001, output_dir=Path(td))
+            records = [gen._generate_hit_record(i, datetime(2013, 7, 1)) for i in range(200)]
+
+        col_names = [c["name"] for c in HITS_TABLE["columns"]]
+        interests_idx = col_names.index("Interests")
+        values = [r[interests_idx] for r in records]
+
+        assert all(0 <= v <= 65_535 for v in values), "Interests values must be in UInt16 range [0, 65535]"
+        assert any(v > self.SMALLINT_MAX for v in values), (
+            f"Expected at least one Interests value > {self.SMALLINT_MAX} in 200 records; "
+            "got all values ≤ SMALLINT_MAX — the INTEGER widening may be unnecessary"
+        )

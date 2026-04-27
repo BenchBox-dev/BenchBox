@@ -64,6 +64,7 @@ class TestNormalizePlatformKey:
     def test_fabric_display_names(self):
         """Test Fabric display names normalize correctly."""
         assert normalize_platform_key("Fabric Lakehouse") == "fabric-lakehouse"
+        assert normalize_platform_key("Fabric Warehouse") == "fabric_dw"
 
     def test_class_name_normalization(self):
         """Test adapter class names normalize to registry keys."""
@@ -112,9 +113,10 @@ class TestFormatCapabilities:
 
     def test_parquet_platform_support(self):
         """Test Parquet platform support."""
-        assert PARQUET_CAPABILITY.supported_platforms["duckdb"] == SupportLevel.NATIVE
-        assert PARQUET_CAPABILITY.supported_platforms["datafusion"] == SupportLevel.NATIVE
-        assert PARQUET_CAPABILITY.supported_platforms["postgresql"] == SupportLevel.EXTENSION
+        assert PARQUET_CAPABILITY.supported_platforms.get("duckdb") == SupportLevel.NATIVE
+        assert PARQUET_CAPABILITY.supported_platforms.get("datafusion") == SupportLevel.NATIVE
+        assert PARQUET_CAPABILITY.supported_platforms.get("athena") == SupportLevel.NATIVE
+        assert PARQUET_CAPABILITY.supported_platforms.get("postgresql") == SupportLevel.EXTENSION
 
     def test_parquet_spark_platform_support(self):
         """Test Parquet support for Spark-based platforms."""
@@ -131,6 +133,7 @@ class TestFormatCapabilities:
             assert PARQUET_CAPABILITY.supported_platforms[platform] == SupportLevel.NATIVE, (
                 f"Expected NATIVE parquet support for {platform}"
             )
+        assert PARQUET_CAPABILITY.supported_platforms["fabric_dw"] == SupportLevel.NATIVE
 
     def test_parquet_presto_trino_support(self):
         """Test Parquet support for Presto and Trino."""
@@ -170,7 +173,7 @@ class TestFormatCapabilities:
             assert platform not in DELTA_CAPABILITY.supported_platforms, (
                 f"{platform} should not be registered in native capabilities"
             )
-        # LakeSail adapter only supports parquet/orc — not registered for delta
+        # LakeSail adapter only supports parquet/orc - not registered for delta
         assert "lakesail" not in DELTA_CAPABILITY.supported_platforms
 
     def test_iceberg_capability(self):
@@ -197,7 +200,7 @@ class TestFormatCapabilities:
             assert ICEBERG_CAPABILITY.supported_platforms[platform] == level, (
                 f"Expected {level} iceberg support for {platform}"
             )
-        # LakeSail adapter only supports parquet/orc — not registered for iceberg
+        # LakeSail adapter only supports parquet/orc - not registered for iceberg
         assert "lakesail" not in ICEBERG_CAPABILITY.supported_platforms
 
     def test_hudi_capability(self):
@@ -283,6 +286,13 @@ class TestPlatformFormatPreferences:
         assert prefs[0] == "parquet"
         assert "delta" not in prefs
 
+    def test_fabric_warehouse_preferences(self):
+        """Test Fabric Warehouse prefers parquet and excludes lakehouse-only formats."""
+        prefs = PLATFORM_FORMAT_PREFERENCES["fabric_dw"]
+        assert prefs[0] == "parquet"
+        assert "delta" not in prefs
+        assert "iceberg" not in prefs
+
     def test_quanton_preferences(self):
         """Test Quanton includes iceberg, hudi, delta."""
         prefs = PLATFORM_FORMAT_PREFERENCES["quanton"]
@@ -316,9 +326,9 @@ class TestPlatformFormatPreferences:
     def test_redshift_native_preferences_exclude_delta(self):
         """Test Redshift native preferences stay conservative."""
         prefs = PLATFORM_FORMAT_PREFERENCES["redshift"]
+        assert prefs.index("tbl") < prefs.index("parquet")
         assert "parquet" in prefs
         assert "delta" not in prefs
-        assert prefs.index("tbl") < prefs.index("parquet")
 
     def test_clickhouse_native_preferences_exclude_delta_or_iceberg(self):
         """Test ClickHouse native preferences stay conservative."""
@@ -449,6 +459,14 @@ class TestGetSupportedFormats:
         )
         assert formats[:2] == ["delta", "parquet"]
 
+    def test_athena_native_supported_formats_stay_text_only(self):
+        """Athena native loading only advertises text source files for staging/CTAS."""
+        assert get_supported_formats("Athena") == ["tbl", "csv"]
+
+    def test_athena_external_supported_formats_require_parquet(self):
+        """Athena external mode only advertises Parquet-backed sources."""
+        assert get_supported_formats("Athena", table_mode="external") == ["parquet"]
+
     def test_unknown_platform(self):
         """Test unknown platform returns empty list."""
         formats = get_supported_formats("unknown_platform")
@@ -478,6 +496,16 @@ class TestGetPreferredFormat:
         """Test Databricks preferred format."""
         preferred = get_preferred_format("databricks")
         assert preferred == "delta"
+
+    def test_athena_native_preferred_format_avoids_parquet(self):
+        """Test Athena native mode keeps staged text files ahead of direct Parquet input."""
+        preferred = get_preferred_format("Athena", ["parquet", "tbl"])
+        assert preferred == "tbl"
+
+    def test_athena_external_preferred_format_requires_parquet(self):
+        """Test Athena external mode prefers Parquet-backed sources."""
+        preferred = get_preferred_format("Athena", ["tbl", "parquet"], table_mode="external")
+        assert preferred == "parquet"
 
     def test_snowflake_external_preferred_format(self):
         """Test Snowflake external mode prefers Iceberg."""

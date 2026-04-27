@@ -50,7 +50,7 @@ class TestLoaderFileFormats:
     def test_load_yml_extension(self, tmp_path):
         """YML extension (in addition to YAML) is supported."""
         config_path = tmp_path / "config.yml"
-        with open(config_path, "w") as fh:
+        with open(config_path, "w", encoding="utf-8") as fh:
             yaml.dump({"parallelism": {"thread_count": 12}}, fh)
 
         loader = DataFrameTuningLoader()
@@ -66,7 +66,7 @@ class TestLoaderFileFormats:
             "execution": {"streaming_mode": True, "lazy_evaluation": False},
             "memory": {"spill_to_disk": True},
         }
-        with open(config_path, "w") as fh:
+        with open(config_path, "w", encoding="utf-8") as fh:
             json.dump(data, fh)
 
         loader = DataFrameTuningLoader()
@@ -142,7 +142,7 @@ class TestLoaderErrorPaths:
     def test_string_path_converted_to_path(self, tmp_path):
         """String path argument is accepted and converted."""
         config_path = tmp_path / "config.yaml"
-        with open(config_path, "w") as fh:
+        with open(config_path, "w", encoding="utf-8") as fh:
             yaml.dump({"parallelism": {"thread_count": 6}}, fh)
 
         loader = DataFrameTuningLoader()
@@ -224,7 +224,7 @@ class TestLoaderSaveRoundtrip:
         loader = DataFrameTuningLoader()
         loader.save_config(config, config_path, include_defaults=True)
 
-        with open(config_path) as fh:
+        with open(config_path, encoding="utf-8") as fh:
             data = yaml.safe_load(fh)
 
         # All top-level sections should be present
@@ -248,7 +248,7 @@ class TestLoaderSaveRoundtrip:
 
 
 # ---------------------------------------------------------------------------
-# Templates – platform coverage
+# Templates - platform coverage
 # ---------------------------------------------------------------------------
 
 
@@ -418,7 +418,7 @@ class TestModuleLevelFunctions:
     def test_load_with_platform_validation(self, tmp_path):
         """load_dataframe_tuning with platform parameter works (logs warnings)."""
         config_path = tmp_path / "config.yaml"
-        with open(config_path, "w") as fh:
+        with open(config_path, "w", encoding="utf-8") as fh:
             yaml.dump({"execution": {"streaming_mode": True}}, fh)
 
         config = load_dataframe_tuning(config_path, platform="polars")

@@ -1,6 +1,6 @@
 """Shared pytest fixtures for PostgreSQL extension adapter testing.
 
-Provides reusable mocks for psycopg2 connections, extension checks,
+Provides reusable mocks for psycopg connections, extension checks,
 and GUC parameter capture. These fixtures can be used across all
 PostgreSQL extension adapter test files (TimescaleDB, pg_duckdb,
 pg_mooncake, and future extensions).
@@ -10,7 +10,7 @@ Usage:
     or use them as helper factories:
 
         from tests.unit.platforms.conftest_pg_extensions import (
-            create_psycopg2_mock,
+            create_psycopg_mock,
             make_extension_check_responses,
             create_guc_capture_cursor,
         )
@@ -25,55 +25,54 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 
-def create_psycopg2_mock(version: str = "2.9.9") -> Mock:
-    """Create a mock psycopg2 module suitable for PostgreSQL extension adapters.
+def create_psycopg_mock(version: str = "3.1.0") -> Mock:
+    """Create a mock psycopg module suitable for PostgreSQL extension adapters.
 
     Returns a mock with the correct attributes that PostgreSQLAdapter checks
-    during initialization (__version__, extras, connect).
+    during initialization (__version__, connect).
 
     Args:
-        version: psycopg2 version string to report.
+        version: psycopg version string to report.
 
     Returns:
-        Mock configured as a psycopg2 module replacement.
+        Mock configured as a psycopg module replacement.
 
     Example:
-        >>> mock_psycopg2 = create_psycopg2_mock()
-        >>> monkeypatch.setattr(pg_duckdb_module, "psycopg2", mock_psycopg2)
-        >>> monkeypatch.setattr(postgresql_module, "psycopg2", mock_psycopg2)
+        >>> mock_psycopg = create_psycopg_mock()
+        >>> monkeypatch.setattr(pg_duckdb_module, "psycopg", mock_psycopg)
+        >>> monkeypatch.setattr(postgresql_module, "psycopg", mock_psycopg)
     """
-    mock_psycopg2 = Mock()
-    mock_psycopg2.__version__ = version
-    mock_psycopg2.extras = Mock()
-    return mock_psycopg2
+    mock_psycopg = Mock()
+    mock_psycopg.__version__ = version
+    return mock_psycopg
 
 
-def patch_psycopg2_for_extension(monkeypatch, extension_module, postgresql_module, version: str = "2.9.9") -> Mock:
-    """Patch psycopg2 in both the extension and parent PostgreSQL modules.
+def patch_psycopg_for_extension(monkeypatch, extension_module, postgresql_module, version: str = "3.1.0") -> Mock:
+    """Patch psycopg in both the extension and parent PostgreSQL modules.
 
-    PostgreSQLAdapter checks for psycopg2 in its own module during __init__,
+    PostgreSQLAdapter checks for psycopg in its own module during __init__,
     so both the extension module AND the parent module must be patched.
 
     Args:
         monkeypatch: pytest monkeypatch fixture.
         extension_module: The extension's Python module (e.g., pg_duckdb_module).
         postgresql_module: The benchbox.platforms.postgresql module.
-        version: psycopg2 version string to report.
+        version: psycopg version string to report.
 
     Returns:
-        The mock psycopg2 object (for configuring connect() etc.).
+        The mock psycopg object (for configuring connect() etc.).
 
     Example:
         >>> import benchbox.platforms.pg_duckdb as pg_duckdb_module
         >>> import benchbox.platforms.postgresql as postgresql_module
-        >>> mock_psycopg2 = patch_psycopg2_for_extension(
+        >>> mock_psycopg = patch_psycopg_for_extension(
         ...     monkeypatch, pg_duckdb_module, postgresql_module
         ... )
     """
-    mock_psycopg2 = create_psycopg2_mock(version)
-    monkeypatch.setattr(extension_module, "psycopg2", mock_psycopg2)
-    monkeypatch.setattr(postgresql_module, "psycopg2", mock_psycopg2)
-    return mock_psycopg2
+    mock_psycopg = create_psycopg_mock(version)
+    monkeypatch.setattr(extension_module, "psycopg", mock_psycopg)
+    monkeypatch.setattr(postgresql_module, "psycopg", mock_psycopg)
+    return mock_psycopg
 
 
 def make_extension_check_responses(
@@ -125,7 +124,7 @@ def make_extension_check_responses(
 
 
 def create_mock_connection() -> tuple[Mock, Mock]:
-    """Create a mock psycopg2 connection with cursor.
+    """Create a mock psycopg connection with cursor.
 
     Returns a (connection, cursor) tuple where the connection's
     cursor() method returns the cursor mock.
@@ -135,7 +134,7 @@ def create_mock_connection() -> tuple[Mock, Mock]:
 
     Example:
         >>> mock_conn, mock_cursor = create_mock_connection()
-        >>> mock_psycopg2.connect.return_value = mock_conn
+        >>> mock_psycopg.connect.return_value = mock_conn
         >>> mock_cursor.fetchone.side_effect = make_extension_check_responses()
     """
     mock_conn = Mock()

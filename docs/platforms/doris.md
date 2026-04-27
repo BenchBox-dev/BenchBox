@@ -41,16 +41,61 @@ benchbox run --platform doris --benchmark tpch --scale 0.01
 ### Docker Quick Start
 
 ```bash
-# Start Apache Doris with Docker (all-in-one FE + BE)
-docker run -p 9030:9030 -p 8030:8030 -p 8040:8040 \
-    apache/doris:doris-all-in-one-2.1
+# Start the repo-managed Apache Doris 4.0.3 stack and wait for FE+BE readiness
+docker compose -f docker/doris/docker-compose.yml up --wait
+
+# Point BenchBox at the mapped Doris ports
+export DORIS_HOST=localhost
+export DORIS_PORT=19031
+export DORIS_HTTP_PORT=18030
 
 # Verify connectivity
-mysql -h 127.0.0.1 -P 9030 -u root -e "SELECT 1"
+mysql -h 127.0.0.1 -P 19031 -u root -e "SELECT 1"
 
 # Run benchmark
 benchbox run --platform doris --benchmark tpch --scale 1.0
 ```
+
+The checked-in compose file uses the official `apache/doris:4.0.3-all-slim`
+image and applies a small amount of startup configuration for local Docker
+Desktop environments, including Doris' `vm.max_map_count`, `ulimit -n`, and
+Java requirements.
+
+By default the stack now runs without `privileged` mode. Set
+`DORIS_PRIVILEGED=true` only if your Docker VM still reports
+`vm.max_map_count < 2000000` and you want the container to raise it at startup;
+preconfiguring the Docker VM once is the narrower alternative.
+
+The compose file still defaults `SKIP_CHECK_ULIMIT=true` because Docker Desktop
+cannot satisfy Doris' swap-disabled preflight check. BenchBox's wrapper
+re-enforces the `ulimit -n >= 60000` and `vm.max_map_count >= 2000000`
+requirements before Doris starts, and emits a warning if swap remains enabled.
+
+BenchBox records the Doris engine version from `@@version_comment`, not
+`SELECT version()`, because Doris exposes MySQL compatibility version `5.7.99`
+on the latter even when the engine itself is 4.x.
+
+### Known Limits In Low-Memory Docker Setups
+
+The bundled all-in-one Docker configuration targets an 8 GB backend memory
+limit so it can run on typical developer laptops. That is enough for smoke
+tests and many SF=1 workloads, but it is not enough for every benchmark:
+
+- `h2odb` at SF=1 can exceed the BE limit while loading `trips`
+- `tpch_skew` at SF=1 can exceed the BE limit while loading `orders`
+
+These are environment limits, not adapter correctness issues. Increase Docker
+memory and the Doris `mem_limit` if you need those datasets to load reliably at
+SF=1.
+
+### Validation Caveat For Major Upgrades
+
+BenchBox's Doris benchmark runs are still commonly exercised under loose
+row-count validation for TPC-H and TPC-DS. That catches gross regressions, but
+it is weaker than exact cross-platform validation for detecting silent semantic
+drift across Doris majors. Treat future compose image bumps as engine upgrades:
+re-run exact or targeted cross-platform spot checks before changing the pinned
+Docker tag.
 
 ## Configuration Options
 
@@ -63,6 +108,8 @@ benchbox run --platform doris --benchmark tpch --scale 1.0
 | `database` | `--doris-database` | `DORIS_DATABASE` | auto-generated | Target database name |
 | `http_port` | `--doris-http-port` | `DORIS_HTTP_PORT` | `8030` | FE HTTP port for Stream Load |
 | `use_tls` | `--doris-use-tls` | - | `false` | Use HTTPS for Stream Load API |
+| `stream_load_chunk_size` | `--platform-option stream_load_chunk_size=<bytes>` | - | `10485760` | Stream Load chunk size in bytes for CSV/TPC inputs |
+| `stream_load_max_filter_ratio` | `--platform-option stream_load_max_filter_ratio=<0..1>` | - | `0` | Allowed fraction of filtered rows; default rejects silent partial loads |
 
 ## Data Loading
 
@@ -218,7 +265,7 @@ At runtime, BenchBox captures platform metadata:
         "http_port": 8030,
         "stream_load_available": True
     },
-    "platform_version": "2.1.x",
+    "platform_version": "4.0.x",
     "client_library_version": "1.x.x"
 }
 ```

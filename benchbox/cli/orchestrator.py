@@ -43,6 +43,35 @@ from benchbox.utils.verbosity import VerbositySettings
 console = quiet_console
 
 
+def _build_failure_result(config: BenchmarkConfig, exc: Exception) -> BenchmarkResults:
+    """Build a BenchmarkResults sentinel for a failed execute_benchmark() invocation."""
+    from benchbox.core.results.models import ExecutionPhases, SetupPhase
+
+    return BenchmarkResults(
+        benchmark_name=getattr(config, "display_name", config.name.upper()),
+        platform="unknown",
+        scale_factor=config.scale_factor,
+        execution_id=uuid.uuid4().hex[:8],
+        timestamp=datetime.now(),
+        duration_seconds=0.0,
+        total_queries=0,
+        successful_queries=0,
+        failed_queries=0,
+        total_execution_time=0.0,
+        average_query_time=0.0,
+        query_results=[],
+        query_definitions={},
+        execution_phases=ExecutionPhases(setup=SetupPhase()),
+        validation_status="FAILED",
+        validation_details={"error": str(exc)},
+        data_loading_time=0.0,
+        schema_creation_time=0.0,
+        total_rows_loaded=0,
+        data_size_mb=0.0,
+        table_statistics={},
+    )
+
+
 class BenchmarkOrchestrator:
     """Orchestrates benchmark execution using platform adapters."""
 
@@ -88,6 +117,28 @@ class BenchmarkOrchestrator:
                 "quiet": self._verbosity.quiet,
             }
         )
+
+        # Forward benchmark-specific options (--benchmark-option K=V) to constructor kwargs.
+        # Also forward seed/force_regenerate from config.options when the benchmark has
+        # registered specs for them, so they reach the constructor.
+        opts = getattr(config, "options", {}) or {}
+        benchmark_options = dict(opts.get("benchmark_options", {}))
+
+        from benchbox.cli.benchmark_hooks import BenchmarkHookRegistry
+
+        registered_specs = BenchmarkHookRegistry.list_option_specs(config.name)
+        # Bridge seed/force_regenerate from top-level config.options into benchmark kwargs
+        # when the benchmark has registered specs for them. These two keys can arrive via
+        # the interactive wizard (which sets them directly on config.options rather than
+        # going through --benchmark-option), so we promote them here to avoid a second
+        # code path that would need to know about benchmark-option registration.
+        for key in ("seed", "force_regenerate"):
+            if key in registered_specs and key not in benchmark_options and key in opts:
+                val = opts[key]
+                if val is not None:
+                    benchmark_options[key] = val
+
+        kwargs.update(benchmark_options)
 
         try:
             benchmark_instance = benchmark_class(parallel=cpu_cores, **kwargs)
@@ -188,69 +239,8 @@ class BenchmarkOrchestrator:
                 else None
             )
 
-            # Determine output root for generation (custom cloud path or managed local path)
-            # If no custom output set and platform requires cloud storage, check for default in credentials
-            if not self.custom_output_dir and database_config:
-                from benchbox.security.credentials import CredentialManager
-
-                if PlatformRegistry.requires_cloud_storage(database_config.type):
-                    cred_manager = CredentialManager()
-                    if cred_manager.has_credentials(database_config.type):
-                        creds = cred_manager.get_platform_credentials(database_config.type)
-                        default_output = creds.get("default_output_location") if creds else None
-                        if default_output:
-                            self.custom_output_dir = default_output
-                            self.console.print(
-                                f"[dim]Using default output location from credentials: {default_output}[/dim]"
-                            )
-
-            if self.custom_output_dir:
-                # Check if this is a cloud storage path (any provider: dbfs://, gs://, s3://, etc.)
-                from benchbox.utils.cloud_storage import is_cloud_path
-
-                if is_cloud_path(self.custom_output_dir):
-                    # Get standardized local cache path for data generation/validation
-                    data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
-                    if data_source:
-                        # Benchmark shares data from another benchmark - use that benchmark's path
-                        local_cache_path = self.directory_manager.get_datagen_path(
-                            data_source.lower(), config.scale_factor
-                        )
-                    else:
-                        # Benchmark generates its own data - use its own path
-                        local_cache_path = self.directory_manager.get_datagen_path(
-                            config.name.lower(), config.scale_factor
-                        )
-
-                    # Handle Databricks dbfs:// paths with DatabricksPath (existing implementation)
-                    if is_databricks_path(self.custom_output_dir):
-                        from benchbox.utils.cloud_storage import DatabricksPath
-
-                        output_root = DatabricksPath(local_cache_path, self.custom_output_dir)
-                    else:
-                        # Other cloud paths (gs://, s3://, etc.) - use CloudStagingPath
-                        from benchbox.utils.cloud_storage import CloudStagingPath
-
-                        output_root = CloudStagingPath(local_cache_path, self.custom_output_dir)
-                        self.console.print(f"[dim]Using local cache: {local_cache_path}[/dim]")
-                        self.console.print(f"[dim]Cloud target: {self.custom_output_dir}[/dim]")
-
-                    # Pass the cloud target to adapter as staging_root for upload
-                    if platform_cfg is not None:
-                        platform_cfg["staging_root"] = self.custom_output_dir
-                else:
-                    # Local path - use directly
-                    output_root = self.custom_output_dir
-            else:
-                # Check if benchmark shares data from another benchmark
-                # If so, respect the benchmark's default path (don't override)
-                data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
-                if data_source:
-                    # Benchmark shares data - use its default path (already set in __init__)
-                    output_root = None
-                else:
-                    # Benchmark generates its own data - use CLI-managed path
-                    output_root = str(self.directory_manager.get_datagen_path(config.name.lower(), config.scale_factor))
+            self._apply_default_cloud_output_dir(database_config)
+            output_root = self._resolve_output_root(config, benchmark, platform_cfg)
 
             # Use LifecyclePhases as single source of truth
             if phases_to_run:
@@ -297,26 +287,9 @@ class BenchmarkOrchestrator:
                 if is_dataframe_execution(database_config):
                     execution_mode = "dataframe"
 
-            # Create adapter using unified factory (handles both SQL and DataFrame)
-            adapter = None
-            if database_config is not None and (phases.load or phases.execute):
-                if execution_mode == "dataframe":
-                    self.console.print("[cyan]Using DataFrame execution mode[/cyan]")
-                    df_tuning_config = opts.get("df_tuning_config")
-                    adapter = get_adapter(
-                        database_config.type,
-                        mode="dataframe",
-                        working_dir=output_root,
-                        verbose=self._verbosity.verbose if self._verbosity else False,
-                        very_verbose=self._verbosity.very_verbose if self._verbosity else False,
-                        tuning_config=df_tuning_config,
-                    )
-                else:
-                    adapter = get_platform_adapter(database_config.type, **(platform_cfg or {}))
-                    # Set benchmark instance on adapter for database validation
-                    if adapter and benchmark:
-                        adapter.benchmark_instance = benchmark
-                        adapter.scale_factor = config.scale_factor
+            adapter = self._build_platform_adapter(
+                database_config, execution_mode, output_root, opts, platform_cfg, benchmark, phases, config
+            )
 
             # Delegate lifecycle to core runner (handles both SQL and DataFrame adapters)
             result = run_benchmark_lifecycle(
@@ -359,31 +332,82 @@ class BenchmarkOrchestrator:
 
             # Fall through to existing error handling
             self.console.print(f"[red]❌ Benchmark execution failed: {e}[/red]")
-            from benchbox.core.results.models import BenchmarkResults, ExecutionPhases, SetupPhase
+            return _build_failure_result(config, e)
 
-            return BenchmarkResults(
-                benchmark_name=getattr(config, "display_name", config.name.upper()),
-                platform="unknown",
-                scale_factor=config.scale_factor,
-                execution_id=uuid.uuid4().hex[:8],
-                timestamp=datetime.now(),
-                duration_seconds=0.0,
-                total_queries=0,
-                successful_queries=0,
-                failed_queries=0,
-                total_execution_time=0.0,
-                average_query_time=0.0,
-                query_results=[],
-                query_definitions={},
-                execution_phases=ExecutionPhases(setup=SetupPhase()),
-                validation_status="FAILED",
-                validation_details={"error": str(e)},
-                data_loading_time=0.0,
-                schema_creation_time=0.0,
-                total_rows_loaded=0,
-                data_size_mb=0.0,
-                table_statistics={},
+    def _apply_default_cloud_output_dir(self, database_config) -> None:
+        """If no custom output dir is set and platform requires cloud storage, pull default from credentials."""
+        if self.custom_output_dir or not database_config:
+            return
+        from benchbox.security.credentials import CredentialManager
+
+        if not PlatformRegistry.requires_cloud_storage(database_config.type):
+            return
+        cred_manager = CredentialManager()
+        if not cred_manager.has_credentials(database_config.type):
+            return
+        creds = cred_manager.get_platform_credentials(database_config.type)
+        default_output = creds.get("default_output_location") if creds else None
+        if default_output:
+            self.custom_output_dir = default_output
+            self.console.print(f"[dim]Using default output location from credentials: {default_output}[/dim]")
+
+    def _resolve_output_root(self, config: BenchmarkConfig, benchmark, platform_cfg):
+        """Resolve the output root for data generation: custom cloud path, custom local, or managed local."""
+        if self.custom_output_dir:
+            return self._resolve_custom_output_root(config, benchmark, platform_cfg)
+
+        data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
+        if data_source:
+            return None
+        return str(self.directory_manager.get_datagen_path(config.name.lower(), config.scale_factor))
+
+    def _resolve_custom_output_root(self, config: BenchmarkConfig, benchmark, platform_cfg):
+        """Resolve a user-supplied custom output directory (possibly cloud) to a concrete output root."""
+        from benchbox.utils.cloud_storage import is_cloud_path
+
+        if not is_cloud_path(self.custom_output_dir):
+            return self.custom_output_dir
+
+        data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
+        source_name = (data_source or config.name).lower()
+        local_cache_path = self.directory_manager.get_datagen_path(source_name, config.scale_factor)
+
+        if is_databricks_path(self.custom_output_dir):
+            from benchbox.utils.cloud_storage import DatabricksPath
+
+            output_root = DatabricksPath(local_cache_path, self.custom_output_dir)
+        else:
+            from benchbox.utils.cloud_storage import CloudStagingPath
+
+            output_root = CloudStagingPath(local_cache_path, self.custom_output_dir)
+            self.console.print(f"[dim]Using local cache: {local_cache_path}[/dim]")
+            self.console.print(f"[dim]Cloud target: {self.custom_output_dir}[/dim]")
+
+        if platform_cfg is not None:
+            platform_cfg["staging_root"] = self.custom_output_dir
+        return output_root
+
+    def _build_platform_adapter(
+        self, database_config, execution_mode, output_root, opts, platform_cfg, benchmark, phases, config
+    ):
+        """Create a SQL or DataFrame adapter for the selected database, or None if not needed."""
+        if database_config is None or not (phases.load or phases.execute):
+            return None
+        if execution_mode == "dataframe":
+            self.console.print("[cyan]Using DataFrame execution mode[/cyan]")
+            return get_adapter(
+                database_config.type,
+                mode="dataframe",
+                working_dir=output_root,
+                verbose=self._verbosity.verbose if self._verbosity else False,
+                very_verbose=self._verbosity.very_verbose if self._verbosity else False,
+                tuning_config=opts.get("df_tuning_config"),
             )
+        adapter = get_platform_adapter(database_config.type, **(platform_cfg or {}))
+        if adapter and benchmark:
+            adapter.benchmark_instance = benchmark
+            adapter.scale_factor = config.scale_factor
+        return adapter
 
     def _prepare_run_config(self, config: BenchmarkConfig, database_config) -> RunConfig:
         """Prepare benchmark run configuration using structured dataclass."""

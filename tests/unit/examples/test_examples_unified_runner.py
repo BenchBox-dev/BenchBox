@@ -465,7 +465,7 @@ class TestUnifiedRunner:
         mock_platform_config.return_value = {"database_path": "/tmp/test.duckdb"}
 
         adapter = MagicMock()
-        adapter.config = {"database_path": "/tmp/test.duckdb"}
+        adapter.platform_config = {"database_path": "/tmp/test.duckdb"}
         mock_create_adapter.return_value = adapter
 
         lifecycle_result = MagicMock()
@@ -547,7 +547,7 @@ class TestUnifiedRunner:
         mock_platform_config.return_value = {"database_path": "/tmp/test.duckdb"}
 
         adapter = MagicMock()
-        adapter.config = {"database_path": "/tmp/test.duckdb"}
+        adapter.platform_config = {"database_path": "/tmp/test.duckdb"}
         mock_create_adapter.return_value = adapter
 
         profiler_instance = MagicMock()
@@ -689,7 +689,7 @@ class TestUnifiedRunner:
         mock_platform_config.return_value = {"database_path": "/tmp/test.duckdb"}
 
         adapter = MagicMock()
-        adapter.config = {"database_path": "/tmp/test.duckdb"}
+        adapter.platform_config = {"database_path": "/tmp/test.duckdb"}
         mock_create_adapter.return_value = adapter
 
         profiler_instance = MagicMock()
@@ -755,7 +755,7 @@ class TestUnifiedRunner:
         }
         mock_platform_config.return_value = {"database_path": "/tmp/test.duckdb"}
         adapter = MagicMock()
-        adapter.config = {"database_path": "/tmp/test.duckdb"}
+        adapter.platform_config = {"database_path": "/tmp/test.duckdb"}
         mock_create_adapter.return_value = adapter
 
         profiler_instance = MagicMock()

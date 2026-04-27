@@ -9,11 +9,63 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import warnings
 from typing import Any, Literal, Optional
 
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.platforms.base.adapter import check_isolation_capability
+from benchbox.platforms.clickhouse.deployment_mode import (
+    CLICKHOUSE_CANONICAL_PLATFORM_NAMES,
+    CLICKHOUSE_DEFAULT_CANONICAL_PLATFORM,
+    CLICKHOUSE_LEGACY_SELECTOR_MAP,
+    clickhouse_legacy_selector_warning,
+)
 from benchbox.utils.runtime_env import ensure_driver_version
+
+
+def _resolve_clickhouse_legacy(
+    platform: str,
+    deployment: Optional[str] = None,
+    config: Optional[dict] = None,
+) -> tuple[str, Optional[str]]:
+    """Translate legacy ClickHouse selectors to first-class platform names.
+
+    Handles the migration from the old mixed-mode ``clickhouse`` platform to the
+    explicit first-class names ``clickhouse-local``, ``clickhouse-server``, and
+    ``clickhouse-cloud``.
+
+    Args:
+        platform: Raw platform name from the caller.
+        deployment: Explicit deployment argument (e.g. from ``get_adapter(..., deployment=...)``)
+        config: Keyword config dict (may contain ``deployment_mode`` or ``mode`` keys).
+
+    Returns:
+        Tuple of (resolved_platform_name, deprecation_message | None).
+        The message is non-None only when a legacy selector was used.
+    """
+    lp = platform.lower().strip()
+
+    # First-class canonical names: pass through unchanged
+    if lp in CLICKHOUSE_CANONICAL_PLATFORM_NAMES:
+        return platform, None
+
+    # Explicit colon-suffix legacy selectors
+    if lp in CLICKHOUSE_LEGACY_SELECTOR_MAP:
+        target = CLICKHOUSE_LEGACY_SELECTOR_MAP[lp]
+        return target, clickhouse_legacy_selector_warning(platform, target)
+
+    # Bare 'clickhouse': resolve to first-class name based on explicit deployment context
+    if lp == "clickhouse":
+        explicit_mode = deployment
+        if not explicit_mode and config:
+            explicit_mode = config.get("deployment_mode") or config.get("mode")
+        if isinstance(explicit_mode, str) and explicit_mode.strip().lower() in ("server", "self-hosted"):
+            target = "clickhouse-server"
+        else:
+            target = CLICKHOUSE_DEFAULT_CANONICAL_PLATFORM  # clickhouse-local
+        return target, clickhouse_legacy_selector_warning(platform, target)
+
+    return platform, None
 
 
 def _normalize_platform_name(platform: str) -> tuple[str, bool, Optional[str]]:
@@ -90,10 +142,20 @@ def get_adapter(
 
     Examples:
         >>> adapter = get_adapter("duckdb")  # Local DuckDB (default)
-        >>> adapter = get_adapter("clickhouse:cloud")  # ClickHouse Cloud
-        >>> adapter = get_adapter("clickhouse", deployment="local")  # chDB
+        >>> adapter = get_adapter("clickhouse-local")  # chDB (explicit first-class name)
+        >>> adapter = get_adapter("clickhouse-server")  # Self-hosted ClickHouse
         >>> adapter = get_adapter("polars-df")  # Polars DataFrame mode
     """
+    # ClickHouse migration: translate legacy selectors to first-class platform names.
+    # Must happen before _normalize_platform_name so colon-suffix parsing is bypassed.
+    resolved_platform, migration_warning = _resolve_clickhouse_legacy(platform, deployment, config)
+    if migration_warning:
+        warnings.warn(migration_warning, DeprecationWarning, stacklevel=2)
+    if resolved_platform != platform:
+        # Migration consumed the deployment selector; reset to avoid double-processing.
+        platform = resolved_platform
+        deployment = None
+
     # Normalize platform name (strip -df suffix, extract :deployment suffix)
     base_platform, df_mode_implied, deployment_from_name = _normalize_platform_name(platform)
 

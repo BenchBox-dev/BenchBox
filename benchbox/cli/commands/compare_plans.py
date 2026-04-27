@@ -120,80 +120,15 @@ def compare_plans(
         benchbox compare-plans --run1 before.json --run2 after.json --output html --output-file report.html
     """
     try:
-        # Load both benchmark results (also loads companion .plans.json if present)
         results1, _ = load_result_file(run1_path)
         results2, _ = load_result_file(run2_path)
 
-        # Handle summary mode
         if show_summary:
-            summary = generate_plan_comparison_summary(
-                results1,
-                results2,
-                regression_threshold_pct=regression_threshold,
-            )
-            if output_format == "json":
-                output = _output_summary_json(summary, return_string=output_file is not None)
-            elif output_format == "html":
-                output = _output_summary_html(summary)
-            else:
-                output = _output_summary_text(summary, return_string=output_file is not None)
-
-            if output_file:
-                output_file.write_text(output)
-                console.print(f"[green]Report written to:[/green] {output_file}")
+            _run_summary_mode(results1, results2, output_format, output_file, regression_threshold)
             return
 
-        # Get query IDs to compare
-        if query_id:
-            query_ids = [query_id]
-        else:
-            # Find common queries between both runs
-            queries1 = set()
-            for phase_results in results1.phases.values():
-                for exec_result in phase_results.queries:
-                    queries1.add(exec_result.query_id)
-
-            queries2 = set()
-            for phase_results in results2.phases.values():
-                for exec_result in phase_results.queries:
-                    queries2.add(exec_result.query_id)
-
-            query_ids = sorted(queries1 & queries2)
-
-            if not query_ids:
-                console.print("[yellow]Warning:[/yellow] No common queries found between runs")
-                ctx.exit(1)
-
-        # Compare plans
-        comparisons = []
-        for qid in query_ids:
-            # Find executions in both runs
-            exec1 = _find_query_execution(results1, qid)
-            exec2 = _find_query_execution(results2, qid)
-
-            if not exec1 or not exec2:
-                if query_id:  # Only warn if specific query was requested
-                    console.print(f"[yellow]Warning:[/yellow] Query '{qid}' not found in both runs")
-                continue
-
-            # Check if plans were captured
-            plan1 = getattr(exec1, "query_plan", None)
-            plan2 = getattr(exec2, "query_plan", None)
-
-            if not plan1 or not plan2:
-                if query_id:  # Only warn if specific query was requested
-                    console.print(f"[yellow]Warning:[/yellow] Query '{qid}' missing plan in one or both runs")
-                continue
-
-            # Compare plans
-            comparison = compare_query_plans(plan1, plan2)
-
-            # Apply threshold filter
-            if comparison.similarity.overall_similarity < threshold:
-                comparisons.append((qid, comparison))
-            elif not query_id and threshold == 0.0:
-                # Include all if no threshold and comparing all queries
-                comparisons.append((qid, comparison))
+        query_ids = _resolve_query_ids(query_id, results1, results2, ctx)
+        comparisons = _build_comparisons(query_ids, results1, results2, threshold, query_id)
 
         if not comparisons:
             if threshold > 0.0:
@@ -202,17 +137,7 @@ def compare_plans(
                 console.print("[yellow]No plans available for comparison[/yellow]")
             return
 
-        # Output results
-        if output_format == "json":
-            output = _output_json(comparisons, return_string=output_file is not None)
-        elif output_format == "html":
-            output = _output_html(comparisons, query_id is not None, results1, results2)
-        else:
-            output = _output_text(comparisons, query_id is not None, return_string=output_file is not None)
-
-        if output_file:
-            output_file.write_text(output)
-            console.print(f"[green]Report written to:[/green] {output_file}")
+        _emit_comparisons(comparisons, output_format, output_file, query_id, results1, results2)
 
     except FileNotFoundError as e:
         console.print(f"[red]Error:[/red] Results file not found: {e.filename}")
@@ -225,6 +150,104 @@ def compare_plans(
         if ctx.obj and ctx.obj.get("verbose"):
             raise
         ctx.exit(1)
+
+
+def _run_summary_mode(
+    results1: BenchmarkResults,
+    results2: BenchmarkResults,
+    output_format: str,
+    output_file: Path | None,
+    regression_threshold: float,
+) -> None:
+    summary = generate_plan_comparison_summary(
+        results1,
+        results2,
+        regression_threshold_pct=regression_threshold,
+    )
+    if output_format == "json":
+        output = _output_summary_json(summary, return_string=output_file is not None)
+    elif output_format == "html":
+        output = _output_summary_html(summary)
+    else:
+        output = _output_summary_text(summary, return_string=output_file is not None)
+
+    if output_file and output is not None:
+        output_file.write_text(output)
+        console.print(f"[green]Report written to:[/green] {output_file}")
+
+
+def _collect_query_ids(results: BenchmarkResults) -> set[str]:
+    ids: set[str] = set()
+    for phase_results in results.phases.values():
+        for exec_result in phase_results.queries:
+            ids.add(exec_result.query_id)
+    return ids
+
+
+def _resolve_query_ids(
+    query_id: str | None,
+    results1: BenchmarkResults,
+    results2: BenchmarkResults,
+    ctx,
+) -> list[str]:
+    if query_id:
+        return [query_id]
+    common = sorted(_collect_query_ids(results1) & _collect_query_ids(results2))
+    if not common:
+        console.print("[yellow]Warning:[/yellow] No common queries found between runs")
+        ctx.exit(1)
+    return common
+
+
+def _build_comparisons(
+    query_ids: list[str],
+    results1: BenchmarkResults,
+    results2: BenchmarkResults,
+    threshold: float,
+    explicit_query_id: str | None,
+) -> list:
+    comparisons: list = []
+    for qid in query_ids:
+        exec1 = _find_query_execution(results1, qid)
+        exec2 = _find_query_execution(results2, qid)
+        if not exec1 or not exec2:
+            if explicit_query_id:
+                console.print(f"[yellow]Warning:[/yellow] Query '{qid}' not found in both runs")
+            continue
+
+        plan1 = getattr(exec1, "query_plan", None)
+        plan2 = getattr(exec2, "query_plan", None)
+        if not plan1 or not plan2:
+            if explicit_query_id:
+                console.print(f"[yellow]Warning:[/yellow] Query '{qid}' missing plan in one or both runs")
+            continue
+
+        comparison = compare_query_plans(plan1, plan2)
+        below_threshold = comparison.similarity.overall_similarity < threshold
+        no_filter = not explicit_query_id and threshold == 0.0
+        if below_threshold or no_filter:
+            comparisons.append((qid, comparison))
+    return comparisons
+
+
+def _emit_comparisons(
+    comparisons: list,
+    output_format: str,
+    output_file: Path | None,
+    explicit_query_id: str | None,
+    results1: BenchmarkResults,
+    results2: BenchmarkResults,
+) -> None:
+    if output_format == "json":
+        output = _output_json(comparisons, return_string=output_file is not None)
+    elif output_format == "html":
+        output = _output_html(comparisons, explicit_query_id is not None, results1, results2)
+    else:
+        output = _output_text(comparisons, explicit_query_id is not None, return_string=output_file is not None)
+
+    if output_file and output is not None:
+        output_file.write_text(output)
+        console.print(f"[green]Report written to:[/green] {output_file}")
 
 
 def _find_query_execution(results: BenchmarkResults, query_id: str):

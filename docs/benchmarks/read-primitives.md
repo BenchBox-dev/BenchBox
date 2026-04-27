@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, read-primitives, custom-benchmark, performance
 ```
 
-> **CLI name:** `read_primitives` — use `benchbox run --benchmark read_primitives`
+> **CLI name:** `read_primitives` - use `benchbox run --benchmark read_primitives`
 
 ## Overview
 

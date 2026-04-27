@@ -33,7 +33,7 @@ class FactGenerationMixin:
                 num_companies,
             )
 
-        with open(file_path, "w", newline="", buffering=self.buffer_size) as f:
+        with open(file_path, "w", newline="", buffering=self.buffer_size, encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             # Process in chunks for better memory management
@@ -139,7 +139,7 @@ class FactGenerationMixin:
                 future_to_chunk[future] = (chunk_start, chunk_end)
 
             # Collect results and write to file
-            with open(file_path, "w", newline="", buffering=self.buffer_size) as f:
+            with open(file_path, "w", newline="", buffering=self.buffer_size, encoding="utf-8") as f:
                 writer = csv.writer(f, delimiter="|")
 
                 completed_chunks = []
@@ -234,7 +234,7 @@ class FactGenerationMixin:
         # Generate balances for a subset of date/customer/account combinations
         num_records = min(num_accounts * 30, 100000)  # ~30 days per account, cap at 100k
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             for _i in range(num_records):
@@ -277,7 +277,7 @@ class FactGenerationMixin:
         # Generate holdings for a subset of combinations
         num_records = min(num_accounts * 10, 50000)  # ~10 holdings per account
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             for _i in range(num_records):
@@ -325,7 +325,7 @@ class FactGenerationMixin:
         days_of_data = min(252, int(252 * self.scale_factor))
         num_records = min(num_securities * days_of_data, 100000)
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             # Track prices for price evolution
@@ -396,7 +396,7 @@ class FactGenerationMixin:
         # Generate watch list entries (each customer watches ~5 securities on average)
         num_records = min(int(num_customers * 5 * self.scale_factor), 25000)
 
-        with open(file_path, "w", newline="") as f:
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
             for _i in range(num_records):

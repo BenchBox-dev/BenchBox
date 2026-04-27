@@ -7,12 +7,14 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 import benchbox.platforms.questdb as questdb_module
 from benchbox.core.platform_registry import PlatformRegistry
+from benchbox.platforms.base.data_loading import CsvDialect, DataSource
 from benchbox.platforms.questdb import QUESTDB_DIALECT, QuestDBAdapter
 
 pytestmark = [
@@ -23,14 +25,13 @@ pytestmark = [
 
 @pytest.fixture()
 def questdb_stubs(monkeypatch):
-    """Patch psycopg2 objects so tests don't require the real driver."""
-    mock_psycopg2 = Mock()
-    mock_psycopg2.__version__ = "2.9.9"
-    mock_psycopg2.extras = Mock()
+    """Patch psycopg objects so tests don't require the real driver."""
+    mock_psycopg = Mock()
+    mock_psycopg.__version__ = "3.1.0"
 
-    monkeypatch.setattr(questdb_module, "psycopg2", mock_psycopg2)
+    monkeypatch.setattr(questdb_module, "psycopg", mock_psycopg)
 
-    return mock_psycopg2
+    return mock_psycopg
 
 
 class TestQuestDBAdapter:
@@ -417,7 +418,7 @@ class TestQuestDBAdapter:
 
         adapter = QuestDBAdapter.from_config(config)
 
-        assert adapter.config.get("tuning_enabled") is True
+        assert adapter.platform_config.get("tuning_enabled") is True
 
     def test_create_schema_skips_foreign_keys(self, questdb_stubs):
         """Schema creation should skip foreign key constraints."""
@@ -444,23 +445,55 @@ class TestQuestDBAdapter:
         assert "CREATE TABLE t2" in executed_text
         assert "FOREIGN KEY" not in executed_text
 
-    def test_open_normalized_csv_stream_tpc_binary(self, questdb_stubs, tmp_path):
-        """TPC files should be normalized without trailing delimiters in binary mode."""
-        adapter = QuestDBAdapter()
+    def test_rest_api_tbl_strips_trailing_delimiter(self, questdb_stubs, tmp_path):
+        """REST API upload strips trailing '|' from TPC .tbl rows before sending."""
+        adapter = QuestDBAdapter(host="localhost", http_port=9000)
         data_file = tmp_path / "lineitem.tbl"
-        data_file.write_bytes(b"1|2|\n3|4|\n")
-
-        with adapter._open_normalized_csv_stream(data_file) as stream:
-            assert stream.read() == b"1|2\n3|4\n"
-
-    def test_open_normalized_csv_stream_tpc_text(self, questdb_stubs, tmp_path):
-        """TPC files should be normalized without trailing delimiters in text mode."""
-        adapter = QuestDBAdapter()
-        data_file = tmp_path / "orders.tbl"
         data_file.write_text("1|2|\n3|4|\n", encoding="utf-8")
 
-        with adapter._open_normalized_csv_stream(data_file, text_mode=True) as stream:
-            assert stream.read() == "1|2\n3|4\n"
+        captured_body = {}
+        mock_requests = Mock()
+        mock_response = Mock(status_code=200, text="| Rows imported | 2 |")
+        mock_requests.post.return_value = mock_response
+
+        def _post(url, **kwargs):
+            f = kwargs["files"]["data"][1]
+            captured_body["content"] = f.read()
+            return mock_response
+
+        mock_requests.post.side_effect = _post
+        dialect = CsvDialect("|", False, "", False, None)
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            adapter._load_table_via_rest_api("lineitem", data_file, dialect)
+
+        assert b"1|2\n" in captured_body["content"]
+        assert b"3|4\n" in captured_body["content"]
+        assert b"1|2|\n" not in captured_body["content"]
+
+    def test_rest_api_csv_passes_data_verbatim(self, questdb_stubs, tmp_path):
+        """REST API upload sends CSV rows unchanged (no stripping for non-TPC)."""
+        adapter = QuestDBAdapter(host="localhost", http_port=9000)
+        data_file = tmp_path / "hits.csv"
+        data_file.write_bytes(b"1,hello\n2,world\n")
+
+        captured_body = {}
+        mock_requests = Mock()
+        mock_response = Mock(status_code=200, text="| Rows imported | 2 |")
+
+        def _post(url, **kwargs):
+            f = kwargs["files"]["data"][1]
+            captured_body["content"] = f.read()
+            return mock_response
+
+        mock_requests.post.side_effect = _post
+        dialect = CsvDialect(",", False, None, False, None)
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            adapter._load_table_via_rest_api("hits", data_file, dialect)
+
+        assert b"1,hello\n" in captured_body["content"]
+        assert b"2,world\n" in captured_body["content"]
 
     def test_cursor_closed_on_execute_query_failure(self, questdb_stubs):
         """Cursor should be closed even when query execution raises."""
@@ -545,6 +578,154 @@ class TestQuestDBAdapter:
         assert "requests>=2.28.0" in info.requirements
         assert info.installation_command == "uv add benchbox --extra questdb"
 
+    def test_handle_existing_database_dry_run(self, questdb_stubs):
+        """handle_existing_database should return early in dry_run mode without connection."""
+        adapter = QuestDBAdapter()
+        adapter.dry_run = True
+        adapter.database_was_reused = None
+
+        adapter.handle_existing_database()
+
+        # No connection should be attempted
+        questdb_stubs.connect.assert_not_called()
+        # database_was_reused should remain unchanged
+        assert adapter.database_was_reused is None
+
+    def test_handle_existing_database_force_recreate(self, questdb_stubs):
+        """handle_existing_database should set database_was_reused=False when force_recreate=True."""
+        adapter = QuestDBAdapter()
+        adapter.force_recreate = True
+
+        adapter.handle_existing_database()
+
+        assert adapter.database_was_reused is False
+        questdb_stubs.connect.assert_not_called()
+
+    def test_handle_existing_database_empty_tables(self, questdb_stubs):
+        """handle_existing_database should set database_was_reused=False when no tables exist."""
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+        mock_conn = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        questdb_stubs.connect.return_value = mock_conn
+
+        # Create a mock benchmark with expected tables
+        mock_benchmark = Mock()
+        mock_benchmark.tables = {"region": None, "nation": None, "lineitem": None}
+
+        adapter = QuestDBAdapter()
+        adapter.benchmark = mock_benchmark
+
+        adapter.handle_existing_database()
+
+        assert adapter.database_was_reused is False
+        mock_conn.close.assert_called_once()
+
+    def test_handle_existing_database_full_tables_match(self, questdb_stubs):
+        """handle_existing_database should set database_was_reused=True when all expected tables exist."""
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__.return_value = mock_cursor
+        # Return all expected tables
+        mock_cursor.fetchall.return_value = [("region",), ("nation",), ("lineitem",)]
+        mock_conn = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        questdb_stubs.connect.return_value = mock_conn
+
+        # Create a mock benchmark with expected tables
+        mock_benchmark = Mock()
+        mock_benchmark.tables = {"region": None, "nation": None, "lineitem": None}
+
+        adapter = QuestDBAdapter()
+        adapter.benchmark = mock_benchmark
+
+        adapter.handle_existing_database()
+
+        assert adapter.database_was_reused is True
+        mock_conn.close.assert_called_once()
+
+    def test_handle_existing_database_partial_stale_tables(self, questdb_stubs):
+        """handle_existing_database should set database_was_reused=False when expected tables are missing."""
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__.return_value = mock_cursor
+        # Return only some tables (e.g., from a different benchmark run)
+        mock_cursor.fetchall.return_value = [("region",), ("nation",)]  # Missing lineitem
+        mock_conn = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        questdb_stubs.connect.return_value = mock_conn
+
+        # Create a mock benchmark with expected tables
+        mock_benchmark = Mock()
+        mock_benchmark.tables = {"region": None, "nation": None, "lineitem": None}
+
+        adapter = QuestDBAdapter()
+        adapter.benchmark = mock_benchmark
+
+        adapter.handle_existing_database()
+
+        assert adapter.database_was_reused is False
+        mock_conn.close.assert_called_once()
+
+    def test_handle_existing_database_connection_error(self, questdb_stubs):
+        """handle_existing_database should set database_was_reused=False on connection error."""
+        # Simulate connection error
+        questdb_stubs.Error = Exception
+        questdb_stubs.connect.side_effect = questdb_stubs.Error("Connection refused")
+
+        mock_benchmark = Mock()
+        mock_benchmark.tables = {"region": None}
+
+        adapter = QuestDBAdapter()
+        adapter.benchmark = mock_benchmark
+
+        adapter.handle_existing_database()
+
+        assert adapter.database_was_reused is False
+
+    def test_handle_existing_database_psycopg_none_raises(self, monkeypatch):
+        """handle_existing_database should raise clear error if psycopg is not available."""
+        monkeypatch.setattr(questdb_module, "psycopg", None)
+
+        adapter = QuestDBAdapter.__new__(QuestDBAdapter)
+        adapter.dry_run = False
+        adapter.force_recreate = False
+
+        with pytest.raises(ImportError, match="psycopg is required"):
+            adapter.handle_existing_database()
+
+    def test_handle_existing_database_benchmark_not_set(self, questdb_stubs):
+        """handle_existing_database should treat as fresh database when benchmark attr is absent."""
+        mock_conn = Mock()
+        questdb_stubs.connect.return_value = mock_conn
+
+        adapter = QuestDBAdapter()
+        # Deliberately leave adapter.benchmark unset (not populated by run_enhanced_benchmark)
+
+        adapter.handle_existing_database()
+
+        assert adapter.database_was_reused is False
+        mock_conn.close.assert_called_once()
+
+    def test_handle_existing_database_empty_tables_dict(self, questdb_stubs):
+        """handle_existing_database should treat as fresh database when benchmark.tables is empty.
+
+        Benchmarks like clickbench initialize tables={} before data download; the method
+        cannot infer expected table names and falls back to fresh-database behavior.
+        """
+        mock_conn = Mock()
+        questdb_stubs.connect.return_value = mock_conn
+
+        mock_benchmark = Mock()
+        mock_benchmark.tables = {}
+
+        adapter = QuestDBAdapter()
+        adapter.benchmark = mock_benchmark
+
+        adapter.handle_existing_database()
+
+        assert adapter.database_was_reused is False
+        mock_conn.close.assert_called_once()
+
 
 class TestQuestDBTlsUrls:
     """Tests for TLS/HTTPS URL construction in QuestDB adapter."""
@@ -559,33 +740,35 @@ class TestQuestDBTlsUrls:
         adapter = QuestDBAdapter(host="myhost", http_port=9000, use_tls=True)
         assert adapter.use_tls is True
 
-    def test_imp_url_uses_http_by_default(self, questdb_stubs):
+    def test_imp_url_uses_http_by_default(self, questdb_stubs, tmp_path):
         """Import endpoint URL uses HTTP scheme by default."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
         mock_requests = Mock()
-        mock_response = Mock(status_code=200, text='{"status":"OK"}')
+        mock_response = Mock(status_code=200, text="| Rows imported | 1 |")
         mock_requests.post.return_value = mock_response
 
-        with (
-            patch.dict("sys.modules", {"requests": mock_requests}),
-            patch.object(adapter, "_open_normalized_csv_stream", return_value=MagicMock()),
-        ):
-            adapter._load_table_via_rest_api("test_table", "/tmp/data.csv")
+        data_file = tmp_path / "data.csv"
+        data_file.write_text("1,test\n", encoding="utf-8")
+        dialect = CsvDialect(",", False, None, False, None)
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            adapter._load_table_via_rest_api("test_table", data_file, dialect)
             url = mock_requests.post.call_args[0][0]
             assert url == "http://myhost:9000/imp"
 
-    def test_imp_url_uses_https_when_tls_enabled(self, questdb_stubs):
+    def test_imp_url_uses_https_when_tls_enabled(self, questdb_stubs, tmp_path):
         """Import endpoint URL uses HTTPS when use_tls=True."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000, use_tls=True)
         mock_requests = Mock()
-        mock_response = Mock(status_code=200, text='{"status":"OK"}')
+        mock_response = Mock(status_code=200, text="| Rows imported | 1 |")
         mock_requests.post.return_value = mock_response
 
-        with (
-            patch.dict("sys.modules", {"requests": mock_requests}),
-            patch.object(adapter, "_open_normalized_csv_stream", return_value=MagicMock()),
-        ):
-            adapter._load_table_via_rest_api("test_table", "/tmp/data.csv")
+        data_file = tmp_path / "data.csv"
+        data_file.write_text("1,test\n", encoding="utf-8")
+        dialect = CsvDialect(",", False, None, False, None)
+
+        with patch.dict("sys.modules", {"requests": mock_requests}):
+            adapter._load_table_via_rest_api("test_table", data_file, dialect)
             url = mock_requests.post.call_args[0][0]
             assert url == "https://myhost:9000/imp"
 

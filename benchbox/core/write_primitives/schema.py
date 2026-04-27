@@ -351,7 +351,25 @@ STAGING_TABLES = {
 
 def _supports_primary_keys(dialect: str) -> bool:
     """Return whether the target SQL dialect supports PRIMARY KEY in CREATE TABLE."""
-    return dialect.lower() not in {"datafusion"}
+    import benchbox.sql_compat.rules.schema_emit.pk_capability  # noqa: F401
+    from benchbox.sql_compat.actions import CompatAction
+    from benchbox.sql_compat.context import CompatibilityContext, Phase
+    from benchbox.sql_compat.registry import REGISTRY
+
+    ctx = CompatibilityContext(
+        platform=dialect.lower(),
+        platform_version=None,
+        benchmark="write_primitives",
+        query_id=None,
+        phase=Phase.SCHEMA_EMIT,
+        mode="sql",
+        dialect=dialect,
+    )
+    registry_decision = REGISTRY.resolve(ctx)
+
+    if registry_decision is not None:
+        return registry_decision.action == CompatAction.NATIVE
+    return True  # no rule: default to supported
 
 
 def get_create_table_sql(table_name: str, dialect: str = "standard", if_not_exists: bool = False) -> str:

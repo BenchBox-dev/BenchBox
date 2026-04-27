@@ -277,66 +277,34 @@ def _build_starburst_config(
     overrides: dict[str, Any],
     info: Any,
 ) -> Any:
-    """Build Starburst database configuration with credential loading.
+    from benchbox.platforms.base.config_utils import build_platform_config
 
-    Args:
-        platform: Platform name (should be 'starburst')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded
-    """
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("starburst") or {}
-
-    # Build merged options: saved_creds < options < overrides
-    merged_options = {}
-    merged_options.update(saved_creds)
-    merged_options.update(options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "Starburst"
-    driver_package = info.driver_package if info else "trino"
-
-    config_dict = {
-        "type": "starburst",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields at top-level
-        "host": merged_options.get("host"),
-        "port": merged_options.get("port"),
-        "catalog": merged_options.get("catalog"),
-        "username": merged_options.get("username"),
-        "password": merged_options.get("password"),
-        "role": merged_options.get("role"),
-        "http_scheme": merged_options.get("http_scheme"),
-        "verify_ssl": merged_options.get("verify_ssl"),
-        "ssl_cert_path": merged_options.get("ssl_cert_path"),
-        "session_properties": merged_options.get("session_properties"),
-        "query_timeout": merged_options.get("query_timeout"),
-        "timezone": merged_options.get("timezone"),
-        "table_format": merged_options.get("table_format"),
-        "staging_root": merged_options.get("staging_root"),
-        # Benchmark context for config-aware schema naming
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    # Only include explicit schema override if provided
-    if "schema" in overrides and overrides["schema"]:
-        config_dict["schema"] = overrides["schema"]
-
-    return DatabaseConfig(**config_dict)
+    return build_platform_config(
+        platform_type="starburst",
+        credential_key="starburst",
+        default_display_name="Starburst",
+        default_driver_package="trino",
+        platform_fields=[
+            "host",
+            "port",
+            "catalog",
+            "username",
+            "password",
+            "role",
+            "http_scheme",
+            "verify_ssl",
+            "ssl_cert_path",
+            "session_properties",
+            "query_timeout",
+            "timezone",
+            "table_format",
+            "staging_root",
+            "schema",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 # Register the config builder with the platform hook registry

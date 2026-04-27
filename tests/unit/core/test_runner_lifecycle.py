@@ -1180,6 +1180,49 @@ def test_representative_benchmarks_standard_path(benchmark_id: str, tmp_path: Pa
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("benchmark_id", ["nyctaxi", "tsbs_devops"])
+def test_runner_propagates_benchmark_name_slug_to_adapter(benchmark_id: str, tmp_path: Path) -> None:
+    """Runner must pass benchmark_name (canonical slug from BenchmarkConfig.name)
+    to the SQL adapter so it never has to sniff identity from benchmark internals."""
+    cfg = BenchmarkConfig(
+        name=benchmark_id,
+        display_name=benchmark_id.upper(),
+        scale_factor=0.01,
+        test_execution_type="standard",
+    )
+    db = DatabaseConfig(type="duckdb", name="duckdb")
+    benchmark = _mk_representative_benchmark(benchmark_id, tmp_path)
+
+    received_kwargs: dict = {}
+
+    class SlugCapturingAdapter:
+        platform_name = "duckdb"
+
+        def run_benchmark(self, benchmark_obj, **kwargs):
+            received_kwargs.update(kwargs)
+            return benchmark_obj.create_enhanced_benchmark_result(
+                platform="duckdb",
+                query_results=[],
+                duration_seconds=0.0,
+                execution_metadata={"mode": "standard"},
+            )
+
+    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=False):
+        run_benchmark_lifecycle(
+            benchmark_config=cfg,
+            database_config=db,
+            system_profile=_mk_system_profile(),
+            platform_config={},
+            phases=LifecyclePhases(generate=False, load=False, execute=True),
+            benchmark_instance=benchmark,
+            platform_adapter=SlugCapturingAdapter(),
+        )
+
+    # The canonical benchmark slug must reach the adapter via benchmark_name kwarg.
+    assert received_kwargs.get("benchmark_name") == benchmark_id
+
+
+@pytest.mark.unit
 def test_standard_path_propagates_table_mode_to_adapter(tmp_path: Path) -> None:
     """When table_mode=external with load+execute, adapter.table_mode must be set."""
     cfg = BenchmarkConfig(

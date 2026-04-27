@@ -634,7 +634,9 @@ LIMIT {limit_rows};
             )
             return translated[0] if translated else query
         except ImportError:
-            raise ImportError("sqlglot is required for SQL dialect translation. Install with: pip install sqlglot")
+            raise ImportError(
+                "sqlglot is required for SQL dialect translation. Install with: pip install sqlglot"
+            ) from None
         except Exception as e:
             # If translation fails, return the original query with a warning
             emit(f"Warning: Failed to translate query to {dialect}: {e}")

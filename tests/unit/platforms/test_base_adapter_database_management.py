@@ -292,17 +292,6 @@ def test_format_execution_time_uses_expected_units(adapter):
     assert adapter._format_execution_time(65.0).startswith("1:")
 
 
-def test_get_benchmark_type_resolves_from_name_class_and_display(adapter):
-    assert adapter._get_benchmark_type(SimpleNamespace(_name="TPC-H")) == "tpch"
-
-    class JoinOrderBenchmark:
-        pass
-
-    assert adapter._get_benchmark_type(JoinOrderBenchmark()) == "joinorder"
-    assert adapter._get_benchmark_type(SimpleNamespace(display_name="TPC-DS")) == "tpcds"
-    assert adapter._get_benchmark_type(SimpleNamespace(_name="custombench")) == "custombench"
-
-
 def test_normalize_and_validate_file_paths_filters_missing_and_empty(adapter, tmp_path):
     good = tmp_path / "good.tbl"
     empty = tmp_path / "empty.tbl"
@@ -319,7 +308,7 @@ def test_display_query_plan_if_enabled_renders_output(adapter, monkeypatch):
     adapter.get_query_plan = Mock(return_value="SEQ SCAN test")
     fake_console = Mock()
 
-    monkeypatch.setattr("benchbox.platforms.base.adapter.quiet_console", fake_console)
+    monkeypatch.setattr("benchbox.platforms.base.result_capture.quiet_console", fake_console)
 
     adapter.display_query_plan_if_enabled(connection=object(), query="SELECT 1", query_id="Q1")
 
@@ -615,16 +604,6 @@ class TestAdapterSchemaGaps:
         assert not failed
         cursor.execute.assert_not_called()
 
-    def test_execute_schema_statements_with_transform(self, adapter):
-        cursor = Mock()
-        statements = ["CREATE TABLE t1"]
-
-        def transform(sql):
-            return sql + " TRANSFORMED"
-
-        adapter._execute_schema_statements(statements, cursor, platform_transform_fn=transform)
-        cursor.execute.assert_called_once_with("CREATE TABLE t1 TRANSFORMED")
-
 
 class TestAdapterConnectionGaps:
     """Coverage-focused tests for PlatformAdapterConnection and Cursor."""
@@ -668,7 +647,7 @@ class TestAdapterConnectionGaps:
 
         adapter.execute_query = Mock(return_value={"rows": []})
 
-        # File I/O error must be swallowed — query must still execute
+        # File I/O error must be swallowed - query must still execute
         conn.execute("SELECT 1")
         adapter.execute_query.assert_called_once()
 
@@ -745,7 +724,7 @@ class TestAdapterSummarizePerformance:
 
         results = [BareResult()]
         summary = adapter._summarize_performance_characteristics(results, 1.0, 0)
-        # BareResult has no execution_time_seconds or rows_returned attributes —
+        # BareResult has no execution_time_seconds or rows_returned attributes -
         # _extract returns None/default for those, so counts are computed but timing is None
         assert summary["total_queries"] == 1
         assert summary["average_query_time_ms"] is None

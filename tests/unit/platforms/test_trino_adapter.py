@@ -519,7 +519,7 @@ class TestTrinoAdapter:
         mock_benchmark = Mock()
 
         # Create temporary test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test1\n2,test2\n")
             temp_path = Path(f.name)
 
@@ -534,9 +534,9 @@ class TestTrinoAdapter:
             assert "test_table" in table_stats
             assert table_stats["test_table"] == 2  # 2 rows in test data
 
-            # Should execute INSERT commands
+            # Should execute qualified INSERT commands (catalog.schema.table)
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-            assert any("INSERT INTO test_table" in call for call in execute_calls)
+            assert any("INSERT INTO" in call and "test_table" in call for call in execute_calls)
 
         finally:
             temp_path.unlink()
@@ -559,7 +559,7 @@ class TestTrinoAdapter:
         mock_benchmark = Mock()
 
         # Create temporary test file with pipe delimiter
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
             f.write("1|test1|\n2|test2|\n")
             temp_path = Path(f.name)
 
@@ -631,7 +631,7 @@ class TestTrinoAdapter:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test\n")
             temp_path = Path(f.name)
 
@@ -1263,52 +1263,51 @@ class TestTrinoConnectionErrorDetection:
 
 
 class TestTrinoValueFormatting:
-    """Tests for _is_date_value and _escape_insert_value."""
-
-    def _adapter(self):
-        try:
-            return TrinoAdapter()
-        except ImportError:
-            pytest.skip("Trino drivers not installed")
+    """Tests for the shared presto_trino_utils value-formatting helpers."""
 
     def test_is_date_value_valid_date(self):
-        adapter = self._adapter()
-        assert adapter._is_date_value("1998-12-31") is True
+        from benchbox.platforms.presto_trino_utils import is_date_value
+
+        assert is_date_value("1998-12-31") is True
 
     def test_is_date_value_regex_only_checks_format(self):
-        adapter = self._adapter()
-        assert adapter._is_date_value("12/31/1998") is False
-        assert adapter._is_date_value("1998-13-99") is True  # YYYY-MM-DD pattern matches; no semantic validation
-        assert adapter._is_date_value("not-a-date") is False
+        from benchbox.platforms.presto_trino_utils import is_date_value
+
+        assert is_date_value("12/31/1998") is False
+        assert is_date_value("1998-13-99") is True  # YYYY-MM-DD pattern matches; no semantic validation
+        assert is_date_value("not-a-date") is False
 
     def test_escape_empty_string_becomes_null(self):
-        adapter = self._adapter()
-        assert adapter._escape_insert_value("") == "NULL"
+        from benchbox.platforms.presto_trino_utils import escape_insert_value
+
+        assert escape_insert_value("") == "NULL"
 
     def test_escape_null_string_becomes_null(self):
-        adapter = self._adapter()
-        assert adapter._escape_insert_value("null") == "NULL"
-        assert adapter._escape_insert_value("NULL") == "NULL"
+        from benchbox.platforms.presto_trino_utils import escape_insert_value
+
+        assert escape_insert_value("null") == "NULL"
+        assert escape_insert_value("NULL") == "NULL"
 
     def test_escape_date_value(self):
-        adapter = self._adapter()
-        result = adapter._escape_insert_value("1998-01-15")
-        assert result == "DATE '1998-01-15'"
+        from benchbox.platforms.presto_trino_utils import escape_insert_value
+
+        assert escape_insert_value("1998-01-15") == "DATE '1998-01-15'"
 
     def test_escape_numeric_value_unquoted(self):
-        adapter = self._adapter()
-        assert adapter._escape_insert_value("42") == "42"
-        assert adapter._escape_insert_value("3.14") == "3.14"
+        from benchbox.platforms.presto_trino_utils import escape_insert_value
+
+        assert escape_insert_value("42") == "42"
+        assert escape_insert_value("3.14") == "3.14"
 
     def test_escape_string_value_quoted(self):
-        adapter = self._adapter()
-        result = adapter._escape_insert_value("hello world")
-        assert result == "'hello world'"
+        from benchbox.platforms.presto_trino_utils import escape_insert_value
+
+        assert escape_insert_value("hello world") == "'hello world'"
 
     def test_escape_string_with_single_quote(self):
-        adapter = self._adapter()
-        result = adapter._escape_insert_value("O'Brien")
-        assert result == "'O''Brien'"
+        from benchbox.platforms.presto_trino_utils import escape_insert_value
+
+        assert escape_insert_value("O'Brien") == "'O''Brien'"
 
 
 class TestTrinoTableDefinitionOptimization:

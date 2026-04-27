@@ -50,8 +50,8 @@ class TestCoffeeShopInit:
 # Order count calculation
 # ---------------------------------------------------------------------------
 class TestCalculateOrderCount:
-    def test_sf_1_gives_50m(self):
-        assert CoffeeShopDataGenerator.calculate_order_count(1.0) == 50_000_000
+    def test_sf_1_gives_8_5m(self):
+        assert CoffeeShopDataGenerator.calculate_order_count(1.0) == 8_500_000
 
     def test_sf_0_gives_minimum_1(self):
         assert CoffeeShopDataGenerator.calculate_order_count(0.0) == 1

@@ -86,7 +86,7 @@ class TestCursorValidationMixinMRO:
             pass
 
         adapter = ConcreteAdapter()
-        # These must NOT raise NotImplementedError — they should reach _FakeParent.
+        # These must NOT raise NotImplementedError - they should reach _FakeParent.
         adapter.log_verbose("test")
         adapter.log_very_verbose("test")
         result = adapter._build_query_result_with_validation(query_id="q1")
@@ -98,7 +98,7 @@ class TestCursorValidationMixinMRO:
         for method_name in CursorValidationQueryExecutionMixin._REQUIRED_METHODS:
             assert method_name not in mixin_own_methods, (
                 f"{method_name} must NOT be defined on CursorValidationQueryExecutionMixin "
-                f"— it would shadow the real implementation via MRO"
+                f"- it would shadow the real implementation via MRO"
             )
 
     def test_real_adapters_resolve_methods_correctly(self):
@@ -113,7 +113,7 @@ class TestCursorValidationMixinMRO:
                 # Find the first class in MRO that defines the method
                 provider = next(c for c in mro if method_name in c.__dict__)
                 assert provider is not CursorValidationQueryExecutionMixin, (
-                    f"{adapter_cls.__name__}.{method_name} resolves to the mixin — "
+                    f"{adapter_cls.__name__}.{method_name} resolves to the mixin - "
                     f"expected PlatformAdapter or a concrete parent"
                 )
 

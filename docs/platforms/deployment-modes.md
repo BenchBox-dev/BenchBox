@@ -27,17 +27,12 @@ A **deployment mode** represents how a database platform is deployed and accesse
 
 ### Syntax
 
-Use the colon syntax to specify deployment modes:
+Use the first-class platform names or the colon syntax to specify deployment modes:
 
 ```bash
-# Default mode (usually local or self-hosted)
-benchbox run --platform clickhouse --benchmark tpch --scale 0.1
-
-# Explicit deployment mode
-benchbox run --platform clickhouse:local --benchmark tpch --scale 0.1
-benchbox run --platform clickhouse:server --benchmark tpch --scale 0.1
-
-# ClickHouse Cloud is a first-class platform (not a deployment mode)
+# ClickHouse first-class platform names (preferred)
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
+benchbox run --platform clickhouse-server --benchmark tpch --scale 0.1
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1
 ```
 
@@ -45,10 +40,10 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1
 
 ```bash
 # ClickHouse: local (chDB) or server (self-hosted)
-benchbox run --platform clickhouse:local --benchmark tpch --scale 0.1
-benchbox run --platform clickhouse:server --benchmark tpch --scale 0.1
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
+benchbox run --platform clickhouse-server --benchmark tpch --scale 0.1
 
-# ClickHouse Cloud: first-class platform (not a deployment mode)
+# ClickHouse Cloud: first-class platform
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1 \
     --platform-option host=abc123.aws.clickhouse.cloud
 
@@ -71,10 +66,12 @@ benchbox run --platform starburst --benchmark tpch --scale 0.1
 
 | Platform | Default Mode | Available Modes | Notes |
 |----------|--------------|-----------------|-------|
-| **ClickHouse** | `local` | `local`, `server` | Local uses chDB, server uses clickhouse-driver |
+| **ClickHouse** | `local` | `local`, `server` | Prefer first-class names: `clickhouse-local`, `clickhouse-server` |
 | **Firebolt** | `core` | `core`, `cloud` | Core is free local Docker deployment |
 | **TimescaleDB** | `self-hosted` | `self-hosted`, `cloud` | Cloud mode for Timescale Cloud |
 | **PySpark** | `local` | `local` | Local single-node Spark |
+| **LakeSail** | `local` | `local`, `distributed` | Sail Rust engine; SQL (`lakesail`) and DataFrame (`lakesail-df`) share modes |
+| **Velox** | `local` | `local`, `remote` | Gluten + Velox on Spark; `local` is Linux-only (use Docker on macOS/Windows) |
 
 ### First-Class Cloud Platforms
 
@@ -103,21 +100,22 @@ This means MotherDuck automatically uses DuckDB's query translator and Starburst
 
 ## ClickHouse Deployment Modes
 
-ClickHouse supports two deployment modes for the base `clickhouse` platform, plus a separate first-class platform for ClickHouse Cloud.
+ClickHouse has three first-class platform names, plus a legacy `clickhouse` selector for backwards compatibility.
 
-### Local Mode (chDB)
+```{note}
+The bare `clickhouse` selector and colon syntax (`clickhouse:local`, `clickhouse:server`) are deprecated. Use the first-class names below. See [Migration Guide](clickhouse-migration.md).
+```
 
-Zero-configuration embedded ClickHouse via the chDB library.
+### clickhouse-local (chDB)
+
+Zero-configuration ClickHouse local mode via the chDB library.
 
 ```bash
 # Install chDB
-uv add chdb
+uv add benchbox --extra clickhouse-local
 
 # Run benchmark
-benchbox run --platform clickhouse:local --benchmark tpch --scale 0.1
-
-# Or simply (local is default)
-benchbox run --platform clickhouse --benchmark tpch --scale 0.1
+benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 ```
 
 **Characteristics:**
@@ -126,13 +124,13 @@ benchbox run --platform clickhouse --benchmark tpch --scale 0.1
 - Same query engine as ClickHouse server
 - Ideal for development and testing
 
-### Server Mode (Self-Hosted)
+### clickhouse-server (Self-Hosted)
 
 Connect to a self-hosted ClickHouse server or cluster.
 
 ```bash
 # Install driver
-uv add clickhouse-driver
+uv add benchbox --extra clickhouse-server
 
 # Environment variables
 export CLICKHOUSE_HOST=localhost
@@ -141,10 +139,10 @@ export CLICKHOUSE_USER=default
 export CLICKHOUSE_PASSWORD=secret
 
 # Run benchmark
-benchbox run --platform clickhouse:server --benchmark tpch --scale 1.0
+benchbox run --platform clickhouse-server --benchmark tpch --scale 1.0
 
 # Or with inline options
-benchbox run --platform clickhouse:server --benchmark tpch --scale 1.0 \
+benchbox run --platform clickhouse-server --benchmark tpch --scale 1.0 \
     --platform-option host=clickhouse.example.com \
     --platform-option port=9000 \
     --platform-option username=benchuser \
@@ -167,15 +165,15 @@ benchbox run --platform clickhouse:server --benchmark tpch --scale 1.0 \
 ClickHouse Cloud is now a **first-class platform** (`clickhouse-cloud`), not a deployment mode. This follows the pattern established by MotherDuck (DuckDB) and Starburst (Trino).
 
 ```bash
-# Install clickhouse-connect
-uv add clickhouse-connect
+# Install ClickHouse Cloud extra
+uv add benchbox --extra clickhouse-cloud
 
 # Environment variables
 export CLICKHOUSE_CLOUD_HOST=abc123.us-east-2.aws.clickhouse.cloud
 export CLICKHOUSE_CLOUD_PASSWORD=your-password
 export CLICKHOUSE_CLOUD_USER=default  # optional, defaults to 'default'
 
-# Run benchmark (note: clickhouse-cloud, not clickhouse:cloud)
+# Run benchmark
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0
 
 # Or with inline options
@@ -198,7 +196,6 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0 \
 - Always uses HTTPS (port 8443)
 - Compression enabled by default for network efficiency
 - Result cache disabled by default for accurate benchmarking
-- **Alias**: `clickhouse:cloud` is also accepted as a platform name
 
 For full documentation, see [ClickHouse Cloud Platform](clickhouse-cloud.md).
 
@@ -440,6 +437,142 @@ If you provide the role separately via `STARBURST_ROLE`, it will be automaticall
 
 ---
 
+## LakeSail Deployment Modes
+
+LakeSail Sail is a Rust-based drop-in replacement for Apache Spark. Both SQL (`lakesail`) and DataFrame (`lakesail-df`) modes share the same deployment model - the adapter connects to a running Sail server via the Spark Connect protocol using the standard `pyspark` client.
+
+### Local Mode (Default)
+
+Single-node multi-threaded execution. Start a Sail server locally, then connect over Spark Connect.
+
+```bash
+# Install the PySpark client (Sail uses standard PySpark + pyarrow)
+uv add pyspark pyarrow
+
+# Start your LakeSail Sail server (see LakeSail documentation)
+# Default endpoint: sc://localhost:50051
+
+# SQL benchmark
+benchbox run --platform lakesail --benchmark tpch --scale 1.0
+
+# DataFrame benchmark
+benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
+
+# Override endpoint / tuning
+benchbox run --platform lakesail --benchmark tpch --scale 1.0 \
+    --lakesail-endpoint sc://localhost:50051 \
+    --lakesail-mode local \
+    --driver-memory 8g \
+    --shuffle-partitions 16
+```
+
+### Distributed Mode
+
+Cluster of Sail Rust workers. Same client, different deployment.
+
+```bash
+benchbox run --platform lakesail --benchmark tpch --scale 10.0 \
+    --lakesail-mode distributed \
+    --lakesail-workers 4 \
+    --lakesail-endpoint sc://my-sail-cluster:50051
+```
+
+**Connection Parameters:**
+
+| Parameter | CLI Flag | Default | Notes |
+|-----------|----------|---------|-------|
+| `endpoint` | `--lakesail-endpoint` | `sc://localhost:50051` | Spark Connect URL |
+| `sail_mode` | `--lakesail-mode` | `local` | `local` or `distributed` |
+| `sail_workers` | `--lakesail-workers` | - | Worker count (distributed mode) |
+| `driver_memory` | `--driver-memory` | `4g` | Driver memory allocation |
+| `shuffle_partitions` | `--shuffle-partitions` | `200` | Shuffle partition count |
+| `table_format` | `--table-format` | `parquet` | `parquet` or `orc` |
+| `adaptive_enabled` | `--adaptive-enabled` | `true` | Adaptive Query Execution (AQE) |
+
+Credentials can be stored via `benchbox credentials set lakesail --option endpoint=... --option sail_mode=distributed`. See [LakeSail Platform Guide](lakesail.md) for the full option reference.
+
+**Characteristics:**
+- No JVM on the execution path - Rust/DataFusion engine only
+- Zero-rewrite migration from PySpark - standard PySpark client
+- SQL and DataFrame modes share the same engine and configuration
+
+---
+
+## Velox (Apache Gluten) Deployment Modes
+
+Apache Gluten offloads Spark SQL physical operators to [Velox](https://velox-lib.io/), a vectorized C++ query engine. The Velox adapter supports two deployment modes: `local` (in-process SparkSession with the Gluten jar loaded) and `remote` (connect to a pre-started Spark Connect server that already has Gluten wired in).
+
+```{important}
+**Linux-only runtime.** The Gluten Velox bundle jar is Linux-only - there are no prebuilt jars for macOS or Windows, and native builds on those hosts are not supported. The checked-in Docker workflow currently targets `linux/amd64` because Apache Gluten 1.6.0 does not publish an official Spark 3.5 arm64 jar. On Apple Silicon, that Docker path is suitable for smoke testing under emulation, but not for timing-valid benchmarks.
+```
+
+### Local Mode (Default)
+
+In-process SparkSession with Gluten plugged in. Linux x86_64 host with the official jar, a custom-built Linux arm64 jar, or inside the `benchbox-velox` Docker container.
+
+```bash
+# Install the Velox extra (pulls pyspark[connect]>=3.5.0)
+uv add benchbox --extra velox
+
+# Provide the Gluten bundle jar (see velox_jar_setup.md for release tarballs and verification steps)
+benchbox run --platform velox --benchmark tpch --scale 0.1 \
+    --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar \
+    --offheap-size 8g
+```
+
+The adapter sets the mandatory Gluten configuration automatically:
+
+- `spark.plugins = org.apache.gluten.GlutenPlugin`
+- `spark.memory.offHeap.enabled = true`
+- `spark.memory.offHeap.size = <offheap_size>`
+- `spark.shuffle.manager = org.apache.spark.shuffle.sort.ColumnarShuffleManager`
+- `spark.jars = <gluten_jar_path>`
+- `spark.driver.extraClassPath = <gluten_jar_path>`
+- `spark.executor.extraClassPath = <gluten_jar_path>`
+
+The `extraClassPath` entries are required: the Gluten plugin class is loaded before `spark.jars` promotions reach the executor classpath, so without them the plugin silently no-ops.
+
+Overriding `spark.shuffle.manager` via `spark_config` raises `ValueError` - `ColumnarShuffleManager` is required for shuffle acceleration.
+
+### Remote Mode (Spark Connect)
+
+Connect to a pre-started Gluten-enabled Spark Connect server (including the `benchbox-velox` Docker image). Works on any host that can reach the endpoint - the server itself must still run on Linux.
+
+```bash
+# Start the Gluten-enabled Spark Connect server (example: provided Docker image)
+docker compose up -d velox-connect
+
+# Drive the benchmark from the host
+benchbox run --platform velox --velox-deployment remote \
+    --velox-endpoint sc://localhost:50051 \
+    --benchmark tpch --scale 0.1
+```
+
+**Configuration Reference:**
+
+| Parameter | CLI Flag | Default | Notes |
+|-----------|----------|---------|-------|
+| `deployment` | `--velox-deployment` | `local` | `local` (in-process, Linux-only) or `remote` (Spark Connect) |
+| `endpoint` | `--velox-endpoint` | `sc://localhost:50051` | Spark Connect URL for `remote` mode |
+| `gluten_jar_path` | `--platform-option gluten_jar_path=…` (alias: `jar=…`) | - | Absolute path to the Gluten bundle jar (required for `local` mode) |
+| `gluten_version` | `--velox-version` | `1.6.0` | Informational; surfaced in `platform_info` |
+| `offheap_size` | `--offheap-size` | `8g` | `spark.memory.offHeap.size` for Velox |
+| `driver_memory` | `--driver-memory` | `4g` | JVM driver heap |
+| `shuffle_partitions` | `--shuffle-partitions` | `200` | `spark.sql.shuffle.partitions` |
+| `table_format` | `--table-format` | `parquet` | `parquet` or `orc` |
+| `adaptive_enabled` | `--adaptive-enabled` | `true` | Adaptive Query Execution (AQE) |
+
+### Verifying Velox Is Active
+
+After a run, use the platform info probe and query plan inspection to confirm Velox handled the queries rather than silently falling back to JVM execution:
+
+- `get_platform_info()` runs `EXPLAIN SELECT count(*) FROM range(10)` and returns `velox_active: true/false`.
+- `get_query_plan()` labels each plan with `Velox native execution: YES/NOT DETECTED` and flags real JVM fallbacks (without false-positives on `VeloxColumnarToRow`).
+
+See [Velox Platform Guide](velox.md) and [Velox Jar Setup](velox_jar_setup.md) for release tarball URLs, verification steps, and Docker build instructions.
+
+---
+
 ## Architecture: DeploymentCapability System
 
 The deployment mode system is built on the `DeploymentCapability` dataclass in `platform_registry.py`:
@@ -467,25 +600,26 @@ Query deployment information programmatically:
 ```python
 from benchbox.core.platform_registry import PlatformRegistry
 
-# Get available deployment modes
+# Get available deployment modes for the base ClickHouse platform
 modes = PlatformRegistry.get_available_deployment_modes("clickhouse")
-# ['local', 'server', 'cloud']
+# ['local', 'server']
 
 # Get default deployment mode
 default = PlatformRegistry.get_default_deployment("clickhouse")
 # 'local'
 
 # Check if mode is supported
-supported = PlatformRegistry.supports_deployment_mode("clickhouse", "cloud")
+supported = PlatformRegistry.supports_deployment_mode("clickhouse", "server")
 # True
 
-# Get deployment capability details
-cap = PlatformRegistry.get_deployment_capability("clickhouse", "cloud")
-# DeploymentCapability(mode='managed', requires_credentials=True, ...)
+# ClickHouse Cloud is a separate first-class platform, not a deployment mode
+# Use --platform clickhouse-cloud (see clickhouse-cloud.md)
+cap = PlatformRegistry.get_deployment_capability("clickhouse", "server")
+# DeploymentCapability(mode='self-hosted', requires_credentials=True, ...)
 
 # Check cloud storage requirements
-needs_storage = PlatformRegistry.requires_cloud_storage_for_deployment("clickhouse", "cloud")
-# True
+needs_storage = PlatformRegistry.requires_cloud_storage_for_deployment("clickhouse", "server")
+# False
 ```
 
 ### Platform Family and Inheritance
@@ -566,7 +700,7 @@ benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0
 
 **"Invalid deployment mode"**
 ```
-ValueError: Invalid ClickHouse deployment mode 'cluster'. Valid modes: cloud, local, server
+ValueError: Invalid ClickHouse deployment mode 'cluster'. Valid modes: local, server
 ```
 Solution: Use one of the valid modes for the platform.
 
@@ -588,10 +722,10 @@ Enable verbose logging to debug connection issues:
 
 ```bash
 # Verbose mode
-benchbox run --platform clickhouse:cloud --benchmark tpch --scale 0.1 -v
+benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1 -v
 
 # Very verbose mode (includes connection parameters)
-benchbox run --platform clickhouse:cloud --benchmark tpch --scale 0.1 -vv
+benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1 -vv
 ```
 
 ---
@@ -602,4 +736,7 @@ benchbox run --platform clickhouse:cloud --benchmark tpch --scale 0.1 -vv
 - [Platform Selection Guide](platform-selection-guide.md) - Choose the right platform
 - [ClickHouse Local Mode](clickhouse-local-mode.md) - Detailed chDB guide
 - [Firebolt](firebolt.md) - Detailed Firebolt guide
+- [LakeSail Sail](lakesail.md) - Rust-based Spark replacement
+- [Apache Gluten + Velox](velox.md) - Native C++ acceleration for Spark SQL
+- [Velox Jar Setup](velox_jar_setup.md) - Gluten release tarball URLs, verification steps, and extracted jar names
 - [Getting Started](../usage/getting-started.md) - Quick start guide

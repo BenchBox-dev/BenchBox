@@ -32,7 +32,12 @@ import logging
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 if TYPE_CHECKING:
+    import polars as pl
+    from datafusion import DataFrame as DataFusionDataFrame, Expr as DataFusionExpr
+    from pyspark.sql import Column as PySparkColumn, DataFrame as PySparkDataFrame
+
     from benchbox.platforms.dataframe.expression_family import ExpressionFamilyAdapter
+    from benchbox.platforms.dataframe.protocol import LazyFrameLike
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +264,7 @@ class _DataFusionSplitListExpr:
     to split_part(expr, separator, n+1).
     """
 
-    def __init__(self, expr: Any, separator: str) -> None:
+    def __init__(self, expr: DataFusionExpr, separator: str) -> None:
         self._expr = expr
         self._separator = separator
 
@@ -267,7 +272,7 @@ class _DataFusionSplitListExpr:
     def list(self) -> _DataFusionSplitListExpr:
         return self
 
-    def get(self, index: int | Any) -> UnifiedExpr:
+    def get(self, index: int | DataFusionExpr) -> UnifiedExpr:
         from datafusion import functions as df_f, lit as df_lit
 
         # split_part is 1-indexed
@@ -723,6 +728,17 @@ class UnifiedExpr:
     .sum(), .mean(), .count(), etc.
 
     For Polars expressions, this is a pass-through.
+
+    Why so many `Any` parameters in this class:
+      Most methods accept "a value the backend would accept here" - that
+      means a scalar literal (int / float / str / bool / bytes / date /
+      None), another `UnifiedExpr`, a column-name string, or a backend-
+      native expression object. The honest type union spans all of those
+      and forces optional-dep imports (polars/pyspark/datafusion) at
+      type-check time without giving callers a useful narrowing surface.
+      Per-method `Any` documents the "we accept whatever the backend
+      operator/function accepts" contract; the implementation guards
+      runtime branches via isinstance / getattr.
     """
 
     def __init__(self, expr: Any, *, _is_string_literal: bool = False) -> None:
@@ -732,6 +748,12 @@ class UnifiedExpr:
             expr: Native expression (PySpark Column, Polars Expr, or DataFusion Expr)
             _is_string_literal: Internal flag indicating this is a string literal
                                (used for PySpark string concatenation detection)
+
+        `expr: Any` is the same escape-hatch documented on `.native`: the
+        honest type is the union of every backend's expression class plus
+        scalar literals, but enforcing it forces optional-dep imports at
+        type-check time without giving callers a useful common surface.
+        Each `Unified*Expr` subclass init below shares this rationale.
         """
         self._expr = expr
         self._is_pyspark = _is_pyspark_column(expr)
@@ -740,7 +762,15 @@ class UnifiedExpr:
 
     @property
     def native(self) -> Any:
-        """Get the underlying native expression."""
+        """Get the underlying native expression.
+
+        Returns the wrapped backend-native expression object, which can be
+        a polars.Expr, pyspark.sql.Column, datafusion.Expr, or any other
+        per-backend expression type. Caller is expected to know the backend
+        before consuming this - narrowing here would force a union over
+        every backend's expression class, none of which we want as a hard
+        import. Escape-hatch `Any` is intentional.
+        """
         return self._expr
 
     def __repr__(self) -> str:
@@ -749,6 +779,15 @@ class UnifiedExpr:
     # =========================================================================
     # Arithmetic Operations
     # =========================================================================
+    # Why `other: Any` on every dunder: the right-hand operand can be a
+    # Python scalar (int/float/str/bool), another UnifiedExpr, a column-name
+    # string, or a backend-native expression object passed by user code.
+    # `int | float | str | bool | UnifiedExpr | <backend-native>` is the
+    # honest type, but the backend-native arm pulls in optional dependencies
+    # and the union becomes load-bearing for type checkers without adding
+    # call-site safety. `Any` documents the "we accept whatever the backend
+    # arithmetic accepts" contract; the implementation guards the runtime
+    # branches via isinstance / getattr.
 
     def __add__(self, other: Any) -> UnifiedExpr:
         """Add operator - handles both numeric addition and string concatenation.
@@ -1748,7 +1787,7 @@ class _PySparkDeferredRank(UnifiedExpr):
     captures the rank parameters and applies them when over() is called.
     """
 
-    def __init__(self, expr: Any, method: str, descending: bool) -> None:
+    def __init__(self, expr: PySparkColumn, method: str, descending: bool) -> None:
         """Initialize the deferred rank.
 
         Args:
@@ -1812,7 +1851,7 @@ class _DataFusionDeferredRank(UnifiedExpr):
     captures the rank parameters and applies them when over() is called.
     """
 
-    def __init__(self, expr: Any, method: str, descending: bool) -> None:
+    def __init__(self, expr: DataFusionExpr, method: str, descending: bool) -> None:
         """Initialize the deferred rank.
 
         Args:
@@ -1884,8 +1923,14 @@ class _DataFusionDeferredFilter(UnifiedExpr):
         """Initialize the deferred filter.
 
         Args:
-            expr: The column expression to aggregate
-            condition: The filter condition to apply
+            expr: The column expression to aggregate (DataFusion `Expr` at runtime)
+            condition: The filter condition to apply (DataFusion `Expr` at runtime)
+
+        Both params stay `Any`: the only call site (`UnifiedExpr.filter` in
+        the DataFusion branch) unwraps `condition.native` which itself
+        returns `Any`. Tightening the annotation here would mis-state the
+        contract - runtime values are DataFusion expressions, but the
+        type-checker can't see the dynamic dispatch that guarantees it.
         """
         super().__init__(expr)
         self._filter_condition = condition
@@ -1946,6 +1991,11 @@ class UnifiedWhenThen:
 
     This allows the Polars-style when/then/otherwise pattern:
         when(condition).then(value).otherwise(default)
+
+    `Any` parameters here follow the same convention as `UnifiedExpr`:
+    builder/condition/value can be a backend-native expression, a
+    `UnifiedExpr`, or a scalar literal. See `UnifiedExpr` class docstring
+    for the full rationale.
     """
 
     def __init__(self, when_builder: Any, platform: str, when_pairs: list | None = None) -> None:
@@ -2036,6 +2086,11 @@ class UnifiedWhen:
     For DataFusion:
         functions.case(condition).when(lit(True), value).otherwise(default)
         For chained whens: coalesce(case(cond1).when(True,v1).end(), case(cond2)..., default)
+
+    `Any` parameters here follow the same convention as `UnifiedExpr`:
+    builder/value can be a backend-native expression, a `UnifiedExpr`, or
+    a scalar literal. See `UnifiedExpr` class docstring for the full
+    rationale.
     """
 
     def __init__(self, when_builder: Any, platform: str, when_pairs: list | None = None) -> None:
@@ -2106,6 +2161,10 @@ def wrap_expr(expr: Any) -> UnifiedExpr:
     return UnifiedExpr(expr)
 
 
+# Backend-detection predicates. `Any` is intentional and load-bearing:
+# these helpers are called *before* the caller knows the backend type,
+# so narrowing the parameter would invert the API. They accept anything
+# and return whether it happens to be a frame/expr from a given backend.
 def _is_pyspark_df(df: Any) -> bool:
     """Check if a DataFrame is a PySpark DataFrame."""
     type_name = type(df).__module__
@@ -2146,7 +2205,7 @@ def _is_datafusion_expr(expr: Any) -> bool:
 # unsupported aggregate arithmetic patterns).
 
 
-def _get_datafusion_ast_string(expr: Any) -> str | None:
+def _get_datafusion_ast_string(expr: DataFusionExpr) -> str | None:
     """Get the internal AST representation from a DataFusion expression.
 
     EXPERIMENTAL: This function relies on parsing error messages from
@@ -2212,7 +2271,7 @@ def _extract_datafusion_multiplier(expr_str: str) -> tuple[float | None, str | N
     return None, None
 
 
-def _rebuild_datafusion_pure_aggregate(expr_str: str) -> Any:
+def _rebuild_datafusion_pure_aggregate(expr_str: str) -> DataFusionExpr | None:
     """Rebuild a pure aggregate expression from a BinaryExpr AST string.
 
     Given an AST string containing the aggregate pattern, extract just
@@ -2253,8 +2312,8 @@ def _rebuild_datafusion_pure_aggregate(expr_str: str) -> Any:
 
 
 def _extract_datafusion_agg_arithmetic(
-    exprs: list[Any],
-) -> tuple[list[Any], list[tuple]]:
+    exprs: list[DataFusionExpr],
+) -> tuple[list[DataFusionExpr], list[tuple]]:
     """Extract arithmetic operations from DataFusion aggregate expressions.
 
     DataFusion doesn't support arithmetic on aggregates inside aggregate(),
@@ -2321,6 +2380,52 @@ def _extract_datafusion_agg_arithmetic(
     return processed, post_ops
 
 
+_AGG_FUNCS = ("sum", "avg", "mean", "count", "min", "max")
+_OP_MAP = {"Multiply": "multiply", "Plus": "add", "Divide": "divide", "Minus": "subtract"}
+
+
+def _parse_multi_agg_pairs(ast_str: str, agg_funcs: list[str], col_matches: list[str], has_nvl: bool):
+    import re
+
+    if not has_nvl:
+        return [(f.lower(), col_matches[i]) for i, f in enumerate(agg_funcs) if i < len(col_matches)]
+
+    # NVL-wrapped aggregates: match (func, col) pairs inside each AggregateFunction block
+    agg_pattern = (
+        r"AggregateFunction\s*\{[^}]*inner:\s*(\w+)[^}]*args:\s*\[ScalarFunction[^]]+name:\s*\\?\"([^\"\\]+)\\?\""
+    )
+    nvl_matches = re.findall(agg_pattern, ast_str, re.DOTALL)
+    aggregates = [(f.lower(), c) for f, c in nvl_matches if f.lower() in _AGG_FUNCS]
+    if aggregates:
+        return aggregates
+    # Fall back to positional pairing if the NVL-specific regex didn't match
+    return [(f.lower(), col_matches[i]) for i, f in enumerate(agg_funcs) if i < len(col_matches)]
+
+
+def _pick_primary_op(ops: list[str]) -> str:
+    for op in ops:
+        if op in ("Multiply", "Plus", "Divide", "Minus"):
+            return op
+    return ops[0]
+
+
+def _build_pure_agg_expr(func_name: str, col_name: str):
+    from datafusion import col as df_col, functions as df_f
+
+    dispatch = {
+        "avg": df_f.avg,
+        "mean": df_f.avg,
+        "sum": df_f.sum,
+        "count": df_f.count,
+        "min": df_f.min,
+        "max": df_f.max,
+    }
+    builder = dispatch.get(func_name)
+    if builder is None:
+        return None
+    return builder(df_col(col_name))
+
+
 def _extract_multi_agg_arithmetic(ast_str: str, alias_name: str) -> tuple[list[Any], tuple] | None:
     """Extract multiple aggregates from a BinaryExpr.
 
@@ -2334,119 +2439,43 @@ def _extract_multi_agg_arithmetic(ast_str: str, alias_name: str) -> tuple[list[A
     """
     import re
 
-    from datafusion import col as df_col, functions as df_f
-
-    # Find all aggregate function names using a simpler pattern
-    # Pattern: inner: Sum { or inner: Avg {
     func_matches = re.findall(r"inner:\s*(\w+)\s*\{", ast_str)
-
-    # Check for NVL/fillna scalar function wrapper
     has_nvl = "NVLFunc" in ast_str or "nvl" in ast_str.lower()
-
-    # Check for Cast wrapper around aggregates
     has_cast = "Cast(" in ast_str and "Float64" in ast_str
 
-    # Find all column names in the expression
-    # The AST string may have escaped quotes as \" (in Rust debug output)
-    # Pattern matches both: name: "col" and name: \"col\"
     col_matches = re.findall(r'name:\s*\\?"([^"\\]+)\\?"', ast_str)
-
-    # Filter out non-column names (table names, etc.)
-    # Column names typically start with a letter and contain only alphanumeric + underscore
     col_matches = [c for c in col_matches if c and c[0].isalpha() and c not in ("?table?",)]
+    agg_funcs = [f for f in func_matches if f.lower() in _AGG_FUNCS]
 
-    # Filter to only aggregate function names (Sum, Avg, Count, Min, Max)
-    agg_funcs = [f for f in func_matches if f.lower() in ("sum", "avg", "mean", "count", "min", "max")]
-
-    # We expect pairs of (func_name, col_name)
     if len(agg_funcs) < 2:
         return None
 
-    # Match function names with column names by position
-    # When NVL is present, columns appear after NVL function, so we need different logic
-    aggregates = []
-    if has_nvl:
-        # When NVL is present, func_matches contains both aggregate funcs and NVLFunc
-        # Each aggregate has its own NVL-wrapped column
-        # Pattern: Sum { ... NVLFunc ... Column(name: col1) ... } ... Sum { ... NVLFunc ... Column(name: col2) ... }
-        # Find aggregate blocks and extract column from each
-        agg_pattern = (
-            r"AggregateFunction\s*\{[^}]*inner:\s*(\w+)[^}]*args:\s*\[ScalarFunction[^]]+name:\s*\\?\"([^\"\\]+)\\?\""
-        )
-        agg_with_nvl_matches = re.findall(agg_pattern, ast_str, re.DOTALL)
-
-        if agg_with_nvl_matches:
-            for func_name, col_name in agg_with_nvl_matches:
-                if func_name.lower() in ("sum", "avg", "mean", "count", "min", "max"):
-                    aggregates.append((func_name.lower(), col_name))
-
-        # If regex didn't match, fall back to simpler matching
-        if not aggregates:
-            # Try to extract from simpler pattern - just pair aggregate funcs with columns
-            for i, func_name in enumerate(agg_funcs):
-                if i < len(col_matches):
-                    aggregates.append((func_name.lower(), col_matches[i]))
-    else:
-        # No NVL wrapper, use simple matching
-        for i, func_name in enumerate(agg_funcs):
-            if i < len(col_matches):
-                aggregates.append((func_name.lower(), col_matches[i]))
-
+    aggregates = _parse_multi_agg_pairs(ast_str, agg_funcs, col_matches, has_nvl)
     if len(aggregates) < 2:
         return None
 
-    # Determine the operation from the AST
-    # Look for the most common operation between aggregates
     ops = re.findall(r"op:\s*(\w+)", ast_str)
     if not ops:
         return None
+    primary_op = _pick_primary_op(ops)
 
-    # Determine primary operation (Multiply, Plus, Minus, Divide)
-    primary_op = ops[0]
-    for op in ops:
-        if op in ("Multiply", "Plus", "Divide", "Minus"):
-            primary_op = op
-            break
-
-    # Build temporary aggregate expressions
     # IMPORTANT: DataFusion's aggregate() only accepts pure aggregate expressions.
     # Any wrapping (Cast, coalesce, arithmetic) must be done AFTER aggregation.
     temp_exprs = []
     temp_aliases = []
-
     for i, (func_name, col_name) in enumerate(aggregates):
+        agg_expr = _build_pure_agg_expr(func_name, col_name)
+        if agg_expr is None:
+            return None
         temp_alias = f"__temp_{alias_name}_{i}__"
         temp_aliases.append(temp_alias)
-
-        col_expr = df_col(col_name)
-
-        # Build PURE aggregate expression (no wrapping)
-        if func_name == "avg" or func_name == "mean":
-            agg_expr = df_f.avg(col_expr)
-        elif func_name == "sum":
-            agg_expr = df_f.sum(col_expr)
-        elif func_name == "count":
-            agg_expr = df_f.count(col_expr)
-        elif func_name == "min":
-            agg_expr = df_f.min(col_expr)
-        elif func_name == "max":
-            agg_expr = df_f.max(col_expr)
-        else:
-            return None
-
         temp_exprs.append(agg_expr.alias(temp_alias))
 
-    # Map AST operation to Python operation string
-    op_map = {"Multiply": "multiply", "Plus": "add", "Divide": "divide", "Minus": "subtract"}
-    operation = op_map.get(primary_op, "multiply")
-
-    # Return temp expressions and post_op
-    # Format: ("multi", temp_aliases, alias_name, operation, has_nvl, has_cast)
-    # The has_nvl and has_cast flags tell post_ops to apply coalesce and cast
+    operation = _OP_MAP.get(primary_op, "multiply")
     return temp_exprs, ("multi", temp_aliases, alias_name, operation, has_nvl, has_cast)
 
 
-def _apply_datafusion_post_ops(result: Any, post_ops: list[tuple]) -> Any:
+def _apply_datafusion_post_ops(result: DataFusionDataFrame, post_ops: list[tuple]) -> DataFusionDataFrame:
     """Apply post-aggregation arithmetic operations to a DataFusion DataFrame.
 
     Args:
@@ -2462,70 +2491,66 @@ def _apply_datafusion_post_ops(result: Any, post_ops: list[tuple]) -> Any:
 
     for post_op in post_ops:
         op_type = post_op[0]
-
         if op_type == "literal":
-            # Format: ("literal", temp_alias, final_alias, value, operation)
-            _, temp_alias, final_alias, value, operation = post_op
-
-            # Apply the arithmetic operation
-            if operation == "multiply":
-                result = result.with_column(final_alias, df_col(temp_alias) * value)
-            elif operation == "divide":
-                result = result.with_column(final_alias, df_col(temp_alias) / value)
-
-            # Drop the temporary column
-            if temp_alias != final_alias:
-                result = result.drop(temp_alias)
-
+            result = _apply_literal_post_op(result, post_op, df_col)
         elif op_type == "multi":
-            # Format: ("multi", temp_aliases, final_alias, operation[, has_nvl, has_cast])
-            # The has_nvl and has_cast flags are optional for backwards compatibility
-            if len(post_op) == 6:
-                _, temp_aliases, final_alias, operation, has_nvl, has_cast = post_op
-            else:
-                _, temp_aliases, final_alias, operation = post_op
-                has_nvl = False
-                has_cast = False
-
-            # Build the combined expression from temp columns
-            if len(temp_aliases) >= 2:
-                import pyarrow as pa
-                from datafusion import functions as df_f, lit as df_lit
-
-                # Get the first column, apply coalesce if needed
-                first_col = df_col(temp_aliases[0])
-                if has_nvl:
-                    first_col = df_f.coalesce(first_col, df_lit(0))
-                if has_cast:
-                    first_col = first_col.cast(pa.float64())
-
-                combined = first_col
-                for temp_alias in temp_aliases[1:]:
-                    next_col = df_col(temp_alias)
-                    if has_nvl:
-                        next_col = df_f.coalesce(next_col, df_lit(0))
-                    if has_cast:
-                        next_col = next_col.cast(pa.float64())
-
-                    if operation == "multiply":
-                        combined = combined * next_col
-                    elif operation == "add":
-                        combined = combined + next_col
-                    elif operation == "divide":
-                        # Use nullif to prevent division by zero
-                        combined = combined / df_f.nullif(next_col, df_lit(0.0))
-                    elif operation == "subtract":
-                        combined = combined - next_col
-
-                result = result.with_column(final_alias, combined)
-
-                # Drop all temporary columns
-                for temp_alias in temp_aliases:
-                    result = result.drop(temp_alias)
-
+            result = _apply_multi_post_op(result, post_op, df_col)
         else:
             raise ValueError(f"Unsupported DataFusion post-op format: {post_op}")
 
+    return result
+
+
+def _apply_literal_post_op(result: DataFusionDataFrame, post_op: tuple, df_col) -> DataFusionDataFrame:
+    """Apply ("literal", temp_alias, final_alias, value, operation) post-op."""
+    _, temp_alias, final_alias, value, operation = post_op
+    if operation == "multiply":
+        result = result.with_column(final_alias, df_col(temp_alias) * value)
+    elif operation == "divide":
+        result = result.with_column(final_alias, df_col(temp_alias) / value)
+    if temp_alias != final_alias:
+        result = result.drop(temp_alias)
+    return result
+
+
+def _apply_multi_post_op(result: DataFusionDataFrame, post_op: tuple, df_col) -> DataFusionDataFrame:
+    """Apply ("multi", temp_aliases, final_alias, operation[, has_nvl, has_cast]) post-op."""
+    if len(post_op) == 6:
+        _, temp_aliases, final_alias, operation, has_nvl, has_cast = post_op
+    else:
+        _, temp_aliases, final_alias, operation = post_op
+        has_nvl = False
+        has_cast = False
+
+    if len(temp_aliases) < 2:
+        return result
+
+    import pyarrow as pa
+    from datafusion import functions as df_f, lit as df_lit
+
+    def _prep(alias: str):
+        expr = df_col(alias)
+        if has_nvl:
+            expr = df_f.coalesce(expr, df_lit(0))
+        if has_cast:
+            expr = expr.cast(pa.float64())
+        return expr
+
+    combined = _prep(temp_aliases[0])
+    for temp_alias in temp_aliases[1:]:
+        next_col = _prep(temp_alias)
+        if operation == "multiply":
+            combined = combined * next_col
+        elif operation == "add":
+            combined = combined + next_col
+        elif operation == "divide":
+            combined = combined / df_f.nullif(next_col, df_lit(0.0))
+        elif operation == "subtract":
+            combined = combined - next_col
+
+    result = result.with_column(final_alias, combined)
+    for temp_alias in temp_aliases:
+        result = result.drop(temp_alias)
     return result
 
 
@@ -2602,6 +2627,258 @@ class UnifiedGroupBy(Generic[DF, Expr]):
         return UnifiedLazyFrame(result, self._adapter)
 
 
+def _normalize_join_keys(on: Any, left_on: Any, right_on: Any, is_cross_join: bool) -> tuple[list, list, bool]:
+    """Normalize on/left_on/right_on into (left_items, right_items, has_expr_join).
+
+    Also decomposes a single equality expression of the form `col("a") == col("b")`
+    passed via `left_on` into separate left/right keys.
+    """
+
+    def has_expressions(val: Any) -> bool:
+        if isinstance(val, UnifiedExpr):
+            return True
+        if isinstance(val, (list, tuple)):
+            return any(isinstance(item, UnifiedExpr) for item in val)
+        return False
+
+    left_has_expr = has_expressions(left_on)
+    right_has_expr = has_expressions(right_on)
+    has_expr_join = left_has_expr or right_has_expr
+
+    if is_cross_join:
+        return [], [], has_expr_join
+
+    if on is not None:
+        left_items = [on] if isinstance(on, str) else list(on)
+        return left_items, left_items.copy(), has_expr_join
+
+    if left_on is None:
+        left_items = []
+    elif isinstance(left_on, (str, UnifiedExpr)):
+        left_items = [left_on]
+    else:
+        left_items = list(left_on)
+
+    if right_on is None:
+        right_items = []
+    elif isinstance(right_on, (str, UnifiedExpr)):
+        right_items = [right_on]
+    else:
+        right_items = list(right_on)
+
+    if (
+        len(left_items) == 1
+        and not right_items
+        and isinstance(left_items[0], UnifiedExpr)
+        and hasattr(left_items[0], "_eq_left")
+    ):
+        eq_expr = left_items[0]
+        left_items = [eq_expr._eq_left]
+        right_items = [eq_expr._eq_right]
+        has_expr_join = True
+
+    return left_items, right_items, has_expr_join
+
+
+def _rename_duplicate_right_columns(other_df: Any, duplicate_cols: set[str], used_names: set[str], suffix: str) -> Any:
+    """Rename duplicate right-side columns by appending suffix (with incremental counter on collisions)."""
+    for col_name in duplicate_cols:
+        new_name = f"{col_name}{suffix}"
+        counter = 2
+        while new_name in used_names:
+            new_name = f"{col_name}{suffix}_{counter}"
+            counter += 1
+        other_df = other_df.with_column_renamed(col_name, new_name)
+        used_names.add(new_name)
+    return other_df
+
+
+def _rename_conflicting_join_keys(
+    other_df: Any,
+    left_cols: list[str],
+    right_cols: list[str],
+    left_columns: set[str],
+    used_names: set[str],
+    suffix: str,
+    is_outer_join: bool,
+) -> tuple[Any, dict[str, str]]:
+    """Rename right-side join keys that conflict with left columns.
+
+    Outer joins use suffixed names (so values can be coalesced by the caller).
+    Inner joins use a temporary sentinel name the caller drops after joining.
+    """
+    right_join_key_renames: dict[str, str] = {}
+    for i, (left_key, right_key) in enumerate(zip(left_cols, right_cols)):
+        if right_key == left_key or (right_key in left_columns and right_key != left_key):
+            if is_outer_join:
+                new_right_key = f"{right_key}{suffix}"
+                counter = 2
+                while new_right_key in used_names:
+                    new_right_key = f"{right_key}{suffix}_{counter}"
+                    counter += 1
+                used_names.add(new_right_key)
+            else:
+                new_right_key = f"__right_join_key_{i}__"
+            other_df = other_df.with_column_renamed(right_key, new_right_key)
+            right_join_key_renames[right_key] = new_right_key
+    return other_df, right_join_key_renames
+
+
+def _normalize_sort_inputs(
+    by: Any,
+    more_columns: tuple,
+    descending: bool | list[bool],
+) -> tuple[list, list[bool]]:
+    """Resolve sort inputs into (cols, desc_flags) lists.
+
+    Handles three calling styles:
+    - positional columns: .sort("c1", "c2")
+    - list + descending flag(s): .sort([...], descending=[True, False])
+    - tuple syntax: .sort([("c1", "desc"), ("c2", "asc")])
+    """
+    cols = list(by) if isinstance(by, list) else [by]
+    cols.extend(more_columns)
+
+    tuple_desc_flags: list[bool] | None = None
+    if cols and isinstance(cols[0], tuple):
+        tuple_desc_flags = []
+        parsed_cols = []
+        for item in cols:
+            if isinstance(item, tuple):
+                col_name, direction = item
+                parsed_cols.append(col_name)
+                tuple_desc_flags.append(direction.lower().startswith("desc"))
+            else:
+                parsed_cols.append(item)
+                tuple_desc_flags.append(False)
+        cols = parsed_cols
+
+    if tuple_desc_flags is not None:
+        desc_flags = tuple_desc_flags
+    elif isinstance(descending, bool):
+        desc_flags = [descending] * len(cols)
+    else:
+        desc_flags = list(descending)
+        if len(desc_flags) < len(cols):
+            desc_flags.extend([False] * (len(cols) - len(desc_flags)))
+    return cols, desc_flags
+
+
+def _sort_pyspark(df, cols: list, desc_flags: list[bool], nulls_last: bool):
+    """Build PySpark orderBy expressions with desc/asc and nulls_last handling."""
+    from pyspark.sql import functions as F  # noqa: N812
+
+    order_exprs = []
+    for col_item, desc in zip(cols, desc_flags, strict=False):
+        if isinstance(col_item, UnifiedExpr):
+            expr = col_item.native
+        elif isinstance(col_item, str):
+            expr = F.col(col_item)
+        else:
+            expr = col_item
+
+        if desc:
+            order_exprs.append(expr.desc_nulls_last() if nulls_last else expr.desc())
+        else:
+            order_exprs.append(expr.asc_nulls_last() if nulls_last else expr.asc())
+    return df.orderBy(*order_exprs)
+
+
+def _sort_datafusion(df, cols: list, desc_flags: list[bool], nulls_last: bool):
+    """Build DataFusion SortExpr list, passing through pre-built SortExprs."""
+    from datafusion import col as df_col
+    from datafusion.expr import SortExpr
+
+    sort_exprs = []
+    for col_item, desc in zip(cols, desc_flags, strict=False):
+        if isinstance(col_item, UnifiedExpr):
+            expr = col_item.native
+        elif isinstance(col_item, str):
+            expr = df_col(col_item)
+        else:
+            expr = col_item
+        if isinstance(expr, SortExpr):
+            sort_exprs.append(expr)
+        else:
+            sort_exprs.append(expr.sort(ascending=not desc, nulls_first=not nulls_last))
+    return df.sort(*sort_exprs)
+
+
+def _prepare_join_items(df, items: list, side: str) -> tuple[Any, list[str], list[str]]:
+    """Promote expression join items to temp columns; return (df, join_cols, temp_cols)."""
+    join_cols: list[str] = []
+    temp_cols: list[str] = []
+    for i, item in enumerate(items):
+        if isinstance(item, UnifiedExpr):
+            temp_col = f"__{side}_join_key_{i}__"
+            df = df.with_column(temp_col, item.native)
+            join_cols.append(temp_col)
+            temp_cols.append(temp_col)
+        elif isinstance(item, str):
+            join_cols.append(item)
+        elif _is_datafusion_expr(item):
+            temp_col = f"__{side}_join_key_{i}__"
+            df = df.with_column(temp_col, item)
+            join_cols.append(temp_col)
+            temp_cols.append(temp_col)
+        else:
+            join_cols.append(str(item))
+    return df, join_cols, temp_cols
+
+
+def _rename_same_named_join_keys(
+    right_df,
+    left_join_cols: list[str],
+    right_join_cols: list[str],
+    temp_cols_right: list[str],
+    left_columns: set[str],
+    used_names: set[str],
+    is_outer_join: bool,
+    suffix: str,
+) -> tuple[Any, dict[str, str]]:
+    """Rename right join keys that collide with left; inner joins get temp names, outer joins get suffixes."""
+    renames: dict[str, str] = {}
+    for i, (left_key, right_key) in enumerate(zip(left_join_cols, right_join_cols)):
+        collides = right_key == left_key or (right_key in left_columns and right_key not in temp_cols_right)
+        if not collides:
+            continue
+        if is_outer_join:
+            new_right_key = f"{right_key}{suffix}"
+            counter = 2
+            while new_right_key in used_names:
+                new_right_key = f"{right_key}{suffix}_{counter}"
+                counter += 1
+            used_names.add(new_right_key)
+        else:
+            new_right_key = f"__expr_join_right_key_{i}__"
+        right_df = right_df.with_column_renamed(right_key, new_right_key)
+        renames[right_key] = new_right_key
+    return right_df, renames
+
+
+def _drop_post_join_temp_columns(
+    result,
+    temp_cols_left: list[str],
+    temp_cols_right: list[str],
+    right_join_key_renames: dict[str, str],
+    is_outer_join: bool,
+    suffix: str,
+):
+    """Drop join-scaffolding columns (renamed right keys for inner joins, temp left/right cols)."""
+    if not is_outer_join:
+        for new_key in right_join_key_renames.values():
+            if new_key in [field.name for field in result.schema()]:
+                result = result.drop(new_key)
+    for temp_col in temp_cols_left:
+        if temp_col in [field.name for field in result.schema()]:
+            result = result.drop(temp_col)
+    for temp_col in temp_cols_right:
+        for col_name in (temp_col, f"{temp_col}{suffix}"):
+            if col_name in [field.name for field in result.schema()]:
+                result = result.drop(col_name)
+    return result
+
+
 class UnifiedLazyFrame(Generic[DF, Expr]):
     """Platform-agnostic DataFrame wrapper for expression-family queries.
 
@@ -2656,7 +2933,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
 
     def join(
         self,
-        other: UnifiedLazyFrame | Any,
+        other: UnifiedLazyFrame | LazyFrameLike,
         left_on: str | list | None = None,
         right_on: str | list | Any | None = None,
         on: str | list[str] | None = None,
@@ -2689,54 +2966,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         # Handle cross joins (no join columns)
         is_cross_join = how == "cross" or (on is None and left_on is None and right_on is None)
 
-        # Helper to check if a value contains expressions
-        def has_expressions(val: Any) -> bool:
-            if isinstance(val, UnifiedExpr):
-                return True
-            if isinstance(val, (list, tuple)):
-                return any(isinstance(item, UnifiedExpr) for item in val)
-            return False
-
-        # Detect expression-based joins
-        left_has_expr = has_expressions(left_on)
-        right_has_expr = has_expressions(right_on)
-        has_expr_join = left_has_expr or right_has_expr
-
-        # Normalize on/left_on/right_on to lists
-        if is_cross_join:
-            left_items: list = []
-            right_items: list = []
-        elif on is not None:
-            left_items = [on] if isinstance(on, str) else list(on)
-            right_items = left_items.copy()
-        else:
-            if left_on is None:
-                left_items = []
-            elif isinstance(left_on, (str, UnifiedExpr)):
-                left_items = [left_on]
-            else:
-                left_items = list(left_on)
-
-            if right_on is None:
-                right_items = []
-            elif isinstance(right_on, (str, UnifiedExpr)):
-                right_items = [right_on]
-            else:
-                right_items = list(right_on)
-
-        # Decompose equality expressions: col("a") == col("b") -> left_on=[col_a], right_on=[col_b]
-        # This enables the natural join syntax: table.join(other, col("a") == col("b"))
-        if (
-            len(left_items) == 1
-            and not right_items
-            and isinstance(left_items[0], UnifiedExpr)
-            and hasattr(left_items[0], "_eq_left")
-        ):
-            eq_expr = left_items[0]
-            left_items = [eq_expr._eq_left]
-            right_items = [eq_expr._eq_right]
-            left_has_expr = True
-            has_expr_join = True
+        left_items, right_items, has_expr_join = _normalize_join_keys(on, left_on, right_on, is_cross_join)
 
         if _is_pyspark_df(self._df):
             # PySpark join: use condition-based join
@@ -2771,111 +3001,12 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
             if how == "outer":
                 how = "full"
 
-            # DataFusion: Handle cross joins, expression joins, and duplicate column names
             if is_cross_join:
-                # DataFusion cross join: add separate constant keys to each side
-                # to avoid column name collision
-                from datafusion import lit as df_lit
-
-                # Handle duplicate column names between left and right
-                left_columns = {field.name for field in self._df.schema()}
-                right_columns = {field.name for field in other_df.schema()}
-                duplicate_cols = left_columns & right_columns
-
-                # Rename duplicate columns on right side before join
-                renamed_other = other_df
-                used_names = set(left_columns)
-                for col_name in duplicate_cols:
-                    new_name = f"{col_name}{suffix}"
-                    counter = 2
-                    while new_name in used_names:
-                        new_name = f"{col_name}{suffix}_{counter}"
-                        counter += 1
-                    renamed_other = renamed_other.with_column_renamed(col_name, new_name)
-                    used_names.add(new_name)
-
-                # Add separate temporary constant columns to avoid collision
-                left_with_key = self._df.with_column("__cross_key_left__", df_lit(1))
-                right_with_key = renamed_other.with_column("__cross_key_right__", df_lit(1))
-                result = left_with_key.join(
-                    right_with_key,
-                    left_on=["__cross_key_left__"],
-                    right_on=["__cross_key_right__"],
-                    how="inner",
-                )
-                # Drop the temporary key columns
-                result = result.drop("__cross_key_left__").drop("__cross_key_right__")
+                result = self._datafusion_cross_join(other_df, suffix)
             elif has_expr_join:
-                # DataFusion expression-based join: add computed columns, join, drop temp
                 result = self._datafusion_join_with_exprs(other_df, left_items, right_items, how, suffix)
             else:
-                # Handle duplicate column names in DataFusion
-                # DataFusion doesn't have a suffix parameter, so we need to rename manually
-                left_cols = [item for item in left_items if isinstance(item, str)]
-                right_cols = [item for item in right_items if isinstance(item, str)]
-
-                # Get column names from both sides
-                left_columns = {field.name for field in self._df.schema()}
-                right_columns = {field.name for field in other_df.schema()}
-
-                # Find duplicate columns (excluding join keys from right side)
-                join_keys_on_right = set(right_cols)
-                non_join_right_cols = right_columns - join_keys_on_right
-                duplicate_cols = left_columns & non_join_right_cols
-
-                # Rename duplicate columns on right side before join
-                # Use incremental suffix if the suffixed name already exists
-                renamed_other = other_df
-                used_names = set(left_columns)
-                for col_name in duplicate_cols:
-                    new_name = f"{col_name}{suffix}"
-                    counter = 2
-                    while new_name in used_names:
-                        new_name = f"{col_name}{suffix}_{counter}"
-                        counter += 1
-                    renamed_other = renamed_other.with_column_renamed(col_name, new_name)
-                    used_names.add(new_name)
-
-                # When joining on same-named columns (e.g., on="customer_id"), DataFusion
-                # will create duplicate columns. We need to rename the right join key
-                # before joining and either drop it (for inner joins) or keep it with
-                # suffix (for outer joins where we might need to coalesce values).
-                is_outer_join = how in ("full", "outer", "left", "right")
-                right_join_key_renames = {}
-                for i, (left_key, right_key) in enumerate(zip(left_cols, right_cols)):
-                    # Case 1: Same join key on both sides (from "on=" parameter)
-                    # Case 2: Right join key conflicts with a left column
-                    if right_key == left_key or (right_key in left_columns and right_key != left_key):
-                        if is_outer_join:
-                            # For outer joins, use suffix so columns can be coalesced
-                            new_right_key = f"{right_key}{suffix}"
-                            # Handle case where suffixed name already exists
-                            counter = 2
-                            while new_right_key in used_names:
-                                new_right_key = f"{right_key}{suffix}_{counter}"
-                                counter += 1
-                            used_names.add(new_right_key)
-                        else:
-                            # For inner joins, use temp name that we'll drop
-                            new_right_key = f"__right_join_key_{i}__"
-                        renamed_other = renamed_other.with_column_renamed(right_key, new_right_key)
-                        right_join_key_renames[right_key] = new_right_key
-
-                # Update right_cols with any renamed keys
-                actual_right_cols = [right_join_key_renames.get(c, c) for c in right_cols]
-
-                result = self._df.join(
-                    renamed_other,
-                    left_on=left_cols,
-                    right_on=actual_right_cols,
-                    how=how,
-                )
-
-                # Drop renamed join key columns only for inner joins (not outer)
-                if not is_outer_join:
-                    for _old_key, new_key in right_join_key_renames.items():
-                        if new_key in [field.name for field in result.schema()]:
-                            result = result.drop(new_key)
+                result = self._datafusion_standard_join(other_df, left_items, right_items, how, suffix)
         else:
             # Fallback: try Polars-style
             left_cols = [item for item in left_items if isinstance(item, str)]
@@ -2889,14 +3020,75 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
 
         return UnifiedLazyFrame(result, self._adapter)
 
+    def _datafusion_cross_join(self, other_df: Any, suffix: str) -> Any:
+        """DataFusion cross join: rename duplicate cols, add constant keys on each side, inner-join, drop keys."""
+        from datafusion import lit as df_lit
+
+        left_columns = {field.name for field in self._df.schema()}
+        right_columns = {field.name for field in other_df.schema()}
+        duplicate_cols = left_columns & right_columns
+
+        renamed_other = _rename_duplicate_right_columns(other_df, duplicate_cols, set(left_columns), suffix)
+
+        left_with_key = self._df.with_column("__cross_key_left__", df_lit(1))
+        right_with_key = renamed_other.with_column("__cross_key_right__", df_lit(1))
+        result = left_with_key.join(
+            right_with_key,
+            left_on=["__cross_key_left__"],
+            right_on=["__cross_key_right__"],
+            how="inner",
+        )
+        return result.drop("__cross_key_left__").drop("__cross_key_right__")
+
+    def _datafusion_standard_join(
+        self,
+        other_df: Any,
+        left_items: list,
+        right_items: list,
+        how: str,
+        suffix: str,
+    ) -> Any:
+        """DataFusion join with manual duplicate-column and join-key renaming (no native suffix support)."""
+        left_cols = [item for item in left_items if isinstance(item, str)]
+        right_cols = [item for item in right_items if isinstance(item, str)]
+
+        left_columns = {field.name for field in self._df.schema()}
+        right_columns = {field.name for field in other_df.schema()}
+
+        join_keys_on_right = set(right_cols)
+        non_join_right_cols = right_columns - join_keys_on_right
+        duplicate_cols = left_columns & non_join_right_cols
+
+        used_names = set(left_columns)
+        renamed_other = _rename_duplicate_right_columns(other_df, duplicate_cols, used_names, suffix)
+
+        is_outer_join = how in ("full", "outer", "left", "right")
+        renamed_other, right_join_key_renames = _rename_conflicting_join_keys(
+            renamed_other, left_cols, right_cols, left_columns, used_names, suffix, is_outer_join
+        )
+
+        actual_right_cols = [right_join_key_renames.get(c, c) for c in right_cols]
+        result = self._df.join(
+            renamed_other,
+            left_on=left_cols,
+            right_on=actual_right_cols,
+            how=how,
+        )
+
+        if not is_outer_join:
+            for _old_key, new_key in right_join_key_renames.items():
+                if new_key in [field.name for field in result.schema()]:
+                    result = result.drop(new_key)
+        return result
+
     def _pyspark_join(
         self,
-        other: Any,
+        other: PySparkDataFrame,
         left_cols: list[str],
         right_cols: list[str],
         how: str,
         suffix: str = "_right",
-    ) -> Any:
+    ) -> PySparkDataFrame:
         """Execute a PySpark join with column equality conditions.
 
         Args:
@@ -2984,9 +3176,9 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
 
     def _pyspark_cross_join(
         self,
-        other: Any,
+        other: PySparkDataFrame,
         suffix: str = "_right",
-    ) -> Any:
+    ) -> PySparkDataFrame:
         """Execute a PySpark cross join (cartesian product).
 
         Args:
@@ -3012,12 +3204,12 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
 
     def _pyspark_join_expr(
         self,
-        other: Any,
+        other: PySparkDataFrame,
         left_col: str,
         right_expr: UnifiedExpr,
         how: str,
         suffix: str = "_right",
-    ) -> Any:
+    ) -> PySparkDataFrame:
         """Execute a PySpark join with an expression-based condition.
 
         Used for joins like: left_on="col1", right_on=col("col2") - 53
@@ -3067,12 +3259,12 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
 
     def _pyspark_join_multi_expr(
         self,
-        other: Any,
+        other: PySparkDataFrame,
         left_items: list,
         right_items: list,
         how: str,
         suffix: str = "_right",
-    ) -> Any:
+    ) -> PySparkDataFrame:
         """Execute a PySpark join with mixed column names and expressions.
 
         Handles joins like:
@@ -3153,12 +3345,12 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
 
     def _polars_join_with_exprs(
         self,
-        other: Any,
+        other: pl.DataFrame | pl.LazyFrame,
         left_items: list,
         right_items: list,
         how: str,
         suffix: str = "_right",
-    ) -> Any:
+    ) -> pl.DataFrame | pl.LazyFrame:
         """Execute a Polars join with mixed column names and expressions.
 
         Polars doesn't directly support expression-based joins, so we add
@@ -3243,12 +3435,12 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
 
     def _datafusion_join_with_exprs(
         self,
-        other: Any,
+        other: DataFusionDataFrame,
         left_items: list,
         right_items: list,
         how: str,
         suffix: str = "_right",
-    ) -> Any:
+    ) -> DataFusionDataFrame:
         """Execute a DataFusion join with mixed column names and expressions.
 
         DataFusion doesn't directly support expression-based joins, so we add
@@ -3264,122 +3456,38 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         Returns:
             Joined DataFusion DataFrame
         """
-        left_df = self._df
-        right_df = other
+        left_df, left_join_cols, temp_cols_left = _prepare_join_items(self._df, left_items, "left")
+        right_df, right_join_cols, temp_cols_right = _prepare_join_items(other, right_items, "right")
 
-        # Track temp columns to drop later
-        temp_cols_left: list[str] = []
-        temp_cols_right: list[str] = []
-
-        # Process left items - add temp columns for expressions
-        left_join_cols: list[str] = []
-        for i, item in enumerate(left_items):
-            if isinstance(item, UnifiedExpr):
-                temp_col = f"__left_join_key_{i}__"
-                left_df = left_df.with_column(temp_col, item.native)
-                left_join_cols.append(temp_col)
-                temp_cols_left.append(temp_col)
-            elif isinstance(item, str):
-                left_join_cols.append(item)
-            elif _is_datafusion_expr(item):
-                temp_col = f"__left_join_key_{i}__"
-                left_df = left_df.with_column(temp_col, item)
-                left_join_cols.append(temp_col)
-                temp_cols_left.append(temp_col)
-            else:
-                # Try to use as-is
-                left_join_cols.append(str(item))
-
-        # Process right items - add temp columns for expressions
-        right_join_cols: list[str] = []
-        for i, item in enumerate(right_items):
-            if isinstance(item, UnifiedExpr):
-                temp_col = f"__right_join_key_{i}__"
-                right_df = right_df.with_column(temp_col, item.native)
-                right_join_cols.append(temp_col)
-                temp_cols_right.append(temp_col)
-            elif isinstance(item, str):
-                right_join_cols.append(item)
-            elif _is_datafusion_expr(item):
-                temp_col = f"__right_join_key_{i}__"
-                right_df = right_df.with_column(temp_col, item)
-                right_join_cols.append(temp_col)
-                temp_cols_right.append(temp_col)
-            else:
-                # Try to use as-is
-                right_join_cols.append(str(item))
-
-        # Get column names from both sides for duplicate handling
         left_columns = {field.name for field in left_df.schema()}
         right_columns = {field.name for field in right_df.schema()}
 
-        # Find duplicate columns (excluding join keys from right side)
-        join_keys_on_right = set(right_join_cols)
-        non_join_right_cols = right_columns - join_keys_on_right
-        duplicate_cols = left_columns & non_join_right_cols
-
-        # Rename duplicate columns on right side before join
-        # Use incremental suffix if the suffixed name already exists
+        duplicate_cols = left_columns & (right_columns - set(right_join_cols))
         used_names = set(left_columns)
-        for col_name in duplicate_cols:
-            new_name = f"{col_name}{suffix}"
-            counter = 2
-            while new_name in used_names:
-                new_name = f"{col_name}{suffix}_{counter}"
-                counter += 1
-            right_df = right_df.with_column_renamed(col_name, new_name)
-            used_names.add(new_name)
+        right_df = _rename_duplicate_right_columns(right_df, duplicate_cols, used_names, suffix)
 
-        # Handle same-named join columns (like on="column_name" pattern)
-        # DataFusion will create duplicate columns, so rename right join keys
         is_outer_join = how in ("full", "outer", "left", "right")
-        right_join_key_renames = {}
-        for i, (left_key, right_key) in enumerate(zip(left_join_cols, right_join_cols)):
-            # If right key same as left key, or right key exists in left columns
-            if right_key == left_key or (right_key in left_columns and right_key not in temp_cols_right):
-                if is_outer_join:
-                    # For outer joins, use suffix so columns can be coalesced
-                    new_right_key = f"{right_key}{suffix}"
-                    counter = 2
-                    while new_right_key in used_names:
-                        new_right_key = f"{right_key}{suffix}_{counter}"
-                        counter += 1
-                    used_names.add(new_right_key)
-                else:
-                    # For inner joins, use temp name that we'll drop
-                    new_right_key = f"__expr_join_right_key_{i}__"
-                right_df = right_df.with_column_renamed(right_key, new_right_key)
-                right_join_key_renames[right_key] = new_right_key
+        right_df, right_join_key_renames = _rename_same_named_join_keys(
+            right_df,
+            left_join_cols,
+            right_join_cols,
+            temp_cols_right,
+            left_columns,
+            used_names,
+            is_outer_join,
+            suffix,
+        )
 
-        # Update right_join_cols with renamed keys
         actual_right_join_cols = [right_join_key_renames.get(c, c) for c in right_join_cols]
-
-        # Perform the join
         result = left_df.join(
             right_df,
             left_on=left_join_cols,
             right_on=actual_right_join_cols,
             how=how,
         )
-
-        # Drop renamed right join key columns only for inner joins
-        if not is_outer_join:
-            for _old_key, new_key in right_join_key_renames.items():
-                if new_key in [field.name for field in result.schema()]:
-                    result = result.drop(new_key)
-
-        # Drop temp columns from left side
-        for temp_col in temp_cols_left:
-            if temp_col in [field.name for field in result.schema()]:
-                result = result.drop(temp_col)
-
-        # Drop temp columns from right side (may have been renamed with suffix)
-        for temp_col in temp_cols_right:
-            for col_name in [temp_col, f"{temp_col}{suffix}"]:
-                if col_name in [field.name for field in result.schema()]:
-                    result = result.drop(col_name)
-
-        return result
+        return _drop_post_join_temp_columns(
+            result, temp_cols_left, temp_cols_right, right_join_key_renames, is_outer_join, suffix
+        )
 
     # =========================================================================
     # Grouping Operations
@@ -3726,93 +3834,16 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         Returns:
             UnifiedLazyFrame with sorted rows
         """
-        # Collect all columns
-        cols = list(by) if isinstance(by, list) else [by]
-        # Add any additional positional columns
-        cols.extend(more_columns)
-
-        # Handle tuple syntax: [("col", "desc"), ("col2", "asc")]
-        # Extract direction flags from tuples before processing descending parameter.
-        tuple_desc_flags: list[bool] | None = None
-        if cols and isinstance(cols[0], tuple):
-            tuple_desc_flags = []
-            parsed_cols = []
-            for item in cols:
-                if isinstance(item, tuple):
-                    col_name, direction = item
-                    parsed_cols.append(col_name)
-                    tuple_desc_flags.append(direction.lower().startswith("desc"))
-                else:
-                    parsed_cols.append(item)
-                    tuple_desc_flags.append(False)
-            cols = parsed_cols
-
-        # Handle descending flags
-        if tuple_desc_flags is not None:
-            desc_flags = tuple_desc_flags
-        elif isinstance(descending, bool):
-            desc_flags = [descending] * len(cols)
-        else:
-            desc_flags = list(descending)
-            # Extend with False if more columns than flags
-            if len(desc_flags) < len(cols):
-                desc_flags.extend([False] * (len(cols) - len(desc_flags)))
+        cols, desc_flags = _normalize_sort_inputs(by, more_columns, descending)
 
         if _is_pyspark_df(self._df):
-            from pyspark.sql import functions as F  # noqa: N812
-
-            # PySpark: Build orderBy expressions
-            order_exprs = []
-            for col_item, desc in zip(cols, desc_flags, strict=False):
-                # Handle both string column names and UnifiedExpr
-                if isinstance(col_item, UnifiedExpr):
-                    expr = col_item.native
-                elif isinstance(col_item, str):
-                    expr = F.col(col_item)
-                else:
-                    # Assume it's already a PySpark Column
-                    expr = col_item
-
-                if desc:
-                    if nulls_last:
-                        order_exprs.append(expr.desc_nulls_last())
-                    else:
-                        order_exprs.append(expr.desc())
-                else:
-                    if nulls_last:
-                        order_exprs.append(expr.asc_nulls_last())
-                    else:
-                        order_exprs.append(expr.asc())
-            result = self._df.orderBy(*order_exprs)
+            result = _sort_pyspark(self._df, cols, desc_flags, nulls_last)
         elif _is_polars_df(self._df):
-            # Polars: Use native sort with nulls_last
-            # Unwrap UnifiedExpr objects to native Polars expressions
             unwrapped_cols = [c.native if isinstance(c, UnifiedExpr) else c for c in cols]
             result = self._df.sort(unwrapped_cols, descending=desc_flags, nulls_last=nulls_last)
         elif _is_datafusion_df(self._df):
-            # DataFusion: Sort expressions use col.sort(ascending=bool, nulls_first=bool)
-            from datafusion import col as df_col
-            from datafusion.expr import SortExpr
-
-            sort_exprs = []
-            for col_item, desc in zip(cols, desc_flags, strict=False):
-                if isinstance(col_item, UnifiedExpr):
-                    expr = col_item.native
-                elif isinstance(col_item, str):
-                    expr = df_col(col_item)
-                else:
-                    expr = col_item
-
-                # If already a SortExpr (e.g. from desc()), use directly
-                if isinstance(expr, SortExpr):
-                    sort_exprs.append(expr)
-                else:
-                    sort_expr = expr.sort(ascending=not desc, nulls_first=not nulls_last)
-                    sort_exprs.append(sort_expr)
-
-            result = self._df.sort(*sort_exprs)
+            result = _sort_datafusion(self._df, cols, desc_flags, nulls_last)
         else:
-            # Fallback
             unwrapped_cols = [c.native if isinstance(c, UnifiedExpr) else c for c in cols]
             result = self._df.sort(unwrapped_cols, descending=desc_flags)
 
@@ -4006,6 +4037,12 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
             - Polars: Polars DataFrame
             - PySpark: PySpark DataFrame
             - DataFusion: PyArrow Table (from collected batches)
+
+        Escape-hatch `Any`: each backend returns its own materialized type.
+        Narrowing to a union (`polars.DataFrame | pyspark.sql.DataFrame |
+        pyarrow.Table`) would force optional-dep imports at type-check time
+        without giving callers a useful common surface - they have to
+        backend-narrow before consuming anyway.
         """
         if _is_pyspark_df(self._df):
             # PySpark DataFrames are already materialized on action
@@ -4079,7 +4116,10 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
             col: Column index (default 0)
 
         Returns:
-            The scalar value at the specified position
+            The scalar value at the specified position. Escape-hatch `Any`
+            because the backing column can hold any SQL-typed value
+            (int / float / Decimal / str / bytes / date / None / nested
+            struct). Caller knows their column's type from context.
         """
         if _is_pyspark_df(self._df):
             # PySpark: collect returns list of Row objects
@@ -4125,7 +4165,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         return UnifiedLazyFrame(result, self._adapter)
 
 
-def wrap_dataframe(df: Any, adapter: ExpressionFamilyAdapter) -> UnifiedLazyFrame:
+def wrap_dataframe(df: LazyFrameLike, adapter: ExpressionFamilyAdapter) -> UnifiedLazyFrame:
     """Wrap a native DataFrame in a UnifiedLazyFrame.
 
     Args:

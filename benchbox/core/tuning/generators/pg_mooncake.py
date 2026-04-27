@@ -74,7 +74,7 @@ class PgMooncakeDDLGenerator(PostgreSQLDDLGenerator):
             platform_opts: Platform-specific options (ignored for columnstore).
 
         Returns:
-            Empty TuningClauses — columnstore tables handle tuning internally.
+            Empty TuningClauses - columnstore tables handle tuning internally.
         """
         # Columnstore tables manage their own storage layout.
         # No PostgreSQL-level partitioning, clustering, or index tuning.

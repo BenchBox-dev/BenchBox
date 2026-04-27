@@ -6,11 +6,11 @@ the unified runner once you are comfortable with the workflow.
 
 ## Progression
 
-1. **Basic (local DuckDB)** – end-to-end power tests for TPC-H and TPC-DS
+1. **Basic (local DuckDB)** - end-to-end power tests for TPC-H and TPC-DS
    with almost no configuration.
-2. **Intermediate (local DuckDB)** – focuses on a common option: running a
+2. **Intermediate (local DuckDB)** - focuses on a common option: running a
    targeted subset of queries for quick smoke tests.
-3. **Cloud** – shows the minimum viable setup for Databricks and how to use
+3. **Cloud** - shows the minimum viable setup for Databricks and how to use
    the dry-run tooling to validate BigQuery environments before spending
    credits.
 
@@ -68,11 +68,11 @@ behave predictably in clean environments.
 
 ## Troubleshooting
 
-- **`ImportError: DuckDB not installed`** – install the core extra with
+- **`ImportError: DuckDB not installed`** - install the core extra with
   `uv pip install duckdb` or install BenchBox via `uv add benchbox`.
-- **`databricks-sql-connector` missing** – install `benchbox[databricks]`
+- **`databricks-sql-connector` missing** - install `benchbox[databricks]`
   or `benchbox[cloud]` before running the Databricks example.
-- **BigQuery dry run warnings** – lack of the Google client libraries or
+- **BigQuery dry run warnings** - lack of the Google client libraries or
   credentials adds a warning to the dry-run output but still writes the
   preview files so you can confirm configuration.
 

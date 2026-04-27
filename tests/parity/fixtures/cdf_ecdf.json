@@ -1,0 +1,121 @@
+{
+  "chart": "cdf_chart",
+  "version": 1,
+  "cases": [
+    {
+      "id": "five_values_sorted",
+      "input": {
+        "values": [
+          30,
+          10,
+          50,
+          20,
+          40
+        ]
+      },
+      "expected": [
+        {
+          "x": 10,
+          "y": 20.0
+        },
+        {
+          "x": 20,
+          "y": 40.0
+        },
+        {
+          "x": 30,
+          "y": 60.0
+        },
+        {
+          "x": 40,
+          "y": 80.0
+        },
+        {
+          "x": 50,
+          "y": 100.0
+        }
+      ]
+    },
+    {
+      "id": "three_values",
+      "input": {
+        "values": [
+          10,
+          30,
+          20
+        ]
+      },
+      "expected": [
+        {
+          "x": 10,
+          "y": 33.33333333333333
+        },
+        {
+          "x": 20,
+          "y": 66.66666666666666
+        },
+        {
+          "x": 30,
+          "y": 100.0
+        }
+      ]
+    },
+    {
+      "id": "nulls_filtered",
+      "input": {
+        "values": [
+          null,
+          5,
+          null,
+          15,
+          25
+        ]
+      },
+      "expected": [
+        {
+          "x": 5,
+          "y": 33.33333333333333
+        },
+        {
+          "x": 15,
+          "y": 66.66666666666666
+        },
+        {
+          "x": 25,
+          "y": 100.0
+        }
+      ]
+    },
+    {
+      "id": "single_value",
+      "input": {
+        "values": [
+          42
+        ]
+      },
+      "expected": [
+        {
+          "x": 42,
+          "y": 100.0
+        }
+      ]
+    },
+    {
+      "id": "empty",
+      "input": {
+        "values": []
+      },
+      "expected": []
+    },
+    {
+      "id": "all_null",
+      "input": {
+        "values": [
+          null,
+          null
+        ]
+      },
+      "expected": []
+    }
+  ]
+}

@@ -384,11 +384,18 @@ def test_transaction_primitives_execute_operation_and_dataframe_paths(monkeypatc
     assert len(bench.run_benchmark(_ExecConn(), categories=["transaction"])) == 1
     assert len(bench.run_benchmark(_ExecConn())) == 2
 
-    fake_df_module = SimpleNamespace(
-        validate_transaction_primitives_platform=lambda p: (False, "unsupported") if p == "duckdb" else (True, ""),
-        get_dataframe_transaction_manager=lambda p, spark_session=None: None if p == "none" else {"platform": p},
+    import benchbox.core.transaction_primitives.dataframe_operations as _df_ops_mod
+
+    monkeypatch.setattr(
+        _df_ops_mod,
+        "validate_transaction_primitives_platform",
+        lambda p: (False, "unsupported") if p == "duckdb" else (True, ""),
     )
-    monkeypatch.setattr(mod, "_dataframe_operations_module", fake_df_module)
+    monkeypatch.setattr(
+        _df_ops_mod,
+        "get_dataframe_transaction_manager",
+        lambda p, spark_session=None: None if p == "none" else {"platform": p},
+    )
     assert bench.supports_dataframe_mode("delta-lake") is True
     assert bench.supports_dataframe_mode("duckdb") is False
     assert bench.validate_dataframe_configuration("duckdb")[0] is False

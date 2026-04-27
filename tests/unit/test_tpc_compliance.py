@@ -815,7 +815,7 @@ class MockTPCCompliantBenchmark(TPCCompliantBenchmark):
             "compliance_score": metrics.compliance_score,
         }
 
-        with open(results_file, "w") as f:
+        with open(results_file, "w", encoding="utf-8") as f:
             json.dump(metrics_dict, f, indent=2)
 
     def run_power_test(self) -> TPCTestResult:
@@ -930,7 +930,7 @@ class TestTPCCompliantBenchmark:
             assert results_file.exists()
 
             # Verify file contents
-            with open(results_file) as f:
+            with open(results_file, encoding="utf-8") as f:
                 saved_metrics = json.load(f)
 
             assert saved_metrics["benchmark_name"] == "TPC-H"

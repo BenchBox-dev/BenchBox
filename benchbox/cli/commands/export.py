@@ -76,25 +76,40 @@ def export(ctx, result_file, formats, output_dir, last, benchmark, platform, for
         # Export to custom directory
         benchbox export --last --format csv --output-dir ./reports/
     """
-    # Default to JSON if no formats specified
     if not formats:
         formats = ["json"]
 
-    # Determine source file
-    source_path = None
+    source_path = _resolve_export_source(result_file, last, benchmark, platform)
+    if source_path is None:
+        return
 
+    result = _load_export_result(source_path)
+    if result is None:
+        return
+
+    output_directory = Path(output_dir) if output_dir else Path("benchmark_runs/results")
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    if not force and not _confirm_overwrite(source_path, output_directory, formats):
+        return
+
+    try:
+        exporter = ResultExporter(output_dir=output_directory)
+        console.print(f"\n[bold]Exporting to {len(formats)} format(s)...[/bold]")
+        exported = exporter.export_result(result, formats=list(formats))
+        _print_export_summary(exported, output_directory)
+    except Exception as e:
+        console.print(f"\n[red]Export failed: {e}[/red]")
+
+
+def _resolve_export_source(result_file, last, benchmark, platform):
+    """Return the source Path to export from, or None if user guidance was printed."""
     if result_file:
-        # Explicit file path provided
-        source_path = Path(result_file)
-    elif last:
-        # Find latest result with optional filters
-        default_results_dir = Path("benchmark_runs/results")
-        source_path = find_latest_result(
-            default_results_dir,
-            benchmark=benchmark,
-            platform=platform,
-        )
+        return Path(result_file)
 
+    if last:
+        default_results_dir = Path("benchmark_runs/results")
+        source_path = find_latest_result(default_results_dir, benchmark=benchmark, platform=platform)
         if not source_path:
             console.print("[yellow]No results found[/yellow]")
             if benchmark or platform:
@@ -105,93 +120,77 @@ def export(ctx, result_file, formats, output_dir, last, benchmark, platform, for
                     filters.append(f"platform={platform}")
                 console.print(f"  Filters: {', '.join(filters)}")
             console.print("\n[dim]Tip: Run a benchmark first or check benchmark_runs/results/[/dim]")
-            return
-
+            return None
         console.print(f"[blue]Using latest result:[/blue] {source_path.name}")
-    else:
-        # No file specified, show usage help
-        console.print("[yellow]Please specify a result file or use --last[/yellow]")
-        console.print("\n[bold]Examples:[/bold]")
-        console.print("  benchbox export result.json --format csv")
-        console.print("  benchbox export --last --format html")
-        console.print("  benchbox export --last --benchmark tpc_h --format csv")
-        console.print("\n[dim]Tip: Use 'benchbox results' to see available result files[/dim]")
-        return
+        return source_path
 
-    # Load result file
+    console.print("[yellow]Please specify a result file or use --last[/yellow]")
+    console.print("\n[bold]Examples:[/bold]")
+    console.print("  benchbox export result.json --format csv")
+    console.print("  benchbox export --last --format html")
+    console.print("  benchbox export --last --benchmark tpc_h --format csv")
+    console.print("\n[dim]Tip: Use 'benchbox results' to see available result files[/dim]")
+    return None
+
+
+def _load_export_result(source_path):
+    """Load a result JSON, printing user-facing errors and returning None on failure."""
     try:
-        result, raw_data = load_result_file(source_path)
-        console.print(f"[green]✓[/green] Loaded: {result.benchmark_name} ({result.platform})")
-        console.print(
-            f"  Scale: {result.scale_factor}, Queries: {result.total_queries}, Duration: {result.duration_seconds:.2f}s"
-        )
+        result, _raw_data = load_result_file(source_path)
     except FileNotFoundError:
         console.print(f"[red]Error: Result file not found: {source_path}[/red]")
-        return
+        return None
     except UnsupportedSchemaError as e:
         console.print(f"[red]Error: {e}[/red]")
         console.print("[dim]Only schema version 1.0 is currently supported[/dim]")
-        return
+        return None
     except ResultLoadError as e:
         console.print(f"[red]Error loading result file: {e}[/red]")
         console.print("[dim]The file may be corrupted or in an invalid format[/dim]")
-        return
+        return None
     except Exception as e:
         console.print(f"[red]Unexpected error: {e}[/red]")
-        return
+        return None
 
-    # Determine output directory
-    if output_dir:
-        output_directory = Path(output_dir)
-    else:
-        # Default to benchmark_runs/results/
-        output_directory = Path("benchmark_runs/results")
+    console.print(f"[green]✓[/green] Loaded: {result.benchmark_name} ({result.platform})")
+    console.print(
+        f"  Scale: {result.scale_factor}, Queries: {result.total_queries}, Duration: {result.duration_seconds:.2f}s"
+    )
+    return result
 
-    # Ensure output directory exists
-    output_directory.mkdir(parents=True, exist_ok=True)
 
-    # Export to requested formats
-    try:
-        exporter = ResultExporter(output_dir=output_directory)
+def _confirm_overwrite(source_path, output_directory, formats) -> bool:
+    """Return True if export should proceed (no conflicts, or user confirmed)."""
+    base_name = source_path.stem
+    conflicts = [
+        fmt
+        for fmt in formats
+        if (output_directory / f"{base_name}.{fmt}").exists()
+        and (output_directory / f"{base_name}.{fmt}") != source_path
+    ]
+    if not conflicts:
+        return True
 
-        # Check for existing files if not --force
-        if not force:
-            base_name = source_path.stem
-            conflicts = []
-            for fmt in formats:
-                potential_file = output_directory / f"{base_name}.{fmt}"
-                if potential_file.exists() and potential_file != source_path:
-                    conflicts.append(fmt)
+    console.print("\n[yellow]Warning: The following files will be overwritten:[/yellow]")
+    for fmt in conflicts:
+        console.print(f"  • {base_name}.{fmt}")
 
-            if conflicts:
-                console.print("\n[yellow]Warning: The following files will be overwritten:[/yellow]")
-                for fmt in conflicts:
-                    console.print(f"  • {base_name}.{fmt}")
+    if not click.confirm("\nProceed with export?", default=True):
+        console.print("[yellow]Export cancelled[/yellow]")
+        return False
+    return True
 
-                if not click.confirm("\nProceed with export?", default=True):
-                    console.print("[yellow]Export cancelled[/yellow]")
-                    return
 
-        # Perform export
-        console.print(f"\n[bold]Exporting to {len(formats)} format(s)...[/bold]")
-        exported = exporter.export_result(result, formats=list(formats))
-
-        # Display success summary
-        console.print("\n[bold green]✓ Export complete![/bold green]")
-        console.print(f"Exported {len(exported)} format(s):")
-
-        for fmt, path in exported.items():
-            try:
-                size_kb = path.stat().st_size / 1024
-                console.print(f"  • {fmt.upper()}: {path.name} ({size_kb:.1f} KB)")
-            except OSError:
-                console.print(f"  • {fmt.upper()}: {path.name}")
-
-        console.print(f"\n[dim]Output directory: {output_directory.absolute()}[/dim]")
-
-    except Exception as e:
-        console.print(f"\n[red]Export failed: {e}[/red]")
-        return
+def _print_export_summary(exported: dict, output_directory: Path) -> None:
+    console.print("\n[bold green]✓ Export complete![/bold green]")
+    console.print(f"Exported {len(exported)} format(s):")
+    for fmt, path in exported.items():
+        try:
+            size_kb = path.stat().st_size / 1024
+            console.print(f"  • {fmt.upper()}: {path.name} ({size_kb:.1f} KB)")
+        except OSError:
+            console.print(f"  • {fmt.upper()}: {path.name}")
+    console.print(f"\n[dim]Output directory: {output_directory.absolute()}[/dim]")
 
 
 __all__ = ["export"]

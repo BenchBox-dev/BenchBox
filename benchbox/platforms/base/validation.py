@@ -180,7 +180,7 @@ class SchemaValidator(BaseValidator):
                     result.add_warning(f"Extra tables found: {', '.join(sorted(extra_tables))}")
 
         except ValueError as e:
-            # Missing benchmark_instance — cannot validate, treat as skipped (not invalid)
+            # Missing benchmark_instance - cannot validate, treat as skipped (not invalid)
             result.add_warning(f"Schema validation skipped: {str(e)}")
         except Exception as e:
             # Other errors - warnings
@@ -391,7 +391,7 @@ class RowCountValidator(BaseValidator):
                 self._validate_table_row_count(connection, table, strategy, result)
 
         except ValueError as e:
-            # Missing benchmark_instance — cannot validate, treat as skipped (not invalid)
+            # Missing benchmark_instance - cannot validate, treat as skipped (not invalid)
             result.add_warning(f"Row count validation skipped: {str(e)}")
         except Exception as e:
             # Other errors - warnings
@@ -523,7 +523,7 @@ class DatabaseValidator:
                     try:
                         expected_tables = self.schema_validator._get_expected_tables()
                     except ValueError:
-                        expected_tables = set()  # No benchmark_instance — skip row count validation
+                        expected_tables = set()  # No benchmark_instance - skip row count validation
                     row_count_result = self.row_count_validator.validate(connection, expected_tables)
                     row_counts_valid = row_count_result.is_valid
                     issues.extend(row_count_result.errors)

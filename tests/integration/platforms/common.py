@@ -523,7 +523,7 @@ class _RedshiftBoto3Session:
 def install_redshift_stubs(
     monkeypatch, *, host: str = "example.redshift.amazonaws.com", port: int = 5439
 ) -> RedshiftStubState:
-    """Install stubs for redshift_connector/psycopg2 and boto3."""
+    """Install stubs for redshift_connector/psycopg and boto3."""
 
     state = RedshiftStubState(host=host, port=port)
 
@@ -534,25 +534,22 @@ def install_redshift_stubs(
     redshift_module.connect = connect
     redshift_module.__version__ = "0.0.1"
 
-    psycopg2_module = types.ModuleType("psycopg2")
-    psycopg2_module.connect = connect
-    extensions_module = types.ModuleType("psycopg2.extensions")
-    extensions_module.ISOLATION_LEVEL_READ_COMMITTED = 1
+    psycopg_module = types.ModuleType("psycopg")
+    psycopg_module.connect = connect
 
     boto3_module = types.ModuleType("boto3")
     boto3_module.Session = lambda **kwargs: _RedshiftBoto3Session(state, **kwargs)
     boto3_module.client = lambda *_args, **_kwargs: _Boto3Client(state)
 
     monkeypatch.setitem(sys.modules, "redshift_connector", redshift_module)
-    monkeypatch.setitem(sys.modules, "psycopg2", psycopg2_module)
-    monkeypatch.setitem(sys.modules, "psycopg2.extensions", extensions_module)
+    monkeypatch.setitem(sys.modules, "psycopg", psycopg_module)
     monkeypatch.setitem(sys.modules, "boto3", boto3_module)
 
     try:
         import benchbox.platforms.redshift as adapter_module
 
         adapter_module.redshift_connector = redshift_module
-        adapter_module.psycopg2 = psycopg2_module
+        adapter_module.psycopg = psycopg_module
         adapter_module.boto3 = boto3_module
     except ImportError:  # pragma: no cover - defensive
         pass
@@ -1053,10 +1050,10 @@ def install_trino_stub(
 
     auth_module = types.ModuleType("trino.auth")
 
+    @dataclass
     class BasicAuthentication:
-        def __init__(self, username: str, password: str) -> None:
-            self.username = username
-            self.password = password
+        username: str
+        password: str
 
     auth_module.BasicAuthentication = BasicAuthentication
 
@@ -1161,10 +1158,10 @@ def install_presto_stub(
 
     auth_module = types.ModuleType("prestodb.auth")
 
+    @dataclass
     class PrestoBasicAuthentication:
-        def __init__(self, username: str, password: str) -> None:
-            self.username = username
-            self.password = password
+        username: str
+        password: str
 
     auth_module.BasicAuthentication = PrestoBasicAuthentication
 
@@ -1265,7 +1262,7 @@ def install_postgresql_stub(
     port: int = 5432,
     database: str = "benchbox",
 ) -> PostgreSQLStubState:
-    """Install psycopg2 stub."""
+    """Install psycopg stub."""
 
     state = PostgreSQLStubState(host=host, port=port, database=database)
 
@@ -1274,25 +1271,16 @@ def install_postgresql_stub(
         conn._state = state  # Expose state for test verification
         return conn
 
-    psycopg2_module = types.ModuleType("psycopg2")
-    psycopg2_module.connect = connect
-    psycopg2_module.__version__ = "2.9.9"
+    psycopg_module = types.ModuleType("psycopg")
+    psycopg_module.connect = connect
+    psycopg_module.__version__ = "3.1.0"
 
-    extras_module = types.ModuleType("psycopg2.extras")
-    extras_module.RealDictCursor = object  # Stub cursor type
-
-    extensions_module = types.ModuleType("psycopg2.extensions")
-    extensions_module.ISOLATION_LEVEL_AUTOCOMMIT = 0
-    extensions_module.ISOLATION_LEVEL_READ_COMMITTED = 1
-
-    monkeypatch.setitem(sys.modules, "psycopg2", psycopg2_module)
-    monkeypatch.setitem(sys.modules, "psycopg2.extras", extras_module)
-    monkeypatch.setitem(sys.modules, "psycopg2.extensions", extensions_module)
+    monkeypatch.setitem(sys.modules, "psycopg", psycopg_module)
 
     try:
         import benchbox.platforms.postgresql as adapter_module
 
-        adapter_module.psycopg2 = psycopg2_module
+        adapter_module.psycopg = psycopg_module
     except ImportError:  # pragma: no cover - defensive
         pass
 
@@ -2572,6 +2560,16 @@ def install_lakesail_stub(
             "DateType",
         ]:
             setattr(adapter_module, type_name, getattr(pyspark_types_module, type_name))
+
+        # Make the adapter think the server is reachable so tests skip the
+        # real TCP connection and pysail import checks.
+        # The adapter calls is_spark_connect_reachable from _spark_helpers, which
+        # the lakesail module imports by name - patch that imported name.
+        monkeypatch.setattr(
+            adapter_module,
+            "is_spark_connect_reachable",
+            lambda endpoint, *, timeout=2.0: True,
+        )
     except ImportError:  # pragma: no cover
         pass
 

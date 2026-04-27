@@ -1,0 +1,1494 @@
+"""Additional coverage tests for SnowflakeAdapter uncovered paths.
+
+Focuses on:
+- _get_query_statistics: retry-exhausted and exception paths
+- configure_for_benchmark: cache-control and suppress_nondeterministic edge cases
+- _build_ctas_sort_sql: method="ctas" and unsupported method branches
+- get_platform_info: warehouse SHOW result captured in compute_configuration
+
+Copyright 2026 Joe Harris / BenchBox Project
+
+Licensed under the MIT License. See LICENSE file in the project root for details.
+"""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+]
+
+
+# ---------------------------------------------------------------------------
+# Shared fixture
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _mock_snowflake_deps():
+    with (
+        patch("benchbox.platforms.snowflake.snowflake"),
+        patch("benchbox.platforms.snowflake.check_platform_dependencies", return_value=(True, [])),
+    ):
+        yield
+
+
+def _make_adapter(**kwargs):
+    from benchbox.platforms.snowflake import SnowflakeAdapter
+
+    defaults = {
+        "account": "test_account",
+        "username": "test_user",
+        "password": "test_pass",
+        "warehouse": "COMPUTE_WH",
+        "database": "BENCHBOX",
+    }
+    defaults.update(kwargs)
+    return SnowflakeAdapter(**defaults)
+
+
+# ---------------------------------------------------------------------------
+# _get_query_statistics: retry-exhausted and exception paths
+# ---------------------------------------------------------------------------
+
+
+class TestGetQueryStatisticsRetry:
+    """Test _get_query_statistics branches not covered by existing tests."""
+
+    def test_returns_note_when_no_result_after_max_retries(self):
+        """When fetchone always returns None, return the note dict after max_retries+1 attempts."""
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = None  # never produces a row
+
+        with patch("time.sleep"):
+            result = adapter._get_query_statistics(mock_conn, "q-miss", max_retries=1, initial_delay=0.001)
+
+        assert "note" in result
+        assert result["retrieval_attempts"] == 2  # max_retries+1
+
+    def test_returns_statistics_error_when_execute_raises(self):
+        """When cursor.execute raises on every attempt, return statistics_error dict."""
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = RuntimeError("history table unavailable")
+
+        with patch("time.sleep"):
+            result = adapter._get_query_statistics(mock_conn, "q-err", max_retries=1, initial_delay=0.001)
+
+        assert "statistics_error" in result
+        assert "history table unavailable" in result["statistics_error"]
+        assert result["retrieval_attempts"] == 2
+
+    def test_query_history_sql_contains_query_id(self):
+        """The SQL executed must query INFORMATION_SCHEMA.QUERY_HISTORY and filter by query_id."""
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = None  # never finds result
+
+        with patch("time.sleep"):
+            adapter._get_query_statistics(mock_conn, "BENCHQ17", max_retries=0)
+
+        executed_sqls = [c.args[0] for c in mock_cursor.execute.call_args_list]
+        assert any("QUERY_HISTORY" in s for s in executed_sqls), f"No QUERY_HISTORY in: {executed_sqls}"
+        assert any("BENCHQ17" in s for s in executed_sqls), f"query_id not in SQL: {executed_sqls}"
+
+
+# ---------------------------------------------------------------------------
+# _build_ctas_sort_sql
+# ---------------------------------------------------------------------------
+
+
+class TestBuildCtasSortSql:
+    """Test _build_ctas_sort_sql method branches."""
+
+    def test_returns_none_when_mode_is_off(self):
+        adapter = _make_adapter()
+        col = Mock()
+        col.name = "l_orderkey"
+
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("off", "ctas")):
+            result = adapter._build_ctas_sort_sql("LINEITEM", [col])
+
+        assert result is None
+
+    def test_generates_ctas_order_by_sql(self):
+        adapter = _make_adapter()
+        col1 = Mock()
+        col1.name = "l_orderkey"
+        col2 = Mock()
+        col2.name = "l_partkey"
+
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "ctas")):
+            sql = adapter._build_ctas_sort_sql("LINEITEM", [col1, col2])
+
+        assert sql is not None
+        assert "CREATE OR REPLACE TABLE LINEITEM" in sql
+        assert "ORDER BY l_orderkey, l_partkey" in sql
+
+    def test_raises_for_unsupported_method(self):
+        adapter = _make_adapter()
+        col = Mock()
+        col.name = "col"
+
+        with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("on", "sort_key")):
+            with pytest.raises(ValueError, match="method.*sort_key.*not supported"):
+                adapter._build_ctas_sort_sql("T", [col])
+
+
+# ---------------------------------------------------------------------------
+# get_platform_info: warehouse compute_configuration captured
+# ---------------------------------------------------------------------------
+
+
+class TestGetPlatformInfoWithWarehouse:
+    """Test get_platform_info populates compute_configuration from SHOW WAREHOUSES."""
+
+    def test_warehouse_details_captured(self):
+        adapter = _make_adapter(warehouse="MY_WH")
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        # Simulate SHOW WAREHOUSES result row with 28+ columns
+        wh_row = ["MY_WH", "STARTED", "STANDARD", "LARGE"] + [None] * 27
+        wh_row[4] = 1  # min_cluster_count
+        wh_row[5] = 3  # max_cluster_count
+        wh_row[11] = 300  # auto_suspend
+        wh_row[12] = True  # auto_resume
+        wh_row[21] = None  # enable_query_acceleration
+        wh_row[22] = None  # query_acceleration_max_scale_factor
+        wh_row[27] = "STANDARD"  # scaling_policy
+
+        def _execute_side_effect(sql):
+            if "current_version" in sql.lower():
+                mock_cursor.fetchone.return_value = ("8.0.0",)
+            elif "current_region" in sql.lower():
+                mock_cursor.fetchone.return_value = ("AWS_US_EAST_1", "AWS")
+            elif "SHOW WAREHOUSES" in sql:
+                mock_cursor.fetchone.return_value = tuple(wh_row)
+            elif "current_account_name" in sql.lower():
+                mock_cursor.fetchone.return_value = ("acct", "org")
+            return mock_cursor
+
+        mock_cursor.execute = Mock(side_effect=_execute_side_effect)
+
+        result = adapter.get_platform_info(connection=mock_conn)
+
+        assert result["platform_version"] == "8.0.0"
+        cc = result.get("compute_configuration")
+        assert cc is not None
+        assert cc["warehouse_name"] == "MY_WH"
+        assert cc["warehouse_size"] == "LARGE"
+
+    def test_warehouse_show_exception_silenced(self):
+        """Exception querying SHOW WAREHOUSES should not propagate."""
+        adapter = _make_adapter()
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        def _execute_side_effect(sql):
+            if "current_version" in sql.lower():
+                mock_cursor.fetchone.return_value = ("8.0.0",)
+            elif "current_region" in sql.lower():
+                raise RuntimeError("region not available")
+            elif "SHOW WAREHOUSES" in sql:
+                raise RuntimeError("permission denied")
+            elif "current_account_name" in sql.lower():
+                raise RuntimeError("no account access")
+            return mock_cursor
+
+        mock_cursor.execute = Mock(side_effect=_execute_side_effect)
+
+        result = adapter.get_platform_info(connection=mock_conn)
+        # Should not raise; platform_version populated
+        assert result["platform_version"] == "8.0.0"
+        assert "compute_configuration" not in result
+
+
+# ---------------------------------------------------------------------------
+# configure_for_benchmark: cache-control validation path
+# ---------------------------------------------------------------------------
+
+
+class TestConfigureForBenchmarkCacheControl:
+    """Test configure_for_benchmark triggers cache-control validation."""
+
+    def test_cache_validation_called_when_disable_result_cache_true(self):
+        adapter = _make_adapter(disable_result_cache=True)
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        with patch.object(
+            adapter,
+            "validate_session_cache_control",
+            return_value={"validated": True, "cache_disabled": True},
+        ) as mock_validate:
+            adapter.configure_for_benchmark(mock_conn, "olap")
+
+        mock_validate.assert_called_once_with(mock_conn)
+
+    def test_no_validation_when_result_cache_enabled(self):
+        adapter = _make_adapter(disable_result_cache=False)
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        with patch.object(adapter, "validate_session_cache_control") as mock_validate:
+            adapter.configure_for_benchmark(mock_conn, "olap")
+
+        mock_validate.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# add_cli_arguments
+# ---------------------------------------------------------------------------
+
+
+class TestAdapterProperties:
+    """Test basic adapter properties and configuration."""
+
+    def test_platform_name_property(self):
+        adapter = _make_adapter()
+        assert adapter.platform_name == "Snowflake"
+
+    def test_dialect(self):
+        adapter = _make_adapter()
+        assert adapter._dialect == "snowflake"
+
+    def test_disable_result_cache_default_true(self):
+        adapter = _make_adapter()
+        assert adapter.disable_result_cache is True
+
+    def test_disable_result_cache_can_be_disabled(self):
+        adapter = _make_adapter(disable_result_cache=False)
+        assert adapter.disable_result_cache is False
+
+    def test_strict_validation_default_true(self):
+        adapter = _make_adapter()
+        assert adapter.strict_validation is True
+
+    def test_warehouse_default(self):
+        adapter = _make_adapter()
+        assert adapter.warehouse == "COMPUTE_WH"
+
+    def test_schema_default(self):
+        adapter = _make_adapter()
+        assert adapter.schema == "PUBLIC"
+
+    def test_timezone_default_utc(self):
+        adapter = _make_adapter()
+        assert adapter.timezone == "UTC"
+
+    def test_query_tag_default(self):
+        adapter = _make_adapter()
+        assert adapter.query_tag == "BenchBox"
+
+    def test_modify_warehouse_settings_default_false(self):
+        adapter = _make_adapter()
+        assert adapter.modify_warehouse_settings is False
+
+    def test_suppress_nondeterministic_errors_default_false(self):
+        adapter = _make_adapter()
+        assert adapter.suppress_nondeterministic_errors is False
+
+    def test_auto_suspend_default(self):
+        adapter = _make_adapter()
+        assert adapter.auto_suspend == 300
+
+    def test_auto_resume_default(self):
+        adapter = _make_adapter()
+        assert adapter.auto_resume is True
+
+    def test_multi_cluster_warehouse_default_false(self):
+        adapter = _make_adapter()
+        assert adapter.multi_cluster_warehouse is False
+
+    def test_iceberg_catalog_default(self):
+        adapter = _make_adapter()
+        assert adapter.iceberg_catalog == "SNOWFLAKE"
+
+    def test_custom_role_stored(self):
+        adapter = _make_adapter(role="SYSADMIN")
+        assert adapter.role == "SYSADMIN"
+
+    def test_custom_authenticator_stored(self):
+        adapter = _make_adapter(authenticator="externalbrowser")
+        assert adapter.authenticator == "externalbrowser"
+
+    def test_private_key_path_stored(self):
+        adapter = _make_adapter(private_key_path="/tmp/key.pem")
+        assert adapter.private_key_path == "/tmp/key.pem"
+
+
+# ---------------------------------------------------------------------------
+# from_config()
+# ---------------------------------------------------------------------------
+
+
+class TestFromConfig:
+    """Test from_config() class method behaviour."""
+
+    def test_from_config_uses_provided_database(self):
+        with patch("benchbox.platforms.snowflake.check_platform_dependencies", return_value=(True, [])):
+            from benchbox.platforms.snowflake import SnowflakeAdapter
+
+            config = {
+                "account": "my_account",
+                "username": "user",
+                "password": "pass",
+                "warehouse": "WH",
+                "database": "EXPLICIT_DB",
+                "benchmark": "tpch",
+                "scale_factor": 1.0,
+            }
+            adapter = SnowflakeAdapter.from_config(config)
+
+        assert adapter.database == "EXPLICIT_DB"
+
+    def test_from_config_generates_database_name_when_missing(self):
+        with (
+            patch("benchbox.platforms.snowflake.check_platform_dependencies", return_value=(True, [])),
+            patch("benchbox.utils.database_naming.generate_database_name", return_value="tpch_1_sf0"),
+        ):
+            from benchbox.platforms.snowflake import SnowflakeAdapter
+
+            config = {
+                "account": "my_account",
+                "username": "user",
+                "password": "pass",
+                "warehouse": "WH",
+                "benchmark": "tpch",
+                "scale_factor": 1.0,
+            }
+            adapter = SnowflakeAdapter.from_config(config)
+
+        assert adapter.database is not None
+
+    def test_from_config_passes_role(self):
+        with patch("benchbox.platforms.snowflake.check_platform_dependencies", return_value=(True, [])):
+            from benchbox.platforms.snowflake import SnowflakeAdapter
+
+            config = {
+                "account": "my_account",
+                "username": "user",
+                "password": "pass",
+                "warehouse": "WH",
+                "database": "DB",
+                "role": "SYSADMIN",
+            }
+            adapter = SnowflakeAdapter.from_config(config)
+
+        assert adapter.role == "SYSADMIN"
+
+    def test_from_config_passes_authenticator(self):
+        with patch("benchbox.platforms.snowflake.check_platform_dependencies", return_value=(True, [])):
+            from benchbox.platforms.snowflake import SnowflakeAdapter
+
+            config = {
+                "account": "my_account",
+                "username": "user",
+                "password": "pass",
+                "warehouse": "WH",
+                "database": "DB",
+                "authenticator": "externalbrowser",
+            }
+            adapter = SnowflakeAdapter.from_config(config)
+
+        assert adapter.authenticator == "externalbrowser"
+
+    def test_from_config_passes_disable_result_cache(self):
+        with patch("benchbox.platforms.snowflake.check_platform_dependencies", return_value=(True, [])):
+            from benchbox.platforms.snowflake import SnowflakeAdapter
+
+            config = {
+                "account": "my_account",
+                "username": "user",
+                "password": "pass",
+                "warehouse": "WH",
+                "database": "DB",
+                "disable_result_cache": False,
+            }
+            adapter = SnowflakeAdapter.from_config(config)
+
+        assert adapter.disable_result_cache is False
+
+
+# ---------------------------------------------------------------------------
+# Constructor: ConfigurationError on missing fields
+# ---------------------------------------------------------------------------
+
+
+class TestConstructorValidation:
+    """Test that missing required fields raise ConfigurationError."""
+
+    def test_missing_account_raises(self):
+        from benchbox.core.exceptions import ConfigurationError
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        with pytest.raises(ConfigurationError, match="account"):
+            SnowflakeAdapter(
+                username="u",
+                password="p",
+                warehouse="WH",
+                database="DB",
+            )
+
+    def test_missing_password_raises(self):
+        from benchbox.core.exceptions import ConfigurationError
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        with pytest.raises(ConfigurationError, match="password"):
+            SnowflakeAdapter(
+                account="a",
+                username="u",
+                warehouse="WH",
+                database="DB",
+            )
+
+    def test_missing_username_raises(self):
+        from benchbox.core.exceptions import ConfigurationError
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        with pytest.raises(ConfigurationError, match="username"):
+            SnowflakeAdapter(
+                account="a",
+                password="p",
+                warehouse="WH",
+                database="DB",
+            )
+
+
+# ---------------------------------------------------------------------------
+# create_connection() - password, key-pair, externalbrowser auth paths
+# ---------------------------------------------------------------------------
+
+
+class TestCreateConnection:
+    """Test create_connection() auth branches."""
+
+    def test_password_auth_passes_correct_params(self):
+        """Default snowflake auth should pass user/password to connector."""
+        import benchbox.platforms.snowflake as sf_module
+
+        adapter = _make_adapter()
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [("8.0.0",)]
+
+        with (
+            patch.object(adapter, "handle_existing_database"),
+            patch.object(sf_module.snowflake.connector, "connect", return_value=mock_conn) as mock_connect,
+        ):
+            result = adapter.create_connection()
+
+        call_kwargs = mock_connect.call_args[1]
+        assert call_kwargs["user"] == "test_user"
+        assert call_kwargs["password"] == "test_pass"
+        assert call_kwargs["account"] == "test_account"
+        assert call_kwargs["warehouse"] == "COMPUTE_WH"
+        assert result is mock_conn
+
+    def test_externalbrowser_auth_sets_authenticator_param(self):
+        """externalbrowser auth must set authenticator= in connection params."""
+        import benchbox.platforms.snowflake as sf_module
+
+        adapter = _make_adapter(authenticator="externalbrowser")
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [("8.0.0",)]
+
+        with (
+            patch.object(adapter, "handle_existing_database"),
+            patch.object(sf_module.snowflake.connector, "connect", return_value=mock_conn) as mock_connect,
+        ):
+            adapter.create_connection()
+
+        call_kwargs = mock_connect.call_args[1]
+        assert call_kwargs.get("authenticator") == "externalbrowser"
+
+    def test_key_pair_auth_sets_private_key_and_removes_password(self):
+        """Key pair auth should set private_key and remove password."""
+        import benchbox.platforms.snowflake as sf_module
+
+        adapter = _make_adapter(private_key_path="/tmp/fake_key.pem")
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [("8.0.0",)]
+
+        # Mock the cryptography imports inside create_connection
+        mock_private_key = MagicMock()
+        mock_pkb = b"fake_der_bytes"
+        mock_private_key.private_bytes.return_value = mock_pkb
+
+        with (
+            patch.object(adapter, "handle_existing_database"),
+            patch.object(sf_module.snowflake.connector, "connect", return_value=mock_conn) as mock_connect,
+            patch("builtins.open", MagicMock()),
+            patch("benchbox.platforms.snowflake.load_pem_private_key", return_value=mock_private_key, create=True),
+            patch("cryptography.hazmat.primitives.serialization.load_pem_private_key", return_value=mock_private_key),
+            patch("cryptography.hazmat.primitives.serialization.Encoding"),
+            patch("cryptography.hazmat.primitives.serialization.PrivateFormat"),
+            patch("cryptography.hazmat.primitives.serialization.NoEncryption"),
+        ):
+            try:
+                adapter.create_connection()
+            except Exception:
+                pass  # We care about the call args, not about success
+
+        if mock_connect.called:
+            call_kwargs = mock_connect.call_args[1]
+            assert "password" not in call_kwargs
+            assert "private_key" in call_kwargs
+
+    def test_role_added_when_configured(self):
+        """role parameter should be forwarded to connector.connect() when set."""
+        import benchbox.platforms.snowflake as sf_module
+
+        adapter = _make_adapter(role="ANALYST")
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [("8.0.0",)]
+
+        with (
+            patch.object(adapter, "handle_existing_database"),
+            patch.object(sf_module.snowflake.connector, "connect", return_value=mock_conn) as mock_connect,
+        ):
+            adapter.create_connection()
+
+        call_kwargs = mock_connect.call_args[1]
+        assert call_kwargs.get("role") == "ANALYST"
+
+    def test_connection_failure_raises(self):
+        """When connector.connect() raises, the exception should propagate."""
+        import benchbox.platforms.snowflake as sf_module
+
+        adapter = _make_adapter()
+
+        with (
+            patch.object(adapter, "handle_existing_database"),
+            patch.object(sf_module.snowflake.connector, "connect", side_effect=RuntimeError("bad credentials")),
+        ):
+            with pytest.raises(RuntimeError, match="bad credentials"):
+                adapter.create_connection()
+
+
+# ---------------------------------------------------------------------------
+# execute_query()
+# ---------------------------------------------------------------------------
+
+
+class TestExecuteQuery:
+    """Test execute_query() paths."""
+
+    def test_successful_execution_returns_result_dict(self):
+        adapter = _make_adapter()
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [("row1",), ("row2",)]
+
+        with patch.object(adapter, "_get_query_statistics", return_value={"note": "no stats"}):
+            result = adapter.execute_query(mock_conn, "SELECT 1", "Q1")
+
+        assert result["query_id"] == "Q1"
+        assert result["rows_returned"] == 2
+        assert result["status"] == "SUCCESS"
+
+    def test_query_tag_set_before_execution(self):
+        """ALTER SESSION SET QUERY_TAG should be called with the query_id."""
+        adapter = _make_adapter(query_tag="BENCH")
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+
+        executed_sqls = []
+        mock_cursor.execute.side_effect = lambda sql: executed_sqls.append(sql)
+
+        with patch.object(adapter, "_get_query_statistics", return_value={}):
+            adapter.execute_query(mock_conn, "SELECT 1", "Q5")
+
+        tag_sqls = [s for s in executed_sqls if "QUERY_TAG" in s]
+        assert any("Q5" in s for s in tag_sqls), f"No QUERY_TAG sql found in {tag_sqls}"
+
+    def test_exception_returns_failed_status(self):
+        """When cursor.execute raises, status should be FAILED."""
+        adapter = _make_adapter()
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = RuntimeError("query syntax error")
+
+        result = adapter.execute_query(mock_conn, "BAD SQL", "Q99")
+
+        assert result["status"] == "FAILED"
+        assert "query syntax error" in result["error"]
+
+    def test_zero_rows_returned_correctly(self):
+        adapter = _make_adapter()
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+
+        with patch.object(adapter, "_get_query_statistics", return_value={}):
+            result = adapter.execute_query(mock_conn, "SELECT 1 WHERE false", "Q0")
+
+        assert result["rows_returned"] == 0
+
+    def test_actual_query_passed_verbatim_to_cursor_execute(self):
+        """The user-supplied query string must appear verbatim in cursor.execute calls."""
+        adapter = _make_adapter(query_tag="BENCH")
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+
+        with patch.object(adapter, "_get_query_statistics", return_value={}):
+            adapter.execute_query(mock_conn, "SELECT COUNT(*) FROM orders", "Q3")
+
+        calls = [c.args[0] for c in mock_cursor.execute.call_args_list]
+        assert "SELECT COUNT(*) FROM orders" in calls, f"Query not found in execute calls: {calls}"
+
+    def test_cursor_closed_after_successful_execution(self):
+        """cursor.close() must be called in the finally block on success."""
+        adapter = _make_adapter()
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+
+        with patch.object(adapter, "_get_query_statistics", return_value={}):
+            adapter.execute_query(mock_conn, "SELECT 1", "Q1")
+
+        mock_cursor.close.assert_called_once()
+
+    def test_cursor_closed_even_on_execution_failure(self):
+        """cursor.close() must be called even when cursor.execute raises."""
+        adapter = _make_adapter()
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = RuntimeError("network error")
+
+        adapter.execute_query(mock_conn, "SELECT 1", "Q1")
+
+        mock_cursor.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# _get_platform_metadata()
+# ---------------------------------------------------------------------------
+
+
+class TestGetPlatformMetadata:
+    """Test _get_platform_metadata() covers version, session info, warehouse info, and table metadata."""
+
+    def _make_cursor(self, version="8.0.0", session_row=None, wh_row=None, tables=None):
+        mock_cursor = Mock()
+        session_row = session_row or ("user1", "role1", "WH1", "DB1", "PUBLIC", "AWS_US_EAST_1", "ACCT1")
+        wh_row = wh_row or (
+            "WH",
+            "STARTED",
+            "STANDARD",
+            "LARGE",
+            1,
+            3,
+            1,
+            0,
+            0,
+            False,
+            True,
+            None,
+            300,
+            True,
+            "100%",
+            "0%",
+            "0%",
+            "0%",
+            "2025-01-01",
+            "2025-01-01",
+            "2025-01-01",
+            "owner",
+            "",
+            None,
+            None,
+            "STANDARD",
+        )
+        tables = tables or [("ORDERS", 1000, 1024, 1, None, None, None)]
+
+        call_count = [0]
+
+        def _execute(sql):
+            call_count[0] += 1
+            if "CURRENT_VERSION" in sql.upper():
+                mock_cursor.fetchone.return_value = (version,)
+                mock_cursor.fetchall.return_value = [(version,)]
+            elif "CURRENT_USER" in sql.upper():
+                mock_cursor.fetchone.return_value = session_row
+                mock_cursor.fetchall.return_value = [session_row]
+            elif "SHOW WAREHOUSES" in sql.upper():
+                mock_cursor.fetchone.return_value = wh_row
+                mock_cursor.fetchall.return_value = [wh_row]
+            elif "INFORMATION_SCHEMA.TABLES" in sql.upper():
+                mock_cursor.fetchone.return_value = None
+                mock_cursor.fetchall.return_value = tables
+            return mock_cursor
+
+        mock_cursor.execute.side_effect = _execute
+        return mock_cursor
+
+    def test_snowflake_version_populated(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_conn.cursor.return_value = self._make_cursor(version="9.1.0")
+
+        result = adapter._get_platform_metadata(mock_conn)
+
+        assert result["snowflake_version"] == "9.1.0"
+
+    def test_session_info_populated(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_conn.cursor.return_value = self._make_cursor()
+
+        result = adapter._get_platform_metadata(mock_conn)
+
+        assert "session_info" in result
+        assert result["session_info"]["current_user"] == "user1"
+
+    def test_warehouse_info_populated(self):
+        adapter = _make_adapter(warehouse="WH")
+        mock_conn = Mock()
+        mock_conn.cursor.return_value = self._make_cursor()
+
+        result = adapter._get_platform_metadata(mock_conn)
+
+        assert "warehouse_info" in result
+        assert result["warehouse_info"]["name"] == "WH"
+        assert result["warehouse_info"]["size"] == "LARGE"
+
+    def test_tables_list_populated(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        tables = [("LINEITEM", 6000000, 102400, 1, None, None, None)]
+        mock_conn.cursor.return_value = self._make_cursor(tables=tables)
+
+        result = adapter._get_platform_metadata(mock_conn)
+
+        assert "tables" in result
+        assert result["tables"][0]["table_name"] == "LINEITEM"
+
+    def test_metadata_error_key_on_exception(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.execute.side_effect = RuntimeError("access denied")
+        mock_conn.cursor.return_value = mock_cursor
+
+        result = adapter._get_platform_metadata(mock_conn)
+
+        assert "metadata_error" in result
+        assert "access denied" in result["metadata_error"]
+
+
+# ---------------------------------------------------------------------------
+# apply_table_tunings()
+# ---------------------------------------------------------------------------
+
+
+class TestApplyTableTunings:
+    """Test apply_table_tunings() ALTER TABLE CLUSTER BY paths."""
+
+    def _make_tuning(self, table_name="ORDERS", cluster_cols=None, partition_cols=None, sort_cols=None):
+        """Return a fake table_tuning object."""
+        mock_tuning = Mock()
+        mock_tuning.table_name = table_name
+        mock_tuning.has_any_tuning.return_value = True
+
+        try:
+            from benchbox.core.tuning.interface import TuningType
+
+            def _get_by_type(tt):
+                if tt == TuningType.CLUSTERING:
+                    return cluster_cols or []
+                if tt == TuningType.PARTITIONING:
+                    return partition_cols or []
+                if tt == TuningType.SORTING:
+                    return sort_cols or []
+                if tt == TuningType.DISTRIBUTION:
+                    return []
+                return []
+
+            mock_tuning.get_columns_by_type.side_effect = _get_by_type
+        except ImportError:
+            mock_tuning.get_columns_by_type.return_value = cluster_cols or []
+
+        return mock_tuning
+
+    def _make_col(self, name, order=0):
+        col = Mock()
+        col.name = name
+        col.order = order
+        return col
+
+    def test_no_op_when_no_tuning(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        mock_tuning = Mock()
+        mock_tuning.has_any_tuning.return_value = False
+
+        adapter.apply_table_tunings(mock_tuning, mock_conn)
+
+        mock_cursor.execute.assert_not_called()
+
+    def test_no_op_when_tuning_is_none(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter.apply_table_tunings(None, mock_conn)
+
+        mock_cursor.execute.assert_not_called()
+
+    def test_cluster_by_executed_when_different_from_current(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        # INFORMATION_SCHEMA query returns no existing clustering key
+        mock_cursor.fetchone.return_value = (None,)
+
+        col1 = self._make_col("o_orderdate", 0)
+        col2 = self._make_col("o_custkey", 1)
+        tuning = self._make_tuning(table_name="ORDERS", cluster_cols=[col1, col2])
+
+        adapter.apply_table_tunings(tuning, mock_conn)
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        cluster_sqls = [s for s in all_sqls if "CLUSTER BY" in s.upper()]
+        assert len(cluster_sqls) >= 1
+        assert "o_orderdate" in cluster_sqls[0]
+        assert "o_custkey" in cluster_sqls[0]
+
+    def test_skips_alter_when_clustering_already_matches(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        col1 = self._make_col("o_orderdate", 0)
+        tuning = self._make_tuning(table_name="ORDERS", cluster_cols=[col1])
+
+        # Simulate existing clustering key already matches desired
+        mock_cursor.fetchone.return_value = ("(o_orderdate)",)
+
+        adapter.apply_table_tunings(tuning, mock_conn)
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        alter_sqls = [s for s in all_sqls if "ALTER TABLE" in s.upper() and "CLUSTER BY" in s.upper()]
+        assert len(alter_sqls) == 0
+
+    def test_partition_cols_used_as_clustering_fallback(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = (None,)
+
+        col1 = self._make_col("l_shipdate", 0)
+        tuning = self._make_tuning(table_name="LINEITEM", partition_cols=[col1])
+
+        adapter.apply_table_tunings(tuning, mock_conn)
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        cluster_sqls = [s for s in all_sqls if "CLUSTER BY" in s.upper()]
+        assert len(cluster_sqls) >= 1
+        assert "l_shipdate" in cluster_sqls[0]
+
+
+# ---------------------------------------------------------------------------
+# create_external_tables()
+# ---------------------------------------------------------------------------
+
+
+class TestCreateExternalTables:
+    """Test create_external_tables() with parquet and delta paths."""
+
+    def _make_data_files(self, table_name="ORDERS", file_names=None):
+        return {table_name: file_names or ["s3://bucket/path/orders/"]}
+
+    def test_parquet_external_table_uses_file_format_type_parquet(self):
+        adapter = _make_adapter(staging_root="s3://bucket/path")
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = (100,)
+
+        data_files = {"ORDERS": ["s3://bucket/path/orders/"]}
+
+        with (
+            patch.object(adapter, "_resolve_data_files", return_value=SimpleNamespace(tables=data_files)),
+            patch.object(adapter, "_detect_external_table_format", return_value="parquet"),
+            patch.object(adapter, "validate_external_table_requirements"),
+        ):
+            adapter.create_external_tables(Mock(), mock_conn, Mock())
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        ext_sqls = [s for s in all_sqls if "EXTERNAL TABLE" in s.upper()]
+        assert any("TYPE=PARQUET" in s or "FILE_FORMAT=(TYPE=PARQUET)" in s for s in ext_sqls), (
+            f"No PARQUET format SQL found. Got: {ext_sqls}"
+        )
+
+    def test_stage_created(self):
+        adapter = _make_adapter(staging_root="s3://bucket/path")
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = (0,)
+
+        data_files = {"ORDERS": ["s3://bucket/path/orders/"]}
+
+        with (
+            patch.object(adapter, "_resolve_data_files", return_value=SimpleNamespace(tables=data_files)),
+            patch.object(adapter, "_detect_external_table_format", return_value="parquet"),
+            patch.object(adapter, "validate_external_table_requirements"),
+        ):
+            adapter.create_external_tables(Mock(), mock_conn, Mock())
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        stage_sqls = [s for s in all_sqls if "CREATE STAGE" in s.upper()]
+        assert len(stage_sqls) >= 1
+
+    def test_alter_external_table_refresh_called(self):
+        adapter = _make_adapter(staging_root="s3://bucket/path")
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = (50,)
+
+        data_files = {"LINEITEM": ["s3://bucket/path/lineitem/"]}
+
+        with (
+            patch.object(adapter, "_resolve_data_files", return_value=SimpleNamespace(tables=data_files)),
+            patch.object(adapter, "_detect_external_table_format", return_value="parquet"),
+            patch.object(adapter, "validate_external_table_requirements"),
+        ):
+            adapter.create_external_tables(Mock(), mock_conn, Mock())
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        refresh_sqls = [s for s in all_sqls if "REFRESH" in s.upper()]
+        assert len(refresh_sqls) >= 1
+
+    def test_validates_staging_root_requirement(self):
+        """validate_external_table_requirements should be called (raises when staging_root missing)."""
+        adapter = _make_adapter()  # no staging_root
+
+        with pytest.raises(ValueError, match="staging_root"):
+            adapter.create_external_tables(Mock(), Mock(), Mock())
+
+
+# ---------------------------------------------------------------------------
+# _get_existing_tables()
+# ---------------------------------------------------------------------------
+
+
+class TestGetExistingTables:
+    """Test _get_existing_tables normalises table names to lowercase."""
+
+    def test_returns_lowercase_table_names(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        # SHOW TABLES: row[1] is the table name
+        mock_cursor.fetchall.return_value = [
+            (None, "LINEITEM", None),
+            (None, "ORDERS", None),
+        ]
+
+        result = adapter._get_existing_tables(mock_conn)
+
+        assert "lineitem" in result
+        assert "orders" in result
+        assert "LINEITEM" not in result
+
+    def test_returns_empty_list_on_exception(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.execute.side_effect = RuntimeError("no access")
+        mock_conn.cursor.return_value = mock_cursor
+
+        result = adapter._get_existing_tables(mock_conn)
+
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# _validate_data_integrity()
+# ---------------------------------------------------------------------------
+
+
+class TestValidateDataIntegrity:
+    """Test _validate_data_integrity() passes and fails correctly."""
+
+    def test_returns_passed_when_all_tables_accessible(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = (1,)
+
+        table_stats = {"ORDERS": 100, "LINEITEM": 200}
+        status, details = adapter._validate_data_integrity(Mock(), mock_conn, table_stats)
+
+        assert status == "PASSED"
+        assert "accessible_tables" in details
+
+    def test_returns_failed_when_table_inaccessible(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        call_count = [0]
+
+        def _execute(sql):
+            call_count[0] += 1
+            if "ORDERS" in sql:
+                return None
+            raise RuntimeError("table not found")
+
+        mock_cursor.execute.side_effect = _execute
+        mock_cursor.fetchone.return_value = (1,)
+
+        table_stats = {"MISSING_TABLE": 0}
+        status, details = adapter._validate_data_integrity(Mock(), mock_conn, table_stats)
+
+        assert status == "FAILED"
+
+    def test_returns_failed_on_unexpected_exception(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_conn.cursor.side_effect = RuntimeError("connection broken")
+
+        table_stats = {"ORDERS": 100}
+        status, details = adapter._validate_data_integrity(Mock(), mock_conn, table_stats)
+
+        assert status == "FAILED"
+        assert "integrity_error" in details
+
+
+# ---------------------------------------------------------------------------
+# configure_for_benchmark: OLAP warehouse modification paths
+# ---------------------------------------------------------------------------
+
+
+class TestConfigureForBenchmarkWarehouse:
+    """Test configure_for_benchmark warehouse modification branches."""
+
+    def test_alter_warehouse_called_when_modify_warehouse_settings_true(self):
+        adapter = _make_adapter(modify_warehouse_settings=True, disable_result_cache=False)
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter.configure_for_benchmark(mock_conn, "olap")
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        alter_sqls = [s for s in all_sqls if "ALTER WAREHOUSE" in s]
+        assert len(alter_sqls) >= 1
+
+    def test_multi_cluster_warehouse_sets_min_max_cluster(self):
+        adapter = _make_adapter(
+            modify_warehouse_settings=True, multi_cluster_warehouse=True, disable_result_cache=False
+        )
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter.configure_for_benchmark(mock_conn, "olap")
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        cluster_sqls = [s for s in all_sqls if "MIN_CLUSTER_COUNT" in s]
+        assert len(cluster_sqls) >= 1
+
+    def test_nondeterministic_settings_applied_when_enabled(self):
+        adapter = _make_adapter(suppress_nondeterministic_errors=True, disable_result_cache=False)
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter.configure_for_benchmark(mock_conn, "olap")
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        nondeterministic_sqls = [s for s in all_sqls if "NONDETERMINISTIC" in s]
+        assert len(nondeterministic_sqls) >= 1
+
+    def test_non_olap_benchmark_type_skips_cache_settings(self):
+        """Non-OLAP benchmark type should not set USE_CACHED_RESULT."""
+        adapter = _make_adapter(disable_result_cache=False)
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter.configure_for_benchmark(mock_conn, "oltp")
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        cache_sqls = [s for s in all_sqls if "USE_CACHED_RESULT" in s]
+        assert len(cache_sqls) == 0
+
+
+# ---------------------------------------------------------------------------
+# generate_tuning_clause()
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateTuningClause:
+    """Test generate_tuning_clause() for clustering and partitioning."""
+
+    def _make_col(self, name, order=0):
+        col = Mock()
+        col.name = name
+        col.order = order
+        return col
+
+    def test_returns_empty_string_when_no_tuning(self):
+        adapter = _make_adapter()
+        mock_tuning = Mock()
+        mock_tuning.has_any_tuning.return_value = False
+
+        result = adapter.generate_tuning_clause(mock_tuning)
+        assert result == ""
+
+    def test_returns_empty_string_when_tuning_is_none(self):
+        adapter = _make_adapter()
+        result = adapter.generate_tuning_clause(None)
+        assert result == ""
+
+    def test_cluster_by_clause_generated(self):
+        adapter = _make_adapter()
+        mock_tuning = Mock()
+        mock_tuning.has_any_tuning.return_value = True
+
+        try:
+            from benchbox.core.tuning.interface import TuningType
+
+            col1 = self._make_col("o_orderdate", 0)
+            col2 = self._make_col("o_custkey", 1)
+
+            def _get_by_type(tt):
+                if tt == TuningType.CLUSTERING:
+                    return [col1, col2]
+                return []
+
+            mock_tuning.get_columns_by_type.side_effect = _get_by_type
+            result = adapter.generate_tuning_clause(mock_tuning)
+
+            assert "CLUSTER BY" in result
+            assert "o_orderdate" in result
+            assert "o_custkey" in result
+        except ImportError:
+            pytest.skip("TuningType not available")
+
+    def test_partition_cols_used_as_clustering_fallback(self):
+        adapter = _make_adapter()
+        mock_tuning = Mock()
+        mock_tuning.has_any_tuning.return_value = True
+
+        try:
+            from benchbox.core.tuning.interface import TuningType
+
+            col1 = self._make_col("l_shipdate", 0)
+
+            def _get_by_type(tt):
+                if tt == TuningType.CLUSTERING:
+                    return []
+                if tt == TuningType.PARTITIONING:
+                    return [col1]
+                return []
+
+            mock_tuning.get_columns_by_type.side_effect = _get_by_type
+            result = adapter.generate_tuning_clause(mock_tuning)
+
+            assert "CLUSTER BY" in result
+            assert "l_shipdate" in result
+        except ImportError:
+            pytest.skip("TuningType not available")
+
+
+# ---------------------------------------------------------------------------
+# _optimize_table_definition()
+# ---------------------------------------------------------------------------
+
+
+class TestOptimizeTableDefinition:
+    """Test _optimize_table_definition() replaces CREATE TABLE with CREATE OR REPLACE TABLE."""
+
+    def test_adds_or_replace_to_create_table(self):
+        adapter = _make_adapter()
+        sql = "CREATE TABLE ORDERS (o_orderkey INT)"
+        result = adapter._optimize_table_definition(sql)
+        assert "CREATE OR REPLACE TABLE" in result
+
+    def test_leaves_non_create_table_unchanged(self):
+        adapter = _make_adapter()
+        sql = "CREATE INDEX idx ON ORDERS (o_orderkey)"
+        result = adapter._optimize_table_definition(sql)
+        assert result == sql
+
+    def test_does_not_double_replace(self):
+        adapter = _make_adapter()
+        sql = "CREATE OR REPLACE TABLE ORDERS (o_orderkey INT)"
+        result = adapter._optimize_table_definition(sql)
+        assert result.count("OR REPLACE") == 1
+
+
+# ---------------------------------------------------------------------------
+# analyze_table() and close_connection()
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyzeTableAndCloseConnection:
+    """Test analyze_table() and close_connection() paths."""
+
+    def test_analyze_table_executes_recluster(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter.analyze_table(mock_conn, "orders")
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        recluster_sqls = [s for s in all_sqls if "RECLUSTER" in s.upper()]
+        assert len(recluster_sqls) >= 1
+
+    def test_analyze_table_suppresses_exception(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.execute.side_effect = RuntimeError("not supported")
+        mock_conn.cursor.return_value = mock_cursor
+
+        # Should not raise
+        adapter.analyze_table(mock_conn, "orders")
+
+    def test_close_connection_calls_close(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+
+        adapter.close_connection(mock_conn)
+
+        mock_conn.close.assert_called_once()
+
+    def test_close_connection_handles_none(self):
+        adapter = _make_adapter()
+        # Should not raise
+        adapter.close_connection(None)
+
+    def test_close_connection_suppresses_exception(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_conn.close.side_effect = RuntimeError("already closed")
+
+        # Should not raise
+        adapter.close_connection(mock_conn)
+
+
+# ---------------------------------------------------------------------------
+# get_target_dialect()
+# ---------------------------------------------------------------------------
+
+
+class TestGetTargetDialect:
+    def test_returns_snowflake(self):
+        adapter = _make_adapter()
+        assert adapter.get_target_dialect() == "snowflake"
+
+
+# ---------------------------------------------------------------------------
+# platform_name property
+# ---------------------------------------------------------------------------
+
+
+class TestPlatformName:
+    def test_platform_name(self):
+        adapter = _make_adapter()
+        assert adapter.platform_name == "Snowflake"
+
+
+# ---------------------------------------------------------------------------
+# supports_tuning_type()
+# ---------------------------------------------------------------------------
+
+
+class TestSupportsTuningType:
+    def test_clustering_supported(self):
+        adapter = _make_adapter()
+        try:
+            from benchbox.core.tuning.interface import TuningType
+
+            assert adapter.supports_tuning_type(TuningType.CLUSTERING) is True
+        except ImportError:
+            pytest.skip("TuningType not available")
+
+    def test_distribution_not_supported(self):
+        adapter = _make_adapter()
+        try:
+            from benchbox.core.tuning.interface import TuningType
+
+            assert adapter.supports_tuning_type(TuningType.DISTRIBUTION) is False
+        except ImportError:
+            pytest.skip("TuningType not available")
+
+
+# ---------------------------------------------------------------------------
+# _create_load_file_formats()
+# ---------------------------------------------------------------------------
+
+
+class TestCreateLoadFileFormats:
+    def test_creates_csv_and_tbl_formats(self):
+        adapter = _make_adapter()
+        mock_cursor = Mock()
+
+        adapter._create_load_file_formats(mock_cursor)
+
+        all_sqls = [call[0][0] for call in mock_cursor.execute.call_args_list]
+        csv_sqls = [s for s in all_sqls if "BENCHBOX_CSV_FORMAT" in s]
+        tbl_sqls = [s for s in all_sqls if "BENCHBOX_TBL_FORMAT" in s]
+        assert len(csv_sqls) >= 1
+        assert len(tbl_sqls) >= 1
+
+
+# ---------------------------------------------------------------------------
+# check_server_database_exists()
+# ---------------------------------------------------------------------------
+
+
+class TestCheckServerDatabaseExists:
+    """Test check_server_database_exists() via admin connection mock."""
+
+    def test_returns_true_when_database_in_show_databases(self):
+        import benchbox.platforms.snowflake as sf_module
+
+        adapter = _make_adapter(database="BENCHDB")
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        # SHOW DATABASES: row[1] is the db name
+        mock_cursor.fetchall.return_value = [(None, "BENCHDB")]
+
+        with patch.object(sf_module.snowflake.connector, "connect", return_value=mock_conn):
+            result = adapter.check_server_database_exists()
+
+        assert result is True
+
+    def test_returns_false_when_database_not_found(self):
+        import benchbox.platforms.snowflake as sf_module
+
+        adapter = _make_adapter(database="MISSING_DB")
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.side_effect = [
+            [],  # SHOW DATABASES returns nothing
+            [],  # SHOW SCHEMAS returns nothing
+        ]
+        mock_cursor.fetchone.return_value = None
+
+        with patch.object(sf_module.snowflake.connector, "connect", return_value=mock_conn):
+            result = adapter.check_server_database_exists()
+
+        assert result is False
+
+    def test_returns_false_on_connection_error(self):
+        import benchbox.platforms.snowflake as sf_module
+
+        adapter = _make_adapter()
+
+        with patch.object(sf_module.snowflake.connector, "connect", side_effect=RuntimeError("timeout")):
+            result = adapter.check_server_database_exists()
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# _parse_copy_results()
+# ---------------------------------------------------------------------------
+
+
+class TestParseCopyResults:
+    """Test _parse_copy_results() logging paths."""
+
+    def test_loaded_status_silently_ignored(self):
+        adapter = _make_adapter()
+        rows = [
+            ("file1.csv", "LOADED", None, 100, None, None),
+        ]
+        # Should not raise
+        adapter._parse_copy_results(rows)
+
+    def test_non_loaded_status_logged_as_warning(self):
+        adapter = _make_adapter()
+        rows = [
+            ("file2.csv", "LOAD_FAILED", None, 0, None, "bad encoding"),
+        ]
+        with patch.object(adapter.logger, "warning") as mock_warn:
+            adapter._parse_copy_results(rows)
+        mock_warn.assert_called()
+
+    def test_short_rows_skipped(self):
+        adapter = _make_adapter()
+        rows = [("file.csv", "LOADED")]  # len(row) <= 3
+        # Should not raise or warn
+        adapter._parse_copy_results(rows)

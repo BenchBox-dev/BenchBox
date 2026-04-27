@@ -136,8 +136,8 @@ def normalized_from_sql_vs_df(
 ) -> list[NormalizedResult]:
     """Convert ``SQLVsDataFrameSummary`` to ``NormalizedResult`` pair.
 
-    Creates two NormalizedResult entries — one for the SQL platform and one
-    for the DataFrame platform — so that standard chart types work.
+    Creates two NormalizedResult entries - one for the SQL platform and one
+    for the DataFrame platform - so that standard chart types work.
 
     Args:
         summary: A :class:`SQLVsDataFrameSummary` instance.

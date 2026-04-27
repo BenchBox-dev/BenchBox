@@ -172,15 +172,17 @@ class TestNYCTaxiQueryManager:
 
     def test_get_categories(self):
         """get_categories should return all unique categories."""
-        categories = NYCTaxiQueryManager.get_categories()
+        manager = NYCTaxiQueryManager()
+        categories = manager.get_categories()
         assert isinstance(categories, list)
         assert len(categories) > 0
         assert "temporal" in categories
         assert "geographic" in categories
 
     def test_get_query_count(self):
-        """get_query_count should return total query count."""
-        count = NYCTaxiQueryManager.get_query_count()
+        """get_query_count should return total query count (Yellow-only default)."""
+        manager = NYCTaxiQueryManager()
+        count = manager.get_query_count()
         assert count == len(QUERIES)
 
 

@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, metadata-primitives, custom-benchmark
 ```
 
-> **CLI name:** `metadata_primitives` — use `benchbox run --benchmark metadata_primitives`
+> **CLI name:** `metadata_primitives` - use `benchbox run --benchmark metadata_primitives`
 
 The Metadata Primitives benchmark tests database catalog introspection performance using INFORMATION_SCHEMA views and platform-specific commands (SHOW, DESCRIBE, PRAGMA). Unlike data operation benchmarks, this focuses on metadata operations critical for data catalog integration, schema discovery, and data governance workflows.
 
@@ -246,14 +246,35 @@ print(f"Total operations: {acl_result.summary['total_operations']}")
 
 ### ACL Platform Support
 
-| Platform | Roles | Table Grants | Column Grants | Row-Level |
-|----------|-------|--------------|---------------|-----------|
-| Snowflake | Yes | Yes | Yes | Yes |
-| BigQuery | Yes | Yes | Yes | Yes |
-| Databricks | Yes | Yes | Yes | Yes |
-| PostgreSQL | Yes | Yes | Yes | Yes |
-| DuckDB | Limited | Limited | No | No |
-| ClickHouse | Yes | Yes | No | Yes |
+Platforms fall into four tiers based on the depth of ACL introspection
+exposed via SQL (see `benchbox/core/metadata_primitives/catalog/queries.yaml`
+and the `supports_acl*` helpers in `benchbox/core/metadata_primitives/ddl.py`):
+
+| Tier | Meaning | Platforms |
+|------|---------|-----------|
+| 1 - Full | Full SQL-level ACL introspection via INFORMATION_SCHEMA | PostgreSQL, Redshift, Firebolt, Synapse, Fabric |
+| 2 - Partial | GRANT/REVOKE supported; introspection limited to system views | Databricks (Unity Catalog), ClickHouse, Snowflake, Trino, Presto |
+| 3 - Limited | ACLs are IAM-managed; SQL introspection is dataset-scoped only | BigQuery |
+| 4 - None | No SQL-level ACL support | DuckDB, SQLite, DataFusion, Spark, Polars |
+
+Capability matrix (derived from the `supports_*` predicates in `ddl.py`):
+
+| Platform | Tier | Roles | Table Grants | Column Grants | Role Hierarchy | SQL Introspection |
+|----------|------|-------|--------------|---------------|----------------|--------------------|
+| PostgreSQL | 1 | Yes | Yes | Yes | Yes | Yes |
+| Redshift | 1 | Yes | Yes | Yes | Yes | Yes |
+| Firebolt | 1 | Yes | Yes | No | Yes | Yes |
+| Synapse | 1 | Yes | Yes | Yes | Yes | Yes |
+| Fabric | 1 | Yes | Yes | Yes | Yes | Yes |
+| Databricks | 2 | Yes | Yes | Yes | Yes | Yes |
+| ClickHouse | 2 | Yes | Yes | No | Yes | Yes |
+| Snowflake | 2 | Yes | Yes | Yes | Yes | No |
+| BigQuery | 3 | IAM | Dataset | No | No | Dataset-scoped |
+| DuckDB | 4 | No | No | No | No | No |
+| SQLite | 4 | No | No | No | No | No |
+
+"SQL Introspection" maps to `supports_acl_introspection`, which distinguishes
+tiers 1/2 (queryable metadata tables) from tiers 3/4.
 
 ## Platform Variants
 

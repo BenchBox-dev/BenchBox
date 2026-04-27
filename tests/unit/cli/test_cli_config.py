@@ -92,7 +92,7 @@ class TestConfigManager:
         config_file = temp_dir / "benchbox.yaml"
         config_data = {"system": {"test": True}}
 
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         # Mock Path.cwd() to return temp directory
@@ -118,7 +118,7 @@ class TestConfigManager:
         home_config_file = home_config_dir / "config.yaml"
 
         config_data = {"system": {"home_test": True}}
-        with open(home_config_file, "w") as f:
+        with open(home_config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         with patch("benchbox.cli.config.Path") as mock_path:
@@ -140,7 +140,7 @@ class TestConfigManager:
         custom_config = temp_dir / "custom_config.yaml"
         config_data = {"custom": True}
 
-        with open(custom_config, "w") as f:
+        with open(custom_config, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config_manager = ConfigManager(config_path=custom_config)
@@ -156,7 +156,7 @@ class TestConfigManager:
             "benchmarks": {"tpch": {"scale": 0.1}},
         }
 
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config_manager = ConfigManager(config_path=config_file)
@@ -181,7 +181,7 @@ class TestConfigManager:
         config_file = temp_dir / "invalid.yaml"
 
         # Write invalid YAML
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             f.write("invalid: yaml: content: [unclosed")
 
         # Should handle invalid YAML gracefully
@@ -207,7 +207,7 @@ class TestConfigManager:
             assert config_file.exists()
 
             # Verify content
-            with open(config_file) as f:
+            with open(config_file, encoding="utf-8") as f:
                 saved_data = yaml.safe_load(f)
 
             assert saved_data["system"]["cpu_cores"] == 8
@@ -223,7 +223,7 @@ class TestConfigManager:
             }
         }
 
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config_manager = ConfigManager(config_path=config_file)
@@ -257,7 +257,7 @@ class TestConfigManager:
             "database": {"type": "sqlite"},
         }
 
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(base_config, f)
 
         config_manager = ConfigManager(config_path=config_file)
@@ -285,7 +285,7 @@ class TestConfigManager:
             "execution": {"max_workers": 4},
         }
 
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config_manager = ConfigManager(config_path=config_file)
@@ -358,7 +358,7 @@ class TestConfigManagerEdgeCases:
             },
         }
 
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(large_config, f)
 
         # Should handle large configs

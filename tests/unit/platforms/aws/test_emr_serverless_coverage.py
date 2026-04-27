@@ -105,9 +105,10 @@ class TestEMRServerlessCoverage:
             ),
             patch.object(adapter, "_retrieve_results", return_value=[{"x": 1}]),
         ):
-            rows = adapter.execute_query("SELECT 1")
+            result = adapter.execute_query(None, "SELECT 1", "q1")
 
-        assert rows == [{"x": 1}]
+        assert result["status"] == "SUCCESS"
+        assert result["results"] == [{"x": 1}]
         assert adapter._query_count == 1
         assert adapter._total_vcpu_hours == 0.5
         assert adapter._total_memory_gb_hours == 0.25
@@ -131,7 +132,7 @@ class TestEMRServerlessCoverage:
         glue = MagicMock()
         adapter._glue_client = glue
         glue.get_database.return_value = {"Database": {"Name": "benchbox"}}
-        adapter.create_schema("benchbox")
+        adapter.create_schema(None, None)
 
         emr = MagicMock()
         emr.get_application.return_value = {"application": {"state": "STARTED", "releaseLabel": "emr-7.0.0"}}

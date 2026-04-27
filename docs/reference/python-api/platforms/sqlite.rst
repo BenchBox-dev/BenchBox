@@ -506,7 +506,7 @@ Benchmarks
 
 - :doc:`/benchmarks/tpc-h` - TPC-H benchmark
 - :doc:`/usage/getting-started` - Getting started guide
-- :doc:`/TROUBLESHOOTING` - General troubleshooting
+- :doc:`/usage/troubleshooting` - General troubleshooting
 
 External Resources
 ~~~~~~~~~~~~~~~~~~

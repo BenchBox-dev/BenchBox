@@ -53,8 +53,8 @@ class DsdgenRunnerMixin:
         if dsdgen_exe.exists():
             if self.verbose:
                 emit(f"Using existing dsdgen executable: {dsdgen_exe}")
-            # Validate the executable is actually executable
-            if not os.access(dsdgen_exe, os.X_OK):
+            # Validate the executable is actually executable (X_OK is a no-op on Windows)
+            if os.name != "nt" and not os.access(dsdgen_exe, os.X_OK):
                 raise PermissionError(f"dsdgen executable at {dsdgen_exe} is not executable")
             return dsdgen_exe
 
@@ -211,7 +211,7 @@ class DsdgenRunnerMixin:
                 error_msg += f": {e.stderr}"
             if e.stdout and self.verbose:
                 error_msg += f"\nOutput: {e.stdout}"
-            raise RuntimeError(error_msg)
+            raise RuntimeError(error_msg) from e
 
     def _run_parallel_dsdgen(self, output_dir: Path) -> None:
         """Run dsdgen in parallel to generate data faster.
@@ -345,7 +345,7 @@ class DsdgenRunnerMixin:
                 error_msg = f"Failed to generate TPC-DS data chunk {chunk_id} with exit code {e.returncode}"
                 if e.stderr:
                     error_msg += f": {e.stderr}"
-                raise RuntimeError(error_msg)
+                raise RuntimeError(error_msg) from e
 
         # Copy required distribution files to output directory
         self._copy_distribution_files(output_dir)

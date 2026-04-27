@@ -9,6 +9,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import json
 import sys
+import sys as _sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -16,13 +17,20 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
-__import__("benchbox.cli.commands.datagen")
-_datagen_module = sys.modules["benchbox.cli.commands.datagen"]
-
-__import__("benchbox.cli.commands.run_official")
-_run_official_module = sys.modules["benchbox.cli.commands.run_official"]
-
 from benchbox.cli.app import cli
+
+# benchbox.cli.commands.__init__ re-exports several Click Commands under the
+# same names as their submodules.  On Python 3.10 mock's string-based patch()
+# resolves the target via getattr(benchbox.cli.commands, "<module>"), which
+# returns the Command object, not the submodule.  Seeding sys.modules here via
+# __import__ and using patch.object() avoids the ambiguity on all Python
+# versions.
+__import__("benchbox.cli.commands.shell")
+_shell_module = _sys.modules["benchbox.cli.commands.shell"]
+__import__("benchbox.cli.commands.datagen")
+_datagen_module = _sys.modules["benchbox.cli.commands.datagen"]
+__import__("benchbox.cli.commands.run_official")
+_run_official_module = _sys.modules["benchbox.cli.commands.run_official"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -216,7 +224,7 @@ class TestShellCommand:
 
             # This should start the shell (but will fail in test without interaction)
             # We're just testing that it accepts the path and tries to connect
-            with patch("benchbox.cli.commands.shell._launch_duckdb_shell") as mock_launch:
+            with patch.object(_shell_module, "_launch_duckdb_shell") as mock_launch:
                 runner.invoke(cli, ["shell", "--database", str(db_path)])
 
                 # Should have called _launch_duckdb_shell
@@ -233,7 +241,7 @@ class TestShellCommand:
             db_path.touch()
 
             # Don't specify --platform, should auto-detect
-            with patch("benchbox.cli.commands.shell._launch_duckdb_shell") as mock_launch:
+            with patch.object(_shell_module, "_launch_duckdb_shell") as mock_launch:
                 runner.invoke(cli, ["shell", "--database", str(db_path)])
 
                 # Should have auto-detected and called DuckDB shell
@@ -250,7 +258,7 @@ class TestShellCommand:
             db_path.touch()
 
             # Don't specify --platform, should auto-detect
-            with patch("benchbox.cli.commands.shell._launch_sqlite_shell") as mock_launch:
+            with patch.object(_shell_module, "_launch_sqlite_shell") as mock_launch:
                 runner.invoke(cli, ["shell", "--database", str(db_path)])
 
                 # Should have auto-detected and called SQLite shell
@@ -615,7 +623,7 @@ class TestDatagenCommandBranches:
 
     def test_non_parquet_format_note_in_console(self):
         """Non-parquet format triggers a console note about default format being used."""
-        # _parse_run_args doesn't encode data_format — the datagen command
+        # _parse_run_args doesn't encode data_format - the datagen command
         # prints a note when data_format != 'parquet'. Verify the note is emitted
         # by checking the console directly with mocked ctx.invoke.
         from unittest.mock import MagicMock, patch as _patch

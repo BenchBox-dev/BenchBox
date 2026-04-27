@@ -33,7 +33,7 @@ from benchbox.utils.scale_factor import format_scale_factor
 
 console = quiet_console
 
-# (key_path, default, check_fn, error_msg) — used by validate_config to loop
+# (key_path, default, check_fn, error_msg) - used by validate_config to loop
 # over numeric threshold guards. Most require > 0; warm_up_iterations and
 # max_retries allow 0 (>= 0).
 _CONFIG_VALIDATION_RULES: list[tuple[str, int, Any, str]] = [
@@ -203,7 +203,7 @@ class ConfigManager:
         try:
             if self.config_path.exists():
                 try:
-                    with open(self.config_path) as f:
+                    with open(self.config_path, encoding="utf-8") as f:
                         config_data = yaml.safe_load(f) or {}
 
                     # If config file is empty or doesn't have any of our main sections,
@@ -313,7 +313,7 @@ class ConfigManager:
                 "generated_by": "benchbox-cli",
             }
 
-            with open(self.config_path, "w") as f:
+            with open(self.config_path, "w", encoding="utf-8") as f:
                 yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False)
 
             console.print(f"[green]✅ Configuration saved to {self.config_path}[/green]")
@@ -432,7 +432,7 @@ class ConfigManager:
             "tuning": "Table tuning and optimization settings",
         }
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False)
 
         console.print(f"[green]✅ Sample configuration created at {path}[/green]")
@@ -488,9 +488,9 @@ class ConfigManager:
             return benchmark_tunings
 
         except (yaml.YAMLError, json.JSONDecodeError) as e:
-            raise ValueError(f"Failed to parse tuning configuration file: {e}")
+            raise ValueError(f"Failed to parse tuning configuration file: {e}") from e
         except Exception as e:
-            raise ValueError(f"Error loading tuning configuration: {e}")
+            raise ValueError(f"Error loading tuning configuration: {e}") from e
 
     def _parse_table_tuning(self, table_name: str, table_data: dict[str, Any]) -> TableTuning:
         """Parse table tuning configuration from dictionary data.
@@ -656,9 +656,9 @@ class ConfigManager:
             return unified_config
 
         except (yaml.YAMLError, json.JSONDecodeError) as e:
-            raise ValueError(f"Failed to parse unified tuning configuration file: {e}")
+            raise ValueError(f"Failed to parse unified tuning configuration file: {e}") from e
         except Exception as e:
-            raise ValueError(f"Error loading unified tuning configuration: {e}")
+            raise ValueError(f"Error loading unified tuning configuration: {e}") from e
 
     def save_unified_tuning_config(
         self,
@@ -1190,7 +1190,7 @@ class ExampleArgumentParser:
             cls._add_databricks_arguments(parser, platform_title)
         elif platform.lower() == "duckdb":
             cls._add_duckdb_arguments(parser, platform_title)
-        elif platform.lower() == "clickhouse":
+        elif platform.lower() in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
             cls._add_clickhouse_arguments(parser, platform_title)
 
     @classmethod
@@ -1270,19 +1270,24 @@ class ExampleArgumentParser:
             "Platform-specific settings and connection",
         )
 
-        # Mode selection (server or embedded)
+        # Deployment selection (canonical --deployment-mode, legacy --mode alias)
         clickhouse_group.add_argument(
+            "--deployment-mode",
             "--mode",
+            dest="deployment_mode",
             type=str,
-            choices=["server", "embedded"],
+            choices=["server", "local", "embedded"],
             default="server",
-            help="ClickHouse mode: 'server' for remote/local server, 'local' for in-process (default: server)",
+            help=(
+                "ClickHouse deployment mode: 'server' for a ClickHouse server, 'local' for chDB. "
+                "Legacy alias 'embedded' maps to 'local'."
+            ),
         )
 
         # Server mode arguments
         server_group = parser.add_argument_group(
             f"{platform_title} Server Mode",
-            "Arguments for server mode (when --mode=server)",
+            "Arguments for server mode (when --deployment-mode=server)",
         )
         server_group.add_argument(
             "--host",
@@ -1305,15 +1310,15 @@ class ExampleArgumentParser:
         server_group.add_argument("--password", type=str, help="ClickHouse password")
         server_group.add_argument("--secure", action="store_true", help="Use secure connection (TLS)")
 
-        # Embedded mode arguments
-        embedded_group = parser.add_argument_group(
-            f"{platform_title} Embedded Mode",
-            "Arguments for embedded mode (when --mode=embedded)",
+        # Local mode arguments
+        local_group = parser.add_argument_group(
+            f"{platform_title} Local Mode",
+            "Arguments for ClickHouse local mode (when --deployment-mode=local or legacy --mode=embedded)",
         )
-        embedded_group.add_argument(
+        local_group.add_argument(
             "--data-path",
             type=str,
-            help="Data path for embedded mode file operations (optional)",
+            help="Path for ClickHouse local mode file operations (optional)",
         )
 
     @classmethod

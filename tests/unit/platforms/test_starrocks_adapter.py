@@ -144,7 +144,10 @@ class TestStarRocksAdapter:
         adapter = StarRocksAdapter(host="localhost", port=9030, database="test")
         connection = adapter.create_connection()
 
-        assert connection == mock_conn
+        from benchbox.platforms.starrocks.setup import _StarRocksConnectionWrapper
+
+        assert isinstance(connection, _StarRocksConnectionWrapper)
+        assert connection._conn == mock_conn
         # Called at least once for the main connection (may also be called for admin ops)
         assert mock_pymysql.connect.call_count >= 1
 
@@ -366,7 +369,10 @@ class TestStarRocksAdapter:
             mock_transpile.return_value = ['SELECT * FROM "table"']
             result = adapter.translate_sql("SELECT * FROM table", "duckdb")
             assert result == 'SELECT * FROM "table";'
-            mock_transpile.assert_called_once_with("SELECT * FROM table", read="duckdb", write="starrocks")
+            # identify=True for starrocks (not in clickhouse/postgres exclusion list)
+            mock_transpile.assert_called_once_with(
+                "SELECT * FROM table", read="duckdb", write="starrocks", identify=True
+            )
 
     def test_apply_constraint_configuration(self, mock_pymysql):
         """Test constraint configuration application."""
@@ -484,3 +490,36 @@ class TestStarRocksAdapter:
             adapter.create_schema(mock_benchmark, mock_conn)
 
         mock_cursor.close.assert_called_once()
+
+
+class TestStarRocksTlsCertValidation:
+    """Tests for verify_ssl and ca_cert_path TLS options (forward-compat for Stream Load)."""
+
+    def test_defaults_verify_ssl_true_no_ca_cert(self):
+        """verify_ssl defaults to True, ca_cert_path defaults to None."""
+        adapter = StarRocksAdapter()
+        assert adapter.verify_ssl is True
+        assert adapter.ca_cert_path is None
+
+    def test_verify_ssl_false_stored(self):
+        """verify_ssl=False is accepted and stored on the adapter."""
+        adapter = StarRocksAdapter(verify_ssl=False)
+        assert adapter.verify_ssl is False
+
+    def test_ca_cert_path_stored(self):
+        """ca_cert_path is accepted and stored on the adapter."""
+        adapter = StarRocksAdapter(ca_cert_path="/etc/ssl/custom-ca.crt")
+        assert adapter.ca_cert_path == "/etc/ssl/custom-ca.crt"
+
+    def test_from_config_passes_verify_ssl_and_ca_cert_path(self):
+        """from_config propagates verify_ssl and ca_cert_path to the adapter."""
+        config = {
+            "host": "localhost",
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+            "verify_ssl": False,
+            "ca_cert_path": "/etc/ssl/my-ca.crt",
+        }
+        adapter = StarRocksAdapter.from_config(config)
+        assert adapter.verify_ssl is False
+        assert adapter.ca_cert_path == "/etc/ssl/my-ca.crt"

@@ -6,7 +6,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, call, patch
@@ -76,7 +75,7 @@ class TestRedshiftAdapter:
         # Simulate environment with no Redshift drivers available.
         with (
             patch.object(redshift_module, "redshift_connector", None),
-            patch.object(redshift_module, "psycopg2", None, create=True),
+            patch.object(redshift_module, "psycopg", None, create=True),
             patch(
                 "benchbox.platforms.redshift.check_platform_dependencies", return_value=(False, ["redshift-connector"])
             ),
@@ -245,7 +244,7 @@ class TestRedshiftAdapter:
         # Mock the connection
         mock_connection = Mock()
 
-        # Mock the actual driver (redshift_connector or psycopg2) at the module level
+        # Mock the actual driver (redshift_connector or psycopg) at the module level
         import benchbox.platforms.redshift as redshift_module
 
         if redshift_module.redshift_connector:
@@ -258,18 +257,18 @@ class TestRedshiftAdapter:
                 assert call_kwargs["database"] == "admin_db"
                 assert call_kwargs["host"] == "test-cluster.redshift.amazonaws.com"
                 assert call_kwargs["user"] == "test_user"
-        elif redshift_module.psycopg2:
-            with patch.object(redshift_module.psycopg2, "connect", return_value=mock_connection):
+        elif redshift_module.psycopg:
+            with patch.object(redshift_module.psycopg, "connect", return_value=mock_connection):
                 connection = adapter._create_admin_connection()
 
                 # Verify it connected to admin database (not target database)
-                redshift_module.psycopg2.connect.assert_called_once()
-                call_kwargs = redshift_module.psycopg2.connect.call_args[1]
+                redshift_module.psycopg.connect.assert_called_once()
+                call_kwargs = redshift_module.psycopg.connect.call_args[1]
                 assert call_kwargs["database"] == "admin_db"
                 assert call_kwargs["host"] == "test-cluster.redshift.amazonaws.com"
                 assert call_kwargs["user"] == "test_user"
         else:
-            pytest.skip("Neither redshift_connector nor psycopg2 available")
+            pytest.skip("Neither redshift_connector nor psycopg available")
             return
 
         assert connection == mock_connection
@@ -346,17 +345,17 @@ class TestRedshiftAdapter:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Mock the actual driver (redshift_connector or psycopg2) at the module level
+        # Mock the actual driver (redshift_connector or psycopg) at the module level
         import benchbox.platforms.redshift as redshift_module
 
         if redshift_module.redshift_connector:
             with patch.object(redshift_module.redshift_connector, "connect", return_value=mock_connection):
                 connection = adapter._create_direct_connection(database="target_db")
-        elif redshift_module.psycopg2:
-            with patch.object(redshift_module.psycopg2, "connect", return_value=mock_connection):
+        elif redshift_module.psycopg:
+            with patch.object(redshift_module.psycopg, "connect", return_value=mock_connection):
                 connection = adapter._create_direct_connection(database="target_db")
         else:
-            pytest.skip("Neither redshift_connector nor psycopg2 available")
+            pytest.skip("Neither redshift_connector nor psycopg available")
             return
 
         assert connection == mock_connection
@@ -477,11 +476,11 @@ class TestRedshiftAdapter:
         if redshift_module.redshift_connector:
             with patch.object(redshift_module.redshift_connector, "connect", return_value=mock_connection):
                 result = adapter.check_server_database_exists(database="test_db")
-        elif redshift_module.psycopg2:
-            with patch.object(redshift_module.psycopg2, "connect", return_value=mock_connection):
+        elif redshift_module.psycopg:
+            with patch.object(redshift_module.psycopg, "connect", return_value=mock_connection):
                 result = adapter.check_server_database_exists(database="test_db")
         else:
-            pytest.skip("Neither redshift_connector nor psycopg2 available")
+            pytest.skip("Neither redshift_connector nor psycopg available")
             return
 
         # Verify result
@@ -517,11 +516,11 @@ class TestRedshiftAdapter:
         if redshift_module.redshift_connector:
             with patch.object(redshift_module.redshift_connector, "connect", return_value=mock_connection):
                 result = adapter.check_server_database_exists(database="nonexistent_db")
-        elif redshift_module.psycopg2:
-            with patch.object(redshift_module.psycopg2, "connect", return_value=mock_connection):
+        elif redshift_module.psycopg:
+            with patch.object(redshift_module.psycopg, "connect", return_value=mock_connection):
                 result = adapter.check_server_database_exists(database="nonexistent_db")
         else:
-            pytest.skip("Neither redshift_connector nor psycopg2 available")
+            pytest.skip("Neither redshift_connector nor psycopg available")
             return
 
         # Verify result
@@ -552,11 +551,11 @@ class TestRedshiftAdapter:
                 redshift_module.redshift_connector, "connect", side_effect=Exception("Connection failed")
             ):
                 result = adapter.check_server_database_exists(database="test_db")
-        elif redshift_module.psycopg2:
-            with patch.object(redshift_module.psycopg2, "connect", side_effect=Exception("Connection failed")):
+        elif redshift_module.psycopg:
+            with patch.object(redshift_module.psycopg, "connect", side_effect=Exception("Connection failed")):
                 result = adapter.check_server_database_exists(database="test_db")
         else:
-            pytest.skip("Neither redshift_connector nor psycopg2 available")
+            pytest.skip("Neither redshift_connector nor psycopg available")
             return
 
         # When connection fails, method should return False (database assumed not to exist)
@@ -591,15 +590,15 @@ class TestRedshiftAdapter:
                 # Verify DROP DATABASE was executed (quoted for SQL injection protection)
                 drop_calls = [call for call in mock_cursor.execute.call_args_list if "DROP DATABASE" in str(call)]
                 assert len(drop_calls) > 0, "DROP DATABASE should have been executed"
-        elif redshift_module.psycopg2:
-            with patch.object(redshift_module.psycopg2, "connect", return_value=mock_connection):
+        elif redshift_module.psycopg:
+            with patch.object(redshift_module.psycopg, "connect", return_value=mock_connection):
                 adapter.drop_database(database="test_db")
 
                 # Verify DROP DATABASE was executed (quoted for SQL injection protection)
                 drop_calls = [call for call in mock_cursor.execute.call_args_list if "DROP DATABASE" in str(call)]
                 assert len(drop_calls) > 0, "DROP DATABASE should have been executed"
         else:
-            pytest.skip("Neither redshift_connector nor psycopg2 available")
+            pytest.skip("Neither redshift_connector nor psycopg available")
             return
 
         # Verify autocommit was enabled
@@ -700,7 +699,7 @@ class TestRedshiftAdapter:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # SQLSTATE 42501 = insufficient_privilege — should not trigger retry
+        # SQLSTATE 42501 = insufficient_privilege - should not trigger retry
         mock_cursor.execute.side_effect = [
             None,  # pg_terminate_backend succeeds
             Exception({"C": "42501", "M": "permission denied to drop database"}),
@@ -714,7 +713,7 @@ class TestRedshiftAdapter:
             with pytest.raises(RuntimeError, match="Failed to drop Redshift database"):
                 adapter.drop_database(database="test_db")
 
-        # Only one admin connection should have been created — no retry
+        # Only one admin connection should have been created - no retry
         mock_admin_conn.assert_called_once()
 
     def test_drop_database_retry_drop_failure_propagates(self):
@@ -762,7 +761,7 @@ class TestRedshiftAdapter:
 
     def test_create_connection_success(self):
         """Test successful connection creation."""
-        # Test uses whichever driver is available (redshift_connector or psycopg2)
+        # Test uses whichever driver is available (redshift_connector or psycopg)
         # Cannot patch module-level driver variables that are set at import time
         try:
             adapter = RedshiftAdapter(
@@ -784,17 +783,17 @@ class TestRedshiftAdapter:
             patch.object(adapter, "handle_existing_database"),
             patch.object(adapter, "check_server_database_exists", return_value=True),
         ):
-            # Mock the actual driver (redshift_connector or psycopg2) at the module level
+            # Mock the actual driver (redshift_connector or psycopg) at the module level
             import benchbox.platforms.redshift as redshift_module
 
             if redshift_module.redshift_connector:
                 with patch.object(redshift_module.redshift_connector, "connect", return_value=mock_connection):
                     connection = adapter.create_connection()
-            elif redshift_module.psycopg2:
-                with patch.object(redshift_module.psycopg2, "connect", return_value=mock_connection):
+            elif redshift_module.psycopg:
+                with patch.object(redshift_module.psycopg, "connect", return_value=mock_connection):
                     connection = adapter.create_connection()
             else:
-                pytest.skip("Neither redshift_connector nor psycopg2 available")
+                pytest.skip("Neither redshift_connector nor psycopg available")
                 return
 
         assert connection == mock_connection
@@ -806,7 +805,7 @@ class TestRedshiftAdapter:
 
     def test_create_connection_with_wlm_settings(self):
         """Test connection creation with WLM settings."""
-        # Test uses whichever driver is available (redshift_connector or psycopg2)
+        # Test uses whichever driver is available (redshift_connector or psycopg)
         try:
             adapter = RedshiftAdapter(
                 host="test-cluster.redshift.amazonaws.com",
@@ -831,11 +830,11 @@ class TestRedshiftAdapter:
             if redshift_module.redshift_connector:
                 with patch.object(redshift_module.redshift_connector, "connect", return_value=mock_connection):
                     adapter.create_connection()
-            elif redshift_module.psycopg2:
-                with patch.object(redshift_module.psycopg2, "connect", return_value=mock_connection):
+            elif redshift_module.psycopg:
+                with patch.object(redshift_module.psycopg, "connect", return_value=mock_connection):
                     adapter.create_connection()
             else:
-                pytest.skip("Neither redshift_connector nor psycopg2 available")
+                pytest.skip("Neither redshift_connector nor psycopg available")
                 return
 
         # Should execute WLM configuration and set search_path (quoted for SQL injection protection)
@@ -849,7 +848,7 @@ class TestRedshiftAdapter:
 
     def test_create_connection_failure(self):
         """Test connection creation failure."""
-        # Test uses whichever driver is available (redshift_connector or psycopg2)
+        # Test uses whichever driver is available (redshift_connector or psycopg)
         try:
             adapter = RedshiftAdapter(
                 host="test-cluster.redshift.amazonaws.com",
@@ -872,12 +871,12 @@ class TestRedshiftAdapter:
                     pytest.raises(Exception, match="Connection failed"),
                 ):
                     adapter.create_connection()
-            elif redshift_module.psycopg2:
-                with patch.object(redshift_module.psycopg2, "connect", side_effect=Exception("Connection failed")):
+            elif redshift_module.psycopg:
+                with patch.object(redshift_module.psycopg, "connect", side_effect=Exception("Connection failed")):
                     with pytest.raises(Exception, match="Connection failed"):
                         adapter.create_connection()
             else:
-                pytest.skip("Neither redshift_connector nor psycopg2 available")
+                pytest.skip("Neither redshift_connector nor psycopg available")
 
     def test_create_schema(self):
         """Test schema creation with Redshift table definitions."""
@@ -937,7 +936,7 @@ class TestRedshiftAdapter:
         mock_benchmark = Mock()
 
         # Create temporary test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test1\n2,test2\n")
             temp_path = Path(f.name)
 
@@ -1023,9 +1022,6 @@ class TestRedshiftAdapter:
         finally:
             parquet_path.unlink()
 
-    @pytest.mark.skipif(
-        sys.platform == "win32", reason="Windows reports st_size=0 for directories, breaking _filter_valid_files"
-    )
     def test_external_table_mode_generates_delta_spectrum_sql(self):
         """External mode should emit Delta-flavored Spectrum SQL for Delta directories."""
         try:
@@ -1097,7 +1093,7 @@ class TestRedshiftAdapter:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test\n")
             csv_path = Path(f.name)
 
@@ -2025,8 +2021,9 @@ class TestRedshiftAdapter:
         """Test unsupported sslmode values are not forwarded to redshift_connector."""
         import benchbox.platforms.redshift as redshift_module
 
-        if not redshift_module.redshift_connector:
-            pytest.skip("redshift_connector not installed")
+        mock_connector = Mock()
+        mock_connect = Mock()
+        mock_connector.connect = mock_connect
 
         adapter = RedshiftAdapter(
             host="test-cluster.redshift.amazonaws.com",
@@ -2036,7 +2033,7 @@ class TestRedshiftAdapter:
             sslmode="prefer",
         )
 
-        with patch.object(redshift_module.redshift_connector, "connect", return_value=Mock()) as mock_connect:
+        with patch.object(redshift_module, "redshift_connector", mock_connector):
             adapter._connect_with_driver(application_name="BenchBox-Validation", connect_timeout=15)
 
         call_kwargs = mock_connect.call_args.kwargs
@@ -2048,8 +2045,9 @@ class TestRedshiftAdapter:
         """Test supported certificate-verification modes are forwarded to redshift_connector."""
         import benchbox.platforms.redshift as redshift_module
 
-        if not redshift_module.redshift_connector:
-            pytest.skip("redshift_connector not installed")
+        mock_connector = Mock()
+        mock_connect = Mock()
+        mock_connector.connect = mock_connect
 
         adapter = RedshiftAdapter(
             host="test-cluster.redshift.amazonaws.com",
@@ -2059,7 +2057,7 @@ class TestRedshiftAdapter:
             sslmode="verify-full",
         )
 
-        with patch.object(redshift_module.redshift_connector, "connect", return_value=Mock()) as mock_connect:
+        with patch.object(redshift_module, "redshift_connector", mock_connector):
             adapter._connect_with_driver(application_name="BenchBox-Validation", connect_timeout=15)
 
         call_kwargs = mock_connect.call_args.kwargs
@@ -2343,7 +2341,7 @@ class TestCopySqlGeneration:
         mock_connection = Mock()
         mock_s3_client = Mock()
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,alpha\n2,beta\n")
             csv_path = Path(f.name)
 
@@ -2476,7 +2474,7 @@ class TestCopySqlGeneration:
 
         with (
             tempfile.NamedTemporaryFile(mode="wb", suffix=".parquet", delete=False) as parquet_file,
-            tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as csv_file,
+            tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as csv_file,
         ):
             parquet_file.write(b"PAR1")
             csv_file.write("1,alpha\n")
@@ -2517,7 +2515,7 @@ class TestCopySqlGeneration:
         mock_connection = Mock()
         mock_s3_client = Mock()
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,x\n")
             csv_path = Path(f.name)
 

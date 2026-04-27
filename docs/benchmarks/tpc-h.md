@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, tpc-h
 ```
 
-> **CLI name:** `tpch` — use `benchbox run --benchmark tpch`
+> **CLI name:** `tpch` - use `benchbox run --benchmark tpch`
 
 ## Overview
 
@@ -106,6 +106,42 @@ The 22 TPC-H queries test different aspects of query processing:
 - **Complex Queries** (Q2, Q15, Q20, Q21): Nested subqueries, correlated queries
 - **Analytical Queries** (Q7, Q8, Q9): Time-series and trend analysis
 
+## Official TPC-H Metrics
+
+BenchBox computes the official TPC-H composite metrics in
+`benchbox/core/tpch/reporting.py`:
+
+| Metric | Meaning |
+|--------|---------|
+| **Power@Size** | Single-stream geometric-mean throughput over the 22 queries (power test) |
+| **Throughput@Size** | Multi-stream throughput (queries executed per hour) (throughput test) |
+| **QphH@Size** | The official composite: `sqrt(Power@Size × Throughput@Size)` |
+
+`TPCHMaintenanceReporter` emits these three values to text, CSV, and HTML
+outputs and also computes two efficiency ratios (`power_efficiency`,
+`throughput_efficiency`) against `QphH@Size`.
+
+### Refresh Functions (RF1 / RF2)
+
+The maintenance phase is implemented in
+`benchbox/core/tpch/maintenance_test.py` (`TPCHMaintenanceTest`):
+
+- **RF1 - Insert new sales:** generates new `orders` and `lineitem` rows
+  with foreign-key validation before insertion.
+- **RF2 - Delete old sales:** deletes matching orders/lineitems to keep the
+  database in steady state.
+
+`maintenance_pairs`, `rf1_interval`, and `rf2_interval` on
+`TPCHMaintenanceTestConfig` control how many RF1/RF2 pairs run and at what
+cadence, per the TPC-H spec.
+
+### DataFrame Coverage
+
+All 22 TPC-H queries have DataFrame equivalents in
+`benchbox/core/tpch/dataframe_queries.py` (one `qN_expression_impl` function
+per query, plus native-pandas variants for several queries). The DataFrame
+and SQL paths are validated against the same result set.
+
 ## Usage Examples
 
 ### Basic Query Generation
@@ -203,6 +239,15 @@ for i, stream_info in enumerate(tpch.get_all_streams_info()):
     print(f"  Permutation: {stream_info['permutation']}")
     print(f"  Output file: {stream_info['output_file']}")
 ```
+
+> **DuckDB concurrency note:** The TPC-H throughput phase shares a single
+> DuckDB connection across streams and issues each stream's queries through
+> a per-stream cursor (`_make_stream_cursor` in
+> `benchbox/platforms/base/execution.py`). DuckDB's Python client is
+> thread-safe only at the cursor level, not the connection level - see the
+> [DuckDB multi-thread guide](https://duckdb.org/docs/stable/guides/python/multiple_threads).
+> If you run BenchBox throughput tests from your own harness against DuckDB,
+> follow the same pattern: one connection, one cursor per thread.
 
 ## Query Characteristics
 

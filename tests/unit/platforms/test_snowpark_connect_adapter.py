@@ -9,11 +9,14 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import inspect
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from benchbox.core.exceptions import ConfigurationError
+from benchbox.platforms.base.adapter import PlatformAdapter
 
 pytestmark = [
     pytest.mark.unit,
@@ -271,7 +274,7 @@ class TestSnowparkConnectAdapterQueryExecution:
         adapter._session = None
 
         with pytest.raises(ConfigurationError, match="No active session"):
-            adapter.execute_query("SELECT 1")
+            adapter.execute_query(None, "SELECT 1", "Q1")
 
     def test_execute_query_success(self, mock_snowpark):
         """Test successful query execution."""
@@ -289,10 +292,12 @@ class TestSnowparkConnectAdapterQueryExecution:
         mock_session.sql.return_value.collect.return_value = [mock_row]
         adapter._session = mock_session
 
-        result = adapter.execute_query("SELECT COUNT(*) AS count FROM table1")
+        result = adapter.execute_query(mock_session, "SELECT COUNT(*) AS count FROM table1", "Q1")
 
-        assert len(result) == 1
-        assert result[0]["COUNT"] == 42
+        assert result["query_id"] == "Q1"
+        assert result["status"] == "SUCCESS"
+        assert result["rows_returned"] == 1
+        assert result["results"][0]["COUNT"] == 42
         mock_session.sql.assert_called_once_with("SELECT COUNT(*) AS count FROM table1")
 
     def test_execute_query_tracks_metrics(self, mock_snowpark):
@@ -311,7 +316,7 @@ class TestSnowparkConnectAdapterQueryExecution:
 
         assert adapter._query_count == 0
 
-        adapter.execute_query("SELECT 1")
+        adapter.execute_query(mock_session, "SELECT 1", "Q1")
 
         assert adapter._query_count == 1
         # Use >= 0 for cross-platform compatibility (Windows timer resolution)
@@ -410,7 +415,7 @@ class TestSnowparkConnectAdapterSchema:
         adapter._session = None
 
         with pytest.raises(ConfigurationError, match="No active session"):
-            adapter.create_schema("test_schema")
+            adapter.create_schema(MagicMock(), None)
 
     def test_create_schema_success(self, mock_snowpark):
         """Test successful schema creation."""
@@ -428,12 +433,48 @@ class TestSnowparkConnectAdapterSchema:
         mock_session.sql.return_value.collect.return_value = None
         adapter._session = mock_session
 
-        adapter.create_schema("test_schema")
+        elapsed = adapter.create_schema(MagicMock(), mock_session)
 
         # Should create database and schema
+        assert elapsed >= 0
         calls = mock_session.sql.call_args_list
         assert any("CREATE DATABASE IF NOT EXISTS" in str(call) for call in calls)
         assert any("CREATE SCHEMA IF NOT EXISTS" in str(call) for call in calls)
+
+    def test_abc_method_signatures_match_platform_adapter(self, mock_snowpark):
+        """Snowpark Connect must preserve the PlatformAdapter call contract."""
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        for method_name in ("create_schema", "load_data", "execute_query"):
+            assert inspect.signature(getattr(SnowparkConnectAdapter, method_name)) == inspect.signature(
+                getattr(PlatformAdapter, method_name)
+            )
+
+    def test_load_data_uses_standard_contract(self, mock_snowpark, tmp_path):
+        """load_data should accept benchmark, connection, data_dir and return the standard tuple."""
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        adapter = SnowparkConnectAdapter(
+            account="xy12345.us-east-1",
+            user="test_user",
+            password="test_password",
+        )
+
+        table_file = tmp_path / "lineitem.parquet"
+        table_file.write_bytes(b"PAR1")
+
+        benchmark = MagicMock()
+        benchmark.get_table_loading_order.return_value = ["lineitem"]
+        mock_session = MagicMock()
+        mock_session.sql.return_value.collect.return_value = [(3,)]
+
+        table_stats, elapsed, per_table = adapter.load_data(benchmark, mock_session, Path(tmp_path))
+
+        assert table_stats == {"lineitem": 3}
+        assert elapsed >= 0
+        assert per_table is not None
+        assert "lineitem" in per_table
+        mock_session.read.parquet.assert_called_once_with("@~/lineitem/")
 
 
 class TestSnowparkConnectAdapterCLI:

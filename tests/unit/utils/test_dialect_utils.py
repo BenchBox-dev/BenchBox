@@ -205,6 +205,20 @@ class TestSQLTranslation:
         query = 'SELECT 1 AS "ALL" ORDER BY "ALL"'
         assert _query_has_group_or_order_by_all(query) is False
 
+    def test_translate_sqlite_rewrites_interval_and_extract(self):
+        """SQLite translation should remove unsupported INTERVAL and EXTRACT syntax."""
+        query = """
+            SELECT EXTRACT(YEAR FROM l_shipdate) AS ship_year
+            FROM lineitem
+            WHERE l_shipdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+        """
+        result = translate_sql_query(query, target_dialect="sqlite", source_dialect="postgres")
+
+        assert "INTERVAL" not in result.upper()
+        assert "EXTRACT" not in result.upper()
+        assert "DATE('1994-01-01', '+1 year')" in result
+        assert "STRFTIME('%Y'," in result
+
 
 class TestIntegrationScenarios:
     """Test real-world integration scenarios."""

@@ -3,25 +3,52 @@ SQL Platforms
 
 .. tags:: reference, sql-platform
 
-Database platforms with SQL interfaces.
+Database platforms with SQL interfaces, grouped by deployment shape.
 
-Local/Embedded Engines
-----------------------
+Single-Node Analytics Engines
+-----------------------------
 
 .. toctree::
    :maxdepth: 1
 
-   datafusion
+   duckdb
    clickhouse-local-mode
-   polars
-   postgresql
+   clickhouse-server
+   datafusion
+   cedardb
 
-Distributed SQL Engines
------------------------
+Row-Based & Postgres-Compatible
+-------------------------------
 
 .. toctree::
    :maxdepth: 1
 
-   presto
+   postgresql
+   sqlite
+   pg_duckdb
+   pg_mooncake
+
+Distributed Query Engines
+-------------------------
+
+.. toctree::
+   :maxdepth: 1
+
    trino
+   presto
    spark
+   doris
+   starrocks
+   lakesail
+   velox
+   singlestore
+
+Time-Series Databases
+---------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   timescaledb
+   influxdb
+   questdb

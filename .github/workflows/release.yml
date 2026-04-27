@@ -26,7 +26,7 @@ jobs:
             console.log(`Checking CI workflows for commit: ${sha}`);
 
             const requiredWorkflows = ['test.yml', 'lint.yml'];
-            const maxWait = 15 * 60 * 1000;  // 15 minutes
+            const maxWait = 30 * 60 * 1000;  // 30 minutes
             const pollInterval = 30 * 1000;  // 30 seconds
             let waited = 0;
 
@@ -79,8 +79,45 @@ jobs:
 
             core.setFailed(`Timed out waiting for CI workflows after ${maxWait/60000} minutes`);
 
-  build:
+  dependency-bounds:
     needs: check-ci-passed
+    runs-on: ubuntu-latest
+    outputs:
+      report_path: ${{ steps.gate.outputs.report_path }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Check dependency upper bounds (blocking + report)
+        id: gate
+        run: |
+          mkdir -p release-artifacts
+          report=release-artifacts/dependency-bounds.md
+          uv run -- python scripts/check_dependency_bounds.py \
+            --fail-on=cap-reached \
+            --output "$report"
+          echo "report_path=$report" >> "$GITHUB_OUTPUT"
+
+      - name: Upload bounds report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-bounds-report
+          path: release-artifacts/dependency-bounds.md
+          retention-days: 90
+
+  build:
+    needs: [check-ci-passed, dependency-bounds]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}

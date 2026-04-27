@@ -8,7 +8,6 @@ from typing import Any
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
-from benchbox.utils.file_format import is_tpc_format
 from benchbox.utils.printing import emit
 
 from .query_transformer import ClickHouseQueryTransformer
@@ -62,8 +61,10 @@ class ClickHouseWorkloadMixin:
         # Replace "Nullable(Type) NOT NULL" patterns
         import re
 
+        # [^)]+  would stop at the first ) inside Nullable(Decimal(38, 0)) NOT NULL;
+        # use an alternation that allows one level of nested parens.
         statement = re.sub(
-            r"Nullable\([^)]+\)\s+NOT\s+NULL",
+            r"Nullable\((?:[^()]+|\([^)]*\))+\)\s+NOT\s+NULL",
             lambda m: m.group(0).replace(" NOT NULL", ""),
             statement,
             flags=re.IGNORECASE,
@@ -113,7 +114,8 @@ class ClickHouseWorkloadMixin:
         pk_columns = []
 
         # Pattern 1: column_name TYPE PRIMARY KEY
-        inline_pk_pattern = r"(\w+)\s+\w+(?:\([^)]*\))?\s+PRIMARY\s+KEY"
+        # (?:\((?:[^()]+|\([^)]*\))*\))? handles one level of nesting e.g. Nullable(Decimal(10,2))
+        inline_pk_pattern = r"(\w+)\s+\w+(?:\((?:[^()]+|\([^)]*\))*\))?\s+PRIMARY\s+KEY"
         inline_matches = re.findall(inline_pk_pattern, statement, re.IGNORECASE)
         pk_columns.extend(inline_matches)
 
@@ -140,23 +142,30 @@ class ClickHouseWorkloadMixin:
             emit(f"  Loading data from {path_info['provider']} cloud storage")
 
         # Create ClickHouse-specific handler factory
-        def clickhouse_handler_factory(file_path, adapter, benchmark_instance):
+        def clickhouse_handler_factory(file_path, adapter, benchmark_instance, table_name=None, data_source=None):
             from benchbox.platforms.base.data_loading import (
                 ClickHouseNativeHandler,
+                DataSource,
                 FileFormatRegistry,
+                resolve_csv_dialect,
             )
 
             # Determine the true base extension (handles names like *.tbl.1.zst)
             base_ext = FileFormatRegistry.get_base_data_extension(file_path)
 
             # Create ClickHouse native handler for supported formats
-            if is_tpc_format(file_path):
-                return ClickHouseNativeHandler("|", adapter, benchmark_instance)
-            elif base_ext == ".csv":
-                return ClickHouseNativeHandler(",", adapter, benchmark_instance)
+            if base_ext in (".tbl", ".dat", ".csv"):
+                dialect_source = data_source or DataSource(source_type="clickhouse_handler", tables={})
+                dialect = resolve_csv_dialect(
+                    dialect_source, table_name or file_path.stem, file_path, benchmark_instance
+                )
+                return ClickHouseNativeHandler(dialect.delimiter, adapter, benchmark_instance)
             elif base_ext == ".parquet":
-                # Fall back to generic Parquet handler (ClickHouse native handler could be added later)
-                return None
+                # Delimiter is unused for Parquet - file() reads the format natively.
+                # We route through ClickHouseNativeHandler so load_table() uses
+                # INSERT INTO ... SELECT * FROM file(path, 'Parquet') instead of
+                # falling back to the generic row-by-row ParquetHandler.
+                return ClickHouseNativeHandler(",", adapter, benchmark_instance)
             return None  # Fall back to generic handler
 
         loader = DataLoader(
@@ -203,6 +212,29 @@ class ClickHouseWorkloadMixin:
         except Exception as e:
             self.logger.debug(f"Failed to get existing tables: {e}")
             return []
+
+    def get_table_row_count(self, connection: Any, table: str) -> int:
+        """Get row count using ClickHouse execute() API.
+
+        Overrides base implementation that uses cursor() - ClickHouseLocalClient
+        and ClickHouseCloudClient expose execute() but not cursor().
+
+        Args:
+            connection: ClickHouse connection (local, server, or cloud)
+            table: Table name
+
+        Returns:
+            Row count as integer, or 0 if unable to determine
+        """
+        try:
+            result = connection.execute(f"SELECT COUNT(*) FROM {table}")
+            if result:
+                row = result[0]
+                return int(row[0])
+            return 0
+        except Exception as e:
+            self.logger.debug(f"Failed to get row count for {table}: {e}")
+            return 0
 
     def _get_constraint_configuration(self) -> tuple[bool, bool]:
         """Extract constraint configuration settings from tuning config.
@@ -292,6 +324,8 @@ class ClickHouseWorkloadMixin:
             # Apply ClickHouse-specific query transformations for SQL compatibility
             transformer = ClickHouseQueryTransformer(verbose=self.very_verbose)
             transformed_query = transformer.transform(query)
+            # Session settings stay generic; analyzer-sensitive query rewrites live in the benchmark.
+            transformed_query = transformer.add_query_settings(transformed_query)
 
             # Log transformations if any were applied
             if transformer.get_transformations_applied() and self.verbose_enabled:
@@ -373,14 +407,18 @@ class ClickHouseWorkloadMixin:
 
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
+            error_type = type(e).__name__
+            # Always populate `error` with a non-empty string - some exceptions
+            # (e.g. chdb errors raised with no message) yield empty str(e).
+            error_message = str(e) or repr(e) or error_type
 
             return {
                 "query_id": query_id,
                 "status": "FAILED",
                 "execution_time_seconds": execution_time,
                 "rows_returned": 0,
-                "error": str(e),
-                "error_type": type(e).__name__,
+                "error": error_message,
+                "error_type": error_type,
             }
 
 

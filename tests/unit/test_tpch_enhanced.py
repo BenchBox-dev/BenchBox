@@ -8,6 +8,7 @@ This implementation is based on the TPC-H specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
@@ -109,6 +110,26 @@ class TestTPCHBenchmarkEnhanced:
             except Exception:
                 # Translation might not be implemented for all dialects
                 pass
+
+    def test_sqlite_translation_executes_against_empty_schema(self, tpch_benchmark):
+        """All translated TPC-H queries should be executable SQLite SQL."""
+        conn = sqlite3.connect(":memory:")
+        conn.executescript(tpch_benchmark.get_create_tables_sql(dialect="sqlite"))
+
+        for query_id in range(1, 23):
+            query = tpch_benchmark.get_query(query_id, scale_factor=0.01, dialect="sqlite")
+            conn.execute(query).fetchall()
+
+    def test_sqlite_translation_rewrites_named_alias_queries(self, tpch_benchmark):
+        """SQLite translation must preserve Q13/Q15 derived column names."""
+        query_13 = tpch_benchmark.get_query(13, scale_factor=0.01, dialect="sqlite")
+        query_15 = tpch_benchmark.get_query(15, scale_factor=0.01, dialect="sqlite")
+
+        assert 'AS "c_count"' in query_13
+        assert 'AS "c_orders"(' not in query_13
+        assert 'AS "supplier_no"' in query_15
+        assert 'AS "total_revenue"' in query_15
+        assert "INTERVAL" not in query_15.upper()
 
     def test_data_generator_properties(self, tpch_benchmark):
         """Test data generator properties and configuration."""

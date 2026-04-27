@@ -30,15 +30,20 @@ from typing import Any
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 from .base import DriverIsolationCapability
-from .postgresql import POSTGRES_DIALECT, PostgreSQLAdapter, _add_postgres_compatible_arguments
+from .postgresql import (
+    POSTGRES_DIALECT,
+    PostgreSQLAdapter,
+    _add_postgres_compatible_arguments,
+    _build_postgres_connection_kwargs,
+)
 
 logger = logging.getLogger(__name__)
 
 try:
-    import psycopg2
-    from psycopg2 import sql as psql
+    import psycopg
+    from psycopg import sql as psql
 except ImportError:
-    psycopg2 = None
+    psycopg = None
     psql = None  # type: ignore[assignment]
 
 
@@ -109,53 +114,10 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> TimescaleDBAdapter:
         """Create TimescaleDB adapter from unified configuration."""
-        adapter_config = {}
-
-        # Connection parameters (inherited from PostgreSQL)
-        adapter_config["host"] = config.get("host", "localhost")
-        adapter_config["port"] = config.get("port", 5432)
-        adapter_config["username"] = config.get("username", "postgres")
-        adapter_config["password"] = config.get("password")
-        adapter_config["schema"] = config.get("schema", "public")
-        adapter_config["sslmode"] = config.get("sslmode", "prefer")
-
-        # Database name - use provided or generate from benchmark config
-        if config.get("database"):
-            adapter_config["database"] = config["database"]
-        elif config.get("benchmark") and config.get("scale_factor") is not None:
-            from benchbox.utils.scale_factor import format_benchmark_name
-
-            benchmark_name = format_benchmark_name(config["benchmark"], config["scale_factor"])
-            adapter_config["database"] = f"benchbox_{benchmark_name}".lower().replace("-", "_")
-        else:
-            adapter_config["database"] = "benchbox"
-
-        # Admin database for CREATE/DROP DATABASE operations
-        adapter_config["admin_database"] = config.get("admin_database", "postgres")
-
-        # Performance settings (inherited from PostgreSQL)
-        adapter_config["work_mem"] = config.get("work_mem", "256MB")
-        adapter_config["maintenance_work_mem"] = config.get("maintenance_work_mem", "512MB")
-        adapter_config["effective_cache_size"] = config.get("effective_cache_size", "1GB")
-        adapter_config["max_parallel_workers_per_gather"] = config.get("max_parallel_workers_per_gather", 2)
-
-        # Connection pool settings
-        adapter_config["connect_timeout"] = config.get("connect_timeout", 10)
-        adapter_config["statement_timeout"] = config.get("statement_timeout", 0)
-
-        # TimescaleDB-specific settings
+        adapter_config = _build_postgres_connection_kwargs(config)
         adapter_config["chunk_interval"] = config.get("chunk_interval", "1 day")
         adapter_config["compression_enabled"] = config.get("compression_enabled", False)
         adapter_config["compression_after"] = config.get("compression_after", "7 days")
-
-        # Force recreate
-        adapter_config["force_recreate"] = config.get("force", False)
-
-        # Pass through other config
-        for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
-            if key in config:
-                adapter_config[key] = config[key]
-
         return cls(**adapter_config)
 
     def __init__(self, **config):
@@ -298,7 +260,7 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             )
 
         except Exception as e:
-            raise ValueError(f"Invalid TIGERDATA_SERVICE_URL (or TIMESCALE_SERVICE_URL) format: {e}")
+            raise ValueError(f"Invalid TIGERDATA_SERVICE_URL (or TIMESCALE_SERVICE_URL) format: {e}") from e
 
     @staticmethod
     def _validate_interval(value: str, param_name: str) -> str:
@@ -387,6 +349,7 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
                         table_name = match.group(1).strip('"').lower()
                         tables_created.append(table_name)
             except Exception as e:
+                connection.rollback()
                 self.logger.warning(f"Schema statement failed: {e}")
                 # Continue with other statements
 
@@ -423,7 +386,7 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
 
         for table_name in time_column_tables:
             try:
-                # Build qualified table identifier safely using psycopg2.sql
+                # Build qualified table identifier safely using psycopg.sql
                 if self.schema != "public":
                     table_identifier = psql.Identifier(self.schema, table_name)
                 else:
@@ -508,7 +471,7 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         cursor = connection.cursor()
 
         try:
-            # Build qualified table identifier safely using psycopg2.sql
+            # Build qualified table identifier safely using psycopg.sql
             if self.schema != "public":
                 table_identifier = psql.Identifier(self.schema, table_name)
             else:
@@ -567,7 +530,7 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         cursor = connection.cursor()
         for table_name in self._hypertables:
             try:
-                # Build qualified table identifier safely using psycopg2.sql
+                # Build qualified table identifier safely using psycopg.sql
                 if self.schema != "public":
                     table_identifier = psql.Identifier(self.schema, table_name)
                 else:
@@ -665,32 +628,47 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             return False
 
 
-def _build_timescaledb_config(benchmark_config: dict, platform_options: dict) -> dict:
-    """Build TimescaleDB configuration from benchmark and platform options.
+def _build_timescaledb_config(
+    platform: str,
+    options: dict[str, Any],
+    overrides: dict[str, Any],
+    info: Any,
+) -> Any:
+    """Build TimescaleDB database configuration with credential loading.
 
     This function is registered with PlatformHookRegistry to provide
     TimescaleDB-specific configuration handling.
     """
-    config = {
-        "host": platform_options.get("host", "localhost"),
-        "port": platform_options.get("port", 5432),
-        "username": platform_options.get("username", "postgres"),
-        "password": platform_options.get("password"),
-        "schema": platform_options.get("schema", "public"),
-        "database": platform_options.get("database"),
-        "admin_database": platform_options.get("admin_database", "postgres"),
-        "sslmode": platform_options.get("sslmode", "prefer"),
-        "work_mem": platform_options.get("work_mem", "256MB"),
-        "maintenance_work_mem": platform_options.get("maintenance_work_mem", "512MB"),
-        "effective_cache_size": platform_options.get("effective_cache_size", "1GB"),
-        "max_parallel_workers_per_gather": platform_options.get("max_parallel_workers_per_gather", 2),
-        # TimescaleDB-specific
-        "chunk_interval": platform_options.get("chunk_interval", "1 day"),
-        "compression_enabled": platform_options.get("compression_enabled", False),
-        "compression_after": platform_options.get("compression_after", "7 days"),
-    }
+    from benchbox.platforms.base.config_utils import POSTGRES_FAMILY_BASE_OPTIONS, build_platform_config
 
-    # Merge benchmark configuration
-    config.update(benchmark_config)
-
-    return config
+    return build_platform_config(
+        platform_type="timescaledb",
+        credential_key="timescaledb",
+        default_display_name="TimescaleDB",
+        default_driver_package="psycopg",
+        base_options={
+            **POSTGRES_FAMILY_BASE_OPTIONS,
+            "chunk_interval": "1 day",
+            "compression_enabled": False,
+            "compression_after": "7 days",
+        },
+        platform_fields=[
+            "host",
+            "port",
+            "username",
+            "password",
+            "database",
+            "admin_database",
+            "sslmode",
+            "work_mem",
+            "maintenance_work_mem",
+            "effective_cache_size",
+            "max_parallel_workers_per_gather",
+            "chunk_interval",
+            "compression_enabled",
+            "compression_after",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )

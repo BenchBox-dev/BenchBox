@@ -80,11 +80,43 @@ platforms:
 
 BenchBox recognizes these environment variables:
 
+### Core Settings
+
+These variables override the corresponding settings in the configuration file (equivalent to editing `~/.benchbox/config.yaml`):
+
+| Variable | Config Path | Type | Default | Description |
+|----------|-------------|------|---------|-------------|
+| `BENCHBOX_DATABASE_PREFERRED` | `database.preferred` | string | `duckdb` | Preferred database platform |
+| `BENCHBOX_SCALE_FACTOR` | `benchmarks.default_scale` | float | `0.01` | Default scale factor |
+| `BENCHBOX_VERBOSE` | `execution.verbose` | boolean | `true` | Enable verbose output (`true`/`1`/`yes`/`on`) |
+| `BENCHBOX_MAX_WORKERS` | `execution.max_workers` | integer | `4` | Maximum parallel worker threads |
+| `BENCHBOX_TUNING_ENABLED` | `tuning.enabled` | boolean | `false` | Enable table tuning by default |
+| `BENCHBOX_TUNING_CONFIG` | `tuning.default_config_file` | string | - | Path to tuning configuration file |
+| `BENCHBOX_OUTPUT_DIR` | `output.directory` | string | `./benchmark_runs/results` | Output directory for result files |
+| `BENCHBOX_MEMORY_LIMIT_GB` | `execution.memory_limit_gb` | integer | `0` (auto) | Memory limit in GB; `0` means no limit |
+
+**Boolean parsing:** `true`, `1`, `yes`, `on` (case-insensitive) are treated as true.
+
 ### General Settings
 
 - `BENCHBOX_NON_INTERACTIVE=true`: Enable non-interactive mode
 - `BENCHBOX_NO_COMPRESSION=true`: Disable data compression
 - `BENCHBOX_CONFIG_PATH=/path/to/config.yaml`: Custom config file location
+
+### Advanced Settings
+
+These variables control lower-level behaviors, useful for CI, offline environments, or advanced workflows:
+
+| Variable | Description |
+|----------|-------------|
+| `BENCHBOX_DATA_DIR` | Override the default local data directory for generated benchmark files |
+| `BENCHBOX_CACHE_DIR` | Override the cache directory for DataFrame benchmark data |
+| `BENCHBOX_TUNING_PATH` | Override the tuning file search root; BenchBox looks for `{platform}/{benchmark}_tuned.yaml` under this directory |
+| `BENCHBOX_QUERY_VALIDATION_MODE` | TPC-DS query validation mode: `exact`, `loose`, `range`, or `skip` (default: `skip`) |
+| `BENCHBOX_NO_DOWNLOAD` | Set to `1` or `true` to disable automatic download of expected-answer files; useful in offline/airgapped environments |
+| `BENCHBOX_ANSWERS_URL` | Override the base URL for downloading expected-answer archives (default: GitHub releases) |
+| `BENCHBOX_ENABLE_EXPERIMENTAL` | Set to `1` or `true` to show experimental platforms in the platform registry |
+| `BENCHBOX_DATA_ORG_MAX_IN_MEMORY_BYTES` | Maximum bytes held in memory when sorting generated data files (integer; default: 512 MB) |
 
 ### Platform Authentication
 
@@ -183,6 +215,134 @@ Use `benchbox platforms status` to see platform information and capabilities:
 ```bash
 benchbox platforms status clickhouse
 benchbox platforms status databricks
+```
+
+(cli-config-sections)=
+## Configuration Sections Reference
+
+Complete reference for all settings in `~/.benchbox/config.yaml` (or `./benchbox.yaml`). Unset values fall back to the defaults shown here.
+
+### `system`
+
+System profiling and detection settings.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `auto_profile` | boolean | `true` | Automatically detect system capabilities on startup |
+| `save_profile` | boolean | `true` | Persist the detected system profile to disk |
+| `profile_cache_hours` | integer | `24` | Hours to cache the system profile before re-detecting |
+
+### `database`
+
+Database connection settings.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `preferred` | string | `duckdb` | Default platform when none is specified on the CLI |
+| `connection_timeout` | integer | `30` | Connection timeout in seconds |
+| `auto_detect` | boolean | `true` | Automatically detect available database platforms |
+
+### `benchmarks`
+
+Default benchmark execution parameters.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `default_scale` | float | `0.01` | Default scale factor |
+| `timeout_minutes` | integer | `60` | Maximum benchmark execution time |
+| `max_memory_gb` | integer | `8` | Maximum memory allocation hint in GB |
+| `continue_on_error` | boolean | `false` | Continue running remaining queries when one fails |
+
+### `output`
+
+Result output and export settings.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `formats` | list | `[json, console]` | Output format list |
+| `directory` | string | `./benchmark_runs/results` | Results directory |
+| `timestamp_format` | string | `%Y%m%d_%H%M%S` | Timestamp format for result filenames |
+| `submit_to_service` | boolean | `false` | Automatically submit results to the hosted service |
+| `service_url` | string | `https://api.benchbox.dev/v1` | Results service URL |
+| `compression.enabled` | boolean | `true` | Enable result file compression |
+| `compression.type` | string | `zstd` | Compression algorithm (`zstd`, `gzip`) |
+| `compression.level` | integer | `null` | Compression level; `null` uses the algorithm default |
+
+### `execution`
+
+Performance and execution control settings.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `parallel_queries` | boolean | `false` | Execute queries in parallel |
+| `max_workers` | integer | `4` | Maximum worker threads for parallel execution |
+| `memory_limit_gb` | integer | `0` | Memory cap in GB; `0` means no limit (auto) |
+| `verbose` | boolean | `true` | Enable verbose progress output |
+
+**`execution.power_run`** - settings for multi-iteration power runs:
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `iterations` | integer | `3` | Number of measurement iterations per query |
+| `warm_up_iterations` | integer | `1` | Warm-up iterations before measurement (not included in stats) |
+| `timeout_per_iteration_minutes` | integer | `60` | Timeout for each iteration |
+| `fail_fast` | boolean | `false` | Stop immediately when any iteration fails |
+| `collect_metrics` | boolean | `true` | Collect resource metrics during execution |
+
+**`execution.concurrent_queries`** - settings for throughput / concurrent-stream runs:
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable concurrent query streams |
+| `max_concurrent` | integer | `2` | Number of concurrent query streams |
+| `query_timeout_seconds` | integer | `300` | Per-query timeout in concurrent mode |
+| `stream_timeout_seconds` | integer | `3600` | Timeout for an entire concurrent stream |
+| `retry_failed_queries` | boolean | `true` | Retry failed queries in concurrent streams |
+| `max_retries` | integer | `3` | Maximum retry attempts per query |
+
+### `tuning`
+
+Table tuning and optimization settings.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `enabled` | boolean | `false` | Apply tuning configurations by default |
+| `default_config_file` | string | `null` | Path to a default tuning YAML file |
+| `validate_on_load` | boolean | `true` | Validate tuning configurations when loaded |
+| `allow_platform_incompatible` | boolean | `false` | Allow tuning configs that contain platform-incompatible directives |
+
+---
+
+Example full configuration file:
+
+```yaml
+system:
+  profile_cache_hours: 48
+
+database:
+  preferred: duckdb
+
+benchmarks:
+  default_scale: 1.0
+  timeout_minutes: 120
+  continue_on_error: true
+
+output:
+  directory: ./results
+  compression:
+    enabled: true
+    type: zstd
+
+execution:
+  max_workers: 8
+  memory_limit_gb: 16
+  power_run:
+    iterations: 5
+    warm_up_iterations: 2
+
+tuning:
+  enabled: true
+  default_config_file: ./tuning/my_tuning.yaml
 ```
 
 ## Related

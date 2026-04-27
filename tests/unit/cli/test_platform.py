@@ -581,7 +581,7 @@ class TestPlatformManager:
                     available=True,
                     enabled=True,
                     requirements=[],
-                    installation_command="uv add clickhouse-connect",
+                    installation_command="uv add benchbox --extra clickhouse-cloud",
                     category="analytical",
                 ),
                 "duckdb": PlatformInfo(
@@ -598,12 +598,12 @@ class TestPlatformManager:
             }
             mock_caps.side_effect = lambda name: (
                 SimpleNamespace(
-                    default_deployment="cloud",
+                    default_deployment="local",
                     deployment_modes={
-                        "cloud": SimpleNamespace(
-                            mode="cloud",
+                        "server": SimpleNamespace(
+                            mode="self-hosted",
                             requires_credentials=True,
-                            requires_cloud_storage=True,
+                            requires_cloud_storage=False,
                             requires_network=True,
                         ),
                         "local": SimpleNamespace(
@@ -621,9 +621,9 @@ class TestPlatformManager:
             self.manager.display_platform_deployments()
 
         output = stream.getvalue()
-        assert "clickhouse:cloud" in output
+        assert "clickhouse:server" in output
         assert "clickhouse:local" in output
-        assert "credentials, cloud storage, network" in output
+        assert "credentials, network" in output
         assert "Usage: benchbox run --platform <platform>:<mode>" in output
 
 

@@ -22,10 +22,11 @@ from __future__ import annotations
 import csv
 import re
 import socket
-import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
+from benchbox.platforms.questdb_rewriter import rewrite as _rewriter_rewrite
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
@@ -39,17 +40,24 @@ from ..utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
 )
-from ..utils.file_format import get_delimiter_for_file, is_tpc_format
-from .base import DriverIsolationCapability, PlatformAdapter
+from ..utils.file_format import get_data_extension
+from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin
+from .base.data_loading import (
+    CsvDialect,
+    DataSourceResolver,
+    normalize_table_paths,
+    prepare_local_load_file,
+    resolve_csv_dialect,
+)
+from .base.sql_execution import execute_sql_query
 
 # QuestDB uses PostgreSQL wire protocol, so we use the postgres dialect
 QUESTDB_DIALECT = "postgres"
 
 try:
-    import psycopg2
-    import psycopg2.extras
+    import psycopg
 except ImportError:
-    psycopg2 = None
+    psycopg = None
 
 # ──────────────────────────────────────────────────────────────────────
 # TPC-H designated timestamp columns per table.
@@ -100,11 +108,11 @@ TPCH_DATE_COLUMNS: dict[str, list[str]] = {
 }
 
 
-class QuestDBAdapter(PlatformAdapter):
+class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
     """QuestDB platform adapter with REST API and ILP data loading.
 
     Supports QuestDB 7.0+ via PostgreSQL wire protocol (port 8812).
-    Uses psycopg2 for database connectivity, REST API for bulk loading,
+    Uses psycopg for database connectivity, REST API for bulk loading,
     and optionally ILP (port 9009) for high-throughput ingestion.
 
     QuestDB-specific considerations:
@@ -112,12 +120,13 @@ class QuestDBAdapter(PlatformAdapter):
     - Tables support designated timestamp columns and partitioning
     - No foreign key constraints
     - DROP TABLE does not support IF EXISTS in all versions
-    - COPY command support is limited; REST API /imp is preferred for loading
+    - COPY FROM STDIN is a no-op in QuestDB; REST API /imp is the only bulk loader
     - Symbol type for low-cardinality string columns
     - PARTITION BY for time-series tables
     """
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
+    _max_identifier_length = 127  # QuestDB supports identifiers up to 127 chars (PostgreSQL caps at 63)
 
     @property
     def platform_name(self) -> str:
@@ -224,6 +233,7 @@ class QuestDBAdapter(PlatformAdapter):
         # QuestDB-specific settings
         adapter_config["loading_method"] = config.get("loading_method", "rest")
         adapter_config["partition_by"] = config.get("partition_by")
+        adapter_config["parquet_chunk_rows"] = config.get("parquet_chunk_rows", 200_000)
 
         # Force recreate
         adapter_config["force_recreate"] = config.get("force", False)
@@ -248,8 +258,8 @@ class QuestDBAdapter(PlatformAdapter):
         super().__init__(**config)
 
         # Check dependencies
-        if psycopg2 is None:
-            available, missing = check_platform_dependencies("questdb", packages=["psycopg2"])
+        if psycopg is None:
+            available, missing = check_platform_dependencies("questdb", packages=["psycopg"])
             if not available:
                 error_msg = get_dependency_error_message("questdb", missing)
                 raise ImportError(error_msg)
@@ -273,12 +283,13 @@ class QuestDBAdapter(PlatformAdapter):
         # QuestDB-specific settings
         self.loading_method = config.get("loading_method", "rest")
         self.partition_by = config.get("partition_by")
+        self.parquet_chunk_rows = int(config.get("parquet_chunk_rows", 200_000))
 
         # QuestDB does not support database management (single DB per instance)
         self.skip_database_management = True
 
     def _get_connection_params(self) -> dict[str, Any]:
-        """Build psycopg2 connection parameters for QuestDB PG wire protocol."""
+        """Build psycopg connection parameters for QuestDB PG wire protocol."""
         params = {
             "host": self.host,
             "port": self.pg_port,
@@ -292,15 +303,6 @@ class QuestDBAdapter(PlatformAdapter):
 
         return {k: v for k, v in params.items() if v is not None}
 
-    def _validate_identifier(self, identifier: str) -> bool:
-        """Validate SQL identifier to prevent injection."""
-        if not identifier or not isinstance(identifier, str):
-            return False
-        if len(identifier) > 127:
-            return False
-        pattern = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
-        return bool(re.match(pattern, identifier))
-
     def create_connection(self, **connection_config) -> Any:
         """Create QuestDB connection via PostgreSQL wire protocol."""
         self.log_operation_start("QuestDB connection")
@@ -310,7 +312,7 @@ class QuestDBAdapter(PlatformAdapter):
 
         # Connect via PG wire protocol
         params = self._get_connection_params()
-        conn = psycopg2.connect(**params)
+        conn = psycopg.connect(**params)
 
         # QuestDB requires autocommit mode for PG wire protocol
         conn.autocommit = True
@@ -326,6 +328,105 @@ class QuestDBAdapter(PlatformAdapter):
             details=f"Connected to {self.host}:{self.pg_port}",
         )
         return conn
+
+    def handle_existing_database(self, **connection_config) -> None:
+        """Override to validate that required tables exist before marking database as reused.
+
+        QuestDB is a server-based database (skip_database_management=True) but we still need
+        to check if the required benchmark tables for the current benchmark exist. If the
+        expected tables don't exist or are stale from a previous benchmark, schema creation
+        and data loading will proceed.
+        """
+        # Guard against missing psycopg dependency
+        if psycopg is None:
+            msg = "psycopg is required for QuestDB but is not installed"
+            raise ImportError(msg)
+
+        self.log_operation_start("Database validation", "Checking existing database compatibility")
+
+        # Quick checks that can't be overridden
+        if self.dry_run:
+            self.log_verbose("Database validation skipped (dry run mode)")
+            return
+
+        if self.force_recreate:
+            self.log_verbose("Force recreate enabled - will recreate schema and reload data")
+            self.database_was_reused = False
+            return
+
+        # For external databases like QuestDB, validate that the expected tables for
+        # the current benchmark exist (not just any tables from a previous benchmark)
+        try:
+            params = self._get_connection_params()
+            test_conn = psycopg.connect(**params)
+            test_conn.autocommit = True
+
+            try:
+                # Get expected table names from the current benchmark
+                if not hasattr(self, "benchmark") or self.benchmark is None:
+                    self.log_verbose("Benchmark not available - treating as fresh database")
+                    self.database_was_reused = False
+                    return
+
+                expected_tables = set(self.benchmark.tables.keys())
+                if not expected_tables:
+                    # Benchmarks that initialize tables={} (e.g. clickbench, which populates
+                    # tables only after downloading data) will always take this path, meaning
+                    # QuestDB reuse detection is disabled for them. Acceptable for now since
+                    # QuestDB is primarily used with TPC benchmarks that pre-declare tables.
+                    self.log_verbose("Benchmark has no tables - treating as fresh database")
+                    self.database_was_reused = False
+                    return
+
+                # Query QuestDB for all table names
+                with test_conn.cursor() as cursor:
+                    cursor.execute("SELECT table_name FROM tables()")
+                    existing_tables = {row[0] for row in cursor.fetchall()}
+
+                # Check if all expected tables are present
+                missing_tables = expected_tables - existing_tables
+                if missing_tables:
+                    self.log_verbose(
+                        f"Expected benchmark tables not found: {', '.join(sorted(missing_tables))} "
+                        "- treating as fresh database (will create schema)"
+                    )
+                    self.database_was_reused = False
+                    return
+
+                # All expected tables exist; verify they are non-empty.
+                # A prior partial run may have created the schema without ever
+                # completing data loading, leaving every table as an empty
+                # schema object. LIMIT 1 is O(1) regardless of table size.
+                empty_tables = []
+                with test_conn.cursor() as row_cursor:
+                    for tname in sorted(expected_tables):
+                        if not self._validate_identifier(tname.lower()):
+                            continue
+                        row_cursor.execute(f'SELECT 1 FROM "{tname}" LIMIT 1')
+                        if row_cursor.fetchone() is None:
+                            empty_tables.append(tname)
+
+                if empty_tables:
+                    self.log_verbose(
+                        f"Tables exist but are empty: {', '.join(empty_tables)} "
+                        "- treating as fresh database (will reload data)"
+                    )
+                    self.database_was_reused = False
+                    return
+
+                self.log_verbose(
+                    f"Found all {len(expected_tables)} expected benchmark tables with data - "
+                    "attempting to reuse existing database"
+                )
+                self.database_was_reused = True
+
+            finally:
+                test_conn.close()
+
+        except (psycopg.Error, OSError) as e:
+            self.logger.debug(f"Error checking existing tables: {e}")
+            self.log_verbose("Unable to verify existing tables - treating as fresh database")
+            self.database_was_reused = False
 
     # ──────────────────────────────────────────────────────────────
     # Schema creation with designated timestamp, partitioning, and
@@ -353,6 +454,32 @@ class QuestDBAdapter(PlatformAdapter):
         cursor = connection.cursor()
         critical_failures = []
         try:
+            # Drop any stale tables left over from a previous partially-failed
+            # schema creation. Without this, tables that succeeded on the prior
+            # run (e.g. those without SYMBOL columns) block re-creation with
+            # "table already exists" while other tables rebuild cleanly.
+            # Skipped for dry-run (no DDL should execute) and when we've
+            # already confirmed the existing database is being reused.
+            if not self.dry_run and not getattr(self, "database_was_reused", False):
+                benchmark_tables = getattr(benchmark, "tables", None)
+                if isinstance(benchmark_tables, dict):
+                    droppable = [
+                        name
+                        for name in benchmark_tables
+                        if isinstance(name, str) and self._validate_identifier(name.lower())
+                    ]
+                    if droppable:
+                        self.log_notice(
+                            f"Pre-dropping {len(droppable)} benchmark table(s) before schema creation: "
+                            f"{', '.join(droppable)}"
+                        )
+                    for table_name in droppable:
+                        try:
+                            self.log_notice(f'Dropping table if it exists: "{table_name}"')
+                            cursor.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+                        except Exception as drop_err:
+                            self.logger.warning(f"Pre-create DROP TABLE {table_name} skipped: {drop_err}")
+
             # Execute each statement separately
             statements = [s.strip() for s in schema_sql.split(";") if s.strip()]
             for stmt in statements:
@@ -363,10 +490,14 @@ class QuestDBAdapter(PlatformAdapter):
                     self.log_verbose("Skipping ALTER TABLE foreign key constraint (unsupported by QuestDB)")
                     continue
 
-                # Strip inline FK constraints from CREATE TABLE statements
+                # Strip inline FK and PK constraints from CREATE TABLE statements
                 if "CREATE TABLE" in stmt_upper and ("FOREIGN KEY" in stmt_upper or "REFERENCES" in stmt_upper):
-                    stmt = self._strip_fk_constraints(stmt)
+                    stmt = strip_foreign_keys(stmt)
                     self.log_verbose("Stripped foreign key constraints from CREATE TABLE (unsupported by QuestDB)")
+
+                if "CREATE TABLE" in stmt_upper and "PRIMARY KEY" in stmt_upper:
+                    stmt = self._strip_pk_constraints(stmt)
+                    self.log_verbose("Stripped primary key constraints from CREATE TABLE (unsupported by QuestDB)")
 
                 # Adapt DROP TABLE statements for QuestDB
                 if "DROP TABLE" in stmt_upper:
@@ -449,6 +580,16 @@ class QuestDBAdapter(PlatformAdapter):
     def _map_column_to_symbol(self, stmt: str, column_name: str) -> str:
         """Replace a VARCHAR/TEXT/CHAR column type with QuestDB symbol type.
 
+        Also strips any trailing ``NOT NULL`` / ``NULL`` nullability modifier:
+        QuestDB's parser rejects nullability constraints on ``SYMBOL`` columns
+        (only ``CAPACITY``, ``NOCACHE``/``CACHE``, and ``INDEX`` are accepted
+        after ``SYMBOL``).
+
+        Limitation: only nullability is stripped. A trailing ``CHECK (...)`` or
+        ``DEFAULT ...`` clause on the source column would survive the rewrite
+        and produce invalid QuestDB DDL. Benchmark schemas currently in use
+        (TPC-H, TPC-DS) do not emit those on VARCHAR/TEXT columns.
+
         Args:
             stmt: CREATE TABLE statement.
             column_name: Column to convert.
@@ -456,8 +597,12 @@ class QuestDBAdapter(PlatformAdapter):
         Returns:
             Modified statement.
         """
-        # Match column definition: column_name followed by type like VARCHAR(n), TEXT, CHAR(n), etc.
-        pattern = rf"(\b{re.escape(column_name)}\b)\s+(?:VARCHAR|TEXT|CHAR|CHARACTER\s+VARYING)(?:\s*\(\s*\d+\s*\))?"
+        # Match column definition: column_name + source type + optional NOT NULL/NULL.
+        pattern = (
+            rf"(\b{re.escape(column_name)}\b)\s+"
+            r"(?:VARCHAR|TEXT|CHAR|CHARACTER\s+VARYING)(?:\s*\(\s*\d+\s*\))?"
+            r"(?:\s+NOT\s+NULL|\s+NULL)?"
+        )
         replacement = r"\1 SYMBOL"
         return re.sub(pattern, replacement, stmt, count=1, flags=re.IGNORECASE)
 
@@ -514,22 +659,44 @@ class QuestDBAdapter(PlatformAdapter):
 
         return stmt + suffix
 
-    def _strip_fk_constraints(self, stmt: str) -> str:
-        """Strip FOREIGN KEY and REFERENCES constraints from CREATE TABLE statements.
+    def _strip_pk_constraints(self, stmt: str) -> str:
+        """Strip PRIMARY KEY constraints from CREATE TABLE statements.
 
-        Removes inline FK constraint clauses while preserving the rest of the
-        CREATE TABLE statement. QuestDB does not support foreign keys.
+        QuestDB 9.3.4 rejects `PRIMARY KEY (col_list)` with:
+          "Schema statement failed: unsupported column type: KEY"
+
+        Removes both forms:
+          - Unnamed: `, PRIMARY KEY (col1, col2)`
+          - Named:   `, CONSTRAINT name PRIMARY KEY (col1, col2)`
+            Constraint name may be bare (``pk_t``), double-quoted (``"pk_t"``),
+            or backtick-quoted (`` `pk_t` ``).
+
+        Column-level `PRIMARY KEY` keywords on individual column definitions
+        are also removed (e.g., `col_id INT PRIMARY KEY`).
+
+        The FK cleanup pass already removes trailing `,)` artifacts, but we
+        apply it again here in case the PK clause was the last item.
         """
-        # Remove FOREIGN KEY (...) REFERENCES ... clauses (with optional trailing comma)
+        # Named constraint form: CONSTRAINT name PRIMARY KEY (col_list)
+        # Name may be bare (pk_t), double-quoted ("pk_t"), or backtick-quoted (`pk_t`)
+        # [^)]* is intentionally simple: PRIMARY KEY column lists in benchmark DDL
+        # are always bare identifiers, never function calls with nested parens.
         stmt = re.sub(
-            r",?\s*FOREIGN\s+KEY\s*\([^)]*\)\s*REFERENCES\s+[^\s(]+\s*(?:\([^)]*\))?\s*(?:ON\s+(?:DELETE|UPDATE)\s+\w+\s*)*",
+            r',?\s*CONSTRAINT\s+(?:"[^"]+"|`[^`]+`|\w+)\s+PRIMARY\s+KEY\s*\([^)]*\)',
             "",
             stmt,
             flags=re.IGNORECASE,
         )
-        # Remove inline column-level REFERENCES clauses (e.g., col_id INT REFERENCES other_table(id))
+        # Unnamed table-level form: PRIMARY KEY (col_list)
         stmt = re.sub(
-            r"\s+REFERENCES\s+[^\s(]+\s*(?:\([^)]*\))?\s*(?:ON\s+(?:DELETE|UPDATE)\s+\w+\s*)*",
+            r",?\s*PRIMARY\s+KEY\s*\([^)]*\)",
+            "",
+            stmt,
+            flags=re.IGNORECASE,
+        )
+        # Column-level form: col_name type PRIMARY KEY
+        stmt = re.sub(
+            r"\s+PRIMARY\s+KEY\b",
             "",
             stmt,
             flags=re.IGNORECASE,
@@ -565,8 +732,6 @@ class QuestDBAdapter(PlatformAdapter):
         Supports two methods:
         - ``rest`` (default): QuestDB REST API CSV import via /imp endpoint
         - ``ilp``: InfluxDB Line Protocol ingestion via TCP port 9009
-
-        Falls back to COPY via PG wire protocol if primary method is unavailable.
         """
         start_time = mono_time()
         table_stats = {}
@@ -574,7 +739,20 @@ class QuestDBAdapter(PlatformAdapter):
         method = self.loading_method
         self.log_operation_start("Data loading", f"source: {data_dir}, method: {method}")
 
-        for table_name, table_path in benchmark.tables.items():
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
+        data_source = resolver.resolve(benchmark, data_dir)
+        if not data_source or not data_source.tables:
+            self.logger.warning("No data files found. Ensure benchmark.generate_data() was called first.")
+            loading_time = elapsed_seconds(start_time)
+            self.log_operation_complete("Data loading", loading_time, "Loaded 0 total rows")
+            return {}, loading_time, None
+
+        for table_name, table_path in data_source.tables.items():
             table_name_lower = table_name.lower()
 
             if not self._validate_identifier(table_name_lower):
@@ -582,44 +760,91 @@ class QuestDBAdapter(PlatformAdapter):
                 table_stats[table_name_lower] = 0
                 continue
 
-            data_file = Path(table_path)
-            if not data_file.exists():
-                self.logger.warning(f"Data file not found: {data_file}")
+            data_files = [f for f in normalize_table_paths(table_path) if f.exists()]
+            if not data_files:
+                self.logger.warning(f"Data file(s) not found for table: {table_name}")
                 table_stats[table_name_lower] = 0
                 continue
 
-            try:
-                if method == "ilp":
-                    row_count = self._load_table_via_ilp(table_name_lower, data_file)
-                    table_stats[table_name_lower] = row_count
-                    self.log_verbose(f"Loaded {row_count:,} rows into {table_name_lower} (via ILP)")
-                else:
-                    row_count = self._load_table_via_rest_api(table_name_lower, data_file)
-                    table_stats[table_name_lower] = row_count
-                    self.log_verbose(f"Loaded {row_count:,} rows into {table_name_lower}")
-            except Exception as e:
-                self.logger.warning(f"{method.upper()} import failed for {table_name_lower}: {e}, falling back to COPY")
+            total_rows = 0
+            for data_file in data_files:
                 try:
-                    row_count = self._load_table_via_copy(connection, table_name_lower, data_file)
-                    table_stats[table_name_lower] = row_count
-                    self.log_verbose(f"Loaded {row_count:,} rows into {table_name_lower} (via COPY)")
-                except Exception as copy_err:
-                    self.logger.error(f"Failed to load {table_name_lower}: {copy_err}")
-                    table_stats[table_name_lower] = 0
+                    dialect = resolve_csv_dialect(data_source, table_name_lower, data_file, benchmark)
+                    if method == "ilp":
+                        rows = self._load_table_via_ilp(table_name_lower, data_file, dialect)
+                        source = "ILP"
+                    elif get_data_extension(data_file) == ".parquet":
+                        rows = self._load_parquet_via_chunked_csv(table_name_lower, data_file)
+                        source = "REST/parquet-csv"
+                    else:
+                        rows = self._load_table_via_rest_api(table_name_lower, data_file, dialect)
+                        source = "REST"
+                except Exception as e:
+                    self.logger.error(f"Failed to load {table_name_lower} chunk {data_file.name}: {e}")
+                    continue
+                total_rows += rows
+                self.log_verbose(f"Loaded {rows:,} rows into {table_name_lower} from {data_file.name} (via {source})")
+
+            table_stats[table_name_lower] = total_rows
 
         loading_time = elapsed_seconds(start_time)
 
         total_rows = sum(table_stats.values())
         self.log_operation_complete("Data loading", loading_time, f"Loaded {total_rows:,} total rows")
 
+        # Populate transactional staging tables (txn_*) derived from just-loaded base
+        # tables. The standard setup() path acquires a lock via a PRIMARY KEY table that
+        # QuestDB 9.3.4 rejects ("unsupported column type: KEY"), so we populate directly.
+        self._populate_transactional_staging_tables(benchmark, connection)
+
         return table_stats, loading_time, None
 
-    def _load_table_via_rest_api(self, table_name: str, data_file: Path) -> int:
+    def _populate_transactional_staging_tables(self, benchmark: Any, connection: Any) -> None:
+        """Populate transactional staging tables from already-loaded base tables.
+
+        transaction_primitives derives txn_orders/txn_lineitem/txn_customer from TPC-H
+        base tables via INSERT...SELECT. The standard benchmark.setup() acquires a lock
+        using a table with column-level PRIMARY KEY syntax that QuestDB 9.3.4 rejects,
+        so we populate the staging tables directly here after base tables are loaded,
+        bypassing the lock mechanism.
+        """
+        staging_tables = getattr(benchmark, "_staging_tables", None)
+        if not isinstance(staging_tables, dict) or not callable(getattr(benchmark, "_populate_staging_table", None)):
+            return
+
+        staging_source: dict[str, str] = {
+            "txn_orders": "orders",
+            "txn_lineitem": "lineitem",
+            "txn_customer": "customer",
+        }
+
+        for staging_name, source_name in staging_source.items():
+            if staging_name not in staging_tables:
+                continue
+            try:
+                result = connection.execute(f"SELECT COUNT(*) FROM {staging_name}").fetchone()
+                if result and result[0] > 0:
+                    self.log_verbose(f"{staging_name} already populated ({result[0]:,} rows), skipping")
+                    continue
+                # count = 0: table exists but is empty - fall through to populate
+            except Exception:
+                pass  # table doesn't exist yet - fall through to populate
+            try:
+                self.log_verbose(f"Populating {staging_name} from {source_name}...")
+                benchmark._populate_staging_table(connection, staging_name, source_name)
+                count_result = connection.execute(f"SELECT COUNT(*) FROM {staging_name}").fetchone()
+                count = count_result[0] if count_result else 0
+                self.log_verbose(f"Populated {staging_name} ({count:,} rows)")
+            except Exception as e:
+                self.logger.warning(f"Failed to populate staging table {staging_name}: {e}")
+
+    def _load_table_via_rest_api(self, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
         """Load data into a table using QuestDB REST API /imp endpoint.
 
         Args:
             table_name: Target table name
             data_file: Path to the data file (CSV or TPC format)
+            dialect: CSV dialect describing delimiter, null handling, etc.
 
         Returns:
             Number of rows loaded
@@ -628,32 +853,113 @@ class QuestDBAdapter(PlatformAdapter):
 
         url = f"{'https' if self.use_tls else 'http'}://{self.host}:{self.http_port}/imp"
 
-        delimiter = get_delimiter_for_file(data_file)
-
-        # Upload via REST API
         params = {
             "name": table_name,
             "overwrite": "false",
             "durable": "true",
-            "delimiter": delimiter,
+            "delimiter": dialect.delimiter,
         }
 
-        with self._open_normalized_csv_stream(data_file) as upload_stream:
-            files = {"data": (f"{table_name}.csv", upload_stream, "text/csv")}
-            response = requests.post(url, params=params, files=files, timeout=300)
+        # Strip trailing delimiter for TPC-H .tbl and TPC-DS .dat files: both
+        # dbgen and dsdgen emit a spurious trailing pipe after every record. CSV
+        # files must NOT be stripped: a trailing comma means the last field is
+        # empty/NULL, not a junk terminator — stripping it drops that field and
+        # causes a column-count mismatch on import.
+        strip_trailing_delim = get_data_extension(data_file) in (".tbl", ".dat")
+        with prepare_local_load_file(
+            data_file, dialect=dialect, strip_trailing_delim=strip_trailing_delim
+        ) as load_path:
+            with open(load_path, "rb") as upload_stream:
+                files = {"data": (f"{table_name}.csv", upload_stream, "text/csv")}
+                response = requests.post(url, params=params, files=files, timeout=300)
         response.raise_for_status()
 
-        # Parse response to get row count
-        result = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
-        rows_imported = result.get("rowsImported", 0)
+        # QuestDB /imp returns text/plain; parse "Rows imported" from the table.
+        # Example line: |  Rows imported  |  3  |
+        match = re.search(r"Rows imported\s*\|\s*(\d+)", response.text)
+        if match:
+            return int(match.group(1))
 
-        if rows_imported == 0:
-            # Fall back to counting rows in the response text or via SQL
-            rows_imported = self._count_table_rows_via_http(table_name)
+        # Fallback: query via SQL if the response format is unexpected
+        return self._count_table_rows_via_http(table_name)
 
-        return rows_imported
+    def _load_parquet_via_chunked_csv(self, table_name: str, data_file: Path) -> int:
+        """Load a parquet file into QuestDB by converting to CSV chunks.
 
-    def _load_table_via_ilp(self, table_name: str, data_file: Path) -> int:
+        QuestDB's /imp REST endpoint accepts CSV only and has a default HTTP
+        receive buffer limit (~128 MB).  Large parquet files (e.g. tpcds_obt at
+        1.1 GB) exceed this limit, causing a ConnectionResetError when uploaded
+        in one shot.
+
+        This method reads the parquet file in row-group chunks (using pyarrow),
+        converts each chunk to CSV, and POSTs each chunk to /imp with
+        ``overwrite=false`` (append mode).  ``create_schema`` always runs before
+        ``load_data``, so the table exists and is empty at this point -
+        appending to an empty table is equivalent to a fresh insert while
+        preserving the QuestDB-specific schema (SYMBOL columns, designated
+        timestamp, PARTITION BY) created during DDL execution.
+
+        Every chunk includes a CSV header row and is posted with
+        ``forceHeader=true`` so QuestDB maps columns by name rather than by
+        position.  QuestDB ≤9.3.x historically mapped CSV positionally even
+        when headers were present (issue questdb/questdb#1758, fixed in
+        PR #1789); always sending a named header is the safe baseline that
+        works correctly on both old and new behaviour.
+
+        Args:
+            table_name: Target table name
+            data_file: Path to the .parquet file
+
+        Returns:
+            Total number of rows loaded
+
+        Raises:
+            ImportError: If pyarrow is not installed
+            RuntimeError: If any chunk upload fails
+        """
+        try:
+            import pyarrow.parquet as pq
+        except ImportError as exc:
+            raise ImportError(
+                "pyarrow is required to load parquet files into QuestDB. Install it with: uv add pyarrow"
+            ) from exc
+
+        import io
+
+        import requests
+
+        url = f"{'https' if self.use_tls else 'http'}://{self.host}:{self.http_port}/imp"
+        total_rows = 0
+
+        pf = pq.ParquetFile(data_file)
+        for batch in pf.iter_batches(batch_size=self.parquet_chunk_rows):
+            # Always include the CSV header row and set forceHeader=true so
+            # QuestDB maps by column name, not position.  Without this, chunks
+            # after the first arrive headerless; QuestDB may assign synthetic
+            # names (f0, f1, …) and silently corrupt column order.
+            csv_buf = io.BytesIO()
+            batch.to_pandas().to_csv(csv_buf, index=False, header=True)
+            csv_buf.seek(0)
+
+            params = {
+                "name": table_name,
+                "overwrite": "false",
+                "durable": "true",
+                "delimiter": ",",
+                "forceHeader": "true",
+            }
+            files = {"data": (f"{table_name}.csv", csv_buf, "text/csv")}
+            response = requests.post(url, params=params, files=files, timeout=600)
+            response.raise_for_status()
+
+            match = re.search(r"Rows imported\s*\|\s*(\d+)", response.text)
+            chunk_rows = int(match.group(1)) if match else len(batch)
+            total_rows += chunk_rows
+            self.log_verbose(f"Loaded chunk of {chunk_rows:,} rows into {table_name} (parquet → CSV)")
+
+        return total_rows
+
+    def _load_table_via_ilp(self, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
         """Load data into a table using InfluxDB Line Protocol (ILP) over TCP.
 
         ILP format per line:
@@ -665,11 +971,11 @@ class QuestDBAdapter(PlatformAdapter):
         Args:
             table_name: Target table name (used as ILP measurement).
             data_file: Path to the data file (CSV or TPC format).
+            dialect: CSV dialect describing delimiter, null handling, etc.
 
         Returns:
             Number of rows sent.
         """
-        delimiter = get_delimiter_for_file(data_file)
         rows_sent = 0
 
         # Read column headers from the table schema via PG wire protocol
@@ -685,25 +991,33 @@ class QuestDBAdapter(PlatformAdapter):
         try:
             sock.connect((self.ilp_host, self.ilp_port))
 
-            with self._open_normalized_csv_stream(data_file, text_mode=True) as stream:
-                reader = csv.reader(stream, delimiter=delimiter)
-                batch: list[str] = []
-                for row in reader:
-                    if len(row) != len(column_names):
-                        continue
-                    line = self._row_to_ilp_line(table_name, column_names, row, ts_col)
-                    if line:
-                        batch.append(line)
-                        rows_sent += 1
+            # Strip trailing delimiter for TPC-H .tbl and TPC-DS .dat files: both
+            # dbgen and dsdgen emit a spurious trailing pipe after every record.
+            # CSV files must NOT be stripped: a trailing comma means the last field
+            # is empty/NULL, not a junk terminator — stripping it drops that field.
+            strip_trailing_delim = get_data_extension(data_file) in (".tbl", ".dat")
+            with prepare_local_load_file(
+                data_file, dialect=dialect, strip_trailing_delim=strip_trailing_delim
+            ) as load_path:
+                with open(load_path, encoding="utf-8") as stream:
+                    reader = csv.reader(stream, delimiter=dialect.delimiter)
+                    batch: list[str] = []
+                    for row in reader:
+                        if len(row) != len(column_names):
+                            continue
+                        line = self._row_to_ilp_line(table_name, column_names, row, ts_col)
+                        if line:
+                            batch.append(line)
+                            rows_sent += 1
 
-                    # Flush in batches of 1000 lines
-                    if len(batch) >= 1000:
+                        # Flush in batches of 1000 lines
+                        if len(batch) >= 1000:
+                            sock.sendall(("\n".join(batch) + "\n").encode("utf-8"))
+                            batch = []
+
+                    # Final flush
+                    if batch:
                         sock.sendall(("\n".join(batch) + "\n").encode("utf-8"))
-                        batch = []
-
-                # Final flush
-                if batch:
-                    sock.sendall(("\n".join(batch) + "\n").encode("utf-8"))
         finally:
             sock.close()
 
@@ -799,65 +1113,6 @@ class QuestDBAdapter(PlatformAdapter):
         except Exception:
             pass
         return 0
-
-    def _load_table_via_copy(self, connection: Any, table_name: str, data_file: Path) -> int:
-        """Load data into a table using COPY via PG wire protocol (fallback).
-
-        Args:
-            connection: psycopg2 connection
-            table_name: Target table name
-            data_file: Path to the data file
-
-        Returns:
-            Number of rows loaded
-        """
-        delimiter = get_delimiter_for_file(data_file)
-        cursor = connection.cursor()
-
-        with self._open_normalized_csv_stream(data_file, text_mode=True) as copy_stream:
-            cursor.copy_expert(
-                f"""COPY "{table_name}" FROM STDIN WITH (FORMAT csv, DELIMITER '{delimiter}')""",
-                copy_stream,
-            )
-
-        # Get row count
-        cursor.execute(f'SELECT count() FROM "{table_name}"')
-        row_count = cursor.fetchone()[0]
-        cursor.close()
-
-        return row_count
-
-    def _open_normalized_csv_stream(self, data_file: Path, *, text_mode: bool = False):
-        """Open a CSV stream normalized for QuestDB loaders.
-
-        For TPC *.tbl files this removes the trailing delimiter from each line
-        while streaming into a spooled temporary file (spills to disk for large files).
-        """
-        if not is_tpc_format(data_file):
-            if text_mode:
-                return open(data_file, encoding="utf-8")
-            return open(data_file, "rb")
-
-        temp_mode = "w+" if text_mode else "w+b"
-        temp_stream = tempfile.SpooledTemporaryFile(mode=temp_mode, max_size=8 * 1024 * 1024)
-
-        if text_mode:
-            with open(data_file, encoding="utf-8") as source:
-                for line in source:
-                    normalized = line.rstrip("\r\n")
-                    if normalized.endswith("|"):
-                        normalized = normalized[:-1]
-                    temp_stream.write(normalized + "\n")
-        else:
-            with open(data_file, "rb") as source:
-                for line in source:
-                    normalized = line.rstrip(b"\r\n")
-                    if normalized.endswith(b"|"):
-                        normalized = normalized[:-1]
-                    temp_stream.write(normalized + b"\n")
-
-        temp_stream.seek(0)
-        return temp_stream
 
     # ──────────────────────────────────────────────────────────────
     # Platform optimizations and benchmark configuration
@@ -958,53 +1213,18 @@ class QuestDBAdapter(PlatformAdapter):
         stream_id: int | None = None,
     ) -> dict[str, Any]:
         """Execute a single query and return detailed results."""
-        start_time = mono_time()
-        self.log_verbose(f"Executing query {query_id}")
-
-        cursor = connection.cursor()
-        try:
-            cursor.execute(query)
-            results = cursor.fetchall()
-
-            execution_time = elapsed_seconds(start_time)
-            actual_row_count = len(results)
-
-            # Validate row count if enabled
-            validation_result = None
-            if validate_row_count and benchmark_type:
-                from benchbox.core.validation.query_validation import QueryValidator
-
-                validator = QueryValidator()
-                validation_result = validator.validate_query_result(
-                    benchmark_type=benchmark_type,
-                    query_id=query_id,
-                    actual_row_count=actual_row_count,
-                    scale_factor=scale_factor,
-                    stream_id=stream_id,
-                )
-
-            result = self._build_query_result_with_validation(
-                query_id=query_id,
-                execution_time=execution_time,
-                actual_row_count=actual_row_count,
-                first_row=results[0] if results else None,
-                validation_result=validation_result,
-            )
-
-            return result
-
-        except Exception as e:
-            execution_time = elapsed_seconds(start_time)
-            return {
-                "query_id": query_id,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "rows_returned": 0,
-                "error": str(e),
-                "error_type": type(e).__name__,
-            }
-        finally:
-            cursor.close()
+        query = _rewriter_rewrite(query)
+        return execute_sql_query(
+            connection,
+            query,
+            query_id,
+            log_verbose=self.log_verbose,
+            build_query_result_with_validation=self._build_query_result_with_validation,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
 
     def get_query_plan(
         self,
@@ -1017,6 +1237,7 @@ class QuestDBAdapter(PlatformAdapter):
         QuestDB supports EXPLAIN for query plans but with fewer options
         than standard PostgreSQL.
         """
+        query = _rewriter_rewrite(query)
         cursor = connection.cursor()
 
         explain_query = f"EXPLAIN {query}"
@@ -1031,14 +1252,6 @@ class QuestDBAdapter(PlatformAdapter):
         except Exception as e:
             cursor.close()
             return f"Failed to get query plan: {e}"
-
-    def close_connection(self, connection: Any) -> None:
-        """Close QuestDB connection."""
-        if connection:
-            try:
-                connection.close()
-            except Exception as e:
-                self.logger.debug(f"Error closing connection: {e}")
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get QuestDB platform information."""
@@ -1081,7 +1294,7 @@ class QuestDBAdapter(PlatformAdapter):
         """
         try:
             params = self._get_connection_params()
-            conn = psycopg2.connect(**params)
+            conn = psycopg.connect(**params)
             conn.autocommit = True
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
@@ -1110,6 +1323,23 @@ class QuestDBAdapter(PlatformAdapter):
         except Exception:
             return False
 
+    def _get_existing_tables(self, connection: Any) -> list[str]:
+        """Get list of existing tables in QuestDB.
+
+        Overrides the base implementation which calls connection.execute() - a
+        DuckDB-style API that psycopg connections do not support.  QuestDB
+        exposes its table catalog via the ``tables()`` function.
+        """
+        try:
+            cursor = connection.cursor()
+            cursor.execute("SELECT table_name FROM tables()")
+            rows = cursor.fetchall()
+            cursor.close()
+            return [row[0].lower() for row in rows]
+        except Exception as e:
+            self.logger.debug(f"Failed to get existing tables: {e}")
+            return []
+
     def drop_table(self, connection: Any, table_name: str) -> None:
         """Drop a table from QuestDB."""
         if not self._validate_identifier(table_name):
@@ -1118,9 +1348,9 @@ class QuestDBAdapter(PlatformAdapter):
 
         try:
             cursor = connection.cursor()
+            self.log_notice(f'Dropping table if it exists: "{table_name}"')
             cursor.execute(f'DROP TABLE IF EXISTS "{table_name}"')
             cursor.close()
-            self.log_verbose(f"Dropped table: {table_name}")
         except Exception as e:
             self.logger.warning(f"Failed to drop table {table_name}: {e}")
 
@@ -1177,6 +1407,55 @@ def _ilp_escape_field(col_name: str, value: str) -> str | None:
     # String - escape double quotes and backslashes
     escaped_val = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'{escaped_key}="{escaped_val}"'
+
+
+def _build_questdb_config(
+    platform: str,
+    options: dict[str, Any],
+    overrides: dict[str, Any],
+    info: Any,
+) -> Any:
+    """Build QuestDB database configuration from CLI platform options.
+
+    Args:
+        platform: Platform name (should be 'questdb')
+        options: CLI platform options from --platform-option flags
+        overrides: Runtime overrides from orchestrator
+        info: Platform info from registry
+
+    Returns:
+        DatabaseConfig with connection parameters at the top level so that
+        ``QuestDBAdapter.from_config()`` can read them via ``config.get()``.
+    """
+    import os
+
+    from benchbox.core.schemas import DatabaseConfig
+
+    merged: dict[str, Any] = {}
+    merged.update(options)
+    merged.update(overrides)
+
+    name = info.display_name if info else "QuestDB"
+    driver_package = info.driver_package if info else "psycopg"
+
+    config_dict: dict[str, Any] = {
+        "type": "questdb",
+        "name": name,
+        "options": merged,
+        "driver_package": driver_package,
+        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
+        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
+        # Connection parameters at top level so from_config() can read them via config.get()
+        "host": merged.get("host") or os.environ.get("QUESTDB_HOST", "localhost"),
+        "pg_port": int(merged.get("pg_port") or os.environ.get("QUESTDB_PG_PORT", "8812")),
+        "http_port": int(merged.get("http_port") or os.environ.get("QUESTDB_HTTP_PORT", "9000")),
+        "ilp_port": int(merged.get("ilp_port") or os.environ.get("QUESTDB_ILP_PORT", "9009")),
+        "username": merged.get("username") or os.environ.get("QUESTDB_USER", "admin"),
+        "password": merged.get("password") or os.environ.get("QUESTDB_PASSWORD", "quest"),
+        "database": merged.get("database") or os.environ.get("QUESTDB_DATABASE", "qdb"),
+        "loading_method": merged.get("loading_method", "rest"),
+    }
+    return DatabaseConfig(**config_dict)
 
 
 def _date_to_epoch_ns(date_str: str) -> str | None:

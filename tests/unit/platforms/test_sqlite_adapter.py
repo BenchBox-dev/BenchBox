@@ -493,7 +493,7 @@ class TestSQLiteAdapter:
         with pytest.raises(ConfigurationError) as excinfo:
             SQLiteAdapter.from_config(config)
 
-        assert "--sqlite-database" in str(excinfo.value)
+        assert "database_path" in str(excinfo.value)
         assert "--benchmark" in str(excinfo.value)
 
     def test_from_config_with_optional_params(self):

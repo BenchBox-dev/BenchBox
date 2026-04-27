@@ -323,10 +323,12 @@ blog_archive_titles = True  # Use titles in archive pages
 # =============================================================================
 # Sidebar Configuration
 # =============================================================================
-# Pattern-based sidebars: blog pages get ABlog widgets, docs get Furo navigation
+# Blog pages override the sidebar with ABlog widgets (recent posts, tag cloud,
+# archives). Everything else falls through to Furo's built-in default sidebar
+# (brand, search, navigation), so no catch-all pattern is needed here — adding
+# one would overlap with `blog/**` and trigger Sphinx warnings.
 
 html_sidebars = {
-    # Blog posts: blog brand + blog-specific navigation
     "blog/**": [
         "sidebar/blog-brand.html",  # Blog brand header
         "sidebar/search.html",  # Search box
@@ -334,14 +336,6 @@ html_sidebars = {
         "ablog/recentposts.html",  # Recent posts list
         "ablog/tagcloud.html",  # Tag cloud
         "ablog/archives.html",  # Archives by year
-        "sidebar/scroll-end.html",  # Scroll container end
-    ],
-    # All other pages (docs): Furo's default navigation
-    "**": [
-        "sidebar/brand.html",  # Project brand/logo
-        "sidebar/search.html",  # Search box
-        "sidebar/scroll-start.html",  # Scroll container start
-        "sidebar/navigation.html",  # Furo toctree navigation
         "sidebar/scroll-end.html",  # Scroll container end
     ],
 }

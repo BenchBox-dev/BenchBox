@@ -559,7 +559,7 @@ class DataCache:
             return False
 
         try:
-            with open(manifest_path) as f:
+            with open(manifest_path, encoding="utf-8") as f:
                 manifest = CacheManifest.from_dict(json.load(f))
 
             # Validate source hash if provided
@@ -607,7 +607,7 @@ class DataCache:
             return None
 
         try:
-            with open(manifest_path) as f:
+            with open(manifest_path, encoding="utf-8") as f:
                 manifest = CacheManifest.from_dict(json.load(f))
 
             cache_dir = manifest_path.parent
@@ -651,7 +651,7 @@ class DataCache:
         manifest_path = self.get_manifest_path(benchmark, scale_factor, format)
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(manifest_path, "w") as f:
+        with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest.to_dict(), f, indent=2)
 
     def clear_cache(
@@ -932,10 +932,6 @@ class DataFrameDataLoader:
         if not resolved and data_dir and data_dir.exists():
             return self._discover_files(data_dir)
 
-        # Finally try benchmark._impl.tables
-        if not resolved and hasattr(benchmark, "_impl"):
-            resolved = self._resolve_table_paths(getattr(benchmark._impl, "tables", None))
-
         if not resolved:
             return {}
 
@@ -1131,10 +1127,6 @@ class DataFrameDataLoader:
         table_metadata: dict[str, dict[str, Any]] = {}
 
         benchmark_delimiter = getattr(benchmark, "csv_delimiter", None)
-        if benchmark_delimiter is None:
-            impl = getattr(benchmark, "_impl", None)
-            if impl is not None:
-                benchmark_delimiter = getattr(impl, "csv_delimiter", None)
 
         for table_name, source_path in source_files.items():
             source_list = source_path if isinstance(source_path, list) else [source_path]

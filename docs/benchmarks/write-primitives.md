@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, write-primitives, custom-benchmark, performance
 ```
 
-> **CLI name:** `write_primitives` — use `benchbox run --benchmark write_primitives`
+> **CLI name:** `write_primitives` - use `benchbox run --benchmark write_primitives`
 
 ## Overview
 

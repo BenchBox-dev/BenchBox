@@ -9,10 +9,10 @@
 
 BenchBox is a modular SQL and DataFrame benchmarking framework for OLAP databases. The architecture separates concerns into four layers:
 
-1. **Benchmarks** — dataset definitions, schemas, queries, and data generation
-2. **Platforms** — database adapters for SQL and DataFrame execution
-3. **Core** — shared infrastructure (runner, results, validation, visualization, etc.)
-4. **CLI** — user-facing commands and execution orchestration
+1. **Benchmarks** - dataset definitions, schemas, queries, and data generation
+2. **Platforms** - database adapters for SQL and DataFrame execution
+3. **Core** - shared infrastructure (runner, results, validation, visualization, etc.)
+4. **CLI** - user-facing commands and execution orchestration
 
 ## Execution Model
 
@@ -68,24 +68,24 @@ The **family-based** adapter architecture means adding a new expression-style pl
 
 Each benchmark (TPC-H, TPC-DS, SSB, ClickBench, etc.) lives under `benchbox/core/<benchmark_id>/` and provides:
 
-- **Schema** — table definitions and DDL generation via `get_create_tables_sql(dialect, tuning_config)`
-- **Queries** — SQL templates with dialect translation via sqlglot
-- **Data generation** — using official TPC tools (dbgen/dsdgen) or built-in generators
-- **Validation** — expected result counts and answer verification
+- **Schema** - table definitions and DDL generation via `get_create_tables_sql(dialect, tuning_config)`
+- **Queries** - SQL templates with dialect translation via sqlglot
+- **Data generation** - using official TPC tools (dbgen/dsdgen) or built-in generators
+- **Validation** - expected result counts and answer verification
 
 All benchmarks inherit from `BaseBenchmark` (`benchbox/base.py`). Benchmarks are registered in `benchbox/core/benchmark_registry.py` which maps CLI names (e.g., `tpch`) to class names and metadata.
 
-There are currently 20 benchmarks across TPC standards, academic, industry, and primitives categories.
+There are currently 22 benchmarks across TPC standards, academic, industry, real-world, time-series, primitives, AI/ML, and experimental categories.
 
 ## Platform Layer
 
-### SQL Platforms (33 adapters)
+### SQL Platforms (46 adapters)
 
 All SQL adapters inherit from `PlatformAdapter` and implement:
-- `get_connection_from_pool()` / `close_connection()` — connection lifecycle
-- `execute_query()` — query execution with timing
-- `get_create_tables_sql()` — platform-specific DDL
-- `load_data()` — bulk data loading
+- `get_connection_from_pool()` / `close_connection()` - connection lifecycle
+- `execute_query()` - query execution with timing
+- `get_create_tables_sql()` - platform-specific DDL
+- `load_data()` - bulk data loading
 
 Platforms span local engines (DuckDB, SQLite, DataFusion), cloud warehouses (Snowflake, BigQuery, Databricks, Redshift), and specialized systems (ClickHouse, StarRocks, QuestDB, TimescaleDB, etc.).
 
@@ -123,9 +123,9 @@ Key command groups: `run`, `compare`, `visualize`, `report`, `metrics`, `tuning`
 ## Visualization
 
 BenchBox provides ASCII chart visualization via `core/visualization/`:
-- **ASCII charts** (`core/visualization/ascii/`) — 15+ chart types rendered as terminal text (bar, box plot, heatmap, histogram, scatter, CDF, sparkline, etc.)
-- **ResultPlotter** (`core/visualization/result_plotter.py`) — normalizes JSON results and orchestrates chart rendering
-- **Templates** (`core/visualization/templates.py`) — named chart combinations (e.g., `flagship`, `comparison`, `executive_summary`)
+- **ASCII charts** (`core/visualization/ascii/`) - 15+ chart types rendered as terminal text (bar, box plot, heatmap, histogram, scatter, CDF, sparkline, etc.)
+- **ResultPlotter** (`core/visualization/result_plotter.py`) - normalizes JSON results and orchestrates chart rendering
+- **Templates** (`core/visualization/templates.py`) - named chart combinations (e.g., `flagship`, `comparison`, `executive_summary`)
 
 ## MCP Integration
 
@@ -133,9 +133,9 @@ The `benchbox/mcp/` package exposes BenchBox functionality as MCP (Model Context
 
 ## Key Design Decisions
 
-1. **Lifecycle over Template Method** — execution phases are data-driven, not inheritance-driven
-2. **Family-based DataFrame adapters** — minimize code duplication across similar platforms
-3. **Official TPC tools** — use dbgen/dsdgen for specification-compliant data generation
-4. **sqlglot translation** — single query definition with automatic dialect translation
-5. **Lazy platform loading** — heavy SDK imports deferred until platform is actually used
-6. **ASCII visualization** — terminal-rendered charts for CI/CD and MCP integration
+1. **Lifecycle over Template Method** - execution phases are declared in configuration, not inherited
+2. **Family-based DataFrame adapters** - minimize code duplication across similar platforms
+3. **Official TPC tools** - use dbgen/dsdgen for specification-compliant data generation
+4. **sqlglot translation** - single query definition with automatic dialect translation
+5. **Lazy platform loading** - heavy SDK imports deferred until platform is actually used
+6. **ASCII visualization** - terminal-rendered charts for CI/CD and MCP integration

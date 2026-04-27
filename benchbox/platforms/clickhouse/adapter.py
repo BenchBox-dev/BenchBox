@@ -7,6 +7,7 @@ import logging
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.utils.dependencies import check_platform_dependencies, get_dependency_error_message
 
+from .deployment_mode import CLICKHOUSE_DEPLOYMENT_MODE_VALUES, resolve_clickhouse_deployment_mode
 from .diagnostics import ClickHouseDiagnosticsMixin
 from .metadata import ClickHouseMetadataMixin
 from .setup import ClickHouseSetupMixin
@@ -30,7 +31,6 @@ class ClickHouseAdapter(
         TPC-DS queries with known incompatibilities:
         - Query 14: INTERSECT DISTINCT requires manual alias addition
         - Query 30: Query plan cloning not implemented for aggregation steps (Code: 48)
-        - Query 66: Nested aggregation not supported - requires query rewrite
         - Query 81: Query plan cloning not implemented for aggregation steps (Code: 48)
 
         These queries may fail even with transformations applied and require
@@ -41,7 +41,7 @@ class ClickHouseAdapter(
 
     # Known incompatible queries that may fail despite transformations
     KNOWN_INCOMPATIBLE_QUERIES = {
-        "tpcds": [14, 30, 66, 81],
+        "tpcds": [14, 30, 81],
     }
 
     def __init__(self, **config):
@@ -51,23 +51,16 @@ class ClickHouseAdapter(
 
         # Determine deployment mode (from factory via colon syntax: clickhouse:local).
         # Default to local mode for easiest onboarding (no credentials required).
-        deployment_mode = config.get("deployment_mode")
-        self.deployment_mode = deployment_mode.lower() if deployment_mode else "local"
+        is_cloud_subclass = config.get("_is_cloud_subclass", False)
+        self.deployment_mode = resolve_clickhouse_deployment_mode(config, allow_cloud=is_cloud_subclass)
 
         # Validate deployment mode
         # Note: "cloud" mode is now a separate first-class platform: clickhouse-cloud
         # The _is_cloud_subclass flag is set by ClickHouseCloudAdapter to bypass this check
-        valid_modes = {"local", "server"}
-        is_cloud_subclass = config.get("_is_cloud_subclass", False)
-        if self.deployment_mode == "cloud" and not is_cloud_subclass:
-            raise ValueError(
-                "ClickHouse Cloud is now a separate first-class platform.\n"
-                "Use --platform clickhouse-cloud instead of --platform clickhouse:cloud\n"
-                "For more information: benchbox run --platform clickhouse-cloud --help"
-            )
+        valid_modes = set(CLICKHOUSE_DEPLOYMENT_MODE_VALUES)
         # Cloud mode is valid when called from ClickHouseCloudAdapter
         if is_cloud_subclass:
-            valid_modes = {"local", "server", "cloud"}
+            valid_modes.add("cloud")
         if self.deployment_mode not in valid_modes:
             raise ValueError(
                 f"Invalid ClickHouse deployment mode '{self.deployment_mode}'. "
@@ -104,8 +97,8 @@ class ClickHouseAdapter(
                 raise ImportError(
                     "ClickHouse Cloud requires clickhouse-connect but it is not installed.\n"
                     "To resolve this issue:\n"
-                    "  1. Install clickhouse-connect: uv add clickhouse-connect\n"
-                    "  2. Or use local mode: --platform clickhouse:local\n"
+                    "  1. Install ClickHouse Cloud extra: uv add benchbox --extra clickhouse-cloud\n"
+                    "  2. Or use local mode: --platform clickhouse-local\n"
                     "\nFor more information, visit: https://clickhouse.com/docs/en/integrations/python"
                 )
             self._setup_cloud_mode(config)

@@ -94,23 +94,31 @@ SKIP_FOR_DATAFRAME = [
 #
 # Most list/array, struct, and string-split queries are now supported through
 # the unified expression API (UnifiedListExpr, UnifiedMapExpr, UnifiedStrExpr).
-#
-# Only map queries remain skipped because Polars has no native Map dtype.
-# PySpark and DataFusion support these via F.map_from_entries() and
-# f.map_from_entries() respectively, but the expression_impl functions call
-# ctx.map_from_entries() which raises NotImplementedError on Polars.
-SKIP_FOR_EXPRESSION_FAMILY = [
+SKIP_FOR_EXPRESSION_FAMILY: list[str] = [
+    # Currently empty as most expression-family gaps are platform-specific
+]
+
+# Queries skipped specifically for Polars DataFrame mode.
+SKIP_FOR_POLARS = [
     # --- Map operations: Polars has no native Map dtype ---
     "map_construction",  # ctx.struct() + ctx.map_from_entries()
     "map_access",  # ctx.struct() + ctx.map_from_entries() + .map.get()
     "map_keys_values",  # ctx.struct() + ctx.map_from_entries() + .map.keys/values()
 ]
 
+# Queries skipped specifically for PySpark DataFrame mode.
+SKIP_FOR_PYSPARK = [
+    # list_filter and list_transform call ctx.element() in expression_impl.
+    # PySpark does not override element() so it raises NotImplementedError.
+    "list_filter",
+    "list_transform",
+]
+
 # Queries skipped specifically for DataFusion DataFrame mode.
 # These use Polars-only features or DataFusion v50 missing functions.
 SKIP_FOR_DATAFUSION = [
-    "list_filter",  # .list.eval() is Polars-only — no DataFusion equivalent
-    "list_transform",  # .list.eval() is Polars-only — no DataFusion equivalent
+    "list_filter",  # .list.eval() is Polars-only - no DataFusion equivalent
+    "list_transform",  # .list.eval() is Polars-only - no DataFusion equivalent
     "list_reduce",  # array_sum() not in DataFusion v50 Python bindings
     "array_distinct",  # DataFusion array_distinct returns Dictionary(Int32,Utf8) causing Arrow type mismatch
 ]
@@ -4067,6 +4075,51 @@ def optimizer_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     return result
 
 
+def optimizer_groupjoin_expression_impl(ctx: DataFrameContext) -> Any:
+    """Test group-join (join+aggregate fusion) optimization.
+
+    Join orders→lineitem then immediately GROUP BY join key - good optimizers
+    fuse these into a single grouped-join pass, never materializing the full
+    intermediate result.
+    """
+    orders = ctx.get_table("orders")
+    lineitem = ctx.get_table("lineitem")
+    col = ctx.col
+    lit = ctx.lit
+
+    result = (
+        orders.join(lineitem, col("o_orderkey") == col("l_orderkey"))
+        .group_by("o_orderkey", "o_custkey", "o_orderdate")
+        .agg(
+            col("l_linenumber").count().alias("line_count"),
+            (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+        )
+        .sort("revenue", descending=True)
+        .limit(100)
+    )
+
+    return result
+
+
+def optimizer_groupjoin_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Test group-join (join+aggregate fusion) optimization."""
+    orders = ctx.get_table("orders")
+    lineitem = ctx.get_table("lineitem")
+
+    merged = orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
+    merged = merged.copy()
+    merged["revenue"] = merged["l_extendedprice"] * (1 - merged["l_discount"])
+
+    result = (
+        merged.groupby(["o_orderkey", "o_custkey", "o_orderdate"], as_index=False)
+        .agg(line_count=("l_linenumber", "count"), revenue=("revenue", "sum"))
+        .nlargest(100, "revenue")
+        .reset_index(drop=True)
+    )
+
+    return result
+
+
 # =============================================================================
 # QUALIFY Queries
 # =============================================================================
@@ -6346,6 +6399,14 @@ _QUERIES = [
         expression_impl=optimizer_runtime_filter_expression_impl,
         pandas_impl=optimizer_runtime_filter_pandas_impl,
     ),
+    DataFrameQuery(
+        query_id="optimizer_groupjoin",
+        query_name="Optimizer: Group-Join Fusion",
+        description="Test join+aggregate fusion into a single grouped-join pass",
+        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
+        expression_impl=optimizer_groupjoin_expression_impl,
+        pandas_impl=optimizer_groupjoin_pandas_impl,
+    ),
     # QUALIFY queries - window function filtering
     DataFrameQuery(
         query_id="qualify_row_number",
@@ -6609,6 +6670,29 @@ def get_skip_for_expression_family() -> list[str]:
         List of query IDs to skip for expression-family platforms (map queries only)
     """
     return SKIP_FOR_EXPRESSION_FAMILY.copy()
+
+
+def get_skip_for_polars() -> list[str]:
+    """Get query IDs that should be skipped for Polars DataFrame mode.
+
+    Polars lacks a native Map dtype, so map queries are skipped.
+
+    Returns:
+        List of query IDs to skip for Polars
+    """
+    return SKIP_FOR_POLARS.copy()
+
+
+def get_skip_for_pyspark() -> list[str]:
+    """Get query IDs that should be skipped for PySpark DataFrame mode.
+
+    PySpark lacks native implementations for higher-order list functions
+    that use the unified expression API's element() hook.
+
+    Returns:
+        List of query IDs to skip for PySpark
+    """
+    return SKIP_FOR_PYSPARK.copy()
 
 
 def get_skip_for_datafusion() -> list[str]:

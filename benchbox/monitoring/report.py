@@ -61,7 +61,7 @@ def _series_to_line_chart(
         use_unicode: Whether to use unicode box-drawing characters.
 
     Returns:
-        Rendered chart string (no title — caller handles title).
+        Rendered chart string (no title - caller handles title).
     """
     points = [LinePoint(series="value", x=float(i), y=v) for i, v in enumerate(series)]
     options = ChartOptions(

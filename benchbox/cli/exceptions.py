@@ -492,4 +492,4 @@ class ValidationRules:
                 raise ValidationError(
                     f"Cannot create output directory: {output_dir}",
                     details={"path": output_dir, "error": str(e)},
-                )
+                ) from e

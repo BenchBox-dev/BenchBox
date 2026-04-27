@@ -142,12 +142,20 @@ class VerbosityMixin(ABC):
         )
 
     def log_verbose(self, message: str) -> None:
+        """Log only when verbose mode is enabled."""
         if self.quiet:
             return
         if self.verbose_enabled:
             self.logger.info(message)
 
+    def log_notice(self, message: str) -> None:
+        """Log a default-visible operational notice while respecting quiet mode."""
+        if self.quiet:
+            return
+        self.logger.info(message)
+
     def log_very_verbose(self, message: str) -> None:
+        """Log only when very-verbose mode is enabled."""
         if self.quiet:
             return
         if self.very_verbose:

@@ -45,6 +45,7 @@ def create_test_result(
     include_queries: bool = False,
     platform_version: str | None = "1.0.0",
     total_cost: float | None = None,
+    compliance_class: str | None = None,
 ) -> BenchmarkResults:
     """Result-database test defaults delegating to shared factory."""
     ts = timestamp or datetime.now(timezone.utc)
@@ -103,6 +104,7 @@ def create_test_result(
         platform_info=platform_info,
         cost_summary=cost_summary,
         execution_phases=execution_phases,
+        compliance_class=compliance_class,
     )
 
 
@@ -574,6 +576,105 @@ class TestRankings:
         assert rankings[0].trend_change is None
 
 
+class TestRankingsComplianceFilter:
+    """Tests that unofficial results are filtered from rankings by default."""
+
+    def test_unofficial_subscale_excluded_by_default(self, tmp_path):
+        """Unofficial subscale results must not appear in default rankings."""
+        db = ResultDatabase(tmp_path / "test.db")
+        now = datetime.now(timezone.utc)
+
+        db.store_result(
+            create_test_result(
+                execution_id="official-run",
+                platform="OfficialDB",
+                benchmark="TPC-DS",
+                scale_factor=1.0,
+                timestamp=now - timedelta(days=5),
+                compliance_class="official",
+            )
+        )
+        db.store_result(
+            create_test_result(
+                execution_id="unofficial-run",
+                platform="UnofficialDB",
+                benchmark="TPC-DS",
+                scale_factor=1.0,
+                timestamp=now - timedelta(days=5),
+                compliance_class="unofficial_subscale",
+            )
+        )
+
+        config = RankingConfig(lookback_days=90)
+        rankings = db.calculate_rankings("TPC-DS", 1.0, config)
+
+        platform_names = [r.platform for r in rankings]
+        assert "OfficialDB" in platform_names
+        assert "UnofficialDB" not in platform_names
+
+    def test_unofficial_excluded_with_include_unofficial_false(self, tmp_path):
+        """Explicit include_unofficial=False excludes unofficial results."""
+        db = ResultDatabase(tmp_path / "test.db")
+        now = datetime.now(timezone.utc)
+
+        db.store_result(
+            create_test_result(
+                execution_id="subscale-run",
+                platform="SubscaleDB",
+                benchmark="TPC-DS",
+                scale_factor=1.0,
+                timestamp=now - timedelta(days=5),
+                compliance_class="unofficial_subscale",
+            )
+        )
+
+        config = RankingConfig(lookback_days=90)
+        rankings = db.calculate_rankings("TPC-DS", 1.0, config, include_unofficial=False)
+        assert len(rankings) == 0
+
+    def test_unofficial_included_with_include_unofficial_true(self, tmp_path):
+        """include_unofficial=True admits unofficial results into rankings."""
+        db = ResultDatabase(tmp_path / "test.db")
+        now = datetime.now(timezone.utc)
+
+        db.store_result(
+            create_test_result(
+                execution_id="subscale-run2",
+                platform="SubscaleDB2",
+                benchmark="TPC-DS",
+                scale_factor=1.0,
+                timestamp=now - timedelta(days=5),
+                compliance_class="unofficial_subscale",
+            )
+        )
+
+        config = RankingConfig(lookback_days=90)
+        rankings = db.calculate_rankings("TPC-DS", 1.0, config, include_unofficial=True)
+        platform_names = [r.platform for r in rankings]
+        assert "SubscaleDB2" in platform_names
+
+    def test_legacy_no_compliance_class_included_by_default(self, tmp_path):
+        """Legacy results (compliance_class=None) are included in default rankings."""
+        db = ResultDatabase(tmp_path / "test.db")
+        now = datetime.now(timezone.utc)
+
+        db.store_result(
+            create_test_result(
+                execution_id="legacy-run",
+                platform="LegacyDB",
+                benchmark="TPC-DS",
+                scale_factor=1.0,
+                timestamp=now - timedelta(days=5),
+                compliance_class=None,
+            )
+        )
+
+        config = RankingConfig(lookback_days=90)
+        rankings = db.calculate_rankings("TPC-DS", 1.0, config)
+        platform_names = [r.platform for r in rankings]
+        assert "LegacyDB" in platform_names
+
+
 class TestPerformanceTrends:
     """Tests for performance trend analysis."""
 
@@ -763,10 +864,10 @@ class TestImportResults:
             queries=[{"id": "1", "ms": 50.0, "rows": 4}],
         )
 
-        with open(results_dir / "result1.json", "w") as f:
+        with open(results_dir / "result1.json", "w", encoding="utf-8") as f:
             json.dump(result_data, f)
 
-        imported, skipped = db.import_results_from_directory(results_dir)
+        imported, skipped, excluded = db.import_results_from_directory(results_dir)
 
         assert imported == 1
         assert skipped == 0
@@ -796,12 +897,12 @@ class TestImportResults:
             queries=[{"id": "1", "ms": 50.0, "rows": 4}],
         )
 
-        with open(results_dir / "result1.json", "w") as f:
+        with open(results_dir / "result1.json", "w", encoding="utf-8") as f:
             json.dump(result_data, f)
 
         # Import twice
-        imported1, skipped1 = db.import_results_from_directory(results_dir)
-        imported2, skipped2 = db.import_results_from_directory(results_dir)
+        imported1, skipped1, excluded1 = db.import_results_from_directory(results_dir)
+        imported2, skipped2, excluded2 = db.import_results_from_directory(results_dir)
 
         assert imported1 == 1
         assert skipped1 == 0
@@ -815,10 +916,10 @@ class TestImportResults:
         results_dir.mkdir()
 
         # Create invalid file
-        with open(results_dir / "invalid.json", "w") as f:
+        with open(results_dir / "invalid.json", "w", encoding="utf-8") as f:
             f.write("{ invalid json")
 
-        imported, skipped = db.import_results_from_directory(results_dir)
+        imported, skipped, excluded = db.import_results_from_directory(results_dir)
 
         assert imported == 0
         assert skipped == 1

@@ -235,9 +235,9 @@ class QGenWrapper:
             error_msg = f"TPC-H compilation failed: {e}"
             if hasattr(e, "stderr") and e.stderr:
                 error_msg += f"\nSTDERR: {e.stderr}"
-            raise QgenCompilationError(error_msg)
+            raise QgenCompilationError(error_msg) from e
         except Exception as e:
-            raise QgenCompilationError(f"Unexpected compilation error: {e}")
+            raise QgenCompilationError(f"Unexpected compilation error: {e}") from e
 
     def _run_make_command(self, target: str, check: bool = True) -> subprocess.CompletedProcess:
         """Run a make command in the tools directory.
@@ -346,9 +346,9 @@ class QGenWrapper:
             return query
 
         except subprocess.TimeoutExpired:
-            raise QgenExecutionError(f"qgen timed out for query {query_id}")
+            raise QgenExecutionError(f"qgen timed out for query {query_id}") from None
         except Exception as e:
-            raise QgenExecutionError(f"Failed to generate query {query_id}: {e}")
+            raise QgenExecutionError(f"Failed to generate query {query_id}: {e}") from e
 
     def _parse_qgen_output(self, output: str, query_id: int) -> QgenQuery:
         """Parse qgen output into structured format.
@@ -792,7 +792,7 @@ def create_qgen_wrapper(tpch_tools_path: Optional[Path] = None, verbose: bool = 
         return wrapper
 
     except Exception as e:
-        raise QgenError(f"Failed to create qgen wrapper: {e}")
+        raise QgenError(f"Failed to create qgen wrapper: {e}") from e
 
 
 def compare_query_implementations(

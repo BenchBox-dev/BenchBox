@@ -1,0 +1,272 @@
+{
+  "chart": "percentile_ladder",
+  "version": 1,
+  "description": "Parity tests for _compute_percentile / computePercentile (matches textcharts.percentile_ladder.compute_percentile) plus _platform_percentile_stats aggregation shape.",
+  "cases": [
+    {
+      "id": "single_value",
+      "input": {
+        "values": [
+          42.0
+        ],
+        "p": 50
+      },
+      "expected": {
+        "result": 42.0
+      }
+    },
+    {
+      "id": "two_values_p50",
+      "input": {
+        "values": [
+          10.0,
+          20.0
+        ],
+        "p": 50
+      },
+      "expected": {
+        "result": 15.0
+      }
+    },
+    {
+      "id": "five_values_p50",
+      "input": {
+        "values": [
+          10.0,
+          20.0,
+          30.0,
+          100.0,
+          200.0
+        ],
+        "p": 50
+      },
+      "expected": {
+        "result": 30.0
+      }
+    },
+    {
+      "id": "five_values_p90",
+      "input": {
+        "values": [
+          10.0,
+          20.0,
+          30.0,
+          100.0,
+          200.0
+        ],
+        "p": 90
+      },
+      "expected": {
+        "result": 160.0
+      }
+    },
+    {
+      "id": "five_values_p95",
+      "input": {
+        "values": [
+          10.0,
+          20.0,
+          30.0,
+          100.0,
+          200.0
+        ],
+        "p": 95
+      },
+      "expected": {
+        "result": 180.0
+      }
+    },
+    {
+      "id": "five_values_p99",
+      "input": {
+        "values": [
+          10.0,
+          20.0,
+          30.0,
+          100.0,
+          200.0
+        ],
+        "p": 99
+      },
+      "expected": {
+        "result": 196.0
+      }
+    },
+    {
+      "id": "tied_values_p50",
+      "input": {
+        "values": [
+          10.0,
+          10.0,
+          10.0,
+          100.0
+        ],
+        "p": 50
+      },
+      "expected": {
+        "result": 10.0
+      }
+    },
+    {
+      "id": "tpch_22q_p50",
+      "input": {
+        "values": [
+          5.1,
+          8.3,
+          12.7,
+          3.2,
+          45.6,
+          22.1,
+          67.8,
+          9.4,
+          15.2,
+          31.0,
+          7.8,
+          19.4,
+          88.2,
+          4.5,
+          11.3,
+          23.7,
+          55.4,
+          16.8,
+          28.9,
+          6.7,
+          42.1,
+          14.5
+        ],
+        "p": 50
+      },
+      "expected": {
+        "result": 16.0
+      }
+    },
+    {
+      "id": "tpch_22q_p90",
+      "input": {
+        "values": [
+          5.1,
+          8.3,
+          12.7,
+          3.2,
+          45.6,
+          22.1,
+          67.8,
+          9.4,
+          15.2,
+          31.0,
+          7.8,
+          19.4,
+          88.2,
+          4.5,
+          11.3,
+          23.7,
+          55.4,
+          16.8,
+          28.9,
+          6.7,
+          42.1,
+          14.5
+        ],
+        "p": 90
+      },
+      "expected": {
+        "result": 54.42000000000002
+      }
+    },
+    {
+      "id": "tpch_22q_p95",
+      "input": {
+        "values": [
+          5.1,
+          8.3,
+          12.7,
+          3.2,
+          45.6,
+          22.1,
+          67.8,
+          9.4,
+          15.2,
+          31.0,
+          7.8,
+          19.4,
+          88.2,
+          4.5,
+          11.3,
+          23.7,
+          55.4,
+          16.8,
+          28.9,
+          6.7,
+          42.1,
+          14.5
+        ],
+        "p": 95
+      },
+      "expected": {
+        "result": 67.17999999999999
+      }
+    },
+    {
+      "id": "tpch_22q_p99",
+      "input": {
+        "values": [
+          5.1,
+          8.3,
+          12.7,
+          3.2,
+          45.6,
+          22.1,
+          67.8,
+          9.4,
+          15.2,
+          31.0,
+          7.8,
+          19.4,
+          88.2,
+          4.5,
+          11.3,
+          23.7,
+          55.4,
+          16.8,
+          28.9,
+          6.7,
+          42.1,
+          14.5
+        ],
+        "p": 99
+      },
+      "expected": {
+        "result": 83.91599999999998
+      }
+    },
+    {
+      "id": "empty_display_timings",
+      "input": {
+        "display_ms_values": []
+      },
+      "expected": {
+        "stats": null
+      }
+    },
+    {
+      "id": "platform_stats_5q",
+      "input": {
+        "display_ms_values": [
+          10.0,
+          20.0,
+          30.0,
+          100.0,
+          200.0
+        ]
+      },
+      "expected": {
+        "stats": {
+          "p50": 30.0,
+          "p90": 160.0,
+          "p95": 180.0,
+          "p99": 196.0
+        }
+      }
+    }
+  ]
+}

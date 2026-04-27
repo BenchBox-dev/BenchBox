@@ -353,8 +353,8 @@ class TestTPCDSConstraints:
     @pytest.mark.e2e
     @pytest.mark.e2e_quick
     @pytest.mark.tpcds
-    def test_tpcds_fractional_scale_error(self, tmp_path: Path) -> None:
-        """Test that TPC-DS rejects fractional scale factors."""
+    def test_tpcds_fractional_scale_warns_but_succeeds(self, tmp_path: Path) -> None:
+        """Test that TPC-DS warns on fractional scale factors but still proceeds."""
         output_dir = tmp_path / "dry_run"
         output_dir.mkdir()
 
@@ -366,15 +366,40 @@ class TestTPCDSConstraints:
                 "--benchmark",
                 "tpcds",
                 "--scale",
-                "0.5",  # Fractional SF not allowed for TPC-DS
+                "0.5",
                 "--dry-run",
                 str(output_dir),
             ]
         )
 
-        # Should fail or warn about fractional SF
-        # TPC-DS requires SF >= 1 due to binary constraints
-        assert result.returncode != 0 or "scale" in result.stdout.lower()
+        assert result.returncode == 0
+        assert "UNOFFICIAL SUBSCALE RUN" in result.stdout
+
+    @pytest.mark.e2e
+    @pytest.mark.e2e_quick
+    @pytest.mark.tpcds
+    def test_tpcds_fractional_scale_quiet_suppresses_warning(self, tmp_path: Path) -> None:
+        """Test that --quiet suppresses the unofficial subscale warning."""
+        output_dir = tmp_path / "dry_run"
+        output_dir.mkdir()
+
+        result = run_cli_command(
+            [
+                "run",
+                "--platform",
+                "duckdb",
+                "--benchmark",
+                "tpcds",
+                "--scale",
+                "0.5",
+                "--quiet",
+                "--dry-run",
+                str(output_dir),
+            ]
+        )
+
+        assert result.returncode == 0
+        assert "UNOFFICIAL SUBSCALE RUN" not in result.stdout
 
 
 # ============================================================================

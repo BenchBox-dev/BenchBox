@@ -47,8 +47,8 @@ class TestReadPrimitivesIdentifyRegression:
         for query_id, query_sql in translated_queries.items():
             assert query_sql, f"Query {query_id} should not be empty"
             assert len(query_sql) > 0, f"Query {query_id} should have SQL content"
-            # All queries should start with SELECT or WITH (for CTEs)
-            assert query_sql.strip().upper().startswith(("SELECT", "WITH", "/*")), (
+            # All queries should start with SELECT, WITH (CTEs), or a comment
+            assert query_sql.strip().upper().startswith(("SELECT", "WITH", "/*", "--")), (
                 f"Query {query_id} should start with SELECT, WITH, or comment"
             )
 

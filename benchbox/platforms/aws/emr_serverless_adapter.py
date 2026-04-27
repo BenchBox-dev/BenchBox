@@ -54,6 +54,7 @@ from benchbox.platforms.base.cloud_spark import (
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
+from benchbox.platforms.base.phase_tracking import _resolve_benchmark_table_names
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
@@ -368,13 +369,15 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
         except ClientError as e:
             raise ConfigurationError(f"Failed to connect to EMR Serverless: {e}") from e
 
-    def create_schema(self, schema_name: str | None = None) -> None:
+    def create_schema(self, benchmark, connection: Any) -> float:
         """Create Glue Data Catalog database if it doesn't exist.
 
         Args:
-            schema_name: Database name (uses self.database if not provided).
+            benchmark: Benchmark instance.
+            connection: Active connection metadata; not used by EMR Serverless.
         """
-        database = schema_name or self.database
+        start_time = mono_time()
+        database = self.database
         client = self._get_glue_client()
 
         try:
@@ -391,33 +394,36 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
                 )
             else:
                 raise
+        return elapsed_seconds(start_time)
 
     def load_data(
         self,
-        tables: list[str],
-        source_dir: Path | str,
-        file_format: str = "parquet",
-        **kwargs: Any,
-    ) -> dict[str, str]:
+        benchmark,
+        connection: Any,
+        data_dir: Path,
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Upload benchmark data to S3 and create Glue tables.
 
         Args:
-            tables: List of table names to load.
-            source_dir: Local directory containing table data files.
-            file_format: Data file format (default: parquet).
-            **kwargs: Additional options.
+            benchmark: Benchmark instance.
+            connection: Active connection metadata; not used by EMR Serverless.
+            data_dir: Local directory containing table data files.
 
         Returns:
-            Dict mapping table names to S3 URIs.
+            Tuple of table row-count placeholders, elapsed seconds, and table URI metadata.
         """
-        source_path = Path(source_dir)
+        start_time = mono_time()
+        source_path = Path(data_dir)
+        tables = _resolve_benchmark_table_names(benchmark)
+        file_format = self.requested_table_format or self.table_format
         if not source_path.exists():
-            raise ConfigurationError(f"Source directory not found: {source_dir}")
+            raise ConfigurationError(f"Source directory not found: {data_dir}")
 
         # Check if tables already exist in S3
         if self._staging and self._staging.tables_exist(tables):
             logger.info("Tables already exist in S3 staging, skipping upload")
-            return {table: self._staging.get_table_uri(table) for table in tables}
+            table_uris = {table: self._staging.get_table_uri(table) for table in tables}
+            return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
         # Upload using cloud-spark staging infrastructure
         if self._staging:
@@ -467,7 +473,7 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
                 else:
                     raise
 
-        return table_uris
+        return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
     def _submit_job_run(self, query: str) -> str:
         """Submit a Spark SQL job run.
@@ -599,40 +605,56 @@ spark.stop()
 
     def execute_query(
         self,
+        connection: Any,
         query: str,
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
         """Execute a SQL query on EMR Serverless.
 
         Args:
+            connection: Active connection metadata; not used by EMR Serverless.
             query: SQL query to execute.
-            **kwargs: Additional query options.
+            query_id: Query identifier.
 
         Returns:
-            Query results as list of dicts.
+            Standard query result dictionary.
         """
-        self._ensure_application_started()
-
         start_time = mono_time()
-        job_run_id = self._submit_job_run(query)
+        try:
+            self._ensure_application_started()
+            job_run_id = self._submit_job_run(query)
+            state, resource_usage = self._wait_for_job_run(job_run_id)
+            elapsed = elapsed_seconds(start_time)
 
-        state, resource_usage = self._wait_for_job_run(job_run_id)
-        elapsed = elapsed_seconds(start_time)
-
-        # Track metrics
-        self._query_count += 1
-        vcpu_hours = resource_usage.get("vCPUHour", 0)
-        memory_gb_hours = resource_usage.get("memoryGBHour", 0)
-        self._total_vcpu_hours += vcpu_hours
-        self._total_memory_gb_hours += memory_gb_hours
-
-        logger.debug(
-            f"Job completed in {elapsed:.1f}s, vCPU-hours: {vcpu_hours:.4f}, memory-GB-hours: {memory_gb_hours:.4f}"
-        )
-
-        # Retrieve results from S3
-        results = self._retrieve_results(job_run_id)
-        return results
+            self._query_count += 1
+            vcpu_hours = resource_usage.get("vCPUHour", 0)
+            memory_gb_hours = resource_usage.get("memoryGBHour", 0)
+            self._total_vcpu_hours += vcpu_hours
+            self._total_memory_gb_hours += memory_gb_hours
+            results = self._retrieve_results(job_run_id)
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "SUCCESS",
+                "execution_time_seconds": elapsed,
+                "rows_returned": len(results),
+                "results": results,
+                "error": None,
+            }
+        except Exception as e:
+            return {
+                "query_id": query_id,
+                "stream_id": stream_id,
+                "status": "FAILED",
+                "execution_time_seconds": elapsed_seconds(start_time),
+                "rows_returned": 0,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            }
 
     def close(self) -> None:
         """Clean up resources and log usage metrics."""

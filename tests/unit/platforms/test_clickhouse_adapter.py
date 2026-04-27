@@ -112,7 +112,10 @@ class TestClickHouseAdapter:
                 result = adapter.translate_sql("SELECT * FROM table", "duckdb")
                 # translate_sql adds semicolon at the end
                 assert result == 'SELECT * FROM "table";'
-                mock_transpile.assert_called_once_with("SELECT * FROM table", read="duckdb", write="clickhouse")
+                # identify=False for clickhouse (excluded from quoting policy)
+                mock_transpile.assert_called_once_with(
+                    "SELECT * FROM table", read="duckdb", write="clickhouse", identify=False
+                )
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_create_schema(self, mock_client_class):
@@ -150,7 +153,7 @@ class TestClickHouseAdapter:
         # Create temporary test file first
         import tempfile
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("1,test\n2,test2\n")
             temp_path = Path(f.name)
 
@@ -264,6 +267,40 @@ class TestClickHouseAdapter:
         # Should execute only basic optimization statements (no OLAP-specific ones)
         # Basic settings (6) + cache control settings (3) + validation query (1) + server memory ratio (1) = 11
         assert mock_client.execute.call_count == 11  # basic + cache + validation + server memory ratio
+
+    @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
+    def test_configure_for_benchmark_join_memory_uses_50_pct_multiplier(self, mock_client_class):
+        """max_bytes_in_join must be 50% of max_memory_usage - SF1 Q5 needs 2.72 GiB."""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        adapter = ClickHouseAdapter(deployment_mode="server", strict_validation=False)
+        adapter.tuning_enabled = False  # trigger OLAP settings path
+
+        connection = adapter.create_connection()
+        mock_client.reset_mock()
+        adapter.configure_for_benchmark(connection, "tpch")
+
+        executed_statements = [call[0][0] for call in mock_client.execute.call_args_list]
+        join_stmt = next((s for s in executed_statements if "max_bytes_in_join" in s), None)
+        assert join_stmt is not None, "max_bytes_in_join setting was not applied"
+
+        # Extract the numeric value from "SET max_bytes_in_join = <N>"
+        import re
+
+        m = re.search(r"max_bytes_in_join\s*=\s*(\d+)", join_stmt)
+        assert m is not None, f"Could not parse max_bytes_in_join value from: {join_stmt}"
+        join_limit = int(m.group(1))
+
+        memory_bytes = adapter._parse_memory_setting(adapter.max_memory_usage)
+        expected_50pct = int(memory_bytes * 0.5)
+        assert join_limit == expected_50pct, (
+            f"max_bytes_in_join should be 50% of max_memory_usage ({expected_50pct}), got {join_limit}"
+        )
+
+        # Verify grace_hash is applied for server mode
+        grace_stmt = next((s for s in executed_statements if "grace_hash" in s), None)
+        assert grace_stmt is not None, "join_algorithm = grace_hash setting was not applied"
 
     @pytest.mark.skipif(not CHDB_AVAILABLE, reason="chDB not installed (required for embedded mode test)")
     def test_configure_for_benchmark_embedded_mode(self):
@@ -735,6 +772,39 @@ class TestClickHouseNativeHandlerBulk:
 
         assert result == 5
 
+    def test_load_table_parquet_zst_uses_parquet_sql(self, tmp_path):
+        """Compressed parquet files should still use ClickHouse's Parquet reader."""
+        parquet_file = tmp_path / "lineitem.parquet.zst"
+        parquet_file.touch()
+
+        handler = self._make_handler()
+        connection = self._make_bulk_connection(before=0, after=6000)
+
+        result = handler.load_table("lineitem", parquet_file, connection, Mock(), Mock())
+
+        assert result == 6000
+        insert_sql = connection.execute.call_args_list[1][0][0]
+        assert "file(" in insert_sql
+        assert "'Parquet'" in insert_sql
+        assert "format_csv_delimiter" not in insert_sql
+
+    def test_bulk_load_parquet_shards_use_parquet_sql(self, tmp_path):
+        """Sharded parquet names should preserve Parquet detection for glob loading."""
+        shards = [tmp_path / f"lineitem.parquet.{i}.zst" for i in range(1, 3)]
+        for shard in shards:
+            shard.touch()
+
+        handler = self._make_handler()
+        connection = self._make_bulk_connection(before=0, after=6000)
+
+        result = handler.load_table_bulk("lineitem", shards, connection, Mock(), Mock())
+
+        assert result == 6000
+        insert_sql = connection.execute.call_args_list[1][0][0]
+        assert "lineitem.parquet.*" in insert_sql
+        assert "'Parquet'" in insert_sql
+        assert "format_csv_delimiter" not in insert_sql
+
     def test_bulk_load_dry_run_returns_placeholder(self, tmp_path):
         """Dry-run mode must return 1000*N without executing INSERT."""
         shards = [tmp_path / f"customer.tbl.{i}" for i in range(1, 5)]
@@ -881,6 +951,25 @@ class TestClickHouseWorkloadCoverage:
         failing_connection.execute.side_effect = RuntimeError("boom")
         assert server_adapter._get_existing_tables(failing_connection) == []
 
+    def test_get_table_row_count_uses_execute_not_cursor(self):
+        # Regression: local/cloud clients have no cursor(); must use execute()
+        adapter = self._adapter(deployment_mode="local")
+
+        conn = Mock()
+        conn.execute.return_value = [(42,)]
+        assert adapter.get_table_row_count(conn, "orders") == 42
+        conn.execute.assert_called_once_with("SELECT COUNT(*) FROM orders")
+
+        # Verify execute() is used (not cursor) even when cursor attribute is absent
+        conn2 = Mock(spec=[])  # no cursor attribute
+        conn2.execute = Mock(return_value=[(99,)])
+        assert adapter.get_table_row_count(conn2, "orders") == 99
+
+        # Silent failure on query error
+        conn3 = Mock()
+        conn3.execute.side_effect = RuntimeError("boom")
+        assert adapter.get_table_row_count(conn3, "orders") == 0
+
     def test_get_constraint_configuration_uses_effective_config(self):
         adapter = self._adapter()
         adapter.get_effective_tuning_configuration = Mock(
@@ -923,6 +1012,7 @@ class TestClickHouseWorkloadCoverage:
 
         transformer = Mock()
         transformer.transform.return_value = "SELECT 1"
+        transformer.add_query_settings.return_value = "SELECT 1 SETTINGS joined_subquery_requires_alias = 0"
         transformer.get_transformations_applied.return_value = ["expanded_final"]
         validation_result = SimpleNamespace(
             is_valid=True,
@@ -956,6 +1046,7 @@ class TestClickHouseWorkloadCoverage:
 
         transformer = Mock()
         transformer.transform.return_value = "SELECT 1"
+        transformer.add_query_settings.return_value = "SELECT 1 SETTINGS joined_subquery_requires_alias = 0"
         transformer.get_transformations_applied.return_value = []
         validation_result = SimpleNamespace(
             is_valid=False,
@@ -983,6 +1074,7 @@ class TestClickHouseWorkloadCoverage:
 
         transformer = Mock()
         transformer.transform.return_value = "SELECT 1"
+        transformer.add_query_settings.return_value = "SELECT 1 SETTINGS joined_subquery_requires_alias = 0"
         transformer.get_transformations_applied.return_value = []
 
         with patch("benchbox.platforms.clickhouse.workload.ClickHouseQueryTransformer", return_value=transformer):
@@ -991,3 +1083,262 @@ class TestClickHouseWorkloadCoverage:
         assert result["status"] == "FAILED"
         assert result["error"] == "boom"
         assert result["error_type"] == "RuntimeError"
+
+    def test_execute_query_error_message_capture_preserves_exception_text(self):
+        """Full driver-style error text (Code/DB::Exception) must flow into result.error."""
+        adapter = self._adapter()
+        connection = Mock()
+        driver_error = (
+            "ClickHouse local query failed: Code: 47. DB::Exception: "
+            "Unknown expression identifier `foo_invalid`. (UNKNOWN_IDENTIFIER)"
+        )
+        connection.execute.side_effect = RuntimeError(driver_error)
+
+        transformer = Mock()
+        transformer.transform.return_value = "SELECT foo_invalid"
+        transformer.add_query_settings.return_value = "SELECT foo_invalid"
+        transformer.get_transformations_applied.return_value = []
+
+        with patch("benchbox.platforms.clickhouse.workload.ClickHouseQueryTransformer", return_value=transformer):
+            result = adapter.execute_query(connection, "SELECT foo_invalid", "Q_err")
+
+        assert result["status"] == "FAILED"
+        assert result["error"] == driver_error
+        assert "UNKNOWN_IDENTIFIER" in result["error"]
+        assert result["error_type"] == "RuntimeError"
+
+    def test_execute_query_error_capture_falls_back_when_str_is_empty(self):
+        """Bare exceptions (no message) must still yield a non-empty `error` field."""
+        adapter = self._adapter()
+        connection = Mock()
+        # RuntimeError() with no args -> str(e) == "" - must not produce empty error.
+        connection.execute.side_effect = RuntimeError()
+
+        transformer = Mock()
+        transformer.transform.return_value = "SELECT 1"
+        transformer.add_query_settings.return_value = "SELECT 1"
+        transformer.get_transformations_applied.return_value = []
+
+        with patch("benchbox.platforms.clickhouse.workload.ClickHouseQueryTransformer", return_value=transformer):
+            result = adapter.execute_query(connection, "SELECT 1", "Q_empty")
+
+        assert result["status"] == "FAILED"
+        assert result["error"]  # non-empty - bug G guard
+        assert result["error_type"] == "RuntimeError"
+
+
+class TestClickHouseQueryTransformerDecimalLiterals:
+    """Regression tests for fix_type_casts decimal literal handling.
+
+    The patterns (0\\.0*)\\b in fix_type_casts used to backtrack-match "0." from
+    non-zero decimals like 0.06, producing malformed SQL such as
+    "CAST(0 AS Decimal(15,2))6". These tests guard against that regression.
+    """
+
+    def _transformer(self):
+        from benchbox.platforms.clickhouse.query_transformer import ClickHouseQueryTransformer
+
+        return ClickHouseQueryTransformer()
+
+    def test_arithmetic_non_zero_decimal_not_corrupted(self):
+        """col + 0.06 must not become col + CAST(...)6."""
+        t = self._transformer()
+        for expr in ("col + 0.06", "col - 0.01", "col * 0.05", "col / 0.07"):
+            result = t.fix_type_casts(expr)
+            assert result == expr, f"fix_type_casts corrupted {expr!r} -> {result!r}"
+
+    def test_arithmetic_pure_zero_decimal_is_cast(self):
+        """col + 0.0 and col - 0.00 are pure-zero floats and should be CAST."""
+        t = self._transformer()
+        for expr in ("col + 0.0", "col - 0.00"):
+            result = t.fix_type_casts(expr)
+            assert "CAST(0 AS Decimal" in result, f"fix_type_casts should cast pure-zero in {expr!r}"
+            assert result.count("CAST") == 1, f"Unexpected extra CASTs in {result!r}"
+
+    def test_then_non_zero_decimal_not_corrupted(self):
+        """THEN 0.06 must not produce THEN CAST(...)6."""
+        t = self._transformer()
+        for expr in ("THEN 0.06", "THEN 0.05", "THEN 0.07"):
+            result = t.fix_type_casts(expr)
+            assert result == expr, f"fix_type_casts corrupted {expr!r} -> {result!r}"
+
+    def test_else_non_zero_decimal_not_corrupted(self):
+        """ELSE 0.07 must not produce ELSE CAST(...)7."""
+        t = self._transformer()
+        for expr in ("ELSE 0.06", "ELSE 0.07", "ELSE 0.01"):
+            result = t.fix_type_casts(expr)
+            assert result == expr, f"fix_type_casts corrupted {expr!r} -> {result!r}"
+
+    def test_tpchavoc_q6_between_clause_preserved(self):
+        """l_discount between 0.06 - 0.01 and 0.06 + 0.01 must pass through unchanged."""
+        t = self._transformer()
+        sql = "WHERE l_discount between 0.06 - 0.01 and 0.06 + 0.01"
+        result = t.fix_type_casts(sql)
+        assert result == sql, f"fix_type_casts corrupted Q6 BETWEEN clause: {result!r}"
+
+    def test_full_transform_preserves_q6_decimal_literals(self):
+        """Full transformer pipeline must not strip leading zeros from Q6-like SQL."""
+        t = self._transformer()
+        sql = (
+            "SELECT SUM(l_extendedprice * l_discount) AS revenue "
+            "FROM lineitem "
+            "WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01"
+        )
+        result = t.transform(sql)
+        assert "0.06" in result, f"0.06 was stripped from SQL: {result!r}"
+        assert "0.01" in result, f"0.01 was stripped from SQL: {result!r}"
+        # Ensure no dangling digits after CAST
+        import re
+
+        assert not re.search(r"Decimal\(15,2\)\)\d", result), f"Dangling digit after CAST: {result!r}"
+
+
+class TestClickHouseQueryTransformerSettings:
+    """Tests for add_query_settings() under the new-analyzer-by-default architecture."""
+
+    def _transformer(self):
+        from benchbox.platforms.clickhouse.query_transformer import ClickHouseQueryTransformer
+
+        return ClickHouseQueryTransformer()
+
+    def test_settings_not_appended_to_non_select(self):
+        """DDL statements must pass through unchanged."""
+        t = self._transformer()
+        ddl = "CREATE TABLE foo (id Int32) ENGINE = MergeTree() ORDER BY id"
+        assert t.add_query_settings(ddl) == ddl
+
+    def test_settings_include_joined_subquery_alias(self):
+        """Every SELECT/WITH query must include joined_subquery_requires_alias = 0."""
+        t = self._transformer()
+        result = t.add_query_settings("SELECT 1")
+        assert "joined_subquery_requires_alias = 0" in result
+
+    def test_enable_analyzer_not_added_for_plain_select(self):
+        """Simple queries must NOT get enable_analyzer = 0 (uses new analyzer by default)."""
+        t = self._transformer()
+        result = t.add_query_settings("SELECT count(*) FROM store_sales")
+        assert "enable_analyzer" not in result
+
+    def test_enable_analyzer_not_added_for_avg_sum_window_pattern(self):
+        """Q47/Q57-like SQL must rely on benchmark-local rewrites, not generic analyzer opt-outs."""
+        t = self._transformer()
+        q47_like = (
+            "WITH v1 AS (SELECT d_year, SUM(ss_sales_price) AS sum_sales, "
+            "AVG(SUM(ss_sales_price)) OVER (PARTITION BY i_category, d_year) AS avg_sales "
+            "FROM store_sales GROUP BY d_year, i_category) SELECT * FROM v1"
+        )
+        result = t.add_query_settings(q47_like)
+        assert "enable_analyzer" not in result
+
+    def test_enable_analyzer_not_added_for_q66_alias_aggregate_pattern(self):
+        """Q66-like SQL must be rewritten in TPC-DS, not downgraded generically here."""
+        t = self._transformer()
+        q66_like = (
+            "SELECT w_warehouse_name, sum(jan_sales) as jan_sales "
+            "FROM (SELECT w_warehouse_name, sum(CASE WHEN d_moy=1 THEN ws_ext_list_price ELSE 0 END) as jan_sales "
+            "FROM web_sales JOIN date_dim ON ws_sold_date_sk = d_date_sk "
+            "UNION ALL SELECT w_warehouse_name, sum(CASE WHEN d_moy=1 THEN cs_ext_list_price ELSE 0 END) as jan_sales "
+            "FROM catalog_sales JOIN date_dim ON cs_sold_date_sk = d_date_sk) "
+            "GROUP BY w_warehouse_name"
+        )
+        result = t.add_query_settings(q66_like)
+        assert "enable_analyzer" not in result
+
+
+class TestClickHouseQueryTransformerDecimalDivision:
+    """Tests for fix_decimal_division_by_zero() - wraps Nullable(Decimal) divisors with NULLIF."""
+
+    def _transformer(self):
+        from benchbox.platforms.clickhouse.query_transformer import ClickHouseQueryTransformer
+
+        return ClickHouseQueryTransformer()
+
+    def test_nullable_decimal_divisor_is_wrapped(self):
+        """/ CAST(col AS Nullable(Decimal(15,4))) must become / NULLIF(CAST(...), 0)."""
+        t = self._transformer()
+        sql = "SELECT a / CAST(b AS Nullable(Decimal(15, 4))) FROM t"
+        result = t.fix_decimal_division_by_zero(sql)
+        assert "NULLIF(CAST(b AS Nullable(Decimal(15, 4))), 0)" in result
+
+    def test_non_nullable_decimal_not_wrapped(self):
+        """/ CAST(col AS Decimal(15,4)) (non-Nullable) must pass through unchanged."""
+        t = self._transformer()
+        sql = "SELECT a / CAST(b AS Decimal(15, 4)) FROM t"
+        result = t.fix_decimal_division_by_zero(sql)
+        assert "NULLIF" not in result
+        assert result == sql
+
+    def test_transformation_recorded(self):
+        """Transformation name must be recorded when the pattern is found."""
+        t = self._transformer()
+        sql = "SELECT x / CAST(y AS Nullable(Decimal(18, 2))) FROM t"
+        t.fix_decimal_division_by_zero(sql)
+        assert "decimal_division_fix" in t.transformations_applied
+
+    def test_no_transformation_when_pattern_absent(self):
+        """No transformation must be recorded when there is no Nullable(Decimal) divisor."""
+        t = self._transformer()
+        sql = "SELECT a / b FROM t"
+        t.fix_decimal_division_by_zero(sql)
+        assert "decimal_division_fix" not in t.transformations_applied
+
+
+class TestClickHouseQueryTransformerSafeDivision:
+    """Focused tests for parenthesized divisor handling in safe_division()."""
+
+    def _transformer(self):
+        from benchbox.platforms.clickhouse.query_transformer import ClickHouseQueryTransformer
+
+        return ClickHouseQueryTransformer()
+
+    def test_parenthesized_divisor_is_wrapped_as_a_whole(self):
+        """Nested parenthesized divisors must be wrapped with one outer NULLIF."""
+        t = self._transformer()
+        sql = "SELECT revenue / ((store_sales + web_sales) / 2) FROM metrics"
+        result = t.safe_division(sql)
+        assert "revenue / NULLIF(((store_sales + web_sales) / 2), 0)" in result
+
+    def test_numeric_literal_divisor_stays_untouched(self):
+        """Literal divisors are already safe and must not gain NULLIF wrappers."""
+        t = self._transformer()
+        sql = "SELECT total_sales / 12 FROM metrics"
+        result = t.safe_division(sql)
+        assert result == sql
+
+    def test_function_call_divisor_is_wrapped(self):
+        """Function-call divisors like COUNT(*) must be wrapped with NULLIF."""
+        t = self._transformer()
+        sql = "SELECT total / COUNT(*) FROM t"
+        result = t.safe_division(sql)
+        assert "total / NULLIF(COUNT(*), 0)" in result
+
+    def test_sum_function_divisor_is_wrapped(self):
+        """SUM(col) divisors must be wrapped with NULLIF."""
+        t = self._transformer()
+        sql = "SELECT revenue / SUM(quantity) FROM t"
+        result = t.safe_division(sql)
+        assert "revenue / NULLIF(SUM(quantity), 0)" in result
+
+    def test_already_nullif_wrapped_divisor_stays_untouched(self):
+        """Divisors already wrapped in NULLIF must not be double-wrapped."""
+        t = self._transformer()
+        sql = "SELECT a / NULLIF(b, 0) FROM t"
+        result = t.safe_division(sql)
+        assert "a / NULLIF(b, 0)" in result
+        assert "NULLIF(NULLIF" not in result
+
+    def test_multiple_divisions_in_one_query(self):
+        """All divisions in a query must be independently wrapped."""
+        t = self._transformer()
+        sql = "SELECT a / b, c / d FROM t"
+        result = t.safe_division(sql)
+        assert "a / NULLIF(b, 0)" in result
+        assert "c / NULLIF(d, 0)" in result
+
+    def test_division_inside_string_literal_not_transformed(self):
+        """Division operators inside string literals must not be modified."""
+        t = self._transformer()
+        sql = "SELECT 'a/b' AS label, x / y FROM t"
+        result = t.safe_division(sql)
+        assert "'a/b'" in result
+        assert "x / NULLIF(y, 0)" in result

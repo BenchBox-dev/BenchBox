@@ -906,7 +906,7 @@ See Also
 - :doc:`/cloud-storage` - Cloud storage usage guide
 - :doc:`/usage/configuration` - Configuration options
 - :doc:`utilities` - Other utility functions
-- :doc:`/TROUBLESHOOTING` - Troubleshooting guide
+- :doc:`/usage/troubleshooting` - Troubleshooting guide
 - :doc:`platforms/databricks` - Databricks cloud integration
 - :doc:`platforms/bigquery` - BigQuery cloud integration
 - :doc:`platforms/snowflake` - Snowflake cloud integration

@@ -372,5 +372,5 @@ def create_sample_execution_config(output_path: Union[str, Path]) -> None:
 
     import yaml
 
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         yaml.dump(sample_config, f, default_flow_style=False, sort_keys=False)

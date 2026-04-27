@@ -48,7 +48,7 @@ def _write_orders_tbl(output_dir: Path, rows: list[tuple] | None = None) -> Path
             ("3", "1234", "F", "205654.30", "1993-10-14", "5-LOW", "Clerk#000000955", "0", "note"),
         ]
     path = output_dir / "orders.tbl"
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         for row in rows:
             f.write("|".join(str(v) for v in row) + "\n")
     return path
@@ -285,7 +285,7 @@ class TestCheckBulkLoadFilesExist:
             (gen.files_dir / f).write_text("data")
         # Write metadata with different scale factor
         metadata = {"scale_factor": 999.0}
-        with open(gen.files_dir / ".bulk_load_metadata.json", "w") as f:
+        with open(gen.files_dir / ".bulk_load_metadata.json", "w", encoding="utf-8") as f:
             json.dump(metadata, f)
         assert gen.check_bulk_load_files_exist() is False
 
@@ -310,7 +310,7 @@ class TestCheckBulkLoadFilesExist:
             (gen.files_dir / f).write_text("data")
         # Write matching metadata
         metadata = {"scale_factor": 0.01}
-        with open(gen.files_dir / ".bulk_load_metadata.json", "w") as f:
+        with open(gen.files_dir / ".bulk_load_metadata.json", "w", encoding="utf-8") as f:
             json.dump(metadata, f)
         assert gen.check_bulk_load_files_exist() is True
 

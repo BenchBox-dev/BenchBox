@@ -153,7 +153,7 @@ class StarRocksTuningMixin:
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
         except Exception as e:
-            raise ValueError(f"Failed to apply tunings to StarRocks table {table_name}: {e}")
+            raise ValueError(f"Failed to apply tunings to StarRocks table {table_name}: {e}") from e
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to StarRocks."""

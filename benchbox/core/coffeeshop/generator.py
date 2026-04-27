@@ -3,16 +3,16 @@
 This implementation discards the legacy 6-table schema and now emits the exact
 three-table layout expected by the reference CoffeeShop generator:
 
-* ``dim_locations`` – static seed data describing each store and its region
-* ``dim_products`` – reference product catalog with seasonal pricing windows
-* ``order_lines`` – exploded fact table with 1-5 lines per order and realistic
+* ``dim_locations`` - static seed data describing each store and its region
+* ``dim_products`` - reference product catalog with seasonal pricing windows
+* ``order_lines`` - exploded fact table with 1-5 lines per order and realistic
   temporal, regional, and product weighting
 
 The generator follows the approved mapping of scale factor → order count where
-``SF=1.0`` produces 50 million orders (≈75 million order lines). Smaller scale
-factors remain practical for development and unit tests while the weighting
-logic mirrors the seasonal, regional, and growth dynamics of the reference
-implementation.
+``SF=1.0`` produces 8.5 million orders (≈13.3 million order lines). Smaller
+scale factors remain practical for development and unit tests while the
+weighting logic mirrors the seasonal, regional, and growth dynamics of the
+reference implementation.
 """
 
 from __future__ import annotations
@@ -53,6 +53,8 @@ T = TypeVar("T")
 
 class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
     """Generate CoffeeShop benchmark data that matches the reference schema."""
+
+    SF1_ORDER_COUNT = 8_500_000
 
     MONTH_WEIGHTS: dict[int, float] = {
         1: 0.82,
@@ -200,7 +202,7 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         path = output_dir / filename
 
         with self.open_output_file(path, "wt") as handle:
-            writer = csv.writer(handle, delimiter="|")
+            writer = csv.writer(handle)
             for seed in self._location_seeds:
                 writer.writerow(
                     [
@@ -221,7 +223,7 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         path = output_dir / filename
 
         with self.open_output_file(path, "wt") as handle:
-            writer = csv.writer(handle, delimiter="|")
+            writer = csv.writer(handle)
             for seed in self._iter_product_seeds_in_order():
                 writer.writerow(
                     [
@@ -257,7 +259,7 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         total_lines = 0
 
         with self.open_output_file(path, "wt") as handle:
-            writer = csv.writer(handle, delimiter="|")
+            writer = csv.writer(handle)
 
             for current_date in sorted(daily_distribution.keys()):
                 orders_for_date = daily_distribution[current_date]
@@ -335,7 +337,7 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
     @staticmethod
     def calculate_order_count(scale_factor: float) -> int:
         """Translate a scale factor into a number of orders."""
-        base = 50_000_000 * scale_factor
+        base = CoffeeShopDataGenerator.SF1_ORDER_COUNT * scale_factor
         return max(1, int(round(base)))
 
     def _group_locations_by_region(self) -> dict[str, list[LocationSeed]]:
@@ -441,10 +443,11 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             compression=resolve_compression_metadata(self),
             parallel=1,
             seed=None,
+            formats=["csv"],
         )
 
         for table, path in table_paths.items():
-            manifest.add_entry(table, path, row_count=self._table_row_counts.get(table, 0))
+            manifest.add_entry(table, path, row_count=self._table_row_counts.get(table, 0), format="csv")
 
         manifest.write()
 

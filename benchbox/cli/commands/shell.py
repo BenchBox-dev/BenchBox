@@ -370,7 +370,7 @@ def shell(ctx, platform, database, benchmark, scale, list_only, last, output, ho
         return
 
     # Path 2: Remote platform (ClickHouse) - requires explicit connection params
-    if platform and platform.lower() == "clickhouse":
+    if platform and platform.lower() in {"clickhouse", "clickhouse-server"}:
         _launch_clickhouse_shell(host, port, user, password, database)
         return
 
@@ -404,13 +404,13 @@ def _shell_direct_connection(
             sys.exit(1)
 
     platform_lower = platform.lower()
-    if platform_lower == "clickhouse":
+    if platform_lower in {"clickhouse", "clickhouse-server"}:
         _launch_clickhouse_shell(host, port, user, password, database)
     elif platform_lower in ("duckdb", "sqlite"):
         _launch_shell_for_platform(platform_lower, database)
     else:
         console.print(f"[red]Error: Platform '{platform}' not supported for interactive shell[/red]")
-        console.print("Supported platforms: duckdb, sqlite, clickhouse")
+        console.print("Supported platforms: duckdb, sqlite, clickhouse-server")
         sys.exit(1)
 
 

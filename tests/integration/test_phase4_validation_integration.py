@@ -93,7 +93,7 @@ class TestPhase4ValidationIntegration:
         assert output_file.exists()
 
         # Verify JSON structure
-        with open(output_file) as f:
+        with open(output_file, encoding="utf-8") as f:
             report_data = json.load(f)
 
         assert "timestamp" in report_data
@@ -360,7 +360,7 @@ class TestPhase4ValidationIntegration:
         # Verify file completeness
         assert output_file.exists()
 
-        with open(output_file) as f:
+        with open(output_file, encoding="utf-8") as f:
             file_data = json.load(f)
 
         required_keys = [

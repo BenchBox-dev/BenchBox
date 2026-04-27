@@ -41,6 +41,10 @@ from benchbox.core.dataframe.profiling import (
 )
 from benchbox.core.dataframe.query import DataFrameQuery
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
+from benchbox.platforms.dataframe._result_helpers import (
+    build_failure_result_dict,
+    build_success_result_dict,
+)
 from benchbox.platforms.dataframe.benchmark_mixin import BenchmarkExecutionMixin
 from benchbox.platforms.dataframe.tuning_mixin import TuningConfigurableMixin
 from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
@@ -480,6 +484,10 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         self.working_dir = Path(working_dir) if working_dir else Path.cwd()
         self.verbose = verbose
         self.very_verbose = very_verbose
+        # Shared loading routes through DataSourceResolver, which expects the
+        # same basic platform contract used by SQL adapters.
+        self.table_mode = "native"
+        self.platform_config: dict[str, Any] = {}
         self._context: PandasFamilyContext[DF] | None = None
 
         # Initialize tuning configuration (from mixin)
@@ -518,6 +526,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         delimiter: str = ",",
         header: int | None = 0,
         names: list[str] | None = None,
+        null_marker: str | None = None,
     ) -> DF:
         """Read a CSV file into a DataFrame.
 
@@ -526,6 +535,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             delimiter: Field delimiter
             header: Row to use as header (None for no header)
             names: Column names (if header is None)
+            null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
 
         Returns:
             DataFrame with the file contents
@@ -988,6 +998,10 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         file_paths: list[Path],
         column_names: list[str] | None = None,
         delimiter: str | None = None,
+        format_hint: str | None = None,
+        *,
+        data_source: Any | None = None,
+        benchmark: Any | None = None,
     ) -> int:
         """Load a table from data files.
 
@@ -999,6 +1013,10 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             table_name: Name for the table
             file_paths: List of file paths to load
             column_names: Optional column names for headerless files
+            delimiter: Optional CSV delimiter override
+            format_hint: Optional format hint from manifest (e.g. "parquet", "csv", "tbl")
+            data_source: Optional DataSource for manifest-aware CSV dialect resolution.
+            benchmark: Optional benchmark instance for CSV dialect resolution.
 
         Returns:
             Number of rows loaded
@@ -1006,9 +1024,16 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         if not file_paths:
             raise ValueError(f"No files provided for table '{table_name}'")
 
-        # Detect format from first file
+        # Use manifest hint when available; fall back to extension detection
         first_file = file_paths[0]
-        format_type = self._detect_format(first_file)
+        if format_hint == "parquet":
+            format_type = "parquet"
+        elif format_hint in ("tbl", "csv"):
+            format_type = format_hint
+        elif format_hint:
+            raise ValueError(f"Unknown format_hint '{format_hint}'; expected 'parquet', 'csv', or 'tbl'")
+        else:
+            format_type = self._detect_format(first_file)
 
         self._log_verbose(f"Loading table {table_name} from {len(file_paths)} file(s), format: {format_type}")
 
@@ -1018,11 +1043,28 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             # CSV or TBL
             actual_delimiter = delimiter if delimiter is not None else ("|" if format_type == "tbl" else ",")
             has_header = format_type == "csv"
+
+            # Resolve null_marker for trailing-delimiter probing via the resolver when a
+            # DataSource is available (manifest path).  Without one, derive from format_type
+            # so .tbl files (format_type=="tbl") keep their existing trailing-delimiter behaviour.
+            # When benchmark=None, NO_BENCHMARK is used: path (a) wins when table_metadata is
+            # present; otherwise path (c) of resolve_csv_dialect derives null_marker from the
+            # file extension (.tbl/.dat → "", everything else → None), which is correct.
+            if data_source is not None:
+                from benchbox.platforms.base.data_loading import NO_BENCHMARK, resolve_csv_dialect
+
+                bm = benchmark if benchmark is not None else NO_BENCHMARK
+                _dialect = resolve_csv_dialect(data_source, table_name, first_file, bm)
+                null_marker: str | None = _dialect.null_marker
+            else:
+                null_marker = "" if format_type == "tbl" else None
+
             df = self._load_csv_files(
                 file_paths,
                 delimiter=actual_delimiter,
                 has_header=has_header,
                 column_names=column_names,
+                null_marker=null_marker,
             )
 
         # Register table
@@ -1098,25 +1140,23 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
 
             self._log_verbose(f"Query {qid} completed in {execution_time:.3f}s, returned {row_count} rows")
 
-            return {
-                "query_id": qid,
-                "status": "SUCCESS",
-                "execution_time_seconds": execution_time,
-                "rows_returned": row_count,
-                "first_row": first_row,
-            }
+            return build_success_result_dict(
+                query_id=qid,
+                execution_time_seconds=execution_time,
+                row_count=row_count,
+                first_row=first_row,
+            )
 
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             error_msg = str(e)
             logger.error(f"Query {qid} failed: {error_msg}")
 
-            return {
-                "query_id": qid,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "error": error_msg,
-            }
+            return build_failure_result_dict(
+                query_id=qid,
+                execution_time_seconds=execution_time,
+                error_message=error_msg,
+            )
 
     def execute_query_profiled(
         self,
@@ -1210,13 +1250,12 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
                 f"rows={row_count}"
             )
 
-            result_dict = {
-                "query_id": qid,
-                "status": "SUCCESS",
-                "execution_time_seconds": execution_time,
-                "rows_returned": row_count,
-                "first_row": first_row,
-            }
+            result_dict = build_success_result_dict(
+                query_id=qid,
+                execution_time_seconds=execution_time,
+                row_count=row_count,
+                first_row=first_row,
+            )
 
             return result_dict, profile
 
@@ -1231,12 +1270,11 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             error_msg = str(e)
             logger.error(f"Query {qid} failed: {error_msg}")
 
-            result_dict = {
-                "query_id": qid,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "error": error_msg,
-            }
+            result_dict = build_failure_result_dict(
+                query_id=qid,
+                execution_time_seconds=execution_time,
+                error_message=error_msg,
+            )
 
             return result_dict, profile
 
@@ -1279,6 +1317,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         delimiter: str,
         has_header: bool,
         column_names: list[str] | None,
+        null_marker: str | None = None,
     ) -> DF:
         """Load CSV/TBL files.
 
@@ -1287,6 +1326,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             delimiter: Field delimiter
             has_header: Whether files have headers
             column_names: Optional column names
+            null_marker: Passed through to read_csv for trailing-delimiter probing.
 
         Returns:
             Combined DataFrame
@@ -1300,6 +1340,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
                 delimiter=delimiter,
                 header=header,
                 names=names,
+                null_marker=null_marker,
             )
 
         # Multiple files - load and concatenate
@@ -1309,6 +1350,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
                 delimiter=delimiter,
                 header=header,
                 names=names,
+                null_marker=null_marker,
             )
             for f in file_paths
         ]

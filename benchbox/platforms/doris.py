@@ -22,12 +22,17 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import gzip
+import io
 import math
 import os
 import re
+import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
+from urllib.parse import urlparse, urlunparse
 
+from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
@@ -43,8 +48,18 @@ from ..utils.dependencies import (
     check_platform_dependencies,
     get_dependency_error_message,
 )
-from ..utils.file_format import get_delimiter_for_file, is_tpc_format
+from ..utils.file_format import get_data_extension
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.data_loading import (
+    CsvDialect,
+    DataSourceResolver,
+    FileFormatRegistry,
+    GzipHandler,
+    NoCompressionHandler,
+    ZstdHandler,
+    normalize_table_paths,
+    resolve_csv_dialect,
+)
 from .base.sql_execution import execute_sql_query
 
 # Doris dialect for SQLGlot
@@ -61,11 +76,109 @@ try:
 except ImportError:
     _requests = None
 
-# Default chunk size for Stream Load: 100MB
-_DEFAULT_STREAM_LOAD_CHUNK_SIZE = 100 * 1024 * 1024
+# Default chunk size for Stream Load: 10MB.
+# Smaller chunks ensure each stream load request completes within the timeout,
+# especially for Docker deployments on macOS where BE disk I/O is slow.
+_DEFAULT_STREAM_LOAD_CHUNK_SIZE = 10 * 1024 * 1024
+_DEFAULT_STREAM_LOAD_MAX_FILTER_RATIO = "0"
 
 # Default bucket count for DISTRIBUTED BY HASH
 _DEFAULT_BUCKETS = 10
+
+# TPC-DS nullable DECIMAL column positions (0-based) per table.
+# dsdgen emits empty string for NULL DECIMAL values; Doris strict mode rejects
+# those rows as type-conversion errors. Preprocessing replaces "" with \N at
+# these positions so NULL is expressed in the format Doris expects.
+# Positions are exact schema column indices from tables.py - trailing-separator
+# artifacts (the empty field produced by dsdgen's always-present row-terminating |)
+# are intentionally excluded; Doris's CSV parser treats a trailing | as a terminator
+# and discards the resulting empty field without a column-count error.
+# Derived from benchbox/core/tpcds/schema/tables.py - update if the schema changes.
+_TPCDS_DECIMAL_NULL_POSITIONS: dict[str, list[int]] = {
+    "call_center": [29, 30],
+    "catalog_returns": [18, 19, 20, 21, 22, 23, 24, 25, 26],
+    "catalog_sales": [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
+    "customer_address": [11],
+    "item": [5, 6],
+    "promotion": [5],
+    "store": [27, 28],
+    "store_returns": [11, 12, 13, 14, 15, 16, 17, 18, 19],
+    "store_sales": [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
+    "warehouse": [13],
+    "web_returns": [15, 16, 17, 18, 19, 20, 21, 22, 23],
+    "web_sales": [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33],
+    "web_site": [24, 25],
+}
+
+
+def _fix_tpcds_decimal_nulls(line: str, delimiter: str, positions: list[int]) -> str:
+    """Replace empty strings at DECIMAL nullable positions with \\N.
+
+    dsdgen emits ``""`` for NULL DECIMAL values. Doris strict mode rejects
+    empty-to-DECIMAL coercions; ``\\N`` is the default Doris null_format
+    and is accepted by strict mode for nullable columns.
+    """
+    fields = line.split(delimiter)
+    for pos in positions:
+        if pos < len(fields) and fields[pos] == "":
+            fields[pos] = r"\N"
+    return delimiter.join(fields)
+
+
+def _format_filter_ratio(value: Any) -> str:
+    """Normalize a Doris ``max_filter_ratio`` value."""
+    ratio = float(value)
+    if math.isnan(ratio) or math.isinf(ratio) or ratio < 0 or ratio > 1:
+        raise ValueError(f"stream_load_max_filter_ratio must be between 0 and 1 inclusive, got {value!r}")
+    if ratio == 0:
+        return "0"
+    return format(ratio, "g")
+
+
+# Regexes for DDL clause injection (_inject_doris_ddl_clauses)
+_CREATE_TABLE_RE = re.compile(
+    r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`\"]?(\w+)[`\"]?\s*\(",
+    re.IGNORECASE,
+)
+# Column definition parser: matches (name, type); known SQL types filter out constraint lines.
+_KNOWN_SQL_TYPES = frozenset(
+    {
+        "int",
+        "integer",
+        "bigint",
+        "smallint",
+        "tinyint",
+        "largeint",
+        "float",
+        "double",
+        "decimal",
+        "numeric",
+        "string",
+        "text",
+        "varchar",
+        "char",
+        "boolean",
+        "bool",
+        "date",
+        "datetime",
+        "timestamp",
+        "time",
+        "json",
+        "jsonb",
+        "array",
+        "map",
+        "struct",
+        "bitmap",
+        "hll",
+        "blob",
+        "binary",
+        "varbinary",
+    }
+)
+_COL_DEF_RE = re.compile(r'[`"]?(\w+)[`"]?\s+(\w+)', re.MULTILINE)
+# Types Doris rejects as key columns (unbounded or unsupported key types)
+_NON_KEY_DORIS_TYPES = frozenset({"time", "json", "jsonb", "blob", "binary", "hll", "bitmap"})
+_DORIS_ENGINE_VERSION_RE = re.compile(r"doris[-\s]v?(\d+\.\d+\.\d+(?:-[A-Za-z0-9]+)?)", re.IGNORECASE)
 
 # TPC-H table key columns for DUPLICATE KEY model
 _TPCH_TABLE_KEYS: dict[str, list[str]] = {
@@ -135,6 +248,137 @@ _TPCH_BITMAP_COLUMNS: dict[str, list[str]] = {
     "orders": ["o_orderstatus"],
     "part": ["p_type"],
 }
+
+
+def _split_sql_statements(sql: str) -> list[str]:
+    """Split SQL on semicolons outside single-quoted string literals."""
+    statements: list[str] = []
+    current: list[str] = []
+    n = len(sql)
+    i = 0
+    while i < n:
+        c = sql[i]
+        if c == "'":
+            lit_start = i
+            i += 1
+            while i < n:
+                lc = sql[i]
+                if lc == "\\" and i + 1 < n:
+                    i += 2
+                    continue
+                if lc == "'":
+                    if i + 1 < n and sql[i + 1] == "'":
+                        i += 2
+                        continue
+                    i += 1
+                    break
+                i += 1
+            current.append(sql[lit_start:i])
+        elif c == ";":
+            stmt = "".join(current).strip()
+            if stmt:
+                statements.append(stmt)
+            current = []
+            i += 1
+        else:
+            current.append(c)
+            i += 1
+    stmt = "".join(current).strip()
+    if stmt:
+        statements.append(stmt)
+    return statements
+
+
+def _normalize_doris_engine_version(
+    mysql_protocol_version: object | None,
+    version_comment: object | None,
+) -> str | None:
+    """Prefer Doris engine version metadata over the MySQL compatibility version."""
+    if version_comment is not None:
+        comment = str(version_comment).strip()
+        match = _DORIS_ENGINE_VERSION_RE.search(comment)
+        if match:
+            return match.group(1)
+        if comment:
+            return comment
+
+    if mysql_protocol_version is None:
+        return None
+
+    version_text = str(mysql_protocol_version).strip()
+    return version_text or None
+
+
+def _read_doris_version_details(cursor: Any) -> tuple[str | None, str | None, str | None]:
+    """Read Doris engine and protocol version details from a live connection."""
+    mysql_protocol_version = None
+    version_comment = None
+
+    try:
+        cursor.execute("SELECT version()")
+        version_row = cursor.fetchone()
+        if version_row:
+            mysql_protocol_version = version_row[0]
+    except Exception:
+        pass
+
+    try:
+        cursor.execute("SELECT @@version_comment")
+        comment_row = cursor.fetchone()
+        if comment_row:
+            version_comment = comment_row[0]
+    except Exception:
+        pass
+
+    platform_version = _normalize_doris_engine_version(mysql_protocol_version, version_comment)
+    mysql_protocol_version_str = str(mysql_protocol_version) if mysql_protocol_version is not None else None
+    version_comment_str = str(version_comment) if version_comment is not None else None
+    return platform_version, mysql_protocol_version_str, version_comment_str
+
+
+class _DorisConnectionWrapper:
+    """Thin adapter that adds a DuckDB-compatible execute() to a PyMySQL connection.
+
+    PyMySQL exposes execute() only on cursors; BenchBox benchmarks (write_primitives,
+    transaction_primitives, metadata_primitives) call connection.execute(sql) directly.
+    This wrapper intercepts that call and delegates to a fresh cursor.
+
+    When ddl_optimizer is provided, CREATE TABLE statements are automatically transformed
+    into Doris-compatible DDL (DUPLICATE KEY + DISTRIBUTED BY HASH + PROPERTIES) before
+    execution, so staging tables created by benchmark setup code get valid Doris DDL.
+    """
+
+    def __init__(self, conn: Any, ddl_optimizer: Any = None) -> None:
+        self._conn = conn
+        self._ddl_optimizer = ddl_optimizer
+
+    def _optimize_if_create(self, stmt: str) -> str:
+        if self._ddl_optimizer is not None and "CREATE TABLE" in stmt.upper():
+            return self._ddl_optimizer(stmt)
+        return stmt
+
+    def execute(self, sql: str, params: Any = None) -> Any:
+        if not sql or not sql.strip():
+            return self._conn.cursor()
+
+        statements = _split_sql_statements(sql)
+
+        if len(statements) <= 1:
+            stmt = self._optimize_if_create(sql.strip())
+            cursor = self._conn.cursor()
+            cursor.execute(stmt, params)
+            return cursor
+
+        last_cursor: Any = None
+        for stmt in statements:
+            stmt = self._optimize_if_create(stmt)
+            c = self._conn.cursor()
+            c.execute(stmt)
+            last_cursor = c
+        return last_cursor if last_cursor is not None else self._conn.cursor()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._conn, name)
 
 
 class DorisAdapter(PlatformAdapter):
@@ -224,17 +468,25 @@ class DorisAdapter(PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> DorisAdapter:
-        """Create Doris adapter from unified configuration."""
+        """Create Doris adapter from unified configuration.
+
+        Standard connection parameters (host/port/credentials) are resolved
+        once by the config builder (_build_doris_config) before this method
+        is called.  from_config() passes those resolved values through and
+        handles benchmark-derived database naming, which requires the
+        benchmark + scale_factor context that the builder carries forward.
+        """
         adapter_config = {}
 
-        # Connection parameters (with env var fallbacks)
-        adapter_config["host"] = config.get("host") or os.environ.get("DORIS_HOST", "localhost")
-        adapter_config["port"] = config.get("port") or int(os.environ.get("DORIS_PORT", "9030"))
-        adapter_config["http_port"] = config.get("http_port") or int(os.environ.get("DORIS_HTTP_PORT", "8030"))
-        adapter_config["username"] = (
-            config.get("username") or os.environ.get("DORIS_USER") or os.environ.get("DORIS_USERNAME", "root")
-        )
-        adapter_config["password"] = config.get("password") or os.environ.get("DORIS_PASSWORD", "")
+        # Pass through connection parameters already resolved by the config builder.
+        # Simple Python defaults cover direct-construction paths (e.g. tests)
+        # where no builder ran.
+        adapter_config["host"] = config.get("host", "localhost")
+        adapter_config["port"] = config.get("port", 9030)
+        adapter_config["http_port"] = config.get("http_port", 8030)
+        adapter_config["be_http_port"] = config.get("be_http_port", 8040)
+        adapter_config["username"] = config.get("username", "root")
+        adapter_config["password"] = config.get("password", "")
 
         # Database name - use provided or generate from benchmark config
         if config.get("database"):
@@ -258,11 +510,15 @@ class DorisAdapter(PlatformAdapter):
         # Doris-specific feature config
         for key in [
             "stream_load_chunk_size",
+            "stream_load_max_filter_ratio",
             "table_model",
             "default_buckets",
+            "replication_num",
             "enable_partitioning",
             "enable_bloom_filter",
             "enable_bitmap_index",
+            "verify_ssl",
+            "ca_cert_path",
         ]:
             if key in config:
                 adapter_config[key] = config[key]
@@ -286,19 +542,26 @@ class DorisAdapter(PlatformAdapter):
 
         self._dialect = DORIS_DIALECT
 
-        # Connection configuration
-        self.host = config.get("host") or os.environ.get("DORIS_HOST", "localhost")
-        self.port = config.get("port") or int(os.environ.get("DORIS_PORT", "9030"))
-        self.http_port = config.get("http_port") or int(os.environ.get("DORIS_HTTP_PORT", "8030"))
+        # Connection configuration.
+        # from_config() (and the config builder before it) have already resolved
+        # env vars and defaults, so __init__ just consumes what it receives.
+        # Simple Python defaults handle the direct-construction path (tests, etc.)
+        self.host = config.get("host", "localhost")
+        self.port = config.get("port", 9030)
+        self.http_port = config.get("http_port", 8030)
+        self.be_http_port = config.get("be_http_port", 8040)
         self.database = config.get("database", "benchbox")
-        self.username = (
-            config.get("username") or os.environ.get("DORIS_USER") or os.environ.get("DORIS_USERNAME", "root")
-        )
-        self.password = config.get("password") or os.environ.get("DORIS_PASSWORD", "")
+        self.username = config.get("username", "root")
+        self.password = config.get("password", "")
         self.use_tls = config.get("use_tls", False)
+        self.verify_ssl = config.get("verify_ssl") if config.get("verify_ssl") is not None else True
+        self.ca_cert_path = config.get("ca_cert_path")
 
         # Chunked loading config (w8)
         self.stream_load_chunk_size: int = config.get("stream_load_chunk_size", _DEFAULT_STREAM_LOAD_CHUNK_SIZE)
+        self.stream_load_max_filter_ratio = _format_filter_ratio(
+            config.get("stream_load_max_filter_ratio", _DEFAULT_STREAM_LOAD_MAX_FILTER_RATIO)
+        )
 
         # Table model config (w11): "duplicate", "aggregate", or "unique"
         self.table_model: str = config.get("table_model", "duplicate").lower()
@@ -311,22 +574,22 @@ class DorisAdapter(PlatformAdapter):
         # Partitioning config (w13)
         self.enable_partitioning: bool = config.get("enable_partitioning", False)
 
+        # Replication factor for table PROPERTIES; default 1 for single-backend Docker environments
+        self.replication_num: int = int(config.get("replication_num", 1))
+
         # Index configs (w20, w21)
         self.enable_bloom_filter: bool = config.get("enable_bloom_filter", False)
         self.enable_bitmap_index: bool = config.get("enable_bitmap_index", False)
 
-        # Validate database at init time — it's used in Stream Load URLs and SQL
+        # Validate database at init time - it's used in Stream Load URLs and SQL
         if not self._validate_identifier(self.database):
             raise ValueError(f"Invalid database identifier: {self.database}")
 
     def _validate_identifier(self, identifier: str) -> bool:
         """Validate SQL identifier to prevent injection."""
-        if not identifier or not isinstance(identifier, str):
-            return False
-        if len(identifier) > 128:
-            return False
-        pattern = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
-        return bool(re.match(pattern, identifier))
+        from benchbox.utils.sql_identifier import is_valid_sql_identifier
+
+        return is_valid_sql_identifier(identifier, max_length=128)
 
     def _admin_connect(self) -> Any:
         """Create an admin connection (no database selected)."""
@@ -343,6 +606,7 @@ class DorisAdapter(PlatformAdapter):
         schema: str | None = None,
         catalog: str | None = None,
         database: str | None = None,
+        **_kwargs,
     ) -> bool:
         """Check if a database exists on the Doris server."""
         db_name = database or self.database
@@ -367,6 +631,7 @@ class DorisAdapter(PlatformAdapter):
         schema: str | None = None,
         catalog: str | None = None,
         database: str | None = None,
+        **_kwargs,
     ) -> None:
         """Drop a database from Doris server."""
         db_name = database or self.database
@@ -439,7 +704,10 @@ class DorisAdapter(PlatformAdapter):
             "Doris connection",
             details=f"Connected to {self.host}:{self.port}/{self.database}",
         )
-        return conn
+        # Wrap with DDL optimizer so benchmark setup code (write_primitives,
+        # transaction_primitives, metadata_primitives) that calls connection.execute()
+        # directly gets proper Doris DDL (DUPLICATE KEY + DISTRIBUTED BY HASH).
+        return _DorisConnectionWrapper(conn, ddl_optimizer=self._inject_doris_ddl_clauses)
 
     def create_schema(self, benchmark, connection: Any) -> float:
         """Create schema using benchmark's SQL definitions."""
@@ -451,6 +719,7 @@ class DorisAdapter(PlatformAdapter):
 
         self.log_very_verbose(f"Executing schema creation script ({len(schema_sql)} characters)")
 
+        scale_factor: float | None = getattr(benchmark, "scale_factor", None)
         cursor = connection.cursor()
         critical_failures = []
 
@@ -458,6 +727,7 @@ class DorisAdapter(PlatformAdapter):
         statements = [s.strip() for s in schema_sql.split(";") if s.strip()]
         try:
             for stmt in statements:
+                stmt = self._inject_doris_ddl_clauses(stmt, scale_factor=scale_factor)
                 try:
                     cursor.execute(stmt)
                 except Exception as e:
@@ -497,39 +767,51 @@ class DorisAdapter(PlatformAdapter):
 
         self.log_operation_start("Data loading", f"source: {data_dir}")
 
-        for table_name, table_path in benchmark.tables.items():
-            table_name_lower = table_name.lower()
+        resolver = DataSourceResolver(
+            platform_name=self.platform_name,
+            table_mode=self.table_mode,
+            platform_config=self.platform_config,
+            requested_format=self.requested_table_format,
+        )
+        data_source = resolver.resolve(benchmark, data_dir)
+        if not data_source or not data_source.tables:
+            self.logger.warning("No data files found. Ensure benchmark.generate_data() was called first.")
+            loading_time = elapsed_seconds(start_time)
+            self.log_operation_complete("Data loading", loading_time, "Loaded 0 total rows")
+            return {}, loading_time, None
 
-            if not self._validate_identifier(table_name_lower):
+        for table_name, table_path in data_source.tables.items():
+            if not self._validate_identifier(table_name):
                 self.logger.warning(f"Skipping table with invalid identifier: {table_name}")
-                table_stats[table_name_lower] = 0
+                table_stats[table_name] = 0
                 continue
 
-            data_file = Path(table_path)
-            if not data_file.exists():
-                self.logger.warning(f"Data file not found: {data_file}")
-                table_stats[table_name_lower] = 0
+            data_files = [f for f in normalize_table_paths(table_path) if f.exists()]
+            if not data_files:
+                self.logger.warning(f"Data file(s) not found for table: {table_name}")
+                table_stats[table_name] = 0
                 continue
 
             table_start = mono_time()
+            table_rows = 0
 
-            try:
-                if _requests is not None:
-                    row_count = self._stream_load_file(table_name_lower, data_file)
-                else:
-                    row_count = self._insert_load_file(connection, table_name_lower, data_file)
+            for data_file in data_files:
+                try:
+                    dialect = resolve_csv_dialect(data_source, table_name, data_file, benchmark)
+                    if _requests is not None:
+                        table_rows += self._stream_load_file(table_name, data_file, dialect)
+                    else:
+                        table_rows += self._insert_load_file(connection, table_name, data_file, dialect)
+                except Exception as e:
+                    self.logger.error(f"Failed to load {table_name}: {e}")
 
-                table_stats[table_name_lower] = row_count
-                table_duration = elapsed_seconds(table_start)
-                per_table_timings[table_name_lower] = {
-                    "rows": row_count,
-                    "duration_seconds": table_duration,
-                }
-                self.log_verbose(f"Loaded {row_count:,} rows into {table_name_lower}")
-
-            except Exception as e:
-                self.logger.error(f"Failed to load {table_name_lower}: {e}")
-                table_stats[table_name_lower] = 0
+            table_stats[table_name] = table_rows
+            table_duration = elapsed_seconds(table_start)
+            per_table_timings[table_name] = {
+                "rows": table_rows,
+                "duration_seconds": table_duration,
+            }
+            self.log_verbose(f"Loaded {table_rows:,} rows into {table_name}")
 
         loading_time = elapsed_seconds(start_time)
         total_rows = sum(table_stats.values())
@@ -537,7 +819,7 @@ class DorisAdapter(PlatformAdapter):
 
         return table_stats, loading_time, per_table_timings
 
-    def _stream_load_file(self, table_name: str, data_file: Path) -> int:
+    def _stream_load_file(self, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
         """Load a file into Doris using Stream Load HTTP API.
 
         Stream Load sends data via HTTP PUT to the FE node, which routes
@@ -547,86 +829,271 @@ class DorisAdapter(PlatformAdapter):
         Args:
             table_name: Target table name (pre-validated)
             data_file: Path to the data file
+            dialect: CSV dialect describing delimiter, null handling, etc.
 
         Returns:
             Number of rows loaded
         """
         data_file = Path(data_file)
+
+        # Parquet files must be sent binary with format=parquet; CSV chunking is invalid.
+        if get_data_extension(data_file) == ".parquet":
+            return self._stream_load_parquet(table_name, data_file)
+
         file_size = data_file.stat().st_size
 
         # Use chunked loading for large files
         if file_size > self.stream_load_chunk_size:
-            return self._stream_load_file_chunked(table_name, data_file)
+            return self._stream_load_file_chunked(table_name, data_file, dialect)
 
-        return self._stream_load_single(table_name, data_file)
+        return self._stream_load_single(table_name, data_file, dialect)
 
-    def _stream_load_single(self, table_name: str, data_file: Path) -> int:
-        """Execute a single Stream Load request for the entire file.
+    @staticmethod
+    def _open_data_file_text(path: Path):
+        """Open a data file as text, decompressing zstd/gzip if needed.
 
-        Args:
-            table_name: Target table name (pre-validated)
-            data_file: Path to the data file
+        Uses latin-1 encoding to handle non-ASCII bytes common in TPC data
+        generated by dbgen (e.g., accented characters in customer names).
 
-        Returns:
-            Number of rows loaded
+        Compression is detected via ``FileFormatRegistry.get_compression_handler``
+        rather than suffix string compare — but the framework handlers force
+        UTF-8 text mode, so we dispatch on handler type and use python-zstandard
+        + ``gzip`` directly to preserve latin-1 encoding.
         """
-        delimiter = get_delimiter_for_file(data_file)
-        is_tpc = is_tpc_format(data_file)
+        import contextlib
 
-        scheme = "https" if self.use_tls else "http"
-        url = f"{scheme}://{self.host}:{self.http_port}/api/{self.database}/{table_name}/_stream_load"
+        handler = FileFormatRegistry.get_compression_handler(path)
 
-        headers = {
-            "Expect": "100-continue",
-            "column_separator": delimiter,
-            "format": "csv",
+        @contextlib.contextmanager
+        def _ctx():
+            if isinstance(handler, ZstdHandler):
+                import zstandard
+
+                dctx = zstandard.ZstdDecompressor()
+                with open(path, "rb") as raw, dctx.stream_reader(raw) as reader:
+                    yield io.TextIOWrapper(reader, encoding="latin-1", newline="")
+            elif isinstance(handler, GzipHandler):
+                yield gzip.open(path, "rt", encoding="latin-1")
+            elif isinstance(handler, NoCompressionHandler):
+                yield open(path, encoding="latin-1")
+            else:
+                raise ValueError(f"Unsupported compression handler {type(handler).__name__} for {path}")
+
+        return _ctx()
+
+    @staticmethod
+    def _open_data_file_binary(path: Path):
+        """Open a data file as a binary stream, decompressing zstd/gzip if needed.
+
+        Returns a file-like object suitable for streaming to Doris stream load.
+        Re-openable so ``_stream_load_put`` retries can pull a fresh stream.
+        """
+        import contextlib
+
+        handler = FileFormatRegistry.get_compression_handler(path)
+
+        @contextlib.contextmanager
+        def _ctx():
+            if isinstance(handler, ZstdHandler):
+                import zstandard
+
+                dctx = zstandard.ZstdDecompressor()
+                with open(path, "rb") as raw:
+                    yield dctx.stream_reader(raw)
+            elif isinstance(handler, GzipHandler):
+                yield gzip.open(path, "rb")
+            elif isinstance(handler, NoCompressionHandler):
+                yield open(path, "rb")
+            else:
+                raise ValueError(f"Unsupported compression handler {type(handler).__name__} for {path}")
+
+        return _ctx()
+
+    def _stream_load_put(self, url: str, data: bytes | Callable[[], Any], headers: dict):
+        """Issue a stream load PUT request, handling FE→BE redirect and retrying
+        transient connection errors with exponential backoff.
+
+        Doris FE may redirect stream load requests to the BE node. In Docker
+        deployments the BE's internal port is not always mapped, so we intercept
+        the redirect and rewrite the URL back to the FE host:port.
+
+        The ``Expect: 100-continue`` header prevents the request body from being
+        sent before the server acknowledges headers, making redirect retries safe.
+        ``data`` may be bytes or a callable returning a fresh binary context
+        manager so retries can re-open the source stream safely.
+        """
+        kwargs = {
+            "auth": (self.username, self.password),
+            # Large fact tables (e.g. TPC-DS catalog_sales at SF=1 in Docker on macOS)
+            # can take several minutes to ingest due to Docker volume I/O overhead.
+            # 1800s (30 min) per chunk is generous but avoids spurious timeout failures.
+            "timeout": 1800,
+            "verify": self.ca_cert_path if self.ca_cert_path else self.verify_ssl,
+            "allow_redirects": False,
         }
 
-        # TPC format files have trailing delimiter that needs to be trimmed
+        _max_attempts = 3
+        _backoff_seconds = [5, 15, 45]
+
+        def _put_once(target_url: str):
+            if callable(data):
+                with data() as body:  # ty: ignore[call-top-callable]
+                    return _requests.put(target_url, data=body, headers=headers, **kwargs)
+            return _requests.put(target_url, data=data, headers=headers, **kwargs)
+
+        for attempt in range(_max_attempts):
+            try:
+                resp = _put_once(url)
+
+                if resp.status_code in (301, 302, 303, 307, 308):
+                    location = resp.headers.get("Location", "")
+                    if location:
+                        parsed = urlparse(location)
+                        scheme = "https" if self.use_tls else "http"
+                        rewritten = urlunparse(
+                            parsed._replace(
+                                scheme=scheme,
+                                netloc=f"{self.host}:{self.be_http_port}",
+                            )
+                        )
+                        resp = _put_once(rewritten)
+
+                return resp
+
+            except (_requests.exceptions.ConnectionError, _requests.exceptions.Timeout) as exc:
+                if attempt == _max_attempts - 1:
+                    raise
+                wait = _backoff_seconds[attempt]
+                self.logger.warning(
+                    f"Stream Load connection error (attempt {attempt + 1}/{_max_attempts}), retrying in {wait}s: {exc}"
+                )
+                time.sleep(wait)
+
+        raise RuntimeError("unreachable")
+
+    def _stream_load_headers(
+        self,
+        *,
+        format_name: str,
+        delimiter: str | None = None,
+        is_tpc: bool = False,
+    ) -> dict[str, str]:
+        """Build consistent Stream Load headers for Doris imports."""
+        headers = {
+            "Expect": "100-continue",
+            "format": format_name,
+            "max_filter_ratio": self.stream_load_max_filter_ratio,
+        }
+        if delimiter is not None:
+            headers["column_separator"] = delimiter
         if is_tpc:
             headers["trim_double_quotes"] = "true"
+        return headers
 
-        if is_tpc:
-            # TPC format: read, strip trailing delimiters, and send
-            with open(data_file) as f:
-                lines = f.read().splitlines()
-            cleaned_lines = []
-            for line in lines:
-                if line.endswith(delimiter):
-                    line = line[: -len(delimiter)]
-                cleaned_lines.append(line)
-            data = "\n".join(cleaned_lines).encode("utf-8")
-
-            resp = _requests.put(
-                url,
-                data=data,
-                headers=headers,
-                auth=(self.username, self.password),
-                timeout=600,
-            )
-        else:
-            # Non-TPC: stream file directly without loading into memory
-            with open(data_file, "rb") as f:
-                resp = _requests.put(
-                    url,
-                    data=f,
-                    headers=headers,
-                    auth=(self.username, self.password),
-                    timeout=600,
-                )
-
+    def _handle_stream_load_response(self, resp: Any, *, context: str) -> dict[str, Any]:
+        """Validate a Doris Stream Load response and reject silent partial loads."""
         if resp.status_code != 200:
-            raise RuntimeError(f"Stream Load failed with status {resp.status_code}: {resp.text}")
+            raise RuntimeError(f"{context} failed with status {resp.status_code}: {resp.text}")
 
         result = resp.json()
         status = result.get("Status")
         if status not in ("Success", "Publish Timeout"):
             message = result.get("Message", "Unknown error")
-            raise RuntimeError(f"Stream Load failed: {status} - {message}")
+            error_url = result.get("ErrorURL", "")
+            if error_url:
+                self.logger.error(f"{context} error detail URL: {error_url}")
+                try:
+                    err_resp = _requests.get(error_url, auth=(self.username, self.password), timeout=30)
+                    self.logger.error(f"{context} error rows:\n{err_resp.text[:2000]}")
+                except Exception as url_err:
+                    self.logger.debug(f"Could not fetch error URL: {url_err}")
+            raise RuntimeError(f"{context} failed: {status} - {message}")
 
+        filtered_rows = int(result.get("NumberFilteredRows", 0) or 0)
+        unselected_rows = int(result.get("NumberUnselectedRows", 0) or 0)
+        if filtered_rows > 0:
+            message = (
+                f"{context} filtered {filtered_rows} row(s) (max_filter_ratio={self.stream_load_max_filter_ratio})"
+            )
+            if self.stream_load_max_filter_ratio == "0":
+                raise RuntimeError(f"{message}; refusing silent partial load")
+            self.logger.warning(message)
+        if unselected_rows > 0:
+            self.logger.warning(f"{context} skipped {unselected_rows} row(s) via Doris WHERE filtering")
+
+        return result
+
+    def _stream_load_single(self, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
+        """Execute a single Stream Load request for the entire file.
+
+        Args:
+            table_name: Target table name (pre-validated)
+            data_file: Path to the data file
+            dialect: CSV dialect describing delimiter, null handling, etc.
+
+        Returns:
+            Number of rows loaded
+        """
+        delimiter = dialect.delimiter
+        is_tpc = dialect.null_marker is not None
+
+        scheme = "https" if self.use_tls else "http"
+        # Use the FE HTTP port (http_port) as the Stream Load entry point.
+        # Doris FE handles routing and redirects to the BE; _stream_load_put rewrites
+        # the redirect Location to the external be_http_port for Docker deployments.
+        url = f"{scheme}://{self.host}:{self.http_port}/api/{self.database}/{table_name}/_stream_load"
+
+        # strict_mode=true is intentionally omitted: TPC-DS/DI generators produce
+        # empty strings for nullable INTEGER columns (e.g. date surrogate keys,
+        # ManagerID). strict_mode=true rejects these rows as type-conversion errors.
+        # With strict_mode=false (default), empty → NULL for nullable columns, which
+        # is the correct semantic. _fix_tpcds_decimal_nulls handles DECIMAL nulls
+        # explicitly so they aren't silently coerced to 0.
+        headers = self._stream_load_headers(format_name="csv", delimiter=delimiter, is_tpc=is_tpc)
+
+        decimal_positions = _TPCDS_DECIMAL_NULL_POSITIONS.get(table_name, [])
+
+        if is_tpc:
+            # TPC format: read all lines, apply DECIMAL-null preprocessing if
+            # needed, then send as bytes. Decompresses zstd/gzip if present.
+            with self._open_data_file_text(data_file) as f:
+                lines = f.read().splitlines()
+            if decimal_positions:
+                lines = [_fix_tpcds_decimal_nulls(line, delimiter, decimal_positions) for line in lines]
+            data = "\n".join(lines).encode("utf-8")
+        else:
+            # Non-TPC: buffer into memory so retry is safe on transient failures.
+            with self._open_data_file_binary(data_file) as f:
+                data = f.read()
+
+        resp = self._stream_load_put(url, data, headers)
+        result = self._handle_stream_load_response(resp, context="Stream Load")
         return int(result.get("NumberLoadedRows", 0))
 
-    def _stream_load_file_chunked(self, table_name: str, data_file: Path) -> int:
+    def _stream_load_parquet(self, table_name: str, data_file: Path) -> int:
+        """Load a Parquet file into Doris using Stream Load with format=parquet.
+
+        Parquet files cannot be split at arbitrary byte boundaries, so the file
+        is streamed as a single request. The stream is reopenable across retries
+        and FE→BE redirects, so compressed outer containers such as
+        ``.parquet.zst`` are decompressed client-side before upload.
+
+        Args:
+            table_name: Target table name
+            data_file: Path to the .parquet file
+
+        Returns:
+            Number of rows loaded
+        """
+        scheme = "https" if self.use_tls else "http"
+        url = f"{scheme}://{self.host}:{self.http_port}/api/{self.database}/{table_name}/_stream_load"
+
+        headers = self._stream_load_headers(format_name="parquet")
+        resp = self._stream_load_put(url, lambda: self._open_data_file_binary(data_file), headers)
+        result = self._handle_stream_load_response(resp, context="Stream Load (Parquet)")
+        return int(result.get("NumberLoadedRows", 0))
+
+    def _stream_load_file_chunked(self, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
         """Load a large file into Doris using chunked Stream Load requests.
 
         Splits the file into chunks of approximately stream_load_chunk_size
@@ -636,28 +1103,27 @@ class DorisAdapter(PlatformAdapter):
         Args:
             table_name: Target table name (pre-validated)
             data_file: Path to the data file
+            dialect: CSV dialect describing delimiter, null handling, etc.
 
         Returns:
             Total number of rows loaded across all chunks
         """
-        delimiter = get_delimiter_for_file(data_file)
-        is_tpc = is_tpc_format(data_file)
+        delimiter = dialect.delimiter
+        is_tpc = dialect.null_marker is not None
 
         scheme = "https" if self.use_tls else "http"
+        # Use the FE HTTP port for Stream Load entry (same as _stream_load_single).
         url = f"{scheme}://{self.host}:{self.http_port}/api/{self.database}/{table_name}/_stream_load"
 
-        headers = {
-            "Expect": "100-continue",
-            "column_separator": delimiter,
-            "format": "csv",
-        }
-        if is_tpc:
-            headers["trim_double_quotes"] = "true"
+        headers = self._stream_load_headers(format_name="csv", delimiter=delimiter, is_tpc=is_tpc)
+
+        decimal_positions = _TPCDS_DECIMAL_NULL_POSITIONS.get(table_name, [])
 
         total_rows = 0
         chunk_num = 0
 
-        with open(data_file) as f:
+        # Open file with decompression support; use latin-1 to handle non-ASCII TPC data.
+        with self._open_data_file_text(data_file) as f:
             while True:
                 chunk_lines: list[str] = []
                 chunk_bytes = 0
@@ -667,12 +1133,11 @@ class DorisAdapter(PlatformAdapter):
                     if not line:
                         continue
 
-                    # Strip trailing delimiter for TPC format
-                    if is_tpc and line.endswith(delimiter):
-                        line = line[: -len(delimiter)]
+                    if decimal_positions:
+                        line = _fix_tpcds_decimal_nulls(line, delimiter, decimal_positions)
 
                     chunk_lines.append(line)
-                    chunk_bytes += len(line.encode("utf-8")) + 1  # +1 for newline
+                    chunk_bytes += len(line.encode("utf-8", errors="replace")) + 1
 
                     if chunk_bytes >= self.stream_load_chunk_size:
                         break
@@ -681,30 +1146,13 @@ class DorisAdapter(PlatformAdapter):
                     break
 
                 chunk_num += 1
-                data = "\n".join(chunk_lines).encode("utf-8")
+                data = "\n".join(chunk_lines).encode("utf-8", errors="replace")
                 self.log_verbose(
                     f"Stream Load chunk {chunk_num} for {table_name}: {len(chunk_lines)} lines, {len(data):,} bytes"
                 )
 
-                resp = _requests.put(
-                    url,
-                    data=data,
-                    headers=headers,
-                    auth=(self.username, self.password),
-                    timeout=600,
-                )
-
-                if resp.status_code != 200:
-                    raise RuntimeError(
-                        f"Stream Load chunk {chunk_num} failed with status {resp.status_code}: {resp.text}"
-                    )
-
-                result = resp.json()
-                status = result.get("Status")
-                if status not in ("Success", "Publish Timeout"):
-                    message = result.get("Message", "Unknown error")
-                    raise RuntimeError(f"Stream Load chunk {chunk_num} failed: {status} - {message}")
-
+                resp = self._stream_load_put(url, data, headers)
+                result = self._handle_stream_load_response(resp, context=f"Stream Load chunk {chunk_num}")
                 chunk_rows = int(result.get("NumberLoadedRows", 0))
                 total_rows += chunk_rows
 
@@ -713,7 +1161,7 @@ class DorisAdapter(PlatformAdapter):
         )
         return total_rows
 
-    def _insert_load_file(self, connection: Any, table_name: str, data_file: Path) -> int:
+    def _insert_load_file(self, connection: Any, table_name: str, data_file: Path, dialect: CsvDialect) -> int:
         """Fallback: load data via batch INSERT statements.
 
         Used when the requests library is not available for Stream Load.
@@ -722,25 +1170,29 @@ class DorisAdapter(PlatformAdapter):
             connection: PyMySQL connection
             table_name: Target table name (pre-validated)
             data_file: Path to the data file
+            dialect: CSV dialect describing delimiter, null handling, etc.
 
         Returns:
             Number of rows loaded
         """
-        delimiter = get_delimiter_for_file(data_file)
-        is_tpc = is_tpc_format(data_file)
+        delimiter = dialect.delimiter
+        is_tpc = dialect.null_marker is not None
         row_count = 0
         batch_size = 1000
 
         cursor = connection.cursor()
 
-        with open(data_file) as f:
+        with open(data_file, encoding="utf-8") as f:
             batch = []
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
 
-                # Remove trailing delimiter for TPC format
+                # INSERT requires exactly N column values, so strip the trailing
+                # field separator that dsdgen appends to every row. Stream Load
+                # sends data verbatim and relies on Doris's CSV parser to treat
+                # the trailing | as a row terminator rather than a column separator.
                 if is_tpc and line.endswith(delimiter):
                     line = line[: -len(delimiter)]
 
@@ -811,7 +1263,7 @@ class DorisAdapter(PlatformAdapter):
 
         if benchmark_type == "olap":
             try:
-                cursor.execute("SET exec_mem_limit = 8589934592")  # 8GB
+                cursor.execute("SET exec_mem_limit = 5368709120")  # 5GB - stays within BE mem_limit=6GB
             except Exception as e:
                 self.logger.debug(f"Could not set exec_mem_limit: {e}")
 
@@ -904,6 +1356,7 @@ class DorisAdapter(PlatformAdapter):
                 "table_model": self.table_model,
                 "default_buckets": self.default_buckets,
                 "stream_load_chunk_size": self.stream_load_chunk_size,
+                "stream_load_max_filter_ratio": self.stream_load_max_filter_ratio,
                 "enable_partitioning": self.enable_partitioning,
                 "enable_bloom_filter": self.enable_bloom_filter,
                 "enable_bitmap_index": self.enable_bitmap_index,
@@ -914,11 +1367,13 @@ class DorisAdapter(PlatformAdapter):
             try:
                 cursor = connection.cursor()
 
-                # Get Doris version
-                cursor.execute("SELECT version()")
-                version_row = cursor.fetchone()
-                if version_row:
-                    platform_info["platform_version"] = version_row[0]
+                platform_version, mysql_protocol_version, version_comment = _read_doris_version_details(cursor)
+                if platform_version:
+                    platform_info["platform_version"] = platform_version
+                if mysql_protocol_version:
+                    platform_info["configuration"]["mysql_protocol_version"] = mysql_protocol_version
+                if version_comment:
+                    platform_info["configuration"]["version_comment"] = version_comment
 
                 # Get current database
                 cursor.execute("SELECT database()")
@@ -958,7 +1413,14 @@ class DorisAdapter(PlatformAdapter):
             return False
 
     def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables in the database."""
+        """Get list of existing tables in the database (lowercased for reuse comparison).
+
+        Migration note: databases created before the lower_case_table_names fix
+        have lowercase TPC-DI table names (e.g. dimcustomer). Those databases
+        pass the reuse check (both sides are lowercased) but fail at query time
+        because queries reference the original mixed-case names. Use --force all
+        to drop and recreate a stale TPC-DI database after upgrading.
+        """
         try:
             cursor = connection.cursor()
             cursor.execute("SHOW TABLES")
@@ -968,6 +1430,167 @@ class DorisAdapter(PlatformAdapter):
         except Exception as e:
             self.logger.debug(f"Failed to get existing tables: {e}")
             return []
+
+    # ------------------------------------------------------------------ #
+    # DDL clause injection
+    # ------------------------------------------------------------------ #
+
+    def _inject_doris_ddl_clauses(self, stmt: str, scale_factor: float | None = None) -> str:
+        """Post-process a CREATE TABLE statement to be valid Doris OLAP DDL.
+
+        Handles five incompatibilities between standard SQL and Doris OLAP:
+        1. Strip inline PRIMARY KEY constraints (parse error in Doris)
+        2. Translate TIME column type to VARCHAR(8) (unsupported in OLAP)
+        3. Inject DUPLICATE/AGGREGATE/UNIQUE KEY clause (required)
+        4. Inject DISTRIBUTED BY HASH clause (required)
+        5. Inject PROPERTIES("replication_num"="N") (avoids replication error
+           when available backends < default replication factor of 3)
+
+        Key columns are derived from the actual schema column order to satisfy
+        Doris's requirement that key columns form a prefix of the schema.
+        STRING/TEXT columns are excluded from key selection.
+        """
+        stripped = stmt.strip()
+        # Use regex search (not startswith) so statements with SQL comment preambles
+        # (e.g., from build_tpch_staging_tables_sql comment separators) are still processed.
+        if not _CREATE_TABLE_RE.search(stripped):
+            return stmt
+
+        # Fix 1: strip table-level FOREIGN KEY constraints (shared helper) and PRIMARY KEY.
+        stripped = strip_foreign_keys(stripped)
+        # Optional leading comma: covers both "col INT, PRIMARY KEY (col)" and
+        # bare-form "(PRIMARY KEY (col), col INT)" where PK is the first clause.
+        stripped = re.sub(r",?\s*PRIMARY\s+KEY\s*\([^)]*\)", "", stripped, flags=re.IGNORECASE)
+        # Column-level: "col TYPE PRIMARY KEY" (no opening paren follows KEY)
+        stripped = re.sub(r"\bPRIMARY\s+KEY\b(?!\s*\()", "", stripped, flags=re.IGNORECASE)
+        # Clean up any leading comma left by stripping a first-position table-level PK clause.
+        stripped = re.sub(r"\(\s*,", "(", stripped)
+
+        # Fix 2: translate TIME column type → VARCHAR(8)
+        # Use a positive lookahead to match TIME only in type position (followed by a column
+        # definition terminator), not when it is a column name (followed by another type word).
+        # This prevents `time DATETIME` from becoming `VARCHAR(8) DATETIME` when SQLGlot
+        # quotes the column name `time` as `\`time\`` and the regex then replaces the name.
+        stripped = re.sub(
+            r"\bTIME\b(?!STAMP)(?=\s*(?:[,\)]|$|NOT\s+NULL|NULL\b|DEFAULT\b|\Z))",
+            "VARCHAR(8)",
+            stripped,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+
+        name_match = _CREATE_TABLE_RE.search(stripped)
+        if not name_match:
+            return stripped
+
+        # Preserve the original table name in DDL - Doris has lower_case_table_names=0
+        # (case-sensitive) by default, so CREATE TABLE DimCustomer creates "DimCustomer".
+        # Queries reference the original-case name; stream load URLs must match too.
+        table_name = name_match.group(1)
+        table_name_key = table_name.lower()  # lowercase for dict lookups only
+
+        # Find matching ')' of the column-definition block.
+        # The regex ends with \( so name_match.end()-1 is the opening paren.
+        open_pos = name_match.end() - 1
+        depth = 0
+        close_pos = -1
+        for i in range(open_pos, len(stripped)):
+            if stripped[i] == "(":
+                depth += 1
+            elif stripped[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    close_pos = i
+                    break
+
+        if close_pos == -1:
+            return stripped
+
+        col_body = stripped[open_pos + 1 : close_pos]
+
+        # Fix 2b: SQLGlot translates VARCHAR(N) → STRING for Doris dialect, but Doris OLAP
+        # rejects STRING as a key column type (VARCHAR is allowed). Convert STRING/TEXT back
+        # to VARCHAR(65533) so these columns can participate in the key prefix.
+        col_body_fixed = re.sub(r"\bSTRING\b", "VARCHAR(65533)", col_body, flags=re.IGNORECASE)
+        col_body_fixed = re.sub(r"\bTEXT\b", "VARCHAR(65533)", col_body_fixed, flags=re.IGNORECASE)
+        # Fix 2c: Doris SMALLINT is signed 16-bit (−32768..32767). Benchmarks like ClickBench
+        # use UInt16 columns (0..65535) that overflow SMALLINT; Doris treats out-of-range
+        # integers as NULL in non-strict mode, which then violates NOT NULL and filters the row.
+        # Widen SMALLINT → INT (signed 32-bit, covers full UInt16 range). Type-safe widening.
+        col_body_fixed = re.sub(r"\bSMALLINT\b", "INT", col_body_fixed, flags=re.IGNORECASE)
+        # Fix 2d: SQLGlot translates DuckDB FLOAT[N] (fixed-size array) to ARRAY<FLOAT>[N] for
+        # Doris/MySQL dialect. Doris only supports ARRAY<TYPE> without dimension size - the [N]
+        # suffix causes a parse error. Strip it.
+        col_body_fixed = re.sub(r"(ARRAY<[^>]+>)\[\d+\]", r"\1", col_body_fixed, flags=re.IGNORECASE)
+        if col_body_fixed != col_body:
+            col_body = col_body_fixed
+            stripped = stripped[: open_pos + 1] + col_body + stripped[close_pos:]
+            close_pos = open_pos + 1 + len(col_body)
+
+        # Parse (name, type) pairs - filter by known SQL types to skip constraint lines.
+        schema_cols: list[tuple[str, str]] = [
+            (m.group(1).lower(), m.group(2).lower())
+            for m in _COL_DEF_RE.finditer(col_body)
+            if m.group(2).lower() in _KNOWN_SQL_TYPES
+        ]
+
+        # Key-eligible columns: exclude types Doris rejects as key columns.
+        keyable_cols = [name for name, typ in schema_cols if typ not in _NON_KEY_DORIS_TYPES]
+
+        model_keyword = {
+            "duplicate": "DUPLICATE KEY",
+            "aggregate": "AGGREGATE KEY",
+            "unique": "UNIQUE KEY",
+        }.get(self.table_model, "DUPLICATE KEY")
+
+        # Fix 3: KEY clause - use longest valid schema prefix from desired keys.
+        desired_keys = [k.lower() for k in _TPCH_TABLE_KEYS.get(table_name_key, [])]
+        if desired_keys:
+            desired_set = set(desired_keys)
+            prefix_keys: list[str] = []
+            for col_name, col_type in schema_cols:
+                if col_name in desired_set and col_type not in _NON_KEY_DORIS_TYPES:
+                    prefix_keys.append(col_name)
+                else:
+                    break  # prefix must be contiguous from position 0
+            key_cols = prefix_keys or (keyable_cols[:1] if keyable_cols else None)
+        else:
+            key_cols = keyable_cols[:1] if keyable_cols else None
+
+        clauses: list[str] = []
+
+        if key_cols:
+            cols_str = ", ".join(f"`{c}`" for c in key_cols)
+            clauses.append(f"{model_keyword}({cols_str})")
+
+        # PARTITION BY RANGE (optional)
+        partition_clause = self.get_partition_clause(table_name_key)
+        if partition_clause:
+            clauses.append(partition_clause)
+
+        # Fix 4: DISTRIBUTED BY HASH (required).
+        # Validate the candidate distribution key exists in the actual schema to prevent
+        # cross-contamination when TPC-H key names are applied to non-TPC-H tables
+        # (e.g., TPC-DS "customer" table doesn't have "c_custkey").
+        schema_col_names = {col_name for col_name, _ in schema_cols}
+        dist_key_candidate = _TPCH_DISTRIBUTION_KEYS.get(table_name_key)
+        dist_key = (
+            dist_key_candidate
+            if dist_key_candidate and dist_key_candidate in schema_col_names
+            else (key_cols[0] if key_cols else None)
+        )
+        buckets = self._compute_bucket_count(table_name_key, scale_factor)
+        if dist_key:
+            clauses.append(f"DISTRIBUTED BY HASH(`{dist_key}`) BUCKETS {buckets}")
+        else:
+            clauses.append(f"DISTRIBUTED BY RANDOM BUCKETS {buckets}")
+
+        # Fix 5: PROPERTIES with replication_num and HDD storage medium.
+        # storage_medium = HDD prevents "Failed to find enough backend" errors on Docker
+        # deployments where Doris defaults to requesting SSD-labeled storage backends.
+        clauses.append(f'PROPERTIES ("replication_num" = "{self.replication_num}", "storage_medium" = "HDD")')
+
+        suffix = "\n" + "\n".join(clauses)
+        return stripped[: close_pos + 1] + suffix + stripped[close_pos + 1 :]
 
     # ------------------------------------------------------------------ #
     # w11/w12/w13: DDL generation for table model, distribution, partitions
@@ -1025,7 +1648,7 @@ class DorisAdapter(PlatformAdapter):
         Uses a heuristic: larger tables at higher scale factors get more buckets.
         Minimum is 1, maximum is capped at 128.
         """
-        if scale_factor is None or scale_factor <= 0:
+        if not isinstance(scale_factor, (int, float)) or scale_factor <= 0:
             return self.default_buckets
 
         # Row count multipliers for TPC-H tables at SF=1
@@ -1250,14 +1873,15 @@ class DorisAdapter(PlatformAdapter):
             else:
                 connection_info["basic_query_test"] = "passed"
 
-            # Check Doris version
-            try:
-                cursor.execute("SELECT version()")
-                version_result = cursor.fetchone()
-                if version_result:
-                    connection_info["server_version"] = version_result[0]
-            except Exception:
+            platform_version, mysql_protocol_version, version_comment = _read_doris_version_details(cursor)
+            if platform_version:
+                connection_info["server_version"] = platform_version
+            else:
                 warnings.append("Could not query Doris version")
+            if mysql_protocol_version:
+                connection_info["mysql_protocol_version"] = mysql_protocol_version
+            if version_comment:
+                connection_info["version_comment"] = version_comment
 
             # Check current database
             try:
@@ -1289,6 +1913,41 @@ class DorisAdapter(PlatformAdapter):
         except ImportError:
             return None
 
+    def _validate_data_integrity(self, benchmark, connection, table_stats: dict) -> tuple:
+        """Doris override: backtick-quote table names to preserve case and reserved words.
+
+        Doris treats several common table names (e.g. ``disk``, ``net``) as reserved
+        keywords, and mixed-case identifiers such as ``DimCustomer`` only resolve
+        reliably when quoted. The base class implementation does not quote identifiers.
+        """
+
+        validation_details: dict[str, Any] = {}
+        try:
+            accessible_tables = []
+            inaccessible_tables = []
+            for table_name in table_stats:
+                try:
+                    cursor = connection.cursor()
+                    try:
+                        cursor.execute(f"SELECT 1 FROM `{table_name}` LIMIT 1")
+                        accessible_tables.append(table_name)
+                    finally:
+                        cursor.close()
+                except Exception:
+                    inaccessible_tables.append(table_name)
+
+            if inaccessible_tables:
+                validation_details["inaccessible_tables"] = inaccessible_tables
+                validation_details["constraints_enabled"] = False
+                return "FAILED", validation_details
+            validation_details["accessible_tables"] = accessible_tables
+            validation_details["constraints_enabled"] = True
+            return "PASSED", validation_details
+        except Exception as e:
+            validation_details["constraints_enabled"] = False
+            validation_details["integrity_error"] = str(e)
+            return "FAILED", validation_details
+
     def supports_tuning_type(self, tuning_type: Any) -> bool:
         """Check if Doris supports a specific tuning type."""
         try:
@@ -1307,24 +1966,64 @@ class DorisAdapter(PlatformAdapter):
             return False
 
 
-def _build_doris_config(benchmark_config: dict, platform_options: dict) -> dict:
-    """Build Doris configuration from benchmark and platform options.
+def _build_doris_config(
+    platform: str,
+    options: dict[str, Any],
+    overrides: dict[str, Any],
+    info: Any,
+) -> Any:
+    """Build Doris database configuration with credential loading.
 
-    This function is registered with PlatformHookRegistry to provide
-    Doris-specific configuration handling.
+    Args:
+        platform: Platform name (should be 'doris')
+        options: CLI platform options from --platform-option flags
+        overrides: Runtime overrides from orchestrator
+        info: Platform info from registry
+
+    Returns:
+        DatabaseConfig with credentials loaded
     """
-    config = {
-        "host": platform_options.get("host") or os.environ.get("DORIS_HOST", "localhost"),
-        "port": platform_options.get("port") or int(os.environ.get("DORIS_PORT", "9030")),
-        "http_port": platform_options.get("http_port") or int(os.environ.get("DORIS_HTTP_PORT", "8030")),
+    # Intentionally inline - not using build_platform_config because env-var fallback and multi-port
+    # int coercion must happen at builder runtime for CLI/test parity. See the Group D TODO notes.
+    from benchbox.core.schemas import DatabaseConfig
+    from benchbox.security.credentials import CredentialManager
+
+    # Load saved credentials
+    cred_manager = CredentialManager()
+    saved_creds = cred_manager.get_platform_credentials("doris") or {}
+
+    # Priority: defaults < saved_creds < explicit_options < overrides
+    explicit_options = overrides.get("_explicit_platform_options", {})
+    merged_options: dict[str, Any] = {}
+    merged_options.update(options)
+    merged_options.update(saved_creds)
+    merged_options.update(explicit_options)
+    merged_options.update(overrides)
+
+    name = info.display_name if info else "Apache Doris"
+    driver_package = info.driver_package if info else "pymysql"
+
+    config_dict = {
+        "type": "doris",
+        "name": name,
+        "options": merged_options or {},
+        "driver_package": driver_package,
+        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
+        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
+        # Platform-specific fields
+        "host": merged_options.get("host") or os.environ.get("DORIS_HOST", "localhost"),
+        "port": int(merged_options.get("port") or os.environ.get("DORIS_PORT", "9030")),
+        "http_port": int(merged_options.get("http_port") or os.environ.get("DORIS_HTTP_PORT", "8030")),
+        "be_http_port": int(merged_options.get("be_http_port") or os.environ.get("DORIS_BE_HTTP_PORT", "8040")),
         "username": (
-            platform_options.get("username") or os.environ.get("DORIS_USER") or os.environ.get("DORIS_USERNAME", "root")
+            merged_options.get("username") or os.environ.get("DORIS_USER") or os.environ.get("DORIS_USERNAME", "root")
         ),
-        "password": platform_options.get("password") or os.environ.get("DORIS_PASSWORD", ""),
-        "database": platform_options.get("database") or os.environ.get("DORIS_DATABASE"),
+        "password": merged_options.get("password") or os.environ.get("DORIS_PASSWORD", ""),
+        "database": merged_options.get("database") or os.environ.get("DORIS_DATABASE"),
+        # Benchmark context
+        "benchmark": overrides.get("benchmark"),
+        "scale_factor": overrides.get("scale_factor"),
+        "tuning_config": overrides.get("tuning_config"),
     }
 
-    # Merge benchmark configuration
-    config.update(benchmark_config)
-
-    return config
+    return DatabaseConfig(**config_dict)

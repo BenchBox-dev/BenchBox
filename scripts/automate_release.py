@@ -453,6 +453,11 @@ def run_pre_flight_checks(source: Path, version: str, release_date: str, auto_co
             print(f"✓ Version bumped to {version}")
         else:
             print(f"✓ Version matches source: {version}")
+            # Ensure landing page badge is current even when version was pre-bumped
+            if not update_landing_page_version(version):
+                print("⚠️  Warning: Landing page version badge not updated")
+            else:
+                print("✓ Landing page version badge is current")
     except Exception as e:
         print(f"⚠️  Warning: Could not verify source version: {e}")
         confirm_or_exit("Continue without version verification?", auto_continue)
@@ -891,7 +896,7 @@ def display_summary(
     print("\n" + "=" * 60)
 
 
-def main() -> int:
+def main() -> int:  # noqa: C901
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1159,14 +1164,18 @@ def main() -> int:
             print("\n❌ Push failed")
             return 1
         print("\n✅ Release automation complete!")
-        print("\nThe release has been pushed. Ready to upload to PyPI:")
-        print(f"  twine upload {target}/dist/benchbox-{version}*")
+        print("\nThe release has been pushed. Remaining steps:")
+        print(f"  1. Upload to PyPI: twine upload {target}/dist/benchbox-{version}*")
+        print("  2. Sync fixes back to private repo:")
+        print(f"     cd {source} && git push private main")
     else:
         print("\n✅ Release automation complete!")
         print("\nThe release is ready to publish manually:")
         print(f"  1. Review: cd {target} && git log --format=fuller")
         print(f"  2. Push: git push origin main && git push origin v{version}")
-        print(f"  3. Upload: twine upload dist/benchbox-{version}*")
+        print(f"  3. Upload to PyPI: twine upload dist/benchbox-{version}*")
+        print("  4. Sync fixes back to private repo:")
+        print(f"     cd {source} && git push private main")
 
     return 0
 

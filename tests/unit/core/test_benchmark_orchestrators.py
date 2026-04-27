@@ -642,7 +642,7 @@ class TestNYCTaxiDownloader:
         from benchbox.core.nyctaxi.downloader import NYCTaxiDataDownloader
 
         d = NYCTaxiDataDownloader(scale_factor=0.5, output_dir=tmp_path)
-        assert d.sample_rate == 0.005
+        assert d.sample_rate == 0.05
         assert d.year == 2019
         assert d.months == list(range(1, 13))
 
@@ -652,7 +652,7 @@ class TestNYCTaxiDownloader:
         d = NYCTaxiDataDownloader(scale_factor=0.01, output_dir=tmp_path)
         zones_file = d._generate_taxi_zones()
         assert zones_file.exists()
-        with open(zones_file) as f:
+        with open(zones_file, encoding="utf-8") as f:
             reader = csv.reader(f)
             header = next(reader)
             assert "location_id" in header
@@ -682,7 +682,7 @@ class TestNYCTaxiDownloader:
 
         d = NYCTaxiDataDownloader(scale_factor=1.0, output_dir=tmp_path, seed=42)
         stats = d.get_download_stats()
-        assert stats["sample_rate"] == 0.01
+        assert stats["sample_rate"] == 0.1
         assert stats["seed"] == 42
 
     def test_download_uses_synthetic_fallback(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

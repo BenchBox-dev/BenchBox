@@ -8,12 +8,14 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import gzip
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.platforms.base.data_loading import CsvDialect, DataSource
 from benchbox.platforms.doris import DorisAdapter
 
 pytestmark = [
@@ -75,8 +77,8 @@ class TestDorisAdapterInitialization:
         assert adapter.password == "secret"
         assert adapter.database == "my_benchmark"
 
-    def test_initialization_env_var_fallback(self):
-        """Test initialization falls back to environment variables."""
+    def test_init_uses_simple_defaults_not_env_vars(self):
+        """Test that __init__ uses simple defaults; env var resolution is the builder's job."""
         try:
             with patch.dict(
                 "os.environ",
@@ -88,15 +90,38 @@ class TestDorisAdapterInitialization:
                     "DORIS_PASSWORD": "env-pass",
                 },
             ):
+                # Direct construction bypasses the builder; __init__ uses Python defaults.
                 adapter = DorisAdapter()
         except ImportError:
             pytest.skip("pymysql not installed")
 
-        assert adapter.host == "env-host"
-        assert adapter.port == 9032
-        assert adapter.http_port == 8032
-        assert adapter.username == "env-user"
-        assert adapter.password == "env-pass"
+        assert adapter.host == "localhost"
+        assert adapter.port == 9030
+        assert adapter.http_port == 8030
+        assert adapter.username == "root"
+        assert adapter.password == ""
+
+    def test_builder_resolves_env_vars(self):
+        """Test that the config builder (_build_doris_config) resolves env vars."""
+        from benchbox.platforms.doris import _build_doris_config
+
+        with patch.dict(
+            "os.environ",
+            {
+                "DORIS_HOST": "env-host",
+                "DORIS_PORT": "9032",
+                "DORIS_HTTP_PORT": "8032",
+                "DORIS_USER": "env-user",
+                "DORIS_PASSWORD": "env-pass",
+            },
+        ):
+            config = _build_doris_config("doris", {}, {}, None)
+
+        assert config.host == "env-host"
+        assert config.port == 9032
+        assert config.http_port == 8032
+        assert config.username == "env-user"
+        assert config.password == "env-pass"
 
     def test_dialect_is_doris(self):
         """Test that Doris uses the 'doris' SQLGlot dialect."""
@@ -188,7 +213,10 @@ class TestDorisConnection:
             mock_pymysql.connect.return_value = mock_connection
             connection = adapter.create_connection()
 
-        assert connection == mock_connection
+        from benchbox.platforms.doris import _DorisConnectionWrapper
+
+        assert isinstance(connection, _DorisConnectionWrapper)
+        assert connection._conn == mock_connection
         mock_pymysql.connect.assert_called_once()
         call_kwargs = mock_pymysql.connect.call_args.kwargs
         assert call_kwargs["host"] == "localhost"
@@ -482,12 +510,16 @@ class TestDorisDataLoading:
         mock_benchmark = Mock()
 
         # Create temporary test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
             f.write("1,test1\n2,test2\n3,test3\n")
             temp_path = Path(f.name)
 
         try:
-            mock_benchmark.tables = {"test_table": str(temp_path)}
+            fake_ds = DataSource(
+                source_type="benchmark_tables",
+                tables={"test_table": [temp_path]},
+                table_metadata={"test_table": {"csv_delimiter": ","}},
+            )
 
             mock_response = Mock()
             mock_response.status_code = 200
@@ -496,13 +528,14 @@ class TestDorisDataLoading:
                 "NumberLoadedRows": 3,
             }
 
-            with patch("benchbox.platforms.doris._requests") as mock_requests:
+            with (
+                patch("benchbox.platforms.doris.DataSourceResolver") as mock_resolver_cls,
+                patch("benchbox.platforms.doris._requests") as mock_requests,
+            ):
+                mock_resolver_cls.return_value.resolve.return_value = fake_ds
                 mock_requests.put.return_value = mock_response
                 mock_requests.__bool__ = Mock(return_value=True)
-
-                # Ensure _requests is not None for the adapter to use Stream Load
-                with patch("benchbox.platforms.doris._requests", mock_requests):
-                    table_stats, load_time, per_table = adapter.load_data(mock_benchmark, Mock(), Path("/tmp"))
+                table_stats, load_time, per_table = adapter.load_data(mock_benchmark, Mock(), Path("/tmp"))
 
             assert isinstance(table_stats, dict)
             assert isinstance(load_time, float)
@@ -526,14 +559,22 @@ class TestDorisDataLoading:
         mock_benchmark = Mock()
 
         # Create temporary test file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
             f.write("1,test1\n2,test2\n")
             temp_path = Path(f.name)
 
         try:
-            mock_benchmark.tables = {"test_table": str(temp_path)}
+            fake_ds = DataSource(
+                source_type="benchmark_tables",
+                tables={"test_table": [temp_path]},
+                table_metadata={"test_table": {"csv_delimiter": ","}},
+            )
 
-            with patch("benchbox.platforms.doris._requests", None):
+            with (
+                patch("benchbox.platforms.doris.DataSourceResolver") as mock_resolver_cls,
+                patch("benchbox.platforms.doris._requests", None),
+            ):
+                mock_resolver_cls.return_value.resolve.return_value = fake_ds
                 table_stats, load_time, per_table = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
 
             assert isinstance(table_stats, dict)
@@ -559,14 +600,22 @@ class TestDorisDataLoading:
         mock_benchmark = Mock()
 
         # Create temporary test file with pipe delimiter
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", encoding="utf-8", delete=False) as f:
             f.write("1|test1|\n2|test2|\n")
             temp_path = Path(f.name)
 
         try:
-            mock_benchmark.tables = {"customer": str(temp_path)}
+            fake_ds = DataSource(
+                source_type="benchmark_tables",
+                tables={"customer": [temp_path]},
+                table_metadata={"customer": {"csv_delimiter": "|", "csv_null_marker": ""}},
+            )
 
-            with patch("benchbox.platforms.doris._requests", None):
+            with (
+                patch("benchbox.platforms.doris.DataSourceResolver") as mock_resolver_cls,
+                patch("benchbox.platforms.doris._requests", None),
+            ):
+                mock_resolver_cls.return_value.resolve.return_value = fake_ds
                 table_stats, load_time, _ = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
 
             assert "customer" in table_stats
@@ -590,9 +639,17 @@ class TestDorisDataLoading:
             pytest.skip("pymysql not installed")
 
         mock_benchmark = Mock()
-        mock_benchmark.tables = {"missing_table": "/nonexistent/path/data.csv"}
+        fake_ds = DataSource(
+            source_type="benchmark_tables",
+            tables={"missing_table": [Path("/nonexistent/path/data.csv")]},
+            table_metadata={},
+        )
 
-        with patch("benchbox.platforms.doris._requests", None):
+        with (
+            patch("benchbox.platforms.doris.DataSourceResolver") as mock_resolver_cls,
+            patch("benchbox.platforms.doris._requests", None),
+        ):
+            mock_resolver_cls.return_value.resolve.return_value = fake_ds
             table_stats, load_time, _ = adapter.load_data(mock_benchmark, Mock(), Path("/tmp"))
 
         assert table_stats["missing_table"] == 0
@@ -611,16 +668,19 @@ class TestDorisDataLoading:
             "Message": "Table not found",
         }
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
             f.write("1,test1\n")
             temp_path = Path(f.name)
 
         try:
+            csv_dialect = CsvDialect(
+                delimiter=",", has_header=False, null_marker=None, normalize_booleans=False, quote=None
+            )
             with patch("benchbox.platforms.doris._requests") as mock_requests:
                 mock_requests.put.return_value = mock_response
 
                 with pytest.raises(RuntimeError, match="Stream Load failed"):
-                    adapter._stream_load_file("test_table", temp_path)
+                    adapter._stream_load_file("test_table", temp_path, csv_dialect)
         finally:
             temp_path.unlink()
 
@@ -635,16 +695,19 @@ class TestDorisDataLoading:
         mock_response.status_code = 503
         mock_response.text = "Service Unavailable"
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
             f.write("1,test1\n")
             temp_path = Path(f.name)
 
         try:
+            csv_dialect = CsvDialect(
+                delimiter=",", has_header=False, null_marker=None, normalize_booleans=False, quote=None
+            )
             with patch("benchbox.platforms.doris._requests") as mock_requests:
                 mock_requests.put.return_value = mock_response
 
                 with pytest.raises(RuntimeError, match="status 503"):
-                    adapter._stream_load_file("test_table", temp_path)
+                    adapter._stream_load_file("test_table", temp_path, csv_dialect)
         finally:
             temp_path.unlink()
 
@@ -790,7 +853,8 @@ class TestDorisPlatformInfo:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
         mock_cursor.fetchone.side_effect = [
-            ("2.1.3-rc04",),  # SELECT version()
+            ("5.7.99",),  # SELECT version() MySQL compatibility string
+            ("doris version doris-4.0.3-rc03-e9096296b8b",),  # SELECT @@version_comment
             ("test_db",),  # SELECT database()
         ]
 
@@ -801,9 +865,11 @@ class TestDorisPlatformInfo:
         assert platform_info["host"] == "doris-host"
         assert platform_info["port"] == 9030
         assert platform_info["dialect"] == "doris"
-        assert platform_info["platform_version"] == "2.1.3-rc04"
+        assert platform_info["platform_version"] == "4.0.3-rc03"
         assert platform_info["configuration"]["database"] == "test_db"
         assert platform_info["configuration"]["http_port"] == 8030
+        assert platform_info["configuration"]["mysql_protocol_version"] == "5.7.99"
+        assert platform_info["configuration"]["version_comment"] == "doris version doris-4.0.3-rc03-e9096296b8b"
 
     def test_get_platform_info_no_connection(self):
         """Test platform info without connection."""
@@ -1011,7 +1077,8 @@ class TestDorisValidation:
         mock_connection.cursor.return_value = mock_cursor
         mock_cursor.fetchone.side_effect = [
             (1,),  # SELECT 1
-            ("2.1.0",),  # SELECT version()
+            ("5.7.99",),  # SELECT version() MySQL compatibility string
+            ("doris version doris-4.0.3-rc03-e9096296b8b",),  # SELECT @@version_comment
             ("test_db",),  # SELECT database()
         ]
 
@@ -1020,7 +1087,9 @@ class TestDorisValidation:
         assert result is not None
         assert result.is_valid is True
         assert result.details["basic_query_test"] == "passed"
-        assert result.details["server_version"] == "2.1.0"
+        assert result.details["server_version"] == "4.0.3-rc03"
+        assert result.details["mysql_protocol_version"] == "5.7.99"
+        assert result.details["version_comment"] == "doris version doris-4.0.3-rc03-e9096296b8b"
 
     def test_validate_connection_health_failure(self):
         """Test connection health validation on failure."""
@@ -1046,8 +1115,7 @@ class TestDorisBuildConfig:
         """Test building config from platform options."""
         from benchbox.platforms.doris import _build_doris_config
 
-        benchmark_config = {"benchmark": "tpch", "scale_factor": 0.01}
-        platform_options = {
+        options = {
             "host": "my-doris",
             "port": 9030,
             "http_port": 8030,
@@ -1056,33 +1124,45 @@ class TestDorisBuildConfig:
             "database": "my_db",
         }
 
-        config = _build_doris_config(benchmark_config, platform_options)
+        config = _build_doris_config("doris", options, {}, None)
 
-        assert config["host"] == "my-doris"
-        assert config["port"] == 9030
-        assert config["http_port"] == 8030
-        assert config["username"] == "admin"
-        assert config["password"] == "secret"
-        assert config["database"] == "my_db"
+        assert config.host == "my-doris"
+        assert config.port == 9030
+        assert config.http_port == 8030
+        assert config.username == "admin"
+        assert config.password == "secret"
+        assert config.database == "my_db"
+        assert config.type == "doris"
 
     def test_build_config_defaults(self):
         """Test building config with defaults."""
         from benchbox.platforms.doris import _build_doris_config
 
-        config = _build_doris_config({}, {})
+        config = _build_doris_config("doris", {}, {}, None)
 
-        assert config["host"] == "localhost"
-        assert config["port"] == 9030
-        assert config["http_port"] == 8030
-        assert config["username"] == "root"
+        assert config.host == "localhost"
+        assert config.port == 9030
+        assert config.http_port == 8030
+        assert config.username == "root"
+
+    def test_build_config_returns_database_config(self):
+        """Test that config builder returns a DatabaseConfig instance."""
+        from benchbox.core.schemas import DatabaseConfig
+        from benchbox.platforms.doris import _build_doris_config
+
+        config = _build_doris_config("doris", {}, {}, None)
+
+        assert isinstance(config, DatabaseConfig)
+        assert config.type == "doris"
+        assert config.name == "Apache Doris"
 
 
 class TestDorisTlsUrls:
     """Tests for TLS/HTTPS URL construction in Doris Stream Load."""
 
     def test_stream_load_url_defaults_to_http(self):
-        """Stream Load URL uses HTTP by default."""
-        adapter = DorisAdapter(host="myhost", http_port=8030, database="test_db")
+        """Stream Load URL uses HTTP and targets FE http_port by default."""
+        adapter = DorisAdapter(host="myhost", http_port=8030, be_http_port=8040, database="test_db")
         assert adapter.use_tls is False
 
         mock_response = Mock()
@@ -1090,7 +1170,7 @@ class TestDorisTlsUrls:
         mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 1}
 
         with (
-            tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f,
+            tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f,
         ):
             f.write("1,test\n")
             temp_path = f.name
@@ -1098,7 +1178,7 @@ class TestDorisTlsUrls:
         try:
             with patch("benchbox.platforms.doris._requests") as mock_requests:
                 mock_requests.put.return_value = mock_response
-                adapter._stream_load_file("test_table", temp_path)
+                adapter._stream_load_file("test_table", temp_path, CsvDialect(",", False, None, False, None))
                 url = mock_requests.put.call_args[0][0]
                 assert url.startswith("http://")
                 assert "myhost:8030" in url
@@ -1106,8 +1186,8 @@ class TestDorisTlsUrls:
             Path(temp_path).unlink(missing_ok=True)
 
     def test_stream_load_url_uses_https_when_tls_enabled(self):
-        """Stream Load URL uses HTTPS when use_tls=True."""
-        adapter = DorisAdapter(host="myhost", http_port=8030, database="test_db", use_tls=True)
+        """Stream Load URL uses HTTPS and FE http_port when use_tls=True."""
+        adapter = DorisAdapter(host="myhost", http_port=8030, be_http_port=8040, database="test_db", use_tls=True)
         assert adapter.use_tls is True
 
         mock_response = Mock()
@@ -1115,7 +1195,7 @@ class TestDorisTlsUrls:
         mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 1}
 
         with (
-            tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f,
+            tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f,
         ):
             f.write("1,test\n")
             temp_path = f.name
@@ -1123,7 +1203,7 @@ class TestDorisTlsUrls:
         try:
             with patch("benchbox.platforms.doris._requests") as mock_requests:
                 mock_requests.put.return_value = mock_response
-                adapter._stream_load_file("test_table", temp_path)
+                adapter._stream_load_file("test_table", temp_path, CsvDialect(",", False, None, False, None))
                 url = mock_requests.put.call_args[0][0]
                 assert url.startswith("https://")
                 assert "myhost:8030" in url
@@ -1153,14 +1233,14 @@ class TestDorisChunkedLoading:
         mock_response.status_code = 200
         mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 3}
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
             f.write("1,a\n2,b\n3,c\n")
             temp_path = Path(f.name)
 
         try:
             with patch("benchbox.platforms.doris._requests") as mock_requests:
                 mock_requests.put.return_value = mock_response
-                rows = adapter._stream_load_file("test_table", temp_path)
+                rows = adapter._stream_load_file("test_table", temp_path, CsvDialect(",", False, None, False, None))
 
             assert rows == 3
             # Single request (not chunked)
@@ -1177,7 +1257,7 @@ class TestDorisChunkedLoading:
         mock_response.status_code = 200
         mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 2}
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
             # Write enough data to exceed 20 bytes
             f.write("1,aaaaaaa\n2,bbbbbbb\n3,ccccccc\n4,ddddddd\n")
             temp_path = Path(f.name)
@@ -1185,7 +1265,7 @@ class TestDorisChunkedLoading:
         try:
             with patch("benchbox.platforms.doris._requests") as mock_requests:
                 mock_requests.put.return_value = mock_response
-                rows = adapter._stream_load_file("test_table", temp_path)
+                rows = adapter._stream_load_file("test_table", temp_path, CsvDialect(",", False, None, False, None))
 
             # Should have made multiple requests
             assert mock_requests.put.call_count > 1
@@ -1194,29 +1274,62 @@ class TestDorisChunkedLoading:
         finally:
             temp_path.unlink()
 
-    def test_chunked_load_tpc_format_strips_delimiter(self):
-        """Chunked loading strips trailing delimiters from TPC format."""
+    def test_chunked_load_tpc_format_preserves_trailing_separator(self):
+        """Chunked loading preserves trailing field separator in TPC format.
+
+        TPC .tbl rows like '1|val1|' end with '|' because it is the field
+        separator before an empty last column, not a spurious trailing delimiter.
+        Stripping it reduces the column count and causes stream load to reject rows.
+        """
         adapter = DorisAdapter(database="test_db", stream_load_chunk_size=15)
 
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 1}
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", encoding="utf-8", delete=False) as f:
             f.write("1|val1|\n2|val2|\n")
             temp_path = Path(f.name)
 
         try:
             with patch("benchbox.platforms.doris._requests") as mock_requests:
                 mock_requests.put.return_value = mock_response
-                adapter._stream_load_file("test_table", temp_path)
+                adapter._stream_load_file("test_table", temp_path, CsvDialect("|", False, "", False, None))
 
-            # Verify data sent does NOT have trailing pipe
-            for call in mock_requests.put.call_args_list:
-                data = call[1].get("data") or call[0][1] if len(call[0]) > 1 else call[1]["data"]
-                decoded = data.decode("utf-8") if isinstance(data, bytes) else data
-                for line in decoded.strip().split("\n"):
-                    assert not line.endswith("|"), f"Trailing delimiter found: {line}"
+            # Verify the payload is sent verbatim - compare byte-exact content.
+            # _requests.put is always called with data as a keyword argument.
+            sent = b"".join(call.kwargs["data"] for call in mock_requests.put.call_args_list)
+            lines = sent.decode("utf-8").split("\n")
+            assert lines == ["1|val1|", "2|val2|"], f"Rows were modified before sending - got: {lines}"
+        finally:
+            temp_path.unlink()
+
+    def test_chunked_load_preserves_rows_without_trailing_separator(self):
+        """Rows without a trailing | (non-NULL last column) are also sent as-is.
+
+        The no-strip fix must not accidentally insert or remove separators for
+        rows that genuinely don't end with the field delimiter.
+        """
+        adapter = DorisAdapter(database="test_db", stream_load_chunk_size=50)
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 1}
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", encoding="utf-8", delete=False) as f:
+            # Row 1: NULL last column (trailing |). Row 2: non-NULL last column (no trailing |).
+            f.write("1|val1|\n2|val2\n")
+            temp_path = Path(f.name)
+
+        try:
+            with patch("benchbox.platforms.doris._requests") as mock_requests:
+                mock_requests.put.return_value = mock_response
+                adapter._stream_load_file("test_table", temp_path, CsvDialect("|", False, "", False, None))
+
+            sent = b"".join(call.kwargs["data"] for call in mock_requests.put.call_args_list)
+            lines = sent.decode("utf-8").split("\n")
+            assert "1|val1|" in lines, "Trailing | stripped from NULL-last-column row"
+            assert "2|val2" in lines, "Non-trailing-| row was modified"
         finally:
             temp_path.unlink()
 
@@ -1228,7 +1341,7 @@ class TestDorisChunkedLoading:
         mock_response.status_code = 503
         mock_response.text = "Service Unavailable"
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
             f.write("1,aaaaaaa\n2,bbbbbbb\n")
             temp_path = Path(f.name)
 
@@ -1236,7 +1349,7 @@ class TestDorisChunkedLoading:
             with patch("benchbox.platforms.doris._requests") as mock_requests:
                 mock_requests.put.return_value = mock_response
                 with pytest.raises(RuntimeError, match="chunk.*failed"):
-                    adapter._stream_load_file("test_table", temp_path)
+                    adapter._stream_load_file("test_table", temp_path, CsvDialect(",", False, None, False, None))
         finally:
             temp_path.unlink()
 
@@ -1246,9 +1359,9 @@ class TestDorisChunkedLoading:
         assert adapter.stream_load_chunk_size == 50 * 1024 * 1024
 
     def test_stream_load_chunk_size_default(self):
-        """Default chunk size is 100MB."""
+        """Default chunk size is 10MB (reduced from 100MB to avoid Docker timeout on large tables)."""
         adapter = DorisAdapter()
-        assert adapter.stream_load_chunk_size == 100 * 1024 * 1024
+        assert adapter.stream_load_chunk_size == 10 * 1024 * 1024
 
     def test_from_config_passes_chunk_size(self):
         """from_config propagates stream_load_chunk_size."""
@@ -1668,3 +1781,303 @@ class TestDorisPlatformInfoNewFields:
         info = adapter.get_platform_info()
         assert info["configuration"]["enable_bloom_filter"] is True
         assert info["configuration"]["enable_bitmap_index"] is True
+
+    def test_platform_info_includes_stream_load_max_filter_ratio(self):
+        """Platform info includes stream_load_max_filter_ratio config."""
+        adapter = DorisAdapter(stream_load_max_filter_ratio=0.001)
+        info = adapter.get_platform_info()
+        assert info["configuration"]["stream_load_max_filter_ratio"] == "0.001"
+
+
+class TestDorisTlsCertValidation:
+    """Tests for verify_ssl and ca_cert_path TLS certificate options."""
+
+    def test_defaults_verify_ssl_true_no_ca_cert(self):
+        """verify_ssl defaults to True, ca_cert_path defaults to None."""
+        adapter = DorisAdapter()
+        assert adapter.verify_ssl is True
+        assert adapter.ca_cert_path is None
+
+    def test_verify_ssl_false_disables_validation(self):
+        """verify_ssl=False is stored and passed as verify=False to requests."""
+        adapter = DorisAdapter(database="test_db", verify_ssl=False)
+        assert adapter.verify_ssl is False
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 1}
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
+            f.write("1,test\n")
+            temp_path = f.name
+
+        try:
+            with patch("benchbox.platforms.doris._requests") as mock_requests:
+                mock_requests.put.return_value = mock_response
+                adapter._stream_load_file("test_table", temp_path, CsvDialect(",", False, None, False, None))
+                _, kwargs = mock_requests.put.call_args
+                assert kwargs["verify"] is False
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_ca_cert_path_passed_as_verify(self):
+        """ca_cert_path is passed as verify= to requests, taking precedence over verify_ssl."""
+        adapter = DorisAdapter(database="test_db", ca_cert_path="/etc/ssl/custom-ca.crt")
+        assert adapter.ca_cert_path == "/etc/ssl/custom-ca.crt"
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 1}
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
+            f.write("1,test\n")
+            temp_path = f.name
+
+        try:
+            with patch("benchbox.platforms.doris._requests") as mock_requests:
+                mock_requests.put.return_value = mock_response
+                adapter._stream_load_file("test_table", temp_path, CsvDialect(",", False, None, False, None))
+                _, kwargs = mock_requests.put.call_args
+                assert kwargs["verify"] == "/etc/ssl/custom-ca.crt"
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_chunked_load_passes_verify_ssl(self):
+        """verify_ssl=False is also propagated to chunked stream load requests."""
+        adapter = DorisAdapter(database="test_db", stream_load_chunk_size=10, verify_ssl=False)
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 5}
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
+            # Write enough data to trigger chunked loading (> 10 bytes chunk size)
+            for i in range(20):
+                f.write(f"{i},value_{i}\n")
+            temp_path = f.name
+
+        try:
+            with patch("benchbox.platforms.doris._requests") as mock_requests:
+                mock_requests.put.return_value = mock_response
+                adapter._stream_load_file("test_table", temp_path, CsvDialect(",", False, None, False, None))
+                # All requests.put calls should have verify=False
+                for call in mock_requests.put.call_args_list:
+                    _, kwargs = call
+                    assert kwargs["verify"] is False
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_from_config_passes_verify_ssl_and_ca_cert_path(self):
+        """from_config propagates verify_ssl and ca_cert_path to the adapter."""
+        config = {
+            "host": "localhost",
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+            "verify_ssl": False,
+            "ca_cert_path": "/etc/ssl/my-ca.crt",
+        }
+        adapter = DorisAdapter.from_config(config)
+        assert adapter.verify_ssl is False
+        assert adapter.ca_cert_path == "/etc/ssl/my-ca.crt"
+
+
+class TestDorisStreamLoadFilterRatio:
+    """Tests for filtered-row handling during Doris Stream Load."""
+
+    def test_invalid_stream_load_max_filter_ratio_raises(self):
+        """stream_load_max_filter_ratio must be between 0 and 1 inclusive."""
+        with pytest.raises(
+            ValueError,
+            match="stream_load_max_filter_ratio must be between 0 and 1 inclusive",
+        ):
+            DorisAdapter(stream_load_max_filter_ratio=1.5)
+
+    def test_from_config_passes_max_filter_ratio(self):
+        """from_config propagates stream_load_max_filter_ratio."""
+        adapter = DorisAdapter.from_config({"stream_load_max_filter_ratio": 0.001})
+        assert adapter.stream_load_max_filter_ratio == "0.001"
+
+    def test_filtered_rows_raise_by_default(self):
+        """Successful Doris responses with filtered rows still fail by default."""
+        adapter = DorisAdapter(database="test_db")
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "Status": "Success",
+            "NumberLoadedRows": 2,
+            "NumberFilteredRows": 1,
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
+            f.write("1,a\n2,b\n3,c\n")
+            temp_path = Path(f.name)
+
+        try:
+            with patch("benchbox.platforms.doris._requests") as mock_requests:
+                mock_requests.put.return_value = mock_response
+                with pytest.raises(RuntimeError, match="refusing silent partial load"):
+                    adapter._stream_load_file("test_table", temp_path, CsvDialect(",", False, None, False, None))
+        finally:
+            temp_path.unlink()
+
+    def test_filtered_rows_can_be_allowed_explicitly(self, caplog):
+        """Nonzero max_filter_ratio allows filtered rows but emits a warning."""
+        import logging
+
+        adapter = DorisAdapter(database="test_db", stream_load_max_filter_ratio=0.001)
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "Status": "Success",
+            "NumberLoadedRows": 2,
+            "NumberFilteredRows": 1,
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", encoding="utf-8", delete=False) as f:
+            f.write("1,a\n2,b\n3,c\n")
+            temp_path = Path(f.name)
+
+        try:
+            with patch("benchbox.platforms.doris._requests") as mock_requests:
+                mock_requests.put.return_value = mock_response
+                with caplog.at_level(logging.WARNING):
+                    rows = adapter._stream_load_file("test_table", temp_path, CsvDialect(",", False, None, False, None))
+
+            assert rows == 2
+            assert "filtered 1 row(s)" in caplog.text
+        finally:
+            temp_path.unlink()
+
+
+class TestDorisParquetStreamLoad:
+    """Tests for Parquet-specific Doris Stream Load handling."""
+
+    def test_parquet_uses_streaming_upload_with_parquet_format(self, tmp_path):
+        """Parquet files must be uploaded as one streaming request with format=parquet."""
+        adapter = DorisAdapter(database="test_db", stream_load_chunk_size=1)
+        parquet_bytes = b"PAR1benchbox-parquetPAR1"
+        data_file = tmp_path / "rows.parquet"
+        data_file.write_bytes(parquet_bytes)
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 7}
+
+        captured: dict[str, object] = {}
+
+        def _put(url, **kwargs):
+            captured["url"] = url
+            captured["headers"] = dict(kwargs["headers"])
+            captured["payload"] = kwargs["data"].read()
+            return mock_response
+
+        with patch("benchbox.platforms.doris._requests") as mock_requests:
+            mock_requests.put.side_effect = _put
+            rows = adapter._stream_load_file("test_table", data_file, CsvDialect(",", False, None, False, None))
+
+        assert rows == 7
+        assert mock_requests.put.call_count == 1
+        assert captured["url"] == "http://localhost:8030/api/test_db/test_table/_stream_load"
+        assert captured["headers"] == {
+            "Expect": "100-continue",
+            "format": "parquet",
+            "max_filter_ratio": "0",
+        }
+        assert captured["payload"] == parquet_bytes
+
+    def test_gzipped_parquet_is_decompressed_before_upload(self, tmp_path):
+        """Outer gzip compression is removed client-side before Parquet upload."""
+        adapter = DorisAdapter(database="test_db")
+        parquet_bytes = b"PAR1compressed-parquetPAR1"
+        data_file = tmp_path / "rows.parquet.gz"
+        data_file.write_bytes(gzip.compress(parquet_bytes))
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"Status": "Success", "NumberLoadedRows": 5}
+
+        captured: dict[str, object] = {}
+
+        def _put(_url, **kwargs):
+            captured["headers"] = dict(kwargs["headers"])
+            captured["payload"] = kwargs["data"].read()
+            return mock_response
+
+        with patch("benchbox.platforms.doris._requests") as mock_requests:
+            mock_requests.put.side_effect = _put
+            rows = adapter._stream_load_file("test_table", data_file, CsvDialect(",", False, None, False, None))
+
+        assert rows == 5
+        assert mock_requests.put.call_count == 1
+        assert captured["headers"]["format"] == "parquet"
+        assert captured["payload"] == parquet_bytes
+
+
+class TestDorisDdlAndIntegrityValidation:
+    """Tests for Doris DDL rewrites and integrity validation overrides."""
+
+    def test_inject_doris_ddl_clauses_strips_array_dimensions(self):
+        """ARRAY<T>[N] should be rewritten to the Doris-supported unsized ARRAY<T> form."""
+        adapter = DorisAdapter()
+        ddl = """\
+CREATE TABLE vectors (
+    id BIGINT PRIMARY KEY,
+    embedding ARRAY<FLOAT>[128] NOT NULL,
+    tag VARCHAR(32)
+);
+"""
+
+        rewritten = adapter._inject_doris_ddl_clauses(ddl)
+
+        assert "ARRAY<FLOAT>[128]" not in rewritten
+        assert "ARRAY<FLOAT>" in rewritten
+        assert "VARCHAR(32)" in rewritten
+
+    def test_inject_doris_ddl_clauses_strips_table_level_pk_with_leading_comma(self):
+        """Table-level PRIMARY KEY (col) with leading comma is stripped."""
+        adapter = DorisAdapter()
+        ddl = "CREATE TABLE t (id BIGINT, name VARCHAR(32), PRIMARY KEY (id))"
+
+        rewritten = adapter._inject_doris_ddl_clauses(ddl)
+
+        assert "PRIMARY KEY" not in rewritten
+
+    def test_inject_doris_ddl_clauses_strips_bare_table_level_pk(self):
+        """Bare table-level PRIMARY KEY (no leading comma) is stripped."""
+        adapter = DorisAdapter()
+        ddl = "CREATE TABLE t (PRIMARY KEY (id), id BIGINT, name VARCHAR(32))"
+
+        rewritten = adapter._inject_doris_ddl_clauses(ddl)
+
+        assert "PRIMARY KEY" not in rewritten
+        # Trailing artefacts cleaned: no leading "(," in column block
+        assert "(," not in rewritten
+
+    def test_inject_doris_ddl_clauses_strips_column_level_pk(self):
+        """Column-level "col TYPE PRIMARY KEY" form is stripped."""
+        adapter = DorisAdapter()
+        ddl = "CREATE TABLE t (id BIGINT PRIMARY KEY, name VARCHAR(32))"
+
+        rewritten = adapter._inject_doris_ddl_clauses(ddl)
+
+        assert "PRIMARY KEY" not in rewritten
+
+    def test_validate_data_integrity_quotes_mixed_case_table_names(self):
+        """Integrity validation should quote mixed-case table names such as DimCustomer."""
+        adapter = DorisAdapter()
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        status, details = adapter._validate_data_integrity(
+            None,
+            mock_connection,
+            {"DimCustomer": 3},
+        )
+
+        assert status == "PASSED"
+        assert details["accessible_tables"] == ["DimCustomer"]
+        mock_cursor.execute.assert_called_once_with("SELECT 1 FROM `DimCustomer` LIMIT 1")
+        mock_cursor.close.assert_called_once()

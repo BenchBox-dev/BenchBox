@@ -14,6 +14,20 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 # ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
+
+
+class QuerySkippedError(ValueError):
+    """Raised when a query is not supported on a given dialect.
+
+    Subclasses :exc:`ValueError` so existing callers that catch the base class
+    continue to work without modification.  New callers should catch this type
+    directly rather than matching against the error message string.
+    """
+
+
+# ---------------------------------------------------------------------------
 # Structural protocol for catalog entries
 # ---------------------------------------------------------------------------
 
@@ -86,7 +100,7 @@ class BaseQueryCatalogMixin:
         if dialect and entry.skip_on:
             normalized_dialect = dialect.lower().strip()
             if normalized_dialect in entry.skip_on:
-                raise ValueError(
+                raise QuerySkippedError(
                     f"Query '{query_id}' is not supported on dialect '{dialect}' (marked as skip_on: {entry.skip_on})"
                 )
 
@@ -98,6 +112,32 @@ class BaseQueryCatalogMixin:
 
         # Return base query
         return self._queries[query_id]
+
+    def has_variant(self, query_id: str, dialect: str) -> bool:
+        """Return ``True`` when the catalog defines a dialect-specific variant for *query_id*.
+
+        Args:
+            query_id: Query identifier.
+            dialect: Target dialect (e.g., ``'duckdb'``, ``'clickhouse'``). Normalized
+                to lowercase before lookup.
+
+        Returns:
+            ``True`` if *query_id* has a catalog variant for *dialect*, ``False``
+            otherwise - including when *query_id* is not in the catalog at all.
+
+        Note:
+            Catalog variants are authored as final target SQL and must not be
+            retranslated through SQLGlot. Callers use the return value to decide
+            whether to bypass source-dialect translation.
+
+            Unlike :meth:`get_query`, this method returns ``False`` rather than
+            raising :exc:`ValueError` for an unknown *query_id*, making it safe
+            to call as a guard before :meth:`get_query`.
+        """
+        entry = self._entries.get(query_id)
+        if entry is None or not entry.variants:
+            return False
+        return dialect.lower().strip() in entry.variants
 
 
 # ---------------------------------------------------------------------------
@@ -142,5 +182,6 @@ class TranslatableQueryMixin:
 __all__ = [
     "BaseQueryCatalogMixin",
     "CatalogEntry",
+    "QuerySkippedError",
     "TranslatableQueryMixin",
 ]

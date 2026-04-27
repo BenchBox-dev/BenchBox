@@ -5,7 +5,7 @@
 ```{tags} advanced, concept, tpc-havoc, tpc-h, custom-benchmark
 ```
 
-> **CLI name:** `tpchavoc` — use `benchbox run --benchmark tpchavoc`
+> **CLI name:** `tpchavoc` - use `benchbox run --benchmark tpchavoc`
 
 ## Overview
 

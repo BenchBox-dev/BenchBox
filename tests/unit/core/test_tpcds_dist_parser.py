@@ -26,7 +26,7 @@ add ("Fairview":199, 0.5, 0.25, 0);
 add ("Oak Grove":160, 0, 0.25, 1);
 """.strip()
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".dst", delete=False, encoding="utf-8") as f:
         f.write(sample_dst_content)
         temp_file = f.name
 

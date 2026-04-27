@@ -5,7 +5,7 @@
 ```{tags} advanced, concept, tpch-skew, tpc-h, custom-benchmark
 ```
 
-> **CLI name:** `tpch_skew` — use `benchbox run --benchmark tpch_skew`
+> **CLI name:** `tpch_skew` - use `benchbox run --benchmark tpch_skew`
 
 ## Overview
 
@@ -188,6 +188,26 @@ for benchmark, name in [(uniform, "Uniform"), (skewed, "Skewed")]:
     query = benchmark.get_query(3)  # Q3: Shipping Priority
     result = adapter.execute_query(query)
     print(f"{name} Q3: {result['execution_time']:.3f}s")
+```
+
+## CLI Options (`--benchmark-option`)
+
+Configure TPC-H Skew via `--benchmark-option KEY=VALUE`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `skew_preset` | `moderate` | Skew distribution: `none`, `light`, `moderate`, `heavy`, `extreme`, `realistic` |
+| `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+
+Accepts hyphenated aliases (e.g. `skew-preset`).
+
+```bash
+# Heavy skew distribution
+benchbox run --platform duckdb --benchmark tpch_skew --scale 1 \
+  --benchmark-option skew_preset=heavy
+
+# List all preset options
+benchbox run --help-topic benchmarks
 ```
 
 ## Scale Factor Guidelines

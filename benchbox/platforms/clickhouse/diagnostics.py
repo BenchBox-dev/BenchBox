@@ -12,77 +12,11 @@ logger = logging.getLogger(__name__)
 class ClickHouseDiagnosticsMixin:
     """Provide diagnostic and metadata utilities for ClickHouse."""
 
-    def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get ClickHouse platform information."""
-        platform_info = {
-            "platform_type": "clickhouse",
-            "platform_name": "ClickHouse",
-            "connection_mode": self.deployment_mode,
-            "configuration": {},
-        }
-
-        # Include mode-specific configuration
-        if self.deployment_mode == "server":
-            platform_info.update(
-                {
-                    "host": getattr(self, "host", None),
-                    "port": getattr(self, "port", None),
-                }
-            )
-            platform_info["configuration"].update(
-                {
-                    "database": getattr(self, "database", None),
-                    "secure": getattr(self, "secure", False),
-                    "compression": getattr(self, "compression", True),
-                    "max_memory_usage": getattr(self, "max_memory_usage", None),
-                    "max_threads": getattr(self, "max_threads", None),
-                }
-            )
-
-            # Get client library version
-            try:
-                import clickhouse_driver
-
-                platform_info["client_library_version"] = clickhouse_driver.__version__
-            except (ImportError, AttributeError):
-                platform_info["client_library_version"] = None
-
-            # Try to get server version if connection is available
-            if connection:
-                try:
-                    result = connection.execute("SELECT version()")
-                    if result:
-                        platform_info["platform_version"] = result[0][0] if result else None
-                except Exception:
-                    platform_info["platform_version"] = None
-            else:
-                platform_info["platform_version"] = None
-
-        elif self.deployment_mode == "local":
-            platform_info["configuration"].update(
-                {
-                    "data_path": getattr(self, "data_path", None),
-                    "memory_limit": getattr(self, "memory_limit", None),
-                }
-            )
-
-            # Get local library version
-            try:
-                import chdb
-
-                chdb_ver = ".".join(map(str, chdb.chdb_version))
-                platform_info["local_library_version"] = chdb_ver
-                platform_info["platform_version"] = chdb_ver
-            except (ImportError, AttributeError):
-                platform_info["local_library_version"] = None
-                platform_info["platform_version"] = None
-
-        return platform_info
-
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
         """Get ClickHouse-specific metadata and system information."""
         metadata = {
             "platform": self.platform_name,
+            "deployment_mode": self.deployment_mode,
             "mode": self.deployment_mode,
             "result_cache_enabled": not getattr(self, "disable_result_cache", True),
         }
@@ -163,7 +97,7 @@ class ClickHouseDiagnosticsMixin:
             client.execute(f"DROP DATABASE IF EXISTS {db_name}")
 
         except Exception as e:
-            raise RuntimeError(f"Failed to drop ClickHouse database: {e}")
+            raise RuntimeError(f"Failed to drop ClickHouse database: {e}") from e
 
     def get_table_info(self, connection: Any, table_name: str) -> dict[str, Any]:
         """Get detailed table information."""

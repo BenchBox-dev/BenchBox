@@ -57,7 +57,7 @@ class TestDatabaseIntegration:
             ["4", "MIDDLE EAST", "uickly special requests"],
         ]
 
-        with open(region_file, "w", newline="") as f:
+        with open(region_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
             writer.writerows(region_data)
 
@@ -76,7 +76,7 @@ class TestDatabaseIntegration:
             ["9", "INDONESIA", "2", "slyly express asymptotes. regular deposits"],
         ]
 
-        with open(nation_file, "w", newline="") as f:
+        with open(nation_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
             writer.writerows(nation_data)
 
@@ -130,7 +130,7 @@ class TestDatabaseIntegration:
             ],
         ]
 
-        with open(supplier_file, "w", newline="") as f:
+        with open(supplier_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
             writer.writerows(supplier_data)
 
@@ -189,7 +189,7 @@ class TestDatabaseIntegration:
             ],
         ]
 
-        with open(customer_file, "w", newline="") as f:
+        with open(customer_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
             writer.writerows(customer_data)
 
@@ -325,7 +325,7 @@ class TestDatabaseIntegration:
 
             # Test rollback scenario with invalid data
             invalid_data_file = benchmark_instance.output_dir / "invalid_region.csv"
-            with open(invalid_data_file, "w") as f:
+            with open(invalid_data_file, "w", encoding="utf-8") as f:
                 # Write invalid data (missing required columns)
                 f.write("0|AFRICA\n")  # Missing comment column
 
@@ -492,7 +492,7 @@ class TestDatabaseIntegration:
                 float_balance = float(acctbal)
                 assert float_balance > 0, f"Account balance should be positive: {float_balance}"
             except (ValueError, TypeError):
-                raise AssertionError(f"Account balance is not numeric: {acctbal}")
+                raise AssertionError(f"Account balance is not numeric: {acctbal}") from None
 
             # Test string data types
             cursor.execute("SELECT c_name, c_mktsegment FROM customer WHERE c_custkey = 1")
@@ -624,7 +624,7 @@ class TestDatabaseIntegration:
 
             # Now create invalid data file
             invalid_file = benchmark_instance.output_dir / "invalid_nation.csv"
-            with open(invalid_file, "w") as f:
+            with open(invalid_file, "w", encoding="utf-8") as f:
                 # Write invalid data (wrong number of columns)
                 f.write("0|ALGERIA|0\n")  # Missing comment column
                 f.write("1|ARGENTINA|1\n")  # Missing comment column
@@ -866,6 +866,6 @@ class TestDatabaseIntegration:
         except Exception as e:
             # Some queries might not work with limited data, that's okay
             if "no such table" not in str(e).lower():
-                raise e
+                raise e from e
         finally:
             conn.close()

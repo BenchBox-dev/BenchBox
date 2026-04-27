@@ -57,15 +57,7 @@ class WriteOperationsCatalog:
     operations: dict[str, WriteOperation]
 
 
-def load_write_primitives_catalog() -> WriteOperationsCatalog:
-    """Load and validate the write primitives operation catalog from package resources.
-
-    Returns:
-        WriteOperationsCatalog containing all operations
-
-    Raises:
-        WritePrimitivesCatalogError: If catalog cannot be loaded or is invalid
-    """
+def _load_catalog_payload() -> dict:
     try:
         catalog_file = resources.files(__package__).joinpath(CATALOG_FILENAME)
     except (AttributeError, FileNotFoundError) as exc:
@@ -81,127 +73,135 @@ def load_write_primitives_catalog() -> WriteOperationsCatalog:
 
     if not isinstance(payload, dict):
         raise WritePrimitivesCatalogError("Write Primitives operation catalog must be a mapping")
+    return payload
 
-    # Validate version
+
+def _parse_validation_queries(operation_id: str, raw_validations: object) -> list[ValidationQuery]:
+    if not isinstance(raw_validations, list):
+        raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' validation_queries must be a list")
+    queries: list[ValidationQuery] = []
+    for val_idx, val_entry in enumerate(raw_validations):
+        if not isinstance(val_entry, dict):
+            raise WritePrimitivesCatalogError(
+                f"Validation query {val_idx} in operation '{operation_id}' must be a mapping"
+            )
+        val_id = val_entry.get("id")
+        if not isinstance(val_id, str) or not val_id.strip():
+            raise WritePrimitivesCatalogError(f"Validation query {val_idx} in operation '{operation_id}' missing 'id'")
+        val_sql = val_entry.get("sql")
+        if not isinstance(val_sql, str) or not val_sql.strip():
+            raise WritePrimitivesCatalogError(
+                f"Validation query '{val_id}' in operation '{operation_id}' missing 'sql'"
+            )
+        queries.append(
+            ValidationQuery(
+                id=val_id.strip(),
+                sql=val_sql,
+                expected_rows=val_entry.get("expected_rows"),
+                expected_rows_min=val_entry.get("expected_rows_min"),
+                expected_rows_max=val_entry.get("expected_rows_max"),
+                expected_values=val_entry.get("expected_values"),
+                check_expression=val_entry.get("check_expression"),
+            )
+        )
+    return queries
+
+
+def _parse_optional_scalars(operation_id: str, entry: dict) -> tuple[str | None, int | None]:
+    cleanup_sql = entry.get("cleanup_sql")
+    if cleanup_sql is not None and not isinstance(cleanup_sql, str):
+        raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' cleanup_sql must be a string")
+
+    expected_rows_affected = entry.get("expected_rows_affected")
+    if expected_rows_affected is not None:
+        try:
+            expected_rows_affected = int(expected_rows_affected)
+        except (TypeError, ValueError):
+            raise WritePrimitivesCatalogError(
+                f"Catalog entry '{operation_id}' expected_rows_affected must be an integer"
+            ) from None
+    return cleanup_sql, expected_rows_affected
+
+
+def _parse_operation_entry(index: int, entry: object, existing_ids: set[str]) -> WriteOperation:
+    if not isinstance(entry, dict):
+        raise WritePrimitivesCatalogError(f"Catalog entry at index {index} must be a mapping")
+
+    operation_id = entry.get("id")
+    if not isinstance(operation_id, str) or not operation_id.strip():
+        raise WritePrimitivesCatalogError(f"Catalog entry at index {index} is missing a valid 'id'")
+    operation_id = operation_id.strip()
+
+    if operation_id in existing_ids:
+        raise WritePrimitivesCatalogError(f"Duplicate operation id detected in catalog: {operation_id}")
+
+    category = entry.get("category")
+    if not isinstance(category, str) or not category.strip():
+        category = operation_id.split("_")[0]
+    category = category.strip().lower()
+
+    description = entry.get("description")
+    if not isinstance(description, str) or not description.strip():
+        raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' must include a description")
+    description = description.strip()
+
+    write_sql = entry.get("write_sql")
+    if not isinstance(write_sql, str) or not write_sql.strip():
+        raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' must include non-empty write_sql")
+
+    cleanup_sql, expected_rows_affected = _parse_optional_scalars(operation_id, entry)
+
+    file_dependencies = entry.get("file_dependencies", [])
+    if not isinstance(file_dependencies, list):
+        raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' file_dependencies must be a list")
+
+    platform_overrides = entry.get("platform_overrides", {})
+    if not isinstance(platform_overrides, dict):
+        raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' platform_overrides must be a mapping")
+
+    requires_setup = entry.get("requires_setup", True)
+    if not isinstance(requires_setup, bool):
+        raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' requires_setup must be a boolean")
+
+    return WriteOperation(
+        id=operation_id,
+        category=category,
+        description=description,
+        write_sql=write_sql,
+        validation_queries=_parse_validation_queries(operation_id, entry.get("validation_queries", [])),
+        cleanup_sql=cleanup_sql,
+        expected_rows_affected=expected_rows_affected,
+        file_dependencies=file_dependencies,
+        platform_overrides=platform_overrides,
+        requires_setup=requires_setup,
+    )
+
+
+def load_write_primitives_catalog() -> WriteOperationsCatalog:
+    """Load and validate the write primitives operation catalog from package resources.
+
+    Returns:
+        WriteOperationsCatalog containing all operations
+
+    Raises:
+        WritePrimitivesCatalogError: If catalog cannot be loaded or is invalid
+    """
+    payload = _load_catalog_payload()
+
     raw_version = payload.get("version", 1)
     try:
         version = int(raw_version)
     except (TypeError, ValueError) as exc:
         raise WritePrimitivesCatalogError("Write Primitives operation catalog version must be an integer") from exc
 
-    # Validate operations list
     raw_entries = payload.get("operations")
     if not isinstance(raw_entries, list):
         raise WritePrimitivesCatalogError("Write Primitives operation catalog must define an 'operations' list")
 
     operations: dict[str, WriteOperation] = {}
-
     for index, entry in enumerate(raw_entries):
-        if not isinstance(entry, dict):
-            raise WritePrimitivesCatalogError(f"Catalog entry at index {index} must be a mapping")
-
-        # Validate operation ID
-        operation_id = entry.get("id")
-        if not isinstance(operation_id, str) or not operation_id.strip():
-            raise WritePrimitivesCatalogError(f"Catalog entry at index {index} is missing a valid 'id'")
-        operation_id = operation_id.strip()
-
-        if operation_id in operations:
-            raise WritePrimitivesCatalogError(f"Duplicate operation id detected in catalog: {operation_id}")
-
-        # Validate category
-        category = entry.get("category")
-        if not isinstance(category, str) or not category.strip():
-            # Try to infer from ID
-            category = operation_id.split("_")[0]
-        category = category.strip().lower()
-
-        # Validate description
-        description = entry.get("description")
-        if not isinstance(description, str) or not description.strip():
-            raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' must include a description")
-        description = description.strip()
-
-        # Validate write SQL
-        write_sql = entry.get("write_sql")
-        if not isinstance(write_sql, str) or not write_sql.strip():
-            raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' must include non-empty write_sql")
-
-        # Parse validation queries
-        validation_queries: list[ValidationQuery] = []
-        raw_validations = entry.get("validation_queries", [])
-        if not isinstance(raw_validations, list):
-            raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' validation_queries must be a list")
-
-        for val_idx, val_entry in enumerate(raw_validations):
-            if not isinstance(val_entry, dict):
-                raise WritePrimitivesCatalogError(
-                    f"Validation query {val_idx} in operation '{operation_id}' must be a mapping"
-                )
-
-            val_id = val_entry.get("id")
-            if not isinstance(val_id, str) or not val_id.strip():
-                raise WritePrimitivesCatalogError(
-                    f"Validation query {val_idx} in operation '{operation_id}' missing 'id'"
-                )
-
-            val_sql = val_entry.get("sql")
-            if not isinstance(val_sql, str) or not val_sql.strip():
-                raise WritePrimitivesCatalogError(
-                    f"Validation query '{val_id}' in operation '{operation_id}' missing 'sql'"
-                )
-
-            validation_queries.append(
-                ValidationQuery(
-                    id=val_id.strip(),
-                    sql=val_sql,
-                    expected_rows=val_entry.get("expected_rows"),
-                    expected_rows_min=val_entry.get("expected_rows_min"),
-                    expected_rows_max=val_entry.get("expected_rows_max"),
-                    expected_values=val_entry.get("expected_values"),
-                    check_expression=val_entry.get("check_expression"),
-                )
-            )
-
-        # Optional fields
-        cleanup_sql = entry.get("cleanup_sql")
-        if cleanup_sql is not None and not isinstance(cleanup_sql, str):
-            raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' cleanup_sql must be a string")
-
-        expected_rows_affected = entry.get("expected_rows_affected")
-        if expected_rows_affected is not None:
-            try:
-                expected_rows_affected = int(expected_rows_affected)
-            except (TypeError, ValueError):
-                raise WritePrimitivesCatalogError(
-                    f"Catalog entry '{operation_id}' expected_rows_affected must be an integer"
-                )
-
-        file_dependencies = entry.get("file_dependencies", [])
-        if not isinstance(file_dependencies, list):
-            raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' file_dependencies must be a list")
-
-        platform_overrides = entry.get("platform_overrides", {})
-        if not isinstance(platform_overrides, dict):
-            raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' platform_overrides must be a mapping")
-
-        # Parse requires_setup flag (defaults to True for backward compatibility)
-        requires_setup = entry.get("requires_setup", True)
-        if not isinstance(requires_setup, bool):
-            raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' requires_setup must be a boolean")
-
-        operations[operation_id] = WriteOperation(
-            id=operation_id,
-            category=category,
-            description=description,
-            write_sql=write_sql,
-            validation_queries=validation_queries,
-            cleanup_sql=cleanup_sql,
-            expected_rows_affected=expected_rows_affected,
-            file_dependencies=file_dependencies,
-            platform_overrides=platform_overrides,
-            requires_setup=requires_setup,
-        )
+        op = _parse_operation_entry(index, entry, set(operations.keys()))
+        operations[op.id] = op
 
     return WriteOperationsCatalog(version=version, operations=operations)
 

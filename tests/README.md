@@ -4,6 +4,8 @@
 
 This directory contains the comprehensive test suite for BenchBox, organized into multiple categories for efficient testing and development workflows.
 
+**See also**: [`AGENTS.md`](../AGENTS.md) for the contributor/agent guide, and [`docs/development/`](../docs/development/) for architecture deep-dives.
+
 ## Test Structure
 
 ```
@@ -106,7 +108,7 @@ uv run -- python -m pytest -m fast
 # Run specific benchmark tests
 uv run -- python -m pytest tests/unit/benchmarks/test_tpch_core.py
 
-# Run with coverage (fast tests only — quick feedback)
+# Run with coverage (fast tests only - quick feedback)
 make coverage-fast
 # or full suite
 make coverage-all
@@ -249,6 +251,49 @@ uv run -- python -m pytest -m tpch
 # Run all tests except memory intensive ones
 uv run -- python -m pytest -m "not memory_intensive"
 ```
+
+## Parallel Run Mutual Exclusion (File Lock)
+
+`tests/conftest.py` acquires a single inter-process file lock at
+`~/.benchbox/test.lock` for the duration of each parallel test session. This
+prevents two concurrent `pytest -n auto` runs from fighting for CPU, which
+would otherwise double runtime and produce flaky timing assertions.
+
+**Contract** (`tests/conftest.py:52-209`):
+
+- Only the **xdist controller** process locks - workers do not. `pytest_configure`
+  checks `hasattr(config, "workerinput")` to distinguish them.
+- Lock is skipped when `numprocesses` is 0/None (no `-n auto`) or when
+  `BENCHBOX_SKIP_TEST_LOCK=1` is set in the environment.
+- Uses `fcntl.flock(LOCK_EX | LOCK_NB)` on POSIX, `msvcrt.locking` on Windows.
+- On contention, the second run **fails fast** with a message identifying the
+  holder (pid, start time, command) and three recovery options. See
+  `tests/conftest.py:138-159`.
+- The fd is held open for the whole session and released in `pytest_unconfigure`.
+
+**When to bypass**: only for intentional concurrent debug runs. Set
+`BENCHBOX_SKIP_TEST_LOCK=1` - but expect noisy timing results and CPU
+contention. Do not bypass in CI.
+
+### macOS-specific conftest branch (`tests/conftest.py:109-122`)
+
+On macOS, xdist workers suppress `setproctitle` to avoid a
+`launchservicesd` CPU storm:
+
+> xdist calls setproctitle() twice per test (running/idle) via
+> xdist.remote.worker_title(). At ~200 calls/second this triggers macOS
+> launchservicesd to rebuild its process registry continuously,
+> consuming 200%+ CPU and ~900 MB RSS - the actual root cause of
+> the macOS beachball during parallel test runs.
+
+The workaround walks the call stack to find the live xdist exec namespace
+and replaces `worker_title` with a no-op. This is necessary because
+`import xdist.remote` in an execnet `__channelexec__` namespace resolves
+to a *different* module object than the one executing - so patching by
+module import alone is a no-op.
+
+This branch only fires when `sys.platform == "darwin"` and the process is
+an xdist worker. Linux and Windows are unaffected.
 
 ## CI/CD Integration
 

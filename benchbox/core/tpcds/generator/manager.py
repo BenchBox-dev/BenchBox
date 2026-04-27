@@ -15,6 +15,7 @@ from benchbox.utils.data_validation import BenchmarkDataValidator
 from benchbox.utils.file_format import is_tpc_format
 from benchbox.utils.printing import emit
 
+from ..compliance import TpcdsComplianceClass, validate_tpcds_scale
 from .filesystem import FileArtifactMixin
 from .runner import DsdgenRunnerMixin
 from .streaming import StreamingGenerationMixin
@@ -42,9 +43,8 @@ class TPCDSDataGenerator(
         """Initialize TPC-DS data generator.
 
         Args:
-            scale_factor: Scale factor (1.0 = ~1GB). Must be >= 1.0 because the native
-                TPC-DS dsdgen binary crashes with fractional scale factors due to
-                internal calculation issues when generating certain tables.
+            scale_factor: Scale factor (1.0 = ~1GB). Sub-SF1 values are allowed
+                for development use, but remain unofficial.
             output_dir: Directory to output generated data
             verbose: Whether to print verbose output during generation
             parallel: Number of parallel processes for data generation
@@ -53,7 +53,8 @@ class TPCDSDataGenerator(
                 compression_type, compression_level, etc.)
 
         Raises:
-            ValueError: If scale_factor < 1.0 (TPC-DS minimum requirement)
+            ValueError: If scale_factor <= 0, > 100000, or below the supported
+                subscale floor.
         """
         # Extract data organization config before passing kwargs to super
         self._data_organization_config = kwargs.pop("data_organization", None)
@@ -118,22 +119,7 @@ class TPCDSDataGenerator(
 
     def _validate_parameters(self) -> None:
         """Validate input parameters."""
-        if self.scale_factor <= 0:
-            raise ValueError(f"Scale factor must be positive, got {self.scale_factor}")
-
-        # TPC-DS dsdgen binary requires scale factor >= 1.0 to avoid segmentation faults.
-        # Fractional scale factors cause dsdgen to crash when generating certain tables
-        # (e.g., call_center) because internal calculations produce invalid chunk sizes.
-        if self.scale_factor < 1.0:
-            raise ValueError(
-                f"TPC-DS requires scale_factor >= 1.0 (got {self.scale_factor}). "
-                "The native dsdgen binary crashes with fractional scale factors. "
-                "For smaller datasets, use TPC-H (which supports fractional SF) or "
-                "use scale_factor=1.0 with a subset of queries."
-            )
-
-        if self.scale_factor > 100000:
-            raise ValueError(f"Scale factor {self.scale_factor} is too large (max 100000)")
+        self.compliance_class: TpcdsComplianceClass = validate_tpcds_scale(self.scale_factor)
 
         if self.parallel < 1:
             raise ValueError(f"Parallel processes must be >= 1, got {self.parallel}")
@@ -336,7 +322,7 @@ class TPCDSDataGenerator(
         try:
             target_dir.mkdir(parents=True, exist_ok=True)
         except PermissionError as e:
-            raise PermissionError(f"Cannot create output directory {target_dir}: {e}")
+            raise PermissionError(f"Cannot create output directory {target_dir}: {e}") from e
 
         if not os.access(target_dir, os.W_OK):
             raise PermissionError(f"Output directory {target_dir} is not writable")
@@ -440,7 +426,7 @@ class TPCDSDataGenerator(
         try:
             target_dir.mkdir(parents=True, exist_ok=True)
         except PermissionError as e:
-            raise PermissionError(f"Cannot create output directory {target_dir}: {e}")
+            raise PermissionError(f"Cannot create output directory {target_dir}: {e}") from e
 
         # Validate output directory is writable
         if not os.access(target_dir, os.W_OK):

@@ -70,8 +70,10 @@ PARQUET_CAPABILITY = FormatCapability(
         "athena-spark": SupportLevel.NATIVE,
         "fabric-spark": SupportLevel.NATIVE,
         "fabric-lakehouse": SupportLevel.NATIVE,
+        "fabric_dw": SupportLevel.NATIVE,
         "trino": SupportLevel.NATIVE,
         "presto": SupportLevel.NATIVE,
+        "athena": SupportLevel.NATIVE,
         "lakesail": SupportLevel.NATIVE,
         "quanton": SupportLevel.NATIVE,
     },
@@ -204,7 +206,7 @@ CAPABILITIES_REGISTRY: dict[str, FormatCapability] = {
 
 # Platform format preferences (which format to prefer when multiple available)
 PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
-    # SQL databases: text files (tbl) preferred — always available from TPC generators,
+    # SQL databases: text files (tbl) preferred - always available from TPC generators,
     # no conversion step required. Parquet preferred over csv as fallback (faster,
     # schema-aware). Users can override via platform config.
     "duckdb": ["tbl", "parquet", "csv", "ducklake", "vortex", "delta"],
@@ -215,7 +217,11 @@ PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
     "redshift": ["tbl", "parquet", "csv"],
     "postgresql": ["tbl", "parquet", "csv"],
     "sqlite": ["tbl", "parquet", "csv"],
-    # Cloud warehouses: parquet preferred — BigQuery native load jobs support parquet,
+    # Athena's native load path stages delimited text into S3, then optionally
+    # converts it to Parquet with CTAS. Native loads should not select Parquet
+    # input files directly.
+    "athena": ["tbl", "csv"],
+    # Cloud warehouses: parquet preferred - BigQuery native load jobs support parquet,
     # and columnar input avoids text parsing / schema inference overhead.
     "bigquery": ["parquet", "tbl", "csv"],
     # Catalog/lakehouse platforms: columnar formats required or strongly preferred
@@ -230,21 +236,22 @@ PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
     "athena-spark": ["delta", "iceberg", "parquet", "tbl", "csv"],
     # fabric-lakehouse is read-only (SQL endpoint); data loaded via fabric-spark
     "fabric-lakehouse": ["parquet", "tbl", "csv"],
+    "fabric_dw": ["parquet", "tbl", "csv"],
     "fabric-spark": ["delta", "iceberg", "parquet", "tbl", "csv"],
     # lakesail uses Spark-based loading; parquet/orc are its native table formats
     "lakesail": ["parquet", "tbl", "csv"],
     "quanton": ["iceberg", "hudi", "delta", "parquet", "tbl", "csv"],
 }
 
-# Platforms whose native loaders have strong operational requirements for
-# platform-preferred format order (e.g., Redshift COPY is most reliable with
-# delimited text).  For these platforms in native mode, PLATFORM_FORMAT_PREFERENCES
-# takes priority over manifest format_preference when selecting data files.
+# DEPRECATED: All native-mode platforms now use PLATFORM_FORMAT_PREFERENCES as
+# their default format ordering (see _prefer_platform_defaults in data_loading.py).
+# This set is retained only to avoid breaking any external references.
 PREFER_PLATFORM_FORMAT_ORDER: set[str] = {
     "redshift",
 }
 
 EXTERNAL_PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
+    "athena": ["parquet"],
     "clickhouse-cloud": ["iceberg", "parquet", "tbl", "csv"],
     "snowflake": ["iceberg", "delta", "parquet", "tbl", "csv"],
     "bigquery": ["delta", "parquet", "tbl", "csv"],
@@ -269,7 +276,7 @@ def normalize_platform_key(platform_name: str) -> str:
 
     key = platform_name.strip().lower()
 
-    # Direct match — most common case
+    # Direct match - most common case
     if key in PLATFORM_FORMAT_PREFERENCES:
         return key
 

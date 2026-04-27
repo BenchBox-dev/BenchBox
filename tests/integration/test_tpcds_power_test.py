@@ -603,7 +603,7 @@ class TestTPCDSPowerTest:
             # Verify file was created and contains expected data
             assert Path(output_file).exists()
 
-            with open(output_file) as f:
+            with open(output_file, encoding="utf-8") as f:
                 exported_data = json.load(f)
 
             assert exported_data["config"]["scale_factor"] == 1.0

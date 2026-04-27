@@ -21,12 +21,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
 from benchbox.base import BaseBenchmark
-from benchbox.core.nyctaxi.downloader import NYCTaxiDataDownloader
+from benchbox.core.nyctaxi.downloader import GreenTaxiDataDownloader, HVFHVDataDownloader, NYCTaxiDataDownloader
 from benchbox.core.nyctaxi.queries import NYCTaxiQueryManager
 from benchbox.core.nyctaxi.schema import (
     NYC_TAXI_SCHEMA,
+    TaxiType,
     get_create_tables_sql,
 )
+from benchbox.utils.compression_mixin import extract_compression_kwargs
+from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
 
 if TYPE_CHECKING:
     from benchbox.core.connection import DatabaseConnection
@@ -35,41 +38,50 @@ if TYPE_CHECKING:
 class NYCTaxiBenchmark(BaseBenchmark):
     """NYC Taxi OLAP benchmark implementation.
 
-    Uses real NYC TLC trip data for OLAP analytics workloads:
-    - 25 representative OLAP queries
-    - Temporal aggregations (hourly, daily, monthly)
-    - Geographic analytics (zone-level patterns)
-    - Financial analysis (revenue, tips, fares)
-    - Multi-dimensional analysis
+    Uses real NYC TLC trip data for OLAP analytics workloads. Supports three
+    taxi data types: Yellow (TPEP), Green (LPEP), and High Volume For-Hire
+    Vehicle (HVFHV - Uber/Lyft). Default is Yellow Taxi only for backwards
+    compatibility.
 
-    Usage:
-        >>> from benchbox.core.nyctaxi import NYCTaxiBenchmark
-        >>> from benchbox.platforms.duckdb import DuckDBAdapter
-        >>>
-        >>> # Create benchmark (SF=1 = ~30M trips)
+    **Query counts by configuration:**
+    - Yellow only (default): 25 OLAP queries
+    - + Green: +4 borough-focused Green Taxi queries
+    - + HVFHV: +4 rideshare-specific HVFHV queries
+    - + Green + HVFHV: +6 cross-type comparison queries (market share, geography,
+      pricing, temporal trends)
+
+    **Usage - Yellow Taxi only (backwards compatible):**
+
         >>> benchmark = NYCTaxiBenchmark(scale_factor=1.0)
-        >>>
-        >>> # Download/generate data
         >>> data_files = benchmark.generate_data()
-        >>>
-        >>> # Get queries
-        >>> queries = benchmark.get_queries()
-        >>>
-        >>> # Run with platform adapter
-        >>> adapter = DuckDBAdapter(database=":memory:")
-        >>> adapter.load_benchmark(benchmark)
-        >>> results = adapter.run_benchmark(benchmark)
+        >>> queries = benchmark.get_queries()  # 25 Yellow Taxi queries
 
-    Scale Factors:
-        - SF=0.01: ~300K trips (~11MB) - Quick testing
-        - SF=0.1: ~3M trips (~110MB) - Development
-        - SF=1.0: ~30M trips (~1.1GB) - Standard benchmark
-        - SF=10: ~300M trips (~11GB) - Large scale
-        - SF=100: ~3B trips (~111GB) - Full dataset
+    **Usage - Multi-type (Green + HVFHV + cross-type analytics):**
+
+        >>> from benchbox.core.nyctaxi.schema import TaxiType
+        >>> benchmark = NYCTaxiBenchmark(
+        ...     scale_factor=1.0,
+        ...     taxi_types=[TaxiType.YELLOW, TaxiType.GREEN, TaxiType.HVFHV],
+        ... )
+        >>> data_files = benchmark.generate_data()
+        >>> queries = benchmark.get_queries()  # 39 queries across all types
+
+    **Scale Factors:**
+        - SF=1.0 targets roughly 10% of the Yellow Taxi corpus, which keeps the
+          default benchmark near BenchBox's ~1GB uncompressed baseline.
+        - Scale factors below 1.0 provide smaller deterministic samples for CI
+          and development.
+        - Scale factors above 10 saturate at the full available dataset.
+
+    **Data availability:**
+        - Yellow Taxi (TPEP): 2019-present
+        - Green Taxi (LPEP): 2014-present
+        - HVFHV (Uber/Lyft): February 2019-present
 
     Attributes:
         scale_factor: Scale factor controlling data size
         year: Year of data to use
+        taxi_types: Active taxi types (default: [TaxiType.YELLOW])
         tables: Dictionary of table names to file paths
     """
 
@@ -86,12 +98,13 @@ class NYCTaxiBenchmark(BaseBenchmark):
         verbose: int | bool = 0,
         quiet: bool = False,
         force_regenerate: bool = False,
+        taxi_types: list[TaxiType] | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize NYC Taxi benchmark.
 
         Args:
-            scale_factor: Scale factor (1.0 = ~30M trips)
+            scale_factor: Scale factor (1.0 = ~10% of annual Yellow Taxi trips)
             output_dir: Directory for data files
             year: Year of data to use (2019-2025)
             months: Specific months to use (1-12), None for all
@@ -99,6 +112,9 @@ class NYCTaxiBenchmark(BaseBenchmark):
             verbose: Verbosity level
             quiet: Suppress output
             force_regenerate: Force data regeneration
+            taxi_types: Taxi types to load. None defaults to [TaxiType.YELLOW] (Yellow only,
+                backward-compatible). Pass [TaxiType.YELLOW, TaxiType.GREEN, TaxiType.HVFHV]
+                for multi-type analytics.
             **kwargs: Additional options
 
         Raises:
@@ -123,6 +139,11 @@ class NYCTaxiBenchmark(BaseBenchmark):
         self.months = months
         self.seed = seed
         self.force_regenerate = force_regenerate
+        # Default to Yellow-only for backwards compatibility
+        self.taxi_types: list[TaxiType] = taxi_types if taxi_types is not None else [TaxiType.YELLOW]
+
+        # CSV files include a header row; server-based loaders (PostgreSQL COPY) must skip it
+        self.csv_has_header: bool = True
 
         # Benchmark metadata
         self._name = "NYC Taxi OLAP"
@@ -130,8 +151,9 @@ class NYCTaxiBenchmark(BaseBenchmark):
         self._description = "NYC Taxi & Limousine Commission trip data for OLAP analytics"
 
         self.logger = logging.getLogger("benchbox.core.nyctaxi.benchmark")
+        compression_kwargs = extract_compression_kwargs(kwargs)
 
-        # Create data downloader
+        # Create Yellow Taxi data downloader (always present)
         self.downloader = NYCTaxiDataDownloader(
             scale_factor=scale_factor,
             output_dir=self.output_dir,
@@ -141,7 +163,38 @@ class NYCTaxiBenchmark(BaseBenchmark):
             verbose=verbose,
             quiet=quiet,
             force_redownload=force_regenerate,
+            **compression_kwargs,
         )
+
+        # Create optional Green and HVFHV downloaders
+        self.green_downloader: GreenTaxiDataDownloader | None = None
+        self.hvfhv_downloader: HVFHVDataDownloader | None = None
+
+        if TaxiType.GREEN in self.taxi_types:
+            self.green_downloader = GreenTaxiDataDownloader(
+                scale_factor=scale_factor,
+                output_dir=self.output_dir,
+                year=year,
+                months=months,
+                seed=seed,
+                verbose=verbose,
+                quiet=quiet,
+                force_redownload=force_regenerate,
+                **compression_kwargs,
+            )
+
+        if TaxiType.HVFHV in self.taxi_types:
+            self.hvfhv_downloader = HVFHVDataDownloader(
+                scale_factor=scale_factor,
+                output_dir=self.output_dir,
+                year=year,
+                months=months,
+                seed=seed,
+                verbose=verbose,
+                quiet=quiet,
+                force_redownload=force_regenerate,
+                **compression_kwargs,
+            )
 
         # Determine date range for queries
         if months:
@@ -158,11 +211,14 @@ class NYCTaxiBenchmark(BaseBenchmark):
         _, last_day = calendar.monthrange(year, end_month)
         end_date = datetime(year, end_month, last_day)
 
-        # Initialize query manager
+        # Initialize query manager - enable type-specific queries based on taxi_types
         self.query_manager = NYCTaxiQueryManager(
             start_date=start_date,
             end_date=end_date,
             seed=seed,
+            include_green_queries=TaxiType.GREEN in self.taxi_types,
+            include_hvfhv_queries=TaxiType.HVFHV in self.taxi_types,
+            include_cross_type_queries=(TaxiType.GREEN in self.taxi_types and TaxiType.HVFHV in self.taxi_types),
         )
 
         # Track generated table files
@@ -171,29 +227,146 @@ class NYCTaxiBenchmark(BaseBenchmark):
     def generate_data(self) -> list[Union[str, Path]]:
         """Download/generate NYC Taxi benchmark data.
 
+        Downloads data for all configured taxi_types. By default only Yellow Taxi
+        data is downloaded (backwards-compatible). Pass taxi_types=[TaxiType.YELLOW,
+        TaxiType.GREEN, TaxiType.HVFHV] to generate multi-type data.
+
         Returns:
             List of paths to data files
         """
-        self.log_verbose(f"Generating NYC Taxi data (SF={self.scale_factor})")
+        self.log_verbose(
+            f"Generating NYC Taxi data (SF={self.scale_factor}, types={[t.value for t in self.taxi_types]})"
+        )
 
+        # Always download Yellow Taxi + taxi_zones
         self.tables = self.downloader.download()
 
         if self.verbose_enabled:
             stats = self.downloader.get_download_stats()
             self.logger.info(f"Data ready: year={stats['year']}, sample_rate={stats['sample_rate']:.4f}")
 
+        # Download Green Taxi if requested
+        if self.green_downloader is not None:
+            self.log_verbose("Downloading Green Taxi data...")
+            green_path = self.green_downloader.download()
+            self.tables["green_trips"] = green_path
+
+        # Download HVFHV if requested
+        if self.hvfhv_downloader is not None:
+            self.log_verbose("Downloading HVFHV data...")
+            hvfhv_path = self.hvfhv_downloader.download()
+            self.tables["hvfhv_trips"] = hvfhv_path
+
+        self._write_manifest()
         return list(self.tables.values())
+
+    def _write_manifest(self) -> None:
+        if not self.tables:
+            return
+
+        yellow_stats = self.downloader.get_download_stats()
+        row_counts = dict(yellow_stats.get("row_counts", {}))
+
+        if self.green_downloader is not None:
+            row_counts.update(self.green_downloader.get_download_stats().get("row_counts", {}))
+
+        if self.hvfhv_downloader is not None:
+            row_counts.update(self.hvfhv_downloader.get_download_stats().get("row_counts", {}))
+
+        # Skip manifest when all downloaders reused cached data (no row counts collected)
+        if not row_counts:
+            return
+
+        manifest = DataGenerationManifest(
+            output_dir=self.output_dir,
+            benchmark="nyctaxi",
+            scale_factor=self.scale_factor,
+            compression=resolve_compression_metadata(self.downloader),
+            parallel=1,
+            seed=self.seed,
+        )
+
+        for table, path in self.tables.items():
+            manifest.add_entry(
+                table,
+                path,
+                row_count=row_counts.get(table, 0),
+                metadata={"csv_has_header": True, "csv_null_marker": None},
+            )
+
+        manifest.write()
 
     def get_queries(self, dialect: str | None = None) -> dict[str, str]:
         """Get all benchmark queries.
 
         Args:
-            dialect: Target SQL dialect (not used - queries are standard SQL)
+            dialect: Target SQL dialect. When 'clickhouse' or 'starrocks', replaces queries that
+                use EXTRACT(DOW/EPOCH …) with platform-native equivalents.
 
         Returns:
             Dictionary mapping query IDs to query strings
         """
-        return self.query_manager.get_queries()
+        import benchbox.sql_compat.rules.query_source.nyctaxi_variants  # noqa: F401
+        from benchbox.sql_compat.actions import CompatAction
+        from benchbox.sql_compat.context import CompatibilityContext, Phase
+        from benchbox.sql_compat.registry import REGISTRY
+        from benchbox.sql_compat.rules.query_source.nyctaxi_variants import (
+            CLICKHOUSE_RUSH_HOUR_SQL,
+            CLICKHOUSE_TRIPS_BY_DOW_SQL,
+            CLICKHOUSE_WEEKDAY_WEEKEND_SQL,
+            STARROCKS_RUSH_HOUR_SQL,
+            STARROCKS_TRIP_DURATION_SQL,
+            STARROCKS_TRIPS_BY_DOW_SQL,
+            STARROCKS_WEEKDAY_WEEKEND_SQL,
+        )
+
+        queries = self.query_manager.get_queries()
+        if not dialect:
+            return queries
+
+        d = dialect.lower()
+        qm = self.query_manager
+        _variants: dict[str, dict[str, str]] = {
+            "starrocks": {
+                "trips-by-day-of-week": STARROCKS_TRIPS_BY_DOW_SQL,
+                "weekday-weekend-comparison": STARROCKS_WEEKDAY_WEEKEND_SQL,
+                "rush-hour-analysis": STARROCKS_RUSH_HOUR_SQL,
+                "trip-duration-analysis": STARROCKS_TRIP_DURATION_SQL,
+            },
+            "clickhouse": {
+                "trips-by-day-of-week": CLICKHOUSE_TRIPS_BY_DOW_SQL,
+                "weekday-weekend-comparison": CLICKHOUSE_WEEKDAY_WEEKEND_SQL,
+                "rush-hour-analysis": CLICKHOUSE_RUSH_HOUR_SQL,
+            },
+        }
+        # Iterate both platforms independently - a real dialect string never matches both.
+        for platform, platform_variants in _variants.items():
+            if platform not in d:
+                continue
+            for query_id, legacy_sql in platform_variants.items():
+                if query_id not in queries:
+                    continue
+                ctx = CompatibilityContext(
+                    platform=platform,
+                    platform_version=None,
+                    benchmark="nyctaxi",
+                    query_id=query_id,
+                    phase=Phase.QUERY_SOURCE,
+                    mode="sql",
+                    dialect=dialect,
+                )
+                registry_decision = REGISTRY.resolve(ctx)
+                if registry_decision is not None:
+                    if registry_decision.action is CompatAction.SELECT_VARIANT:
+                        variant_template = registry_decision.payload.variant_sql  # type: ignore[union-attr]
+                    else:
+                        continue  # registry says NATIVE - keep original
+                else:
+                    variant_template = legacy_sql  # no rule: use legacy SQL
+                query_def = qm._active_queries[query_id]
+                params = qm._generate_params(query_def)
+                queries[query_id] = variant_template.format(**params)
+        return queries
 
     def get_query(
         self,
@@ -219,12 +392,13 @@ class NYCTaxiBenchmark(BaseBenchmark):
         return self.query_manager.get_query(query_key, params)
 
     def get_schema(self) -> dict[str, dict[str, Any]]:
-        """Get the NYC Taxi schema.
+        """Get the NYC Taxi schema for active taxi types.
 
         Returns:
-            Schema dictionary with table definitions
+            Schema dictionary with table definitions for active tables
         """
-        return NYC_TAXI_SCHEMA
+        active_tables = self._get_active_tables()
+        return {k: v for k, v in NYC_TAXI_SCHEMA.items() if k in active_tables}
 
     def get_create_tables_sql(
         self,
@@ -248,6 +422,7 @@ class NYCTaxiBenchmark(BaseBenchmark):
             dialect=dialect,
             include_constraints=include_constraints,
             time_partitioning=time_partitioning,
+            taxi_types=self.taxi_types,
         )
 
     def get_benchmark_info(self) -> dict[str, Any]:
@@ -266,7 +441,8 @@ class NYCTaxiBenchmark(BaseBenchmark):
             "months": self.months or list(range(1, 13)),
             "num_queries": self.query_manager.get_query_count(),
             "query_categories": self.query_manager.get_categories(),
-            "tables": ["taxi_zones", "trips"],
+            "tables": self._get_active_tables(),
+            "taxi_types": [t.value for t in self.taxi_types],
             "data_type": "real",  # Uses real TLC data, not synthetic
             "dimensions": {
                 "temporal": "pickup/dropoff timestamps",
@@ -274,6 +450,15 @@ class NYCTaxiBenchmark(BaseBenchmark):
                 "financial": "fares, tips, surcharges",
             },
         }
+
+    def _get_active_tables(self) -> list[str]:
+        """Return list of tables active for the current taxi_types configuration."""
+        tables = ["taxi_zones", "trips"]
+        if TaxiType.GREEN in self.taxi_types:
+            tables.append("green_trips")
+        if TaxiType.HVFHV in self.taxi_types:
+            tables.append("hvfhv_trips")
+        return tables
 
     def get_query_info(self, query_id: str) -> dict[str, Any]:
         """Get metadata for a specific query.
@@ -357,8 +542,12 @@ class NYCTaxiBenchmark(BaseBenchmark):
         total_rows = 0
         loaded_tables = 0
 
-        # Load tables in dependency order (dimension tables first)
+        # Load tables in dependency order (dimension tables first, then fact tables)
         table_order = ["taxi_zones", "trips"]
+        if TaxiType.GREEN in self.taxi_types:
+            table_order.append("green_trips")
+        if TaxiType.HVFHV in self.taxi_types:
+            table_order.append("hvfhv_trips")
 
         for table_name in table_order:
             if table_name not in self.tables:
@@ -401,7 +590,9 @@ class NYCTaxiBenchmark(BaseBenchmark):
         Returns:
             Number of rows loaded
         """
-        # Get table schema to determine column count
+        # Get table schema to determine column count (supports all taxi type tables)
+        if table_name not in NYC_TAXI_SCHEMA:
+            raise ValueError(f"Unknown table: {table_name}")
         table_schema = NYC_TAXI_SCHEMA[table_name]
         column_names = list(table_schema["columns"].keys())
         num_columns = len(column_names)
@@ -417,13 +608,67 @@ class NYCTaxiBenchmark(BaseBenchmark):
             # Skip header row
             next(reader, None)
 
+            rows_skipped = 0
             for row in reader:
                 # Validate row has correct number of columns
                 if len(row) != num_columns:
-                    continue  # Skip malformed rows
+                    rows_skipped += 1
+                    continue
 
                 # Execute individual INSERT
                 connection.execute(insert_sql, row)
                 rows_loaded += 1
 
+        if rows_skipped:
+            logging.getLogger(__name__).warning(
+                "Skipped %d malformed rows in %s (expected %d columns)",
+                rows_skipped,
+                table_name,
+                num_columns,
+            )
         return rows_loaded
+
+
+# ---------------------------------------------------------------------------
+# Register benchmark-specific CLI option specs
+# ---------------------------------------------------------------------------
+
+from benchbox.cli.benchmark_hooks import (  # noqa: E402
+    BenchmarkHookRegistry,
+    BenchmarkOptionSpec,
+    parse_enum_list,
+    parse_int,
+    parse_int_list,
+)
+
+BenchmarkHookRegistry.register_option_specs(
+    "nyctaxi",
+    BenchmarkOptionSpec(
+        name="taxi_types",
+        parser=parse_enum_list(TaxiType),
+        help="Taxi data types to load (yellow,green,hvfhv)",
+        aliases=("taxi-types",),
+    ),
+    BenchmarkOptionSpec(
+        name="year",
+        parser=parse_int,
+        default=2019,
+        help="Year of TLC data (2019-2025)",
+    ),
+    BenchmarkOptionSpec(
+        name="months",
+        parser=parse_int_list,
+        help="Months to include, comma-separated (1-12)",
+    ),
+    BenchmarkOptionSpec(
+        name="seed",
+        parser=parse_int,
+        help="Random seed for reproducibility",
+    ),
+    BenchmarkOptionSpec(
+        name="force_regenerate",
+        parser=lambda v: v.strip().lower() in ("true", "1", "yes"),
+        help="Force data regeneration",
+        aliases=("force-regenerate",),
+    ),
+)

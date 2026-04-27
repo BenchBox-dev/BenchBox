@@ -191,6 +191,8 @@ class TestExampleArgumentParser:
         # Test ClickHouse arguments
         args = parser.parse_args(
             [
+                "--deployment-mode",
+                "local",
                 "--host",
                 "clickhouse.example.com",
                 "--port",
@@ -208,6 +210,16 @@ class TestExampleArgumentParser:
         assert args.user == "test_user"
         assert args.password == "secret123"
         assert args.secure is True
+        assert args.deployment_mode == "local"
+
+    def test_add_platform_arguments_clickhouse_accepts_legacy_mode_alias(self):
+        """Legacy `--mode` should populate deployment_mode for compatibility."""
+        parser = ExampleArgumentParser.create_benchmark_parser("Test")
+        ExampleArgumentParser.add_platform_arguments(parser, "clickhouse")
+
+        args = parser.parse_args(["--mode", "embedded"])
+
+        assert args.deployment_mode == "embedded"
 
     def test_add_platform_arguments_unknown(self):
         """Test adding arguments for unknown platform (should not crash)."""

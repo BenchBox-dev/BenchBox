@@ -240,7 +240,7 @@ def _download_and_extract(
 
         logger.info("Downloading %s...", archive_name)
         if not _download_with_retry(archive_url, tmp_path):
-            # 404/403 — release asset not yet published
+            # 404/403 - release asset not yet published
             logger.debug(
                 "%s not found at %s. Run 'benchbox download-answers' after the answers-v1 release is published.",
                 archive_name,

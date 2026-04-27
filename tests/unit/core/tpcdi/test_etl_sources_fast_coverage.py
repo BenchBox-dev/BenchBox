@@ -56,13 +56,6 @@ def test_format_wrappers_generate_and_write(tmp_path: Path, monkeypatch: pytest.
     csv_fmt.write_to_file(df, csv_file)
     assert csv_file.exists()
 
-    xml_fmt = src_mod.XMLSourceFormat(root_element="root", record_element="row")
-    xml_out = xml_fmt.generate_data("Broker", 10, output_dir=tmp_path)
-    assert xml_out.endswith("hr.xml")
-    xml_file = tmp_path / "x.xml"
-    xml_fmt.write_to_file(df, xml_file)
-    assert xml_file.exists()
-
     fw_fmt = src_mod.FixedWidthSourceFormat(field_widths={"id": 3, "name": 4}, fill_char=".")
     fw_out = fw_fmt.generate_data("Legacy", 10, output_dir=tmp_path)
     assert fw_out.endswith("ext.dat")
@@ -76,6 +69,19 @@ def test_format_wrappers_generate_and_write(tmp_path: Path, monkeypatch: pytest.
     pipe_file = tmp_path / "x.tbl"
     pipe_fmt.write_to_file(pd.DataFrame([{"id": 1, "name": None}]), pipe_file)
     assert "NULL" in pipe_file.read_text(encoding="utf-8")
+
+
+def test_xml_format_generate_and_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    pytest.importorskip("lxml", reason="lxml required for pandas to_xml()")
+    monkeypatch.setattr(src_mod, "TPCDISourceDataGenerator", _FakeGenerator)
+    df = pd.DataFrame([{"id": 1, "name": "a"}])
+
+    xml_fmt = src_mod.XMLSourceFormat(root_element="root", record_element="row")
+    xml_out = xml_fmt.generate_data("Broker", 10, output_dir=tmp_path)
+    assert xml_out.endswith("hr.xml")
+    xml_file = tmp_path / "x.xml"
+    xml_fmt.write_to_file(df, xml_file)
+    assert xml_file.exists()
 
 
 def test_source_data_generator_wrapper_methods(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

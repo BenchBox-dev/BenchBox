@@ -1,0 +1,56 @@
+{
+  "chart": "lightness_for_cell",
+  "version": 1,
+  "cases": [
+    {
+      "id": "fastest_in_col",
+      "input": {
+        "ms": 100.0,
+        "minInCol": 100.0
+      },
+      "expected": {
+        "lightness": "95%"
+      }
+    },
+    {
+      "id": "ten_x_slower",
+      "input": {
+        "ms": 1000.0,
+        "minInCol": 100.0
+      },
+      "expected": {
+        "lightness": "25%"
+      }
+    },
+    {
+      "id": "two_x_slower",
+      "input": {
+        "ms": 200.0,
+        "minInCol": 100.0
+      },
+      "expected": {
+        "lightness": "74%"
+      }
+    },
+    {
+      "id": "null_ms",
+      "input": {
+        "ms": null,
+        "minInCol": 100.0
+      },
+      "expected": {
+        "lightness": null
+      }
+    },
+    {
+      "id": "zero_ms",
+      "input": {
+        "ms": 0.0,
+        "minInCol": 100.0
+      },
+      "expected": {
+        "lightness": null
+      }
+    }
+  ]
+}

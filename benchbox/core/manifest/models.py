@@ -35,6 +35,7 @@ class ConvertedFileEntry:
     row_groups: int | None = None
     is_directory: bool = False
     conversion_options: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

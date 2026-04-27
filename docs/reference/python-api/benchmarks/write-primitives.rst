@@ -586,7 +586,7 @@ Write Primitives provides DataFrame support for write operations on DataFrame pl
      - ✓*
      - ✓*
      - ✓*
-     - *Requires Delta Lake table format
+     - *Requires Delta Lake table format*
 
 DataFrameWriteOperationsManager
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

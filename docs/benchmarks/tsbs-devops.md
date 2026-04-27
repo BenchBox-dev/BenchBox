@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, tsbs-devops, custom-benchmark
 ```
 
-> **CLI name:** `tsbs_devops` — use `benchbox run --benchmark tsbs_devops`
+> **CLI name:** `tsbs_devops` - use `benchbox run --benchmark tsbs_devops`
 
 ## Overview
 
@@ -31,10 +31,10 @@ The TSBS DevOps benchmark uses a dimensional model with a tags table and four me
 | Table | Purpose | Rows per SF=1 |
 |-------|---------|---------------|
 | **tags** | Host metadata and dimensions | 100 |
-| **cpu** | CPU usage metrics per timestamp | ~864,000 |
-| **mem** | Memory metrics per timestamp | ~864,000 |
-| **disk** | Disk I/O metrics per device | ~1,728,000 |
-| **net** | Network metrics per interface | ~1,728,000 |
+| **cpu** | CPU usage metrics per timestamp | ~1,728,000 |
+| **mem** | Memory metrics per timestamp | ~1,728,000 |
+| **disk** | Disk I/O metrics per device | ~3,456,000 |
+| **net** | Network metrics per interface | ~3,456,000 |
 
 ### tags Table
 
@@ -90,11 +90,21 @@ The TSBS DevOps benchmark uses a dimensional model with a tags table and four me
 | `time` | TIMESTAMP | Measurement timestamp (PK) |
 | `hostname` | VARCHAR | Host identifier (PK) |
 | `device` | VARCHAR | Disk device name (PK) |
-| `reads_completed` | BIGINT | Total read operations |
-| `writes_completed` | BIGINT | Total write operations |
-| `read_time_ms` | BIGINT | Read time in milliseconds |
-| `write_time_ms` | BIGINT | Write time in milliseconds |
+| `reads_completed` | BIGINT | Total read operations (cumulative counter) |
+| `reads_merged` | BIGINT | Merged read operations |
+| `sectors_read` | BIGINT | Sectors read (cumulative counter) |
+| `read_time_ms` | BIGINT | Read time in milliseconds (cumulative counter) |
+| `writes_completed` | BIGINT | Total write operations (cumulative counter) |
+| `writes_merged` | BIGINT | Merged write operations |
+| `sectors_written` | BIGINT | Sectors written (cumulative counter) |
+| `write_time_ms` | BIGINT | Write time in milliseconds (cumulative counter) |
 | `io_in_progress` | INTEGER | Current I/O operations |
+| `io_time_ms` | BIGINT | Total I/O time (cumulative counter) |
+| `weighted_io_time_ms` | BIGINT | Weighted I/O time (cumulative counter) |
+
+> **Note:** Columns flagged as *cumulative counter* accumulate across samples
+> (see `generator.py:_generate_disk_metrics`). Compute the delta between
+> consecutive samples per `(hostname, device)` when reporting rates.
 
 ### net Table
 
@@ -103,14 +113,20 @@ The TSBS DevOps benchmark uses a dimensional model with a tags table and four me
 | `time` | TIMESTAMP | Measurement timestamp (PK) |
 | `hostname` | VARCHAR | Host identifier (PK) |
 | `interface` | VARCHAR | Network interface name (PK) |
-| `bytes_recv` | BIGINT | Bytes received |
-| `bytes_sent` | BIGINT | Bytes sent |
-| `packets_recv` | BIGINT | Packets received |
-| `packets_sent` | BIGINT | Packets sent |
-| `err_in` | BIGINT | Receive errors |
-| `err_out` | BIGINT | Send errors |
-| `drop_in` | BIGINT | Dropped incoming packets |
-| `drop_out` | BIGINT | Dropped outgoing packets |
+| `bytes_recv` | BIGINT | Bytes received (cumulative counter) |
+| `bytes_sent` | BIGINT | Bytes sent (cumulative counter) |
+| `packets_recv` | BIGINT | Packets received (cumulative counter) |
+| `packets_sent` | BIGINT | Packets sent (cumulative counter) |
+| `err_in` | BIGINT | Receive errors in this sample window |
+| `err_out` | BIGINT | Send errors in this sample window |
+| `drop_in` | BIGINT | Dropped incoming packets in this sample window |
+| `drop_out` | BIGINT | Dropped outgoing packets in this sample window |
+
+> **Note:** `bytes_*` and `packets_*` columns are cumulative counters
+> (see `generator.py:_generate_net_metrics`); compute the delta between
+> consecutive samples per `(hostname, interface)` when reporting rates.
+> Error and drop columns are per-sample gauges (generated as rare 0/1
+> events), so they can be summed over a window rather than differenced.
 
 ## Query Categories
 
@@ -171,7 +187,7 @@ Filtering by host metadata:
 ```python
 from benchbox import TSBSDevOps
 
-# Initialize TSBS DevOps benchmark (SF=1 = 100 hosts, 1 day)
+# Initialize TSBS DevOps benchmark (SF=1 = 100 hosts, 2 days)
 tsbs = TSBSDevOps(scale_factor=1.0, output_dir="tsbs_data")
 
 # Generate time-series data
@@ -326,15 +342,43 @@ adapter = InfluxDBAdapter(
 - **Tags vs Fields**: hostname becomes a tag (indexed), metrics become fields
 - **No DELETE**: InfluxDB Core doesn't support deletes; use retention policies instead
 
+## CLI Options (`--benchmark-option`)
+
+Configure TSBS Devops data generation via `--benchmark-option KEY=VALUE`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `num_hosts` | - | Number of simulated hosts |
+| `duration_days` | - | Duration in days for data generation |
+| `interval_seconds` | `10` | Measurement interval in seconds |
+| `start_time` | - | Start time in ISO format (e.g. `2019-01-01T00:00:00`) |
+| `seed` | - | Random seed for reproducibility |
+| `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+
+Accepts hyphenated aliases (e.g. `num-hosts`, `duration-days`).
+
+```bash
+# Custom host count and interval
+benchbox run --platform duckdb --benchmark tsbs_devops --scale 1 \
+  --benchmark-option num_hosts=100 \
+  --benchmark-option interval_seconds=30 \
+  --benchmark-option start_time=2019-01-01T00:00:00
+```
+
 ## Scale Factor Guidelines
 
-| Scale Factor | Hosts | Duration | CPU Rows | Total Rows | Use Case |
-|-------------|-------|----------|----------|------------|----------|
-| 0.01 | 10 | 1 day | ~86K | ~430K | Quick testing |
-| 0.1 | 10 | 1 day | ~86K | ~430K | Development |
-| 1.0 | 100 | 1 day | ~864K | ~5M | Standard benchmark |
-| 10.0 | 1000 | 10 days | ~86M | ~500M | Performance testing |
-| 100.0 | 1000 | 100 days | ~864M | ~5B | Large scale testing |
+| Scale Factor | Hosts | Duration | CPU Rows | Total Rows | Data Size | Use Case |
+|-------------|-------|----------|----------|------------|-----------|----------|
+| 0.01 | 10 | 2 days | ~173K | ~1M | ~93 MB | Quick testing |
+| 0.1 | 10 | 2 days | ~173K | ~1M | ~93 MB | Development |
+| 1.0 | 100 | 2 days | ~1.7M | ~10M | ~0.93 GB | Standard benchmark |
+| 10.0 | 1,000 | 2 days | ~17.3M | ~100M | ~9.3 GB | Performance testing |
+| 100.0 | 10,000 | 2 days | ~173M | ~1B | ~93 GB | Large scale testing |
+
+> **Note:** Duration is fixed at 2 days; only host count scales with SF. If both
+> hosts *and* duration scaled, total rows would grow as SF² (quadratic) instead of SF (linear),
+> making large scale factors disproportionately expensive.
+> SF=0.01 and SF=0.1 produce identical output due to the 10-host minimum floor.
 
 ## Data Generation Patterns
 

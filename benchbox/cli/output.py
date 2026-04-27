@@ -146,6 +146,9 @@ class ConsoleResultFormatter:
     @staticmethod
     def _determine_benchmark_status(results: BenchmarkResults) -> tuple[str, str]:
         """Determine overall benchmark status and color."""
+        # Defense-in-depth: 0 total queries means nothing ran - always FAILED.
+        if results.total_queries == 0:
+            return "FAILED", "red"
         query_success = results.successful_queries == results.total_queries
         validation_success = getattr(results, "validation_status", "PASSED") in ["PASSED", "PARTIAL"]
 
@@ -368,7 +371,9 @@ class ConsoleResultFormatter:
 
         if getattr(results, "validation_status", None):
             stats["validation_status"] = str(results.validation_status)
-        if getattr(results, "power_at_size", None):
+        _compliance_class = getattr(results, "compliance_class", None)
+        _unofficial = _compliance_class in {"unofficial_nonstandard", "unofficial_subscale"}
+        if not _unofficial and getattr(results, "power_at_size", None):
             stats["power_at_size"] = f"{results.power_at_size:.2f}"
 
         return stats

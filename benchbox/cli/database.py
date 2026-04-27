@@ -124,8 +124,8 @@ class DatabaseManager:
                     or platform_info.category in ["analytical", "cloud"],
                 }
 
-                # Special handling for ClickHouse modes
-                if platform_name == "clickhouse":
+                # Special handling for ClickHouse platform family
+                if platform_name in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
                     has_server = any(
                         lib.name == "clickhouse_driver" and lib.installed for lib in platform_info.libraries
                     )
@@ -442,6 +442,14 @@ class DatabaseManager:
         overrides = self.verbosity.to_config()
         if runtime_overrides:
             overrides.update(runtime_overrides)
+        # Stash only truly explicit CLI options (minus registered defaults) so builders can
+        # apply them with higher priority than saved credentials but lower than runtime overrides.
+        # parse_options() merges defaults into platform_options, so subtract defaults to isolate
+        # values the user explicitly typed on the command line.
+        if platform_options:
+            explicit_only = {k: v for k, v in platform_options.items() if defaults.get(k) != v}
+            if explicit_only:
+                overrides["_explicit_platform_options"] = explicit_only
 
         try:
             config = PlatformHookRegistry.build_database_config(platform_lower, options, overrides)

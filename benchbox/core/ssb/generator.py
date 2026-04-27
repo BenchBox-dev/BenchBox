@@ -27,7 +27,7 @@ from pathlib import Path
 
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 from benchbox.utils.compression_mixin import CompressionMixin
-from benchbox.utils.file_format import detect_compression
+from benchbox.utils.file_format import detect_compression, validate_tbl_compression_consistency
 
 
 class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
@@ -264,22 +264,7 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         """Ensure no raw .tbl files exist when compression is enabled; ensure no empty compressed files."""
         if not self.should_use_compression():
             return
-        # No raw .tbl
-        raw_tbl = list(target_dir.glob("*.tbl"))
-        if raw_tbl:
-            names = ", ".join(f.name for f in raw_tbl[:5])
-            more = "..." if len(raw_tbl) > 5 else ""
-            raise RuntimeError(
-                f"File format consistency violation: Found raw .tbl files with compression enabled: {names}{more}"
-            )
-        # No empty compressed
-        ext = self.get_compressor().get_file_extension()
-        compressed = list(target_dir.glob(f"*.tbl{ext}"))
-        empties = [f for f in compressed if f.stat().st_size <= (9 if ext == ".zst" else 20)]
-        if empties:
-            names = ", ".join(f.name for f in empties[:5])
-            more = "..." if len(empties) > 5 else ""
-            raise RuntimeError(f"File format consistency violation: Found empty compressed files: {names}{more}")
+        validate_tbl_compression_consistency(target_dir, self.get_compressor().get_file_extension())
 
     def _write_manifest(self, output_dir: Path, table_paths: dict[str, Path]) -> None:
         import json
@@ -318,7 +303,7 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                         with open(p, "rb") as fh, dctx.stream_reader(fh) as reader:
                             import io
 
-                            rows = sum(1 for _ in io.TextIOWrapper(reader))
+                            rows = sum(1 for _ in io.TextIOWrapper(reader, encoding="utf-8"))
                     except Exception:
                         rows = 0
                 elif compression == "bzip2":
@@ -344,7 +329,7 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 }
             )
         out = output_dir / "_datagen_manifest.json"
-        with open(out, "w") as f:
+        with open(out, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)
 
     def _generate_customer_data(self) -> str:

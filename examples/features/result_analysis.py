@@ -76,7 +76,7 @@ def generate_sample_results():
     baseline_file = baseline_output / "results.json"
 
     # Save baseline results
-    with open(baseline_file, "w") as f:
+    with open(baseline_file, "w", encoding="utf-8") as f:
         json.dump(baseline_results.model_dump(), f, indent=2)
 
     print(f"✓ Baseline saved to {baseline_file}")
@@ -93,7 +93,7 @@ def generate_sample_results():
     recent_file = recent_output / "results.json"
 
     # Save recent results
-    with open(recent_file, "w") as f:
+    with open(recent_file, "w", encoding="utf-8") as f:
         json.dump(recent_results.model_dump(), f, indent=2)
 
     print(f"✓ Recent saved to {recent_file}")
@@ -111,7 +111,7 @@ def load_results(result_path: Path) -> dict[str, Any]:
     - Query-by-query results (execution times, status)
     - Configuration details
     """
-    with open(result_path) as f:
+    with open(result_path, encoding="utf-8") as f:
         return json.load(f)
 
 

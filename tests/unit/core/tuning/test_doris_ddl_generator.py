@@ -1,6 +1,6 @@
 """Tests for benchbox.core.tuning.generators.doris.DorisDDLGenerator.
 
-Focused on the generator class itself — DDL string content and TuningClauses
+Focused on the generator class itself - DDL string content and TuningClauses
 field values. Does not duplicate the adapter-level tests in test_doris_adapter.py.
 
 Copyright 2026 Joe Harris / BenchBox Project

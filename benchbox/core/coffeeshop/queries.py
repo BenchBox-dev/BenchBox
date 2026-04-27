@@ -126,7 +126,7 @@ SELECT
 FROM order_lines ol
 JOIN dim_products dp ON ol.product_record_id = dp.record_id
 WHERE ol.order_date BETWEEN DATE '{start_date}' AND DATE '{end_date}'
-  AND ol.order_date BETWEEN DATE(dp.from_date) AND DATE(dp.to_date)
+  AND ol.order_date BETWEEN dp.from_date AND dp.to_date
 GROUP BY dp.subcategory
 ORDER BY revenue DESC;
 """,

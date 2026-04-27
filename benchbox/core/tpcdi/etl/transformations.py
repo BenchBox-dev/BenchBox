@@ -2582,7 +2582,7 @@ class TransformationEngine:
                 self.parallel_context.increment_failed_chunks()
                 error_msg = f"Exception transforming dimension {table_name}: {str(e)}"
                 self.logger.error(error_msg)
-                raise RuntimeError(error_msg)
+                raise RuntimeError(error_msg) from e
 
         return results
 

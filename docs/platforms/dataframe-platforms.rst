@@ -11,8 +11,9 @@ Native DataFrame API platforms for benchmarking without SQL.
    dataframe
    polars
    pandas-dataframe
+   pyspark-dataframe
+   datafusion-dataframe
    modin-dataframe
    dask-dataframe
    cudf
-   pyspark-dataframe
-   datafusion-dataframe
+   databricks-dataframe

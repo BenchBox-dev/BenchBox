@@ -5,7 +5,7 @@
 ```{tags} intermediate, concept, amplab, custom-benchmark
 ```
 
-> **CLI name:** `amplab` — use `benchbox run --benchmark amplab`
+> **CLI name:** `amplab` - use `benchbox run --benchmark amplab`
 
 ## Overview
 
@@ -29,17 +29,20 @@ The AMPLab benchmark uses a simple three-table schema that models web analytics 
 
 ### Core Tables
 
-| Table | Purpose | Approximate Rows (SF 1) |
-|-------|---------|-------------------------|
-| **RANKINGS** | Web page rankings (PageRank-style) | 18,000,000 |
-| **USERVISITS** | User visit logs and ad revenue | 155,000,000 |
-| **DOCUMENTS** | Web page content and text | 50,000,000 |
+| Table | Purpose | Approximate Rows (SF 1) | Row count formula |
+|-------|---------|-------------------------|-------------------|
+| **RANKINGS** | Web page rankings (PageRank-style) | 250,000 | `int(250_000 * scale_factor)` |
+| **USERVISITS** | User visit logs and ad revenue | 2,500,000 | `int(2_500_000 * scale_factor)` |
+| **DOCUMENTS** | Web page content and text | 125,000 | `int(125_000 * scale_factor)` |
+
+Row counts scale linearly with `scale_factor` for all three tables (see
+`benchbox/core/amplab/generator.py`).
 
 ### Schema Details
 
 **RANKINGS Table:**
 - `pageURL` (VARCHAR(300)) - Primary Key: Web page URL
-- `pageRank` (INTEGER) - Page ranking score (1-1000)
+- `pageRank` (INTEGER) - Page ranking score (1-10,000, drawn from a Pareto distribution with α=1.16 and capped)
 - `avgDuration` (INTEGER) - Average visit duration in seconds
 
 **USERVISITS Table:**
@@ -531,11 +534,11 @@ print(f"\\nComplete Benchmark Summary: {complete_results['summary']}")
 
 | Scale Factor | Rankings Rows | UserVisits Rows | Documents Rows | Total Size | Use Case |
 |-------------|---------------|-----------------|---------------|------------|----------|
-| 0.01 | ~180K | ~1.5M | ~500K | ~100 MB | Development |
-| 0.1 | ~1.8M | ~15M | ~5M | ~1 GB | Testing |
-| 1.0 | ~18M | ~150M | ~50M | ~10 GB | Standard benchmark |
-| 10.0 | ~180M | ~1.5B | ~500M | ~100 GB | Large-scale testing |
-| 100.0 | ~1.8B | ~15B | ~5B | ~1 TB | Production simulation |
+| 0.01 | ~2.5K | ~25K | ~1.25K | ~11 MB | Development |
+| 0.1 | ~25K | ~250K | ~12.5K | ~110 MB | Testing |
+| 1.0 | ~250K | ~2.5M | ~125K | ~1.1 GB | Standard benchmark |
+| 10.0 | ~2.5M | ~25M | ~1.25M | ~11 GB | Large-scale testing |
+| 100.0 | ~25M | ~250M | ~12.5M | ~110 GB | Production simulation |
 
 ### Advanced-level Configuration
 

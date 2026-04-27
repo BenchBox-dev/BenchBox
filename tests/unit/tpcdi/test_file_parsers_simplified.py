@@ -160,7 +160,7 @@ class TestCSVParser:
         """Test parsing a simple CSV file."""
         csv_content = "id,name,value\n1,Alice,100\n2,Bob,200\n3,Charlie,300"
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
             f.write(csv_content)
             temp_file = Path(f.name)
 
@@ -182,7 +182,7 @@ class TestCSVParser:
         """Test parsing CSV with missing expected columns."""
         csv_content = "id,name\n1,Alice\n2,Bob"
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
             f.write(csv_content)
             temp_file = Path(f.name)
 
@@ -226,7 +226,7 @@ class TestPipeDelimitedParser:
         """Test parsing a pipe-delimited file."""
         pipe_content = "id|name|value\n1|Alice|100\n2|Bob|200"
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt", encoding="utf-8") as f:
             f.write(pipe_content)
             temp_file = Path(f.name)
 
@@ -264,7 +264,7 @@ class TestFixedWidthParser:
 
         field_specs = [("id", 0, 5), ("name", 5, 10), ("value", 15, 8)]
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt", encoding="utf-8") as f:
             f.write(fw_content)
             temp_file = Path(f.name)
 
@@ -324,7 +324,7 @@ class TestXMLParser:
             </record>
         </root>"""
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".xml") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".xml", encoding="utf-8") as f:
             f.write(xml_content)
             temp_file = Path(f.name)
 
@@ -360,7 +360,7 @@ class TestXMLParser:
             </record>
         </root>"""
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".xml") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".xml", encoding="utf-8") as f:
             f.write(xml_content)
             temp_file = Path(f.name)
 
@@ -427,7 +427,7 @@ class TestMultiFormatParser:
         """Test multi-format parser integration."""
         csv_content = "id,name\n1,Alice\n2,Bob"
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
             f.write(csv_content)
             temp_file = Path(f.name)
 
@@ -451,7 +451,7 @@ class TestConvenienceFunctions:
         """Test parse_csv_file convenience function."""
         csv_content = "id,name\n1,Alice\n2,Bob"
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
             f.write(csv_content)
             temp_file = Path(f.name)
 
@@ -467,7 +467,7 @@ class TestConvenienceFunctions:
         """Test parse_pipe_delimited_file convenience function."""
         pipe_content = "id|name\n1|Alice\n2|Bob"
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt", encoding="utf-8") as f:
             f.write(pipe_content)
             temp_file = Path(f.name)
 
@@ -484,7 +484,7 @@ class TestConvenienceFunctions:
         fw_content = "00001Alice\n00002Bob  "
         field_specs = [("id", 0, 5), ("name", 5, 5)]
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt", encoding="utf-8") as f:
             f.write(fw_content)
             temp_file = Path(f.name)
 
@@ -506,7 +506,7 @@ class TestConvenienceFunctions:
             </record>
         </root>"""
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".xml") as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".xml", encoding="utf-8") as f:
             f.write(xml_content)
             temp_file = Path(f.name)
 

@@ -44,7 +44,7 @@ pytestmark = [
 
 
 # ---------------------------------------------------------------------------
-# SchemaMapper – type map coverage
+# SchemaMapper - type map coverage
 # ---------------------------------------------------------------------------
 
 
@@ -81,7 +81,7 @@ class TestSchemaMapperTypeMaps:
 
 
 # ---------------------------------------------------------------------------
-# FormatConverter – format detection with real temp files
+# FormatConverter - format detection with real temp files
 # ---------------------------------------------------------------------------
 
 
@@ -166,7 +166,7 @@ class TestFormatConverterFormats:
 
 
 # ---------------------------------------------------------------------------
-# FormatConverter – _resolve_arrow_types
+# FormatConverter - _resolve_arrow_types
 # ---------------------------------------------------------------------------
 
 
@@ -207,7 +207,7 @@ class TestResolveArrowTypes:
 
 
 # ---------------------------------------------------------------------------
-# FormatConverter – _build_write_kwargs
+# FormatConverter - _build_write_kwargs
 # ---------------------------------------------------------------------------
 
 
@@ -236,7 +236,7 @@ class TestBuildWriteKwargs:
 
 
 # ---------------------------------------------------------------------------
-# DataCache – shard support in manifests
+# DataCache - shard support in manifests
 # ---------------------------------------------------------------------------
 
 
@@ -266,7 +266,7 @@ class TestDataCacheShardedManifest:
             },
         }
 
-        with open(cache_path / "_manifest.json", "w") as fh:
+        with open(cache_path / "_manifest.json", "w", encoding="utf-8") as fh:
             json.dump(manifest, fh)
 
         assert cache.has_cached_data("tpch", 1.0, DataFormat.PARQUET) is True
@@ -293,7 +293,7 @@ class TestDataCacheShardedManifest:
             },
         }
 
-        with open(cache_path / "_manifest.json", "w") as fh:
+        with open(cache_path / "_manifest.json", "w", encoding="utf-8") as fh:
             json.dump(manifest, fh)
 
         assert cache.has_cached_data("tpch", 1.0, DataFormat.PARQUET) is False
@@ -317,7 +317,7 @@ class TestDataCacheShardedManifest:
             },
         }
 
-        with open(cache_path / "_manifest.json", "w") as fh:
+        with open(cache_path / "_manifest.json", "w", encoding="utf-8") as fh:
             json.dump(manifest, fh)
 
         files = cache.get_cached_files("tpch", 1.0, DataFormat.PARQUET)
@@ -356,7 +356,7 @@ class TestDataCacheShardedManifest:
 
 
 # ---------------------------------------------------------------------------
-# DataCache – clear_cache branch coverage
+# DataCache - clear_cache branch coverage
 # ---------------------------------------------------------------------------
 
 
@@ -411,7 +411,7 @@ class TestDataCacheClearBranches:
 
 
 # ---------------------------------------------------------------------------
-# DataLoadResult – edge cases
+# DataLoadResult - edge cases
 # ---------------------------------------------------------------------------
 
 
@@ -441,7 +441,7 @@ class TestDataLoadResultEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# CacheManifest – from_dict with missing tables key
+# CacheManifest - from_dict with missing tables key
 # ---------------------------------------------------------------------------
 
 
@@ -462,7 +462,7 @@ class TestCacheManifestEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# _compute_source_hash – shard support
+# _compute_source_hash - shard support
 # ---------------------------------------------------------------------------
 
 
@@ -495,7 +495,7 @@ class TestSourceHashShards:
 
 
 # ---------------------------------------------------------------------------
-# DataFrameDataLoader – source format detection
+# DataFrameDataLoader - source format detection
 # ---------------------------------------------------------------------------
 
 
@@ -533,7 +533,7 @@ class TestDataLoaderFormatDetection:
 
 
 # ---------------------------------------------------------------------------
-# DataFrameDataLoader – table write config filtering
+# DataFrameDataLoader - table write config filtering
 # ---------------------------------------------------------------------------
 
 
@@ -581,7 +581,7 @@ class TestDataLoaderWriteConfigFiltering:
 
 
 # ---------------------------------------------------------------------------
-# DataFrameDataLoader – file discovery
+# DataFrameDataLoader - file discovery
 # ---------------------------------------------------------------------------
 
 
@@ -627,7 +627,7 @@ class TestDataLoaderFileDiscovery:
 
 
 # ---------------------------------------------------------------------------
-# ConversionStatus – enum values
+# ConversionStatus - enum values
 # ---------------------------------------------------------------------------
 
 
@@ -643,7 +643,7 @@ class TestConversionStatusEnum:
 
 
 # ---------------------------------------------------------------------------
-# get_tpch_column_names – completeness
+# get_tpch_column_names - completeness
 # ---------------------------------------------------------------------------
 
 

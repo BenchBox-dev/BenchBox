@@ -85,7 +85,7 @@ def generate_post_run_summary(
     ]
 
     if not successful:
-        # Nothing to chart — return empty summary
+        # Nothing to chart - return empty summary
         return PostRunSummary(summary_box="", query_histogram="", charts=[])
 
     # Aggregate per-query: group by canonical query ID, compute mean latency.
@@ -144,7 +144,7 @@ def generate_post_run_summary(
     summary_box_chart = SummaryBox(stats, options=options)
     summary_box_text = summary_box_chart.render()
 
-    # Build query latency chart — choose orientation based on label length.
+    # Build query latency chart - choose orientation based on label length.
     # Vertical histogram works for short numeric IDs (Q1-Q22).
     # Horizontal bars are more readable for long descriptive names
     # (e.g., "aggregation_groupby_large").
@@ -185,7 +185,7 @@ def generate_post_run_summary(
 
 
 # Median query-ID length above which horizontal bars are used instead of vertical.
-# 6 chars accommodates TPC-style IDs (Q1–Q22) vertically; longer benchmark IDs
+# 6 chars accommodates TPC-style IDs (Q1-Q22) vertically; longer benchmark IDs
 # (e.g., ClickBench "aggregation_groupby_large") switch to horizontal layout.
 _HORIZONTAL_LABEL_THRESHOLD = 6
 

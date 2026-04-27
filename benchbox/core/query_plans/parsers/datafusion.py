@@ -339,72 +339,78 @@ class DataFusionQueryPlanParser(QueryPlanParser):
         details = node.get("details", "")
         operator = node.get("operator", "").lower()
 
-        # Extract table name for scan operators
         if "scan" in operator or "datasource" in operator or "parquet" in operator:
-            # Look for table name pattern: "tablename projection=" or just "tablename"
-            table_match = re.search(r"(?:^|:\s*)(\w+)(?:\s+projection|\s*$)", details)
-            if table_match:
-                node["table"] = table_match.group(1)
-
-        # Extract join type
+            self._extract_scan_info(node, details)
         if "join" in operator:
-            details_lower = details.lower()
-            if "left" in details_lower or "left" in operator:
-                node["join_type"] = JoinType.LEFT
-            elif "right" in details_lower or "right" in operator:
-                node["join_type"] = JoinType.RIGHT
-            elif "full" in details_lower or "full" in operator:
-                node["join_type"] = JoinType.FULL
-            elif "cross" in details_lower or "cross" in operator:
-                node["join_type"] = JoinType.CROSS
-            elif "semi" in details_lower:
-                node["join_type"] = JoinType.SEMI
-            elif "anti" in details_lower:
-                node["join_type"] = JoinType.ANTI
-            else:
-                node["join_type"] = JoinType.INNER
-
-            # Extract join condition
-            if "on=" in details_lower or "filter=" in details_lower:
-                cond_match = re.search(r"(?:on|filter)=\[?([^\]]+)\]?", details, re.IGNORECASE)
-                if cond_match:
-                    node["join_condition"] = cond_match.group(1).strip()
-
-        # Extract filter expressions
-        if "filter" in operator:
-            # The filter expression is typically the details
-            if details:
-                node["filter_expression"] = details
-
-        # Extract sort keys
+            self._extract_join_info(node, operator, details)
+        if "filter" in operator and details:
+            node["filter_expression"] = details
         if "sort" in operator:
-            # Sort keys often appear in brackets like [col@0 ASC, col@1 DESC]
-            sort_match = re.search(r"\[([^\]]+)\]", details)
-            if sort_match:
-                node["sort_keys"] = sort_match.group(1)
-
-        # Extract projection expressions
+            self._extract_sort_info(node, details)
         if "projection" in operator:
-            # Projection expressions after "expr="
-            expr_match = re.search(r"expr=\[([^\]]+)\]", details)
-            if expr_match:
-                node["projection_exprs"] = expr_match.group(1)
-
-        # Extract aggregate info
+            self._extract_projection_info(node, details)
         if "aggregate" in operator:
-            # Group by and aggregation functions
-            gby_match = re.search(r"gby=\[([^\]]*)\]", details)
-            if gby_match:
-                node["group_by"] = gby_match.group(1)
-            aggr_match = re.search(r"aggr=\[([^\]]*)\]", details)
-            if aggr_match:
-                node["aggregates"] = aggr_match.group(1)
-
-        # Extract limit count
+            self._extract_aggregate_info(node, details)
         if "limit" in operator:
-            fetch_match = re.search(r"fetch=(\d+)", details)
-            if fetch_match:
-                node["limit_count"] = int(fetch_match.group(1))
+            self._extract_limit_info(node, details)
+
+    @staticmethod
+    def _extract_scan_info(node: dict[str, Any], details: str) -> None:
+        table_match = re.search(r"(?:^|:\s*)(\w+)(?:\s+projection|\s*$)", details)
+        if table_match:
+            node["table"] = table_match.group(1)
+
+    @staticmethod
+    def _classify_join_type(operator: str, details_lower: str) -> JoinType:
+        for keyword, join_type in (
+            ("left", JoinType.LEFT),
+            ("right", JoinType.RIGHT),
+            ("full", JoinType.FULL),
+            ("cross", JoinType.CROSS),
+        ):
+            if keyword in details_lower or keyword in operator:
+                return join_type
+        if "semi" in details_lower:
+            return JoinType.SEMI
+        if "anti" in details_lower:
+            return JoinType.ANTI
+        return JoinType.INNER
+
+    @classmethod
+    def _extract_join_info(cls, node: dict[str, Any], operator: str, details: str) -> None:
+        details_lower = details.lower()
+        node["join_type"] = cls._classify_join_type(operator, details_lower)
+        if "on=" in details_lower or "filter=" in details_lower:
+            cond_match = re.search(r"(?:on|filter)=\[?([^\]]+)\]?", details, re.IGNORECASE)
+            if cond_match:
+                node["join_condition"] = cond_match.group(1).strip()
+
+    @staticmethod
+    def _extract_sort_info(node: dict[str, Any], details: str) -> None:
+        sort_match = re.search(r"\[([^\]]+)\]", details)
+        if sort_match:
+            node["sort_keys"] = sort_match.group(1)
+
+    @staticmethod
+    def _extract_projection_info(node: dict[str, Any], details: str) -> None:
+        expr_match = re.search(r"expr=\[([^\]]+)\]", details)
+        if expr_match:
+            node["projection_exprs"] = expr_match.group(1)
+
+    @staticmethod
+    def _extract_aggregate_info(node: dict[str, Any], details: str) -> None:
+        gby_match = re.search(r"gby=\[([^\]]*)\]", details)
+        if gby_match:
+            node["group_by"] = gby_match.group(1)
+        aggr_match = re.search(r"aggr=\[([^\]]*)\]", details)
+        if aggr_match:
+            node["aggregates"] = aggr_match.group(1)
+
+    @staticmethod
+    def _extract_limit_info(node: dict[str, Any], details: str) -> None:
+        fetch_match = re.search(r"fetch=(\d+)", details)
+        if fetch_match:
+            node["limit_count"] = int(fetch_match.group(1))
 
     def _build_tree(self, parsed_nodes: list[dict[str, Any]]) -> LogicalOperator:
         """

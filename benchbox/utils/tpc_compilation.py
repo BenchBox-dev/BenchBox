@@ -333,7 +333,7 @@ class TPCCompiler:
                 binary_hash = hashlib.md5(f.read()).hexdigest()
 
             # Read and parse checksums.md5 file
-            with open(checksum_file) as f:
+            with open(checksum_file, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -379,8 +379,8 @@ class TPCCompiler:
 
         precompiled_path = binary_info.precompiled_path
 
-        # Check if binary exists and is executable
-        if not (precompiled_path.exists() and os.access(precompiled_path, os.X_OK)):
+        # Check if binary exists and is executable (X_OK is a no-op on Windows)
+        if not (precompiled_path.exists() and (os.name == "nt" or os.access(precompiled_path, os.X_OK))):
             return False
 
         # Verify checksum if available
@@ -410,7 +410,8 @@ class TPCCompiler:
         binary_info = self.binaries[binary_name]
         binary_path = binary_info.binary_path
 
-        return binary_path and binary_path.exists() and os.access(binary_path, os.X_OK)
+        # os.X_OK is a no-op on Windows (always True); existence check is sufficient there
+        return binary_path and binary_path.exists() and (os.name == "nt" or os.access(binary_path, os.X_OK))
 
     def needs_compilation(self, binary_name: str) -> bool:
         """Check if binary needs compilation.
@@ -452,7 +453,12 @@ class TPCCompiler:
             return binary_info.precompiled_path
 
         # Fall back to source-compiled binary
-        if binary_info.binary_path and binary_info.binary_path.exists() and os.access(binary_info.binary_path, os.X_OK):
+        # os.X_OK is a no-op on Windows (always True); existence check is sufficient there
+        if (
+            binary_info.binary_path
+            and binary_info.binary_path.exists()
+            and (os.name == "nt" or os.access(binary_info.binary_path, os.X_OK))
+        ):
             return binary_info.binary_path
 
         return None
@@ -717,7 +723,7 @@ debug:
 	@echo "Machine flag: {machine_flag}"
 	@echo "CFLAGS: $(CFLAGS)"
 """
-        with open(makefile_path, "w") as f:
+        with open(makefile_path, "w", encoding="utf-8") as f:
             f.write(makefile_content)
 
     def _apply_macos_patches(self, source_dir: Path):
@@ -731,7 +737,7 @@ debug:
             if file_path.exists():
                 try:
                     # Read the file
-                    with open(file_path) as f:
+                    with open(file_path, encoding="utf-8") as f:
                         content = f.read()
 
                     # Check if already patched
@@ -742,7 +748,7 @@ debug:
                         content = content.replace("#include <malloc.h>", "#include <stdlib.h>")
 
                         # Write back
-                        with open(file_path, "w") as f:
+                        with open(file_path, "w", encoding="utf-8") as f:
                             f.write(content)
 
                 except Exception as e:
@@ -766,7 +772,7 @@ debug:
 #endif /* MACOS_COMPAT_H */
 """
             try:
-                with open(compat_header, "w") as f:
+                with open(compat_header, "w", encoding="utf-8") as f:
                     f.write(compat_content)
             except Exception as e:
                 logger.warning(f"Failed to create compatibility header: {e}")

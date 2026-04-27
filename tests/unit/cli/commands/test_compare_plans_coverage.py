@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -68,10 +68,10 @@ class _Summary:
         return {"baseline": self.baseline_run_id, "current": self.current_run_id}
 
 
+@dataclass
 class _Exec:
-    def __init__(self, query_id: str, query_plan: object | None = object()):
-        self.query_id = query_id
-        self.query_plan = query_plan
+    query_id: str
+    query_plan: object | None = field(default_factory=object)
 
 
 class _Phase:

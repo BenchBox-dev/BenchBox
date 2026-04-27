@@ -81,6 +81,8 @@ class InfluxDBMetadataMixin:
             "org": config.get("org"),
             "database": config.get("database", "benchbox"),
             "ssl": config.get("ssl", True),
+            "verify_ssl": config.get("verify_ssl", True),
+            "ca_cert_path": config.get("ca_cert_path"),
             "mode": config.get("mode", "cloud"),
         }
 

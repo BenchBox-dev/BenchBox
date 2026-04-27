@@ -212,7 +212,7 @@ class TestSafeExtractTar:
     def test_sibling_directory_traversal_rejected(self, tmp_path):
         """Should reject members that resolve to a sibling directory of dest_dir.
 
-        e.g. dest=/tmp/foo, member resolves to /tmp/foobar/evil.txt — a naive
+        e.g. dest=/tmp/foo, member resolves to /tmp/foobar/evil.txt - a naive
         startswith('/tmp/foo') check would incorrectly pass this.
         """
         from benchbox.core.expected_results.download import _safe_extract_tar
@@ -501,7 +501,7 @@ class TestPartialCacheNotWarm:
         cache_dir = tmp_path / "tpch"
         cache_dir.mkdir(parents=True)
         (cache_dir / "q1.out").write_text("partial data\n")
-        # No sentinel — simulates interrupted extraction
+        # No sentinel - simulates interrupted extraction
 
         monkeypatch.setattr(dl_module, "get_tpch_cache_dir", lambda: cache_dir)
         monkeypatch.setattr(dl_module, "_load_checksum_manifest", dict)

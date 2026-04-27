@@ -6,8 +6,8 @@ then reports groups of functions whose AST structure is identical (Type-2 clones
 in the clone-detection literature: same structure, different identifiers/literals).
 
 Exit codes:
-  0 – duplicate ratio is within the configured threshold
-  1 – duplicate ratio exceeds the threshold (or other error)
+  0 - duplicate ratio is within the configured threshold
+  1 - duplicate ratio exceeds the threshold (or other error)
 
 Integration points:
   • ``make duplicate-check``
@@ -30,7 +30,7 @@ from typing import Any
 
 try:
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover – Python 3.10
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
     import tomli as tomllib  # type: ignore[no-redef]
 
 

@@ -1301,14 +1301,14 @@ class TPCResultValidator:
         """Save validation report to file."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(report.to_dict(), f, indent=2)
 
         self.logger.info(f"Validation report saved to: {output_path}")
 
     def load_report(self, input_path: Path) -> ValidationReport:
         """Load validation report from file."""
-        with open(input_path) as f:
+        with open(input_path, encoding="utf-8") as f:
             report_data = json.load(f)
 
         # Reconstruct ValidationReport object

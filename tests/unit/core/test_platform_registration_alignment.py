@@ -30,6 +30,8 @@ CANONICAL_SQL_PLATFORMS = {
     "sqlite",
     "datafusion",
     "clickhouse",
+    "clickhouse-local",  # First-class embedded chDB platform
+    "clickhouse-server",  # First-class self-hosted ClickHouse platform
     "clickhouse-cloud",  # First-class ClickHouse Cloud platform (refactored from clickhouse:cloud)
     "databricks",
     "bigquery",
@@ -51,6 +53,7 @@ CANONICAL_SQL_PLATFORMS = {
     "databend",
     "questdb",
     "lakesail",
+    "velox",
     "fabric-lakehouse",
 }
 # Note: polars was removed from CANONICAL_SQL_PLATFORMS as SQL mode is no longer supported
@@ -96,6 +99,9 @@ PLATFORMS_NOT_YET_IN_ADAPTER_MAPPING = {
     "timescaledb",
     "pg-duckdb",
     "pg-mooncake",
+    # Newly added - adapter class exists but not yet wired into platform_mapping
+    "cedardb",
+    "singlestore",
 }
 
 
@@ -118,6 +124,8 @@ class TestPlatformRegistrationAlignment:
             BigQueryAdapter,
             ClickHouseAdapter,
             ClickHouseCloudAdapter,
+            ClickHouseLocalAdapter,
+            ClickHouseServerAdapter,
             DatabricksAdapter,
             DataFusionAdapter,
             DuckDBAdapter,
@@ -142,6 +150,7 @@ class TestPlatformRegistrationAlignment:
         from benchbox.platforms.questdb import QuestDBAdapter
         from benchbox.platforms.starburst import StarburstAdapter
         from benchbox.platforms.starrocks import StarRocksAdapter
+        from benchbox.platforms.velox import VeloxAdapter
 
         return {
             "duckdb": DuckDBAdapter,
@@ -151,6 +160,8 @@ class TestPlatformRegistrationAlignment:
             "datafusion": DataFusionAdapter,
             "polars": PolarsAdapter,
             "clickhouse": ClickHouseAdapter,
+            "clickhouse-local": ClickHouseLocalAdapter,
+            "clickhouse-server": ClickHouseServerAdapter,
             "clickhouse-cloud": ClickHouseCloudAdapter,
             "databricks": DatabricksAdapter,
             "bigquery": BigQueryAdapter,
@@ -174,6 +185,7 @@ class TestPlatformRegistrationAlignment:
             "databend": DatabendAdapter,
             "questdb": QuestDBAdapter,
             "lakesail": LakeSailAdapter,
+            "velox": VeloxAdapter,
         }
 
     def test_all_canonical_platforms_in_registry_metadata(self):

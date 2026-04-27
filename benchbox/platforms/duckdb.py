@@ -24,10 +24,10 @@ except ImportError:
 
 from benchbox.core.errors import PlanCaptureError
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
-from benchbox.utils.file_format import is_tpc_format
 from benchbox.utils.printing import emit
 
 from .base import DriverIsolationCapability, PlatformAdapter
+from .base.ddl_helpers import strip_foreign_keys
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import TuningColumn
@@ -106,11 +106,20 @@ def _build_duckdb_ctas_sort_sql(table_name: str, sort_columns) -> str:
     return f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM {table_name} ORDER BY {order_by_clause};"
 
 
-def _resolve_external_table_sources(benchmark: Any, data_dir: Path) -> dict[str, list[Path]]:
-    """Resolve table->file mappings for external table/view registration."""
+def _resolve_external_data_source(benchmark: Any, data_dir: Path, adapter: Any = None) -> Any:
+    """Resolve the DataSource for external table/view registration."""
     from benchbox.platforms.base.data_loading import DataSourceResolver
 
-    source = DataSourceResolver().resolve(benchmark, data_dir)
+    return DataSourceResolver(
+        platform_name="duckdb",
+        table_mode=getattr(adapter, "table_mode", "native") if adapter else "native",
+        platform_config=getattr(adapter, "config", None) if adapter else None,
+        requested_format=getattr(adapter, "requested_table_format", None) if adapter else None,
+    ).resolve(benchmark, data_dir)
+
+
+def _external_table_sources_from_data_source(source: Any) -> dict[str, list[Path]]:
+    """Normalize a resolved DataSource into table->existing paths for external views."""
     if source is None:
         return {}
 
@@ -226,7 +235,14 @@ def _try_parquet_scan(source_paths: list[Path]) -> str | None:
     return f"read_parquet({path_array})"
 
 
-def _try_text_scan(source_paths: list[Path], column_names: list[str] | None) -> tuple[str, str] | None:
+def _try_text_scan(
+    source_paths: list[Path],
+    column_names: list[str] | None,
+    *,
+    data_source: Any | None = None,
+    table_name: str | None = None,
+    benchmark: Any | None = None,
+) -> tuple[str, str] | None:
     """Try text file scan (TBL/CSV/DAT) if any source paths match."""
     from benchbox.utils.file_format import detect_data_format
 
@@ -241,7 +257,16 @@ def _try_text_scan(source_paths: list[Path], column_names: list[str] | None) -> 
     if not text_paths:
         return None
 
-    return _build_csv_scan_expression(text_paths, column_names), detected_fmt
+    return (
+        _build_csv_scan_expression(
+            text_paths,
+            column_names,
+            data_source=data_source,
+            table_name=table_name,
+            benchmark=benchmark,
+        ),
+        detected_fmt,
+    )
 
 
 def _build_duckdb_external_scan_expression(
@@ -252,6 +277,9 @@ def _build_duckdb_external_scan_expression(
     vortex_extension_loaded: bool,
     iceberg_extension_loaded: bool = False,
     column_names: list[str] | None = None,
+    data_source: Any | None = None,
+    table_name: str | None = None,
+    benchmark: Any | None = None,
 ) -> tuple[str, bool, bool, bool, str]:
     """Build DuckDB scan expression for external table/view creation.
 
@@ -279,7 +307,13 @@ def _build_duckdb_external_scan_expression(
     if parquet_expr:
         return parquet_expr, delta_extension_loaded, vortex_extension_loaded, iceberg_extension_loaded, "parquet"
 
-    text_result = _try_text_scan(source_paths, column_names)
+    text_result = _try_text_scan(
+        source_paths,
+        column_names,
+        data_source=data_source,
+        table_name=table_name,
+        benchmark=benchmark,
+    )
     if text_result:
         return text_result[0], delta_extension_loaded, vortex_extension_loaded, iceberg_extension_loaded, text_result[1]
 
@@ -293,26 +327,51 @@ def _build_duckdb_external_scan_expression(
 def _build_csv_scan_expression(
     text_paths: list[Path],
     column_names: list[str] | None,
+    *,
+    data_source: Any | None = None,
+    table_name: str | None = None,
+    benchmark: Any | None = None,
 ) -> str:
     """Build a ``read_csv()`` scan expression for DuckDB external views."""
-    from benchbox.platforms.base.data_loading import escape_sql_string_literal
+    from benchbox.platforms.base.data_loading import (
+        NO_BENCHMARK,
+        DataSource,
+        escape_sql_string_literal,
+        resolve_csv_dialect,
+    )
     from benchbox.utils.file_format import (
         get_column_names_with_trailing,
-        get_delimiter_for_file,
         has_trailing_delimiter,
     )
 
-    delimiter = get_delimiter_for_file(text_paths[0])
+    dialect_source = data_source or DataSource(source_type="external_scan", tables={})
+    dialect = resolve_csv_dialect(
+        dialect_source,
+        table_name or text_paths[0].stem,
+        text_paths[0],
+        benchmark if benchmark is not None else NO_BENCHMARK,
+    )
+    delimiter = dialect.delimiter
     escaped_paths = [escape_sql_string_literal(str(p)) for p in text_paths]
     if len(escaped_paths) == 1:
         path_expr = f"'{escaped_paths[0]}'"
     else:
         path_expr = "[" + ", ".join(f"'{p}'" for p in escaped_paths) + "]"
 
-    csv_params = [f"delim='{delimiter}'", "header=false", "nullstr=''", "ignore_errors=true"]
+    csv_params = [
+        f"delim='{escape_sql_string_literal(delimiter)}'",
+        f"header={str(dialect.has_header).lower()}",
+        "ignore_errors=true",
+    ]
+    if dialect.null_marker is not None:
+        csv_params.append(f"nullstr='{escape_sql_string_literal(dialect.null_marker)}'")
 
-    if column_names:
-        trailing = has_trailing_delimiter(text_paths[0], delimiter, column_names)
+    if column_names and not dialect.has_header:
+        # Trailing-delimiter probing is only relevant for TPC-style sources where
+        # rows look like `1|foo|` and need an absorbing dummy column. CSV dialects
+        # without a null marker (e.g. ClickBench) never have trailing delimiters,
+        # so we skip the disk read.
+        trailing = dialect.null_marker is not None and has_trailing_delimiter(text_paths[0], delimiter, column_names)
         all_names = get_column_names_with_trailing(column_names, trailing)
         names_param = ", ".join(f"'{col}'" for col in all_names)
         csv_params.extend([f"names=[{names_param}]", "null_padding=true"])
@@ -322,7 +381,7 @@ def _build_csv_scan_expression(
             return f"(SELECT {select_cols} FROM {scan_expr})"
         return scan_expr
 
-    # No column names — fall back to auto_detect (columns will be column0, column1, …).
+    # No column names - fall back to auto_detect (columns will be column0, column1, …).
     csv_params.append("auto_detect=true")
     return f"read_csv({path_expr}, {', '.join(csv_params)})"
 
@@ -357,7 +416,8 @@ def _create_duckdb_external_views(
 
     start_time = mono_time()
     data_dir = Path(data_dir)
-    table_sources = _resolve_external_table_sources(benchmark, data_dir)
+    source = _resolve_external_data_source(benchmark, data_dir, adapter=adapter)
+    table_sources = _external_table_sources_from_data_source(source)
     if not table_sources:
         raise RuntimeError(f"No external source files found under {data_dir}")
 
@@ -384,6 +444,9 @@ def _create_duckdb_external_views(
             vortex_extension_loaded=vortex_loaded,
             iceberg_extension_loaded=iceberg_loaded,
             column_names=col_names,
+            data_source=source,
+            table_name=table_name,
+            benchmark=benchmark,
         )
         if detected_format is None:
             detected_format = fmt
@@ -722,16 +785,7 @@ class DuckDBAdapter(PlatformAdapter):
         # For TPC-DS, remove foreign key constraints to avoid constraint violations during parallel loading
         benchmark_name = getattr(benchmark, "_name", "") or benchmark.__class__.__name__
         if "TPC-DS" in str(benchmark_name) or "TPCDS" in str(benchmark_name):
-            # Strip REFERENCES clauses from schema to avoid foreign key constraint violations
-            import re
-
-            schema_sql = re.sub(
-                r",\s*FOREIGN KEY[^,)]*\([^)]*\)\s*REFERENCES[^,)]*\([^)]*\)",
-                "",
-                schema_sql,
-                flags=re.IGNORECASE | re.MULTILINE,
-            )
-            schema_sql = re.sub(r"REFERENCES\s+\w+\s*\([^)]*\)", "", schema_sql, flags=re.IGNORECASE)
+            schema_sql = strip_foreign_keys(schema_sql)
 
         # Split schema into individual CREATE TABLE statements for better compatibility
         # This handles foreign key constraints and complex multi-table schemas
@@ -770,7 +824,7 @@ class DuckDBAdapter(PlatformAdapter):
                         tables_created += 1
                         self.log_very_verbose(f"Created table: {table_name}")
                     except Exception as e:
-                        raise Exception(f"Failed to create table {table_name}: {e}")
+                        raise Exception(f"Failed to create table {table_name}: {e}") from e
 
         duration = elapsed_seconds(start_time)
         self.log_operation_complete("Schema creation", duration, f"{tables_created} tables created")
@@ -789,12 +843,13 @@ class DuckDBAdapter(PlatformAdapter):
             emit(f"  Loading data from {path_info['provider']} cloud storage")
 
         # Create DuckDB-specific handler factory
-        def duckdb_handler_factory(file_path, adapter, benchmark_instance):
+        def duckdb_handler_factory(file_path, adapter, benchmark_instance, table_name=None, data_source=None):
             from benchbox.platforms.base.data_loading import (
                 DuckDBDeltaHandler,
                 DuckDBNativeHandler,
                 DuckDBParquetHandler,
                 FileFormatRegistry,
+                resolve_csv_dialect,
             )
 
             # Check if this is a Delta Lake table directory
@@ -807,10 +862,14 @@ class DuckDBAdapter(PlatformAdapter):
             base_ext = FileFormatRegistry.get_base_data_extension(file_path)
 
             # Create DuckDB native handler for supported formats
-            if is_tpc_format(file_path):
-                return DuckDBNativeHandler("|", adapter, benchmark_instance)
-            elif base_ext == ".csv":
-                return DuckDBNativeHandler(",", adapter, benchmark_instance)
+            if base_ext in (".tbl", ".dat", ".csv"):
+                from benchbox.platforms.base.data_loading import DataSource
+
+                dialect_source = data_source or DataSource(source_type="duckdb_handler", tables={})
+                dialect = resolve_csv_dialect(
+                    dialect_source, table_name or file_path.stem, file_path, benchmark_instance
+                )
+                return DuckDBNativeHandler(dialect.delimiter, adapter, benchmark_instance)
             elif base_ext == ".parquet":
                 return DuckDBParquetHandler(adapter)
             return None  # Fall back to generic handler
@@ -982,7 +1041,7 @@ class DuckDBAdapter(PlatformAdapter):
         opt-out when plan capture overhead must be minimised.
 
         Note: EXPLAIN (ANALYZE, ...) re-executes the query, adding ~1× query cost to the
-        capture step. Plan fingerprints are unaffected — compute_plan_fingerprint()
+        capture step. Plan fingerprints are unaffected - compute_plan_fingerprint()
         excludes timing/cardinality by design.
         """
         analyze = self.analyze_plans
@@ -1172,7 +1231,7 @@ class DuckDBAdapter(PlatformAdapter):
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
         except Exception as e:
-            raise ValueError(f"Failed to apply tunings to DuckDB table {table_name_upper}: {e}")
+            raise ValueError(f"Failed to apply tunings to DuckDB table {table_name_upper}: {e}") from e
 
     def apply_unified_tuning(self, tuning_config, connection) -> None:
         """Apply unified tuning configuration to DuckDB.

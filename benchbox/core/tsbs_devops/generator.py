@@ -25,15 +25,17 @@ from typing import Union
 
 import numpy as np
 
+from benchbox.core.manifest_utils import write_generator_manifest
 from benchbox.core.tsbs_devops.schema import (
     TABLE_ORDER,
     TSBS_DEVOPS_SCHEMA,
 )
+from benchbox.utils.compression_mixin import CompressionMixin
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
 # Default configuration
 DEFAULT_HOSTS = 100
-DEFAULT_DURATION_DAYS = 1
+DEFAULT_DURATION_DAYS = 2
 DEFAULT_INTERVAL_SECONDS = 10
 REGIONS = ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"]
 DATACENTERS = ["dc1", "dc2", "dc3"]
@@ -45,7 +47,7 @@ SERVICES = ["api", "web", "worker", "cache", "db", "queue"]
 ENVIRONMENTS = ["prod", "prod", "staging", "dev"]  # 50% prod
 
 
-class TSBSDevOpsDataGenerator(VerbosityMixin):
+class TSBSDevOpsDataGenerator(CompressionMixin, VerbosityMixin):
     """Generates TSBS DevOps benchmark data.
 
     Creates synthetic time-series data simulating infrastructure
@@ -81,13 +83,18 @@ class TSBSDevOpsDataGenerator(VerbosityMixin):
             force_regenerate: Force regeneration even if data exists
             **kwargs: Additional options
         """
+        super().__init__(**kwargs)
+
         self.scale_factor = scale_factor
         self.output_dir = Path(output_dir) if output_dir else Path.cwd() / "tsbs_devops_data"
 
-        # Calculate dimensions based on scale factor
-        # SF=1.0: 100 hosts, 1 day = ~864,000 rows per metric table
+        # Calculate dimensions based on scale factor.
+        # SF=1.0 uses 100 hosts over 2 days, which keeps the dataset close to
+        # BenchBox's ~1GB baseline while preserving TSBS's host-driven scale semantics.
+        # Only num_hosts scales with SF; duration_days is fixed to avoid quadratic
+        # growth (hosts × days both scaling would produce SF² total rows).
         self.num_hosts = num_hosts or max(10, int(DEFAULT_HOSTS * scale_factor))
-        self.duration_days = duration_days or max(1, int(DEFAULT_DURATION_DAYS * scale_factor))
+        self.duration_days = duration_days or DEFAULT_DURATION_DAYS
         self.interval_seconds = interval_seconds
         self.start_time = start_time or datetime(2024, 1, 1, 0, 0, 0)
 
@@ -102,6 +109,7 @@ class TSBSDevOpsDataGenerator(VerbosityMixin):
 
         # Generate consistent host metadata
         self._generate_host_metadata()
+        self._table_row_counts: dict[str, int] = {}
 
     def _generate_host_metadata(self) -> None:
         """Generate consistent host tags for all hosts."""
@@ -159,47 +167,53 @@ class TSBSDevOpsDataGenerator(VerbosityMixin):
         table_files["disk"] = self._generate_disk_metrics(num_timestamps)
         table_files["net"] = self._generate_net_metrics(num_timestamps)
 
+        if self._table_row_counts:
+            write_generator_manifest(
+                self, "tsbs_devops", table_files, self._table_row_counts, metadata={"csv_has_header": True}
+            )
         self.log_verbose("TSBS DevOps data generation complete")
         return table_files
 
     def _check_existing_data(self) -> bool:
         """Check if valid data files exist."""
         for table in TABLE_ORDER:
-            if not (self.output_dir / f"{table}.csv").exists():
+            filename = self.get_compressed_filename(f"{table}.csv")
+            if not (self.output_dir / filename).exists():
                 return False
         return True
 
     def _collect_table_files(self) -> dict[str, Path]:
         """Collect existing table file paths."""
         return {
-            table: self.output_dir / f"{table}.csv"
+            table: self.output_dir / self.get_compressed_filename(f"{table}.csv")
             for table in TABLE_ORDER
-            if (self.output_dir / f"{table}.csv").exists()
+            if (self.output_dir / self.get_compressed_filename(f"{table}.csv")).exists()
         }
 
     def _generate_tags(self) -> Path:
         """Generate tags table with host metadata."""
-        output_path = self.output_dir / "tags.csv"
+        output_path = self.output_dir / self.get_compressed_filename("tags.csv")
 
         columns = list(TSBS_DEVOPS_SCHEMA["tags"]["columns"].keys())
 
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
+        with self.open_output_file(output_path, "wt") as f:
             writer = csv.DictWriter(f, fieldnames=columns)
             writer.writeheader()
 
             for host in self.hosts:
                 writer.writerow(host)
 
+        self._table_row_counts["tags"] = len(self.hosts)
         self.log_verbose(f"  tags: {len(self.hosts)} rows")
         return output_path
 
     def _generate_cpu_metrics(self, num_timestamps: int) -> Path:
         """Generate CPU metrics with realistic patterns."""
-        output_path = self.output_dir / "cpu.csv"
+        output_path = self.output_dir / self.get_compressed_filename("cpu.csv")
         columns = list(TSBS_DEVOPS_SCHEMA["cpu"]["columns"].keys())
 
         total_rows = 0
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
+        with self.open_output_file(output_path, "wt") as f:
             writer = csv.writer(f)
             writer.writerow(columns)
 
@@ -248,16 +262,17 @@ class TSBSDevOpsDataGenerator(VerbosityMixin):
                     )
                     total_rows += 1
 
+        self._table_row_counts["cpu"] = total_rows
         self.log_verbose(f"  cpu: {total_rows} rows")
         return output_path
 
     def _generate_mem_metrics(self, num_timestamps: int) -> Path:
         """Generate memory metrics with realistic patterns."""
-        output_path = self.output_dir / "mem.csv"
+        output_path = self.output_dir / self.get_compressed_filename("mem.csv")
         columns = list(TSBS_DEVOPS_SCHEMA["mem"]["columns"].keys())
 
         total_rows = 0
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
+        with self.open_output_file(output_path, "wt") as f:
             writer = csv.writer(f)
             writer.writerow(columns)
 
@@ -297,18 +312,19 @@ class TSBSDevOpsDataGenerator(VerbosityMixin):
                     )
                     total_rows += 1
 
+        self._table_row_counts["mem"] = total_rows
         self.log_verbose(f"  mem: {total_rows} rows")
         return output_path
 
     def _generate_disk_metrics(self, num_timestamps: int) -> Path:
         """Generate disk I/O metrics."""
-        output_path = self.output_dir / "disk.csv"
+        output_path = self.output_dir / self.get_compressed_filename("disk.csv")
         columns = list(TSBS_DEVOPS_SCHEMA["disk"]["columns"].keys())
 
         devices = ["sda", "sdb"]  # 2 disks per host
         total_rows = 0
 
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
+        with self.open_output_file(output_path, "wt") as f:
             writer = csv.writer(f)
             writer.writerow(columns)
 
@@ -358,18 +374,19 @@ class TSBSDevOpsDataGenerator(VerbosityMixin):
                         )
                         total_rows += 1
 
+        self._table_row_counts["disk"] = total_rows
         self.log_verbose(f"  disk: {total_rows} rows")
         return output_path
 
     def _generate_net_metrics(self, num_timestamps: int) -> Path:
         """Generate network metrics."""
-        output_path = self.output_dir / "net.csv"
+        output_path = self.output_dir / self.get_compressed_filename("net.csv")
         columns = list(TSBS_DEVOPS_SCHEMA["net"]["columns"].keys())
 
         interfaces = ["eth0", "lo"]
         total_rows = 0
 
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
+        with self.open_output_file(output_path, "wt") as f:
             writer = csv.writer(f)
             writer.writerow(columns)
 
@@ -421,6 +438,7 @@ class TSBSDevOpsDataGenerator(VerbosityMixin):
                         )
                         total_rows += 1
 
+        self._table_row_counts["net"] = total_rows
         self.log_verbose(f"  net: {total_rows} rows")
         return output_path
 

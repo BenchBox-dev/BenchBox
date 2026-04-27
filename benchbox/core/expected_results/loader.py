@@ -42,7 +42,7 @@ def parse_tpch_answer_file(answer_file_path: Path) -> int:
         raise FileNotFoundError(f"TPC-H answer file not found: {answer_file_path}")
 
     try:
-        with open(answer_file_path) as f:
+        with open(answer_file_path, encoding="utf-8") as f:
             lines = f.readlines()
 
         # Filter out empty lines
