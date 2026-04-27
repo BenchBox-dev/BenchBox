@@ -68,6 +68,14 @@ No credentials in repo; use env vars or `.env` (gitignored); redact secrets in l
 Conventional Commits (feat:, fix:, docs:, test:). PRs link issues, include tests + docs. CI: ruff + typecheck + tests via `make test-ci`.
 Single repo (`origin` → `joeharris76/BenchBox`); two long-lived branches: `develop` (dev work) and `main` (release-only). Dev PRs target `develop`, squash-merge. Releases go through the version-branch flow (`make release-prepare VERSION=X.Y.Z` cuts `vX.Y.Z` from develop, squash-merge to main, tag, then `make release-rebase-develop`). Full runbook: `docs/operations/release-guide.md`.
 
+**`develop` is PR-gated** (no direct push). Required checks: `lint` + `test (ubuntu-latest, 3.12)`. Linear history; squash-only; 0 reviewer approvals required (self-merge is fine).
+
+**One-shot flow**: from a feature branch run `make pr-preflight && make pr-open`. Preflight runs ruff + fast tests (mirrors CI). `pr-open` pushes, opens the PR vs `develop`, and enables `gh pr merge --auto --squash` so the PR lands the moment CI goes green. Don't poll. The pre-push hook `pr-preflight-fast-tests` (in `.pre-commit-config.yaml`) re-runs the fast lane automatically — activate once with `pre-commit install`.
+
+**Worktrees for parallel branches**: keep `~/Developer/BenchBox/` on `develop` permanently; `make worktree-add BRANCH=fix/foo` creates `../BenchBox.fix-foo/` off `origin/develop`. `cd` in, `uv sync --group dev`, work, run `make pr-open` from inside. After auto-merge, `make worktree-prune` sweeps the worktree (looks for branches gone on origin). Three branches in flight = three worktrees, no stash thrash.
+
+**In Claude Code**: the project-local `/pr` slash command (`.claude/commands/pr.md`) is the canonical wrapper — it commits, preflights, pushes, opens, and enables auto-merge in one shot. Prefer it over the user-global `/commit-push-pr` plugin; that one targets `main` by default and doesn't enable auto-merge.
+
 ## Planning & TODOs
 Layout: `_project/TODO/{worktree}/{phase}/{item}.yaml`; completed → `_project/DONE/`. Stable `id` = filename slug.
 Flat `work[]` with `needs` edges (not nested tasks.phases). Inter-item deps: `deps.needs: [slug-ids]`. Deferred work in separate `deferred[]`.
