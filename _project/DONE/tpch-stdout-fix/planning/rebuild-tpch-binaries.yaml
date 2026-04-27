@@ -1,0 +1,104 @@
+id: rebuild-tpch-binaries
+title: "Rebuild TPC-H binaries with stdout fix for all platforms"
+worktree: "tpch-stdout-fix"
+priority: "High"
+status: "Completed"
+category: "Core Functionality"
+description: |
+  After applying stdout patches to TPC-H source, rebuild dbgen binaries
+  for all supported platforms to enable streaming data generation.
+
+  Target platforms (6 total):
+  - darwin-arm64 (macOS Apple Silicon)
+  - darwin-x86_64 (macOS Intel)
+  - linux-arm64 (Linux ARM64)
+  - linux-x86_64 (Linux x86_64)
+  - windows-arm64 (Windows ARM64)
+  - windows-x86_64 (Windows x86_64)
+
+context_sections:
+  "Technical Context": |
+    Binary locations: _binaries/tpc-h/{platform}/dbgen
+
+    Build requirements:
+    - Native compilation for macOS platforms
+    - Docker containers for Linux builds (existing infrastructure)
+    - MinGW cross-compilation for Windows builds (via Docker)
+
+    Infrastructure used:
+    - _sources/compilation/scripts/compile-all-platforms.sh
+    - _sources/compilation/docker/Dockerfile.linux-{x86_64,arm64}
+    - _sources/compilation/docker/Dockerfile.windows-{x86_64,arm64}
+
+tasks:
+  phases:
+  - phase: "Phase 1: macOS Builds"
+    done: true
+    items:
+    - summary: "Build darwin-arm64 binary on Apple Silicon Mac"
+      done: true
+    - summary: "Build darwin-x86_64 binary (cross-compile or Rosetta)"
+      done: true
+    - summary: "Verify both macOS binaries work with -z flag"
+      done: true
+
+  - phase: "Phase 2: Linux Builds"
+    done: true
+    items:
+    - summary: "Build linux-x86_64 binary (Docker)"
+      done: true
+    - summary: "Build linux-arm64 binary (Docker)"
+      done: true
+    - summary: "Verify both Linux binaries work with -z flag"
+      done: true
+
+  - phase: "Phase 3: Windows Builds"
+    done: true
+    items:
+    - summary: "Build windows-x86_64 binary (MinGW via Docker)"
+      done: true
+    - summary: "Build windows-arm64 binary (MinGW via Docker)"
+      done: true
+    - summary: "Verify Windows binaries work with -z flag"
+      done: true
+
+  - phase: "Phase 4: Verification"
+    done: true
+    items:
+    - summary: "Verify all 6 binaries have -z flag in help output"
+      done: true
+    - summary: "All existing TPC-H tests pass (101 tests)"
+      done: true
+
+files_affected:
+  modified:
+  - "_binaries/tpc-h/darwin-arm64/dbgen"
+  - "_binaries/tpc-h/darwin-x86_64/dbgen"
+  - "_binaries/tpc-h/linux-arm64/dbgen"
+  - "_binaries/tpc-h/linux-x86_64/dbgen"
+  - "_binaries/tpc-h/windows-arm64/dbgen.exe"
+  - "_binaries/tpc-h/windows-x86_64/dbgen.exe"
+
+dependencies:
+  blocked_by:
+  - "_project/DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml"
+  related:
+  - "_project/DONE/tpcds-stdout-fix/rebuild-tpcds-binaries.yaml"
+
+success_metrics:
+- "All 6 platform binaries compile successfully"
+- "All binaries pass -z stdout output verification"
+- "Output from -z matches output from file mode exactly"
+- "Binary sizes are reasonable (no bloat)"
+
+metadata:
+  created_date: "2026-01-15"
+  completed_date: "2026-01-16"
+  estimated_effort: "2-4 hours"
+  commits:
+  - "39c96fd7"
+  tags:
+  - "tpc-h"
+  - "compilation"
+  - "binaries"
+  - "cross-platform"

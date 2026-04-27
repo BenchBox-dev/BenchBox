@@ -1,0 +1,609 @@
+id: velox-gluten-spark-adapter
+title: "Add Velox + Gluten Spark Acceleration Platform Adapter"
+worktree: platform-expansion
+priority: Medium
+status: Completed
+completed_date: "2026-04-26"
+category: Platform Expansion
+description: |
+  Add a BenchBox platform adapter for Apache Gluten with the Velox backend -
+  a plugin to Apache Spark that offloads physical operators to a highly
+  optimized native C++ engine (Velox) while preserving Spark's fault
+  tolerance, distributed scheduling, and DataFrame/SQL APIs.
+
+  Unlike LakeSail (a standalone Rust/DataFusion Spark-Connect server),
+  Gluten+Velox runs *inside* Apache Spark via jar + plugin configuration.
+  From a client perspective, a Gluten-accelerated Spark cluster still speaks
+  standard Spark (Connect or classic) - the acceleration is invisible to the
+  application. The adapter's job is therefore primarily to:
+
+    1. Own the lifecycle of a Gluten-enabled SparkSession / Spark-Connect
+       server (jars on the classpath, required conf set, off-heap memory).
+    2. Expose Gluten/Velox-specific configuration knobs as CLI options.
+    3. Capture native-execution metadata (backend = Velox vs. JVM fallback)
+       in platform info and query plans.
+    4. Reuse all Spark load/query/tuning plumbing already proven on
+       LakeSail and Apache Spark adapters.
+
+  Reference performance: TPC-H ~3.3x overall / up to ~23x on individual
+  queries, TPC-DS ~3x overall / up to ~13.7x on individual queries (Gluten
+  community numbers, March 2024). This makes Velox a natural fit next to
+  LakeSail, Photon-backed Databricks, and Fabric native acceleration in
+  BenchBox's "accelerated Spark" tier.
+
+  Upstream references:
+    - https://gluten.apache.org/
+    - https://github.com/apache/gluten (ASF Top-Level Project since Feb 2026)
+    - https://velox-lib.io/
+    - https://apache.github.io/incubator-gluten/get-started/Velox.html
+
+context_sections:
+  "Why Velox and not just Spark": |
+    Apache Spark's default executor is JVM + Catalyst + Tungsten. Velox
+    replaces the physical operator layer with a vectorized C++ engine
+    (columnar, SIMD-friendly, unified memory management). Gluten is the
+    Spark plugin that:
+      - Intercepts physical plans after Catalyst.
+      - Translates supported operators/expressions into a Velox plan
+        via Substrait.
+      - Executes them natively off-heap; falls back to JVM row-based
+        execution for unsupported operators (transparent row/columnar
+        conversion).
+      - Adds a ColumnarShuffleManager for native off-heap shuffle.
+
+    For BenchBox this is interesting because we already benchmark Apache
+    Spark and LakeSail; adding Gluten+Velox lets users answer "how much
+    of the LakeSail speedup is 'native execution' vs 'non-Spark runtime'?"
+    on identical hardware.
+
+  "Deployment shapes": |
+    Gluten+Velox can be deployed in several ways; the adapter should
+    support at least (a) and (b) in v1, and (c) as a deferred follow-up:
+
+      (a) Local standalone Spark (pyspark in-process or local[*])
+          with the Gluten jar added to the driver/executor classpath.
+          Cheapest to test, closest to Apache Spark adapter pattern.
+          IMPORTANT: "local" in this context means "one Spark JVM on the
+          same host as the Python client" - that host MUST be Linux
+          (native or containerized). See "Docker dev workflow" below.
+
+      (b) Remote Spark-Connect server that has been pre-started with
+          Gluten jars and Gluten plugin config. Matches LakeSail adapter
+          shape: connect with `sc://host:port`, do not manage cluster.
+          The pre-started server is typically itself a Linux container.
+
+      (c) Containerized/managed deployments (EMR, Dataproc, Fabric native
+          execution, on-prem K8s). Out of v1 scope; configuration hooks
+          only, no lifecycle management.
+
+  "Docker dev workflow (primary local path on macOS / Windows)": |
+    Gluten ships prebuilt bundle jars ONLY for linux_amd64 and
+    linux_aarch64. No Darwin or Windows artifact exists, and upstream
+    Gluten explicitly does not test macOS builds (see apache/incubator-
+    gluten #5006 and #5491). BenchBox therefore standardizes on Docker
+    as the primary local dev and CI path:
+
+      Base image:    apache/spark:3.5.2 (or a matching pyspark 3.5.x jdk17)
+      OS:            Ubuntu 22.04 (matches Gluten supported-OS matrix)
+      JDK:           OpenJDK 17
+      Python:        3.11+ with pyspark==3.5.x
+      Jar:           bind-mount or COPY gluten-velox-bundle-spark3.5_2.12
+                     -linux_{amd64|aarch64}-1.4.0.jar into the image
+      Expose:        50051 (Spark-Connect) for 'remote' deployment, or run
+                     the whole benchmark inside the container for 'local'.
+
+    Two supported dev workflows:
+
+      (1) Adapter-only Docker (benchbox client outside, Spark inside):
+          docker run starts a Gluten-configured Spark-Connect server
+          inside the container; benchbox on the host connects via
+          `sc://localhost:50051` with deployment=remote. Host can be
+          macOS or Linux. No Gluten binary on the host.
+
+      (2) All-in-one Docker (benchbox client AND Spark inside):
+          docker run executes `benchbox run --platform velox …` entirely
+          inside the Linux container with deployment=local. Simpler for
+          one-shot benchmarks and CI.
+
+    Arch note: Apple Silicon hosts can run the linux_arm64 bundle image
+    natively (no emulation). Intel Macs use linux_amd64. Do NOT rely on
+    Rosetta/qemu emulation for benchmarks - it voids the timing numbers.
+
+  "Minimum required Spark configuration": |
+    spark.plugins                           = org.apache.gluten.GlutenPlugin
+    spark.memory.offHeap.enabled            = true
+    spark.memory.offHeap.size               = <off-heap, e.g. 8g-20g>
+    spark.shuffle.manager                   = org.apache.spark.shuffle.sort.ColumnarShuffleManager
+    spark.driver.extraClassPath             = <path to gluten-velox-bundle jar>
+    spark.executor.extraClassPath           = <path to gluten-velox-bundle jar>
+
+    Official supported Spark versions as of Gluten 1.4.x: 3.2.2, 3.3.1,
+    3.4.4, 3.5.5. Bundle jar naming:
+      gluten-velox-bundle-spark{3.5}_{2.12}-{linux_amd64|linux_aarch64}-{1.4.0}.jar
+
+    Java 8 or 17. Linux only (Ubuntu 20/22, CentOS 8) for prebuilt jars.
+    On macOS and Windows the adapter is exercised exclusively via Docker
+    (see "Docker dev workflow" above). Native macOS/Darwin execution of
+    Gluten is NOT supported by upstream and is NOT a goal of this work.
+
+  "Relationship to existing adapters": |
+    - benchbox/platforms/spark.py           - classic SparkSession; closest
+                                              template for local-mode Gluten.
+    - benchbox/platforms/lakesail.py        - Spark-Connect client adapter,
+                                              auto-starts local server, no
+                                              cluster mgmt. Template for
+                                              remote-mode Gluten.
+    - benchbox/platforms/base/spark_execution_mixin.py
+                                            - SparkDataLoadMixin /
+                                              SparkQueryExecutionMixin
+                                              already handle load+query via
+                                              PySpark. Reuse verbatim.
+    - benchbox/platforms/base/cloud_spark.py - SparkTuningMixin, reuse.
+
+  "Known Velox/Gluten caveats that affect benchmarks": |
+    - Not every SQL operator is accelerated; Gluten logs fallback events.
+      For honest benchmarking we should surface fallback counts in
+      platform_info / per-query metadata.
+    - Off-heap memory is mandatory and sized separately from heap; too
+      small a value causes OOM or forced JVM fallback.
+    - ColumnarShuffleManager is required for shuffle acceleration;
+      omitting it silently forfeits most of the speedup.
+    - DECIMAL precision, TIMESTAMP timezone semantics, and some TPC-DS
+      queries historically have Velox-vs-Spark diffs. Validation mode
+      `loose` may be required for some queries until parity is confirmed.
+    - Dependency is not a pip package: Gluten ships a JVM bundle jar
+      (~150MB). The adapter cannot be made importable purely via `uv add`
+      - it also needs the jar on disk. The install UX must account for
+      this (downloader helper or explicit user-supplied path).
+
+metadata:
+  tags:
+    - platform
+    - spark
+    - velox
+    - gluten
+    - native-execution
+    - accelerated-spark
+  estimated_effort: "Large - ~6-8 engineering days including jar
+    provisioning, two deployment modes, multi-arch Docker image +
+    compose, CI strategy, and docs"
+  created_date: "2026-04-12"
+  model_platforms:
+    - lakesail
+    - spark
+    - snowpark-connect
+
+technical_requirements:
+  dependencies:
+    - "pyspark (existing extra - reused)"
+    - "Gluten Velox bundle jar, e.g. gluten-velox-bundle-spark3.5_2.12-linux_amd64-1.4.0.jar"
+    - "Java 8 or 17 on PATH (JAVA_HOME) - inside the container for macOS/Windows devs"
+    - "Docker Desktop or Docker Engine - the ONLY supported local dev path on macOS/Windows; also the recommended path on Linux to pin OS/JDK versions"
+    - "Linux x86_64 or aarch64 Docker image (apache/spark:3.5.x on Ubuntu 22.04)"
+  constraints:
+    - "Local mode requires a JVM and the Gluten jar on disk inside the execution host (container or Linux VM)"
+    - "Remote mode requires a pre-configured Spark-Connect server (typically a Linux container) with Gluten already wired"
+    - "No prebuilt macOS/Windows bundle jars exist as of 1.4.x - all non-Linux development and CI MUST go through Docker"
+    - "Native macOS builds of Gluten are not supported by upstream - do not attempt to work around; use Docker instead"
+    - "Benchmarks run under Rosetta/qemu emulation produce meaningless timing numbers - match image arch to host arch (linux_arm64 for Apple Silicon, linux_amd64 for Intel)"
+    - "Off-heap memory budget is a real resource cost; Docker-based defaults must respect container memory limits (docker run --memory) and safe 16GB developer laptops"
+  compatibility: |
+    Gluten is *additive* to Apache Spark. Any Spark-SQL workload BenchBox
+    already runs on the Spark adapter should run on Gluten+Velox; the
+    execution differences are:
+      - Some operators fall back to JVM (logged by Gluten).
+      - Numeric and timestamp edge cases may differ - treat as validation
+        concerns, not correctness bugs, unless reproducible.
+      - EXPLAIN output includes VeloxColumnar* / RowToVeloxColumnar nodes.
+
+files_affected:
+  added:
+    - "benchbox/platforms/velox.py  # primary adapter (name TBD: velox | gluten-velox)"
+    - "tests/unit/platforms/test_velox_adapter.py"
+    - "tests/integration/platforms/test_velox_live.py"
+    - "docs/platforms/velox.md"
+    - "docs/platforms/velox_jar_setup.md                  # how to obtain/pin the bundle jar"
+    - "docs/platforms/velox_docker_dev.md                 # Docker-based local dev workflow (primary path on macOS/Windows)"
+    - "docker/velox/Dockerfile                            # apache/spark:3.5.2 + JDK17 + bundle jar + pyspark + benchbox"
+    - "docker/velox/docker-compose.yml                    # adapter-only and all-in-one workflows"
+    - "docker/velox/entrypoint.sh                         # starts Spark-Connect server with Gluten conf, or runs benchbox CLI"
+    - "docker/velox/README.md                             # build + run recipes, arch selection, memory sizing"
+  modified:
+    - "benchbox/platforms/__init__.py             # lazy adapter entry + aliases + list_available_platforms constants"
+    - "benchbox/platforms/adapter_factory.py      # dispatch entry for 'velox' (mirror lakesail wiring)"
+    - "benchbox/utils/dependencies.py             # add 'velox' DependencyInfo"
+    - "pyproject.toml                              # add [project.optional-dependencies] velox extra"
+    - "docs/platforms/index.md"
+    - "docs/benchmarks/platform_matrix.md         # if it exists; tier Velox under accelerated-Spark"
+
+must_preserve:
+  - "Existing Spark adapter (benchbox/platforms/spark.py) behavior unchanged when Velox jar / plugin not configured"
+  - "Existing LakeSail adapter (benchbox/platforms/lakesail.py) behavior unchanged - Velox adapter must be a new file, not a subclass modifying LakeSail"
+  - "SparkDataLoadMixin and SparkQueryExecutionMixin contracts preserved - Velox adapter consumes them, does not edit them"
+  - "All existing platform unit tests pass: uv run -- python -m pytest tests/unit/platforms/ -q"
+  - "Platform registry autodiscovery still loads every existing platform after Velox is added"
+
+approach: |
+  Follow the LakeSail adapter as the structural template, and the
+  Apache Spark adapter for local-mode session construction. Concretely:
+
+    1. New file benchbox/platforms/velox.py defines VeloxAdapter
+       inheriting (SparkDataLoadMixin, SparkQueryExecutionMixin,
+       PlatformAdapter), mirroring LakeSail's class layout.
+
+    2. Two deployment modes via a `deployment` config field:
+         - "local":   builds a SparkSession (classic or Spark-Connect via
+                      pysail-style in-process server is NOT applicable
+                      here; use pyspark.sql.SparkSession.builder.master
+                      'local[*]'). Adds Gluten jar to spark.jars and
+                      classpath, sets plugin + off-heap + columnar shuffle.
+         - "remote":  treats the endpoint as a pre-configured Spark-Connect
+                      server (mirror LakeSail _parse_endpoint / _is_server
+                      _reachable). Does NOT auto-start a server.
+
+    3. Config knobs (CLI + --platform-option):
+         deployment        = local | remote          (default local)
+         endpoint          = sc://host:port          (remote only)
+         gluten_jar_path   = /abs/path/to/bundle.jar (local only; required)
+         gluten_version    = 1.4.0                    (informational; surfaced in platform_info)
+         offheap_size      = 8g                       (default conservative)
+         shuffle_partitions, adaptive_enabled, driver_memory, app_name,
+         table_format, spark_config, disable_cache     (identical to LakeSail)
+
+    4. `_get_spark_conf()` merges LakeSail-style base conf with Gluten-
+       mandatory keys; in remote mode the conf is advisory (the server
+       already has it - send only what Spark-Connect respects).
+
+    5. `_create_spark_session()`:
+         - local:  SparkSession.builder.master('local[*]')
+                     .config('spark.plugins', 'org.apache.gluten.GlutenPlugin')
+                     .config('spark.jars', gluten_jar_path)
+                     .config('spark.driver.extraClassPath', gluten_jar_path)
+                     .config('spark.executor.extraClassPath', gluten_jar_path)
+                     .config('spark.memory.offHeap.enabled', 'true')
+                     .config('spark.memory.offHeap.size', offheap_size)
+                     .config('spark.shuffle.manager',
+                             'org.apache.spark.shuffle.sort.ColumnarShuffleManager')
+                     .getOrCreate()
+         - remote: SparkSession.builder.remote(endpoint) + conf overlay.
+
+    6. `get_platform_info()` reports: deployment mode, gluten_version,
+       gluten_jar_path (redacted), offheap_size, Spark version, PySpark
+       version, and (best-effort) backend fingerprint:
+         - EXPLAIN a trivial query, look for 'VeloxColumnar' nodes to
+           confirm Velox is actually active; store `velox_active: bool`.
+
+    7. Query plan capture (`get_query_plan`) uses EXPLAIN EXTENDED (as
+       LakeSail does) and additionally greps for Velox columnar nodes so
+       the get_query_plan MCP tool can show native-vs-fallback.
+
+    8. Fallback telemetry (stretch, in w-series): hook into Spark logs
+       or Gluten metrics (SparkListener) to count JVM-fallback
+       operators per query and attach to BenchmarkResults query metadata.
+
+    9. Dependency + registry wiring (four touchpoints, mirroring LakeSail):
+         - pyproject.toml extra "velox" pins pyspark==3.5.x (matching the
+           bundle jar); the jar itself is NOT packaged.
+         - utils/dependencies.py adds DependencyInfo("velox", ...) with
+           packages=["pyspark"] and an extra `external_artifacts` note
+           pointing to docs/platforms/velox_jar_setup.md.
+         - platforms/__init__.py: register "VeloxAdapter" in the lazy
+           adapter map (mirroring the "LakeSailAdapter" entry at line 89),
+           add "velox" (and optional "gluten-velox") to the platform-name
+           lookup, add availability constant entry for
+           list_available_platforms().
+         - platforms/adapter_factory.py: register the Velox dispatch entry
+           so get_platform_adapter("velox", **config) resolves.
+         - At the bottom of velox.py, define `_build_velox_config` and
+           call PlatformHookRegistry.register_config_builder("velox", ...)
+           exactly as LakeSail does (credential loading, driver_package
+           = "pyspark", platform_fields listing Velox-specific knobs).
+
+   10. Jar provisioning helper (small utility in benchbox/platforms/velox
+       or a scripts/ helper): given gluten_version + spark_version + arch,
+       prints the canonical jar URL (Apache dist mirror) and checksum.
+       Do NOT auto-download during benchmark runs (supply-chain risk);
+       provide an opt-in `benchbox fetch-velox-jar` CLI later if demanded.
+
+   11. Docker-based local dev + CI path (primary workflow on macOS/Windows,
+       recommended on Linux):
+
+         docker/velox/Dockerfile
+           FROM apache/spark:3.5.2-scala2.12-java17-python3-ubuntu
+           ARG GLUTEN_VERSION=1.4.0
+           ARG TARGETARCH        # amd64 | arm64 (inferred by buildx)
+           RUN curl -fsSL ${APACHE_MIRROR}/gluten/${GLUTEN_VERSION}/\
+               gluten-velox-bundle-spark3.5_2.12-linux_${TARGETARCH}-${GLUTEN_VERSION}.jar \
+               -o /opt/gluten.jar
+           COPY --chown=spark:spark . /opt/benchbox
+           RUN pip install -e /opt/benchbox[velox]
+           COPY docker/velox/entrypoint.sh /entrypoint.sh
+           ENTRYPOINT ["/entrypoint.sh"]
+
+         docker/velox/docker-compose.yml defines two services:
+           - 'velox-connect': starts Spark-Connect server on :50051 with
+             Gluten conf, for adapter-only dev from the host.
+           - 'velox-runner':  runs `benchbox run --platform velox …`
+             end-to-end inside the container, for one-shot benchmarks
+             and CI.
+
+         Build and publish multi-arch images via `docker buildx build
+         --platform linux/amd64,linux/arm64` so Apple Silicon and Intel
+         developers get native execution.
+
+         The adapter code DOES NOT manage Docker lifecycle - that is the
+         user's responsibility via `docker compose up`. The adapter only
+         needs to (a) accept a `sc://localhost:50051` endpoint, and
+         (b) document the Docker path prominently.
+
+   12. Validation strategy for first PR: run TPC-H Q1, Q6, Q3, Q9 at
+       SF 0.01 under local mode *inside* the Docker image on both
+       linux/amd64 and linux/arm64 runners (matrix), assert
+       'VeloxColumnar' nodes appear in EXPLAIN for at least Q1/Q6.
+       This becomes the single live_integration test; all other tests
+       use mocked pyspark like existing LakeSail tests.
+
+anti_patterns:
+  - "DO NOT auto-download the Gluten bundle jar inside the adapter - because
+    silent network fetches during benchmark runs are a supply-chain and
+    reproducibility hazard - require the user to supply `gluten_jar_path`
+    (or pre-stage via an explicit, documented CLI command)."
+  - "DO NOT subclass LakeSailAdapter or SparkAdapter - because Velox is a
+    distinct deployment shape with required conf that would leak into those
+    adapters if inherited - create a new VeloxAdapter that reuses the Spark
+    mixins directly, following the LakeSail file as a structural template."
+  - "DO NOT silently omit spark.shuffle.manager=ColumnarShuffleManager -
+    because forgetting it forfeits most of the Velox shuffle speedup and
+    produces misleading benchmark numbers - fail fast with a clear error if
+    the user overrides it to a non-columnar value while deployment=local."
+  - "DO NOT require Velox jar for unit tests - because CI runners don't have
+    the ~150MB native bundle and may not be Linux - mock SparkSession and
+    gate live integration tests behind the `live_integration` + Linux markers."
+  - "DO NOT edit benchbox/platforms/lakesail.py or benchbox/platforms/spark.py
+    - because Velox is additive and those adapters must remain byte-identical
+    to avoid regressing existing benchmarks - all new code lives in velox.py
+    and the small registration deltas in __init__.py / dependencies.py."
+  - "DO NOT pin pyspark to a version outside the Gluten-supported set
+    (3.2.2 / 3.3.1 / 3.4.4 / 3.5.5 as of 1.4.x) - because the native bundle
+    is ABI-coupled to the Spark minor version - expose `gluten_version` and
+    validate pyspark version matches on session creation."
+  - "DO NOT attempt a native macOS / Darwin build of Gluten or Velox as part
+    of this work - because upstream does not support or test this path (see
+    apache/incubator-gluten #5006, #5491) and any local success would diverge
+    from published benchmark numbers - direct macOS/Windows developers to the
+    Docker workflow in docker/velox/ instead."
+  - "DO NOT run the Docker image under Rosetta or qemu emulation when the
+    host arch differs from the image arch - because emulated SIMD / off-heap
+    allocation destroys timing fidelity (this is the whole point of Velox) -
+    ship multi-arch images (linux/amd64 + linux/arm64) via docker buildx and
+    fail fast with a clear warning if the adapter detects emulation at
+    session startup."
+  - "DO NOT have the adapter call out to `docker` / manage container
+    lifecycle - because coupling benchmark runs to an implicit Docker daemon
+    hides failure modes and confuses CI - treat Docker as user-operated
+    infrastructure (like a Spark cluster), documented in docker/velox/README
+    .md, and have the adapter speak only to an already-running endpoint or
+    in-process SparkSession."
+
+verification:
+  - description: "Adapter module imports cleanly without Gluten jar present"
+    command: 'uv run -- python -c "from benchbox.platforms.velox import VeloxAdapter; print(''import OK'')"'
+    expected_output: "import OK"
+  - description: "Platform registry exposes 'velox' via list_available_platforms()"
+    command: 'uv run -- python -c "from benchbox.platforms import list_available_platforms; assert ''velox'' in list_available_platforms(); print(''registered'')"'
+    expected_output: "registered"
+  - description: "adapter_factory dispatches 'velox' to VeloxAdapter class"
+    command: 'uv run -- python -c "from benchbox.platforms.adapter_factory import get_adapter_class; cls = get_adapter_class(''velox''); assert cls.__name__ == ''VeloxAdapter''; print(''dispatch OK'')"'
+    expected_output: "dispatch OK"
+  - description: "Unit tests for new adapter pass (mocked SparkSession)"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_velox_adapter.py -q"
+    expected_output: "exit code 0"
+  - description: "All existing platform unit tests still pass (exit 0)"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -q"
+    expected_output: "exit code 0"
+  - description: "LakeSail and Spark adapter tests specifically unaffected"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_lakesail.py tests/unit/platforms/test_spark_adapter.py -q"
+    expected_output: "exit code 0"
+  - description: "Dependency introspection reports velox extra"
+    command: 'uv run -- python -c "from benchbox.utils.dependencies import DEPENDENCIES; assert ''velox'' in DEPENDENCIES; print(''dep OK'')"'
+    expected_output: "dep OK"
+  - description: "Lint + typecheck clean on new file"
+    command: "uv run ruff check benchbox/platforms/velox.py && uv run ty check benchbox/platforms/velox.py"
+    expected_output: "exit code 0"
+  - description: "Docker image builds cleanly on both architectures"
+    command: "docker buildx build --platform linux/amd64,linux/arm64 -f docker/velox/Dockerfile -t benchbox-velox:test ."
+    expected_output: "exit code 0 for both platforms"
+  - description: "Docker-compose 'velox-connect' service starts and accepts Spark-Connect on :50051"
+    command: "cd docker/velox && docker compose up -d velox-connect && timeout 60 bash -c 'until nc -z localhost 50051; do sleep 1; done' && docker compose down"
+    expected_output: "exit code 0 (port 50051 reachable within 60s)"
+  - description: "Live smoke (runs INSIDE the Docker image; gated by live_integration marker): TPC-H Q1 at SF 0.01 reports velox_active=True"
+    command: "docker run --rm benchbox-velox:test python -m pytest tests/integration/platforms/test_velox_live.py::test_tpch_q1_velox_active -m live_integration -q"
+    expected_output: "exit code 0 (test asserts platform_info['velox_active'] is True and row count matches TPC-H Q1 expected)"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/velox.py"
+    - "benchbox/platforms/__init__.py         # registration lines only"
+    - "benchbox/platforms/adapter_factory.py  # dispatch entry only"
+    - "benchbox/utils/dependencies.py         # new DependencyInfo entry only"
+    - "pyproject.toml                          # new optional-dependency group only"
+    - "tests/unit/platforms/test_velox_adapter.py"
+    - "tests/integration/platforms/test_velox_live.py"
+    - "docs/platforms/velox.md"
+    - "docs/platforms/velox_jar_setup.md"
+    - "docs/platforms/velox_docker_dev.md"
+    - "docs/platforms/index.md"
+    - "docker/velox/Dockerfile"
+    - "docker/velox/docker-compose.yml"
+    - "docker/velox/entrypoint.sh"
+    - "docker/velox/README.md"
+  do_not_modify:
+    - "benchbox/platforms/spark.py"
+    - "benchbox/platforms/lakesail.py"
+    - "benchbox/platforms/base/spark_execution_mixin.py"
+    - "benchbox/platforms/base/cloud_spark.py"
+    - "benchbox/core/runner.py"
+
+success_metrics:
+  - "VeloxAdapter runs TPC-H SF 0.01 end-to-end in local mode INSIDE the docker/velox image on both linux/amd64 and linux/arm64"
+  - "platform_info reports velox_active=True and the correct gluten_version"
+  - "EXPLAIN output for at least 2 TPC-H queries contains VeloxColumnar* nodes"
+  - "Measured speedup on TPC-H SF 1 (local mode inside Docker, 8 cores, 16GB) vs benchbox/platforms/spark.py with same data and tuning is >=1.5x geomean - sanity check, not a pass/fail gate"
+  - "Zero regression in existing Spark or LakeSail adapter tests"
+  - "docker buildx builds the image for linux/amd64 AND linux/arm64 without errors"
+  - "Apple Silicon developers can run `docker compose up velox-connect` and connect benchbox on the host via sc://localhost:50051 without emulation warnings"
+  - "Docs clearly explain: (a) how to get the jar OR use the Docker image, (b) why macOS/Windows users must use Docker, (c) how to pick gluten/spark/arch triple, (d) known fallback caveats"
+
+open_questions:
+  - "Adapter/alias naming: 'velox' (engine-centric), 'gluten-velox' (plugin-centric), or both?  CLI precedent favors short names (duckdb, sqlite) - leaning 'velox' primary with 'gluten-velox' alias."
+  - "Do we ship a jar fetcher helper in v1, or defer until users ask?  Leaning defer - document the Apache mirror URL and checksum instead."
+  - "Should 'remote' mode be in v1 or split to a follow-up item?  Probably v1 - it is nearly free given LakeSail's Spark-Connect plumbing."
+  - "Do we want a GPU variant (Velox + cuDF) as a separate adapter ('velox-gpu') or a config flag on the same adapter?  Defer - watch NVIDIA Velox/cuDF GA timeline first."
+  - "Validation mode default: 'exact' or 'loose'?  Start 'loose' for TPC-DS due to known Velox decimal/timestamp edge cases; revisit per-query after smoke runs."
+  - "Do we need a second live test matrix entry (Arm64) in v1?  YES - multi-arch Docker (linux/amd64 + linux/arm64) is v1 scope because Apple Silicon is the primary dev host and we explicitly forbid emulation."
+  - "Should the Docker image publish to GHCR/Docker Hub, or stay build-your-own in v1?  Leaning build-your-own - avoids release-pipeline scope creep; publish when users ask."
+
+work:
+  - id: w1
+    summary: "Research spike - pin Gluten 1.4.x + Spark 3.5.x + base Docker image, document jar URLs + sha256 for linux_amd64 and linux_arm64"
+    status: done
+    notes: |
+      Output: a one-pager in docs/platforms/velox_jar_setup.md with exact
+      jar URLs (both arches), sha256 sums, Spark/Java/OS compatibility
+      matrix, and the base image tag. This is prerequisite for every
+      following unit because it pins the test + Docker matrix.
+
+  - id: w2
+    summary: "Scaffold VeloxAdapter skeleton in benchbox/platforms/velox.py by copying LakeSail structure - class, __init__, from_config, platform_name, get_target_dialect"
+    needs: [w1]
+    status: done
+    notes: |
+      Pure skeleton - no session logic yet. Goal: module imports cleanly
+      with pyspark missing, same try/except shape as LakeSail.
+
+  - id: w3
+    summary: "Register adapter across four wiring points - platforms/__init__.py, adapter_factory.py, utils/dependencies.py DependencyInfo, pyproject.toml 'velox' extra"
+    needs: [w2]
+    status: done
+    notes: |
+      Single work unit because the four edits are trivial individually
+      and must land together for the adapter to be reachable. Commit
+      as one change. The pyproject extra pins pyspark to a
+      Gluten-supported version (3.2.2 / 3.3.1 / 3.4.4 / 3.5.5).
+
+  - id: w4
+    summary: "Add _build_velox_config + PlatformHookRegistry.register_config_builder('velox', ...) at the bottom of velox.py, mirroring _build_lakesail_config"
+    needs: [w3]
+    status: done
+
+  - id: w5
+    summary: "Implement local-mode _create_spark_session - SparkSession.builder with required Gluten conf, jar classpath, off-heap, ColumnarShuffleManager; validate gluten_jar_path exists with clear error"
+    needs: [w2]
+    status: done
+    notes: |
+      Mirror benchbox/platforms/spark.py for builder construction; add
+      Gluten-specific conf.
+
+  - id: w6
+    summary: "Implement remote-mode _create_spark_session and _ensure_server_ready (endpoint parse, socket probe) - mirror LakeSail but do NOT auto-start a server"
+    needs: [w2]
+    status: done
+
+  - id: w7
+    summary: "Wire in SparkDataLoadMixin and SparkQueryExecutionMixin by implementing load_data, execute_query, create_schema, close_connection - all thin delegates, same as LakeSail"
+    needs: [w5, w6]
+    status: done
+
+  - id: w8
+    summary: "Implement get_platform_info including a 'velox_active' probe via EXPLAIN on SELECT 1 looking for VeloxColumnar plan nodes"
+    needs: [w7]
+    status: done
+
+  - id: w9
+    summary: "Implement get_query_plan using EXPLAIN EXTENDED and annotate whether each query is fully native or contains fallback nodes"
+    needs: [w7]
+    status: done
+
+  - id: w10
+    summary: "Add CLI arguments (add_cli_arguments) for --velox-deployment, --velox-endpoint, --velox-jar, --velox-version, --offheap-size, reuse Spark args where possible"
+    needs: [w7]
+    status: done
+
+  - id: w11
+    summary: "Implement SparkTuningMixin wiring (supports_tuning_type, generate_tuning_clause, apply_unified_tuning) - copy LakeSail, partitioning + sorting only"
+    needs: [w7]
+    status: done
+
+  - id: w12
+    summary: "Unit tests: config building, dependency check failure path, endpoint parsing, local vs remote dispatch (mocked SparkSession)"
+    needs: [w5, w6]
+    status: done
+    notes: |
+      Model on tests/unit/platforms/test_lakesail.py. Must run without
+      pyspark installed (gated import, mock at module level).
+
+  - id: w13
+    summary: "Unit tests: velox_active probe parsing, get_query_plan fallback annotation, SparkTuningMixin behavior"
+    needs: [w8, w9, w11]
+    status: done
+
+  - id: w14
+    summary: "Author docker/velox/Dockerfile - multi-arch (linux/amd64 + linux/arm64) FROM apache/spark:3.5.2, bundle jar via ARG TARGETARCH, install benchbox[velox]"
+    needs: [w1, w7]
+    status: done
+    notes: |
+      Build with: docker buildx build --platform linux/amd64,linux/arm64
+      Validate on Apple Silicon (arm64) and Intel/CI (amd64) separately
+      before the full matrix.
+
+  - id: w15
+    summary: "Author docker/velox/entrypoint.sh + docker-compose.yml with two services: velox-connect (:50051) and velox-runner (one-shot benchbox run)"
+    needs: [w14]
+    status: done
+
+  - id: w16
+    summary: "Author docker/velox/README.md - service selection, buildx arch, --memory limits, jar placement, troubleshooting"
+    needs: [w15]
+    status: done
+
+  - id: w17
+    summary: "Live integration test (live_integration marker): TPC-H Q1+Q6 at SF 0.01 inside the Docker image, asserts velox_active=True"
+    needs: [w12, w13, w15]
+    status: done
+    notes: |
+      Must be runnable via `docker run benchbox-velox:test pytest …`.
+      Skipped outside the image; mark with `requires_docker` fixture.
+
+  - id: w18
+    summary: "Author docs/platforms/velox.md - overview, when to choose Velox over Spark/LakeSail, config examples, known caveats; link prominently to velox_docker_dev.md"
+    needs: [w7]
+    status: done
+
+  - id: w19
+    summary: "Author docs/platforms/velox_docker_dev.md - Docker dev workflow: prereqs, buildx, compose recipes, arch selection, memory sizing, CI integration, troubleshooting"
+    needs: [w16]
+    status: done
+
+  - id: w20
+    summary: "Update docs/platforms/index.md and platform matrix to list Velox under accelerated-Spark tier, with explicit 'Linux/Docker only' note"
+    needs: [w18, w19]
+    status: done
+
+  - id: w21
+    summary: "Run full smoke: uv run -- python -m pytest -m fast -q and new unit tests; build both-arch Docker images; fix any drift"
+    needs: [w12, w13, w14, w18, w19]
+    status: done
+
+deferred:
+  - summary: "SparkListener-based fallback-operator counter attached to per-query metadata in BenchmarkResults"
+    reason: "Would require editing SparkQueryExecutionMixin (violates scope_limit) or adding a new mixin; valuable for honest benchmarking but not blocking v1. Split into its own TODO after v1 lands and we see how often users hit fallback in practice."
+  - summary: "GPU variant (Velox + NVIDIA cuDF) as separate 'velox-gpu' adapter"
+    reason: "Track NVIDIA/Velox cuDF GA before committing to a GPU adapter; keep CPU Velox as baseline first."
+  - summary: "Managed Spark integrations (EMR, Dataproc, Fabric native execution)"
+    reason: "Config hooks only, no lifecycle management in v1. Spin out per-provider items if user demand appears."
+  - summary: "Automatic jar provisioning CLI (`benchbox fetch-velox-jar`)"
+    reason: "Supply-chain and reproducibility risk - document the Apache mirror URL + checksum instead; add only if users ask."
+  - summary: "Arm64 live CI matrix entry"
+    reason: "Prebuilt aarch64 bundle jars exist but we have no aarch64 CI runners today; add when infra is available."
+  - summary: "Iceberg / Hudi / Delta read acceleration coverage"
+    reason: "Gluten supports these formats but each needs its own validation pass; separate from core adapter work."

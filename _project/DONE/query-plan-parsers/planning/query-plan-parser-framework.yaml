@@ -1,0 +1,233 @@
+id: query-plan-parser-framework
+title: Query Plan Parser Framework
+worktree: query-plan-parsers
+category: Core Functionality
+priority: High
+status: Completed
+completed_date: '2025-11-23'
+completion_notes: 'Base parser framework and DuckDB parser fully implemented and tested.
+
+  SQLite parser implemented. Remaining parsers (PostgreSQL, BigQuery, Snowflake,
+
+  DataFusion, ClickHouse, Redshift, Databricks) deferred for incremental implementation.
+
+  '
+description: "Implement platform-specific EXPLAIN output parsers that convert native query \nplans into harmonized QueryPlanDAG\
+  \ structure. Includes base parser interface\nand 9 platform-specific implementations.\n\n**Parsing Strategy**:\n- Each platform\
+  \ provides EXPLAIN in different format (text trees, JSON, XML)\n- Parse native format → intermediate representation → QueryPlanDAG\n\
+  - Graceful degradation on parse failures (warn, continue without plan)\n"
+context_sections:
+- name: Parser Complexity Matrix
+  summary: 'Easy (JSON): PostgreSQL, BigQuery, Snowflake (120-150 LOC each)
+
+    Medium (Text): DuckDB, SQLite, DataFusion, ClickHouse, Redshift (150-220 LOC)
+
+    Hard (Complex): Databricks/Spark (200-250 LOC)
+
+    Total: ~1,500 LOC for all parsers
+
+    '
+- name: Operator Harmonization
+  summary: 'Physical operators mapped to logical vocabulary. Examples:
+
+    - HashJoin, MergeJoin, NestedLoopJoin → Join(type=inner/left/right)
+
+    - SeqScan, IndexScan, TableScan → Scan(table_name=...)
+
+    - HashAggregate, StreamAggregate → Aggregate(agg_functions=[...])
+
+    '
+impact: 'HIGH - Enables query plan capture for all platforms. Each parser is independent
+
+  and can be implemented/tested in parallel once base interface defined.
+
+  '
+research_value: 'Documents platform-specific EXPLAIN formats and operator semantics. Establishes
+
+  harmonization rules for cross-platform query optimization analysis.
+
+  '
+dependencies:
+- workstream: Query Plan Core Infrastructure (Models & Storage)
+  reason: Requires QueryPlanDAG, LogicalOperator, PhysicalOperator models
+tasks:
+- phase: 'Phase 2.1: Base Parser Interface'
+  description: Abstract base class for all parsers
+  items:
+  - summary: Create benchbox/core/results/query_plan_parsers/ directory
+    done: false
+  - summary: Implement QueryPlanParser ABC in base_parser.py
+    done: false
+    details: "class QueryPlanParser(ABC):\n    @abstractmethod\n    def parse_explain_output(self, explain_text: str) -> QueryPlanDAG:\n\
+      \        \"\"\"Parse platform EXPLAIN into QueryPlanDAG\"\"\"\n    \n    @abstractmethod\n    def get_explain_query(self,\
+      \ original_query: str) -> str:\n        \"\"\"Generate EXPLAIN query for platform\"\"\"\n        # e.g., \"EXPLAIN (FORMAT\
+      \ JSON) {query}\"\n    \n    def parse_with_fallback(self, explain_text: str, query_id: str) -> QueryPlanDAG | None:\n\
+      \        \"\"\"Parse with error handling, return None on failure\"\"\"\n"
+  - summary: Add OperatorMapper helper class
+    done: false
+    details: "class OperatorMapper:\n    @staticmethod\n    def physical_to_logical(phys_type: str, platform: str) -> str:\n\
+      \        \"\"\"Map physical operator to logical type\"\"\"\n        # HashJoin → Join, SeqScan → Scan, etc.\n"
+  - summary: Create parser registration registry
+    done: false
+    details: Map platform name → parser class for dynamic loading
+- phase: 'Phase 2.2: DuckDB Parser (Proof of Concept)'
+  description: First implementation as reference
+  items:
+  - summary: Create duckdb_parser.py
+    done: false
+  - summary: Implement DuckDB EXPLAIN text parser
+    done: false
+    details: 'DuckDB format: Tree-structured text with indentation
+
+      "PRAGMA enable_profiling" → "PRAGMA show_profiling_info"
+
+      Fallback to "EXPLAIN {query}"
+
+      '
+  - summary: Parse DuckDB operator names to logical operators
+    done: false
+    details: HASH_JOIN → Join, SEQ_SCAN → Scan, HASH_AGGREGATE → Aggregate
+  - summary: Extract cost estimates and row counts
+    done: false
+  - summary: Create test fixtures with sample DuckDB plans
+    done: false
+  - summary: Write parser tests (tests/unit/parsers/test_duckdb_parser.py)
+    done: false
+  - summary: Integration test with real DuckDB queries
+    done: false
+- phase: 'Phase 2.3: SQLite Parser'
+  description: Simplest parser (good second implementation)
+  items:
+  - summary: Create sqlite_parser.py
+    done: false
+  - summary: Implement SQLite EXPLAIN QUERY PLAN parser
+    done: false
+    details: Simple nested list format, easier to parse than DuckDB
+  - summary: Map SQLite operators (SCAN, SEARCH, USE TEMP B-TREE)
+    done: false
+  - summary: Create test fixtures and tests
+    done: false
+- phase: 'Phase 2.4: DataFusion Parser'
+  description: Rust-style plan format
+  items:
+  - summary: Create datafusion_parser.py
+    done: false
+  - summary: Parse DataFusion EXPLAIN output (Rust debug format)
+    done: false
+  - summary: Map DataFusion operators (HashJoinExec, FilterExec, ProjectionExec)
+    done: false
+  - summary: Create test fixtures and tests
+    done: false
+- phase: 'Phase 2.5: PostgreSQL Parser'
+  description: JSON format (easy)
+  items:
+  - summary: Create postgres_parser.py
+    done: false
+  - summary: Implement EXPLAIN (FORMAT JSON) parser
+    done: false
+    details: PostgreSQL provides structured JSON, easiest to parse
+  - summary: Map PostgreSQL operators (Hash Join, Seq Scan, Index Scan)
+    done: false
+  - summary: Extract cost/rows from JSON structure
+    done: false
+  - summary: Create test fixtures and tests
+    done: false
+- phase: 'Phase 2.6: ClickHouse Parser'
+  description: Custom text format
+  items:
+  - summary: Create clickhouse_parser.py
+    done: false
+  - summary: Parse ClickHouse EXPLAIN output
+    done: false
+  - summary: Map ClickHouse operators (ReadFromMergeTree, Aggregating, Expression)
+    done: false
+  - summary: Create test fixtures and tests
+    done: false
+- phase: 'Phase 2.7: Cloud Platform Parsers'
+  description: BigQuery, Redshift, Databricks, Snowflake
+  items:
+  - summary: Create bigquery_parser.py
+    done: false
+    details: BigQuery provides JSON execution plan via API
+  - summary: Create redshift_parser.py
+    done: false
+    details: Redshift EXPLAIN text format, similar to PostgreSQL
+  - summary: Create databricks_parser.py
+    done: false
+    details: Spark plan format (most complex, 200-250 LOC)
+  - summary: Create snowflake_parser.py
+    done: false
+    details: Snowflake provides JSON/XML plan formats
+  - summary: Create test fixtures for each platform
+    done: false
+  - summary: Write parser tests for each platform
+    done: false
+  - summary: Document credential requirements for testing
+    done: false
+- phase: 'Phase 2.8: Parser Error Handling & Validation'
+  description: Graceful degradation and robustness
+  items:
+  - summary: Implement ParseError exception hierarchy
+    done: false
+  - summary: Add logging for parse failures with context
+    done: false
+  - summary: Create parser validation test suite
+    done: false
+    details: Test malformed input, empty plans, platform version differences
+  - summary: Add parser performance benchmarks
+    done: false
+    details: Ensure parsing <100ms for typical plans
+technical_requirements:
+- category: Parsing
+  items:
+  - Robust error handling (don't fail benchmark on parse error)
+  - Support for platform-specific EXPLAIN dialects
+  - Version-tolerant parsing where possible
+- category: Performance
+  items:
+  - Parse time <100ms for typical plans (<100 operators)
+  - Memory overhead <5MB during parsing
+- category: Testing
+  items:
+  - Fixture-based tests for each platform
+  - Real-world plan samples from TPC-H/TPC-DS
+  - Coverage >80% for parser logic
+files_affected:
+  modified:
+  - benchbox/core/results/query_plan_parsers/__init__.py
+  - benchbox/core/results/query_plan_parsers/base_parser.py
+  - benchbox/core/results/query_plan_parsers/duckdb_parser.py
+  - benchbox/core/results/query_plan_parsers/sqlite_parser.py
+  - benchbox/core/results/query_plan_parsers/datafusion_parser.py
+  - benchbox/core/results/query_plan_parsers/postgres_parser.py
+  - benchbox/core/results/query_plan_parsers/clickhouse_parser.py
+  - benchbox/core/results/query_plan_parsers/bigquery_parser.py
+  - benchbox/core/results/query_plan_parsers/redshift_parser.py
+  - benchbox/core/results/query_plan_parsers/databricks_parser.py
+  - benchbox/core/results/query_plan_parsers/snowflake_parser.py
+  - tests/unit/parsers/test_base_parser.py
+  - tests/unit/parsers/test_duckdb_parser.py
+  - tests/unit/parsers/test_sqlite_parser.py
+  - tests/unit/parsers/test_datafusion_parser.py
+  - tests/unit/parsers/test_postgres_parser.py
+  - tests/unit/parsers/test_clickhouse_parser.py
+  - tests/unit/parsers/test_bigquery_parser.py
+  - tests/unit/parsers/test_redshift_parser.py
+  - tests/unit/parsers/test_databricks_parser.py
+  - tests/unit/parsers/test_snowflake_parser.py
+  - tests/fixtures/query_plans/
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - parsers
+  - platforms
+  depends_on:
+  - Query Plan Core Infrastructure (Models & Storage)
+  blocks:
+  - Query Plan Platform Adapter Integration
+  estimated_effort: 2-3 weeks (parsers can be implemented in parallel)
+  lines_of_code: ~1,500 LOC (parsers + tests)

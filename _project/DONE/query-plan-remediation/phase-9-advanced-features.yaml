@@ -1,0 +1,340 @@
+id: phase-9-advanced-features
+title: 'Query Plan Remediation - Phase 9: Advanced Features'
+worktree: query-plan-remediation
+category: Enhancement
+priority: Low
+status: Completed
+description: 'Add advanced features for power users: enhanced visualization, automated
+
+  query insights from plans, historical trend analysis, and plan-based
+
+  recommendations. These are P3 features for future enhancement.
+
+
+  **Nice-to-Have Features** (not critical for production):
+
+  - Interactive plan visualization
+
+  - Automated anti-pattern detection
+
+  - Query complexity scoring
+
+  - Plan-based optimization suggestions
+
+  - Time-series plan evolution tracking
+
+  - Integration with external tools
+
+  '
+context_sections:
+- name: Current Visualization Limitations
+  summary: 'Current visualization is basic text output:
+
+    - No interactive exploration
+
+    - No drill-down into operator details
+
+    - No visual comparison of two plans
+
+    - No cost/time annotations
+
+
+    Power users would benefit from richer visualization.
+
+    '
+- name: Missed Insight Opportunities
+  summary: 'Plans contain rich information that could be automatically analyzed:
+
+    - Full table scans on large tables (performance red flag)
+
+    - Cartesian products (correctness red flag)
+
+    - Inefficient join orders
+
+    - Missing indexes
+
+    - Suboptimal join algorithms
+
+
+    Currently users must manually inspect plans to find these.
+
+    '
+- name: Historical Analysis Gap
+  summary: 'No tools for analyzing plan trends over time:
+
+    - When did this query''s plan become inefficient?
+
+    - Is plan stability improving or degrading?
+
+    - Which queries have the most plan changes?
+
+    '
+- name: Limited External Integration
+  summary: 'No integration with:
+
+    - Query optimizers/analyzers
+
+    - Monitoring systems (Datadog, Grafana)
+
+    - Alerting on plan regressions
+
+    - Export to specialized visualization tools
+
+    '
+impact: 'LOW - These are quality-of-life improvements for power users. Nice to have
+
+  but not required for production use. Can be added incrementally based on
+
+  user demand.
+
+
+  - Enhanced visualization improves analysis efficiency
+
+  - Automated insights reduce manual work
+
+  - Historical tracking enables proactive optimization
+
+  - External integration fits into existing workflows
+
+  '
+research_value: 'Demonstrates potential for ML/heuristic-based query optimization insights.
+
+  Shows value of rich visualization for complex data structures.
+
+  '
+tasks:
+- phase: 'Task 9.1: Enhanced Plan Visualization'
+  description: Create interactive and visual plan representations
+  items:
+  - summary: Implement HTML interactive visualization
+    done: false
+    details: "File: benchbox/visualizations/interactive_plan.py\n\ndef generate_interactive_html(plan: QueryPlanDAG) -> str:\n\
+      \    \"\"\"Generate interactive HTML visualization using D3.js.\"\"\"\n\n    # Features:\n    # - Collapsible tree visualization\n\
+      \    # - Hover to see operator details\n    # - Click to expand/collapse subtrees\n    # - Color-coded by operator type\n\
+      \    # - Cost annotations if available\n\n    template = \"\"\"\n    <!DOCTYPE html>\n    <html>\n    <head>\n     \
+      \   <script src=\"https://d3js.org/d3.v7.min.js\"></script>\n        <style>\n            .node circle { fill: #fff;\
+      \ stroke: steelblue; }\n            .node text { font: 12px sans-serif; }\n            .link { fill: none; stroke: #ccc;\
+      \ }\n        </style>\n    </head>\n    <body>\n        <div id=\"plan-viz\"></div>\n        <script>\n            const\
+      \ treeData = {{PLAN_JSON}};\n            // D3 tree rendering code...\n        </script>\n    </body>\n    </html>\n\
+      \    \"\"\"\n\n    plan_json = json.dumps(plan.to_dict())\n    return template.replace(\"{{PLAN_JSON}}\", plan_json)\n"
+  - summary: Implement Graphviz DOT export
+    done: false
+    details: "File: benchbox/visualizations/graphviz_export.py\n\ndef export_to_dot(plan: QueryPlanDAG) -> str:\n    \"\"\"\
+      Export plan to Graphviz DOT format.\"\"\"\n\n    dot = [\"digraph QueryPlan {\"]\n    dot.append('  rankdir=TB;')\n\n\
+      \    def add_node(op: LogicalOperator):\n        label = f\"{op.operator_type}\"\n        if op.table_name:\n      \
+      \      label += f\"\\\\n{op.table_name}\"\n\n        color = get_color_for_operator(op.operator_type)\n        dot.append(f'\
+      \  \"{op.operator_id}\" [label=\"{label}\", fillcolor=\"{color}\"];')\n\n        for child in op.children:\n       \
+      \     dot.append(f'  \"{op.operator_id}\" -> \"{child.operator_id}\";')\n            add_node(child)\n\n    add_node(plan.logical_root)\n\
+      \    dot.append(\"}\")\n    return \"\\n\".join(dot)\n\nUsage:\nbenchbox show-plan --run results.json --query-id q05\
+      \ --format dot > plan.dot\ndot -Tpng plan.dot -o plan.png\n"
+  - summary: Implement side-by-side comparison visualization
+    done: false
+    details: "File: benchbox/visualizations/plan_comparison_viz.py\n\ndef visualize_comparison(plan1: QueryPlanDAG, plan2:\
+      \ QueryPlanDAG) -> str:\n    \"\"\"Generate side-by-side comparison with diff highlighting.\"\"\"\n\n    # Show both\
+      \ plans with:\n    # - Red highlighting: operators removed\n    # - Green highlighting: operators added\n    # - Yellow\
+      \ highlighting: operators changed\n\n    comparison = compare_query_plans(plan1, plan2)\n\n    html = generate_split_view_html(plan1,\
+      \ plan2, comparison)\n    return html\n"
+  - summary: Add CLI commands for visualizations
+    done: false
+    details: "File: benchbox/cli/commands/show_plan.py\n\n@click.option(\"--format\", type=click.Choice([\"text\", \"json\"\
+      , \"html\", \"dot\"]),\n             default=\"text\")\n@click.option(\"--interactive\", is_flag=True,\n           \
+      \  help=\"Open interactive visualization in browser\")\n\nIf --interactive:\n    html = generate_interactive_html(plan)\n\
+      \    with tempfile.NamedTemporaryFile(suffix=\".html\", delete=False) as f:\n        f.write(html.encode())\n      \
+      \  webbrowser.open(f.name)\n"
+- phase: 'Task 9.2: Automated Query Insights'
+  description: Detect anti-patterns and suggest optimizations
+  items:
+  - summary: Implement anti-pattern detectors
+    done: false
+    details: "File: benchbox/analysis/plan_insights.py\n\nclass PlanInsights:\n    \"\"\"Automated analysis of query plans.\"\
+      \"\"\n\n    def detect_cartesian_products(self, plan: QueryPlanDAG) -> list[str]:\n        \"\"\"Detect Cartesian products\
+      \ (joins without conditions).\"\"\"\n        issues = []\n\n        def check_node(op: LogicalOperator):\n         \
+      \   if op.operator_type == LogicalOperatorType.JOIN:\n                if not op.properties.get(\"join_condition\"):\n\
+      \                    issues.append(\n                        f\"Operator {op.operator_id}: Cartesian product detected\"\
+      \n                    )\n\n            for child in op.children:\n                check_node(child)\n\n        check_node(plan.logical_root)\n\
+      \        return issues\n\n    def detect_full_scans_on_large_tables(self, plan: QueryPlanDAG,\n                    \
+      \                      table_sizes: dict[str, int]) -> list[str]:\n        \"\"\"Detect full table scans on large tables.\"\
+      \"\"\n        issues = []\n\n        def check_node(op: LogicalOperator):\n            if op.operator_type == LogicalOperatorType.SCAN:\n\
+      \                table = op.table_name\n                if table and table_sizes.get(table, 0) > 1_000_000:\n      \
+      \              # Large table, check if using index\n                    if op.physical_operator and \"IndexScan\" not\
+      \ in op.physical_operator.operator_type:\n                        issues.append(\n                            f\"Full\
+      \ scan on large table {table} ({table_sizes[table]:,} rows)\"\n                        )\n\n            for child in\
+      \ op.children:\n                check_node(child)\n\n        check_node(plan.logical_root)\n        return issues\n\n\
+      \    def detect_inefficient_join_orders(self, plan: QueryPlanDAG) -> list[str]:\n        \"\"\"Detect potentially inefficient\
+      \ join orders.\"\"\"\n        # Heuristic: Large table joined first is often inefficient\n        # Better to join small\
+      \ tables first to reduce intermediate result size\n\n    def suggest_missing_indexes(self, plan: QueryPlanDAG) -> list[str]:\n\
+      \        \"\"\"Suggest indexes based on scan and filter patterns.\"\"\"\n        suggestions = []\n\n        def check_node(op:\
+      \ LogicalOperator):\n            if op.operator_type == LogicalOperatorType.SCAN:\n                # Look for downstream\
+      \ filters\n                filters = find_filters_on_table(op.table_name, plan)\n                for filter_col in filters:\n\
+      \                    suggestions.append(\n                        f\"Consider index on {op.table_name}({filter_col})\"\
+      \n                    )\n\n        # ...\n\n        return suggestions\n"
+  - summary: Implement query complexity scoring
+    done: false
+    details: "File: benchbox/analysis/complexity_score.py\n\ndef compute_complexity_score(plan: QueryPlanDAG) -> dict:\n \
+      \   \"\"\"Compute complexity score from plan structure.\"\"\"\n\n    score = {\n        \"total_operators\": 0,\n  \
+      \      \"join_complexity\": 0,  # Number and types of joins\n        \"aggregation_complexity\": 0,\n        \"subquery_depth\"\
+      : 0,\n        \"overall_score\": 0  # 0-100, higher = more complex\n    }\n\n    def analyze_node(op: LogicalOperator,\
+      \ depth: int):\n        score[\"total_operators\"] += 1\n\n        if op.operator_type == LogicalOperatorType.JOIN:\n\
+      \            score[\"join_complexity\"] += 2 if op.join_type == JoinType.CROSS else 1\n\n        if op.operator_type\
+      \ == LogicalOperatorType.AGGREGATE:\n            score[\"aggregation_complexity\"] += 1\n\n        score[\"subquery_depth\"\
+      ] = max(score[\"subquery_depth\"], depth)\n\n        for child in op.children:\n            analyze_node(child, depth\
+      \ + 1)\n\n    analyze_node(plan.logical_root, 0)\n\n    # Compute overall score\n    score[\"overall_score\"] = min(100,\
+      \ (\n        score[\"total_operators\"] * 2 +\n        score[\"join_complexity\"] * 5 +\n        score[\"aggregation_complexity\"\
+      ] * 3 +\n        score[\"subquery_depth\"] * 10\n    ))\n\n    return score\n"
+  - summary: Create CLI command for insights
+    done: false
+    details: "File: benchbox/cli/commands/analyze_plan.py\n\n@click.command(\"analyze-plan\")\n@click.option(\"--run\", required=True)\n\
+      @click.option(\"--query-id\", required=True)\n@click.option(\"--table-stats\", help=\"JSON file with table sizes\")\n\
+      def analyze_plan(run, query_id, table_stats):\n    \"\"\"Analyze query plan and suggest optimizations.\"\"\"\n\n   \
+      \ results = load_results(run)\n    execution = get_execution(results, query_id)\n    plan = execution.query_plan\n\n\
+      \    insights = PlanInsights()\n\n    print(f\"Analysis for {query_id}\")\n    print(\"=\" * 50)\n\n    # Complexity\n\
+      \    complexity = compute_complexity_score(plan)\n    print(f\"Complexity Score: {complexity['overall_score']}/100\"\
+      )\n    print(f\"  Operators: {complexity['total_operators']}\")\n    print(f\"  Joins: {complexity['join_complexity']}\"\
+      )\n\n    # Anti-patterns\n    cartesian = insights.detect_cartesian_products(plan)\n    if cartesian:\n        print(\"\
+      \\n⚠️  Cartesian Products:\")\n        for issue in cartesian:\n            print(f\"  - {issue}\")\n\n    # Suggestions\n\
+      \    if table_stats:\n        table_sizes = json.loads(Path(table_stats).read_text())\n        full_scans = insights.detect_full_scans_on_large_tables(plan,\
+      \ table_sizes)\n        if full_scans:\n            print(\"\\n⚠️  Full Scans on Large Tables:\")\n            for issue\
+      \ in full_scans:\n                print(f\"  - {issue}\")\n"
+- phase: 'Task 9.3: Historical Trend Analysis'
+  description: Analyze plan evolution and trends over time
+  items:
+  - summary: Implement plan stability metrics
+    done: false
+    details: "File: benchbox/analysis/plan_stability.py\n\ndef compute_stability_metrics(history: list[dict]) -> dict:\n \
+      \   \"\"\"Compute stability metrics from plan history.\"\"\"\n\n    metrics = {\n        \"total_runs\": len(history),\n\
+      \        \"unique_plans\": len(set(h[\"fingerprint\"] for h in history)),\n        \"change_frequency\": 0,  # % of\
+      \ runs with plan change\n        \"stability_score\": 0,  # 0-100, higher = more stable\n        \"trend\": \"stable\"\
+      \ | \"improving\" | \"degrading\"\n    }\n\n    # Calculate change frequency\n    changes = sum(\n        1 for i in\
+      \ range(len(history) - 1)\n        if history[i][\"fingerprint\"] != history[i + 1][\"fingerprint\"]\n    )\n    metrics[\"\
+      change_frequency\"] = changes / (len(history) - 1) if len(history) > 1 else 0\n\n    # Stability score (inverse of change\
+      \ frequency)\n    metrics[\"stability_score\"] = int((1 - metrics[\"change_frequency\"]) * 100)\n\n    # Trend analysis\
+      \ (recent vs historical)\n    recent = history[-10:]  # Last 10 runs\n    historical = history[:-10] if len(history)\
+      \ > 10 else []\n\n    if historical:\n        recent_changes = sum(\n            1 for i in range(len(recent) - 1)\n\
+      \            if recent[i][\"fingerprint\"] != recent[i + 1][\"fingerprint\"]\n        )\n        historical_changes\
+      \ = sum(\n            1 for i in range(len(historical) - 1)\n            if historical[i][\"fingerprint\"] != historical[i\
+      \ + 1][\"fingerprint\"]\n        )\n\n        recent_rate = recent_changes / (len(recent) - 1)\n        historical_rate\
+      \ = historical_changes / (len(historical) - 1)\n\n        if recent_rate < historical_rate * 0.7:\n            metrics[\"\
+      trend\"] = \"improving\"\n        elif recent_rate > historical_rate * 1.3:\n            metrics[\"trend\"] = \"degrading\"\
+      \n        else:\n            metrics[\"trend\"] = \"stable\"\n\n    return metrics\n"
+  - summary: Implement correlation with performance
+    done: false
+    details: "File: benchbox/analysis/plan_performance_correlation.py\n\ndef correlate_plan_changes_with_performance(history:\
+      \ list[dict]) -> dict:\n    \"\"\"Find correlation between plan changes and performance.\"\"\"\n\n    correlations =\
+      \ []\n\n    for i in range(len(history) - 1):\n        curr = history[i]\n        next_run = history[i + 1]\n\n    \
+      \    plan_changed = curr[\"fingerprint\"] != next_run[\"fingerprint\"]\n        perf_change_pct = (\n            (next_run[\"\
+      execution_time_ms\"] - curr[\"execution_time_ms\"]) /\n            curr[\"execution_time_ms\"] * 100\n        )\n\n\
+      \        correlations.append({\n            \"run_ids\": (curr[\"run_id\"], next_run[\"run_id\"]),\n            \"plan_changed\"\
+      : plan_changed,\n            \"perf_change_pct\": perf_change_pct,\n            \"significant\": abs(perf_change_pct)\
+      \ > 20\n        })\n\n    # Calculate correlation coefficient\n    plan_changes = [1 if c[\"plan_changed\"] else 0 for\
+      \ c in correlations]\n    perf_changes = [c[\"perf_change_pct\"] for c in correlations]\n\n    import scipy.stats\n\
+      \    correlation, p_value = scipy.stats.pearsonr(plan_changes, perf_changes)\n\n    return {\n        \"correlation_coefficient\"\
+      : correlation,\n        \"p_value\": p_value,\n        \"significant_correlations\": [c for c in correlations if c[\"\
+      significant\"]],\n        \"interpretation\": interpret_correlation(correlation, p_value)\n    }\n"
+  - summary: Create visualization of plan evolution
+    done: false
+    details: "File: benchbox/visualizations/plan_timeline.py\n\ndef visualize_plan_timeline(query_id: str, history: list[dict])\
+      \ -> str:\n    \"\"\"Generate timeline visualization of plan changes.\"\"\"\n\n    # Use matplotlib or Plotly to create:\n\
+      \    # - Timeline with markers for plan changes\n    # - Overlay with performance (execution time)\n    # - Annotate\
+      \ with fingerprint changes\n\n    import matplotlib.pyplot as plt\n\n    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)\n\
+      \n    timestamps = [h[\"timestamp\"] for h in history]\n    execution_times = [h[\"execution_time_ms\"] for h in history]\n\
+      \    fingerprints = [h[\"fingerprint\"] for h in history]\n\n    # Plot execution time\n    ax1.plot(timestamps, execution_times,\
+      \ marker='o')\n    ax1.set_ylabel(\"Execution Time (ms)\")\n    ax1.set_title(f\"Plan Evolution for {query_id}\")\n\n\
+      \    # Mark plan changes\n    for i in range(len(history) - 1):\n        if fingerprints[i] != fingerprints[i + 1]:\n\
+      \            ax1.axvline(timestamps[i + 1], color='r', linestyle='--', alpha=0.5)\n\n    # Plot plan fingerprint changes\
+      \ (encoded as integers)\n    fingerprint_ids = [hash(fp) for fp in fingerprints]\n    ax2.scatter(timestamps, fingerprint_ids,\
+      \ c=fingerprint_ids, cmap='tab10')\n    ax2.set_ylabel(\"Plan Version\")\n    ax2.set_xlabel(\"Date\")\n\n    return\
+      \ fig\n"
+- phase: 'Task 9.4: External Integrations'
+  description: Integrate with external tools and platforms
+  items:
+  - summary: Implement Prometheus metrics export
+    done: false
+    details: "File: benchbox/integrations/prometheus_exporter.py\n\ndef export_plan_metrics(results: BenchmarkResults) ->\
+      \ str:\n    \"\"\"Export plan metrics in Prometheus format.\"\"\"\n\n    metrics = []\n\n    metrics.append(f'benchbox_plans_captured{{platform=\"\
+      {results.platform}\"}} {results.query_plans_captured}')\n    metrics.append(f'benchbox_plan_capture_overhead_pct{{platform=\"\
+      {results.platform}\"}} {results.avg_plan_capture_overhead_pct}')\n\n    for execution in results.query_executions:\n\
+      \        if execution.query_plan:\n            complexity = compute_complexity_score(execution.query_plan)\n       \
+      \     metrics.append(\n                f'benchbox_query_complexity{{query_id=\"{execution.query_id}\",platform=\"{results.platform}\"\
+      }} '\n                f'{complexity[\"overall_score\"]}'\n            )\n\n    return \"\\n\".join(metrics)\n"
+  - summary: Implement Datadog integration
+    done: false
+    details: "File: benchbox/integrations/datadog_integration.py\n\ndef send_plan_metrics_to_datadog(results: BenchmarkResults):\n\
+      \    \"\"\"Send plan metrics to Datadog.\"\"\"\n\n    from datadog import statsd\n\n    statsd.gauge(\"benchbox.plans_captured\"\
+      , results.query_plans_captured,\n                tags=[f\"platform:{results.platform}\"])\n\n    statsd.gauge(\"benchbox.plan_overhead_pct\"\
+      ,\n                results.avg_plan_capture_overhead_pct,\n                tags=[f\"platform:{results.platform}\"])\n\
+      \n    # Alert on high overhead\n    if results.avg_plan_capture_overhead_pct > 15:\n        statsd.event(\n        \
+      \    \"High Plan Capture Overhead\",\n            f\"Overhead {results.avg_plan_capture_overhead_pct:.1f}% exceeds 15%\"\
+      ,\n            alert_type=\"warning\",\n            tags=[f\"platform:{results.platform}\"]\n        )\n"
+  - summary: Implement webhook for plan changes
+    done: false
+    details: "File: benchbox/integrations/webhooks.py\n\ndef notify_plan_changes(comparison: dict, webhook_url: str):\n  \
+      \  \"\"\"Send notification of plan changes to webhook.\"\"\"\n\n    if comparison[\"plans_changed\"] == 0:\n       \
+      \ return  # No changes, no notification\n\n    payload = {\n        \"event\": \"plan_changes_detected\",\n        \"\
+      baseline_run\": comparison[\"baseline_run_id\"],\n        \"current_run\": comparison[\"current_run_id\"],\n       \
+      \ \"changes\": comparison[\"plans_changed\"],\n        \"regressions\": len([\n            c for c in comparison[\"\
+      performance_correlations\"]\n            if c[\"regression\"]\n        ])\n    }\n\n    requests.post(webhook_url, json=payload)\n"
+  - summary: Add CLI flags for integrations
+    done: false
+    details: 'File: benchbox/cli/run.py
+
+
+      @click.option("--export-prometheus", help="Export metrics to file")
+
+      @click.option("--send-to-datadog", is_flag=True)
+
+      @click.option("--webhook-url", help="Webhook for plan change notifications")
+
+      '
+technical_requirements:
+- category: Visualization
+  items:
+  - Interactive visualizations work in modern browsers
+  - Graphviz export compatible with standard tools
+  - Comparison view highlights differences clearly
+- category: Insights
+  items:
+  - Anti-pattern detection has low false positive rate
+  - Suggestions are actionable and specific
+  - Complexity scoring is intuitive
+- category: Historical Analysis
+  items:
+  - Trend analysis handles irregular time series
+  - Correlation calculations are statistically sound
+  - Visualizations are publication-quality
+- category: Integrations
+  items:
+  - Metrics format compatible with target systems
+  - Webhooks are reliable (retries, error handling)
+  - Integration flags are optional (no new dependencies)
+files_affected:
+  modified:
+  - benchbox/visualizations/interactive_plan.py
+  - benchbox/visualizations/graphviz_export.py
+  - benchbox/visualizations/plan_comparison_viz.py
+  - benchbox/visualizations/plan_timeline.py
+  - benchbox/analysis/plan_insights.py
+  - benchbox/analysis/complexity_score.py
+  - benchbox/analysis/plan_stability.py
+  - benchbox/analysis/plan_performance_correlation.py
+  - benchbox/integrations/prometheus_exporter.py
+  - benchbox/integrations/datadog_integration.py
+  - benchbox/integrations/webhooks.py
+  - benchbox/cli/commands/analyze_plan.py
+  - benchbox/cli/commands/show_plan.py
+  - benchbox/cli/run.py
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - visualization
+  - insights
+  - integrations
+  - p3
+  - nice-to-have
+  dependencies:
+  - All previous phases (build on complete foundation)
+  estimated_effort: 2-3 weeks (can be split into incremental releases)
+  lines_of_code: ~1500 LOC (visualizations + insights + integrations + tests)

@@ -1,0 +1,146 @@
+id: coverage-platforms
+title: "Improve test coverage for platform adapter modules to ≥50%"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-02-18"
+category: Testing and Quality Assurance
+description: |
+  Several platform adapter modules are below 50% test coverage. These include
+  both DataFrame platform abstractions and cloud/remote platform adapters.
+
+  Current coverage breakdown:
+    - platforms/dataframe/unified_frame.py: 31.0% (930 missing)
+    - platforms/dataframe/benchmark_mixin.py: 38.5% (232 missing)
+    - platforms/dataframe/expression_family.py: 45.7% (215 missing)
+    - platforms/dataframe/dask_df.py: 26.1% (139 missing)
+    - platforms/dataframe/ducklake_maintenance.py: 0.0% (126 missing)
+    - platforms/credentials/redshift.py: 25.2% (333 missing)
+    - platforms/credentials/bigquery.py: 31.1% (171 missing)
+    - platforms/credentials/snowflake.py: 34.6% (123 missing)
+    - platforms/databricks/credentials.py: 31.7% (127 missing)
+    - platforms/databricks/dataframe_adapter.py: 23.6% (120 missing)
+    - platforms/athena.py: 39.7% (356 missing)
+    - platforms/fabric_warehouse.py: 43.9% (252 missing)
+    - platforms/influxdb/adapter.py: 26.3% (101 missing)
+    - platforms/influxdb/client.py: 44.0% (94 missing)
+    - platforms/cudf.py: 48.1% (175 missing)
+    - platforms/motherduck.py: 35.9% (84 missing)
+    - platforms/clickhouse_cloud.py: 49.3% (35 missing)
+
+  Cloud platform tests should mock all external API calls. DataFrame platform
+  tests can use in-memory data.
+
+metadata:
+  tags:
+  - testing
+  - coverage
+  - platforms
+  estimated_effort: Medium
+  created_date: "2026-02-07"
+  last_updated: "2026-02-18T16:20:00"
+
+  migration_review_required: true
+impact:
+  business_value: |
+    Platform adapters are the primary extension point. Coverage gaps here risk
+    regressions when adding new platforms or updating existing ones.
+  technical_debt: |
+    17 platform files below 50% coverage. Cloud credentials modules are
+    particularly important to test since authentication failures are
+    hard to debug in production.
+
+must_preserve:
+- "All existing platform tests continue to pass"
+- "No changes to production code"
+
+approach: |
+  Follow existing patterns in tests/unit/platforms/. For cloud adapters,
+  mock all SDK clients (boto3, google-cloud, snowflake-connector). For
+  credential modules, test env var parsing, config file loading, and
+  validation logic. For DataFrame adapters, use small in-memory DataFrames.
+  unified_frame.py is the largest file - focus on the public API methods
+  and expression translation.
+
+anti_patterns:
+- "DO NOT require cloud credentials for unit tests - because CI has no cloud access and tests must be runnable offline - mock
+  all SDK clients (boto3, google-cloud, snowflake-connector)"
+- "DO NOT import heavy cloud SDKs at module level in test files - because they add 2-5s import overhead and may not be installed
+  - use unittest.mock.patch or lazy imports"
+- "DO NOT test platform-specific SQL dialect generation - because dialect translation is covered by separate dialect tests
+  - test adapter configuration, connection logic, and error handling instead"
+
+verification:
+- description: "All platform tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+
+success_metrics:
+- "Every platforms/* file listed above reaches ≥50% line coverage"
+- "Zero test failures introduced"
+- "No cloud SDK imports required to run tests"
+
+files_affected:
+  added:
+  - "tests/unit/platforms/dataframe/test_unified_frame_coverage.py"
+  - "tests/unit/platforms/dataframe/test_benchmark_mixin.py"
+  - "tests/unit/platforms/dataframe/test_ducklake_maintenance.py"
+  - "tests/unit/platforms/test_credentials_coverage.py"
+  - "tests/unit/platforms/test_athena_coverage.py"
+  - "tests/unit/platforms/test_fabric_warehouse.py"
+  - "tests/unit/platforms/test_influxdb_coverage.py"
+
+scope_limit:
+  only_modify:
+  - "tests/unit/platforms/"
+  do_not_modify:
+  - "benchbox/"
+work:
+- id: w1
+  summary: "Add tests for platforms/dataframe/unified_frame.py (31.0% → 50%)"
+  status: done
+- id: w2
+  summary: "Add tests for platforms/dataframe/benchmark_mixin.py (38.5% → 50%)"
+  status: done
+- id: w3
+  summary: "Add tests for platforms/dataframe/expression_family.py (45.7% → 50%)"
+  status: done
+- id: w4
+  summary: "Add tests for platforms/dataframe/dask_df.py (26.1% → 50%)"
+  status: done
+- id: w5
+  summary: "Add tests for platforms/dataframe/ducklake_maintenance.py (0% → 50%)"
+  status: done
+- id: w6
+  summary: "Add tests for platforms/credentials/redshift.py (25.2% → 50%)"
+  status: done
+- id: w7
+  summary: "Add tests for platforms/credentials/bigquery.py (31.1% → 50%)"
+  status: done
+- id: w8
+  summary: "Add tests for platforms/credentials/snowflake.py (34.6% → 50%)"
+  status: done
+- id: w9
+  summary: "Add tests for platforms/databricks/credentials.py (31.7% → 50%)"
+  status: done
+- id: w10
+  summary: "Add tests for platforms/athena.py (39.7% → 50%)"
+  status: done
+- id: w11
+  summary: "Add tests for platforms/fabric_warehouse.py (43.9% → 50%)"
+  status: done
+- id: w12
+  summary: "Add tests for platforms/databricks/dataframe_adapter.py (23.6% → 50%)"
+  status: done
+- id: w13
+  summary: "Add tests for platforms/influxdb/ (26-44% → 50%)"
+  status: done
+- id: w14
+  summary: "Add tests for platforms/cudf.py (48.1% → 50%)"
+  status: done
+- id: w15
+  summary: "Add tests for platforms/motherduck.py (35.9% → 50%)"
+  status: done
+- id: w16
+  summary: "Add tests for platforms/clickhouse_cloud.py (49.3% → 50%)"
+  status: done

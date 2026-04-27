@@ -1,0 +1,23 @@
+id: migrate-unified-runner-py-to-use-run-benchmark-lifecycle
+title: ✅ Migrate unified_runner.py to Use run_benchmark_lifecycle
+category: '"Technical Debt & Refactoring"'
+status: Completed
+priority: High
+impact: Aligns the example runner with the core lifecycle API so example usage stays consistent with production orchestration.
+sections:
+  Summary: '"Replaced bespoke phase handling in the example runner with `run_benchmark_lifecycle`, ensuring configuration,
+    verbosity, and export plumbing mirror the CLI flow."'
+  Completed Tasks: '- Lifecycle integration
+
+    - Test coverage'
+  Testing: '"uv run -- python -m pytest
+
+    *(fails: pre-existing ImportError in tests/unit/core/test_tpcds_resource_resolution.py for `_resolve_tpcds_tool_and_template_paths`.)*
+
+    "'
+  Files Affected: '- examples/unified_runner.py
+
+    - tests/unit/examples/test_unified_runner.py'
+worktree: unknown
+description: '"Replaced bespoke phase handling in the example runner with `run_benchmark_lifecycle`, ensuring configuration,
+  verbosity, and export plumbing mirror the CLI flow."'

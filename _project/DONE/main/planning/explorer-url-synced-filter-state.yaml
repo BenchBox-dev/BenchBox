@@ -1,0 +1,126 @@
+id: explorer-url-synced-filter-state
+title: "Explorer: URL-synced filter state via useUrlState hook"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-17"
+category: Core Functionality
+
+description: |
+  Phase E of the Results Explorer strategy revision
+  (plans/purring-jingling-petal-ultraplan).
+
+  The master leaderboard (Phase B) and the query workbench (Phase C)
+  both want shareable URLs that round-trip filter state. Existing
+  BenchmarkIndex/PlatformIndex filter selects use local `useState`,
+  which makes cohort/SF/phase choices invisible to navigation and
+  bookmarks.
+
+  Introduce a tiny `useUrlState<T>(key, initial, serde)` hook using
+  `history.replaceState` + `popstate`. Migrate existing filter
+  `useState` call sites directly - no API surface invention, just a
+  swap.
+
+work:
+  - id: w1
+    summary: "Implement useUrlState<T>(key, initial, serde) hook"
+    status: done
+    notes: |
+      New file: results-explorer/src/lib/useUrlState.ts
+        - Read initial value from URL (?key=...) via the provided
+          serde.decode; fall back to `initial` if absent/invalid
+        - setValue updates state and calls
+          history.replaceState(null, "", newSearch) - no history spam
+        - Subscribe to `popstate` so back/forward re-hydrate state
+        - Provide a default serde for string; optionals:
+          arraySerde (comma-separated), numberSerde, jsonSerde
+      Must be SSR-safe no-op (check typeof window) since vite-ssg
+      is used for build.
+
+  - id: w2
+    summary: "Migrate BenchmarkIndex filter selects to useUrlState"
+    needs: [w1]
+    status: done
+    notes: |
+      Direct swap: each `const [foo, setFoo] = useState(...)` that
+      drives a filter select becomes useUrlState with an appropriate
+      key (e.g., sf, phase, tuning). No behavior change beyond URL
+      round-trip.
+
+  - id: w3
+    summary: "Migrate PlatformIndex filter selects to useUrlState"
+    needs: [w1]
+    status: done
+
+  - id: w4
+    summary: "Vitest coverage for useUrlState"
+    needs: [w1]
+    status: done
+    notes: |
+      tests in src/lib/__tests__/useUrlState.test.ts covering:
+        - initial value from URL beats `initial`
+        - invalid URL value falls back to `initial`
+        - setValue writes ?key=... without pushing history
+        - popstate re-hydrates (simulate via
+          window.dispatchEvent(new PopStateEvent('popstate')))
+        - SSR no-op when window is undefined
+
+files_affected:
+  modified:
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+  added:
+    - "results-explorer/src/lib/useUrlState.ts"
+    - "results-explorer/src/lib/__tests__/useUrlState.test.ts"
+
+must_preserve:
+  - "Existing BenchmarkIndex/PlatformIndex filter behavior is identical - URL sync is additive"
+  - "vite-ssg build continues to succeed (hook must be SSR-safe)"
+  - "No new dependencies - hook uses only built-in history/popstate APIs"
+
+approach: |
+  Land w1 + w4 (hook + tests) as a pure addition first, then the two
+  migrations as independent commits. Other pages that need URL state
+  (new Home master leaderboard, new Query workbench) will adopt the
+  hook as part of their own items - this item scopes to what exists
+  today so the migration isn't tangled with new UI.
+
+anti_patterns:
+  - "DO NOT use pushState - because filter changes should not spam browser history - always replaceState"
+  - "DO NOT add a routing library - because the current app uses preact-iso/vite-ssg - stay vanilla"
+  - "DO NOT centralise all filter state into a context - because filter concerns are page-local - per-key useUrlState is enough"
+
+verification:
+  - description: "Explorer typecheck + Vitest suites green (including useUrlState tests)"
+    command: "cd results-explorer && npm run typecheck && npm test"
+    expected_output: "all green"
+  - description: "vite-ssg build succeeds"
+    command: "cd results-explorer && npm run build"
+    expected_output: "build completes without SSR errors"
+  - description: "URL round-trips on BenchmarkIndex and PlatformIndex"
+    command: "cd results-explorer && npm run dev"
+    expected_output: "changing SF/phase/tuning updates URL; reload restores state; back button works"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/lib/useUrlState.ts"
+    - "results-explorer/src/lib/__tests__/useUrlState.test.ts"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+
+impact:
+  user_impact: |
+    Filter state is shareable: a colleague can paste a URL and land
+    on the same SF/phase/tuning view. Back/forward buttons restore
+    filter state instead of losing it.
+  technical_debt: |
+    One small hook replaces ad-hoc useState filter patterns across
+    BenchmarkIndex and PlatformIndex. Unblocks Home (master
+    leaderboard) and Query workbench from each inventing their own
+    URL-state plumbing.
+
+metadata:
+  tags: ["explorer", "url-state", "hook", "ultraplan-phase-e"]
+  estimated_effort: "Small (2-4 hours)"
+  created_date: "2026-04-17"
+  source: "ultraplan: Results Explorer strategy revision (purring-jingling-petal-ultraplan), Phase E"

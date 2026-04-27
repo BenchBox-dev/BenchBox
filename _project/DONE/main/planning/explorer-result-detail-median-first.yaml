@@ -1,0 +1,110 @@
+id: explorer-result-detail-median-first
+title: "Explorer ResultDetail: default to median-of-passing, move raw samples to drill-down"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-17"
+category: Core Functionality
+
+description: |
+  Phase A of the Results Explorer strategy revision (plans/purring-jingling-petal-ultraplan).
+
+  `ResultDetail.tsx` is the only surface that currently violates the
+  "median at high level, samples on drill-down" contract: it renders the
+  raw per-sample `DetailResult.queries[]` array (every iter/stream) as
+  the default query table, while every other page (BenchmarkIndex,
+  PlatformIndex, Compare, Home) already reads the canonical median from
+  `DetailResult.display_timings[]`.
+
+  This item fixes that drift. The raw samples do not disappear - they
+  move behind an "Individual samples" expander so audit is still
+  possible without polluting the default view.
+
+work:
+- id: w1
+  summary: "Switch default query table + QueryTimingChart to display_timings[]"
+  status: done
+  notes: |
+    ResultDetail.tsx lines 63, 111, 288 - swap `detail.queries` for
+    `detail.display_timings`. Row shape becomes
+    `{query_id, display_ms, sample_count}`. Sort key changes from
+    `duration_ms` → `display_ms`. Drop the Status column (no per-run
+    status at the median level) and replace it with a "Samples" column
+    backed by `sample_count`. `QueryTimingChart` likewise reads
+    `display_timings`.
+
+- id: w2
+  summary: "Add collapsible 'Individual samples' section rendering raw queries[]"
+  needs: [w1]
+  status: done
+  notes: |
+    Below the main table, add a `<details>` / expander that, when
+    opened, renders the existing raw `detail.queries[]` table
+    (per-sample rows with iter/stream/status). Keep the current
+    columns and sort behavior so nothing is lost - only demoted from
+    default to drill-down.
+
+- id: w3
+  summary: "Vitest coverage for default-median table and samples expander"
+  needs: [w2]
+  status: done
+  notes: |
+    Extend `ResultDetail.test.tsx` to assert:
+      - default table rows == display_timings.length (not queries.length)
+      - sample_count cell matches display_timings[i].sample_count
+      - opening the expander reveals a second table whose row count
+        matches the raw queries[] length
+      - QueryTimingChart bars correspond to display_ms values
+
+files_affected:
+  modified:
+  - "results-explorer/src/pages/ResultDetail.tsx"
+  - "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+
+must_preserve:
+- "Raw per-sample table remains reachable via the drill-down expander (no data removal)"
+- "fmtGeomean call sites on this page continue to consume detail.geomean_ms / display_geomean_ms unchanged"
+- "QueryTimingChart visual output matches display_timings median values (matches what CLI reports)"
+
+approach: |
+  display_timings[] is already the authoritative median-of-passing feed
+  used by every aggregate page (see getDisplayMs() and
+  BenchmarkIndex/PlatformIndex/Compare call sites). This item is a
+  straight data-source swap at ResultDetail.tsx lines 63/111/288 plus a
+  new drill-down section - not a new abstraction.
+
+anti_patterns:
+- "DO NOT drop the raw queries[] rendering - because per-sample data is needed for audit/debugging - move it behind a <details>
+  expander instead"
+- "DO NOT introduce a new aggregation helper - because display_timings[] is already the precomputed median - just read it"
+
+verification:
+- description: "Explorer typecheck + Vitest suites stay green"
+  command: "cd results-explorer && npm run typecheck && npm test"
+  expected_output: "all green"
+- description: "Visual: default table for a sample result shows one row per query, Individual samples expander reveals per-iter/stream
+    rows"
+  command: "cd results-explorer && npm run dev"
+  expected_output: "/results/r/<id> renders median-first default, drill-down expander works"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/pages/ResultDetail.tsx"
+  - "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+
+impact:
+  user_impact: |
+    Result detail pages match the rest of the explorer: one median
+    row per query by default, per-sample noise hidden behind an
+    expander. Users comparing a single result to a leaderboard no
+    longer see different numbers than the leaderboard shows.
+  technical_debt: |
+    Removes the last surface that reads raw queries[] as the default
+    view. Completes the "median at high level, samples on drilldown"
+    contract across the whole app.
+
+metadata:
+  tags: ["explorer", "result-detail", "median", "ultraplan-phase-a"]
+  estimated_effort: "Small (2-4 hours)"
+  created_date: "2026-04-17"
+  source: "ultraplan: Results Explorer strategy revision (purring-jingling-petal-ultraplan), Phase A"

@@ -1,0 +1,45 @@
+# PostgreSQL Docker Compose - DEVELOPMENT/TEST ONLY
+# Standard PostgreSQL instance for integration testing
+# Plaintext credentials below are for local testing only - do not use in production
+#
+# Usage:
+#   docker compose -f docker-compose.yml up -d
+#   benchbox run --platform postgresql --benchmark tpch --scale 0.01 \
+#     --platform-option host=localhost --platform-option port=5432 \
+#     --platform-option user=benchbox --platform-option password=benchbox \
+#     --platform-option database=benchbox_test
+#
+# Ports:
+#   5432 - PostgreSQL wire protocol
+#
+# Default credentials:
+#   Username: benchbox
+#   Password: benchbox
+#   Database: benchbox_test
+#
+# NOTE: PostgreSQL 18 cannot reuse a PG16 data directory in place. This compose
+# file intentionally uses a fresh named volume; migrate manually from the old
+# `postgresql-data` volume if you need to preserve local test data.
+
+services:
+  postgresql:
+    image: postgres:18
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: benchbox
+      POSTGRES_PASSWORD: benchbox
+      POSTGRES_DB: benchbox_test
+    volumes:
+      - postgresql18-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benchbox -d benchbox_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgresql18-data:
+    driver: local

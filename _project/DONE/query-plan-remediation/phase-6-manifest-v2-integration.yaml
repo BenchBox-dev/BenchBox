@@ -1,0 +1,350 @@
+id: phase-6-manifest-v2-integration
+title: 'Query Plan Remediation - Phase 6: Manifest v2 Integration'
+worktree: query-plan-remediation
+category: Feature Completion
+priority: Medium
+status: Completed
+description: 'Complete the integration of query plan tracking with manifest v2 to enable
+
+  cross-run plan comparison, regression detection, and plan versioning. Populate
+
+  the currently-empty plan_comparison_summary field and add plan metadata to
+
+  manifests.
+
+
+  **Current State**: plan_comparison_summary field exists but is never populated
+
+  **Target State**: Full cross-run comparison with regression detection
+
+  '
+context_sections:
+- name: Incomplete Manifest Integration
+  summary: "BenchmarkResults has a plan_comparison_summary field defined but it's\nnever populated:\n\n@dataclass\nclass BenchmarkResults:\n\
+    \    plan_comparison_summary: dict[str, Any] | None = None  # Never set!\n\nThis field was intended for cross-run comparison\
+    \ metadata but was left\nunimplemented.\n"
+- name: Missing Plan Metadata in Manifests
+  summary: 'Manifest v2 tracks table formats, schema versions, and data generation
+
+    metadata, but has no plan-related fields:
+
+    - No plan fingerprints per query
+
+    - No plan version tracking
+
+    - No correlation with manifest generations
+
+
+    This makes it impossible to query "which queries changed plans between
+
+    manifest v1 and v2?"
+
+    '
+- name: Cross-Run Regression Detection Gap
+  summary: 'No tooling exists to:
+
+    - Compare plans across two benchmark runs
+
+    - Identify which queries had plan changes
+
+    - Correlate plan changes with performance changes
+
+    - Flag regressions (plan changed AND perf degraded >20%)
+
+
+    Manual comparison is tedious and error-prone.
+
+    '
+impact: 'MEDIUM - Manifest integration is required for production use cases involving
+
+  plan evolution tracking and regression detection. Without it, the feature
+
+  provides snapshot analysis only, not historical comparison.
+
+
+  - Plan metadata enables version tracking across runs
+
+  - Cross-run comparison automates regression detection
+
+  - Correlation with performance changes provides actionable insights
+
+  '
+research_value: 'Demonstrates integration of structured metadata with result tracking system.
+
+  Shows pattern for correlating plan changes with performance impact.
+
+  '
+tasks:
+- phase: 'Task 6.1: Populate plan_comparison_summary'
+  description: Implement logic to populate comparison summary in results
+  items:
+  - summary: Define plan_comparison_summary schema
+    done: false
+    details: "File: benchbox/core/results/models.py\n\n# Define structure:\nplan_comparison_summary = {\n    \"baseline_run_id\"\
+      : str,\n    \"current_run_id\": str,\n    \"plans_compared\": int,\n    \"plans_unchanged\": int,\n    \"plans_changed\"\
+      : int,\n    \"structural_differences\": [\n        {\n            \"query_id\": str,\n            \"change_type\": \"\
+      operator_added\" | \"operator_removed\" | \"join_type_changed\",\n            \"details\": str\n        }\n    ],\n\
+      \    \"performance_correlations\": [\n        {\n            \"query_id\": str,\n            \"plan_changed\": bool,\n\
+      \            \"perf_change_pct\": float,\n            \"regression\": bool  # plan changed AND perf degraded >20%\n\
+      \        }\n    ]\n}\n"
+  - summary: Implement populate_comparison_summary() function
+    done: false
+    details: "File: benchbox/analysis/plan_comparison.py\n\ndef populate_comparison_summary(\n    baseline: BenchmarkResults,\n\
+      \    current: BenchmarkResults\n) -> dict[str, Any]:\n    \"\"\"Generate comparison summary for two runs.\"\"\"\n\n\
+      \    summary = {\n        \"baseline_run_id\": baseline.run_id,\n        \"current_run_id\": current.run_id,\n     \
+      \   \"plans_compared\": 0,\n        \"plans_unchanged\": 0,\n        \"plans_changed\": 0,\n        \"structural_differences\"\
+      : [],\n        \"performance_correlations\": []\n    }\n\n    # Build query execution maps\n    baseline_map = {e.query_id:\
+      \ e for e in baseline.query_executions}\n    current_map = {e.query_id: e for e in current.query_executions}\n\n   \
+      \ for query_id in baseline_map.keys() & current_map.keys():\n        baseline_exec = baseline_map[query_id]\n      \
+      \  current_exec = current_map[query_id]\n\n        if not (baseline_exec.query_plan and current_exec.query_plan):\n\
+      \            continue\n\n        summary[\"plans_compared\"] += 1\n\n        # Compare fingerprints\n        if baseline_exec.query_plan.plan_fingerprint\
+      \ == current_exec.query_plan.plan_fingerprint:\n            summary[\"plans_unchanged\"] += 1\n        else:\n     \
+      \       summary[\"plans_changed\"] += 1\n\n            # Detailed comparison\n            comparison = compare_query_plans(\n\
+      \                baseline_exec.query_plan,\n                current_exec.query_plan\n            )\n\n            summary[\"\
+      structural_differences\"].append({\n                \"query_id\": query_id,\n                \"change_type\": comparison.primary_difference_type,\n\
+      \                \"details\": comparison.summary\n            })\n\n        # Performance correlation\n        perf_change_pct\
+      \ = (\n            (current_exec.execution_time_ms - baseline_exec.execution_time_ms)\n            / baseline_exec.execution_time_ms\
+      \ * 100\n        )\n\n        is_regression = (\n            baseline_exec.query_plan.plan_fingerprint !=\n        \
+      \    current_exec.query_plan.plan_fingerprint\n            and perf_change_pct > 20\n        )\n\n        summary[\"\
+      performance_correlations\"].append({\n            \"query_id\": query_id,\n            \"plan_changed\": baseline_exec.query_plan.plan_fingerprint\
+      \ !=\n                          current_exec.query_plan.plan_fingerprint,\n            \"perf_change_pct\": perf_change_pct,\n\
+      \            \"regression\": is_regression\n        })\n\n    return summary\n"
+  - summary: Call populate_comparison_summary() in compare command
+    done: false
+    details: "File: benchbox/cli/commands/compare.py\n\n@click.command()\n@click.option(\"--baseline\", required=True)\n@click.option(\"\
+      --current\", required=True)\ndef compare(baseline, current):\n    baseline_results = load_results(baseline)\n    current_results\
+      \ = load_results(current)\n\n    # Populate comparison summary\n    comparison_summary = populate_comparison_summary(\n\
+      \        baseline_results,\n        current_results\n    )\n\n    current_results.plan_comparison_summary = comparison_summary\n\
+      \n    # Output comparison report\n    print_comparison_report(comparison_summary)\n"
+  - summary: Add tests for comparison summary
+    done: false
+    details: 'File: tests/unit/analysis/test_plan_comparison_summary.py
+
+
+      - Test: Unchanged plans counted correctly
+
+      - Test: Changed plans detected and categorized
+
+      - Test: Performance correlations computed
+
+      - Test: Regressions flagged (plan changed + perf degraded >20%)
+
+      '
+- phase: 'Task 6.2: Add Plan Metadata to Manifest'
+  description: Extend manifest v2 to track plan fingerprints and versions
+  items:
+  - summary: Add plan metadata fields to manifest schema
+    done: false
+    details: "File: benchbox/manifest/manifest_v2.py\n\n@dataclass\nclass ManifestV2:\n    # ... existing fields ...\n   \
+      \ plan_metadata: PlanMetadata | None = None\n\n@dataclass\nclass PlanMetadata:\n    \"\"\"Plan fingerprint and version\
+      \ tracking per query.\"\"\"\n    plan_fingerprints: dict[str, str]  # query_id → fingerprint\n    plan_versions: dict[str,\
+      \ int]      # query_id → version number\n    plan_capture_timestamp: dict[str, str]  # query_id → ISO timestamp\n  \
+      \  platform: str\n    platform_version: str | None\n"
+  - summary: Populate plan metadata during benchmark run
+    done: false
+    details: "File: benchbox/core/benchmark_runner.py\n\ndef create_manifest_with_plan_metadata(results: BenchmarkResults):\n\
+      \    plan_metadata = PlanMetadata(\n        plan_fingerprints={},\n        plan_versions={},\n        plan_capture_timestamp={},\n\
+      \        platform=results.platform,\n        platform_version=results.platform_version\n    )\n\n    for execution in\
+      \ results.query_executions:\n        if execution.query_plan:\n            plan_metadata.plan_fingerprints[execution.query_id]\
+      \ = (\n                execution.query_plan.plan_fingerprint\n            )\n            plan_metadata.plan_capture_timestamp[execution.query_id]\
+      \ = (\n                datetime.utcnow().isoformat()\n            )\n\n    manifest.plan_metadata = plan_metadata\n\
+      \    return manifest\n"
+  - summary: Implement plan version incrementation
+    done: false
+    details: "When loading previous manifest and creating new one:\n\ndef update_plan_versions(\n    prev_metadata: PlanMetadata\
+      \ | None,\n    current_metadata: PlanMetadata\n) -> None:\n    \"\"\"Increment version if fingerprint changed.\"\"\"\
+      \n    if not prev_metadata:\n        # First run: all versions = 1\n        for query_id in current_metadata.plan_fingerprints:\n\
+      \            current_metadata.plan_versions[query_id] = 1\n        return\n\n    for query_id, current_fp in current_metadata.plan_fingerprints.items():\n\
+      \        prev_fp = prev_metadata.plan_fingerprints.get(query_id)\n        prev_version = prev_metadata.plan_versions.get(query_id,\
+      \ 0)\n\n        if prev_fp == current_fp:\n            # Unchanged\n            current_metadata.plan_versions[query_id]\
+      \ = prev_version\n        else:\n            # Changed\n            current_metadata.plan_versions[query_id] = prev_version\
+      \ + 1\n"
+  - summary: Add manifest validation for plan metadata
+    done: false
+    details: "File: benchbox/manifest/validation.py\n\ndef validate_plan_metadata(metadata: PlanMetadata) -> list[str]:\n\
+      \    \"\"\"Validate plan metadata completeness.\"\"\"\n    errors = []\n\n    # Check fingerprints are valid SHA256\n\
+      \    for query_id, fp in metadata.plan_fingerprints.items():\n        if not re.match(r'^[a-f0-9]{64}$', fp):\n    \
+      \        errors.append(f\"Invalid fingerprint for {query_id}: {fp}\")\n\n    # Check versions are positive\n    for\
+      \ query_id, version in metadata.plan_versions.items():\n        if version < 1:\n            errors.append(f\"Invalid\
+      \ version for {query_id}: {version}\")\n\n    # Check fingerprints and versions aligned\n    if metadata.plan_fingerprints.keys()\
+      \ != metadata.plan_versions.keys():\n        errors.append(\"Fingerprints and versions have different query sets\")\n\
+      \n    return errors\n"
+  - summary: Add tests for manifest plan metadata
+    done: false
+    details: 'File: tests/unit/manifest/test_plan_metadata.py
+
+
+      - Test: Plan metadata populated from results
+
+      - Test: Version incremented when fingerprint changes
+
+      - Test: Version unchanged when fingerprint same
+
+      - Test: Validation catches invalid fingerprints/versions
+
+      '
+- phase: 'Task 6.3: Implement Cross-Run Plan Regression Detection'
+  description: Create tooling to detect and report plan regressions
+  items:
+  - summary: Create benchbox plan-diff command
+    done: false
+    details: "File: benchbox/cli/commands/plan_diff.py\n\n@click.command(\"plan-diff\")\n@click.option(\"--baseline\", required=True,\
+      \ help=\"Baseline results JSON\")\n@click.option(\"--current\", required=True, help=\"Current results JSON\")\n@click.option(\"\
+      --output\", help=\"Output report to file\")\n@click.option(\"--format\", type=click.Choice([\"text\", \"json\", \"html\"\
+      ]),\n             default=\"text\")\ndef plan_diff(baseline, current, output, format):\n    \"\"\"Compare query plans\
+      \ across two benchmark runs.\"\"\"\n\n    baseline_results = load_results(baseline)\n    current_results = load_results(current)\n\
+      \n    comparison = populate_comparison_summary(baseline_results, current_results)\n\n    if format == \"text\":\n  \
+      \      report = generate_text_report(comparison)\n    elif format == \"json\":\n        report = json.dumps(comparison,\
+      \ indent=2)\n    elif format == \"html\":\n        report = generate_html_report(comparison)\n\n    if output:\n   \
+      \     Path(output).write_text(report)\n    else:\n        print(report)\n"
+  - summary: Implement generate_text_report()
+    done: false
+    details: "def generate_text_report(comparison: dict) -> str:\n    \"\"\"Generate human-readable comparison report.\"\"\
+      \"\n    lines = [\n        \"Query Plan Comparison Report\",\n        \"=\" * 50,\n        f\"Baseline: {comparison['baseline_run_id']}\"\
+      ,\n        f\"Current:  {comparison['current_run_id']}\",\n        \"\",\n        f\"Plans compared: {comparison['plans_compared']}\"\
+      ,\n        f\"Unchanged:      {comparison['plans_unchanged']}\",\n        f\"Changed:        {comparison['plans_changed']}\"\
+      ,\n        \"\"\n    ]\n\n    if comparison['structural_differences']:\n        lines.append(\"Structural Differences:\"\
+      )\n        for diff in comparison['structural_differences']:\n            lines.append(f\"  {diff['query_id']}: {diff['change_type']}\"\
+      )\n            lines.append(f\"    {diff['details']}\")\n\n    lines.append(\"\")\n    lines.append(\"Performance Regressions\
+      \ (plan changed + perf degraded >20%):\")\n\n    regressions = [c for c in comparison['performance_correlations']\n\
+      \                  if c['regression']]\n\n    if regressions:\n        for reg in regressions:\n            lines.append(\n\
+      \                f\"  {reg['query_id']}: \"\n                f\"{reg['perf_change_pct']:+.1f}% slower\"\n          \
+      \  )\n    else:\n        lines.append(\"  None detected\")\n\n    return \"\\n\".join(lines)\n"
+  - summary: Implement generate_html_report()
+    done: false
+    details: "def generate_html_report(comparison: dict) -> str:\n    \"\"\"Generate HTML comparison report with visualizations.\"\
+      \"\"\n\n    # Use template with:\n    # - Summary table\n    # - List of changed queries with diff visualization\n \
+      \   # - Performance correlation scatter plot\n    # - Regression highlights\n\n    template = load_template(\"plan_comparison_report.html\"\
+      )\n    return template.render(comparison=comparison)\n"
+  - summary: Add plan-diff to CLI entrypoint
+    done: false
+    details: 'File: benchbox/cli/main.py
+
+
+      from benchbox.cli.commands.plan_diff import plan_diff
+
+
+      cli.add_command(plan_diff)
+
+      '
+  - summary: Create tests for plan-diff command
+    done: false
+    details: 'File: tests/cli/test_plan_diff_command.py
+
+
+      - Test: Command loads two result files
+
+      - Test: Comparison report generated
+
+      - Test: Text, JSON, HTML formats work
+
+      - Test: Regressions identified correctly
+
+      - Test: Output to file works
+
+      '
+- phase: 'Task 6.4: Historical Plan Tracking'
+  description: Track plan evolution across multiple runs
+  items:
+  - summary: Create plan history storage
+    done: false
+    details: "File: benchbox/analysis/plan_history.py\n\nclass PlanHistory:\n    \"\"\"Track query plan evolution across multiple\
+      \ runs.\"\"\"\n\n    def __init__(self, storage_path: Path):\n        self.storage_path = storage_path\n        self.storage_path.mkdir(exist_ok=True)\n\
+      \n    def add_run(self, results: BenchmarkResults) -> None:\n        \"\"\"Add a run to plan history.\"\"\"\n      \
+      \  history_file = self.storage_path / f\"{results.run_id}.json\"\n\n        history_entry = {\n            \"run_id\"\
+      : results.run_id,\n            \"timestamp\": results.start_time,\n            \"platform\": results.platform,\n   \
+      \         \"plan_fingerprints\": {}\n        }\n\n        for execution in results.query_executions:\n            if\
+      \ execution.query_plan:\n                history_entry[\"plan_fingerprints\"][execution.query_id] = {\n            \
+      \        \"fingerprint\": execution.query_plan.plan_fingerprint,\n                    \"estimated_cost\": execution.query_plan.estimated_cost,\n\
+      \                    \"execution_time_ms\": execution.execution_time_ms\n                }\n\n        history_file.write_text(json.dumps(history_entry,\
+      \ indent=2))\n"
+  - summary: Implement query_plan_history() method
+    done: false
+    details: "def query_plan_history(\n    self,\n    query_id: str\n) -> list[dict]:\n    \"\"\"Get plan history for a specific\
+      \ query.\"\"\"\n\n    history = []\n    for entry_file in sorted(self.storage_path.glob(\"*.json\")):\n        entry\
+      \ = json.loads(entry_file.read_text())\n        if query_id in entry[\"plan_fingerprints\"]:\n            plan_data\
+      \ = entry[\"plan_fingerprints\"][query_id]\n            history.append({\n                \"run_id\": entry[\"run_id\"\
+      ],\n                \"timestamp\": entry[\"timestamp\"],\n                \"fingerprint\": plan_data[\"fingerprint\"\
+      ],\n                \"estimated_cost\": plan_data.get(\"estimated_cost\"),\n                \"execution_time_ms\": plan_data[\"\
+      execution_time_ms\"]\n            })\n\n    return history\n"
+  - summary: Implement detect_plan_flapping() method
+    done: false
+    details: "def detect_plan_flapping(\n    self,\n    query_id: str,\n    window_size: int = 10\n) -> bool:\n    \"\"\"\
+      Detect if plan changes back and forth frequently.\"\"\"\n\n    history = self.query_plan_history(query_id)[-window_size:]\n\
+      \n    if len(history) < 3:\n        return False\n\n    fingerprints = [h[\"fingerprint\"] for h in history]\n    unique_fps\
+      \ = set(fingerprints)\n\n    # Flapping: more than 2 unique fingerprints in recent window\n    # and changes occur frequently\
+      \ (not just once)\n    if len(unique_fps) <= 2:\n        return False\n\n    # Count transitions\n    transitions =\
+      \ sum(\n        1 for i in range(len(fingerprints) - 1)\n        if fingerprints[i] != fingerprints[i + 1]\n    )\n\n\
+      \    # Flapping if >30% of runs have transitions\n    return transitions > (len(fingerprints) * 0.3)\n"
+  - summary: Create CLI command for plan history
+    done: false
+    details: "File: benchbox/cli/commands/plan_history.py\n\n@click.command(\"plan-history\")\n@click.option(\"--query-id\"\
+      , required=True)\n@click.option(\"--history-dir\", required=True)\ndef plan_history_cmd(query_id, history_dir):\n  \
+      \  \"\"\"Show plan evolution history for a query.\"\"\"\n\n    history = PlanHistory(Path(history_dir))\n    entries\
+      \ = history.query_plan_history(query_id)\n\n    print(f\"Plan history for {query_id}:\")\n    print(f\"{'Run ID':<20}\
+      \ {'Timestamp':<20} {'Fingerprint':<16} {'Time (ms)':<12}\")\n    print(\"-\" * 70)\n\n    for entry in entries:\n \
+      \       fp_short = entry[\"fingerprint\"][:12] + \"...\"\n        print(\n            f\"{entry['run_id']:<20} \"\n\
+      \            f\"{entry['timestamp']:<20} \"\n            f\"{fp_short:<16} \"\n            f\"{entry['execution_time_ms']:<12.2f}\"\
+      \n        )\n\n    # Detect flapping\n    if history.detect_plan_flapping(query_id):\n        print(\"\\n⚠️  WARNING:\
+      \ Plan flapping detected for this query\")\n"
+  - summary: Add tests for plan history tracking
+    done: false
+    details: 'File: tests/analysis/test_plan_history.py
+
+
+      - Test: History entries stored correctly
+
+      - Test: Query plan history retrieval
+
+      - Test: Flapping detection (positive and negative cases)
+
+      - Test: History persists across runs
+
+      '
+technical_requirements:
+- category: Manifest Integration
+  items:
+  - Plan metadata serializes to/from JSON
+  - Version incrementation is deterministic
+  - Validation catches malformed metadata
+- category: Comparison
+  items:
+  - Fingerprint comparison is fast (<1ms per query)
+  - Regression detection threshold configurable
+  - Reports support text, JSON, HTML formats
+- category: History Tracking
+  items:
+  - History storage is append-only
+  - Query lookups are efficient
+  - Flapping detection algorithm is tunable
+files_affected:
+  modified:
+  - benchbox/core/results/models.py
+  - benchbox/manifest/manifest_v2.py
+  - benchbox/core/benchmark_runner.py
+  - benchbox/cli/main.py
+  - benchbox/analysis/plan_comparison.py
+  - benchbox/analysis/plan_history.py
+  - benchbox/cli/commands/plan_diff.py
+  - benchbox/cli/commands/plan_history.py
+  - benchbox/manifest/validation.py (or extend existing)
+  - tests/unit/analysis/test_plan_comparison_summary.py
+  - tests/unit/manifest/test_plan_metadata.py
+  - tests/cli/test_plan_diff_command.py
+  - tests/analysis/test_plan_history.py
+  - templates/plan_comparison_report.html
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - manifest-v2
+  - regression-detection
+  - p2
+  dependencies:
+  - phase-1-critical-bug-fixes.yaml (fingerprinting)
+  - phase-3-robustness-validation.yaml (fingerprint verification)
+  estimated_effort: 1-1.5 weeks
+  lines_of_code: ~800 LOC (metadata + comparison + history + CLI + tests)

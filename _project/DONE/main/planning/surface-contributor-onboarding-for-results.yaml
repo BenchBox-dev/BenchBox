@@ -1,0 +1,132 @@
+id: surface-contributor-onboarding-for-results
+title: "Surface contributor onboarding for results submission"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-12"
+completed_note: "Contributor path is now linked from the explorer header, explorer home CTA, docs navigation, and README. Completed 2026-04-12."
+category: Documentation
+
+deps:
+  needs:
+  - implement-pr-based-result-submission-workflow
+
+description: |
+  `docs/contributing-results.md` was added in PR #53 but it is not linked
+  from the docs navigation, the README, or the explorer header. Phase 2
+  produces zero contributions if no one can find the door.
+
+  This item makes the contribution path discoverable from the three places
+  a prospective contributor will plausibly start: the explorer (which is
+  where they encounter results in the first place), the docs nav (where
+  they look for "how do I…"), and the repo README (where they land from
+  GitHub search). It also adds a homepage callout on the explorer landing
+  page once the corpus is large enough to make the call-to-action credible.
+
+work:
+- id: w1
+  summary: "Add 'Submit a result' link to the explorer site header"
+  status: done
+  notes: |
+    Edit `results-explorer/src/components/Header.tsx` (or equivalent -
+    confirm the actual file). Add a nav link "Submit a result" pointing
+    to the contributor guide URL on benchbox.dev/docs/contributing-results.
+    Style consistently with existing nav items. Open in same tab.
+
+- id: w2
+  summary: "Add a homepage CTA card on the explorer landing page"
+  needs: [w1]
+  status: done
+  notes: |
+    Add a small card to the explorer landing page (after the summary
+    cards) inviting visitors to contribute their own results. Card title:
+    "Run BenchBox on your platform - submit your results". Link to
+    contributor guide. Include a one-line summary of the workflow
+    (run → submit → PR). Skip the card on benchmark/platform browse pages
+    (top-level landing only).
+
+- id: w3
+  summary: "Add 'Contributing Results' to the docs nav"
+  status: done
+  notes: |
+    Edit `docs/index.rst` (or the appropriate Sphinx toctree) to include
+    `contributing-results` under a "Contributing" section. If a
+    "Contributing" toctree section doesn't exist, create one alongside
+    the existing top-level sections (Concepts, Platforms, etc.).
+    Confirm the page renders in `docs/_build/html/contributing-results.html`
+    after a local sphinx build.
+
+- id: w4
+  summary: "Add a 'Contributing Results' section to README.md"
+  status: done
+  notes: |
+    Add a short section after the existing "Quick Start" / installation
+    section. Two paragraphs maximum:
+      1. The pitch (you can publish your own results in the public corpus)
+      2. The link to the full guide
+    Match the README's existing voice. Do not duplicate the full guide
+    content here.
+
+- id: w5
+  summary: "Verify all four entry points render and resolve correctly"
+  needs: [w1, w2, w3, w4]
+  status: done
+  notes: |
+    - Build the explorer locally; click the new header link and CTA card.
+    - Build sphinx docs locally; navigate to the new entry from the docs
+      nav.
+    - Render README.md preview (e.g. via `gh repo view --web` after push,
+      or VS Code preview); confirm link works.
+    - Confirm all links resolve to the same URL
+      (`/docs/contributing-results.html` or equivalent published path).
+
+verification:
+- description: "Header component references the contributor guide"
+  command: "grep -r 'contributing-results' results-explorer/src/components/"
+  expected_output: "at least one match"
+- description: "Sphinx toctree references the contributor guide"
+  command: "grep -r 'contributing-results' docs/index.rst docs/*.rst"
+  expected_output: "at least one match in a toctree"
+- description: "README references the contributor guide"
+  command: "grep -c 'contributing-results' README.md"
+  expected_output: ">= 1"
+
+must_preserve:
+- The existing `docs/contributing-results.md` content (this TODO surfaces it, doesn't rewrite it).
+- Existing explorer header layout and styling (additive only).
+- Existing README structure and pitch (additive only - small new section).
+
+anti_patterns:
+- DO NOT create a separate landing page that duplicates the contributor guide - because it splits the source of truth and rots independently; surface the existing page from multiple entry points.
+- DO NOT put the CTA card on every explorer page - because it becomes noise once the visitor is deep in a comparison; landing-only is sufficient.
+- DO NOT add the CTA before the corpus is broad enough to look credible - because inviting contributors to a sparse corpus invites questions about why their result would matter; sequence after `expand-seed-corpus-to-sf-0-1` lands.
+
+scope_limit:
+  only_modify:
+  - results-explorer/src/components/Header.tsx  # or actual header path
+  - results-explorer/src/pages/Home.tsx  # or landing path
+  - docs/index.rst
+  - README.md
+  do_not_touch:
+  - docs/contributing-results.md  # already exists, content unchanged
+  - benchbox/
+  - results-data/
+
+metadata:
+  tags:
+  - documentation
+  - results
+  - contributor-experience
+  - phase-2
+  estimated_effort: "Small"
+  created_date: "2026-04-12"
+
+impact:
+  business_value: |
+    Phase 2 produces zero contributions without discoverability. This is
+    the cheapest possible step to convert the existing investment in
+    submit/CI/docs into actual community engagement.
+  user_impact: |
+    Prospective contributors find the path in 0 clicks from the explorer
+    or 1 click from docs/README, instead of having to search for a file
+    they don't know exists.

@@ -1,0 +1,15 @@
+id: cli-parameter-consistency-with-unified-runner
+title: ✅ CLI Parameter Consistency with Unified Runner
+category: Core Architecture
+status: Completed
+impact: Improves CLI usability by consolidating related flags into single parameters, ensures consistency between CLI and
+  unified_runner interfaces, simplifies command-line usage with more intuitive flag structure, and provides cleaner parameter
+  validation and execution logic.
+sections:
+  Notes: '"```"'
+extra_fields:
+  Description: '"Refactored CLI parameter flags to be consistent with `unified_runner` flags, consolidating multiple boolean
+    flags into single parameter-based flags for better usability and consistency across interfaces."'
+worktree: unknown
+priority: Medium
+description: 'Archived DONE item for: ✅ CLI Parameter Consistency with Unified Runner'

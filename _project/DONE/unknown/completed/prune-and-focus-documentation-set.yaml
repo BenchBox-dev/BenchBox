@@ -1,0 +1,23 @@
+id: prune-and-focus-documentation-set
+title: ✅ Prune and Focus Documentation Set
+category: Documentation and Developer Experience
+status: Completed
+priority: Medium
+impact: Prevents information overload, keeps the happy path obvious, and aligns CLI docs with the current command surface.
+sections:
+  Summary: Restructured the Sphinx navigation, merged duplicate guides, and introduced a concise 'Getting started in 5 minutes'
+    so new users can install, profile, run, and export results without wading through overlapping pages.
+  Completed Tasks: '- Streamlined the documentation entry point
+
+    - Delivered a five-minute quick start
+
+    - Updated the CLI reference
+
+    - Trimmed advanced topics
+
+    - Kept the Sphinx build green'
+  Testing: '"`uv run -- python -m pytest` (fails in the existing suite because of pre-existing platform/database naming tests
+    and Coffeeshop integration; the new docs build test passes.)"'
+worktree: unknown
+description: Restructured the Sphinx navigation, merged duplicate guides, and introduced a concise 'Getting started in 5 minutes'
+  so new users can install, profile, run, and export results without wading through overlapping pages.

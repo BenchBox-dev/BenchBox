@@ -1,0 +1,65 @@
+id: interactive-wizard-official-tpc-mode
+title: "Add --official TPC compliance mode to interactive wizard"
+worktree: ux-improvements
+priority: High
+status: Not Started
+description: |
+  The CLI supports `--official` mode for TPC-compliant benchmark runs which:
+  1. Validates scale factors against TPC-allowed values (1, 10, 30, 100, etc.)
+  2. Requires seed for reproducibility
+  3. Warns about multi-stream requirements
+  4. Displays compliance banner
+
+  This mode is not exposed in the interactive wizard, preventing users from
+  running official TPC-compliant benchmarks interactively.
+
+category: User Experience
+
+tasks:
+  phases:
+  - phase: "Phase 1: Implementation"
+    done: false
+    items:
+    - summary: "Add official mode option to benchmark configuration"
+      done: false
+    - summary: "Validate scale factor against TPC-allowed values"
+      done: false
+    - summary: "Force seed prompt when official mode enabled"
+      done: false
+    - summary: "Display compliance banner in output"
+      done: false
+
+  - phase: "Phase 2: Testing"
+    done: false
+    items:
+    - summary: "Test scale factor validation in official mode"
+      done: false
+    - summary: "Verify seed is required in official mode"
+      done: false
+
+metadata:
+  tags:
+  - cli
+  - ux
+  - interactive
+  - tpc
+  - compliance
+  estimated_effort: "Small"
+  created_date: "2025-12-21"
+
+impact:
+  user_impact: |
+    Enables TPC-compliant benchmarks interactively:
+    - Official benchmark submissions
+    - Reproducible industry-standard results
+    - Validated scale factors
+
+files_affected:
+  modified:
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/cli/benchmarks.py"
+
+success_metrics:
+- "Official mode available in wizard"
+- "Scale factor validation enforced"
+- "Seed required in official mode"

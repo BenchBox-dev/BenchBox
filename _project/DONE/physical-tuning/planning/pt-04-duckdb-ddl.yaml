@@ -1,0 +1,196 @@
+# Physical Tuning #04: DuckDB DDL Generator
+#
+# DuckDB is the primary local testing platform - high priority.
+
+id: pt-04-duckdb-ddl
+title: "PT-04: DuckDB Physical Tuning DDL Generator"
+worktree: "physical-tuning"
+priority: "High"
+status: "Not Started"
+category: "Platform Expansion"
+
+description: |
+  Implement DDL generation for DuckDB with support for its physical tuning
+  capabilities, particularly sorting which was added in v0.10.
+
+  ## DuckDB Physical Tuning Features
+
+  ### Sorting (v0.10+)
+  DuckDB supports row ordering in table definitions:
+  ```sql
+  CREATE TABLE t (a INT, b INT) ORDER BY a, b;
+  ```
+
+  Benefits:
+  - Improved compression for sorted columns
+  - Faster range scans on sorted columns
+  - Better locality for related rows
+
+  ### Partitioning (Hive-style)
+  DuckDB can read/write Hive-partitioned Parquet:
+  ```sql
+  COPY (SELECT * FROM t) TO 'path' (FORMAT PARQUET, PARTITION_BY (col1, col2));
+  ```
+
+  This is more for external data organization than table-level tuning.
+
+  ### No Distribution
+  DuckDB is a single-node database - distribution tuning is not applicable.
+
+  ## Current Gap
+
+  DuckDB adapter (`benchbox/platforms/duckdb.py`) has:
+  - `generate_tuning_clause()` method (line ~683)
+  - Reads partitioning columns but only logs them
+  - Does NOT add ORDER BY to CREATE TABLE statements
+
+context_sections:
+  "DDL Syntax Examples": |
+    ```sql
+    -- Sorted table (DuckDB 0.10+)
+    CREATE TABLE lineitem (
+        l_orderkey BIGINT NOT NULL,
+        l_partkey BIGINT NOT NULL,
+        l_suppkey BIGINT NOT NULL,
+        l_linenumber INTEGER NOT NULL,
+        l_quantity DECIMAL(15,2),
+        l_extendedprice DECIMAL(15,2),
+        l_discount DECIMAL(15,2),
+        l_tax DECIMAL(15,2),
+        l_returnflag VARCHAR(1),
+        l_linestatus VARCHAR(1),
+        l_shipdate DATE,
+        l_commitdate DATE,
+        l_receiptdate DATE,
+        l_shipinstruct VARCHAR(25),
+        l_shipmode VARCHAR(10),
+        l_comment VARCHAR(44)
+    ) ORDER BY l_shipdate, l_orderkey;
+
+    -- Multiple sort columns with DESC
+    CREATE TABLE orders (
+        o_orderkey BIGINT PRIMARY KEY,
+        o_custkey BIGINT,
+        o_orderstatus VARCHAR(1),
+        o_totalprice DECIMAL(15,2),
+        o_orderdate DATE,
+        o_orderpriority VARCHAR(15),
+        o_clerk VARCHAR(15),
+        o_shippriority INTEGER,
+        o_comment VARCHAR(79)
+    ) ORDER BY o_orderdate DESC, o_orderkey;
+
+    -- Export with Hive partitioning
+    COPY (SELECT * FROM lineitem)
+    TO '/data/tpch/lineitem'
+    (FORMAT PARQUET, PARTITION_BY (YEAR(l_shipdate), MONTH(l_shipdate)));
+    ```
+
+  "Version Compatibility": |
+    DuckDB version requirements:
+    - ORDER BY in CREATE TABLE: v0.10.0+ (released March 2024)
+    - Hive partitioning COPY: v0.8.0+
+    - PARTITION_BY in COPY: v0.9.0+
+
+    BenchBox should:
+    - Check DuckDB version before using ORDER BY syntax
+    - Gracefully degrade for older versions (log warning, skip ORDER BY)
+
+tasks:
+  phases:
+  - phase: "Phase 1: DuckDBDDLGenerator Implementation"
+    done: false
+    items:
+    - summary: "Create benchbox/core/tuning/generators/duckdb.py"
+      done: false
+      subtasks:
+      - summary: "Implement generate_tuning_clauses() with ORDER BY"
+        done: false
+      - summary: "Support ASC/DESC per column"
+        done: false
+      - summary: "Validate distribution tuning not used (single-node)"
+        done: false
+    - summary: "Add DuckDB version detection"
+      done: false
+      subtasks:
+      - summary: "Query SELECT version() or check duckdb.__version__"
+        done: false
+      - summary: "Disable ORDER BY for versions < 0.10"
+        done: false
+
+  - phase: "Phase 2: Integration with DuckDB Adapter"
+    done: false
+    items:
+    - summary: "Inject DuckDBDDLGenerator into DuckDBAdapter"
+      done: false
+    - summary: "Modify CREATE TABLE generation in load_data()"
+      done: false
+    - summary: "Add ORDER BY clause based on tuning config"
+      done: false
+
+  - phase: "Phase 3: Partitioned Export Support"
+    done: false
+    items:
+    - summary: "Add Hive-style partition export option"
+      done: false
+    - summary: "Support partition_by in COPY TO statements"
+      done: false
+    - summary: "Generate partition transform expressions (YEAR, MONTH)"
+      done: false
+
+  - phase: "Phase 4: Testing"
+    done: false
+    items:
+    - summary: "Unit tests for DuckDBDDLGenerator"
+      done: false
+      subtasks:
+      - summary: "Test ORDER BY clause generation"
+        done: false
+      - summary: "Test version compatibility handling"
+        done: false
+      - summary: "Test distribution warning"
+        done: false
+    - summary: "Integration tests with actual DuckDB"
+      done: false
+      subtasks:
+      - summary: "Verify sorted table creation"
+        done: false
+      - summary: "Verify partitioned export"
+        done: false
+      - summary: "Benchmark query performance with/without sorting"
+        done: false
+
+files_affected:
+  added:
+  - "benchbox/core/tuning/generators/duckdb.py"
+  - "tests/unit/core/tuning/generators/test_duckdb_ddl.py"
+  modified:
+  - "benchbox/platforms/duckdb.py"
+  - "examples/tunings/duckdb/tpch_tuned.yaml"
+
+technical_requirements:
+  constraints:
+  - "Must gracefully handle DuckDB versions < 0.10"
+  - "Must warn if distribution tuning is configured (not applicable)"
+  dependencies:
+  - "DuckDB 0.10+ for ORDER BY support"
+
+success_metrics:
+- "CREATE TABLE includes ORDER BY clause for v0.10+"
+- "TPC-H Q1, Q6 show measurable performance improvement with sorted tables"
+- "Older DuckDB versions work without ORDER BY (graceful degradation)"
+
+dependencies:
+  blocked_by:
+  - "_project/TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml"
+
+metadata:
+  owners:
+  - "joe"
+  tags:
+  - "tuning"
+  - "duckdb"
+  - "local-platform"
+  - "ddl-generation"
+  estimated_effort: "Small"
+  created_date: "2026-01-03"

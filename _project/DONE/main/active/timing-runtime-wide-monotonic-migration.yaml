@@ -1,0 +1,158 @@
+id: timing-runtime-wide-monotonic-migration
+title: "Migrate runtime elapsed and timeout timing to centralized monotonic clock"
+worktree: main
+priority: Medium-High
+status: Completed
+category: Code Quality and Technical Debt
+description: |
+  Complete runtime-wide migration from wall-clock elapsed arithmetic to
+  centralized monotonic timing helpers introduced in the timing foundation.
+
+  This includes remaining benchmark runtime paths in platforms/core where
+  elapsed durations, retries, and timeout windows still use `time.time()`.
+  Wall-clock timestamps are retained only where event-time semantics are
+  required (audit timestamps, metadata timestamps, user-facing timeline fields).
+
+deps:
+  needs:
+    - timing-query-contract-unification
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - timing
+    - runtime
+    - monotonic
+    - refactor
+  estimated_effort: 4-6 days
+  created_date: "2026-02-12"
+  completed_date: "2026-02-12"
+
+impact:
+  business_value: |
+    Improves timing stability under system clock adjustments and increases
+    confidence in runtime duration metrics across all supported platforms.
+  technical_debt: |
+    Reduces hundreds of ad-hoc wall-clock elapsed calculations by consolidating
+    runtime timing methodology around one shared utility.
+
+files_affected:
+  modified:
+    - benchbox/base.py
+    - benchbox/platforms/
+    - benchbox/core/
+    - benchbox/core/validation/data.py
+
+must_preserve:
+  - "Benchmark output metrics remain numerically consistent within expected tolerance"
+  - "Event timestamp fields remain wall-clock UTC values"
+  - "Platform adapter behavior and SQL execution semantics do not change"
+
+approach: |
+  Execute subsystem migration in batches:
+  1) platform adapters query/load/create-schema elapsed timers,
+  2) base benchmark runtime (`benchbox/base.py`) and core validation runtime
+     (`benchbox/core/validation/data.py`),
+  3) core benchmark runtime modules (including TPC-DI and multiregion).
+
+  Use `benchbox/utils/clock.py` wrappers for all elapsed and timeout logic.
+  Avoid mixing direct `perf_counter` and raw `time.time` calls in migrated paths.
+
+anti_patterns:
+  - "DO NOT convert every datetime.now usage blindly - because many are event timestamps not elapsed timers - migrate only elapsed/timeout
+    arithmetic"
+  - "DO NOT perform giant unreviewable refactor in one commit - because timing changes are cross-cutting - migrate by subsystem
+    with focused test coverage"
+  - "DO NOT change public result field semantics while migrating clocks - because this phase is methodology-only - preserve
+    existing units/contracts"
+
+verification:
+  - description: "Platform unit tests pass for touched adapters"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -k 'adapter or timing or load_data' -q"
+    expected_output: "Selected tests pass"
+  - description: "Core runtime tests pass for touched benchmark modules"
+    command: "uv run -- python -m pytest tests/unit/core/ -k 'runner or timing or benchmark' -q"
+    expected_output: "Selected tests pass"
+  - description: "Core validation timing tests pass for migrated validation paths"
+    command: "uv run -- python -m pytest tests/unit/core/test_validation_data.py -q"
+    expected_output: "Selected tests pass"
+
+scope_limit:
+  only_modify:
+    - benchbox/base.py
+    - benchbox/platforms/base/adapter.py
+    - benchbox/platforms/base/data_loading.py
+    - benchbox/core/runner/runner.py
+    - benchbox/core/validation/data.py
+    - benchbox/core/tpcdi/benchmark.py
+    - benchbox/core/tpcdi/etl/batch.py
+    - benchbox/core/tpcdi/etl/transformations.py
+    - benchbox/core/multiregion/orchestrator.py
+    - tests/unit/platforms/test_base_adapter.py
+    - tests/unit/core/test_runner_lifecycle.py
+    - tests/unit/core/test_validation_data.py
+  do_not_modify:
+    - benchbox/cli/
+    - benchbox/core/results/
+
+success_metrics:
+  - "Runtime elapsed/timeout calculations in migrated modules use centralized monotonic helpers"
+  - "No new runtime elapsed logic is implemented with time.time deltas"
+  - "Subsystem test suites for touched areas remain green"
+
+work:
+  - id: w1
+    summary: "Inventory remaining runtime elapsed and timeout call sites after phase-2 changes"
+    status: done
+  - id: w2
+    summary: "Migrate platform base adapter elapsed/timeout logic to centralized monotonic helpers"
+    needs:
+      - w1
+    status: done
+  - id: w3
+    summary: "Migrate platform base data-loading elapsed/timeout logic to centralized monotonic helpers"
+    needs:
+      - w1
+    status: done
+  - id: w4
+    summary: "Migrate core runner lifecycle elapsed/timeout logic to centralized monotonic helpers"
+    needs:
+      - w1
+    status: done
+  - id: w5
+    summary: "Migrate benchbox/base.py benchmark duration arithmetic to centralized monotonic helpers"
+    needs:
+      - w1
+    status: done
+  - id: w6
+    summary: "Migrate core validation elapsed logic in benchbox/core/validation/data.py to centralized monotonic helpers"
+    needs:
+      - w1
+    status: done
+  - id: w7
+    summary: "Migrate TPC-DI benchmark and ETL elapsed/timeout hotspots to centralized monotonic helpers"
+    needs:
+      - w1
+    status: done
+  - id: w8
+    summary: "Migrate multiregion orchestrator elapsed timing to centralized monotonic helpers"
+    needs:
+      - w1
+    status: done
+  - id: w9
+    summary: "Add regression tests for timeout behavior under wall-clock perturbation scenarios"
+    needs:
+      - w2
+      - w3
+      - w4
+      - w5
+      - w6
+      - w7
+      - w8
+    status: done
+  - id: w10
+    summary: "Run targeted platform/core suites and document timing parity outcomes"
+    needs:
+      - w9
+    status: done

@@ -1,0 +1,15 @@
+id: automated-data-publishing-pipeline
+title: Automated Data Publishing Pipeline
+worktree: infrastructure-publishing
+category: Supporting Infrastructure
+priority: Medium
+status: "Completed"
+description: 'Automated pipeline to publish results to cloud storage, generate permalinks,
+
+  and manage benchmark artifacts.
+
+  '
+metadata:
+  estimated_effort: 1 week (0.5 FTE)
+  budget: $4K-5K
+  due_date: 2026-Q4

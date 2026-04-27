@@ -1,0 +1,166 @@
+id: validate-and-integrate-tpc-tuning-json
+title: "Validate tpc-tuning.json z-ordering recommendations and integrate or discard"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+deps:
+  needs: []
+
+description: |
+  tpc-tuning.json is an untracked scratchpad containing two sets of tuning
+  recommendations generated in a prior AI conversation. The file is malformed
+  (an AI response is embedded as text between two JSON objects) and is not
+  integrated into the project.
+
+  Most of its content is already captured in the codebase (partitioning in
+  schema.py / registry.py; clustering in the same files). The only unique
+  content is a broader set of z-ordering column recommendations that go beyond
+  what is currently in examples/tunings/databricks/:
+
+  TPC-H gaps (JSON recommends, YAML omits):
+    lineitem:   l_suppkey, l_shipdate
+    orders:     o_orderkey, o_custkey
+    customer:   c_nationkey
+    supplier:   s_suppkey, s_nationkey  (entire table absent)
+    part:       p_partkey, p_type, p_size  (entire table absent)
+
+  TPC-DS gaps (JSON recommends, YAML omits):
+    customer:   c_current_addr_sk, c_current_cdemo_sk
+    date_dim:   d_year, d_moy
+    item:       i_category, i_class
+    sales_returns (virtual group): customer_sk, item_sk, store_sk,
+                                   promotion_sk, ticket_number
+    web_catalog (virtual group):   web_page_sk, web_site_sk, ship_mode_sk
+
+  Goal: validate each gap column against actual TPC-H/TPC-DS query patterns.
+  For columns that appear in frequent join/filter predicates, add them to the
+  Databricks tuning YAML files. For columns that don't, drop them. Then delete
+  tpc-tuning.json.
+
+work:
+  - id: w1
+    summary: "Audit TPC-H query files for gap column usage in predicates and joins"
+    status: pending
+    notes: |
+      For each gap column listed in the description (lineitem: l_suppkey,
+      l_shipdate; orders: o_orderkey, o_custkey; customer: c_nationkey;
+      supplier: s_suppkey, s_nationkey; part: p_partkey, p_type, p_size):
+
+      Search the 22 TPC-H query templates (benchbox/core/tpch/queries/) for
+      WHERE / JOIN / GROUP BY / ORDER BY uses of that column. Count how many
+      of the 22 queries reference each column in a selective predicate or join.
+
+      Acceptance criterion: >= 3 queries use the column selectively → keep it.
+      Document findings in a simple table (column | query count | keep/drop).
+
+  - id: w2
+    summary: "Audit TPC-DS query files for gap column usage in predicates and joins"
+    needs: [w1]
+    status: pending
+    notes: |
+      Same methodology as w1 but for TPC-DS (99 queries in
+      benchbox/core/tpcds/queries/).
+
+      Gap columns to check:
+        customer:       c_current_addr_sk, c_current_cdemo_sk
+        date_dim:       d_year, d_moy
+        item:           i_category, i_class
+        sales_returns:  the JSON uses a virtual table name; resolve to the real
+                        per-table columns (ss_customer_sk, ss_store_sk,
+                        ss_promo_sk, ss_ticket_number, etc.)
+        web_catalog:    resolve virtual table to real columns across
+                        web_page, web_site, ship_mode tables
+
+      Acceptance criterion same as w1 (>= 3 queries). Document findings.
+
+  - id: w3
+    summary: "Integrate accepted z-ordering columns into Databricks YAML tuning files"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      Files to modify:
+        examples/tunings/databricks/tpch_tuned.yaml
+        examples/tunings/databricks/tpcds_tuned.yaml
+
+      For each column that passed the acceptance criterion:
+        - Add it under the correct table's z_ordering_columns list
+        - Match the existing ALL-CAPS naming convention used in those files
+        - Keep the ordering: date/partition columns first, then FK/join columns,
+          then filter columns
+
+      Do NOT add columns that failed the criterion. Do NOT modify
+      examples/tunings/duckdb/ - DuckDB uses ORDER BY, not Z-ordering.
+
+  - id: w4
+    summary: "Delete tpc-tuning.json and verify nothing references it"
+    needs: [w3]
+    status: pending
+    notes: |
+      The file is untracked (confirmed via git status), so deletion requires only:
+        rm tpc-tuning.json
+
+      Before deleting, grep the codebase to confirm nothing imports or loads it:
+        grep -r "tpc-tuning" benchbox/ examples/ tests/ docs/
+
+      If any reference exists, update it first.
+
+verification:
+  - description: "tpc-tuning.json no longer exists in the working tree"
+    command: "test ! -f tpc-tuning.json && echo 'gone'"
+    expected_output: "gone"
+  - description: "Databricks TPC-H YAML has at least one new z-ordering column vs prior state"
+    command: "git diff HEAD -- examples/tunings/databricks/tpch_tuned.yaml | grep '^+' | grep -v '^+++' | grep -i '_\\(suppkey\\|nationkey\\|orderkey\\|custkey\\|partkey\\|type\\|size\\)' | head -5"
+    expected_output: "at least one matching line (if any gap columns passed the acceptance criterion)"
+  - description: "No codebase reference to tpc-tuning.json remains"
+    command: "grep -r 'tpc-tuning' benchbox/ examples/ tests/ docs/ || echo 'no references'"
+    expected_output: "no references"
+
+must_preserve:
+  - Existing z-ordering columns already in examples/tunings/databricks/ - the audit must not
+    remove or reorder any column that is currently there.
+  - The ALL-CAPS naming convention for column names in Databricks YAML files.
+  - examples/tunings/duckdb/ - these files must not be touched; DuckDB uses ORDER BY not Z-ordering.
+
+anti_patterns:
+  - DO NOT add z-ordering columns based solely on the JSON recommendations without
+    validating query usage - because untested tuning columns waste compute on optimize
+    operations without improving query times.
+  - DO NOT resolve the "sales_returns" and "web_catalog" virtual table names in the JSON to
+    real columns by guessing - because the JSON was generated by an AI with no access to
+    actual query templates; check the query files directly.
+  - DO NOT modify examples/tunings/duckdb/ - because DuckDB doesn't support Z-ordering;
+    those files use ORDER BY and are independently maintained.
+  - DO NOT delete tpc-tuning.json before w3 is complete - because it is the only record
+    of the recommendations being evaluated.
+
+scope_limit:
+  only_modify:
+    - examples/tunings/databricks/tpch_tuned.yaml
+    - examples/tunings/databricks/tpcds_tuned.yaml
+    - tpc-tuning.json # deletion only
+  do_not_touch:
+    - benchbox/core/tpch/schema.py
+    - benchbox/core/tpcds/schema/registry.py
+    - examples/tunings/duckdb/
+
+metadata:
+  tags:
+    - tuning
+    - databricks
+    - tpch
+    - tpcds
+    - z-ordering
+    - cleanup
+  estimated_effort: "Small"
+  created_date: "2026-04-20"
+
+impact:
+  business_value: |
+    Ensures the Databricks tuning configuration is grounded in actual query
+    patterns rather than AI-generated guesses, and removes an ambiguous
+    scratchpad file that could mislead future contributors.
+  user_impact: |
+    Databricks users running tuned benchmarks get an evidence-backed
+    z-ordering configuration, not one frozen at an arbitrary subset.

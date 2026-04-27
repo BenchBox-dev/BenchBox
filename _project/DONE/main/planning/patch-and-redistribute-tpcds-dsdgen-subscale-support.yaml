@@ -1,0 +1,194 @@
+id: patch-and-redistribute-tpcds-dsdgen-subscale-support
+title: "Patch and redistribute TPC-DS dsdgen binaries for subscale support"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-14"
+category: Tooling and Distribution
+
+description: |
+  `_sources/tpcds-subscale-probe.md` shows that the currently bundled
+  `darwin-arm64` and `darwin-x86_64` `dsdgen` binaries segfault with exit code
+  139 before emitting required small-dimension tables at `sf=0.01`, `0.1`, and
+  `0.5`. The repo's only bundled `tpcds_sf001` asset is
+  `examples/data/tpcds_sf001/README.txt`, so there is no real sample-data
+  fallback to unblock the higher-level unofficial-scale work.
+
+  This item isolates the generator/distribution problem from the broader
+  methodology and result-pipeline feature. The desired outcome is either:
+  1. a legally shippable patched binary set that passes Gate Zero across every
+     bundle target BenchBox distributes, or
+  2. an explicit decision that patched redistribution is not viable, which then
+     unblocks a separate user-supplied/pre-generated-data track.
+
+work:
+- id: w1
+  summary: "Root-cause the subscale crash in `_sources/tpc-ds/tools` with a minimal reproducer tied to `call_center`, `store`,
+    `warehouse`, and `web_site`."
+  status: done
+  notes: |
+    Completed during Gate Zero investigation on 2026-04-13. All four target tables
+    (call_center, store, warehouse, web_site) exhibit exit 139 with no output file
+    at sf=0.01, 0.1, and 0.5 on both bundled macOS binaries (darwin-arm64,
+    darwin-x86_64). A fresh source build from _sources/tpc-ds/tools reproduced the
+    same failure for call_center sf=0.01. lldb on the source-built binary pinned the
+    fault to a null dereference in dist_weight at dist.c:512: weight_sets[wset - 1]
+    with wset=0, reached via scaling.c:124 (LogScale), scaling.c:319 (get_rowcount),
+    parallel.c:64 (split_work), and driver.c:549 (main). lldb was run only on
+    call_center; the identical exit-139 pattern across all four tables implies the
+    same root cause. See _sources/tpcds-subscale-probe.md for the full evidence record.
+
+- id: w2
+  summary: "Audit TPC licensing and BenchBox release constraints for shipping patched `dsdgen` binaries rather than upstream
+    artifacts."
+  needs: [w1]
+  status: done
+  notes: |
+    Completed on 2026-04-14. Full analysis in docs/tpc-licensing-analysis.md.
+
+    Conclusion: redistribution of patched dsdgen/dsqgen binaries is LEGALLY VIABLE under
+    TPC EULA v2.2. Clause 4b explicitly grants modification rights; Clause 9 permits
+    redistribution of modified software without TPC approval.
+
+    Required actions before publishing any patched bundle (none of which require TPC approval):
+    1. Add EULA.txt to each _binaries/tpc-ds/*/ directory (copy from _sources/tpc-ds/EULA.txt)
+    2. Add NOTICE.txt to each bundle directory containing "THE TPC SOFTWARE IS AVAILABLE
+       WITHOUT CHARGE FROM TPC." (Clause 9b verbatim requirement) plus attribution line
+    3. Document MIT/TPC license split in README or CONTRIBUTING
+
+    Gap: these compliance elements are ALREADY MISSING from the current unmodified bundles,
+    not just the patched ones. W4 must remedy both gaps simultaneously.
+
+- id: w3
+  summary: "Prototype the source patch on the native Darwin toolchain and rerun Gate Zero at 0.01, 0.1, and 0.5 with row counts
+    and checksums."
+  needs: [w1, w2]
+  status: done
+  notes: |
+    Completed on 2026-04-14. Source patch applied to _sources/tpc-ds/tools/ across
+    five files (params.h, r_params.h, r_params.c, scaling.c, w_call_center.c) following
+    the DuckDB TPC-DS extension approach: read SCALE as double via a new get_dbl(),
+    route sub-SF1 scales through the case-1 switch branch via iScale = max(1, int(nScale)),
+    and apply the fractional factor as a post-multiplier on the SF=1 baseline with a
+    minimum-1-row floor. See _sources/tpc-ds/PATCHES.md "Sub-SF1 Scale Factor Support"
+    for the full diff description.
+
+    Built from source at /tmp/tpcds_subscale_build/tools/dsdgen on darwin-arm64 and
+    reran the Gate Zero probe for call_center, store, warehouse, web_site at
+    sf=0.01, 0.1, 0.5 plus the sf=1.0 control. All 16 combinations exit 0 with
+    non-empty output (previously all 12 sub-SF1 combinations exit 139). sf=1.0 row
+    counts and SHA-256 checksums match the pre-patch control column exactly, so the
+    patch does not perturb canonical generation. sf=0.5 row counts are exactly 50%
+    of sf=1.0, and sf=0.01 / sf=0.1 hit the min-1 floor on the small-dimension
+    tables as designed. Full table of row counts and checksums is in
+    _sources/tpcds-subscale-probe.md "Post-Patch Gate Zero (w3)".
+
+    Scope caveat: this item is satisfied for darwin-arm64 only. Cross-bundle Gate
+    Zero evidence (darwin-x86_64, linux-arm64, linux-x86_64, windows-x86_64) is the
+    w4 deliverable and is still pending. Shipped _binaries/ bundles remain
+    unpatched; BenchBox's scale_factor >= 1.0 Python guard stays in place until w4
+    completes across every target.
+
+- id: w4
+  summary: "Build and verify the patched bundle set for every distributed target (`darwin-*`, `linux-*`, `windows-*`) or document
+    exactly which targets remain unsupported."
+  needs: [w3]
+  status: done
+  notes: |
+    Completed on 2026-04-14. Full results in _sources/tpcds-subscale-probe.md "Cross-Bundle Gate Zero (w4)".
+
+    Built and verified four of six bundle targets:
+    - darwin-arm64: macOS native gcc/clang (arm64 host)
+    - darwin-x86_64: macOS native gcc/clang with -arch x86_64 flag
+    - linux-arm64: Docker ubuntu:22.04 --platform linux/arm64
+    - linux-x86_64: Docker ubuntu:22.04 --platform linux/amd64
+
+    All 16 SF×table combinations (sf=0.01, 0.1, 0.5, 1.0 × call_center, store, warehouse,
+    web_site) exit 0 across all four platforms. SF=1.0 checksums match the pre-patch control
+    exactly. Cross-platform checksums are byte-identical - deterministic output confirmed.
+
+    Windows status: windows-arm64 and windows-x86_64 NOT rebuilt. No MinGW or Windows
+    cross-compiler available on the darwin-arm64 build host. Upstream unpatched binaries
+    remain in those bundle directories; they will continue to exit 139 for sf < 1.0.
+    A separate TODO should track obtaining a Windows cross-compilation environment.
+
+    Deployed: patched dsdgen + dsqgen to _binaries/tpc-ds/{darwin-arm64,darwin-x86_64,
+    linux-arm64,linux-x86_64}/. Added EULA.txt and NOTICE.txt to all six bundle directories
+    and _binaries/tpc-ds/NOTICE.txt at the top level to satisfy TPC EULA v2.2 Clause 9a/9b.
+
+- id: w5
+  summary: "Publish the updated probe artifact and either unblock `support-unofficial-tpcds-scales-with-methodology-guardrails`
+    or open the user-supplied-data fallback item with concrete evidence."
+  needs: [w4]
+  status: done
+  notes: |
+    Completed on 2026-04-14. _sources/tpcds-subscale-probe.md updated with two new
+    sections: "Post-Patch Gate Zero (w3)" (darwin-arm64 source-build results) and
+    "Cross-Bundle Gate Zero (w4)" (darwin-x86_64, linux-arm64, linux-x86_64 results plus
+    Windows status documentation). All evidence committed to main.
+
+    Decision: unblock `support-unofficial-tpcds-scales-with-methodology-guardrails`.
+    Four of six bundle targets have patched binaries with cross-platform Gate Zero evidence.
+    Windows targets are explicitly documented as unsupported until a cross-compilation
+    environment is available. The higher-level feature can proceed on this basis with the
+    Windows limitation clearly surfaced in NOTICE.txt and the probe artifact.
+
+files_affected:
+  modified:
+  - "_sources/tpc-ds/tools/"
+  - "_binaries/tpc-ds/"
+  - "_sources/tpcds-subscale-probe.md"
+  - "docs/development/tpc-compilation-guide.md"
+
+must_preserve:
+- "Official `sf>=1` TPC-DS generation remains stable while the patch track is in flight."
+- "Do not claim generic subscale support until every shipped bundle target has empirical Gate Zero evidence."
+- "Do not replace real benchmark data with placeholder sample bundles."
+
+approach: |
+  Treat this as a standalone toolchain project. Reproduce the crash at the
+  native `dsdgen` layer, patch the source if feasible, validate the patch on
+  the host toolchain first, then rebuild and rerun Gate Zero across all
+  distributed bundle targets before reopening the higher-level unofficial-scale
+  feature.
+
+anti_patterns:
+- "DO NOT remove BenchBox's `scale_factor >= 1.0` guard first -- because the current shipped binaries crash and there is no
+  real `sf001` sample dataset."
+- "DO NOT treat a single-platform patch as sufficient evidence -- because BenchBox ships multiple bundled binaries and the
+  original feature depends on cross-bundle behavior."
+- "DO NOT bury licensing or redistribution work inside the higher-level methodology TODO -- because binary shipping is a separate
+  release decision."
+
+verification:
+- description: "New TODO validates against the project TODO schema"
+  command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/patch-and-redistribute-tpcds-dsdgen-subscale-support.yaml"
+  expected_output: "validation passes with no schema errors"
+- description: "TODO dependency graph remains valid after adding the follow-up"
+  command: "uv run _project/scripts/todo_cli.py check-graph"
+  expected_output: "graph validation passes with no cycles or dangling references"
+- description: "Indexes regenerate cleanly after adding the follow-up"
+  command: "uv run _project/scripts/generate_indexes.py"
+  expected_output: "TODO indexes regenerate successfully"
+
+metadata:
+  tags:
+  - tpcds
+  - dsdgen
+  - binaries
+  - subscale
+  - licensing
+  estimated_effort: "Medium"
+  created_date: "2026-04-13"
+
+impact:
+  business_value: |
+    Separates the binary/toolchain blocker from the higher-level methodology
+    feature so the team can make a hard go/no-go decision on native unofficial
+    TPC-DS support.
+  user_impact: |
+    Prevents contributors from spending time on a feature path that the shipped
+    generator assets cannot currently support.
+  technical_debt: |
+    Converts an implicit generator assumption into an explicit toolchain project
+    with testable exit criteria.

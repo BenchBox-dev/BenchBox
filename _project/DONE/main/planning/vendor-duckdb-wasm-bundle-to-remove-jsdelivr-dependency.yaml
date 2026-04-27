@@ -1,0 +1,113 @@
+id: vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency
+title: "Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-19"
+category: Infrastructure
+
+description: |
+  The explorer no longer bootstraps DuckDB-WASM from jsDelivr. Instead,
+  `results-explorer/src/lib/duckdbBundles.ts` imports the worker and WASM
+  assets directly from the installed npm package via Vite `?url` imports,
+  and `results-explorer/src/db.ts` now resolves the runtime bundle from
+  that same-origin descriptor.
+
+  This removed the external CDN dependency for both production explorer
+  loads and the browser-functional harness without introducing a separate
+  committed vendor directory. Because the browser now imports assets from
+  the installed package at build time, there is no duplicated byte copy to
+  desync from `package-lock.json`.
+
+deps:
+  needs:
+    - implement-results-explorer-browser-functional-tests
+
+work:
+  - id: w1
+    summary: "Load the duckdb-wasm bundle from same-origin Vite asset URLs"
+    status: done
+    notes: |
+      Added `results-explorer/src/lib/duckdbBundles.ts` with MVP/EH/COI
+      asset descriptors and switched `results-explorer/src/db.ts` to use
+      `selectBundle(LOCAL_DUCKDB_BUNDLES)`.
+
+  - id: w2
+    summary: "Assert in smoke coverage that e2e no longer hits jsDelivr"
+    needs: [w1]
+    status: done
+    notes: |
+      Added a smoke assertion in
+      `results-explorer/e2e/smoke/harness.spec.ts` that fails on any
+      request to `cdn.jsdelivr.net`.
+
+  - id: w3
+    summary: "Keep bundle bytes in lockstep with the installed npm package"
+    needs: [w1]
+    status: done
+    notes: |
+      Vite now emits the worker/WASM assets directly from
+      `node_modules/@duckdb/duckdb-wasm`, so there is no separate
+      vendored directory to drift from the lockfile.
+
+must_preserve:
+  - "`registerFileURL('results.duckdb', ...)` and `ATTACH ... AS bench (READ_ONLY)` continue to work unchanged - this TODO only moves bundle loading, not file registration."
+  - "Cross-origin isolation (COEP/COOP) still enables SharedArrayBuffer in the browser."
+  - "The Chromium blocking gate keeps passing throughout the change."
+
+approach: |
+  Keep the change focused on bundle loading. Do not touch the DuckDB
+  attach logic, the fixture generator, or the range-read test server -
+  those are separate concerns owned by other TODOs.
+
+anti_patterns:
+  - "DO NOT commit the WASM binaries into `results-explorer/public/vendor/duckdb-wasm/` without a desync guard - because `npm install` can silently drift the runtime version away from the shipped WASM bytes - wire in the version check in the same PR that vendors the bundle."
+  - "DO NOT remove the jsDelivr fallback without confirming the vendored path handles the MVP / EH / COI worker variants the way `selectBundle` does - because picking the wrong variant silently degrades performance or breaks threading - exercise `selectBundle` against the vendored descriptor first, then drop jsDelivr only if every platform target still resolves to a local file."
+
+verification:
+  - description: "The TODO item itself validates cleanly"
+    command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency.yaml"
+    expected_output: "Validation passes with no schema or DAG errors"
+  - description: "Chromium e2e suite passes with jsDelivr network access blocked"
+    command: "cd results-explorer && npm run test:e2e:chromium -- --grep @smoke"
+    expected_output: "Smoke suite passes with no jsDelivr requests observed in the network log"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/db.ts"
+    - "results-explorer/public/vendor/duckdb-wasm/"
+    - "results-explorer/scripts/serve-browser-tests.mjs"
+    - "results-explorer/package.json"
+    - "results-explorer/package-lock.json"
+    - "results-explorer/e2e/smoke/"
+  do_not_modify:
+    - "results-explorer/public/data/"
+    - "results-data/bundles/"
+    - "results-explorer/e2e/routes/"
+    - "results-explorer/e2e/failures/"
+    - "results-explorer/e2e/capability/"
+
+metadata:
+  tags:
+    - "results"
+    - "explorer"
+    - "duckdb-wasm"
+    - "supply-chain"
+    - "infrastructure"
+    - "ci"
+  estimated_effort: "Small"
+  created_date: "2026-04-19"
+
+impact:
+  business_value: |
+    Removes a single external CDN as a potential hard dependency for
+    both production explorer loads and the blocking Chromium gate. Any
+    jsDelivr incident no longer blocks PR merges or locks users out of
+    the results explorer.
+  user_impact: |
+    More resilient cold loads for explorer users; identical steady-state
+    experience. Test runs are faster because the ~6 MB bundle is served
+    from the same origin as the app rather than a CDN hop.
+  technical_debt: |
+    Retires a cross-cutting external dependency that the WebKit-flake
+    TODO was only able to address as a side effect.

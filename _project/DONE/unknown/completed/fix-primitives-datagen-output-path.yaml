@@ -1,0 +1,27 @@
+id: fix-primitives-datagen-output-path
+title: ✅ Fix Primitives Datagen Output Path
+category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+status: Completed
+priority: High
+impact: Restores Primitives benchmark usability by ensuring data lands in the CLI-standard benchmark_runs directory while
+  keeping cloud uploads functional.
+sections:
+  Summary: Reworked the Primitives data generator to reuse the shared cloud/local handler, aligned benchmark output_dir handling
+    with BaseBenchmark expectations, and verified the CLI now persists data under benchmark_runs/datagen/primitives_sf1.
+  Completed Tasks: '- Benchmark path audit
+
+    - Generator refactor
+
+    - Testing
+
+    - Verification'
+  Files Affected: '- benchbox/core/primitives/generator.py
+
+    - benchbox/core/primitives/benchmark.py
+
+    - tests/unit/generators/test_primitives_generator.py
+
+    - _project/PROJECT_TODO.yaml'
+worktree: unknown
+description: Reworked the Primitives data generator to reuse the shared cloud/local handler, aligned benchmark output_dir
+  handling with BaseBenchmark expectations, and verified the CLI now persists data under benchmark_runs/datagen/primitives_sf1.

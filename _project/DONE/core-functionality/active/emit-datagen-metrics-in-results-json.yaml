@@ -1,0 +1,134 @@
+id: emit-datagen-metrics-in-results-json
+title: "Emit meaningful datagen metrics in results JSON"
+worktree: core-functionality
+priority: High
+status: Completed
+completed_date: "2026-02-25"
+description: |
+  Successful datagen-only runs (--phases generate) produce results JSON with
+  near-zero metrics: run.total_duration_ms is always 0, phases.data_generation
+  has only {"status": "COMPLETED"} with no duration_ms, and no per-table stats
+  are surfaced anywhere.
+
+  Three distinct bugs prevent existing timing and manifest data from reaching
+  the JSON output:
+
+  1. duration_seconds kwarg silently dropped: runner.py captures datagen_duration
+     and passes it to create_enhanced_benchmark_result(), but that method does
+     not declare duration_seconds as an explicit parameter - it lands in **kwargs
+     and is never extracted. ResultBuilder._calculate_duration() then returns 0.0
+     (no query times, no loading time). Fix: add set_total_duration() to builder
+     and wire the param through.
+
+  2. duration_ms missing from phases dict: runner.py passes
+     phases={"data_generation": {"status": "COMPLETED"}} without duration_ms.
+     Fix: include "duration_ms": int(datagen_duration * 1000) in the dict.
+
+  3. Manifest-level per-table stats never surfaced: the manifest
+     (_datagen_manifest.json) written by every generator contains per-file
+     row_count and size_bytes. After _ensure_data_generated() completes these
+     sit on disk but are never read back. Fix: add _read_datagen_stats_from_manifest()
+     helper that aggregates tables_generated, total_rows, total_size_bytes and
+     merges them into the phases dict.
+
+category: Core Functionality
+
+deps:
+  needs:
+  - propagate-duration-seconds-in-enhanced-results
+
+work:
+- id: w1
+  summary: "Add set_total_duration() to ResultBuilder; update _calculate_duration() to check it first"
+  status: done
+
+- id: w2
+  summary: "Add duration_seconds as explicit param to create_enhanced_benchmark_result(); call builder.set_total_duration()
+    when provided"
+  needs: [w1]
+  status: done
+
+- id: w3
+  summary: "Include duration_ms in phases dict and execution_metadata.phase_status in runner.py data-only result block"
+  needs: [w2]
+  status: done
+
+- id: w4
+  summary: "Add _read_datagen_stats_from_manifest() and _flatten_manifest_v2_entries() helpers; merge stats into phase dict"
+  needs: [w3]
+  status: done
+
+- id: w5
+  summary: "Add tests/unit/core/runner/test_datagen_metrics.py with 5 tests covering duration, phase stats, manifest presence/absence"
+  needs: [w3, w4]
+  status: done
+
+must_preserve:
+- "All existing callers of create_enhanced_benchmark_result() continue to work - duration_seconds was previously silently
+  accepted via **kwargs; making it explicit must not break any call site"
+- "ResultBuilder._calculate_duration() fallback logic (start/end times, then query time sum) remains intact for non-datagen
+  paths"
+- "Standard benchmark runs (load+power) report correct total_duration_ms and phase timings - no regression"
+- "_ensure_data_generated() return type (bool) and calling convention in runner.py unchanged"
+
+approach: |
+  Work through the three bugs in dependency order (builder → base_benchmark → runner).
+
+  For w1: add _total_duration_seconds: float | None = None to ResultBuilder.__init__
+  (after _execution_phases_override), add set_total_duration(seconds: float) setter,
+  and prepend a check in _calculate_duration():
+    if self._total_duration_seconds is not None:
+        return self._total_duration_seconds
+
+  For w2: add duration_seconds: Optional[float] = None as an explicit keyword parameter
+  to create_enhanced_benchmark_result() (after performance_characteristics, before **kwargs).
+  After builder construction, call: if duration_seconds is not None: builder.set_total_duration(duration_seconds)
+
+  For w3: in runner.py data-only block (line 643), compute datagen_duration_ms = int(datagen_duration * 1000)
+  and include it in both places the phases dict appears.
+
+  For w4: add helper _read_datagen_stats_from_manifest(benchmark) near _ensure_data_generated().
+  Use existing load_manifest() from benchbox.core.manifest.io. Handle both ManifestV1 (tables is
+  dict[str, list[FileEntry]]) and ManifestV2 (tables is dict[str, TableFormats] with .formats dict).
+  Return {} on any failure - stats are non-critical. Merge returned dict into phase_data with **.
+
+  For w5: use pytest fixtures and mock benchmark objects with a temp manifest on disk.
+  Parametrize over tpch/tpcds/ssb to confirm benchmark-agnostic behavior.
+
+anti_patterns:
+- "DO NOT read the manifest eagerly in every code path -- because manifest may not exist for all run types -- only call _read_datagen_stats_from_manifest
+  in the data_only branch"
+- "DO NOT raise exceptions from _read_datagen_stats_from_manifest -- because stats are non-critical and a crash would block
+  all datagen runs -- catch all exceptions and return {}"
+- "DO NOT rename or remove the **kwargs parameter from create_enhanced_benchmark_result -- because many call sites pass platform-specific
+  kwargs -- only add duration_seconds before it"
+- "DO NOT change _ensure_data_generated return type or call conventions -- because runner logic for reuse/force-regen depends
+  on the bool return -- add the manifest helper as a separate function"
+
+verification:
+- description: "run.total_duration_ms is non-zero after a datagen run"
+  command: "uv run -- python -m pytest tests/unit/core/runner/test_datagen_metrics.py::test_datagen_duration_in_run_block
+    -v"
+  expected_output: "PASSED"
+- description: "phases.data_generation.duration_ms present and > 0 in result JSON"
+  command: "uv run -- python -m pytest tests/unit/core/runner/test_datagen_metrics.py::test_datagen_phase_has_duration_ms
+    -v"
+  expected_output: "PASSED"
+- description: "Manifest stats surfaced when manifest file exists on disk"
+  command: "uv run -- python -m pytest tests/unit/core/runner/test_datagen_metrics.py::test_datagen_phase_has_table_stats_when_manifest_present
+    -v"
+  expected_output: "PASSED"
+- description: "No crash when manifest is absent; phase still has status and duration_ms"
+  command: "uv run -- python -m pytest tests/unit/core/runner/test_datagen_metrics.py::test_datagen_phase_gracefully_degrades_without_manifest
+    -v"
+  expected_output: "PASSED"
+- description: "Full test suite passes with no regression"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "All tests pass with 0 failures"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/results/builder.py"
+  - "benchbox/core/base_benchmark.py"
+  - "benchbox/core/runner/runner.py"
+  - "tests/unit/core/runner/test_datagen_metrics.py"

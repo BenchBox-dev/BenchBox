@@ -1,0 +1,30 @@
+id: databricks-adapter-correct-data-loading-approach-copy-into-unity-catalog-volumes-2
+title: '"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)"'
+category: Project Lifecycle Management
+status: Completed
+impact: Aligns with Databricks best practices, improves reliability and scalability, simplifies loading code, and provides
+  a clear, auditable ingestion path.
+sections:
+  Notes: '- "benchbox/platforms/databricks.py: load_data now uses COPY INTO for each table, infers delimiter (tbl → `|`, csv
+    → `,`), counts rows, logs timings, and optionally OPTIMIZEs Delta tables. Supports staging via:"
+
+    - Enforces staging location presence (raises ValueError if missing) and eliminates temporary views/INSERT SELECT.
+
+    - "Tests: tests/unit/platforms/test_databricks_copy_into.py validates COPY INTO SQL, absence of temp views/INSERT, UC
+    Volume staging, and error on missing staging."
+
+    - Path normalization for remote output roots added separately for consistency across CLI/unified runner.'
+extra_fields:
+  Description: Replaced temp‑view/INSERT patterns with Databricks‑native COPY INTO loading from UC Volumes or cloud URIs;
+    added first‑class UC Volumes support and clear staging requirements.
+worktree: unknown
+priority: Medium
+description: '- "benchbox/platforms/databricks.py: load_data now uses COPY INTO for each table, infers delimiter (tbl → `|`,
+  csv → `,`), counts rows, logs timings, and optionally OPTIMIZEs Delta tables. Supports staging via:"
+
+  - Enforces staging location presence (raises ValueError if missing) and eliminates temporary views/INSERT SELECT.
+
+  - "Tests: tests/unit/platforms/test_databricks_copy_into.py validates COPY INTO SQL, absence of temp views/INSERT, UC Volume
+  staging, and error on missing staging."
+
+  - Path normalization for remote output roots added separately for consistency across CLI/unified runner.'

@@ -1,0 +1,40 @@
+# StarRocks Docker Compose
+# All-in-one StarRocks instance for integration testing
+#
+# Usage:
+#   docker compose -f docker-compose.yml up -d
+#   benchbox run --platform starrocks --benchmark tpch --scale 0.01 \
+#     --platform-option host=localhost --platform-option port=19030
+#
+# Ports:
+#   19030 (default host) -> 9030 - MySQL protocol (query interface)
+#   18040 (default host) -> 8040 - HTTP API (Stream Load)
+#
+# Default credentials:
+#   Username: root
+#   Password: (empty)
+
+services:
+  starrocks:
+    image: starrocks/allin1-ubuntu:3.5.16
+    ports:
+      - "${STARROCKS_HOST_PORT:-19030}:9030"
+      - "${STARROCKS_HTTP_PORT:-18040}:8040"
+    volumes:
+      - starrocks-fe-meta:/data/deploy/starrocks/fe/meta
+      - starrocks-be-storage:/data/deploy/starrocks/be/storage
+    healthcheck:
+      test: >
+        mysql -h127.0.0.1 -P9030 -uroot --skip-password -e "SHOW FRONTENDS"
+        || exit 1
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  starrocks-fe-meta:
+    driver: local
+  starrocks-be-storage:
+    driver: local

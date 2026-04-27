@@ -1,0 +1,54 @@
+id: harmonize-cli-verbosity-flow
+title: ✅ Harmonize CLI Verbosity Flow
+category: Observability Enhancements
+status: Completed
+priority: High
+impact: CLI verbosity flags now flow through configuration, orchestration, and adapter layers so quiet/default/-v/-vv modes
+  produce consistent output across all phases.
+sections:
+  Summary: Introduced structured verbosity settings, rewired CLI plumbing to persist them, and taught benchmarks plus platform
+    adapters to honour the propagated levels.
+  Completed Tasks: '- ✅ Verbosity settings
+
+    - "✅ CLI & configuration pipeline"
+
+    - "✅ Core & adapter alignment"
+
+    - ✅ Tests'
+  Testing: '"`UV_CACHE_DIR=.uv-cache uv run -- python -m pytest tests/unit/cli/test_cli_verbose.py tests/unit/core/test_runner_lifecycle.py`
+
+    `UV_CACHE_DIR=.uv-cache uv run -- python -m pytest`
+
+    *(fails: pre-existing ImportError in tests/unit/core/test_tpcds_resource_resolution.py for `_resolve_tpcds_tool_and_template_paths`.)*
+
+    "'
+  Files Affected: '- benchbox/utils/verbosity.py
+
+    - benchbox/base.py
+
+    - benchbox/cli/commands/run.py
+
+    - benchbox/cli/benchmarks.py
+
+    - benchbox/cli/database.py
+
+    - benchbox/cli/orchestrator.py
+
+    - benchbox/core/config.py
+
+    - benchbox/core/runner/runner.py
+
+    - tests/unit/cli/test_cli_verbose.py
+
+    - tests/unit/core/test_runner_lifecycle.py
+
+    - tests/unit/cli/test_cli_output.py
+
+    - docs/reference/result_schema_v1.md (new)
+
+    - docs/index.rst
+
+    - _project/PRE_RELEASE_CHECKLIST.md'
+worktree: unknown
+description: Introduced structured verbosity settings, rewired CLI plumbing to persist them, and taught benchmarks plus platform
+  adapters to honour the propagated levels.

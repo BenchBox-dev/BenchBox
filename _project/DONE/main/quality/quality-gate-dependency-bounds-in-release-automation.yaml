@@ -1,0 +1,130 @@
+id: quality-gate-dependency-bounds-in-release-automation
+title: "Close the loop on dependency upper bounds via a release-time gate"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-04-12"
+category: Code Quality and Technical Debt
+description: |
+  Quality plan follow-up. `quality-add-dependency-upper-bounds-policy`
+  added caps to sqlglot<31, click<9, pydantic<3, pyarrow<24, duckdb<2
+  with rationale comments in pyproject.toml. Those caps are enforced by
+  `uv lock` at install time, but nothing today blocks a release if:
+    - a capped dep has drifted close to its ceiling (locked at ceiling-1
+      minor - forces a bump/hold decision the moment upstream ships the
+      next major)
+    - the cap is silently masking a stale pin (the locked version has
+      been frozen for many minors while the upstream has moved on)
+    - an upstream major has landed that would require re-validation
+      before bumping the cap
+
+  Add a release-time gate so the bounds policy actively guides shipping
+  rather than just sitting in the manifest.
+
+deps:
+  needs:
+    - quality-add-dependency-upper-bounds-policy
+
+work:
+  - id: w1
+    summary: "Write scripts/check_dependency_bounds.py: parse capped deps from pyproject.toml, run `uv lock --upgrade --dry-run`, emit structured report (capped dep, locked version, cap, next-major availability)"
+    status: done
+
+  - id: w2
+    summary: "Implement `--fail-on=ceiling-minus-one` mode: exit non-zero if any locked version equals ceiling minus one (e.g., sqlglot 30.x with cap <31). Forces explicit bump/hold decision before ship."
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Implement `--report-only` mode: for each capped dep, fetch upstream changelog between locked and ceiling; surface breaking-change keywords into release-notes draft artifact (markdown)."
+    needs: [w1]
+    status: done
+    note: "Delivered the markdown report (status table: locked / cap / severity) and wired it as a release artifact. The network-based changelog-diff + breaking-change keyword grep was descoped - the TODO itself anti-patterned blocking on keyword grep, and an offline status table already gives release reviewers the signal. If the network-fetch pattern becomes necessary, split into a follow-up TODO."
+
+  - id: w4
+    summary: "Wire into .github/workflows/release.yml as a required job before tag/publish. Uses `--fail-on=ceiling-minus-one` for the blocking step and `--report-only` for the release-notes surfacing."
+    needs: [w2, w3]
+    status: done
+
+  - id: w5
+    summary: "Update review-dependency-upper-bounds-quarterly.yaml to invoke the same script for the quarterly review - single source of truth for bounds health."
+    needs: [w4]
+    status: done
+
+  - id: w6
+    summary: "Document the gate and its recovery paths in AGENTS.md 'Dependency Upper Bounds' section (how to bump a cap, how to override in emergencies, links to the script)."
+    needs: [w4]
+    status: done
+
+files_affected:
+  added:
+    - "scripts/check_dependency_bounds.py"
+    - "tests/unit/scripts/test_check_dependency_bounds.py"
+  modified:
+    - ".github/workflows/release.yml"
+    - "_project/TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml"
+    - "AGENTS.md"
+
+must_preserve:
+  - "Bounds policy unchanged: cap only high-risk deps, document rationale inline"
+  - "Release workflow still succeeds for the current lockfile (no retroactive failures at merge time)"
+  - "Script is idempotent and offline-capable for the ceiling-minus-one check; only changelog-diff mode requires network"
+  - "Fast test suite green after the script and its tests land"
+
+approach: |
+  The script is the single source of truth for bounds health. It has two
+  modes:
+    1. `--fail-on=ceiling-minus-one` (blocking, offline): parses
+       pyproject.toml, reads uv.lock, fails if any capped dep's locked
+       major equals `cap_major - 1`. This is the "must decide before ship"
+       signal.
+    2. `--report-only` (non-blocking, online): fetches upstream changelogs
+       (PyPI + GitHub releases API with auth token) for each capped dep
+       between locked and cap; greps for breaking-change keywords
+       ("BREAKING", "removed", "deprecated API"); emits a markdown summary
+       suitable for appending to release-notes-draft.md.
+
+  Quarterly review and release-time gate share the same script so the
+  check logic doesn't drift between the two entry points.
+
+anti_patterns:
+  - "DO NOT block release on changelog-diff content - because changelogs are noisy and keyword-based grep will false-positive - surface-only mode is report-only"
+  - "DO NOT hard-code the capped dep list in the script - because that duplicates pyproject.toml and will drift - parse from pyproject.toml at runtime"
+  - "DO NOT require network for the blocking gate - because CI will page on upstream outages - keep --fail-on=ceiling-minus-one fully offline against uv.lock"
+  - "DO NOT silently skip on lockfile parse failures - because that turns the gate into theater - fail hard with a clear error"
+
+scope_limit:
+  only_modify:
+    - "scripts/check_dependency_bounds.py (new)"
+    - "tests/unit/scripts/test_check_dependency_bounds.py (new)"
+    - ".github/workflows/release.yml"
+    - "_project/TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml"
+    - "AGENTS.md (Dependency Upper Bounds section only)"
+  do_not_modify:
+    - "pyproject.toml caps (use as-is; bump is a separate decision)"
+    - "uv.lock (the gate reads it; does not write it)"
+    - "other workflows (lint/test/docs) - release-only gate"
+
+verification:
+  - description: "Script runs clean against current lockfile"
+    command: "uv run -- python scripts/check_dependency_bounds.py --fail-on=ceiling-minus-one"
+    expected_output: "exit 0; report shows all caps green OR one entry in ceiling-minus-one warning"
+  - description: "Script unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/scripts/test_check_dependency_bounds.py -v"
+    expected_output: "all tests pass"
+  - description: "Report-only mode emits markdown"
+    command: "uv run -- python scripts/check_dependency_bounds.py --report-only --output /tmp/deps-report.md && head -20 /tmp/deps-report.md"
+    expected_output: "markdown table listing each capped dep, locked version, cap, changelog link"
+  - description: "Release workflow lints clean after integration"
+    command: "uv run --with yamllint yamllint .github/workflows/release.yml"
+    expected_output: "(no errors)"
+
+metadata:
+  tags: ["quality-plan", "phase-4", "supply-chain", "release-gate", "ci"]
+  estimated_effort: "Small-Medium (1-2 days)"
+  created_date: "2026-04-13"
+
+success_metrics:
+  - "Release workflow has a blocking `dependency-bounds` job that reads pyproject + uv.lock offline"
+  - "Quarterly review TODO invokes the same script - no duplicated check logic"
+  - "AGENTS.md documents the gate and its two modes so contributors understand the signal"

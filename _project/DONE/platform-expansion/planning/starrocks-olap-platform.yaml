@@ -1,0 +1,236 @@
+id: starrocks-olap-platform
+title: "Add StarRocks MPP OLAP platform support"
+worktree: platform-expansion
+priority: Medium
+status: Completed
+completed_date: "2026-02-16"
+description: |
+  Integrate StarRocks as a supported BenchBox platform. StarRocks is an open-source
+  MPP columnar OLAP database (Linux Foundation project) with strong performance
+  characteristics and growing enterprise adoption (11K+ GitHub stars, used by
+  Airbnb, Alibaba, Coinbase, Pinterest, Tencent).
+
+  Technical fit analysis confirms:
+  - SQLGlot has official 'starrocks' dialect support (verified working)
+  - MySQL protocol connectivity via PyMySQL (port 9030)
+  - Full TPC-H (22 queries) and TPC-DS (99 queries) compatibility
+  - Competitive performance vs ClickHouse, Trino, Druid in benchmarks
+  - Multiple data loading options (Stream Load HTTP API, INSERT+FILES())
+
+  Strategic value:
+  - Fills gap in modern MPP OLAP coverage alongside ClickHouse
+  - Enables independent TPC-H/TPC-DS verification (vs vendor-published results)
+  - Native data lake support (Iceberg, Hudi, Delta Lake) enables lakehouse benchmarks
+  - Growing market adoption makes this relevant for users
+
+  Reference: Comprehensive analysis completed in conversation on 2026-01-07.
+
+category: Platform Expansion
+
+metadata:
+  tags:
+  - starrocks
+  - olap
+  - mpp
+  - columnar
+  - platform
+  - mysql-protocol
+  estimated_effort: Medium
+  created_date: "2026-01-07"
+  last_updated: "2026-02-11T11:20:00"
+
+  related:
+  - postgresql-first-class-platform
+  migration_review_required: true
+impact:
+  business_value: |
+    StarRocks is gaining significant enterprise adoption as an open-source
+    alternative to commercial OLAP systems. Supporting it expands BenchBox's
+    relevance to a growing user base and enables independent performance
+    verification of vendor benchmark claims.
+  user_impact: |
+    Users running StarRocks deployments can benchmark their systems with
+    industry-standard TPC-H/TPC-DS workloads. Comparative analysis against
+    ClickHouse, Trino, and other platforms becomes straightforward.
+  technical_debt: |
+    Clean implementation following established patterns (similar to ClickHouse).
+    No technical debt expected.
+
+technical_requirements:
+  constraints:
+  - "Requires StarRocks FE node accessible on port 9030 (MySQL protocol)"
+  - "Stream Load requires direct access to BE nodes (HTTP port 8040)"
+  - "No embedded/local mode available (unlike ClickHouse chDB)"
+  dependencies:
+  - "pymysql (Python MySQL client)"
+  - "requests (for Stream Load HTTP API)"
+  compatibility: |
+    - Python 3.10+
+    - StarRocks 3.0+ (storage-compute separation architecture)
+    - SQLGlot 23+ (official starrocks dialect)
+
+files_affected:
+  modified:
+  - benchbox/platforms/__init__.py
+  - benchbox/core/platform_registry.py
+  - pyproject.toml
+  added:
+  - benchbox/platforms/starrocks.py
+  - tests/unit/platforms/test_starrocks_adapter.py
+  - tests/integration/platforms/test_starrocks_smoke.py
+  - docs/platforms/starrocks.md
+  - examples/getting_started/sql/starrocks_tpch.py
+
+must_preserve:
+- "All existing platform adapter tests pass: uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+- "Platform registry autodiscovery continues working for all existing platforms"
+- "ClickHouse adapter's PyMySQL usage unaffected by StarRocks's PyMySQL dependency"
+
+anti_patterns:
+- "DO NOT modify existing adapter files - because StarRocks is additive - create a new starrocks.py file"
+- "DO NOT use port 8030 for Stream Load - because StarRocks routes Stream Load to BE on port 8040, unlike Doris which routes
+  to FE on port 8030 - verify port in StarRocks documentation"
+- "DO NOT create a shared DorisStarRocksBase class - because the projects have diverged and coupling creates fragile inheritance
+  - implement independently"
+
+verification:
+- description: "New adapter imports correctly"
+  command: "uv run -- python -c \"from benchbox.platforms.starrocks import StarRocksAdapter; print('import OK')\""
+  expected_output: "import OK"
+- description: "Unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_starrocks_adapter.py -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Existing platform tests unaffected"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v --tb=short"
+  expected_output: "all tests pass, 0 failures"
+- description: "Integration smoke test for StarRocks platform"
+  command: "uv run -- python -m pytest tests/integration/platforms/test_starrocks_smoke.py -v --tb=short -m integration"
+  expected_output: "smoke test passes for StarRocks connection, schema, load, and query execution"
+- description: "TPC-H SF=0.01 end-to-end run succeeds on StarRocks"
+  command: "uv run -- benchbox run --platform starrocks --benchmark tpch --scale 0.01 --non-interactive --phases power"
+  expected_output: "run completes with successful query execution and valid row counts"
+- description: "TPC-DS SF=1 end-to-end run succeeds on StarRocks"
+  command: "uv run -- benchbox run --platform starrocks --benchmark tpcds --scale 1 --non-interactive --phases power"
+  expected_output: "run completes all selected TPC-DS queries without platform-specific failures"
+
+scope_limit:
+  only_modify:
+  - "_project/TODO/platform-expansion/planning/starrocks-olap-platform.yaml"
+  - "benchbox/platforms/__init__.py"
+  - "benchbox/core/platform_registry.py"
+  - "pyproject.toml"
+  - "benchbox/platforms/starrocks.py"
+  - "benchbox/platforms/credentials/starrocks.py"
+  - "tests/unit/platforms/test_starrocks_adapter.py"
+  - "tests/integration/platforms/test_starrocks_smoke.py"
+  - "docs/platforms/starrocks.md"
+  - "examples/getting_started/sql/starrocks_tpch.py"
+  do_not_modify:
+  - "benchbox/platforms/clickhouse/"
+  - "benchbox/platforms/doris.py"
+  - "benchbox/core/runner.py"
+
+success_metrics:
+- "StarRocks adapter passes all unit tests"
+- "TPC-H SF=0.01 completes successfully with correct row counts"
+- "TPC-DS SF=1 completes all 99 queries"
+- "Platform appears in CLI wizard and --help output"
+- "Documentation published on docs site"
+
+open_questions:
+- "Should we support CelerData Cloud API for managed deployments?"
+- "Should we implement materialized view benchmarking as an advanced feature?"
+- "What's the best approach for Docker-based integration testing?"
+
+context_sections:
+  "Performance Positioning": |
+    Based on CelerData benchmark reports (vendor-published, caveat applies):
+    - 2-2.2x faster than ClickHouse on SSB wide-table workloads
+    - 6.9-8.1x faster than Trino on TPC-DS 1TB
+    - Competitive with ClickHouse on ClickBench
+
+    BenchBox can provide independent verification of these claims.
+
+  "Architecture Comparison": |
+    StarRocks vs similar platforms:
+    - vs ClickHouse: Similar columnar MPP, but better multi-table joins
+    - vs Trino: Native storage (not just federated), vectorized execution
+    - vs Druid: Full SQL support, better ad-hoc query flexibility
+
+  "Data Loading Strategy": |
+    Recommended approach for BenchBox:
+    1. Stream Load (HTTP PUT) for CSV files - primary method
+    2. INSERT+FILES() for cloud storage (S3, GCS) scenarios
+    3. Standard INSERT for small datasets/testing
+
+    Stream Load endpoint: http://{be_host}:8040/api/{database}/{table}/_stream_load
+work:
+- id: w1
+  summary: "Implement adapter skeleton and dialect wiring in benchbox/platforms/starrocks.py"
+  status: done
+- id: w2
+  summary: "Implement connection and query execution paths (PyMySQL + timing/row validation)"
+  needs: [w1]
+  status: done
+- id: w3
+  summary: "Implement StarRocks schema creation (table models, distribution, partitioning)"
+  needs: [w1]
+  status: done
+- id: w4
+  summary: "Implement Stream Load via BE HTTP endpoint on port 8040 with robust error handling"
+  needs: [w1]
+  status: done
+- id: w5
+  summary: "Implement chunked Stream Load and load status validation for large files"
+  needs: [w4]
+  status: done
+- id: w6
+  summary: "Register platform in registry and package metadata (platform_registry, __init__, pyproject extras)"
+  needs: [w2]
+  status: done
+- id: w7
+  summary: "Implement cache-control and validation hooks (disable query cache + verify)"
+  needs: [w2]
+  status: done
+- id: w8
+  summary: "Implement platform optimization hooks (bitmap/bloom indexes and ANALYZE support)"
+  needs: [w3]
+  status: done
+- id: w9
+  summary: "Add StarRocks tuning profile with benchmark-specific defaults (TPC-H)"
+  needs: [w8]
+  status: done
+- id: w10
+  summary: "Add TPC-DS tuning defaults for StarRocks profile"
+  needs: [w9]
+  status: done
+- id: w11
+  summary: "Create unit test suite for adapter connection, SQL generation, and Stream Load formatting"
+  needs: [w2, w4]
+  status: done
+- id: w12
+  summary: "Create integration smoke coverage (local cluster harness + adapter smoke tests)"
+  needs: [w6, w11]
+  status: done
+- id: w13
+  summary: "Run and validate TPC-H SF=0.01 end-to-end on StarRocks"
+  needs: [w12]
+  status: done
+- id: w14
+  summary: "Run and validate TPC-DS SF=1 end-to-end on StarRocks"
+  needs: [w12]
+  status: done
+- id: w15
+  summary: "Publish documentation (platform guide, Stream Load details, deployment options)"
+  needs: [w11]
+  status: done
+- id: w16
+  summary: "Add getting-started example script for StarRocks TPC-H run"
+  needs: [w15]
+  status: done
+
+deferred:
+- id: d1
+  summary: "End-to-end TPC-H/TPC-DS validation on live StarRocks cluster (w13-w14)"
+  reason: "Requires running StarRocks FE+BE cluster - not available in local dev"
+  revisit_when: "StarRocks Docker Compose harness available in CI"

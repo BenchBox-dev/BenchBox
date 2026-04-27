@@ -1,0 +1,297 @@
+id: drop-plotly-html-charts
+title: "Drop Plotly dependency and HTML chart rendering - go ASCII-only"
+worktree: core-functionality
+priority: High
+status: "Completed"
+completed_date: "2026-02-06"
+category: Core Functionality
+description: |
+  Remove Plotly and the entire HTML chart rendering pipeline from BenchBox. The ASCII charting
+  system (2,255 lines, 6 chart types, zero dependencies) is the actively-used visualization
+  path for CLI, MCP, and CI. The Plotly/HTML path (~1,750 lines source + ~1,260 lines tests)
+  generates static .html files that nobody opens - there is no browser integration, no HTTP
+  server, no CI usage, and no documented user workflow that depends on HTML output.
+
+  Removing Plotly eliminates:
+  - Two parallel rendering pipelines with incompatible data models
+  - ~2,300 lines of source + test code (37% reduction in visualization module)
+  - 46 MB optional dependency weight (plotly 43 MB + narwhals 3.3 MB)
+  - The dual data model problem (BarDatum vs BarData, etc.) that forces every new chart type
+    to be implemented twice
+  - Three test files that use pytest.importorskip("plotly") and may skip silently
+
+  This clears the path for the ASCII charting enhancement (enhance-ascii-charting.yaml) by
+  establishing a single canonical data model and removing the need for conversion layers.
+
+  Decision rationale: Evaluated in depth - HTML charts are the default format but disconnected
+  from real usage. MCP returns file paths for HTML (useless to LLMs) vs inline content for ASCII
+  (immediately useful). CLI generates files users must manually locate and open. No blog workflow
+  references chart generation. The feature is vestigial.
+
+tasks:
+  phases:
+    - title: "Phase 1 - Remove Plotly rendering code"
+      description: |
+        Delete Plotly-specific source files and strip Plotly code from shared files.
+        This is the bulk of the removal (~80% of the win).
+      items:
+        - description: "Delete benchbox/core/visualization/charts.py (626 lines - 6 Plotly chart classes)"
+          done: true
+        - description: "Delete benchbox/core/visualization/styles.py (137 lines - Plotly template/theme system)"
+          done: true
+        - description: "Delete benchbox/core/visualization/dependencies.py (20 lines - require_plotly() gate)"
+          done: true
+        - description:
+            "Strip Plotly rendering from result_plotter.py - keep from_sources(), NormalizedResult, _suggest_chart_types();
+            remove .figure() calls and HTML generation"
+          done: true
+        - description:
+            "Strip Plotly export from exporters.py - keep export_ascii() and render_ascii_chart(); remove export_figure()
+            and pio.write_html()"
+          done: true
+        - description:
+            "Strip Plotly code from mcp/tools/visualization.py - remove _check_visualization_dependencies(), HTML format
+            branch, file-path response model"
+          done: true
+        - description: "Update benchbox/core/visualization/__init__.py - remove Plotly class exports"
+          done: true
+        - description: "Remove plotly from pyproject.toml viz extra, mcp extra, and dev group"
+          done: true
+
+    - title: "Phase 2 - Unify data models"
+      description: |
+        Promote ASCII data models as the canonical models. Remove the conversion layer
+        in exporters.py that translates between Plotly models and ASCII models. Have
+        ResultPlotter produce ASCII-native data models directly.
+      items:
+        - description:
+            "Audit both model hierarchies - Plotly (BarDatum, TimeSeriesPoint, CostPerformancePoint, DistributionSeries,
+            QueryLatencyDatum) vs ASCII (BarData, BoxPlotSeries, LinePoint, ScatterPoint, HistogramBar)"
+          done: true
+        - description: "Promote ASCII models as canonical - move to a shared data_models.py or keep in ascii/ module"
+          done: true
+        - description: "Refactor ResultPlotter._render_* methods to produce ASCII data models directly instead of Plotly models"
+          done: true
+        - description: "Remove the manual conversion layer in exporters.py:render_ascii_chart()"
+          done: true
+        - description: "Verify all factory functions (from_bar_data, from_query_latency_data, etc.) work with unified models"
+          done: true
+
+    - title: "Phase 3 - Simplify MCP tool and CLI"
+      description: |
+        Remove the format parameter branching. generate_chart always returns inline
+        ASCII content. Remove the dependency check guard. Clean up CLI visualize command.
+      items:
+        - description: "Remove format parameter from generate_chart MCP tool (always ASCII)"
+          done: true
+        - description: "Remove _check_visualization_dependencies() from MCP tools"
+          done: true
+        - description: "Simplify generate_chart response model - always inline content, never file paths"
+          done: true
+        - description: "Update CLI benchbox visualize command - remove --format html option"
+          done: true
+        - description: "Update chart generation guide docs to reflect ASCII-only"
+          done: true
+
+    - title: "Phase 4 - Delete Plotly tests and update remaining tests"
+      description: |
+        Remove test files that test Plotly-specific functionality. Update MCP visualization
+        tests to remove HTML format test cases. Verify ASCII test suite still passes.
+      items:
+        - description: "Delete tests/unit/visualization/test_charts.py (264 lines - tests Plotly chart classes)"
+          done: true
+        - description: "Delete tests/unit/visualization/test_result_plotter.py (385 lines - tests Plotly rendering)"
+          done: true
+        - description: "Delete tests/unit/visualization/test_styles.py (102 lines - tests Plotly themes)"
+          done: true
+        - description: "Delete tests/integration/visualization/test_visualization_export.py (50 lines - tests HTML export)"
+          done: true
+        - description: "Update tests/unit/mcp/test_visualization_tools.py - remove HTML format tests, Plotly import mock tests"
+          done: true
+        - description: "Update tests/unit/visualization/test_visualize_cli.py - remove HTML format test cases"
+          done: true
+        - description: "Verify tests/unit/visualization/ascii/test_ascii_charts.py passes unchanged"
+          done: true
+
+    - title: "Phase 5 - Cleanup orphaned references"
+      description: |
+        Search for any remaining references to Plotly, HTML charts, or removed modules
+        across the entire codebase. Clean up imports, docstrings, and documentation.
+      items:
+        - description: "Grep for 'plotly', 'html.*chart', 'go.Figure', 'pio.write', 'require_plotly' across codebase"
+          done: true
+        - description: "Check benchbox/core/dataframe/benchmark_suite.py for conditional Plotly imports"
+          done: true
+        - description: "Check benchbox/core/comparison/plotter.py for chart imports"
+          done: true
+        - description: "Update docs/visualization/chart-generation-guide.md"
+          done: true
+        - description: "Remove orphaned kaleido from venv if present (not in pyproject.toml but may be installed)"
+          done: true
+        - description: "Run full test suite to confirm zero regressions"
+          done: true
+
+must_preserve:
+  - "All 6 ASCII chart types (bar, histogram, heatmap, box, line, scatter) must remain fully functional"
+  - "ASCIIChartBase interface and render() -> str contract must not change"
+  - "MCP generate_chart tool must continue to work (ASCII format)"
+  - "MCP suggest_charts tool must continue to work (format-agnostic logic)"
+  - "ResultPlotter.from_sources() must continue loading and normalizing result JSON files"
+  - "NormalizedResult and NormalizedQuery dataclasses must be preserved (shared data loading)"
+  - "CLI benchbox visualize command must continue to work (ASCII output)"
+  - "tests/unit/visualization/ascii/test_ascii_charts.py (934 lines) must pass unchanged"
+  - "Chart templates (default, flagship, head_to_head, trends, cost_optimization) must work with ASCII"
+
+approach: |
+  Work outside-in: start by deleting the leaf Plotly files (charts.py, styles.py, dependencies.py)
+  that nothing else imports, then strip Plotly code from the shared files (result_plotter.py,
+  exporters.py, visualization.py) that have both Plotly and ASCII paths. After removal, unify the
+  data models by promoting ASCII models as canonical and refactoring ResultPlotter to produce them
+  directly. Finally simplify the MCP/CLI interface by removing format branching.
+
+  Key files to reference for understanding the current dual-path architecture:
+  - exporters.py:render_ascii_chart() - shows the conversion between Plotly and ASCII models
+  - mcp/tools/visualization.py - shows the format branching (HTML vs ASCII)
+  - charts.py - the Plotly chart classes that will be deleted entirely
+
+anti_patterns:
+  - "DO NOT delete result_plotter.py entirely - because it contains the data loading and normalization logic (from_sources,
+    NormalizedResult) that ASCII charts depend on"
+  - "DO NOT delete exporters.py entirely - because export_ascii() and render_ascii_chart() serve the ASCII path; only remove
+    export_figure() and Plotly imports"
+  - "DO NOT remove the chart template system (templates.py) - because templates are format-agnostic and drive which charts to
+    generate, not how to render them"
+  - "DO NOT break the MCP tool registration - because generate_chart must still work; just remove the HTML branch and simplify
+    the response model"
+  - "DO NOT leave 'plotly' in pyproject.toml extras - because orphaned optional deps confuse users and bloat installs"
+
+verification:
+  - description: "All ASCII chart tests pass unchanged"
+    command: "uv run -- python -m pytest tests/unit/visualization/ascii/ -v"
+    expected_output: "all tests pass, 0 failures"
+  - description: "MCP visualization tool tests pass"
+    command: "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py -v"
+    expected_output: "all tests pass (some removed, remaining pass)"
+  - description: "No references to plotly remain in source code"
+    command: "grep -r 'import plotly\\|from plotly\\|require_plotly' benchbox/ --include='*.py'"
+    expected_output: "no output (zero matches)"
+  - description: "plotly is not in any pyproject.toml dependency group"
+    command: "grep -c 'plotly' pyproject.toml"
+    expected_output: "0"
+  - description: "Full test suite passes"
+    command: "uv run -- python -m pytest -x -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Lint and type check clean"
+    command: "uv run ruff check benchbox/core/visualization/"
+    expected_output: "no lint errors"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/visualization/charts.py"
+    - "benchbox/core/visualization/styles.py"
+    - "benchbox/core/visualization/dependencies.py"
+    - "benchbox/core/visualization/result_plotter.py"
+    - "benchbox/core/visualization/exporters.py"
+    - "benchbox/core/visualization/__init__.py"
+    - "benchbox/core/visualization/templates.py"
+    - "benchbox/mcp/tools/visualization.py"
+    - "benchbox/cli/commands/visualize.py"
+    - "benchbox/core/dataframe/benchmark_suite.py"
+    - "benchbox/core/comparison/plotter.py"
+    - "tests/unit/visualization/test_charts.py"
+    - "tests/unit/visualization/test_result_plotter.py"
+    - "tests/unit/visualization/test_styles.py"
+    - "tests/unit/visualization/test_visualize_cli.py"
+    - "tests/unit/mcp/test_visualization_tools.py"
+    - "tests/integration/visualization/test_visualization_export.py"
+    - "pyproject.toml"
+    - "docs/visualization/chart-generation-guide.md"
+  do_not_modify:
+    - "benchbox/core/visualization/ascii/"
+    - "tests/unit/visualization/ascii/"
+
+files_affected:
+  removed:
+    - "benchbox/core/visualization/charts.py"
+    - "benchbox/core/visualization/styles.py"
+    - "benchbox/core/visualization/dependencies.py"
+    - "tests/unit/visualization/test_charts.py"
+    - "tests/unit/visualization/test_result_plotter.py"
+    - "tests/unit/visualization/test_styles.py"
+    - "tests/integration/visualization/test_visualization_export.py"
+  modified:
+    - "benchbox/core/visualization/result_plotter.py"
+    - "benchbox/core/visualization/exporters.py"
+    - "benchbox/core/visualization/__init__.py"
+    - "benchbox/mcp/tools/visualization.py"
+    - "benchbox/cli/commands/visualize.py"
+    - "benchbox/core/dataframe/benchmark_suite.py"
+    - "benchbox/core/comparison/plotter.py"
+    - "tests/unit/mcp/test_visualization_tools.py"
+    - "tests/unit/visualization/test_visualize_cli.py"
+    - "pyproject.toml"
+    - "docs/visualization/chart-generation-guide.md"
+
+dependencies:
+  blocks:
+    - "enhance-ascii-charting"
+  blocked_by: []
+  related:
+    - "enhance-ascii-charting"
+
+impact:
+  business_value: |
+    Eliminates a vestigial feature that adds maintenance burden without user value. Every
+    future chart type (comparison_bar, diverging_bar, summary_box) only needs one implementation
+    instead of two. Reduces optional dependency weight by 46 MB. Simplifies MCP tool responses
+    from file-path-vs-content branching to always-inline content.
+  user_impact: |
+    Users who installed benchbox[viz] or benchbox[mcp] get a lighter install. CLI and MCP
+    visualization continues to work identically (ASCII was already the functional path).
+    Users who generated HTML files (if any) lose that capability - mitigated by the fact that
+    no browser integration existed and files had to be manually located and opened.
+  technical_debt: |
+    Removes significant technical debt: the dual data model hierarchy, the conversion layer
+    in exporters.py, the format branching in MCP tools, and the three test files that skip
+    silently when plotly isn't installed. Net reduction of ~2,300 lines.
+
+context_sections:
+  - title: "Removal Scope Summary"
+    content: |
+      Source code: Delete 783 lines entirely (charts.py, styles.py, dependencies.py),
+      strip ~725 lines from shared files (result_plotter.py, exporters.py, visualization.py).
+      Tests: Delete 801 lines (4 test files), update 2 test files.
+      Config: Remove plotly from pyproject.toml viz/mcp extras.
+      Total: ~2,300 lines removed, 37% reduction in visualization module.
+
+  - title: "Evidence: HTML Charts Are Unused"
+    content: |
+      1. No webbrowser.open() or HTTP server in codebase - HTML files sit on disk
+      2. No CI workflow generates or validates HTML charts
+      3. MCP returns file paths for HTML (useless to LLMs) vs inline for ASCII (useful)
+      4. Blog workflow skill does not reference chart generation
+      5. HTML is the default format but CLI visualize is rarely invoked
+      6. Three Plotly test files use importorskip - they skip silently in minimal envs
+      7. Previous work (trim-viz-deps-plotly-only.yaml in DONE/) already removed kaleido,
+         signaling a trajectory toward lighter visualization deps
+
+  - title: "Data Model Unification Plan"
+    content: |
+      Current dual models:
+        Plotly: BarDatum, TimeSeriesPoint, CostPerformancePoint, DistributionSeries, QueryLatencyDatum
+        ASCII:  BarData, BoxPlotSeries, LinePoint, ScatterPoint, HistogramBar
+      After removal: Promote ASCII models as canonical. ResultPlotter produces them directly.
+      Conversion layer in exporters.py:render_ascii_chart() becomes unnecessary.
+      New chart types (from enhance-ascii-charting TODO) only need ASCII models.
+
+metadata:
+  created_date: "2026-02-06"
+  completed_date: "2026-02-06"
+  last_updated: "2026-02-06"
+  estimated_effort: "2-3 days"
+  tags:
+    - visualization
+    - plotly
+    - dependency-removal
+    - simplification
+    - architecture

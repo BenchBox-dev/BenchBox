@@ -1,0 +1,127 @@
+id: formalize-mcp-internal-apis
+title: "Promote 3 internal MCP API references to public exports"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-03-23"
+category: Packaging
+description: |
+  BenchBox's MCP server consumes 23+ core APIs. Most are already public, but
+  3 are internal module references that MCP imports directly:
+
+  | Symbol                      | Current location                        |
+  |-----------------------------|-----------------------------------------|
+  | TPCH_DATAFRAME_QUERIES      | benchbox.core.tpch.dataframe_queries    |
+  | TPCDS_DATAFRAME_QUERIES     | benchbox.core.tpcds.dataframe_queries   |
+  | DATAFRAME_PLATFORMS          | benchbox.platforms.dataframe             |
+
+  These should be promoted to public exports (re-exported from a stable
+  location like `benchbox.api` or `benchbox.__init__`) so MCP is not coupled
+  to internal module paths.
+
+  MCP is already gated behind an optional extra (`benchbox[mcp]`) and the
+  dependency direction is already one-way (MCP depends on core, core never
+  imports MCP). No distribution split is needed at this time.
+
+metadata:
+  tags:
+  - architecture
+  - packaging
+  - mcp
+  - scope-review
+  estimated_effort: "Small"
+  created_date: "2026-03-12"
+  source_review: "Orthogonal functionality review finding #5"
+
+future_state:
+  readme: "docs/design/future-state/formalize-mcp-internal-apis/README.md"
+
+impact:
+  user_impact: |
+    None. MCP behavior is unchanged. The optional extra install path remains
+    `benchbox[mcp]`.
+  maintainer_impact: |
+    MCP code references stable public exports instead of reaching into
+    internal module paths. Future internal refactors won't break MCP imports.
+  packaging_impact: |
+    No new packages, no dependency changes. A few re-exports are added to
+    a public API surface.
+  regression_risk: |
+    Low. This is adding re-exports and updating import paths - no behavior
+    change.
+
+justification: |
+  The 3 internal references are the only fragile coupling point between MCP
+  and core. Promoting them to public exports is a small change that reduces
+  fragility regardless of whether a distribution split ever happens.
+
+cost_benefit_analysis:
+  expected_benefits: |
+    High relative to cost. Decouples MCP from internal module layout with
+    minimal effort. Makes future refactoring of core internals safe for MCP.
+  expected_costs: |
+    Trivial. Add 3 re-exports, update 3 import statements in MCP code, add
+    a test asserting the exports exist.
+  recommendation: |
+    Proceed when convenient. A distribution split should wait until post-v1.0
+    when APIs are stable and release cadence may diverge.
+
+files_affected:
+  modified:
+  - "benchbox/__init__.py"
+  - "benchbox/mcp/tools/benchmark.py"
+  - "tests/unit/cli/test_cli_package_exports.py"
+
+work:
+- id: w1
+  summary: "Add 3 public re-exports and update MCP imports"
+  status: done
+  notes: |
+    Re-export TPCH_DATAFRAME_QUERIES, TPCDS_DATAFRAME_QUERIES, and
+    DATAFRAME_PLATFORMS from a public API surface (e.g. benchbox/__init__.py
+    or a new benchbox/api.py). Update benchbox/mcp/ imports to use the
+    public path.
+
+- id: w2
+  summary: "Add a test asserting the 3 symbols are public exports"
+  needs: [w1]
+  status: done
+  notes: |
+    Add assertions in test_cli_package_exports.py (or a new test) that
+    verify the 3 symbols are importable from the public location.
+
+must_preserve:
+- "MCP server behavior and schema semantics unchanged"
+- "Core benchmark execution unaffected"
+- "benchbox[mcp] optional extra install path unchanged"
+
+approach: |
+  Add re-exports, update imports, add a test. No new packages, no
+  compatibility shims, no distribution split.
+
+anti_patterns:
+- "DO NOT split MCP into a separate distribution at this stage - APIs are not stable (v0.1.5, alpha)"
+- "DO NOT add backwards-compatibility shims for the old internal import paths - MCP is the only consumer"
+- "DO NOT change MCP schemas or prompt contracts as part of this work"
+
+verification:
+- description: "MCP tests still pass with updated imports"
+  command: "uv run -- python -m pytest tests/unit/mcp/ -q"
+  expected_output: "All tests pass"
+- description: "Public exports test confirms the 3 symbols are accessible"
+  command: "uv run -- python -m pytest tests/unit/cli/test_cli_package_exports.py -q"
+  expected_output: "All tests pass"
+- description: "Core CLI and documentation tests unaffected"
+  command: "uv run -- python -m pytest tests/unit/test_cli_documentation.py -q"
+  expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+  - "benchbox/__init__.py"
+  - "benchbox/mcp/tools/benchmark.py"
+  - "tests/unit/cli/test_cli_package_exports.py"
+  - "tests/unit/mcp/"
+  do_not_touch:
+  - "MCP server bootstrap, schemas, or prompt contracts"
+  - "Core benchmark implementations"
+  - "pyproject.toml entry points or extras"

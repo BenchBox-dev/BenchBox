@@ -1,0 +1,758 @@
+id: acl-benchmark-enhancement
+title: Enhance Metadata Primitives with Access Control (ACL) Performance Testing
+priority: Medium
+status: Completed
+completed: 2025-12-05
+created: 2024-12-05
+estimated_effort: large
+tags:
+- metadata-primitives
+- benchmark
+- access-control
+- acl
+- security
+description: 'Extend the Metadata Primitives benchmark to measure performance of access control
+
+  metadata operations. This includes:
+
+
+  1. Performance of ADDING access controls (GRANT/REVOKE execution timing)
+
+  2. Performance of QUERYING access controls (reading privilege metadata)
+
+
+  NOT in scope: Performance of data read/write operations subject to ACLs.
+
+
+  The goal is to understand how ACL complexity (number of roles, grants, hierarchy depth)
+
+  affects metadata introspection performance across different database platforms.
+
+  '
+motivation: 'Access control metadata is critical for:
+
+  - Data governance and compliance workflows
+
+  - Security auditing and permission reviews
+
+  - Data catalog permission discovery
+
+  - IDE/tool integration for permission-aware autocomplete
+
+  - Role-based access control (RBAC) administration tools
+
+
+  As organizations scale their data platforms, ACL metadata can grow to millions of
+
+  permission records. Understanding how this affects metadata query performance
+
+  helps identify platforms suitable for large-scale governance deployments.
+
+  '
+platform_support:
+  postgresql:
+    tier: 1
+    grant_revoke: true
+    table_privileges: true
+    column_privileges: true
+    role_hierarchy: true
+    native_tables:
+    - pg_roles
+    - pg_auth_members
+    - pg_default_acl
+    - pg_namespace
+    - information_schema.table_privileges
+    - information_schema.column_privileges
+    notes: 'Most comprehensive ACL metadata support; gold standard for implementation.
+
+      Full SQL-standard GRANT/REVOKE plus rich pg_* catalog tables.
+
+      Supports row-level security (RLS) policies.
+
+      '
+  redshift:
+    tier: 1
+    grant_revoke: true
+    table_privileges: true
+    column_privileges: true
+    role_hierarchy: true
+    native_tables:
+    - SVV_RELATION_PRIVILEGES
+    - SVV_COLUMN_PRIVILEGES
+    - SVV_SCHEMA_PRIVILEGES
+    - SVV_DEFAULT_PRIVILEGES
+    - SVV_DATASHARE_PRIVILEGES
+    functions:
+    - HAS_TABLE_PRIVILEGE()
+    - HAS_SCHEMA_PRIVILEGE()
+    notes: 'Amazon Redshift provides comprehensive SVV_* views for privilege metadata.
+
+      Does NOT use standard INFORMATION_SCHEMA.table_privileges.
+
+      Full GRANT/REVOKE support with PostgreSQL-like syntax.
+
+      Includes data sharing privilege tracking.
+
+      '
+  firebolt:
+    tier: 1
+    grant_revoke: true
+    table_privileges: true
+    column_privileges: false
+    role_hierarchy: true
+    native_tables:
+    - information_schema.object_privileges
+    notes: 'Firebolt has full GRANT/REVOKE with SQL syntax.
+
+      information_schema.object_privileges shows all granted permissions.
+
+      Supports GRANT ALL ON ACCOUNT for comprehensive role setup.
+
+      Role-based access control with hierarchical inheritance.
+
+      '
+  synapse:
+    tier: 1
+    grant_revoke: true
+    table_privileges: true
+    column_privileges: true
+    role_hierarchy: true
+    native_tables:
+    - sys.database_permissions
+    - sys.server_permissions
+    - sys.database_principals
+    - sys.server_principals
+    functions:
+    - sys.fn_my_permissions()
+    notes: 'Azure Synapse Analytics uses T-SQL GRANT/DENY/REVOKE syntax.
+
+      Full sys.database_permissions for querying granted permissions.
+
+      Supports column-level and row-level security.
+
+      Note: Use sp_addrolemember/sp_droprolemember instead of ALTER ROLE.
+
+      '
+  fabric:
+    tier: 1
+    grant_revoke: true
+    table_privileges: true
+    column_privileges: true
+    role_hierarchy: true
+    native_tables:
+    - sys.database_permissions
+    - sys.database_principals
+    functions:
+    - sys.fn_my_permissions()
+    notes: 'Microsoft Fabric Warehouse supports T-SQL GRANT/REVOKE/DENY.
+
+      Users auto-created on first GRANT (no explicit CREATE USER).
+
+      Requires Fabric Read permission at workspace level for connection.
+
+      Supports column-level security (CLS) and row-level security (RLS).
+
+      '
+  databricks:
+    tier: 2
+    grant_revoke: true
+    table_privileges: true
+    column_privileges: true
+    role_hierarchy: true
+    native_tables:
+    - system.information_schema.table_privileges
+    - system.information_schema.column_privileges
+    notes: 'Databricks Unity Catalog provides comprehensive ACL metadata.
+
+      REQUIRES Unity Catalog enabled workspace - non-UC workspaces have NO ACL support.
+
+      Standard SQL GRANT/REVOKE syntax on Unity Catalog objects.
+
+      Legacy Hive metastore workspaces lack privilege introspection.
+
+      '
+  clickhouse:
+    tier: 2
+    grant_revoke: true
+    table_privileges: false
+    column_privileges: false
+    role_hierarchy: true
+    native_tables:
+    - system.grants
+    - system.roles
+    - system.role_grants
+    - system.users
+    - system.privileges
+    notes: 'ClickHouse server mode has GRANT/REVOKE and system.* tables for ACL metadata.
+
+      Local/embedded mode has very limited ACL support.
+
+      No standard INFORMATION_SCHEMA privilege views - must use system.grants.
+
+      Row-level security via row policies supported.
+
+      '
+  snowflake:
+    tier: 2
+    grant_revoke: true
+    table_privileges: show_grants_only
+    column_privileges: show_grants_only
+    role_hierarchy: true
+    native_tables:
+    - ACCOUNT_USAGE.GRANTS_TO_ROLES
+    - ACCOUNT_USAGE.GRANTS_TO_USERS
+    - SNOWFLAKE.ACCOUNT_USAGE.ACCESS_HISTORY
+    commands:
+    - SHOW GRANTS ON <object>
+    - SHOW GRANTS TO ROLE <role>
+    - SHOW GRANTS OF ROLE <role>
+    notes: 'Snowflake uses SHOW GRANTS commands - NOT queryable INFORMATION_SCHEMA views.
+
+      ACCOUNT_USAGE schema provides queryable grant history but requires ACCOUNTADMIN.
+
+      Role-centric model: permissions granted to roles, roles granted to users.
+
+      May need special handling for SHOW command result sets.
+
+      '
+  trino:
+    tier: 2
+    grant_revoke: true
+    table_privileges: false
+    column_privileges: false
+    role_hierarchy: true
+    native_tables: []
+    commands:
+    - SHOW GRANTS
+    notes: 'Trino supports GRANT/REVOKE but implementation is connector-dependent.
+
+      Some connectors have no support for GRANT/REVOKE.
+
+      File-based access control as alternative (rules in JSON/YAML config).
+
+      No INFORMATION_SCHEMA privilege views - use SHOW GRANTS.
+
+      Column-level GRANT/REVOKE is an open feature request (#4328).
+
+      '
+  presto:
+    tier: 2
+    grant_revoke: true
+    table_privileges: false
+    column_privileges: false
+    role_hierarchy: true
+    native_tables: []
+    notes: 'PrestoDB (original Presto) has similar ACL support to Trino.
+
+      GRANT/REVOKE on tables with DELETE, INSERT, SELECT privileges.
+
+      System access control via plugins (file-based rules).
+
+      Schema ownership rules for DROP/ALTER/CREATE SCHEMA.
+
+      Known issue: GRANT to PUBLIC role may not work correctly (#6688).
+
+      '
+  bigquery:
+    tier: 3
+    grant_revoke: partial
+    table_privileges: dataset_scoped
+    column_privileges: false
+    role_hierarchy: iam_based
+    native_tables:
+    - INFORMATION_SCHEMA.OBJECT_PRIVILEGES
+    notes: 'BigQuery uses Google Cloud IAM for primary access control.
+
+      In-database GRANT/REVOKE limited to dataset scope.
+
+      INFORMATION_SCHEMA.OBJECT_PRIVILEGES only shows dataset-level grants.
+
+      Full ACL introspection requires Cloud Resource Manager API calls.
+
+      Not suitable for SQL-based ACL benchmarking.
+
+      '
+  athena:
+    tier: 3
+    grant_revoke: false
+    table_privileges: false
+    column_privileges: false
+    role_hierarchy: false
+    native_tables: []
+    external_acl: AWS Lake Formation
+    notes: 'AWS Athena has NO SQL GRANT/REVOKE - uses Lake Formation for permissions.
+
+      Lake Formation permissions managed via AWS Console/CLI/API, not SQL.
+
+      Valid permissions: SELECT, ALTER, DROP, DELETE, INSERT, DESCRIBE, etc.
+
+      Third-party tools like ''lakecli'' provide SQL-like GRANT syntax wrapper.
+
+      Not suitable for SQL-based ACL benchmarking.
+
+      '
+  duckdb:
+    tier: 4
+    grant_revoke: basic
+    table_privileges: false
+    column_privileges: false
+    role_hierarchy: basic
+    native_tables: []
+    notes: 'DuckDB has basic GRANT/REVOKE syntax but NO privilege introspection.
+
+      No INFORMATION_SCHEMA.table_privileges or equivalent.
+
+      No system tables/functions to query granted permissions.
+
+      Can test GRANT/REVOKE execution timing only, not introspection queries.
+
+      ACL introspection queries must return empty or be skipped.
+
+      '
+  sqlite:
+    tier: 4
+    grant_revoke: false
+    table_privileges: false
+    column_privileges: false
+    role_hierarchy: false
+    native_tables: []
+    notes: 'SQLite has NO access control - no GRANT/REVOKE support.
+
+      Security delegated to OS file permissions.
+
+      Encryption provides all-or-nothing access control.
+
+      Application-level RBAC must be implemented in code.
+
+      SKIP all ACL testing on SQLite.
+
+      '
+  datafusion:
+    tier: 4
+    grant_revoke: false
+    table_privileges: false
+    column_privileges: false
+    role_hierarchy: false
+    native_tables: []
+    notes: 'Apache DataFusion is a query engine library, not a database.
+
+      NO built-in access control, GRANT/REVOKE, or privilege metadata.
+
+      Security must be implemented in the embedding application.
+
+      SKIP all ACL testing on DataFusion.
+
+      '
+  spark:
+    tier: 4
+    grant_revoke: false
+    table_privileges: false
+    column_privileges: false
+    role_hierarchy: false
+    native_tables: []
+    external_acl: Apache Ranger, Hive Authorization
+    notes: 'Native Apache Spark SQL has NO GRANT/REVOKE support (JIRA SPARK-32498).
+
+      Must use external authorization: Hive SQL-Standard Authorization, Apache Ranger.
+
+      spark-authorizer plugin enables Hive-style GRANT/REVOKE.
+
+      Databricks Spark uses Unity Catalog (see databricks entry).
+
+      For standalone Spark: SKIP ACL testing or require Ranger/Hive integration.
+
+      '
+  polars:
+    tier: 4
+    grant_revoke: false
+    table_privileges: false
+    column_privileges: false
+    role_hierarchy: false
+    native_tables: []
+    notes: 'Polars SQL mode is an in-memory query engine, not a database.
+
+      NO access control concepts - all data accessible to the process.
+
+      SKIP all ACL testing on Polars.
+
+      '
+phases:
+- phase: 1
+  name: ACL Query Category
+  description: Add read-only queries for privilege metadata introspection
+  tasks:
+  - task: Add acl_introspection category to queries.yaml
+    files:
+    - benchbox/core/metadata_primitives/catalog/queries.yaml
+    queries:
+    - id: acl_table_privileges_list
+      description: List all table-level privileges
+      sql: SELECT grantee, table_schema, table_name, privilege_type, is_grantable FROM information_schema.table_privileges
+      variants_needed:
+      - clickhouse
+      - snowflake
+      - bigquery
+    - id: acl_table_privileges_filtered
+      description: Privileges for benchbox_* tables only
+      sql: '... WHERE table_name LIKE ''benchbox_%'''
+    - id: acl_privilege_count_by_type
+      description: Count privileges grouped by type (SELECT, INSERT, etc.)
+    - id: acl_grantee_count_per_table
+      description: Count distinct grantees per table
+    - id: acl_privileged_tables_summary
+      description: Summary of tables with explicit grants
+    - id: acl_column_privileges_list
+      description: Column-level privileges (where supported)
+      skip_on:
+      - duckdb
+      - clickhouse
+    - id: acl_role_list
+      description: List all roles/users
+      variants_needed:
+      - all_platforms
+    - id: acl_role_membership
+      description: Role hierarchy - which roles contain which
+      skip_on:
+      - duckdb
+      - bigquery
+    - id: acl_effective_permissions
+      description: Resolved permissions considering role inheritance
+      skip_on:
+      - duckdb
+      - bigquery
+    - id: acl_permission_matrix
+      description: 'Cross-tabulation: objects × grantees × permission types'
+  - task: Add acl_search category for permission discovery patterns
+    queries:
+    - id: acl_find_tables_with_grants
+      description: Find all tables that have any explicit grants
+    - id: acl_find_grantees_for_pattern
+      description: Find who has access to tables matching pattern
+    - id: acl_find_admin_grants
+      description: Find grants with is_grantable=YES (admin rights)
+  - task: Update query manager to handle new category
+    files:
+    - benchbox/core/metadata_primitives/queries.py
+- phase: 2
+  name: ACL Complexity Configuration
+  description: Extend complexity config with ACL parameters
+  tasks:
+  - task: Add ACL enums to complexity.py
+    files:
+    - benchbox/core/metadata_primitives/complexity.py
+    code_additions: "class PermissionDensity(Enum):\n    \"\"\"Density of permissions per object.\"\"\"\n    NONE = \"none\"\
+      \           # No ACL testing\n    SPARSE = \"sparse\"       # 1-2 grants per table\n    MODERATE = \"moderate\"   #\
+      \ 5-10 grants per table\n    DENSE = \"dense\"         # 20+ grants per table\n\nclass RoleHierarchyDepth(Enum):\n \
+      \   \"\"\"Depth of role inheritance chains.\"\"\"\n    FLAT = \"flat\"           # No role nesting\n    SHALLOW = \"\
+      shallow\"     # 2 levels (role -> user)\n    MODERATE = \"moderate\"   # 3-4 levels\n    DEEP = \"deep\"           #\
+      \ 5+ levels\n"
+  - task: Extend MetadataComplexityConfig with ACL fields
+    code_additions: "@dataclass\nclass MetadataComplexityConfig:\n    # ... existing fields ...\n\n    # ACL complexity settings\n\
+      \    acl_role_count: int = 0                    # Number of test roles (0 = skip ACL)\n    acl_permission_density: PermissionDensity\
+      \ = PermissionDensity.NONE\n    acl_hierarchy_depth: RoleHierarchyDepth = RoleHierarchyDepth.FLAT\n    acl_column_grants:\
+      \ bool = False           # Include column-level grants\n    acl_grant_with_grant_option: bool = False # Include WITH\
+      \ GRANT OPTION\n"
+  - task: Update validation and serialization
+    details: '- Add validation for new fields in __post_init__
+
+      - Update to_dict() and from_dict() methods
+
+      - Update GeneratedMetadata to track created roles/grants
+
+      '
+- phase: 3
+  name: ACL Generator Implementation
+  description: Extend MetadataGenerator to create ACL structures
+  tasks:
+  - task: Add platform capability checks for ACL
+    files:
+    - benchbox/core/metadata_primitives/ddl.py
+    code_additions: "def supports_acl_introspection(dialect: str) -> bool:\n    \"\"\"Check if platform supports queryable\
+      \ ACL metadata.\"\"\"\n    return dialect.lower() not in [\"duckdb\"]\n\ndef supports_role_hierarchy(dialect: str) ->\
+      \ bool:\n    \"\"\"Check if platform supports role-to-role grants.\"\"\"\n    return dialect.lower() in [\"postgresql\"\
+      , \"clickhouse\", \"snowflake\", \"databricks\"]\n\ndef supports_column_grants(dialect: str) -> bool:\n    \"\"\"Check\
+      \ if platform supports column-level privileges.\"\"\"\n    return dialect.lower() in [\"postgresql\", \"snowflake\"\
+      , \"databricks\"]\n"
+  - task: Implement role generation in MetadataGenerator
+    files:
+    - benchbox/core/metadata_primitives/generator.py
+    methods:
+    - name: _generate_acl_roles
+      description: Create test roles with benchbox_role_* naming
+      sql_patterns:
+        postgresql: CREATE ROLE benchbox_role_{i}
+        clickhouse: CREATE ROLE benchbox_role_{i}
+        snowflake: CREATE ROLE benchbox_role_{i}
+        bigquery: null
+        databricks: CREATE ROLE benchbox_role_{i}
+        duckdb: CREATE ROLE benchbox_role_{i}
+    - name: _generate_acl_grants
+      description: Grant permissions to roles based on density config
+      logic: "For each table in generated.tables:\n    For i in range(grants_per_table):\n        role = roles[i % len(roles)]\n\
+        \        permissions = select_permissions_for_density(config.acl_permission_density)\n        GRANT {permissions}\
+        \ ON {table} TO {role}\n"
+    - name: _generate_role_hierarchy
+      description: Create role inheritance chains
+      logic: "Based on acl_hierarchy_depth:\n    FLAT: No nesting\n    SHALLOW: parent_role -> child_role\n    MODERATE: grandparent\
+        \ -> parent -> child\n    DEEP: 5+ level chains\n"
+    - name: _generate_column_grants
+      description: Grant column-level permissions (where supported)
+      skip_on:
+      - duckdb
+      - clickhouse
+      - bigquery
+  - task: Implement ACL cleanup in teardown
+    methods:
+    - name: _cleanup_acl_grants
+      description: REVOKE all benchbox_* grants
+      order: Must run before role cleanup
+    - name: _cleanup_acl_roles
+      description: DROP all benchbox_role_* roles
+      order: Must run after grant cleanup
+  - task: Update GeneratedMetadata to track ACL objects
+    code_additions: "@dataclass\nclass GeneratedMetadata:\n    # ... existing fields ...\n    roles: list[str] = field(default_factory=list)\n\
+      \    grants: list[dict[str, Any]] = field(default_factory=list)  # {grantee, object, privileges}\n"
+- phase: 4
+  name: GRANT/REVOKE Timing Measurement
+  description: Measure execution time of ACL mutation operations
+  tasks:
+  - task: Add ACL mutation timing to benchmark
+    files:
+    - benchbox/core/metadata_primitives/benchmark.py
+    methods:
+    - name: measure_grant_performance
+      description: Time individual GRANT operations
+      returns: "AclMutationResult:\n    operation: str  # \"GRANT\" or \"REVOKE\"\n    target_type: str  # \"table\", \"column\"\
+        , \"role\"\n    execution_time_ms: float\n    success: bool\n"
+    - name: measure_bulk_grant_performance
+      description: Time bulk GRANT operations
+      metrics:
+      - grants_per_second
+      - avg_grant_time_ms
+      - total_grants
+      - total_time_ms
+    - name: measure_revoke_performance
+      description: Time REVOKE operations (cleanup baseline)
+  - task: Add result dataclasses for ACL timing
+    code_additions: "@dataclass\nclass AclMutationResult:\n    \"\"\"Result of a single GRANT/REVOKE operation.\"\"\"\n  \
+      \  operation: str\n    target_type: str\n    execution_time_ms: float\n    success: bool\n    error: str | None = None\n\
+      \n@dataclass\nclass AclBenchmarkResult:\n    \"\"\"Results from ACL benchmark run.\"\"\"\n    setup_time_ms: float\n\
+      \    teardown_time_ms: float\n    introspection_results: MetadataBenchmarkResult\n    mutation_results: list[AclMutationResult]\n\
+      \    summary: dict[str, Any]\n"
+- phase: 5
+  name: ACL Complexity Presets
+  description: Add predefined presets for ACL testing scenarios
+  tasks:
+  - task: Add ACL-focused presets to COMPLEXITY_PRESETS
+    presets:
+      acl_minimal:
+        description: Light ACL testing - 5 roles, sparse grants
+        config:
+          width_factor: 20
+          catalog_size: 10
+          acl_role_count: 5
+          acl_permission_density: sparse
+          acl_hierarchy_depth: flat
+      acl_moderate:
+        description: Moderate ACL complexity - 20 roles, role hierarchy
+        config:
+          width_factor: 30
+          catalog_size: 50
+          acl_role_count: 20
+          acl_permission_density: moderate
+          acl_hierarchy_depth: shallow
+      acl_complex:
+        description: Complex ACL structures - 50 roles, deep hierarchy
+        config:
+          width_factor: 50
+          catalog_size: 100
+          acl_role_count: 50
+          acl_permission_density: dense
+          acl_hierarchy_depth: moderate
+          acl_column_grants: true
+      acl_stress:
+        description: Stress test - 100+ roles, maximum complexity
+        config:
+          width_factor: 100
+          catalog_size: 200
+          acl_role_count: 100
+          acl_permission_density: dense
+          acl_hierarchy_depth: deep
+          acl_column_grants: true
+          acl_grant_with_grant_option: true
+  - task: Update get_complexity_preset() for new presets
+  - task: Update _get_complexity_categories() to include acl categories
+- phase: 6
+  name: Testing & Documentation
+  description: Unit tests, integration tests, and documentation
+  tasks:
+  - task: Add unit tests for ACL complexity config
+    files:
+    - tests/unit/core/metadata_primitives/test_metadata_complexity.py
+    tests:
+    - test_acl_config_validation
+    - test_acl_config_serialization
+    - test_acl_presets_exist
+  - task: Add integration tests for ACL generation
+    files:
+    - tests/integration/test_metadata_acl_duckdb.py
+    tests:
+    - test_role_creation
+    - test_grant_generation
+    - test_acl_cleanup
+    - test_acl_query_execution
+    notes: 'DuckDB tests will be limited due to ACL introspection limitations.
+
+      Focus on testing GRANT/REVOKE execution and cleanup.
+
+      '
+  - task: Add PostgreSQL ACL integration tests (if available)
+    files:
+    - tests/integration/test_metadata_acl_postgresql.py
+    tests:
+    - test_full_acl_introspection
+    - test_role_hierarchy_queries
+    - test_column_privileges
+    markers:
+    - postgresql
+    - requires_admin
+  - task: Update benchmark documentation
+    files:
+    - docs/benchmarks/metadata-primitives.md
+    content:
+    - ACL testing overview
+    - Platform support matrix
+    - Preset descriptions
+    - Example usage
+queries_to_add:
+  acl_introspection:
+  - id: acl_table_privileges_list
+    sql: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type,\n    is_grantable\nFROM information_schema.table_privileges\n\
+      WHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nORDER BY table_name, grantee, privilege_type\n"
+    variants:
+      clickhouse: "SELECT\n    user_name AS grantee,\n    database AS table_schema,\n    table AS table_name,\n    access_type\
+        \ AS privilege_type,\n    grant_option AS is_grantable\nFROM system.grants\nWHERE database != 'system'\nORDER BY table,\
+        \ user_name, access_type\n"
+      duckdb: "-- DuckDB lacks TABLE_PRIVILEGES; return empty result set\nSELECT\n    CAST(NULL AS VARCHAR) AS grantee,\n\
+        \    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(NULL AS VARCHAR) AS\
+        \ privilege_type,\n    CAST(NULL AS VARCHAR) AS is_grantable\nWHERE 1=0\n"
+  - id: acl_role_list
+    sql: 'SELECT DISTINCT grantee AS role_name
+
+      FROM information_schema.table_privileges
+
+      ORDER BY grantee
+
+      '
+    variants:
+      postgresql: 'SELECT rolname AS role_name, rolsuper, rolcreatedb, rolcreaterole
+
+        FROM pg_roles
+
+        WHERE rolname NOT LIKE ''pg_%''
+
+        ORDER BY rolname
+
+        '
+      clickhouse: 'SELECT name AS role_name
+
+        FROM system.roles
+
+        ORDER BY name
+
+        '
+      snowflake: 'SHOW ROLES
+
+        '
+      duckdb: '-- DuckDB: no role introspection available
+
+        SELECT CAST(NULL AS VARCHAR) AS role_name WHERE 1=0
+
+        '
+  - id: acl_role_membership
+    sql: "-- PostgreSQL pattern (standard)\nSELECT\n    r.rolname AS role_name,\n    m.rolname AS member_name\nFROM pg_auth_members\
+      \ am\nJOIN pg_roles r ON am.roleid = r.oid\nJOIN pg_roles m ON am.member = m.oid\nORDER BY r.rolname, m.rolname\n"
+    skip_on:
+    - duckdb
+    - bigquery
+    variants:
+      clickhouse: "SELECT\n    role_name,\n    granted_role_name AS member_name\nFROM system.role_grants\nORDER BY role_name,\
+        \ granted_role_name\n"
+  - id: acl_privilege_count_by_type
+    sql: "SELECT\n    privilege_type,\n    COUNT(*) AS grant_count\nFROM information_schema.table_privileges\nWHERE table_schema\
+      \ NOT IN ('information_schema', 'pg_catalog')\nGROUP BY privilege_type\nORDER BY grant_count DESC\n"
+  - id: acl_grantee_count_per_table
+    sql: "SELECT\n    table_name,\n    COUNT(DISTINCT grantee) AS grantee_count\nFROM information_schema.table_privileges\n\
+      WHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_name\nORDER BY grantee_count DESC\nLIMIT\
+      \ 20\n"
+  - id: acl_tables_with_grants
+    sql: "SELECT DISTINCT\n    table_schema,\n    table_name,\n    COUNT(*) AS total_grants\nFROM information_schema.table_privileges\n\
+      WHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_schema, table_name\nORDER BY total_grants\
+      \ DESC\n"
+  - id: acl_column_privileges_list
+    sql: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    column_name,\n    privilege_type\nFROM information_schema.column_privileges\n\
+      WHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nORDER BY table_name, column_name, grantee\n"
+    skip_on:
+    - duckdb
+    - clickhouse
+    - bigquery
+success_criteria:
+- All ACL introspection queries run successfully on PostgreSQL
+- ACL queries gracefully skip or return empty on unsupported platforms
+- Role/grant generation creates correct structures
+- Cleanup properly removes all benchbox_role_* and grants
+- GRANT/REVOKE timing measurements are accurate (< 1ms variance)
+- Integration tests pass on DuckDB (limited scope)
+- No privilege escalation or security issues introduced
+- Documentation covers platform-specific limitations
+risks:
+- risk: ACL operations require admin privileges on some platforms
+  mitigation: '- Use test-specific roles where possible
+
+    - Document privilege requirements
+
+    - Skip tests when insufficient privileges detected
+
+    '
+- risk: ACL changes persist and affect concurrent sessions
+  mitigation: '- Use unique prefixes (benchbox_role_*, benchbox_grant_*)
+
+    - Implement thorough cleanup in teardown
+
+    - Run ACL tests in isolated database/schema
+
+    '
+- risk: Platform ACL implementations vary significantly
+  mitigation: '- Use skip_on for unsupported features
+
+    - Provide platform-specific variants
+
+    - Document what works where in platform support matrix
+
+    '
+- risk: SHOW GRANTS (Snowflake) not queryable like standard SQL
+  mitigation: '- May need special handling or skip Snowflake ACL queries
+
+    - Consider using ACCOUNT_USAGE.GRANTS_* tables instead
+
+    '
+dependencies:
+- Metadata Primitives complexity testing (Phase 1) - COMPLETE
+- MetadataGenerator infrastructure - COMPLETE
+- Query variant system - COMPLETE
+blocked_by: []
+acceptance_tests:
+- name: ACL introspection queries execute on PostgreSQL
+  command: "uv run benchbox run --platform postgresql --benchmark metadata_primitives \\\n  --scale 1 --queries \"acl_table_privileges_list,acl_role_list\"\
+    \n"
+  expected: All queries complete successfully
+- name: ACL complexity preset runs
+  command: "uv run python -c \"\nfrom benchbox.core.metadata_primitives import (\n    MetadataPrimitivesBenchmark, get_complexity_preset\n\
+    )\nimport duckdb\nconn = duckdb.connect(':memory:')\nbenchmark = MetadataPrimitivesBenchmark()\nresult = benchmark.run_complexity_benchmark(conn,\
+    \ 'duckdb', 'acl_minimal')\nprint(f'Setup time: {result.setup_time_ms:.1f}ms')\nprint(f'Roles created: {len(result.generated_metadata.roles)}')\n\
+    \"\n"
+  expected: 'Roles created: 5'
+- name: ACL dry run shows queries
+  command: "uv run benchbox run --platform databricks --benchmark metadata_primitives \\\n  --dry-run /tmp/acl_dryrun\n"
+  expected: ACL queries appear in preview
+worktree: metadata-primitives

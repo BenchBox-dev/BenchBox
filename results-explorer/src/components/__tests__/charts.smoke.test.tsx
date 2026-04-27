@@ -1,0 +1,353 @@
+/**
+ * Smoke tests for the 10 chart components added by
+ * explorer-close-chart-type-coverage-gaps.
+ *
+ * Each chart is tested for:
+ *   (a) empty data - renders null or an empty-state message without throwing
+ *   (b) realistic data - renders an <svg> or <table> without throwing
+ *
+ * Math correctness is already covered by the parity suite
+ * (src/__tests__/parity/chartMath.parity.test.ts); these tests only guard
+ * against rendering regressions (null-dereferences, layout crashes).
+ */
+
+import { render } from "@testing-library/preact";
+import { describe, it, expect } from "vitest";
+import type { BenchmarkSummary, PlatformRow } from "@/types";
+import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
+
+import { PercentileLadder } from "@/components/PercentileLadder";
+import { CDFChart } from "@/components/CDFChart";
+import { RankTable } from "@/components/RankTable";
+import { DistributionBox } from "@/components/DistributionBox";
+import { QueryHistogram } from "@/components/QueryHistogram";
+import { PowerBar } from "@/components/PowerBar";
+import { StackedPhase } from "@/components/StackedPhase";
+import { TimeSeries } from "@/components/TimeSeries";
+import { CostScatter } from "@/components/CostScatter";
+import { SparklineTable } from "@/components/SparklineTable";
+
+function makePlatform(
+  overrides: Partial<PlatformRow> = {},
+): PlatformRow {
+  return {
+    result_id: "r1",
+    short_id: "",
+    platform_id: "duckdb",
+    platform: "DuckDB",
+    platform_version: null,
+    tuning_mode: null,
+    tuning_hash: null,
+    execution_mode: null,
+    trust_label: "maintainer-run",
+    run_date: "2026-04-01",
+    is_ranking_eligible: true,
+    power_score: 3000,
+    display_geomean_ms: 12,
+    sample_geomean_ms: 12,
+    cost_usd: null,
+    compliance_class: null,
+    percentile_stats: null,
+    phase_durations: null,
+    timings: { Q1: 10, Q2: 20, Q3: 30 },
+    ...overrides,
+  };
+}
+
+function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummary {
+  return {
+    benchmark: "tpch",
+    scale_factor: 0.1,
+    phase: "power",
+    query_ids: ["Q1", "Q2", "Q3"],
+    platforms: [
+      makePlatform({ result_id: "r1", platform_id: "duckdb", platform: "DuckDB" }),
+      makePlatform({
+        result_id: "r2",
+        platform_id: "sqlite",
+        platform: "SQLite",
+        power_score: 1500,
+        display_geomean_ms: 25,
+        timings: { Q1: 20, Q2: 40, Q3: 60 },
+      }),
+    ],
+    cell_reduction: "median",
+    ranking: null,
+    ...overrides,
+  };
+}
+
+function emptySummary(): BenchmarkSummary {
+  return makeSummary({ platforms: [], query_ids: [] });
+}
+
+// ---------------------------------------------------------------------------
+// PercentileLadder
+// ---------------------------------------------------------------------------
+
+describe("PercentileLadder", () => {
+  it("renders nothing when given no rows", () => {
+    const { container } = render(<PercentileLadder rows={[]} />);
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("renders an svg when given percentile rows", () => {
+    const { container } = render(
+      <PercentileLadder
+        rows={[
+          {
+            platform: "DuckDB",
+            percentile_stats: { p50: 10, p90: 25, p95: 40, p99: 90 },
+          },
+        ]}
+      />,
+    );
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CDFChart
+// ---------------------------------------------------------------------------
+
+describe("CDFChart", () => {
+  it("renders nothing for empty summary", () => {
+    const { container } = render(<CDFChart summary={emptySummary()} />);
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("renders an svg for a populated summary", () => {
+    const { container } = render(<CDFChart summary={makeSummary()} />);
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RankTable
+// ---------------------------------------------------------------------------
+
+describe("RankTable", () => {
+  it("renders nothing when platforms are empty", () => {
+    const { container } = render(<RankTable summary={emptySummary()} />);
+    expect(container.querySelector("table")).toBeNull();
+  });
+
+  it("assigns 1st/2nd rank per query and shows win counts", () => {
+    const { container } = render(<RankTable summary={makeSummary()} />);
+    const table = container.querySelector("table");
+    expect(table).not.toBeNull();
+    expect(table!.textContent).toContain("1st");
+    expect(table!.textContent).toContain("2nd");
+  });
+
+  it("ties - platforms with equal timings get equal rank", () => {
+    const summary = makeSummary({
+      platforms: [
+        makePlatform({ result_id: "r1", platform: "A", timings: { Q1: 10 } }),
+        makePlatform({ result_id: "r2", platform: "B", timings: { Q1: 10 } }),
+      ],
+      query_ids: ["Q1"],
+    });
+    const { container } = render(<RankTable summary={summary} />);
+    const cells = container.querySelectorAll("td");
+    const ranks = Array.from(cells).map((c) => c.textContent);
+    expect(ranks.filter((r) => r === "1st").length).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DistributionBox
+// ---------------------------------------------------------------------------
+
+describe("DistributionBox", () => {
+  it("renders nothing for empty summary", () => {
+    const { container } = render(<DistributionBox summary={emptySummary()} />);
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("renders an svg for a populated summary", () => {
+    const { container } = render(<DistributionBox summary={makeSummary()} />);
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QueryHistogram
+// ---------------------------------------------------------------------------
+
+describe("QueryHistogram", () => {
+  it("renders nothing for empty summary", () => {
+    const { container } = render(<QueryHistogram summary={emptySummary()} />);
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("renders bars for a populated summary", () => {
+    const { container } = render(<QueryHistogram summary={makeSummary()} />);
+    expect(container.querySelector("svg")).not.toBeNull();
+    expect(container.querySelectorAll("rect").length).toBeGreaterThan(0);
+  });
+
+  it("auto-splits into multiple panels when query count > 33", () => {
+    const query_ids = Array.from({ length: 70 }, (_, i) => `Q${i + 1}`);
+    const timings: Record<string, number> = {};
+    for (const qid of query_ids) timings[qid] = 10;
+    const summary = makeSummary({
+      query_ids,
+      platforms: [makePlatform({ timings })],
+    });
+    const { container } = render(<QueryHistogram summary={summary} />);
+    const svgs = container.querySelectorAll("svg");
+    expect(svgs.length).toBeGreaterThan(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PowerBar
+// ---------------------------------------------------------------------------
+
+describe("PowerBar", () => {
+  it("shows a 'not available' message when no power_score", () => {
+    const summary = makeSummary({
+      platforms: [makePlatform({ power_score: null }), makePlatform({ power_score: 0 })],
+    });
+    const { container } = render(<PowerBar summary={summary} />);
+    expect(container.textContent).toContain("not available");
+  });
+
+  it("renders bars sorted descending by power_score", () => {
+    const summary = makeSummary({
+      platforms: [
+        makePlatform({ result_id: "r1", platform: "Low", power_score: 100 }),
+        makePlatform({ result_id: "r2", platform: "High", power_score: 900 }),
+        makePlatform({ result_id: "r3", platform: "Mid", power_score: 500 }),
+      ],
+    });
+    const { container } = render(<PowerBar summary={summary} />);
+    const labels = Array.from(container.querySelectorAll("text"))
+      .map((t) => t.textContent)
+      .filter((t): t is string => !!t);
+    const highIdx = labels.indexOf("High");
+    const midIdx = labels.indexOf("Mid");
+    const lowIdx = labels.indexOf("Low");
+    expect(highIdx).toBeGreaterThanOrEqual(0);
+    expect(highIdx).toBeLessThan(midIdx);
+    expect(midIdx).toBeLessThan(lowIdx);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StackedPhase
+// ---------------------------------------------------------------------------
+
+describe("StackedPhase", () => {
+  it("shows a 'not available' message when no phase_durations", () => {
+    const { container } = render(<StackedPhase summary={makeSummary()} />);
+    expect(container.textContent).toContain("not available");
+  });
+
+  it("renders segments when phase_durations are populated", () => {
+    const summary = makeSummary({
+      platforms: [
+        makePlatform({
+          phase_durations: { data_loading: 10, power_test: 30, throughput_test: 5 },
+        }),
+      ],
+    });
+    const { container } = render(<StackedPhase summary={summary} />);
+    expect(container.querySelector("svg")).not.toBeNull();
+    expect(container.querySelectorAll("rect").length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TimeSeries
+// ---------------------------------------------------------------------------
+
+function makeEntry(
+  overrides: Partial<ChartHistoricalEntry> = {},
+): ChartHistoricalEntry {
+  return {
+    result_id: "r1",
+    benchmark: "tpch",
+    scale_factor: 0.1,
+    platform: "DuckDB",
+    platform_id: "duckdb",
+    run_date: "2026-04-01",
+    power_score: 3000,
+    display_geomean_ms: 12,
+    ...overrides,
+  };
+}
+
+describe("TimeSeries", () => {
+  it("shows an insufficient-data message when fewer than 2 runs per platform", () => {
+    const { container } = render(
+      <TimeSeries entries={[makeEntry({ result_id: "r1" })]} />,
+    );
+    expect(container.textContent).toContain("Not enough");
+  });
+
+  it("renders a line chart when ≥2 runs exist", () => {
+    const entries = [
+      makeEntry({ result_id: "r1", run_date: "2026-03-01", display_geomean_ms: 15 }),
+      makeEntry({ result_id: "r2", run_date: "2026-04-01", display_geomean_ms: 10 }),
+    ];
+    const { container } = render(<TimeSeries entries={entries} />);
+    expect(container.querySelector("svg")).not.toBeNull();
+    expect(container.querySelector("path")).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CostScatter
+// ---------------------------------------------------------------------------
+
+describe("CostScatter", () => {
+  it("shows a 'no cost data' message when cost_usd is null across the board", () => {
+    const { container } = render(<CostScatter summary={makeSummary()} />);
+    expect(container.textContent).toContain("No cost data");
+  });
+
+  it("renders points when cost_usd is populated", () => {
+    const summary = makeSummary({
+      platforms: [
+        makePlatform({ result_id: "r1", platform: "A", cost_usd: 0.5 }),
+        makePlatform({ result_id: "r2", platform: "B", cost_usd: 1.25 }),
+      ],
+    });
+    const { container } = render(<CostScatter summary={summary} />);
+    expect(container.querySelector("svg")).not.toBeNull();
+    const circles = container.querySelectorAll("circle");
+    expect(circles.length).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SparklineTable
+// ---------------------------------------------------------------------------
+
+describe("SparklineTable", () => {
+  it("renders nothing when platforms are empty", () => {
+    const { container } = render(<SparklineTable summary={emptySummary()} />);
+    expect(container.querySelector("table")).toBeNull();
+  });
+
+  it("renders one row per platform", () => {
+    const { container } = render(<SparklineTable summary={makeSummary()} />);
+    const bodyRows = container.querySelectorAll("tbody tr");
+    expect(bodyRows.length).toBe(2);
+  });
+
+  it("hides the Cost column when no cost data is present", () => {
+    const { container } = render(<SparklineTable summary={makeSummary()} />);
+    expect(container.textContent).not.toContain("Cost");
+  });
+
+  it("shows the Cost column when cost data is present", () => {
+    const summary = makeSummary({
+      platforms: [makePlatform({ cost_usd: 0.5 }), makePlatform({ result_id: "r2", cost_usd: 1.0 })],
+    });
+    const { container } = render(<SparklineTable summary={summary} />);
+    expect(container.textContent).toContain("Cost");
+  });
+});

@@ -1,0 +1,420 @@
+id: cleanup-project-scratch-directory
+title: "Relocate canonical assets out of _project/ scratch area to proper homes"
+worktree: main
+priority: Medium-High
+status: Completed
+category: Code Quality and Technical Debt
+
+description: |
+  The `_project/` directory was designed as a scratch/transient working area.
+  A 2026-04-15 audit revealed it now contains a mix of intentional permanent
+  assets and misplaced canonical ones:
+
+  CONFIRMED CLUTTER (unambiguous - archive or delete):
+    - 3 superseded monolithic TODO YAMLs totalling ~1.1 MB
+      (PROJECT_TODO.yaml, PROJECT_DONE.yaml, PROJECT_TODO.yaml.before-fix)
+    - 10 MB coverage.json (generated artifact, should not be tracked in git)
+    - 2 timing report text files (generated output, reproducible)
+    - 1 POC script (dataframe_poc.py, superseded by production code)
+    - 1 one-off analysis artifact (reclassification.yaml)
+
+  CONFIRMED MISPLACED (should live in docs/):
+    - _project/adr/ - 2 ADRs belong in docs/development/adr/
+    - _project/analysis/hosted-results-contract.md - live contract referenced by
+      results-data/README.md and docs/operations/results-phase-2-runbook.md
+    - _project/analysis/threat-model.md - canonical security doc
+    - _project/analysis/benchbox-results-platform-strategy.md - active strategy doc
+
+  OPEN QUESTIONS requiring a research gate (see w1):
+    - _project/specs/ (30+ files, 1.7 MB) - authoritative or internal-only?
+    - _project/DESIGN-integrated-task-management.md - stays near the TODO system
+      it describes, or moves to docs/development/?
+    - _project/PLATFORM_INTEGRATION_ROADMAP.md, RELEASE_PRIORITIZATION_v1.md,
+      PRE_RELEASE_CHECKLIST.md - active agent reference artifacts or publishable docs?
+    - _project/DATAFRAME_SUPPORT_MASTER.md + format-converter/query-plan docs -
+      live architecture references or completed-milestone archives?
+    - _project/handoffs/ - active context for in-flight work or historical records?
+
+  INTENTIONALLY STAYS in _project/ (do not touch):
+    - _project/scripts/ - isolated pyproject.toml prevents dependency leakage into
+      the main wheel; invocation `uv run --project _project/scripts` is canonical
+    - _project/config/ - config for the scripts above; co-located by design
+    - _project/TODO_SCHEMA.yaml, TODO_ENTRY_TEMPLATE.yaml - used by validate_todo.py
+    - _project/TODO/, _project/DONE/ - the active project management system
+    - _project/scratch/, _project/notes/, _project/_archive/, _project/_trash/
+
+work:
+  - id: w1
+    summary: "Research gate: read and classify the 5 ambiguous asset groups"
+    status: done
+    notes: |
+      VERDICT Q1 - _project/specs/ → OPTION C: ARCHIVE. docs/benchmarks/ and
+      docs/platforms/ are comprehensive (25+ and 50+ files respectively) and cover
+      all the same benchmarks and platforms. specs/ has zero external references
+      outside _project/. Decision: git mv _project/specs/ _project/_archive/specs/
+
+      VERDICT Q2 - DESIGN-integrated-task-management.md → OPTION B: MOVE.
+      Zero external references found (grep confirmed no hits outside the TODO file).
+      Standalone architecture doc describing task system design. Move to
+      docs/development/task-management-design.md.
+
+      VERDICT Q3 - Roadmap/quality docs → OPTION C: ARCHIVE. PLATFORM_INTEGRATION_ROADMAP.md
+      last commit Nov 2024. PRE_RELEASE_CHECKLIST.md and RELEASE_PRIORITIZATION_v1.md only
+      referenced in completed DONE items (PROJECT_DONE.yaml, _project/DONE/). All describe
+      completed pre-release planning. Archive to _project/_archive/.
+
+      VERDICT Q4 - DATAFRAME_SUPPORT_MASTER.md + related → OPTION A: ARCHIVE. No open
+      TODO depends on these files. Only self-referential _project/ links. No active
+      implementation work references them. Archive to _project/_archive/.
+
+      VERDICT Q5 - _project/handoffs/ → OPTION B: PARTIAL ARCHIVE. Most recent file
+      (results-publishing-handoff-2026-04-04.md) was updated 2026-04-12 describing active
+      Phase 2 results-publishing work (PR #53). Keep it active. Archive the other 3 older
+      handoffs to _project/_archive/handoffs/.
+
+  - id: w2
+    summary: "Archive superseded monolithic YAMLs and delete generated artifacts"
+    status: done
+    notes: |
+      No research gate required - these are unambiguously clutter.
+
+      ARCHIVE with git mv (preserve history):
+        git mv _project/PROJECT_TODO.yaml _project/_archive/PROJECT_TODO.yaml
+        git mv _project/PROJECT_DONE.yaml _project/_archive/PROJECT_DONE.yaml
+        git mv _project/PROJECT_TODO.yaml.before-fix _project/_archive/PROJECT_TODO.yaml.before-fix
+        git mv _project/timing_report.txt _project/_archive/timing_report.txt
+        git mv _project/timing_report_all.txt _project/_archive/timing_report_all.txt
+        git mv _project/dataframe_poc.py _project/_archive/dataframe_poc.py
+        git mv _project/reclassification.yaml _project/_archive/reclassification.yaml
+
+      DELETE (generated, reproducible, not worth archiving):
+        git rm _project/coverage.json
+
+      GITIGNORE: check if _project/coverage.json is in .gitignore.
+        grep "coverage.json" .gitignore
+        If absent, add the line: _project/coverage.json
+
+      POST-MOVE VERIFICATION:
+        uv run --project _project/scripts -- python _project/scripts/todo_cli.py stats
+        Expected: same item counts as before - confirms no TODO path breakage.
+
+  - id: w3
+    summary: "Move ADRs from _project/adr/ to docs/development/adr/"
+    status: done
+    notes: |
+      Source files (confirmed no production code dependency on these paths):
+        _project/adr/0001-unified-platform-registration.md
+        _project/adr/adr-textcharts-extraction.md
+
+      Steps:
+        mkdir -p docs/development/adr/
+        git mv _project/adr/0001-unified-platform-registration.md docs/development/adr/0001-unified-platform-registration.md
+        git mv _project/adr/adr-textcharts-extraction.md docs/development/adr/adr-textcharts-extraction.md
+
+      UPDATE REFERENCES (exactly one external reference confirmed):
+        File: _blog/building-benchbox/outlines/06-extracting-textcharts.md
+        Search: grep -n "_project/adr" _blog/building-benchbox/outlines/06-extracting-textcharts.md
+        Update the path from `_project/adr/adr-textcharts-extraction.md`
+        to `docs/development/adr/adr-textcharts-extraction.md`.
+
+      Also scan for any other references:
+        grep -r "_project/adr" . --include="*.md" --include="*.rst" --include="*.yaml"
+        Expected after fix: zero matches.
+
+      Consider adding docs/development/adr/README.md (one line: "Architecture Decision Records")
+      to make the directory self-documenting if it doesn't already have one.
+
+  - id: w4
+    summary: "Move 3 canonical analysis docs to proper docs/ locations"
+    status: done
+    notes: |
+      These 3 files are actively linked from outside _project/ and belong in docs/.
+      Confirmed external references exist to all three.
+
+      MOVE A - hosted-results-contract.md:
+        git mv _project/analysis/hosted-results-contract.md docs/reference/hosted-results-contract.md
+        Update references:
+          grep -rn "hosted-results-contract" . --include="*.md" --include="*.rst"
+          Files confirmed to reference it:
+            - results-data/README.md
+            - docs/operations/results-phase-2-runbook.md
+            - _project/analysis/benchbox-results-platform-strategy.md (update in-place after move B)
+            - _project/handoffs/ (do NOT update - historical records, broken links acceptable)
+
+      MOVE B - threat-model.md:
+        git mv _project/analysis/threat-model.md docs/reference/threat-model.md
+        Update references:
+          grep -rn "threat-model" . --include="*.md" --include="*.rst"
+          Update any hits outside _project/handoffs/
+
+      MOVE C - benchbox-results-platform-strategy.md:
+        git mv _project/analysis/benchbox-results-platform-strategy.md docs/development/benchbox-results-platform-strategy.md
+        Update references:
+          grep -rn "benchbox-results-platform-strategy" . --include="*.md"
+          Update any hits outside _project/handoffs/
+
+      FINAL VERIFICATION:
+        grep -r "_project/analysis/hosted-results-contract\|_project/analysis/threat-model\|_project/analysis/benchbox-results-platform-strategy" \
+             . --include="*.md" --include="*.rst"
+        Expected: zero matches (handoff internal links excluded from this check).
+
+  - id: w5
+    summary: "Execute research-gate decisions for specs, design docs, roadmaps, and handoffs"
+    needs: [w1]
+    status: done
+    notes: |
+      Apply one of the classified actions per research gate outcome. The exact moves
+      depend entirely on w1 findings - the options are specified here:
+
+      FOR _project/specs/ - pick ONE:
+        Option A (authoritative content not in docs/):
+          For each unique spec file: git mv _project/specs/{name}.md docs/benchmarks/{name}.md
+          OR git mv _project/specs/platforms/{name}.md docs/platforms/{name}.md
+          Archive anything already covered: git mv _project/specs/{dup}.md _project/_archive/specs/{dup}.md
+        Option B (internal design notes only):
+          Write _project/specs/README.md: "Internal design notes - not published. See docs/ for authoritative content."
+          No moves needed.
+        Option C (superseded by public docs):
+          git mv _project/specs/ _project/_archive/specs/
+
+      FOR _project/DESIGN-integrated-task-management.md - pick ONE:
+        Option A (agent navigation reference → stay in _project/): no action.
+        Option B (publishable architecture doc → move):
+          git mv _project/DESIGN-integrated-task-management.md docs/development/task-management-design.md
+          grep -rn "DESIGN-integrated-task-management" . --include="*.md" --include="*.py" --include="*.yaml"
+          Update any hits.
+
+      FOR roadmap/quality docs (PLATFORM_INTEGRATION_ROADMAP.md, RELEASE_PRIORITIZATION_v1.md, PRE_RELEASE_CHECKLIST.md) - pick ONE:
+        Option A (agent-facing action lists → stay in _project/): no action.
+        Option B (publishable → merge/move to docs/development/):
+          git mv each file to appropriate docs/ path.
+        Option C (completed milestones → archive):
+          git mv each file to _project/_archive/
+
+      FOR _project/DATAFRAME_SUPPORT_MASTER.md + FORMAT_CONVERTER_*.md + query_plan_*.md - pick ONE per file:
+        Option A (not consulted in >90 days, no open TODO dependency): git mv to _project/_archive/
+        Option B (active reference → condense): Do NOT bulk-move the 67 KB master doc.
+          Create a condensed docs/development/dataframe-support-architecture.md (key decisions only)
+          and archive the master doc. This is non-trivial - only do this if clearly warranted.
+
+      FOR _project/handoffs/ - pick ONE:
+        Option A (all historical): git mv _project/handoffs/ _project/_archive/handoffs/
+        Option B (most recent is active): git mv older handoffs individually to _project/_archive/handoffs/
+          Leave the most recent 1-2 in _project/handoffs/.
+
+  - id: w6
+    summary: "Update AGENTS.md and any remaining stale cross-references"
+    needs: [w3, w4, w5]
+    status: done
+    notes: |
+      Scan for any paths moved in w3, w4, w5 that still have stale references:
+
+        grep -r "_project/adr" . --include="*.md" --include="*.rst" --include="*.py" --include="*.yaml"
+        grep -r "_project/analysis/hosted-results-contract\|_project/analysis/threat-model\|_project/analysis/benchbox-results-platform-strategy" \
+             . --include="*.md" --include="*.rst"
+
+      If w5 moved specs/ or design docs, also run:
+        grep -r "_project/specs\|_project/DESIGN-integrated-task-management\|_project/PLATFORM_INTEGRATION_ROADMAP\|_project/RELEASE_PRIORITIZATION\|_project/PRE_RELEASE_CHECKLIST" \
+             . --include="*.md" --include="*.rst" --include="*.yaml"
+
+      Fix every match that falls outside _project/handoffs/ (historical docs - broken links there are acceptable).
+      If AGENTS.md references any moved file, update it. The timing_wall_clock_allowlist.json reference
+      in AGENTS.md line 64 MUST NOT be changed (that file is not moving).
+
+  - id: w7
+    summary: "Validate TODO system integrity and commit all changes"
+    needs: [w2, w3, w4, w5, w6]
+    status: done
+    notes: |
+      Run full validation suite:
+        uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all
+        uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph
+        uv run --project _project/scripts -- python _project/scripts/generate_indexes.py
+
+      Run fast tests to confirm nothing is broken:
+        uv run -- python -m pytest -m fast -q
+
+      Commit with explicit staging - DO NOT use git add -A:
+        git add <each moved/modified file by path>
+        git commit -m "chore(cleanup): relocate canonical assets out of _project/ scratch area"
+
+      Commit message should list the major moves: ADRs, analysis docs, archived YAMLs,
+      and note which research-gate decisions were made.
+
+deferred:
+  - summary: "Automate stale-reference detection via CI lint"
+    reason: |
+      A grep-based CI step could catch future cases where docs are created inside
+      _project/ and linked from outside. Deferred because it requires writing a
+      check_project_references.py script and wiring it into the Makefile - small
+      enough to add as a follow-up TODO once this cleanup is done.
+  - summary: "Compress or split DATAFRAME_SUPPORT_MASTER.md into topic-scoped reference docs"
+    reason: |
+      The 67 KB master doc is dense. Breaking it into per-topic pages in docs/
+      would improve discoverability, but requires careful editing to avoid losing
+      context. Deferred until the research gate confirms the doc is still actively
+      consulted (if it's not, archiving is sufficient).
+
+files_affected:
+  modified:
+    - "_project/TODO/main/planning/cleanup-project-scratch-directory.yaml"
+    - "_project/_indexes/master.yaml"
+    - "_project/_indexes/by-category.yaml"
+    - "_project/_indexes/by-priority.yaml"
+    - "_project/_indexes/by-status.yaml"
+    - ".gitignore"
+    - "AGENTS.md"
+    - "results-data/README.md"
+    - "docs/operations/results-phase-2-runbook.md"
+    - "_blog/building-benchbox/outlines/06-extracting-textcharts.md"
+  added:
+    - "docs/development/adr/0001-unified-platform-registration.md"
+    - "docs/development/adr/adr-textcharts-extraction.md"
+    - "docs/reference/hosted-results-contract.md"
+    - "docs/reference/threat-model.md"
+    - "docs/development/benchbox-results-platform-strategy.md"
+  removed:
+    - "_project/adr/0001-unified-platform-registration.md"
+    - "_project/adr/adr-textcharts-extraction.md"
+    - "_project/analysis/hosted-results-contract.md"
+    - "_project/analysis/threat-model.md"
+    - "_project/analysis/benchbox-results-platform-strategy.md"
+    - "_project/coverage.json"
+    - "_project/PROJECT_TODO.yaml"
+    - "_project/PROJECT_DONE.yaml"
+    - "_project/PROJECT_TODO.yaml.before-fix"
+    - "_project/timing_report.txt"
+    - "_project/timing_report_all.txt"
+    - "_project/dataframe_poc.py"
+    - "_project/reclassification.yaml"
+
+must_preserve:
+  - "_project/scripts/ invocation path - `uv run --project _project/scripts` must continue to work; do not move any file under _project/scripts/"
+  - "_project/config/timing_wall_clock_allowlist.json path - referenced verbatim in AGENTS.md line 64 and by timing_policy_check.py"
+  - "_project/TODO_SCHEMA.yaml and _project/TODO_ENTRY_TEMPLATE.yaml paths - referenced in AGENTS.md and by validate_todo.py"
+  - "_project/TODO/ and _project/DONE/ directory structure - the active project management system must remain intact"
+  - "All git mv operations must use `git mv`, not shell cp+rm, to preserve file history"
+
+approach: |
+  Work in parallel where possible: w2 (archive clutter) and w3 (move ADRs) and w4 (move analysis docs)
+  have no mutual dependencies and can be done in any order or simultaneously in one commit.
+  w1 (research gate) must complete before w5. w6 (stale reference scan) must run after all moves.
+
+  Rule of thumb for the research gate: if a file's last git commit is >90 days old AND no open
+  TODO item explicitly depends on it, treat it as archivable. If a file is referenced by grep hits
+  outside _project/, it is misplaced and should move to docs/.
+
+  For reference updates: update live docs (docs/, results-data/, AGENTS.md) but do NOT update
+  _project/handoffs/ - those are historical records where broken internal links are acceptable.
+
+  Stage files explicitly by path (never `git add -A`). Use `git mv` not `cp` + `rm` for all
+  file relocations to preserve history. Bundle w2 + w3 + w4 into a single commit if they have
+  no reference-update entanglements; otherwise separate for clarity.
+
+anti_patterns:
+  - "DO NOT move _project/scripts/ or _project/config/ - because they form an intentionally isolated Python environment with `uv run --project _project/scripts` as the canonical invocation - moving them would break every command in CLAUDE.md and AGENTS.md"
+  - "DO NOT use `git add -A` or `git add .` - because this repo has strict per-file staging policy and generated files could accidentally be staged - add each path explicitly"
+  - "DO NOT bulk-move _project/specs/ without reading them first - because specs may be internal-only design notes that would be inappropriate to publish in docs/ - the research gate (w1) must answer this first"
+  - "DO NOT update reference links inside _project/handoffs/ files - because those are historical records and patching them wastes time with no benefit - stale links in historical docs are acceptable"
+  - "DO NOT archive or move PROJECT_TODO.yaml and PROJECT_DONE.yaml without git mv - because git rm + git add would lose file history - always use git mv even when moving to _archive/"
+  - "DO NOT attempt to condense DATAFRAME_SUPPORT_MASTER.md into a short docs page without the research gate confirming it is still actively consulted - if it's unused, plain archiving is the right call"
+
+verification:
+  - description: "TODO system still works after all moves"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py stats"
+    expected_output: "Item counts match pre-cleanup totals; no errors about missing schema or config files"
+  - description: "No stale references to moved ADR paths"
+    command: "grep -r '_project/adr' . --include='*.md' --include='*.rst' --include='*.yaml'"
+    expected_output: "Zero matches"
+  - description: "No stale references to moved analysis docs"
+    command: "grep -r '_project/analysis/hosted-results-contract\\|_project/analysis/threat-model\\|_project/analysis/benchbox-results-platform-strategy' . --include='*.md'"
+    expected_output: "Zero matches"
+  - description: "Archived monolithic YAMLs are gone from _project/ root"
+    command: "ls _project/PROJECT_TODO.yaml _project/PROJECT_DONE.yaml 2>&1"
+    expected_output: "ls: cannot access (files no longer at root)"
+  - description: "coverage.json absent from _project/ root"
+    command: "ls _project/coverage.json 2>&1"
+    expected_output: "ls: cannot access"
+  - description: "Fast tests still pass"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "All tests pass, no failures"
+  - description: "TODO graph validation passes"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+    expected_output: "No cycles or dangling dependency edges"
+
+scope_limit:
+  only_modify:
+    - "_project/_archive/"
+    - "_project/adr/"
+    - "_project/analysis/"
+    - "_project/specs/"
+    - "_project/handoffs/"
+    - "_project/PROJECT_TODO.yaml"
+    - "_project/PROJECT_DONE.yaml"
+    - "_project/PROJECT_TODO.yaml.before-fix"
+    - "_project/timing_report.txt"
+    - "_project/timing_report_all.txt"
+    - "_project/dataframe_poc.py"
+    - "_project/reclassification.yaml"
+    - "_project/coverage.json"
+    - "_project/DESIGN-integrated-task-management.md"
+    - "_project/PLATFORM_INTEGRATION_ROADMAP.md"
+    - "_project/RELEASE_PRIORITIZATION_v1.md"
+    - "_project/PRE_RELEASE_CHECKLIST.md"
+    - "_project/DATAFRAME_SUPPORT_MASTER.md"
+    - "_project/DATAFRAME_CONSOLIDATION_SUMMARY.md"
+    - "_project/FORMAT_CONVERTER_COMPLETION_SUMMARY.md"
+    - "_project/FORMAT_CONVERTER_IMPLEMENTATION_STATUS.md"
+    - "_project/format-converter-adversarial-review-and-fixes.md"
+    - "_project/query_plan_workstream_summary.md"
+    - "_project/query_plan_capture_overview.md"
+    - "docs/development/adr/"
+    - "docs/reference/"
+    - "docs/development/benchbox-results-platform-strategy.md"
+    - "docs/benchmarks/"
+    - "docs/platforms/"
+    - ".gitignore"
+    - "AGENTS.md"
+    - "results-data/README.md"
+    - "docs/operations/results-phase-2-runbook.md"
+    - "_blog/building-benchbox/outlines/06-extracting-textcharts.md"
+  do_not_modify:
+    - "_project/scripts/"
+    - "_project/config/"
+    - "_project/TODO_SCHEMA.yaml"
+    - "_project/TODO_ENTRY_TEMPLATE.yaml"
+    - "_project/TODO/"
+    - "_project/DONE/"
+    - "_project/scratch/"
+    - "_project/notes/"
+    - "_project/handoffs/"
+    - "benchbox/"
+    - "tests/"
+    - "results-explorer/"
+
+open_questions:
+  - "Are _project/specs/ files authoritative (merge to docs/) or internal design notes (add README, leave in place)?"
+  - "Does DESIGN-integrated-task-management.md serve as a navigational reference for agents working in _project/, or is it a standalone publishable architecture doc?"
+  - "Are PLATFORM_INTEGRATION_ROADMAP.md, RELEASE_PRIORITIZATION_v1.md, and PRE_RELEASE_CHECKLIST.md actively referenced by agents, or are they completed planning artifacts?"
+  - "Is DATAFRAME_SUPPORT_MASTER.md (67 KB) actively consulted during implementation, or can it be archived?"
+  - "Do _project/handoffs/ contain active context for in-flight results-publishing work, or are all phases complete?"
+
+success_metrics:
+  - "_project/ root contains no canonical docs that belong in docs/"
+  - "ADRs are discoverable in docs/development/adr/ alongside other development docs"
+  - "hosted-results-contract.md, threat-model.md references in docs/ and results-data/ resolve correctly"
+  - "No file in the main codebase links to a path that no longer exists (verified by grep)"
+  - "The 5 research-gate questions have documented, specific answers recorded in w1 notes"
+  - "_project/ root is visibly cleaner: monolithic YAMLs, generated files, and POC code gone"
+
+completed_date: "2026-04-16"
+
+metadata:
+  tags:
+    - "repository-maintenance"
+    - "docs-structure"
+    - "technical-debt"
+    - "cleanup"
+  estimated_effort: "Small-Medium (4-8 hours including research gate)"
+  created_date: "2026-04-15"
+  last_updated: "2026-04-15T00:00:00"

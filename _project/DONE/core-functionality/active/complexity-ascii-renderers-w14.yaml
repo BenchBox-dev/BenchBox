@@ -1,0 +1,128 @@
+id: "complexity-ascii-renderers-w14"
+title: "Decompose monolithic ASCII visualization render() functions (complexity batch 3)"
+worktree: "main"
+priority: "Medium"
+status: Completed
+completed_date: "2026-02-22"
+description: |
+  7 ASCII chart render() functions accumulate complexity by doing layout calculation,
+  data normalization, header rendering, bar/cell rendering, and legend rendering all in
+  one method. Each concern is independent and can be a private helper method. This
+  reduces per-function complexity from 15-20 to well below the warn threshold without
+  changing behavior.
+
+  Target functions:
+    benchbox/core/visualization/ascii/heatmap.py:render               (20)
+    benchbox/core/visualization/ascii/histogram.py:_render_simple_chunk (20)
+    benchbox/core/visualization/ascii/histogram.py:_render_grouped_chunk (20)
+    benchbox/core/visualization/ascii/diverging_bar.py:render          (17)
+    benchbox/core/visualization/ascii/summary_box.py:render            (17)
+    benchbox/core/visualization/ascii/sparkline_table.py:render        (15)
+    benchbox/cli/commands/visualize.py:_render_ascii_charts            (16)
+
+  Note: Several render() functions are already approved as required-complexity ignores
+  (line_chart, box_plot, scatter_plot, bar_chart, rank_table, cdf_chart). The functions
+  listed above are NOT in that list - their complexity is reducible.
+
+category: "Core Functionality"
+
+work:
+- id: w1
+  summary: "Decompose heatmap render(): extract column-width calc, header, cell rendering, legend"
+  status: done
+  notes: |
+    benchbox/core/visualization/ascii/heatmap.py:render (line 91)
+    Extract to private methods on the class:
+    - _compute_column_widths(data, headers) → list[int]
+    - _render_title_header(title, total_width) → list[str]
+    - _render_cell(value, normalized, width, colorize) → str
+    - _render_legend(lines) → list[str]
+    Main render() orchestrates via calls to these helpers.
+
+- id: w2
+  summary: "Decompose histogram _render_simple_chunk and _render_grouped_chunk"
+  status: done
+  notes: |
+    benchbox/core/visualization/ascii/histogram.py - both functions (lines 236, 369)
+    Both share bar-height calculation and y-axis label logic:
+    - Extract _compute_bar_height(value, max_value, chart_height) → int
+    - Extract _render_y_axis_label(row_idx, max_value, chart_height) → str
+    - Extract _render_footer_legend(series_names, colors) → list[str]
+    _render_grouped_chunk also: extract _get_series_lookup(data) → dict
+    After extraction, _render_grouped_chunk should call _render_simple_chunk for
+    shared rendering logic where possible (DRY).
+
+- id: w3
+  summary: "Decompose diverging_bar and summary_box render() functions"
+  needs: []
+  status: done
+  notes: |
+    diverging_bar.py:render (line 64):
+    - Extract _partition_series(data) → (improvements, regressions)
+    - Extract _compute_layout(improvements, regressions, width) → LayoutConfig
+    summary_box.py:render (line 88):
+    - Extract _build_metric_rows(metrics) → list[str]
+    - Extract _pad_to_equal_length(left, right) → tuple[list, list]
+
+- id: w4
+  summary: "Decompose sparkline_table render() and _render_ascii_charts dispatch"
+  needs: []
+  status: done
+  notes: |
+    sparkline_table.py:render (line 63):
+    - Extract _normalize_column(col_data) → list[float]
+    - Extract _render_sparkline(values, width) → str
+    visualize.py:_render_ascii_charts (line 20):
+    - Extract _resolve_chart_type(template, chart_type) → str
+    - Replace if/elif chain for chart type validation with dict lookup
+
+- id: w5
+  summary: "Run smoke tests and complexity check; verify all 7 functions below warn threshold"
+  needs: [w1, w2, w3, w4]
+  status: done
+
+metadata:
+  estimated_effort: "1 day"
+  tags: ["complexity", "refactor", "visualization", "ascii"]
+
+must_preserve:
+- "All chart output must be pixel-for-pixel identical - test with known data fixtures"
+- "render() method signatures unchanged (callers pass same arguments)"
+- "Color codes and ANSI escape sequences must be identical"
+- "Column width calculations must produce the same values"
+
+approach: |
+  Extract helper methods as private (prefixed _) on the same class or as module-level
+  functions if they don't use self. Keep render() as the public entry point that
+  orchestrates helpers in order.
+
+  Reference existing decomposed charts: ascii/line_chart.py is well-structured -
+  note how it organizes helpers as private methods. Follow that pattern.
+
+  Test approach: capture render() output before and after and compare with assertEqual.
+
+anti_patterns:
+- "DO NOT change the public render() signature"
+- "DO NOT create a base class or mixin for shared helpers - module-level functions are fine"
+- "DO NOT extract so many small helpers that reading render() requires jumping between 10 methods"
+- "DO NOT optimize the rendering logic while refactoring - behavior first, optimization later"
+
+verification:
+- description: "Smoke tests pass"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all tests pass, 0 failures"
+- description: "Visualization-specific tests pass"
+  command: "uv run -- python -m pytest tests/ -k 'ascii or visual or chart or render' -q"
+  expected_output: "all tests pass, 0 failures"
+- description: "Target functions below warn threshold"
+  command: "uv run -- python scripts/check_complexity.py --top 150 2>&1 | grep -E '(heatmap|histogram|diverging|summary_box|sparkline|visualize)'"
+  expected_output: "No WARN entries for the 7 target functions"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/visualization/ascii/heatmap.py"
+  - "benchbox/core/visualization/ascii/histogram.py"
+  - "benchbox/core/visualization/ascii/diverging_bar.py"
+  - "benchbox/core/visualization/ascii/summary_box.py"
+  - "benchbox/core/visualization/ascii/sparkline_table.py"
+  - "benchbox/cli/commands/visualize.py"

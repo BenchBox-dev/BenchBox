@@ -1,0 +1,82 @@
+id: dedup-cloud-platform-shared-utilities
+title: "Extract shared cloud platform utilities (session cache validation, credential prompts)"
+worktree: core-functionality
+priority: Low
+status: Completed
+completed_date: "2026-02-22"
+category: Core Functionality
+description: |
+  Two groups from the duplicate-check report identify shared logic across
+  cloud platform adapters:
+
+  - Group 21 (86 lines): `validate_session_cache_control` is duplicated between
+    redshift.py:1417 and snowflake.py:914. Identical algorithm (result dict,
+    try/except/finally, ConfigurationError, strict_validation branching) with
+    only SQL query string, setting key, and platform name differing.
+
+  - Group 29 (69 lines): `_prompt_default_output_location` is duplicated between
+    credentials/bigquery.py:204 and credentials/redshift.py:247. Identical
+    interactive prompt flow with only cloud-specific strings differing (gs:// vs
+    s3://, storage_bucket vs s3_bucket, permission names).
+
+approach: |
+  For validate_session_cache_control:
+  - Extract to a shared mixin or utility function accepting cache_control_query,
+    setting_key, disabled_value, and platform_name parameters
+  - Both Redshift and Snowflake inherit/call the shared implementation
+
+  For _prompt_default_output_location:
+  - Extract to benchbox/platforms/credentials/shared.py with parameters for
+    path_scheme, storage_label, permission_note, platform_name
+  - BigQuery and Redshift credential modules call the shared function
+
+work:
+  - id: w1
+    summary: "Extract validate_session_cache_control to shared cloud platform mixin"
+    status: done
+
+  - id: w2
+    summary: "Refactor Redshift and Snowflake to use shared cache validation"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Extract _prompt_default_output_location to credentials/shared.py"
+    status: done
+
+  - id: w4
+    summary: "Refactor BigQuery and Redshift credentials to use shared prompt"
+    needs: [w3]
+    status: done
+
+  - id: w5
+    summary: "Run platform tests to verify no regressions"
+    needs: [w2, w4]
+    status: done
+
+files_affected:
+  created:
+    - "benchbox/platforms/cloud_shared.py"
+    - "benchbox/platforms/credentials/shared.py"
+  modified:
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/snowflake.py"
+    - "benchbox/platforms/credentials/bigquery.py"
+    - "benchbox/platforms/credentials/redshift.py"
+
+verification:
+  - description: "Platform adapter tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v -k 'redshift or snowflake or bigquery'"
+    expected_output: "all tests pass"
+
+must_preserve:
+  - "validate_session_cache_control returns identical result dict structure"
+  - "_prompt_default_output_location interactive flow unchanged from user perspective"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - refactoring
+  estimated_effort: "2-3 hours"
+  created_date: "2026-02-21"

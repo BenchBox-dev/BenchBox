@@ -1,0 +1,93 @@
+id: datavault-benchmark-implementation
+title: Add Data Vault Benchmark Implementation
+worktree: benchmark-expansion
+category: Core Functionality
+priority: Medium
+status: Completed
+completed_date: '2025-11-28'
+description: 'Implement a Data Vault 2.0 benchmark for BenchBox using TPC-H as the source data. This benchmark transforms
+  TPC-H''s 8 tables into 21 Data Vault tables (7 Hubs, 6 Links, 8 Satellites) and adapts the 22 TPC-H queries to work with
+  the Hub-Link-Satellite data model.
+
+  '
+context_sections:
+- name: Data Vault Context
+  summary: 'Data Vault 2.0 is an enterprise data warehouse modeling methodology using Hub (business keys), Link (relationships),
+    and Satellite (attributes) tables. This benchmark enables performance testing of Data Vault patterns on various platforms.
+
+    '
+impact: 'Adds Data Vault modeling support to BenchBox, enables evaluation of platform performance with data vault query patterns
+  (multi-join hub-link-satellite chains), provides comparative analysis between 3NF TPC-H and Data Vault architectures.
+
+  '
+tasks:
+- phase: Schema and Core Structure
+  done: true
+  items:
+  - summary: Create `benchbox/core/datavault/` directory structure
+  - summary: Implement `schema.py` with 21 Data Vault table definitions (7 Hubs, 6 Links, 8 Satellites)
+  - summary: Implement `etl/hash_functions.py` with MD5 hash key generation utilities
+  - summary: Create `DataVaultBenchmark` class skeleton inheriting from BaseBenchmark
+  - summary: Add unit tests for schema definitions in `tests/unit/core/datavault/test_schema.py`
+- phase: ETL Transformer Implementation
+  done: true
+  items:
+  - summary: Implement `etl/transformer.py` using DuckDB in-memory for transformations
+  - summary: Create SQL transforms for all 7 Hub tables from TPC-H source
+  - summary: Create SQL transforms for all 6 Link tables with FK hash keys
+  - summary: Create SQL transforms for all 8 Satellite tables with HASHDIFF
+  - summary: Implement loading order respecting Hub→Link→Satellite dependencies
+  - summary: Add manifest generation for Data Vault output files
+  - summary: Create unit tests in `tests/unit/core/datavault/test_transformer.py`
+- phase: Query Adaptation
+  done: true
+  items:
+  - summary: Create `queries.py` with DataVaultQueryManager class
+  - summary: Adapt TPC-H Q1 (lineitem aggregation) to Hub+Satellite pattern
+  - summary: Adapt TPC-H Q2-Q5 (multi-table joins) to Hub-Link-Satellite chains
+  - summary: Adapt TPC-H Q6-Q10 queries with appropriate join patterns
+  - summary: Adapt TPC-H Q11-Q15 queries including Q15a CTE variant
+  - summary: Adapt TPC-H Q16-Q22 queries completing all 22 adaptations
+  - summary: Add SQLGlot dialect translation support
+  - summary: Create query parsing tests in `tests/unit/core/datavault/test_queries.py`
+- phase: CLI and Integration
+  done: true
+  items:
+  - summary: Add Data Vault benchmark registration to `benchbox/cli/benchmarks.py`
+  - summary: Create `benchbox/datavault.py` public API wrapper
+  - summary: Add package exports to `benchbox/__init__.py`
+  - summary: Add CLI memory/time estimates for datavault benchmark
+- phase: Hardening (Adversarial Review)
+  done: true
+  items:
+  - summary: Validate hash_algorithm at init time with clear error for non-MD5
+  - summary: Add force_regenerate support with manifest checking
+  - summary: Add comprehensive unit tests for validation logic
+technical_requirements:
+- category: Schema
+  details: 21 tables total - 7 Hubs, 6 Links, 8 Satellites with MD5 hash keys
+- category: ETL
+  details: DuckDB in-memory transforms from TPC-H .tbl files to Data Vault .tbl files
+- category: Queries
+  details: 22 adapted TPC-H queries using Hub→Satellite→Link join patterns
+- category: Platforms
+  details: Support all existing BenchBox platforms via SQLGlot dialect translation
+files_affected:
+  modified:
+  - 'change_type: New; details: `benchbox/core/datavault/` directory with complete implementation'
+  - 'change_type: New; details: `benchbox/datavault.py` top-level interface'
+  - 'change_type: New; details: `tests/unit/core/datavault/` test directory'
+  - 'change_type: Modified; details: `benchbox/cli/benchmarks.py` - add benchmark registration and estimates'
+  - 'change_type: Modified; details: `benchbox/__init__.py` - add package exports'
+  added: []
+  removed: []
+commits:
+- c7c8e3dd
+- cbdc2020
+- b097ca9c
+- d2bb51a8
+- 1027183c
+- bc10c890
+- 916c4092
+- f8d31a0f
+future_work: []

@@ -1,0 +1,98 @@
+id: emr-serverless-platform
+title: "Amazon EMR Serverless Platform"
+worktree: platform-expansion
+priority: Medium-High
+status: Completed
+category: Platform Expansion
+completed_date: "2025-12-24"
+
+description: |
+  Add Amazon EMR Serverless managed Spark platform adapter. EMR Serverless provides
+  true serverless Spark with sub-second startup and automatic resource scaling.
+
+  Implementation reuses S3 staging and IAM auth patterns from AWS Glue adapter.
+  Uses EMR Serverless API for application and job management.
+
+tasks:
+  phases:
+  - phase: "Phase 1: Adapter Implementation"
+    done: true
+    items:
+    - summary: "Create EMRServerlessAdapter class"
+      done: true
+      subtasks:
+      - summary: "Implement create_connection() with EMR Serverless client"
+        done: true
+      - summary: "Implement application lifecycle (create/start/stop)"
+        done: true
+      - summary: "Implement job submission via start_job_run()"
+        done: true
+      - summary: "Add job polling and status tracking"
+        done: true
+    - summary: "Support SQL execution mode"
+      done: true
+    - summary: "Register in platform_registry.py"
+      done: true
+
+  - phase: "Phase 2: Testing"
+    done: true
+    items:
+    - summary: "Create unit tests with mocked EMR Serverless client"
+      done: true
+      note: "20 unit tests covering initialization, connection, data loading, tuning, CLI, registry"
+
+  - phase: "Phase 3: Documentation"
+    done: true
+    items:
+    - summary: "Create examples/getting_started/cloud/emr_serverless_tpch.py"
+      done: true
+    - summary: "Write docs/platforms/emr-serverless.md"
+      done: true
+
+metadata:
+  tags:
+  - cloud-spark
+  - aws
+  - emr-serverless
+  - serverless
+  estimated_effort: 1.5 weeks
+  actual_effort: "1 day (leveraging cloud-spark shared infrastructure and AWS Glue patterns)"
+  created_date: "2025-12-24"
+
+impact:
+  business_value: |
+    EMR Serverless is growing rapidly for interactive Spark workloads. Sub-second
+    startup makes it ideal for benchmarking scenarios.
+
+files_affected:
+  modified:
+  - benchbox/platforms/aws/__init__.py
+  - benchbox/core/platform_registry.py
+  - benchbox/utils/dependencies.py
+  added:
+  - benchbox/platforms/aws/emr_serverless_adapter.py
+  - tests/unit/platforms/aws/test_emr_serverless_adapter.py
+  - examples/getting_started/cloud/emr_serverless_tpch.py
+  - docs/platforms/emr-serverless.md
+
+implementation_notes: |
+  Implemented using the cloud-spark shared infrastructure:
+  - CloudSparkStaging.from_uri() for S3 data uploads
+  - SparkConfigOptimizer.for_tpch() for benchmark-specific Spark configs
+  - EMRServerlessJobState enum for job state tracking
+
+  Key adapter features:
+  - Application lifecycle management (create/start/stop)
+  - Job run submission with polling
+  - vCPU-hour and memory-GB-hour tracking
+  - Pre-initialized capacity support for sub-second startup
+  - Results written to S3 and retrieved after completion
+
+success_metrics:
+- "20 unit tests passing with full coverage of adapter functionality"
+- "Documentation complete with IAM setup guide"
+- "Example script with dry-run support"
+
+dependencies:
+  blocked_by:
+  - _project/DONE/platform-expansion/planning/aws-glue-platform.yaml

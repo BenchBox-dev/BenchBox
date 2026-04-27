@@ -1,0 +1,381 @@
+id: implement-results-explorer-browser-functional-tests
+title: "Implement browser-based functional testing for the results explorer"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-19"
+category: Testing and Quality Assurance
+
+description: |
+  The results explorer now has substantial unit, component, and parity coverage
+  under `results-explorer/src/__tests__/` and `results-explorer/src/**/__tests__/`,
+  but there is still no durable browser-level acceptance suite for the behaviors
+  that matter most in production:
+
+  - real DuckDB-WASM startup and worker loading
+  - client-side routing under the `/results/` base path
+  - deep links to ResultDetail / Compare / Query pages
+  - clipboard and download flows
+  - compare hard-block and soft-warning behaviors
+  - query workbench read-only SQL behavior in a real browser
+  - network and sidecar failure handling
+
+  The repo also contains evidence that this gap is real, not hypothetical:
+  `_project/_archive/handoffs/handoff-results-publishing-phase2.md` explicitly
+  notes that cross-browser acceptance remained largely manual, and
+  `verify-trust-badge-rendering-in-explorer` proved that one-off Playwright-driven
+  browser checks are useful but too narrow and too manual to act as a long-term
+  quality gate.
+
+  This item implements a deterministic browser-functional-test layer for
+  `results-explorer/`, centered on a Playwright-style harness that runs against
+  a built explorer app plus generated fixture data. The implementation must not
+  start by guessing at unresolved details. A research gate comes first and must
+  lock the execution model, fixture strategy, and browser matrix before any test
+  or product code is edited.
+
+deps:
+  needs:
+    - launch-results-explorer-acceptance-and-seed
+
+work:
+  - id: w1
+    summary: "Run a research gate and lock the browser-test architecture before editing"
+    status: done
+    notes: |
+      Read the current explorer routes, DuckDB-WASM loading path, existing
+      jsdom/unit coverage, manual browser-verification TODOs, and deploy/base-path
+      assumptions before changing any code.
+
+      The research gate must answer all open questions below with explicit
+      decisions and evidence from the current repo:
+      - built app vs dev server test target
+      - temp fixture corpus vs mutating `results-explorer/public/data/`
+      - blocking vs smoke browser matrix
+      - minimum seam required for deterministic failure injection
+
+      Deliverable: an implementation note at
+      `docs/development/browser-test-architecture.md` that records the chosen
+      defaults and rejected alternatives for each open question, plus a link
+      to it from this TODO's notes before w2 starts. No implementation starts
+      until these decisions are locked.
+
+      Architecture note (accepted 2026-04-18):
+      `docs/development/browser-test-architecture.md`. Locked decisions:
+      (1) test target is the built `dist/` served via Playwright `webServer`,
+      (2) fixture corpus is generated per-run into gitignored
+      `results-explorer/test-fixtures/.generated/` with the curated public
+      corpus untouched, (3) Chromium full suite is the required blocking
+      gate while Firefox and WebKit run `@smoke` only and graduate on flake
+      data, (4) no production-code seam is added for failure injection -
+      all error paths are exercised through Playwright `page.route()`,
+      `setOffline`, permissions grants, and download events.
+
+  - id: w2
+    summary: "Add the browser-test harness, scripts, and built-app serving model"
+    needs: [w1]
+    status: done
+    notes: |
+      Add the test runner, package scripts, `playwright.config.ts`, and failure
+      artifact handling. The suite must exercise the built explorer with the
+      real `/results/` base path rather than a mocked or simplified route setup.
+
+      Required harness properties:
+      - deterministic local command for one-shot setup + run
+      - traces/screenshots/report on failure
+      - artifact directories gitignored
+      - Chromium as the primary gate from the first slice
+
+  - id: w3
+    summary: "Implement deterministic fixture-corpus generation for browser tests"
+    needs: [w1]
+    status: done
+    notes: |
+      Browser tests must not depend on whichever derived artifacts happen to be
+      present in the working tree. Generate fixture data per run from canonical
+      source bundles plus controlled metadata variants so tests can cover:
+      - valid compare cohorts
+      - mixed trust labels
+      - mixed tuning modes
+      - multiple phases / execution modes
+      - results with and without tuning sidecars
+      - compare-invalid cohorts for hard-block tests
+
+      The generated fixture corpus must be isolated from `results-data/bundles/`
+      and from the committed curated corpus.
+
+  - id: w4
+    summary: "Cover Home plus benchmark/platform index happy paths under the real `/results/` base path"
+    needs: [w2, w3]
+    status: done
+    notes: |
+      Add browser tests for:
+      - Home
+      - BenchmarkIndex
+      - PlatformIndex
+
+      Cover real interactions rather than only page load:
+      - filter toggles and URL sync
+      - route deep-link loads
+      - result and cohort navigation
+
+      Keep this slice limited to the landing and browse surfaces so it can land
+      as a single vertical increment without being blocked on compare, query,
+      download, or failure-path work.
+
+  - id: w5
+    summary: "Cover ResultDetail and Compare happy paths, deep links, and shareable URL-state workflows"
+    needs: [w2, w3, w4]
+    status: done
+    notes: |
+      Add browser tests for:
+      - ResultDetail
+      - Compare
+
+      Cover real interactions rather than only page load:
+      - compare selection flows
+      - route deep-link loads
+      - result and cohort navigation
+      - compare share-URL and clipboard flows
+
+      Keep compare/history/clipboard behavior in its own slice because it is
+      one of the main reasons to add real browser coverage and it can be landed
+      independently from query-workbench and injected-failure work.
+
+  - id: w6
+    summary: "Cover Query workbench browser workflows, read-only SQL, and table/download interactions"
+    needs: [w2, w3, w4]
+    status: done
+    notes: |
+      Add browser tests for the Query page that prove the browser-only parts of
+      the workbench against a real built app:
+      - query-table sorting and column toggles
+      - starter-query loading
+      - read-only SQL enforcement in the workbench
+      - CSV and JSON download flows
+
+      Keep this separate from the route-browse and compare slices because Query
+      already has several distinct behaviors in Vitest and is large enough to
+      justify its own work unit.
+
+  - id: w7
+    summary: "Cover failure and recovery paths with user-visible assertions"
+    needs: [w2, w3, w5, w6]
+    status: done
+    notes: |
+      Add explicit tests for the behaviors jsdom does not prove today:
+      - DuckDB snapshot missing/corrupt or unreachable
+      - compare benchmark mismatch and scale mismatch hard blocks
+      - tuning-config sidecar fetch failure
+      - online/offline or retry-state behavior where supported by the app
+      - RG-2 HTTP range-reads: assert that a cold single-row lookup against
+        `results.duckdb` served by the test harness issues `Range: bytes=...`
+        requests, receives `206 Partial Content` with `Accept-Ranges: bytes`,
+        and that the sum of `Content-Length` transferred is ≤10% of the
+        on-disk DB size. This closes the
+        `explorer-canonical-browser-duckdb-read-model` RG-2 gate that the
+        completed TODO deferred to browser-level coverage.
+
+      Failure assertions must validate user-visible error states, not only
+      thrown exceptions or console output.
+
+  - id: w8
+    summary: "Integrate the suite into CI and define the release-check browser matrix"
+    needs: [w4, w5, w6, w7]
+    status: done
+    notes: |
+      Wire the new suite into CI with a stable gating policy:
+      - Chromium full suite required
+      - Firefox and WebKit smoke coverage initially narrower unless the
+        research gate proves full parity is low-risk
+      - failure artifacts uploaded in CI
+
+      Also document the residual manual release check for meaningful explorer
+      changes: one short pass across Chrome, Firefox, and Safari for layout and
+      browser-specific rendering issues that automation may not catch early.
+
+  - id: w9
+    summary: "Close with full validation, flake triage, and follow-up capture"
+    needs: [w8]
+    status: done
+    notes: |
+      Do not mark this item complete on a single green run. Verify repeatability,
+      capture any flaky selectors or browser-specific issues, and create focused
+      follow-up TODOs for defects that should not block the initial harness.
+
+open_questions:
+  - "Should fixture generation write into a temp served directory or reuse `results-explorer/public/data/` during test setup?"
+  - "Is any production-code seam needed for reliable failure injection, or can all required error-path coverage be achieved through the test server and network interception layer?"
+  - "Which cross-browser projects should be blocking immediately versus smoke-only until flake data is available?"
+  - "Can compare/share/download flows be covered against a static built server alone, or is a custom server wrapper required for reliable artifact and failure-path control?"
+
+research_value:
+  hypothesis: |
+    A deterministic Playwright-based suite running against a built explorer app
+    and generated fixture corpus will catch real production regressions that the
+    current jsdom/parity stack cannot, without forcing test-only changes into
+    the curated public corpus.
+  validation_approach: |
+    The research gate inventories the current explorer runtime model, existing
+    gaps, and prior manual-browser work. Implementation then proves the chosen
+    architecture by covering each top-level route plus at least one browser-only
+    failure mode with stable repeatable runs.
+  success_criteria: |
+    The team can run one deterministic command locally and in CI to validate the
+    explorer’s real browser behavior, and the suite covers every intended
+    user-facing route and critical failure path without depending on ad-hoc
+    working-tree artifacts.
+
+success_metrics:
+  - "Every top-level explorer route has at least one browser-functional test covering a successful user flow."
+  - "Each route with meaningful failure behavior has at least one browser test asserting the user-visible error state."
+  - "Real browser-only behaviors are covered: DuckDB-WASM init, deep-link routing, clipboard, and downloads."
+  - "Fixture data is generated deterministically per run; implementation does not require committing test-only corpus mutations."
+  - "Chromium gating is stable enough for CI, with Firefox/WebKit smoke coverage added and documented."
+
+files_affected:
+  modified:
+    - "_project/TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml"
+    - "results-explorer/package.json"
+    - "results-explorer/package-lock.json"
+    - "results-explorer/src/App.tsx"
+    - "results-explorer/src/db.ts"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/manifest.ts"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/components/ErrorMessage.tsx"
+    - ".github/workflows/docs.yml"
+    - "tests/unit/core/explorer_pipeline/"
+    - "docs/development/browser-test-architecture.md"
+    - "docs/development/results-explorer-browser-testing.md"
+  added:
+    - "results-explorer/playwright.config.ts"
+    - "results-explorer/e2e/"
+    - "results-explorer/test-fixtures/"
+    - "results-explorer/test-results/.gitignore"
+
+must_preserve:
+  - "Existing Vitest unit/component/parity tests remain the fast inner-loop signal; the browser suite supplements them and does not replace them."
+  - "The explorer continues to run correctly under the `/results/` base path and existing deep links remain valid."
+  - "The query workbench remains read-only against the DuckDB snapshot; browser-test plumbing must not introduce a writable test-only bypass."
+  - "The curated public corpus under `results-data/bundles/` is not modified for browser-test-only edge cases."
+  - "Existing result download URLs and compare URL semantics remain shareable and user-facing."
+
+approach: |
+  Start with a research gate, not with package installation or test writing.
+  Use the current explorer implementation as the source of truth:
+  `results-explorer/src/App.tsx`, `results-explorer/src/db.ts`,
+  `results-explorer/src/lib/duckdbQueries.ts`, the current page-level Vitest
+  coverage, and the archived/manual browser-validation notes.
+
+  Prefer a Playwright-style browser harness because this item needs
+  multi-browser support, downloads, clipboard checks, traces, and stable
+  route-level acceptance. Run against the built explorer rather than mocked
+  fetches or jsdom-only abstractions. Generate fixture data from canonical
+  bundles plus controlled mutations in an isolated test area instead of relying
+  on whatever happens to be present in `results-explorer/public/data/`.
+
+  Implement in thin slices:
+  1. lock architecture in the research gate
+  2. establish harness and fixture generation
+  3. land browse-surface happy paths
+  4. land compare/detail happy paths
+  5. land query-workbench happy paths
+  6. add injected failure-path coverage
+  7. wire CI and residual manual release checks
+
+anti_patterns:
+  - "DO NOT begin implementation before the research gate closes the open questions - because the built-app target, fixture location, and browser matrix materially change the shape of the solution - lock those decisions first."
+  - "DO NOT point the browser suite at ad-hoc mocked JSON or a jsdom-only harness - because the missing coverage is specifically real browser DuckDB-WASM, routing, clipboard, and download behavior - run against generated `results.duckdb` and actual built assets."
+  - "DO NOT rely on whichever artifacts happen to exist in `results-explorer/public/data/` - because the working tree is not deterministic and may not include the variants needed for coverage - generate a fixture corpus per run."
+  - "DO NOT mutate `results-data/bundles/` or the committed curated corpus to create edge cases - because that pollutes real published data with test-only scenarios - synthesize variants in an isolated fixture workspace."
+  - "DO NOT make all three browsers blocking before flake characteristics are known - because a noisy gate will stall adoption - require Chromium first and graduate Firefox/WebKit based on research-gate evidence."
+
+verification:
+  - description: "The TODO item itself validates cleanly"
+    command: "uv run _project/scripts/validate_todo.py _project/TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml"
+    expected_output: "Validation passes with no schema or DAG errors"
+  - description: "TODO graph remains valid after the new item is added"
+    command: "uv run _project/scripts/todo_cli.py check-graph"
+    expected_output: "No cycles, dangling refs, or duplicate IDs"
+  - description: "The TODO explicitly names the research-gate decision record location"
+    command: "rg -n 'browser-test-architecture\\.md' _project/TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml"
+    expected_output: "The TODO points w1 at `docs/development/browser-test-architecture.md` as the architecture-note deliverable"
+  - description: "Existing explorer fast tests remain green after harness integration"
+    command: "cd results-explorer && npm test"
+    expected_output: "All Vitest suites pass"
+  - description: "Explorer typecheck remains green"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "TypeScript exits successfully with no errors"
+  - description: "The built explorer still compiles under the `/results/` base path"
+    command: "cd results-explorer && npm run build"
+    expected_output: "Vite build succeeds"
+  - description: "Primary browser-functional suite passes in Chromium"
+    command: "cd results-explorer && npm run test:e2e:chromium"
+    expected_output: "All required browser-functional tests pass in Chromium"
+  - description: "Cross-browser smoke coverage passes in Firefox"
+    command: "cd results-explorer && npm run test:e2e:firefox"
+    expected_output: "Smoke coverage passes in Firefox"
+  - description: "Cross-browser smoke coverage passes in WebKit"
+    command: "cd results-explorer && npm run test:e2e:webkit"
+    expected_output: "Smoke coverage passes in WebKit"
+  - description: "Any Python-side fixture-generation or explorer-pipeline glue stays green"
+    command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline -q"
+    expected_output: "All targeted Python explorer-pipeline tests pass"
+  - description: "Residual manual release check is executed after meaningful explorer changes (manual - no command by design)"
+    expected_output: "One short Chrome/Firefox/Safari pass is documented for Home, BenchmarkIndex, ResultDetail, Compare, and Query pages"
+
+scope_limit:
+  only_modify:
+    - "_project/TODO/main/planning/implement-results-explorer-browser-functional-tests.yaml"
+    - "results-explorer/package.json"
+    - "results-explorer/package-lock.json"
+    - "results-explorer/playwright.config.ts"
+    - "results-explorer/e2e/"
+    - "results-explorer/src/App.tsx"
+    - "results-explorer/src/db.ts"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/manifest.ts"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/components/ErrorMessage.tsx"
+    - "results-explorer/test-fixtures/"
+    - "results-explorer/test-results/.gitignore"
+    - ".github/workflows/docs.yml"
+    - ".github/workflows/results-explorer-browser.yml"
+    - "tests/unit/core/explorer_pipeline/"
+    - "docs/development/browser-test-architecture.md"
+    - "docs/development/results-explorer-browser-testing.md"
+  do_not_modify:
+    - "results-data/bundles/"
+    - "docs/reference/hosted-results-contract.md"
+    - "benchbox/core/results/"
+
+metadata:
+  tags:
+    - "results"
+    - "explorer"
+    - "testing"
+    - "browser"
+    - "e2e"
+    - "playwright"
+    - "quality-gate"
+  estimated_effort: "Large"
+  created_date: "2026-04-18"
+
+impact:
+  business_value: |
+    This closes one of the highest remaining credibility gaps in the public
+    results explorer: proving that the real browser experience works as
+    designed, not just the isolated page logic. It also turns manual
+    acceptance work into a repeatable quality gate for future explorer changes.
+  user_impact: |
+    Users get a more reliable explorer experience across routing, compare
+    workflows, query workbench interactions, downloads, and browser-specific
+    error handling.
+  technical_debt: |
+    Replaces ad-hoc and one-off manual browser verification with a deterministic
+    acceptance layer aligned to the actual deployment model.

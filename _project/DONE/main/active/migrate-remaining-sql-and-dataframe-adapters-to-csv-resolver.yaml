@@ -1,0 +1,177 @@
+id: migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver
+title: "Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-26"
+category: Platform Expansion
+description: |
+  Follow-up to migrate-remaining-adapters-to-csv-resolver-pipeline (completed
+  2026-04-25). That work converted DuckDB, ClickHouse, StarRocks, Databend,
+  Firebolt, Redshift, BigQuery, Databricks, Spark, Velox, and LakeSail to
+  resolve_csv_dialect(). The adversarial review of that work flagged that the
+  TODO scope explicitly excluded several adapters that still drive CSV/TBL
+  load options through is_tpc_format() / get_delimiter_for_file(). Those
+  adapters need the same migration so the codebase converges on one CSV
+  dialect contract.
+
+  Current evidence from the live codebase (verified 2026-04-26):
+
+  - benchbox/platforms/snowflake.py:855 — _get_file_format_for_table() picks
+    BENCHBOX_TBL_FORMAT vs BENCHBOX_CSV_FORMAT via is_tpc_format(first_file).
+    Manifest-annotated .csv carrying TPC dialect metadata silently falls into
+    the CSV format branch.
+  - benchbox/platforms/fabric_warehouse.py:945,950,1024 — branches on
+    is_tpc_format(data_file) to pick field_terminator and reads
+    get_delimiter_for_file(data_file) for COPY INTO statements.
+  - benchbox/platforms/datafusion.py:845 — _detect_csv_format() falls back
+    to get_delimiter_for_file(file_paths[0]).
+  - benchbox/platforms/azure_synapse.py:541,610 — uses
+    get_delimiter_for_file(first_file) for COPY INTO field_terminator and
+    direct INSERT delimiter.
+  - benchbox/platforms/dataframe/{modin,cudf,pandas,pyspark,dask,lakesail}_df.py
+    — use is_tpc_format(path) to gate has_trailing_delimiter() probing in
+    DataFrame loaders. Same trailing-delimiter behaviour change addressed in
+    DuckDB needs to be propagated through these read paths. (Note: the
+    predecessor TODO migrated the SQL lakesail.py platform; lakesail_df.py
+    and dask_df.py were not included and still use is_tpc_format.)
+  - benchbox/platforms/base/utils.py:45 — detect_file_format() uses
+    is_tpc_format() to pick a default delimiter when no metadata is supplied.
+    This is a shared utility — verify whether it should be migrated or
+    documented as the legitimate "no-context" fallback.
+
+metadata:
+  tags:
+  - data-loading
+  - csv-dialect
+  - manifest
+  - platform-adapters
+  - resolver
+  estimated_effort: "Medium (2-3 focused implementation sessions)"
+  created_date: "2026-04-26"
+  related_commits:
+  - "73f3a582e"
+  - "cb8c81fe7"
+  - "ca6a4ef50"
+
+impact:
+  user_impact: |
+    Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and the dataframe
+    adapters will honour manifest-declared CSV dialects (delimiter, header,
+    null_marker) the same way the SQL warehouse adapters already do. Closes
+    the remaining gap that lets manifest-driven .csv inputs silently fall
+    back to extension heuristics on these platforms.
+  technical_debt: |
+    Removes the second CSV dialect contract from BenchBox so future dialect
+    changes are testable in one shared resolver instead of platform-by-platform.
+  regression_risk: |
+    Medium. Snowflake's COPY INTO uses named file format objects rather than
+    inline options, so the migration touches both file format selection and
+    creation. The dataframe adapters share trailing-delimiter handling that
+    has subtle interactions with column_names null padding — preserve the
+    `dialect.null_marker is not None` gate established in the DuckDB migration.
+
+deps:
+  needs: []
+
+work:
+- id: w1
+  summary: "Migrate Snowflake _get_file_format_for_table to resolve_csv_dialect"
+  status: done
+  notes: |
+    Replace is_tpc_format(first_file) in
+    benchbox/platforms/snowflake.py:_get_file_format_for_table with a
+    resolver-backed dialect lookup. Pass the DataSource down from
+    _resolve_data_files (currently swallowed). Add a regression test that
+    asserts manifest-declared TBL dialect on a .csv path picks
+    BENCHBOX_TBL_FORMAT.
+
+- id: w2
+  summary: "Migrate Fabric Warehouse COPY INTO field_terminator selection"
+  needs: [w1]
+  status: done
+  notes: |
+    Replace is_tpc_format/get_delimiter_for_file at
+    benchbox/platforms/fabric_warehouse.py:945,950,1024 with
+    resolve_csv_dialect(). Thread the DataSource through the load helpers.
+
+- id: w3
+  summary: "Migrate DataFusion CSV delimiter detection"
+  needs: [w1]
+  status: done
+  notes: |
+    Replace get_delimiter_for_file fallback in _detect_csv_format() at
+    benchbox/platforms/datafusion.py:845 with resolver lookup. DataFusion's
+    loader already has the DataSource available — just plumb the dialect.
+
+- id: w4
+  summary: "Migrate Azure Synapse COPY INTO and direct INSERT delimiters"
+  needs: [w1]
+  status: done
+  notes: |
+    Replace get_delimiter_for_file usages at
+    benchbox/platforms/azure_synapse.py:541,610 with resolver-backed dialect.
+
+- id: w5
+  summary: "Migrate dataframe adapters (pandas, modin, cudf, pyspark, dask, lakesail)"
+  needs: [w1]
+  status: done
+  notes: |
+    Replace is_tpc_format() usages in benchbox/platforms/dataframe/*.py with
+    resolve_csv_dialect(). Affected: pandas_df.py:231, pyspark_df.py:462,
+    modin_df.py:296, cudf_df.py:238, dask_df.py:284, lakesail_df.py:330.
+    Preserve the `null_marker is not None` gate for has_trailing_delimiter()
+    established in the DuckDB external-scan migration. Add focused regression
+    tests per adapter mirroring test_spark_csv_dialect_resolver.py.
+
+- id: w6
+  summary: "Decide migration vs documentation for base/utils.detect_file_format"
+  needs: [w1]
+  status: done
+  notes: |
+    benchbox/platforms/base/utils.py:detect_file_format() is a shared utility
+    called without DataSource context. Either migrate callers to thread the
+    resolver, or document this as the legitimate no-context fallback and
+    add it to the regression guard's allowlist.
+
+- id: w7
+  summary: "Extend the regression guard to cover the newly migrated adapters"
+  needs: [w2, w3, w4, w5]
+  status: done
+  notes: |
+    Add the new adapter paths to _MIGRATED_ADAPTER_PATHS in
+    tests/unit/platforms/test_csv_dialect.py so future regressions are
+    caught.
+
+files_affected:
+  modified:
+  - "benchbox/platforms/snowflake.py"
+  - "benchbox/platforms/fabric_warehouse.py"
+  - "benchbox/platforms/datafusion.py"
+  - "benchbox/platforms/azure_synapse.py"
+  - "benchbox/platforms/dataframe/"
+  - "benchbox/platforms/base/utils.py"
+  - "tests/unit/platforms/test_csv_dialect.py"
+
+must_preserve:
+- "DataSourceResolver remains the single source of table/file resolution; do not reimplement manifest walking inside adapters."
+- "resolve_csv_dialect() precedence remains manifest table_metadata first, then real benchmark csv_* attributes, then file-extension
+  fallback with logging."
+- "null_marker=None remains semantically distinct from a missing null marker; adapters must not replace explicit None with
+  a default string."
+- "Snowflake named file format objects (BENCHBOX_TBL_FORMAT, BENCHBOX_CSV_FORMAT) still load TPC and CSV data with their existing
+  column/null/date semantics."
+- "Dataframe adapter trailing-delimiter probing preserves the `null_marker is not None` gate so non-TPC CSVs do not pay the
+  extra disk read."
+
+verification:
+  command: "uv run -- python -m pytest tests/unit/platforms/test_csv_dialect.py tests/unit/platforms/test_snowflake_csv_dialect.py
+    tests/unit/platforms/ -k csv_dialect -q"
+  expected: "All csv_dialect tests pass; no is_tpc_format imports remain in the migrated adapter paths listed in _MIGRATED_ADAPTER_PATHS"
+
+approach: |
+  Mirror the structure of the completed migrate-remaining-adapters TODO:
+  one work item per adapter, regression tests per adapter, then extend
+  the shared regression guard. Reuse the helpers in
+  tests/unit/platforms/csv_dialect_test_helpers.py (benchmark_stub,
+  resolver_data_source, unsafe_plain_mock_benchmark) for adapter tests.

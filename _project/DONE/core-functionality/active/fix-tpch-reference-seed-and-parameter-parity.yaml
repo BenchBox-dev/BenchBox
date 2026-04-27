@@ -1,0 +1,196 @@
+id: fix-tpch-reference-seed-and-parameter-parity
+title: "Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity"
+worktree: "core-functionality"
+priority: "High"
+status: "Completed"
+completed_date: "2026-02-06"
+description: |
+  The TPC-H reference seed constant has an incorrect octal-to-decimal mapping,
+  and a recent seed default change (dbf159bd) broke SQL/DataFrame benchmark
+  parity by making the two modes use different query parameters.
+
+  Two distinct bugs:
+
+  1. TPCH_SF1_REFERENCE_SEED = 0o0101000000 evaluates to 17039360 in Python,
+     but the comment says "16843008 decimal". Either the octal literal or the
+     comment is wrong. Whichever is the actual reference seed, the value used
+     must match the answer files shipped for SF=1.0 validation.
+
+  2. Commit dbf159bd changed `seed = run_config.get("seed", 1)` to
+     `seed = run_config.get("seed")` in adapter.py:3656 (TPC-H path).
+     When seed=None at SF=1.0, TPCHPowerTest auto-selects the reference seed
+     (17039360) instead of the previous default (1). The DataFrame queries in
+     dataframe_queries.py use hardcoded TPCH_PARAMS that were calibrated to
+     seed=1 parameters. The two modes now run different query workloads,
+     producing a spurious 3.3x performance gap and 4 validation failures
+     (Q11, Q16, Q18, Q20) in SQL mode.
+
+  Evidence from today's benchmark runs:
+    - DF geometric mean: 18.1ms vs SQL geometric mean: 60.0ms (3.3x)
+    - Q18: DF returns 57 rows (correct), SQL returns 9 rows (wrong seed params)
+    - Q11: SQL returns non-deterministic row counts (1031, 888, 839 across iters)
+    - All 22 queries show DF faster, which was not the case before dbf159bd
+
+category: "Core Functionality"
+
+tasks:
+  phases:
+  - phase: "Phase 1: Determine correct reference seed"
+    done: true
+    items:
+    - summary: "Verify which seed the SF=1 answer files were generated with by running qgen with candidate seeds and comparing
+        output row counts against answer files"
+      done: true
+    - summary: "Fix TPCH_SF1_REFERENCE_SEED so the octal literal, decimal comment, and answer files all agree"
+      done: true
+    - summary: "Document the reference seed provenance in a code comment (which TPC-H spec version, how it was determined)"
+      done: true
+
+  - phase: "Phase 2: Restore seed default behavior"
+    done: true
+    items:
+    - summary: "Decide policy: should no-seed default to reference_seed (exact validation) or seed=1 (DF parameter parity)?
+        Document the decision."
+      done: true
+      subtasks:
+      - summary: "Option A: Keep reference_seed auto-select, update TPCH_PARAMS in dataframe_queries.py to match reference
+          seed parameters"
+        done: false
+      - summary: "Option B: Restore seed=1 default, only use reference_seed when --validation=exact is explicitly requested"
+        done: false
+    - summary: "Implement chosen option and ensure both SQL and DF modes produce matching row counts for all 22 queries at
+        SF=1"
+      done: true
+
+  - phase: "Phase 3: Parameterize DataFrame queries"
+    done: true
+    items:
+    - summary: "Make TPCH_PARAMS in dataframe_queries.py derivable from seed rather than hardcoded, or at minimum validate
+        that hardcoded values match the default seed"
+      done: true
+    - summary: "Add a startup assertion or test that compares TPCH_PARAMS values against qgen output for the default seed"
+      done: true
+
+  - phase: "Phase 4: Testing and validation"
+    done: true
+    items:
+    - summary: "Run both modes at SF=1 and confirm geometric mean ratio is within 1.0-1.5x (not 3.3x)"
+      done: true
+    - summary: "Confirm all 22 queries pass validation in both modes with 0 row-count mismatches"
+      done: true
+    - summary: "Add unit test asserting TPCH_SF1_REFERENCE_SEED decimal comment matches actual value"
+      done: true
+
+metadata:
+  owners:
+  - "joe"
+  tags:
+  - "tpch"
+  - "correctness"
+  - "seed"
+  - "validation"
+  estimated_effort: "1-2 days"
+  created_date: "2026-02-06"
+
+impact:
+  business_value: |
+    Benchmark comparisons between SQL and DataFrame modes are meaningless when
+    the two modes run different query parameters. This blocks credible
+    performance analysis and any published comparison numbers.
+  technical_debt: |
+    The hardcoded TPCH_PARAMS dictionary creates a hidden coupling between
+    DataFrame queries and an implicit seed value. Any future seed change
+    will silently break parity again.
+
+files_affected:
+  modified:
+  - "benchbox/core/tpch/benchmark.py"
+  - "benchbox/core/tpch/dataframe_queries.py"
+  - "benchbox/platforms/base/adapter.py"
+  - "benchbox/core/tpch/power_test.py"
+  added:
+  - "tests/unit/test_reference_seed.py"
+
+must_preserve:
+- "TPCHPowerTest.__init__() seed auto-selection logic for exact validation when user explicitly passes --validation=exact"
+- "get_reference_seed() returns correct seed for SF=1.0 that matches answer files"
+- "DataFrame queries produce correct row counts matching TPC-H answer files at SF=1"
+- "SQL queries with default seed produce identical row counts to DataFrame queries for all 22 TPC-H queries"
+
+approach: |
+  Start by determining the correct reference seed empirically:
+    1. Run `qgen` with various candidate seeds (1, 16843008, 17039360) at SF=1
+    2. Compare generated query parameters against TPCH_PARAMS values
+    3. Compare generated query output against answer files in benchbox/core/tpch/answers/
+
+  The seed that produces parameters matching TPCH_PARAMS AND matching answer
+  file row counts is the correct reference seed. Fix the constant accordingly.
+
+  For the default behavior, Option B (restore seed=1 default) is likely simpler
+  and lower-risk: change adapter.py:3656 back to `run_config.get("seed", 1)` and
+  only auto-select reference_seed when validation_mode=="exact". This preserves
+  parity without touching DataFrame queries.
+
+  Long-term, TPCH_PARAMS should be generated from qgen output for a given seed
+  rather than hardcoded, but that can be a follow-up.
+
+anti_patterns:
+- "DO NOT change TPCH_PARAMS values without verifying against qgen output - because the parameters are interdependent and
+  arbitrary changes will produce wrong row counts - regenerate from qgen instead"
+- "DO NOT remove the reference_seed concept entirely - because exact validation against answer files requires a specific seed
+  - keep it available but don't make it the default"
+- "DO NOT add seed parameter threading to DataFrame query functions - because that would require reimplementing qgen's parameter
+  substitution in Python - keep DataFrame params as a static dict derived from qgen output"
+
+verification:
+- description: "Reference seed constant matches its comment"
+  command: "uv run -- python -c \"from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED; print(TPCH_SF1_REFERENCE_SEED)\""
+  expected_output: "Value matches the decimal comment in the source code"
+- description: "SQL and DataFrame modes produce matching row counts at SF=0.01"
+  command: "uv run -- python -m pytest tests/ -k 'tpch' -v --timeout=60"
+  expected_output: "All TPC-H tests pass"
+- description: "Existing platform tests still pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -v"
+  expected_output: "All tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/tpch/benchmark.py"
+  - "benchbox/core/tpch/dataframe_queries.py"
+  - "benchbox/platforms/base/adapter.py"
+  - "benchbox/core/tpch/power_test.py"
+  - "tests/unit/test_reference_seed.py"
+  do_not_modify:
+  - "benchbox/platforms/dataframe/expression_family.py"
+  - "benchbox/platforms/dataframe/benchmark_mixin.py"
+  - "benchbox/cli/"
+
+commits:
+- "dbf159bd"
+- "44d280c0"
+
+context_sections:
+  "Root Cause Analysis": |
+    Commit dbf159bd ("fix(metrics): harmonize TPC Power@Size calculation")
+    changed the seed default from 1 to None as a side-effect of its primary
+    goal (fixing Power@Size metric calculation). The seed change was described
+    as "SQL seed default changed to None to allow reference-seed validation"
+    but the downstream impact on SQL/DF parity was not assessed.
+
+    The octal/decimal mismatch in TPCH_SF1_REFERENCE_SEED predates this
+    commit and may have been introduced when the constant was first created.
+    Python's 0o prefix for octal literals is easy to misread as decimal.
+
+  "Resolution": |
+    Fixed the reference seed comment to match the actual octal value (17039360).
+    Changed seed default behavior to use qgen -d flag (defaults mode) when
+    seed=None, which produces the official TPC-H default substitution parameters
+    matching the answer files. Updated DataFrame TPCH_PARAMS to match qgen -d
+    output. Both SQL and DF modes now produce identical row counts for all 22
+    TPC-H queries at SF=1.
+
+success_metrics:
+- "SQL and DF modes at SF=1 produce identical row counts for all 22 TPC-H queries"
+- "Geometric mean ratio between modes is within 1.0-1.5x (not 3.3x)"
+- "TPCH_SF1_REFERENCE_SEED octal literal and decimal comment agree"
+- "Unit test exists that asserts seed constant self-consistency"

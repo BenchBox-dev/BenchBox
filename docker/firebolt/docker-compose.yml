@@ -1,0 +1,39 @@
+# Firebolt Core Docker Compose - DEVELOPMENT/TEST ONLY
+# Firebolt Core: free, self-hosted vectorized analytics engine (no auth required)
+#
+# Usage:
+#   docker compose -f docker-compose.yml up -d --wait
+#   benchbox run --platform firebolt --benchmark tpch --scale 0.01 \
+#     --platform-option url=http://localhost:3473
+#
+# Ports:
+#   3473 - Firebolt Core HTTP API (no authentication)
+#
+# System requirements: 16 GB RAM minimum recommended
+# macOS: container runs as root (required for io_uring/seccomp workaround)
+
+services:
+  firebolt:
+    image: ghcr.io/firebolt-db/firebolt-core:preview-rc
+    user: root
+    ulimits:
+      memlock:
+        soft: 8589934592
+        hard: 8589934592
+    security_opt:
+      - seccomp:unconfined
+    ports:
+      - "3473:3473"
+    volumes:
+      - firebolt-data:/firebolt-core/volume
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/3473' 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  firebolt-data:
+    driver: local

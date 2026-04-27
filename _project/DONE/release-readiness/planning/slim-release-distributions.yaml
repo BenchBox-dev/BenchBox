@@ -1,0 +1,51 @@
+id: slim-release-distributions
+title: Slim Release Distributions
+worktree: release-readiness
+category: Project Lifecycle Management
+priority: Medium
+status: Completed
+completed_date: '2025-11-28'
+description: Decide whether project wheels should ship the entire 3k test suite and adjust packaging configuration accordingly.
+context_sections:
+- name: Current Build Output
+  summary: '"`uv build` bundles tests/, fixtures, and docs into the wheel, increasing size and install time."'
+impact: Produces leaner artifacts for end users and clarifies what is supported post-install.
+tasks:
+- phase: Distribution Audit
+  done: true
+  notes: '- Wheel: 1.3MB, 391 files (no test files, no _project/, no fixtures/)
+
+    - Sdist: 1.2MB, 603 files (no test files, no _project/)
+
+    - Already properly excludes benchbox.tests* and test directories in pyproject.toml
+
+    '
+  items:
+  - summary: Inventory files included in sdist and wheel.
+  - summary: Identify artifacts safe to exclude.
+- phase: Packaging Adjustments
+  done: true
+  notes: "- pyproject.toml already configured with proper exclusions:\n  - exclude = [\"benchbox.tests*\", \"benchbox.platforms.clickhouse*\"\
+    , ...]\n- MANIFEST.in excludes test fixtures\n- No additional changes needed - already optimal\n"
+  items:
+  - summary: Update MANIFEST/pyproject to control package data.
+  - summary: '"Provide optional `benchbox-tests` extra if needed."'
+- phase: Validation
+  done: true
+  notes: '- Installed wheel in isolated venv successfully
+
+    - "import benchbox; from benchbox import TPCH" works correctly
+
+    - No test files present in installed package
+
+    '
+  items:
+  - summary: Smoke test installed package without tests directory.
+  - summary: Update release docs with new install footprint.
+files_affected:
+  modified:
+  - pyproject.toml
+  - MANIFEST.in
+  - docs/DEVELOPMENT.md
+  added: []
+  removed: []

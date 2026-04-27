@@ -31,13 +31,6 @@ from pathlib import Path
 
 # Import from benchbox and sibling scripts
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from benchbox.release.content_validation import check_content_for_release
-from benchbox.release.workflow import (
-    DEFAULT_MAX_FILE_SIZE_MB,
-    DEFAULT_MAX_TOTAL_SIZE_MB,
-    calculate_release_timestamp,
-    check_release_size,
-)
 from finalize_release import archive_release_artifacts, git_tag_with_timestamp
 from update_version import (
     DOCUMENTATION_PATHS,
@@ -45,6 +38,14 @@ from update_version import (
     update_release_marker,
     update_version_in_init,
     update_version_in_pyproject,
+)
+
+from benchbox.release.content_validation import check_content_for_release
+from benchbox.release.workflow import (
+    DEFAULT_MAX_FILE_SIZE_MB,
+    DEFAULT_MAX_TOTAL_SIZE_MB,
+    calculate_release_timestamp,
+    check_release_size,
 )
 
 
@@ -212,20 +213,20 @@ Summarize these raw commit messages into a compact changelog entry for version {
 
 RULES:
 - Output ONLY the markdown body (### Added, ### Fixed, ### Changed sections). Do NOT include
-  the ## [version] header line — the caller adds that.
+  the ## [version] header line - the caller adds that.
 - Group related commits into single thematic bullets. Hundreds of raw commits should become
   10-25 well-written bullets total across all sections.
 - Major features get **bold lead-ins** with a dash separator and a 1-2 sentence description
   that explains the user impact, e.g.:
   **DataFrame mode for all benchmarks** - Complete DataFrame query implementations across all
-  18 benchmarks including TPC-DS (102 queries), TPC-H (22 queries), SSB, ClickBench, and more.
+  22 benchmarks including TPC-DS (99 queries), TPC-H (22 queries), SSB, ClickBench, and more.
 - Minor items can be plain single-line bullets without bold.
 - Omit internal refactors, TODO management, CI tweaks, and commit noise.
 - Use Keep a Changelog conventions (Added/Fixed/Changed).
-- Preserve technical accuracy — mention specific counts, platform names, and query IDs where
+- Preserve technical accuracy - mention specific counts, platform names, and query IDs where
   they add value.
 - Wrap lines at 100 characters with 2-space continuation indent.
-- Do NOT add any preamble, explanation, or commentary — output the markdown sections only.
+- Do NOT add any preamble, explanation, or commentary - output the markdown sections only.
 
 Here is an example of the desired style from the previous release:
 
@@ -742,6 +743,8 @@ def squash_commits(target: Path, version: str, git_timestamp: str) -> bool:
     env = os.environ.copy()
     env["GIT_AUTHOR_DATE"] = git_timestamp
     env["GIT_COMMITTER_DATE"] = git_timestamp
+    # Public release tree has no .pre-commit-config.yaml; silence the hook if present
+    env["PRE_COMMIT_ALLOW_NO_CONFIG"] = "1"
 
     anchor = _find_squash_anchor(target)
 

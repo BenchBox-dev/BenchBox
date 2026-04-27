@@ -1,0 +1,177 @@
+id: coverage-below-50-modules-wave-plan
+title: "Raise remaining benchbox modules below 50% to >=50% coverage"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-02-10"
+category: Testing and Quality Assurance
+description: |
+  Coverage snapshot from coverage.json (generated 2026-02-09) still shows 75
+  benchbox/*.py modules below 50% line coverage. This TODO defines a detailed,
+  wave-based implementation plan to bring each of those modules to >=50% while
+  preserving fast, deterministic unit-test execution.
+
+  Planning basis:
+    - Source report: coverage.json + scripts/check_per_file_coverage.py
+    - Current low-water marks include 0%-20% in reporting/query helpers,
+      TPC-DS/TPC-H dataframe query modules, legacy ETL modules, and selected
+      CLI/platform adapters.
+
+  Completion target:
+    - No benchbox/*.py module below 50% in the standard coverage-per-file run
+    - keep per-module gate reproducible in CI/local
+    - preserve existing CLI/platform behavior
+
+work:
+  - id: w1
+    summary: "Generate canonical backlog artifact of all <50% modules from coverage.json"
+    status: done
+
+  - id: w2
+    summary: "Classify backlog into effort tiers: tiny (<120 stmts), medium (120-400), large (>400)"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Wave A: lift tiny 0%-20% helper/entry files to >=50% with focused import+error-path tests"
+    needs: [w2]
+    status: done
+
+  - id: w4
+    summary: "Wave B: lift tiny 20%-49% files (results/runner/query parser helpers) with branch-targeted tests"
+    needs: [w3]
+    status: done
+
+  - id: w5
+    summary: "Wave C: core benchmark wrappers (amplab/ssb/h2odb/clickbench/nyctaxi) to >=50%"
+    needs: [w4]
+    status: done
+
+  - id: w6
+    summary: "Wave D: CLI low-coverage commands (results/run/plot/exceptions) to >=50%"
+    needs: [w4]
+    status: done
+
+  - id: w7
+    summary:
+      "Wave E: platform adapters below 50% (fabric_warehouse, influxdb client/setup, redshift, databricks, bigquery,
+      clickhouse workload)"
+    needs: [w4]
+    status: done
+
+  - id: w8
+    summary: "Wave F: metadata/read/write primitives modules below 50%"
+    needs: [w5, w6]
+    status: done
+
+  - id: w9
+    summary:
+      "Wave G: TPC-DI low modules (etl pipeline/batch/transformations/source_generators/scd + remaining generators) to
+      >=50%"
+    needs: [w5, w8]
+    status: done
+
+  - id: w10
+    summary: "Wave H: TPC-DS/TPC-H large dataframe query modules and reporting modules to >=50%"
+    needs: [w5, w8]
+    status: done
+
+  - id: w11
+    summary: "Wave I: remaining analytics/concurrency/cloud-storage low modules to >=50%"
+    needs: [w6, w7, w8]
+    status: done
+
+  - id: w12
+    summary: "Run full make coverage-per-file and capture zero-failure report artifact"
+    needs: [w9, w10, w11]
+    status: done
+
+  - id: w13
+    summary: "Address stragglers from final run, commit by wave, and keep per-wave before/after module snapshots"
+    needs: [w12]
+    status: done
+
+  - id: w14
+    summary: "Close TODO when all modules reach >=50%, validate TODO metadata, and move to DONE"
+    needs: [w13]
+    status: done
+
+deferred:
+  - summary: "Do not add new permanent deferred coverage list entries in this campaign"
+    reason: "Goal is full closure of currently below-50 modules, not further scope deferral"
+
+metadata:
+  tags:
+    - coverage
+    - testing
+    - quality
+    - cli
+    - core
+    - platforms
+    - tpcdi
+    - tpcds
+    - tpch
+  estimated_effort: Large
+  created_date: "2026-02-09"
+  last_updated: "2026-02-10T12:00:00"
+
+impact:
+  business_value: |
+    Reduces regression risk across under-tested benchmark paths and CLI execution
+    surfaces, increasing reliability for local runs and CI checks.
+  technical_debt: |
+    Eliminates large low-coverage pockets that currently require temporary
+    deferrals and makes coverage enforcement meaningful across active modules.
+
+must_preserve:
+  - "Existing fast/unit suite remains deterministic and does not require cloud credentials"
+  - "Current CLI command contracts, option names, and help output semantics remain unchanged"
+  - "TPC-DI SQL/DataFrame ETL parity and adapter behavior remain intact"
+  - "No destructive changes to benchmark query semantics or result schemas"
+
+approach: |
+  Use wave-by-wave, file-targeted unit tests first, refactoring production code
+  only when required for testability. For each wave:
+    1) identify exact uncovered branches from term-missing output,
+    2) add focused tests in tests/unit matching existing patterns,
+    3) run targeted pytest selection,
+    4) run coverage-per-file and record deltas.
+  Favor mocks/fakes over integration setup. Keep each wave independently
+  committable with explicit module-level coverage deltas.
+
+anti_patterns:
+  - "DO NOT lower thresholds or weaken the checker - because that hides quality gaps - close missing branches with tests"
+  - "DO NOT add broad deferred exclusions - because this repeats temporary-split debt - either test or refactor for testability"
+  - "DO NOT add slow/live integration tests for coverage points - because CI must stay fast/offline - use deterministic unit
+    tests"
+  - "DO NOT assert exact SQL formatting when intent-level checks suffice - because formatting churn creates flaky tests - assert
+    structure and behavior"
+
+verification:
+  - description: "Targeted module wave tests pass"
+    command: "uv run -- python -m pytest tests/unit -m fast --tb=short"
+    expected_output: "0 failures"
+  - description: "Per-file coverage gate passes with no module below 50%"
+    command: "make coverage-per-file"
+    expected_output: "No active-scope files below threshold"
+  - description: "CI-oriented fast checks still green"
+    command: "make ci-test"
+    expected_output: "all configured checks pass"
+
+scope_limit:
+  only_modify:
+    - "tests/unit/"
+    - "benchbox/"
+    - "scripts/"
+    - "Makefile"
+    - "pyproject.toml"
+    - "_project/TODO/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchmark_runs/"
+    - "_binaries/"
+
+success_metrics:
+  - "All modules listed as <50% in the 2026-02-09 coverage snapshot reach >=50%"
+  - "scripts/check_per_file_coverage.py reports zero failures at --min 50"
+  - "No net increase in deferred coverage exclusions"

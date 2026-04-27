@@ -1,0 +1,179 @@
+id: dataframe-data-loading-strategy-and-format-management
+title: DataFrame Data Loading Strategy and Format Management
+worktree: dataframe-phase0-data-loading
+category: Core Functionality
+priority: Critical
+status: Completed
+completed_date: '2025-12-02'
+description: 'Define and implement strategy for loading TPC-H/TPC-DS data into DataFrames.
+
+
+  Different platforms prefer different formats (CSV vs Parquet vs Arrow) and
+
+  have different loading mechanisms. Must integrate with existing DataSourceResolver.
+
+  '
+implementation_summary: 'Implemented comprehensive data loading infrastructure in benchbox/core/dataframe/data_loader.py:
+
+
+  DataFrameDataLoader:
+
+  - Orchestrates data preparation for DataFrame platforms
+
+  - Automatic format detection (CSV, TBL, Parquet, Arrow)
+
+  - Platform-specific format recommendations via PlatformCapabilities
+
+  - prepare_benchmark_data() returns ready-to-load file paths
+
+
+  FormatConverter:
+
+  - CSV/TBL to Parquet conversion with PyArrow
+
+  - Handles TPC trailing delimiter format
+
+  - Compression support (zstd, snappy, gzip)
+
+  - Efficient schema handling with column name mapping
+
+
+  DataCache:
+
+  - ~/.benchbox/dataframe-data/ cache directory structure
+
+  - Manifest-based validation with source file hashing
+
+  - Per-benchmark, per-SF, per-format organization
+
+  - Cache hit detection for fast subsequent runs
+
+
+  SchemaMapper:
+
+  - TPC schema to DataFrame type mapping
+
+  - Polars, Pandas, and PyArrow type mappings
+
+  - Column name extraction from schema definitions
+
+  - get_tpch_column_names() and get_tpcds_column_names() helpers
+
+
+  40 unit tests in tests/unit/core/dataframe/test_data_loader.py
+
+  '
+tasks:
+- phase: 'Phase 0.11: Data Format Strategy'
+  items:
+  - summary: Define supported data formats
+    done: true
+    details: 'DataFormat enum: CSV, PARQUET, ARROW
+
+      Platform preferences via PlatformCapabilities.recommended_data_format
+
+      '
+  - summary: Integrate with DataSourceResolver
+    done: true
+    details: 'DataFrameDataLoader._get_source_files() handles:
+
+      - benchmark.tables attribute
+
+      - data_dir file discovery
+
+      - benchmark._impl.tables fallback
+
+      '
+- phase: 'Phase 0.12: Data Loader Implementation'
+  items:
+  - summary: Create DataFrameDataLoader class
+    done: true
+    details: 'prepare_benchmark_data() orchestrates:
+
+      1. Determine optimal format for platform + SF
+
+      2. Check if data already exists in correct format
+
+      3. Check cache for converted data
+
+      4. Convert from CSV/TBL to Parquet if needed
+
+      5. Return paths to data files
+
+      '
+  - summary: Implement CSV to Parquet conversion utility
+    done: true
+    details: 'FormatConverter.convert_csv_to_parquet():
+
+      - Uses PyArrow for efficient conversion
+
+      - Handles TBL trailing delimiter
+
+      - Applies compression
+
+      - Returns (status, row_count)
+
+      '
+  - summary: Implement platform-specific load methods
+    done: true
+    details: 'SchemaMapper provides type mappings for:
+
+      - Polars (Int64, Float64, Utf8, Date)
+
+      - Pandas (int64, float64, object, datetime64)
+
+      - PyArrow (int64, float64, string, date32)
+
+      '
+- phase: 'Phase 0.13: Caching and Reuse'
+  items:
+  - summary: Implement data cache directory structure
+    done: true
+    details: "Cache structure:\n~/.benchbox/dataframe-data/\n  tpch/\n    sf_1.0/\n      parquet/\n        _manifest.json\n\
+      \        customer.parquet\n        lineitem.parquet\n"
+  - summary: Implement data freshness checking
+    done: true
+    details: 'Source hash validation via _compute_source_hash()
+
+      Manifest validation in DataCache.has_cached_data()
+
+      '
+  - summary: Add --regenerate-data flag to CLI
+    done: false
+    note: 'force_regenerate parameter exists in DataFrameDataLoader
+
+      CLI integration deferred to backwards compatibility phase
+
+      '
+- phase: 'Phase 0.14: Integration with Benchmark Lifecycle'
+  items:
+  - summary: Add data preparation phase to benchmark execution
+    done: true
+    details: 'DataFrameDataLoader.prepare_benchmark_data() provides
+
+      complete data preparation lifecycle
+
+      '
+  - summary: Update BaseBenchmark interface
+    done: false
+    note: 'get_tpch_column_names() and get_tpcds_column_names() helpers
+
+      provided instead of modifying BaseBenchmark
+
+      '
+files_affected:
+  modified:
+  - benchbox/core/dataframe/data_loader.py
+  - tests/unit/core/dataframe/test_data_loader.py
+  - benchbox/core/dataframe/__init__.py
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - dataframe
+  - data-loading
+  - phase0
+  estimated_effort: 4-5 days
+  actual_effort: Phases 0.11-0.14 substantially complete

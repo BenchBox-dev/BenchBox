@@ -1,0 +1,151 @@
+id: operate-results-platform-security-observability-and-abuse-controls
+title: "Operate results platform security, observability, and abuse controls"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+deps:
+  needs:
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
+description: |
+  A hosted benchmark-results platform is not credible if anyone can spam it,
+  exfiltrate private metadata, or silently corrupt public read models. Before
+  BenchBox opens self-service submissions broadly, it needs threat modeling,
+  quotas, moderation controls, observability, backups, and explicit incident
+  procedures.
+
+  This item covers the operational and governance controls that make the hosted
+  platform safe to run in public.
+
+  **Phase assignment:** Phase 3 only. Phase 1 (static, maintainer-curated) and
+  Phase 2 (PR-based, GitHub-mediated) have no hosted services to secure or
+  operate. This work is only relevant if/when a hosted API is built.
+
+work:
+- id: w1
+  summary: "Enumerate assets and attack surface: protected assets, external interfaces, trust boundaries"
+  status: pending
+  notes: |
+    List what must be protected: raw bundles, durable metadata, public read
+    models, API keys, actor identity records. Map external interfaces (submission
+    API, explorer, admin CLI). Output: one-page asset inventory used as input
+    to w2.
+
+- id: w2
+  summary: "Write STRIDE threat analysis for the submission, storage, and explorer layers"
+  needs: [w1]
+  status: pending
+  notes: |
+    Apply STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure,
+    Denial of Service, Elevation of Privilege) to each layer in w1. Output:
+    threat-model.md with per-threat likelihood × impact scores and proposed
+    mitigations.
+
+- id: w3
+  summary: "Prioritize top 10 mitigations and assign to design items or Phase 3 acceptance criteria"
+  needs: [w2]
+  status: pending
+  notes: |
+    Sort threats by risk score. For each top-10 mitigation, either assign to
+    an existing design TODO (auth, quota, moderation) or add it as an
+    acceptance criterion to the Phase 3 launch gate.
+
+- id: w4
+  summary: "Define auth model: eligibility gates, token type, scopes, and session lifetime"
+  needs: [w3]
+  status: pending
+  notes: |
+    Choose between API keys vs OAuth. Define token scopes (submit-only vs full
+    read access). Set session and refresh lifetime policy. Outputs feed into
+    integrate-benchbox-cli-submit-and-service-auth.
+
+- id: w5
+  summary: "Define rate limiting and quota model: per-actor submission limits and storage caps"
+  needs: [w4]
+  status: pending
+  notes: |
+    Set per-actor burst budget, daily submission cap, and total storage quota.
+    Define what happens when a limit is hit (reject vs queue vs alert). Include
+    a grace period for first-time submitters.
+
+- id: w6
+  summary: "Define moderation workflow: trust promotion, content takedown, and audit log schema"
+  needs: [w4]
+  status: pending
+  notes: |
+    How does a new actor become trusted? Who can trigger takedowns and under
+    what conditions? What fields does the audit log capture? Output: moderation
+    runbook with explicit escalation paths.
+
+- id: w7
+  summary: "Define platform SLOs: ingestion latency p99, explorer availability, backup RPO/RTO"
+  needs: [w5]
+  status: pending
+  notes: |
+    Set observable, testable SLO targets. Example targets: submission ACK <5s
+    p99, explorer p99 <500ms, backup RPO <24h, RTO <4h. These feed alerting
+    thresholds and incident severity definitions.
+
+- id: w8
+  summary: "Write incident response runbook for result integrity incidents, data breaches, and abuse"
+  needs: [w6, w7]
+  status: pending
+  notes: |
+    Define who is alerted, what actions are taken, and what public
+    communications are required for each incident class. Runbook must be
+    executable without the original author present.
+
+metadata:
+  tags:
+  - results
+  - security
+  - observability
+  - moderation
+  - operations
+  estimated_effort: "Large"
+  created_date: "2026-03-29"
+
+impact:
+  business_value: |
+    Protects the credibility of BenchBox-hosted results before public exposure
+    creates reputational or operational risk.
+  user_impact: |
+    Users get clearer trust labels, better uptime, and safer handling of
+    private or unlisted submissions.
+  technical_debt: |
+    Prevents security and moderation from becoming an afterthought bolted onto
+    a live service.
+
+must_preserve:
+- "Public and unlisted result visibility rules stay enforceable at the storage and API layers, not only in UI hints"
+- "Explorer rebuilds and moderation actions remain auditable after the fact"
+
+approach: |
+  Treat trust, moderation, and observability as first-class platform features.
+  The hosted explorer can be static-first, but the write path still needs the
+  same operational rigor as any public ingestion service.
+
+anti_patterns:
+- "DO NOT launch self-service public submissions without quotas and rate limits -- because abuse cost will be immediate -- define throttling and eligibility rules first"
+- "DO NOT rely on UI badges alone for trust and visibility enforcement -- because storage and API mistakes can leak data -- enforce policy at the service boundary"
+
+verification:
+  # These are done-state checks - run them after work completes, not before.
+  # The output files are created by this TODO's work units.
+- description: "Threat model document committed with STRIDE coverage (run after w2)"
+  command: "grep -c 'Spoofing\\|Tampering\\|Repudiation\\|Information\\|Denial\\|Elevation' _project/analysis/threat-model.md"
+  expected_output: "6"
+- description: "Incident runbook committed and covers all three required incident classes (run after w8)"
+  command: "grep -c 'integrity\\|breach\\|abuse' docs/operations/results-phase-3-runbook.md"
+  expected_output: "3"
+
+files_affected:
+  modified:
+  - "_project/analysis/benchbox-results-platform-strategy.md"
+  - "_project/TODO/main/planning/"
+
+scope_limit:
+  only_modify:
+  - "_project/analysis/"
+  - "_project/TODO/"

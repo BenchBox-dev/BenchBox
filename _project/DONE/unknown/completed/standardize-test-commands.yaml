@@ -1,0 +1,38 @@
+id: standardize-test-commands
+title: ✅ Standardize Test Commands
+category: Pre-Release High Priority Tasks (COMPLETED)
+status: Completed
+priority: High
+impact: Eliminated confusion and standardized development workflow
+sections:
+  Description: Successfully resolved dual test execution system confusion by standardizing all test commands to use pytest
+    with markers, removing references to non-existent run_tests.py script and ensuring consistent test execution across the
+    project.
+  Completed Tasks: '- "✅ **Updated Makefile**: Converted all test commands from run_tests.py to pytest -m commands"
+
+    - "✅ **Updated Documentation**: Removed all references to non-existent run_tests.py script"
+
+    - "✅ **Created Comprehensive Test Suite**: Added test_standardized_test_commands.py"
+
+    - "✅ **Verified Test Execution**: Confirmed all test methods work correctly"'
+  Files Modified: '- "**Modified**: `Makefile` (standardized test targets to use pytest commands)"
+
+    - "**Modified**: `README.md` (updated project structure documentation)"
+
+    - "**Modified**: `tests/utilities/README.md` (updated with current command examples)"
+
+    - "**New**: `tests/unit/test_standardized_test_commands.py` (comprehensive test suite)"'
+  Success Metrics Achieved: '- ✅ Single, clear way to run tests using pytest markers
+
+    - ✅ No confusion about test execution methods
+
+    - ✅ All test categories accessible via pytest -m commands
+
+    - ✅ Documentation clearly explains standardized approach
+
+    - ✅ No references to non-existent run_tests.py script
+
+    - ✅ All test commands work consistently across development workflow'
+worktree: unknown
+description: Successfully resolved dual test execution system confusion by standardizing all test commands to use pytest with
+  markers, removing references to non-existent run_tests.py script and ensuring consistent test execution across the project.

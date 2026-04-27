@@ -1,0 +1,112 @@
+id: prune-legacy-publishing-prototype
+title: "Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Code Quality & Build
+description: |
+  The gap matrix (_project/_archive/publishing-gap-matrix.md) recommends PRUNE for the
+  original prototype publishing module. The new BundlePublisher + PublicationStore is now
+  the supported implementation (merged via PR #13/#50, 143 tests passing).
+
+  The prototype has:
+  - Zero runtime consumers outside its own tests
+  - In-memory-only state (doesn't survive process exit)
+  - Non-canonical JSON serialization (duplicates the exporter)
+  - Fake permalink generation with no resolver service
+  - Declared-but-unimplemented features (secondary_storage, notifications, PARQUET)
+
+  Legacy files to remove:
+  - benchbox/core/publishing/publisher.py (460 lines)
+  - benchbox/core/publishing/artifacts.py (340 lines)
+  - benchbox/core/publishing/permalink.py (~200 lines)
+  - benchbox/core/publishing/config.py (~200 lines)
+
+  Legacy test files to remove:
+  - tests/unit/core/publishing/test_publisher.py
+  - tests/unit/core/publishing/test_artifacts.py
+  - tests/unit/core/publishing/test_permalink.py
+  - tests/unit/core/publishing/test_publishing_config.py
+
+  Legacy __init__.py exports to remove: 12 symbols (PublishFormat, PublishingConfig,
+  RetentionPolicy, StorageConfig, StorageProvider, Artifact, ArtifactManager,
+  ArtifactMetadata, ArtifactStatus, ArtifactType, Permalink, PermalinkGenerator,
+  PermalinkRegistry, PublishBatchResult, Publisher, PublishResult)
+
+deps:
+  needs:
+  - productize-result-publishing-and-artifact-sharing
+
+work:
+- id: w1
+  summary: "Verify zero runtime imports of legacy symbols outside tests and __init__.py"
+  status: pending
+  notes: |
+    grep for imports of Publisher, ArtifactManager, PermalinkGenerator, etc.
+    Confirm the only consumers are __init__.py re-exports and test files.
+
+- id: w2
+  summary: "Remove legacy source files (publisher.py, artifacts.py, permalink.py, config.py)"
+  needs: [w1]
+  status: pending
+
+- id: w3
+  summary: "Remove legacy test files (test_publisher.py, test_artifacts.py, test_permalink.py, test_publishing_config.py)"
+  needs: [w2]
+  status: pending
+
+- id: w4
+  summary: "Clean up __init__.py: remove legacy imports and __all__ entries"
+  needs: [w2]
+  status: pending
+
+- id: w5
+  summary: "Run full test suite to verify no regressions"
+  needs: [w3, w4]
+  status: pending
+
+verification:
+- description: "No legacy publishing imports remain"
+  command: "uv run ruff check benchbox/core/publishing/ && ! grep -r 'ArtifactManager\\|PermalinkRegistry\\|PermalinkGenerator' benchbox/ --include='*.py' | grep -v '__pycache__'"
+  expected_output: "No matches"
+- description: "All publishing tests still pass"
+  command: "uv run -- python -m pytest tests/unit/core/publishing/ tests/integration/test_publish_cli.py -q"
+  expected_output: "All tests pass (count will drop by ~80 from removing legacy tests)"
+- description: "Full fast test suite passes"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "All tests pass"
+
+must_preserve:
+- "BundlePublisher, PublicationStore, BundlePublishResult, PublicationRecord, build_reference must remain"
+- "benchbox publish CLI command group must remain functional"
+- "benchbox run --publish integration must remain functional"
+- "test_publish_store.py and test_publish_cli.py must remain and pass"
+
+anti_patterns:
+- "DO NOT remove files piecemeal without verifying zero consumers first - because hidden imports cause runtime ImportError - scan the full tree before deleting"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/publishing/"
+  - "tests/unit/core/publishing/"
+  do_not_modify:
+  - "benchbox/cli/commands/publish.py"
+  - "benchbox/core/publishing/bundle_publisher.py"
+  - "benchbox/core/publishing/store.py"
+  - "tests/unit/core/publishing/test_publish_store.py"
+  - "tests/integration/test_publish_cli.py"
+
+metadata:
+  tags:
+  - publishing
+  - cleanup
+  - dead-code
+  estimated_effort: "Half day"
+  created_date: "2026-04-03"
+
+impact:
+  business_value: |
+    Removes ~1,200 lines of dead prototype code and ~80 tests that validate orphaned behavior.
+    Reduces maintenance burden and eliminates confusion about which publishing implementation is supported.
+  technical_debt: |
+    Eliminates the dual-implementation state in the publishing module.

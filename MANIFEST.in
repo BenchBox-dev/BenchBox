@@ -37,4 +37,35 @@ prune tests
 prune docs
 prune examples
 
+# Defence-in-depth: exclude maintainer-only and develop-only content from sdist.
+# The two-branch model keeps these on the develop branch (never on main) — this
+# pruning is a tripwire if the branch model ever leaks paths through.
+prune _project
+prune _blog
+prune .claude
+prune .codex
+prune .gemini
+prune .github
+prune .mypy_cache
+prune .ruff_cache
+prune htmlcov
+prune release
+prune landing
+prune scripts
+exclude .pre-commit-config.yaml
+exclude .coveragerc_core
+exclude .dockerignore
+exclude .env.example
+exclude .mcp.json
+exclude AGENTS.md
+exclude CLAUDE.md
+exclude GEMINI.md
+exclude todo.config.yaml
+exclude skill-sync.yaml
+exclude skill-sync.lock
+exclude _benchbox_pytest_xdist_safety.py
+exclude pytest.ini
+exclude pytest-ci.ini
+exclude Makefile
+
 global-exclude *.py[cod] __pycache__ *.so *.dylib *.dll *.log

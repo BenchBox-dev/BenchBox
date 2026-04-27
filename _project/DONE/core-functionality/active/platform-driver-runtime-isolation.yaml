@@ -1,0 +1,271 @@
+id: platform-driver-runtime-isolation
+title: "Implement per-run platform driver runtime isolation (DuckDB first)"
+worktree: core-functionality
+priority: High
+status: Completed
+completed_date: "2026-02-20"
+category: Core Functionality
+description: |
+  Correctness bug discovered on 2026-02-20: versioned DuckDB benchmark runs
+  produced result artifacts showing DuckDB 1.4.3 for every run, even when runs
+  were intended for versions like 0.9.2 and 1.2.2. This invalidates cross-version
+  benchmark comparisons.
+
+  Root cause:
+  - BenchBox execution and metadata both used the same in-process imported
+    `duckdb` module from the BenchBox environment.
+  - Existing driver metadata plumbing (`driver_version`, `driver_version_resolved`)
+    did not guarantee runtime isolation for execution.
+  - External invocation patterns (`uv run --python <env> ...`) were not a reliable
+    per-run isolation contract for BenchBox.
+
+  Non-negotiable requirement:
+  - A benchmark run must be able to request a specific platform driver/library
+    version and execute using that actual runtime version.
+  - DuckDB is first implementation target, and the same delivery must roll the
+    mechanism out across other supported package-based platforms (not DuckDB-only).
+  - Results must persist both requested and actual resolved runtime versions.
+  - Runtime version must be verified from live execution context (DuckDB connection),
+    not only static config values.
+  - Default behavior must remain unchanged when no explicit version is requested.
+
+context_sections:
+  "Evidence Summary": |
+    The following result files showed platform.version/client_version = 1.4.3
+    across supposedly versioned runs:
+    - benchmark_runs/results/ssb_sf10_duckdb_sql_20260220_043409_92e71e46.json
+    - benchmark_runs/results/ssb_sf10_duckdb_sql_20260220_042816_a7549169.json
+    - benchmark_runs/results/ssb_sf10_duckdb_sql_20260220_041646_36c142fe.json
+    - benchmark_runs/results/ssb_sf10_duckdb_sql_20260220_042229_9e861cbc.json
+
+  "Unblocked Work": |
+    Unblocks reliable completion of:
+    _project/TODO/blog-content/active/duckdb-version-performance-benchmarks.yaml
+    which was reset pending due to incorrect runtime versioning artifacts.
+
+  "Platform Scope Policy": |
+    This work is platform-wide. DuckDB provides the first concrete path, but
+    the final deliverable includes generic rollout for other platform adapters
+    that declare driver package metadata. No deferred "DuckDB-only" endpoint.
+
+metadata:
+  tags:
+  - runtime-isolation
+  - driver-versioning
+  - duckdb
+  - correctness
+  - benchmark-integrity
+  estimated_effort: "2-4 days"
+  created_date: "2026-02-20"
+
+impact:
+  business_value: |
+    Restores trust in version-over-version benchmark claims and prevents publishing
+    incorrect performance conclusions.
+  user_impact: |
+    Users can intentionally benchmark specific platform versions and rely on result
+    metadata to reflect actual runtime used for execution.
+  technical_debt: |
+    Replaces fragile environment-coupled behavior with a first-class per-run
+    versioning mechanism and explicit runtime validation.
+
+files_affected:
+  modified:
+  - benchbox/utils/runtime_env.py
+  - benchbox/platforms/__init__.py
+  - benchbox/platforms/duckdb.py
+  - benchbox/cli/database.py
+  - benchbox/cli/execution_pipeline.py
+  - benchbox/core/results/schema.py
+  - benchbox/core/results/platform_info.py
+  - benchbox/platforms/datafusion.py
+  - benchbox/platforms/dataframe/polars_df.py
+  - benchbox/platforms/dataframe/pandas_df.py
+  - tests/unit/utils/test_runtime_env.py
+  - tests/unit/platforms/test_duckdb_adapter.py
+  - tests/unit/cli/test_execution_pipeline_driver_metadata.py
+  added:
+  - tests/integration/test_duckdb_version_isolation.py
+  - tests/unit/platforms/test_platform_driver_runtime_contract.py
+
+work:
+- id: w1
+  summary: "Define per-run driver version contract and runtime-isolation extension points (package, requested, resolved, runtime-actual,
+    strategy)"
+  status: done
+
+- id: w2
+  summary: "Implement runtime_env contract types and resolver primitives for requested/resolved versions and isolation strategy
+    selection"
+  needs:
+  - w1
+  status: done
+
+- id: w3
+  summary: "Implement runtime environment materialization path for Python driver packages with strict unavailable-version
+    error handling"
+  needs:
+  - w2
+  status: done
+
+- id: w4
+  summary: "Wire first-class per-run version selection through CLI/config and platform factory while keeping default no-version
+    behavior unchanged"
+  needs:
+  - w1
+  status: done
+
+- id: w5
+  summary: "Implement DuckDB runtime execution path bound to requested driver runtime for actual query execution"
+  needs:
+  - w3
+  - w4
+  status: done
+
+- id: w6
+  summary: "Capture and validate actual DuckDB runtime version from live connection context and expose it through adapter
+    metadata"
+  needs:
+  - w5
+  status: done
+
+- id: w7
+  summary: "Persist requested, resolved, and actual runtime versions in result metadata and JSON export without breaking existing
+    fields"
+  needs:
+  - w6
+  status: done
+
+- id: w8
+  summary: "Roll out the shared runtime-isolation contract to other package-based platforms and define explicit behavior for
+    non-isolatable adapters"
+  needs:
+  - w2
+  - w4
+  status: done
+
+- id: w9
+  summary: "Add unit tests for runtime_env, DuckDB version-selection path, unavailable-version errors, default behavior, and
+    cross-platform contract enforcement"
+  needs:
+  - w7
+  - w8
+  status: done
+
+- id: w10
+  summary: "Add integration-style test proving two requested DuckDB versions produce distinct actual runtime versions in separate
+    result JSON files"
+  needs:
+  - w7
+  - w9
+  status: done
+
+- id: w11
+  summary: "Run verification matrix (DuckDB 0.9.2 + 1.2.2 and at least one non-DuckDB platform), collect command output proving
+    runtime isolation and metadata correctness"
+  needs:
+  - w10
+  status: done
+
+must_preserve:
+- "Default runs without explicit requested version continue working for DuckDB and use current environment behavior."
+- "Existing CLI/platform option compatibility for driver metadata is preserved (no breaking change to current workflows)."
+- "Result JSON remains backward-compatible: platform.version and platform.client_version still present."
+- "Platform adapter factory remains generic and does not regress non-DuckDB adapters or platform-specific connection flows."
+
+approach: |
+  Build on existing driver metadata plumbing instead of replacing it:
+
+  1. Extend runtime_env to support explicit runtime-isolation strategy and
+     package+version selection suitable for per-run execution.
+  2. Keep shared platform adapter hooks generic (package name + requested version +
+     resolved version + runtime-actual version), add DuckDB-specific runtime
+     validation from live context (module + connection), then apply the same
+     contract to other package-based platforms.
+  3. Ensure results schema captures both intent and truth:
+     - requested driver version
+     - resolved install/runtime version
+     - actual live runtime version used by execution
+  4. Guard default behavior: if no requested version is provided, do not force
+     isolation changes that alter existing run flow.
+  5. Validate with two real DuckDB versions in separate runs and assert distinct
+     actual versions in exported JSON, plus at least one non-DuckDB platform
+     contract verification in the same delivery.
+
+anti_patterns:
+- "DO NOT treat requested version as proof of execution version -- because config intent can diverge from runtime imports
+  -- validate from live runtime/connection."
+- "DO NOT rely on external `uv run --python ...` process wrapping as the product contract -- because it is not reliably enforced
+  inside BenchBox execution -- provide first-class in-product version selection."
+- "DO NOT hardcode DuckDB-only logic in shared interfaces -- because other platforms need the same mechanism -- keep package/version/runtime
+  strategy generic with platform-specific adapters."
+- "DO NOT defer non-DuckDB rollout into a follow-up item -- because runtime correctness is platform-wide -- land shared integration
+  for other package-based platforms in this same TODO."
+- "DO NOT break default no-version runs -- because existing users depend on current behavior -- make version isolation opt-in
+  when explicit version is requested."
+
+verification:
+- description: "Unit tests for runtime version selection and DuckDB adapter path pass"
+  command: "uv run -- python -m pytest tests/unit/utils/test_runtime_env.py tests/unit/platforms/test_duckdb_adapter.py tests/unit/cli/test_execution_pipeline_driver_metadata.py
+    -v --tb=short"
+  expected_output: "all targeted tests pass with 0 failures"
+- description: "Cross-platform runtime contract tests pass for non-DuckDB adapters that declare driver metadata"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_platform_driver_runtime_contract.py -v --tb=short"
+  expected_output: "contract tests pass and enforce requested/resolved/actual metadata behavior across platforms"
+- description: "Integration-style isolation test passes for two distinct requested versions"
+  command: "uv run -- python -m pytest tests/integration/test_duckdb_version_isolation.py -v --tb=short"
+  expected_output: "test verifies separate runs and distinct actual runtime versions in JSON metadata"
+- description: "Default behavior regression check (no explicit driver version) still passes"
+  command: "uv run -- python -m pytest tests/integration/test_benchmark_duckdb_execution.py -k 'smoke or basic' -v --tb=short"
+  expected_output: "existing default DuckDB execution path remains green"
+- description: "Manual DuckDB 0.9.2 run includes inspected JSON fields for requested/resolved/actual and platform/client versions"
+  command: "benchbox run --platform duckdb --benchmark ssb --scale 0.01 --queries Q1 --platform-option driver_version=0.9.2
+    --non-interactive --quiet && f_092=$(ls -t benchmark_runs/results/*duckdb_sql*.json | sed -n '1p') && echo \"$f_092\"\
+    \ && jq '{platform_version:.platform.version,client_version:.platform.client_version,requested:(.execution.driver_version_requested
+    // .execution_metadata.driver_version_requested),resolved:(.execution.driver_version_resolved // .execution_metadata.driver_version_resolved),actual:(.execution.driver_version_actual
+    // .execution_metadata.driver_version_actual // .execution.runtime_version_actual // .execution_metadata.runtime_version_actual)}'
+    \"$f_092\""
+  expected_output: "command prints result file path and JSON object where requested/resolved/actual/platform/client versions
+    all match 0.9.2"
+- description: "Manual DuckDB 1.2.2 run includes inspected JSON fields and proves version differs from prior run"
+  command: "benchbox run --platform duckdb --benchmark ssb --scale 0.01 --queries Q1 --platform-option driver_version=1.2.2
+    --non-interactive --quiet && f_new=$(ls -t benchmark_runs/results/*duckdb_sql*.json | sed -n '1p') && f_prev=$(ls -t benchmark_runs/results/*duckdb_sql*.json
+    | sed -n '2p') && jq '{platform_version:.platform.version,client_version:.platform.client_version,requested:(.execution.driver_version_requested
+    // .execution_metadata.driver_version_requested),resolved:(.execution.driver_version_resolved // .execution_metadata.driver_version_resolved),actual:(.execution.driver_version_actual
+    // .execution_metadata.driver_version_actual // .execution.runtime_version_actual // .execution_metadata.runtime_version_actual)}'
+    \"$f_prev\" \"$f_new\" && test \"$(jq -r '.platform.version' \"$f_new\")\" != \"$(jq -r '.platform.version' \"$f_prev\"\
+    )\""
+  expected_output: "jq output shows one result with 0.9.2 and one with 1.2.2, and final version-inequality test exits successfully"
+
+scope_limit:
+  only_modify:
+  - benchbox/utils/runtime_env.py
+  - benchbox/platforms/__init__.py
+  - benchbox/platforms/duckdb.py
+  - benchbox/cli/database.py
+  - benchbox/cli/execution_pipeline.py
+  - benchbox/core/results/schema.py
+  - benchbox/core/results/platform_info.py
+  - tests/unit/utils/test_runtime_env.py
+  - tests/unit/platforms/test_duckdb_adapter.py
+  - tests/unit/cli/test_execution_pipeline_driver_metadata.py
+  - tests/integration/test_duckdb_version_isolation.py
+  - tests/unit/platforms/test_platform_driver_runtime_contract.py
+  - benchbox/platforms/datafusion.py
+  - benchbox/platforms/dataframe/polars_df.py
+  - benchbox/platforms/dataframe/pandas_df.py
+  do_not_modify:
+  - benchbox/core/tpch/benchmark.py
+  - benchbox/core/tpch/queries.py
+  - benchbox/core/tpcds/benchmark/runner.py
+  - benchbox/core/tpcds/queries.py
+  - benchbox/core/ssb/benchmark.py
+  - benchbox/core/ssb/queries.py
+
+success_metrics:
+- "At least two requested DuckDB versions (example: 0.9.2 and 1.2.2) execute in separate runs with different actual runtime
+  versions recorded in JSON."
+- "Result metadata stores requested, resolved, and actual runtime versions with backward-compatible schema for DuckDB and
+  other package-based platforms."
+- "DuckDB and non-DuckDB contract tests covering version selection/isolation pass."
+- "Default no-version DuckDB run path passes regression test without behavioral change."

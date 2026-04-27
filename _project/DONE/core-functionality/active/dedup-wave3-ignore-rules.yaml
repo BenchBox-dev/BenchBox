@@ -1,0 +1,227 @@
+id: dedup-wave3-ignore-rules
+title: "Add ignore rules for 13 boilerplate/false-positive duplicate groups from wave-3 triage"
+worktree: core-functionality
+priority: Medium-High
+status: Completed
+completed_date: "2026-03-12"
+category: "Code Quality and Technical Debt"
+description: |
+  The `make duplicate-check-verbose` report (2026-03-12, post wave-2) shows 344
+  duplicate groups / 8,051 duplicated lines (threshold 9,476). Wave-3 triage of
+  the top-30 groups identifies 13 groups that are intentional boilerplate, wave-2
+  extraction residuals, protocol conformance, TPC spec-mandated query patterns,
+  or AST structural false positives. These should be suppressed via ignore_rules
+  to reduce noise and focus the checker on genuine consolidation targets.
+
+  Groups to mark as ignored (by current report rank):
+
+  G1  (68 lines): generate_company_dimension / generate_customer_dimension /
+      generate_security_dimension in tpcdi/generator/sql.py. Wave-2 residual:
+      these are thin wrappers calling _build_dimension_sql with domain-specific
+      column expressions. The 34-line structural match is the wrapper pattern,
+      not duplicated logic.
+
+  G2  (55 lines): aggregation_distinct_groupby_expression_impl /
+      aggregation_distinct_groupby_pandas_impl /
+      aggregation_groupby_large_expression_impl in
+      read_primitives/dataframe_queries.py. H2O.db benchmark spec-driven query
+      variants. Wave-2 extracted aggregation_groupby_impl for some pandas variants;
+      the remaining 6 copies (expression + large) are spec-mandated groupby patterns
+      varying only by column names and cardinality.
+
+  G3  (55 lines): classify_error / date_add / date_sub across 6 files.
+      AST false positive - these are different functions with different return
+      types and semantics (error classification vs datetime arithmetic) that
+      happen to share the facade/delegation AST shape.
+
+  G5  (48 lines): get_operations_by_category / get_queries_by_category across
+      5 primitives modules (ai_primitives, metadata_primitives, read_primitives,
+      transaction_primitives, write_primitives). Query catalog lookup methods
+      with type variance (dict[str, str] vs dict[str, Operation]). The 12-line
+      pattern is intentional per-type catalog API. Not worth a shared base class
+      for the type generics overhead.
+
+  G6  (48 lines): get_all_create_table_sql in amplab, read_primitives, ssb.
+      Wave-2 residual: all three now delegate to schema_utils.collect_create_table_sql.
+      The structural match is the wrapper (passing table_order + per-table fn).
+
+  G7  (48 lines): supports_acl_introspection / supports_column_grants /
+      supports_role_hierarchy in metadata_primitives/ddl.py. Intentional
+      capability-matrix methods. Each defines a different platform set.
+      Consolidating would require a capability-type string parameter that
+      obscures the intent.
+
+  G8  (48 lines): generate_data / get_all_aliases / get_benchmark_info across
+      platform_registry.py, datavault.py, nyctaxi.py, tpch_skew.py, tsbs_devops.py.
+      Facade API conformance methods - same pattern as __init__ facades already
+      ignored in wave-2.
+
+  G9  (48 lines): get_queries_by_category in tpcdi/query_analytics.py,
+      tpcdi/query_etl.py, tpcdi/query_validation.py. Same catalog lookup pattern
+      as G5. Extend existing wave-2 rule for TPC-DI query modules.
+
+  G19 (44 lines): get_dataframe_metadata_manager / get_dataframe_transaction_manager /
+      get_dataframe_write_manager across 3 primitives dataframe_operations modules.
+      Wave-2 residual: these now delegate to _get_dataframe_manager in
+      dataframe_manager_factory.py. Structural match is the wrapper pattern.
+
+  G20 (44 lines): validate_customer_tier / validate_gender / validate_trade_type
+      in tpcdi/etl/validation.py. Domain-specific validators that intentionally
+      follow the same isin(valid_set) pattern with different column names and
+      valid value sets.
+
+  G21 (44 lines): __init__ across 5 unrelated classes (tpcdi/tools/data_cleaners.py,
+      base/data_loading.py x2, unified_frame.py x2). Constructor boilerplate:
+      docstring + attribute assignment. Different classes, different attributes.
+
+  G22 (44 lines): calculate_official_metrics / execute_operation / get across
+      5 files. AST false positive - three different function names with different
+      purposes that share the delegation/accessor AST shape.
+
+  G27 (43 lines): q26_expression_impl / q7_expression_impl in
+      tpcds/dataframe_queries/queries.py. TPC-DS spec pair: Q7 and Q26 both
+      compute aggregated metrics from item-joined fact tables with promotional
+      filtering. Same structural pattern, different dimension tables and measures.
+
+  After adding rules, rebaseline: threshold = ceil(actual * 1.10).
+
+approach: |
+  Add entries to the existing ignore_rules list in pyproject.toml under
+  [tool.benchbox.duplicates]. Follow the established pattern and wave-2 style.
+
+  Strategy by group:
+
+  1. G1 (tpcdi dimension generators): Add generate_company_dimension,
+     generate_customer_dimension, generate_security_dimension scoped to
+     benchbox/core/tpcdi/generator/sql.py.
+
+  2. G2 (H2O.db aggregation queries): Add aggregation_distinct_groupby_expression_impl,
+     aggregation_distinct_groupby_pandas_impl, aggregation_groupby_large_expression_impl,
+     aggregation_groupby_large_pandas_impl scoped to
+     benchbox/core/read_primitives/dataframe_queries.py.
+
+  3. G3 (facade delegation false positive): Add classify_error scoped to
+     tpcdi/etl/error_recovery.py. For date_add/date_sub, check if already
+     covered by existing rules; extend path_contains if not.
+
+  4. G5 (primitives catalog methods): Add get_operations_by_category,
+     get_queries_by_category scoped to primitives queries.py and operations.py files.
+
+  5. G6 (schema wrappers): Add get_all_create_table_sql scoped to
+     amplab/schema.py, read_primitives/schema.py, ssb/schema.py.
+
+  6. G7 (capability checks): Add supports_acl_introspection,
+     supports_column_grants, supports_role_hierarchy scoped to
+     metadata_primitives/ddl.py.
+
+  7. G8 (facade methods): Extend existing facade rule to add generate_data,
+     get_all_aliases, get_benchmark_info for the relevant facade files.
+
+  8. G9 (TPC-DI query catalog): Extend existing wave-2 TPC-DI rule (line 1005)
+     to add get_queries_by_category for query_analytics, query_etl, query_validation.
+
+  9. G19 (manager factory wrappers): Add get_dataframe_metadata_manager,
+     get_dataframe_transaction_manager, get_dataframe_write_manager scoped to
+     primitives dataframe_operations.py files.
+
+  10. G20 (domain validators): Add validate_customer_tier, validate_gender,
+      validate_trade_type scoped to tpcdi/etl/validation.py.
+
+  11. G21 (__init__ constructors): Extend existing __init__ ignore rule to
+      add the relevant file paths.
+
+  12. G22 (false positive): Add calculate_official_metrics, execute_operation
+      scoped to the specific false-positive file paths. Check if partially
+      covered by existing rules.
+
+  13. G27 (TPC-DS spec pair): Extend the existing Q62/Q99/Q38/Q87 rule to
+      add q26_expression_impl, q7_expression_impl.
+
+  After adding, run `make duplicate-check-verbose` and lower threshold.
+
+work:
+- id: w1
+  summary: "Add ignore rules for wave-2 residual wrappers: G1, G6, G19"
+  status: done
+  notes: |
+    These are thin wrappers left over after wave-2 extractions. The underlying
+    logic was already consolidated; the structural match is the delegation pattern.
+    G1: generate_*_dimension scoped to tpcdi/generator/sql.py.
+    G6: get_all_create_table_sql scoped to amplab/schema.py, read_primitives/schema.py, ssb/schema.py.
+    G19: get_dataframe_*_manager scoped to primitives dataframe_operations.py files.
+
+- id: w2
+  summary: "Add ignore rules for AST false positives: G3, G22"
+  status: done
+  notes: |
+    These are structurally similar AST hashes across unrelated functions.
+    G3: classify_error scoped to tpcdi/etl/error_recovery.py; check date_add/date_sub
+    coverage in existing rules, extend path_contains if needed.
+    G22: calculate_official_metrics, execute_operation scoped to false-positive paths;
+    check overlap with existing rules first.
+
+- id: w3
+  summary: "Add ignore rules for intentional boilerplate patterns: G2, G5, G7, G8, G9, G20, G21, G27"
+  status: done
+  notes: |
+    G2: H2O.db aggregation query impls scoped to read_primitives/dataframe_queries.py.
+    G5: primitives catalog methods scoped to queries.py and operations.py files.
+    G7: capability checks scoped to metadata_primitives/ddl.py.
+    G8: extend existing facade rule with generate_data, get_all_aliases, get_benchmark_info.
+    G9: extend existing TPC-DI rule (line 1005) with get_queries_by_category.
+    G20: domain validators scoped to tpcdi/etl/validation.py.
+    G21: extend existing __init__ rule with new file paths.
+    G27: extend existing Q62/Q99/Q38/Q87 rule with q26/q7_expression_impl.
+
+- id: w4
+  summary: "Run make duplicate-check-verbose, verify groups suppressed, rebaseline threshold"
+  status: done
+  needs: [w1, w2, w3]
+  notes: |
+    Verify each targeted function name no longer appears in the report.
+    Rebaseline threshold: threshold = ceil(actual * 1.10).
+
+- id: w5
+  summary: "Run make duplicate-check to confirm check still passes with new threshold"
+  status: done
+  needs: [w4]
+
+files_affected:
+  modified:
+  - "pyproject.toml"
+
+verification:
+- description: "Duplicate check passes at lowered threshold"
+  command: "make duplicate-check"
+  expected_output: "PASS"
+- description: "Suppressed groups no longer appear in verbose output"
+  command: "make duplicate-check-verbose 2>&1 | grep -c 'generate_company_dimension\\|supports_acl_introspection\\|validate_customer_tier\\\
+    |q26_expression'"
+  expected_output: "0"
+
+scope_limit:
+  only_modify:
+  - "pyproject.toml"
+
+must_preserve:
+- "Existing ignore_rules entries remain intact"
+- "Threshold only lowered, never raised beyond current value"
+- "make duplicate-check still passes in CI"
+
+anti_patterns:
+- "DO NOT add overly broad function name ignores - because broad ignores mask future real duplicates that should be consolidated,
+  defeating the purpose of the checker - always scope with path_contains"
+- "DO NOT duplicate existing rules - because multiple rules matching the same function create maintenance burden when paths
+  change and make it unclear which rule is authoritative - extend existing rules by adding function names or paths"
+- "DO NOT ignore groups that are genuine consolidation candidates - because the wave-3 consolidation TODOs (sql-platform-adapters,
+  core-and-dataframe) target groups where extraction will reduce real maintenance cost - check the companion TODOs before
+  classifying a group as ignore"
+
+metadata:
+  tags:
+  - code-quality
+  - duplicate-check
+  - ignore-rules
+  - wave-3
+  estimated_effort: "1-2 hours"
+  created_date: "2026-03-12"

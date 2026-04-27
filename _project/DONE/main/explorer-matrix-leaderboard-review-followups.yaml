@@ -1,0 +1,85 @@
+id: explorer-matrix-leaderboard-review-followups
+title: "Address follow-up findings from matrix-leaderboard code review"
+worktree: main
+priority: Low
+status: Completed
+completed_date: "2026-04-19"
+category: Core Functionality
+
+description: |
+  Non-required nits surfaced by the code review of explorer-matrix-leaderboard-view.
+  No Required issues were found; all critical implementation items are correct.
+  This item tracks four minor polish improvements.
+
+work:
+- id: w1
+  summary: "Add comment explaining ?? 0 fallback in Compare.tsx grouped chart"
+  needs: []
+  status: done
+  notes: |
+    Compare.tsx:196-198 - grouped bar chart uses `?? 0` for null display_ms
+    values (queries where all runs failed).  Zero-height bars correctly
+    disappear visually, but the intent is non-obvious: a reader might wonder
+    if 0 misrepresents failed queries as "fastest."
+
+    Fix: add a one-line comment before the `?? 0`:
+      // Null means all runs failed; render as 0 so bar disappears rather than
+      // crashing the chart formatter.
+
+- id: w2
+  summary: "Document zero-timing filter intent in QueryHeatmap.tsx"
+  needs: []
+  status: done
+  notes: |
+    QueryHeatmap.tsx:74 - filter `v > 0` silently excludes timing=0ms
+    (physically impossible but could occur with rounding artifacts).
+
+    Fix: add a comment:
+      // Exclude zero/null cells; sub-ms values round to 0 in some runners.
+
+- id: w3
+  summary: "Improve getBenchmarkSummary to also check !res.ok before content-type"
+  needs: []
+  status: done
+  notes: |
+    manifest.ts:79-80 - HTML detection uses `contentType.includes("text/html")`.
+    If a real 5xx error page uses `application/json` content-type, the gzip
+    DecompressionStream would throw with a cryptic "DecompressionStream error"
+    rather than a meaningful HTTP error.
+
+    Fix: check `!res.ok` first:
+      if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+    Then proceed to content-type check for Vite SPA fallback detection.
+
+- id: w4
+  summary: "Suppress lightnessForCell call when suppressHeat is true"
+  needs: []
+  status: done
+  notes: |
+    QueryHeatmap.tsx:272 - lightnessForCell is called unconditionally even
+    when suppressHeat=true (single-platform view).  The result is immediately
+    discarded.  This is a negligible waste but could confuse a reader.
+
+    Fix: guard the call:
+      const lightness = suppressHeat ? null : lightnessForCell(ms, minInCol);
+
+files_affected:
+  modified:
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/lib/manifest.ts"
+
+must_preserve:
+- "Compare.tsx grouped chart rendering - only adding a comment in w1"
+- "QueryHeatmap heat coloring behavior - only adding a comment in w2 and guarding an unused call in w4"
+
+verification:
+- description: "Full test suite green"
+  command: "cd results-explorer && npm run typecheck && npm test"
+  expected_output: "all green"
+
+metadata:
+  tags: ["explorer", "heatmap", "compare", "review-followup"]
+  estimated_effort: "Tiny (< 30 min)"
+  created_date: "2026-04-16"
+  source: "Code review of explorer-matrix-leaderboard-view (2026-04-16)"

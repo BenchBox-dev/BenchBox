@@ -1,0 +1,163 @@
+# Cloud DW Sorted Data Ingestion (Deep Sort) Follow-up
+#
+# Location: _project/DONE/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml
+
+id: cloud-dw-sorted-data-ingestion
+title: "Add sorted data ingestion support for cloud data warehouses to compare against clustering/Z-order/partitioning"
+worktree: physical-tuning
+priority: High
+status: Completed
+completed_date: "2026-02-20"
+description: |
+  Add explicit sorted data ingestion support for cloud data warehouse platforms as
+  a first-class benchmark strategy, even when platform-native tuning features
+  (clustering keys, Z-ordering, partitioning, sort keys) already exist.
+
+  Rationale:
+  - Deep sorting is an alternative physical layout strategy, not only a fallback.
+  - Users need apples-to-apples performance and cost comparisons between:
+      1) deep sorted ingestion,
+      2) platform-native tuning features,
+      3) combined strategies where safe/valid.
+  - Current cloud CTAS-sort decisions default to "unsupported/no-op" for several
+    platforms, which blocks this experiment design.
+
+  Scope:
+  - Add an opt-in sorted ingestion mode for cloud platforms.
+  - Implement per-platform sorted ingestion execution paths with clear capability
+    gates and documented behavior.
+  - Capture benchmark metadata so result analysis can quantify value/cost trade-offs.
+
+category: Core Functionality
+
+deps:
+  needs:
+    - ctas-sort-dataloader-connectivity
+    - ctas-sort-cloud-platforms
+
+work:
+  - id: w1
+    summary: "Define sorted-ingestion strategy model and CLI/tuning config surface (force/auto/off, method selection)"
+    status: done
+  - id: w2
+    summary:
+      "Implement capability matrix + guardrails for cloud platforms (Snowflake, Databricks, BigQuery, Redshift, Athena,
+      Synapse, ClickHouse Cloud)"
+    needs: [w1]
+    status: done
+  - id: w3
+    summary: "Implement Snowflake/Databricks deep-sort ingestion paths with safe defaults and explicit method markers"
+    needs: [w2]
+    status: done
+  - id: w4
+    summary: "Implement BigQuery/Redshift deep-sort ingestion paths or explicit actionable errors"
+    needs: [w2]
+    status: done
+  - id: w5
+    summary: "Implement Athena/Synapse deep-sort ingestion paths or explicit actionable errors"
+    needs: [w2]
+    status: done
+  - id: w6
+    summary: "Implement ClickHouse Cloud deep-sort ingestion path or explicit actionable error"
+    needs: [w2]
+    status: done
+  - id: w7
+    summary: "Add result metadata for ingestion strategy, runtime overhead, and cost-impact comparability"
+    needs: [w3, w4, w5, w6]
+    status: done
+  - id: w8
+    summary: "Unit/integration test coverage for strategy selection and SQL/action generation in dry-run mode"
+    needs: [w3, w4, w5, w6, w7]
+    status: done
+  - id: w9
+    summary: "Documentation and examples: deep-sort vs native-tuning comparison workflow"
+    needs: [w8]
+    status: done
+
+metadata:
+  tags:
+    - tuning
+    - cloud
+    - data-loading
+    - sorting
+    - performance
+    - cost-analysis
+  estimated_effort: "Large"
+  created_date: "2026-02-20"
+
+impact:
+  business_value: |
+    Enables evidence-based tuning decisions by quantifying when deep-sorted
+    ingestion outperforms, underperforms, or complements platform-native features.
+  user_impact: |
+    Users can run repeatable A/B comparisons of sorted ingestion vs clustering,
+    Z-ordering, partitioning, and sort-key approaches on the same benchmark/data.
+  technical_debt: |
+    Replaces implicit "unsupported" behavior with explicit strategy selection and
+    capability-driven execution, reducing ambiguity in cloud tuning outcomes.
+
+files_affected:
+  modified:
+    - "benchbox/core/tuning/interface.py"
+    - "benchbox/core/tuning/parser.py"
+    - "benchbox/platforms/base/adapter.py"
+    - "benchbox/platforms/base/data_loading.py"
+    - "benchbox/platforms/snowflake.py"
+    - "benchbox/platforms/databricks/adapter.py"
+    - "benchbox/platforms/bigquery.py"
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/athena.py"
+    - "benchbox/platforms/azure_synapse.py"
+    - "benchbox/platforms/clickhouse_cloud.py"
+    - "benchbox/cli/commands/run.py"
+    - "benchbox/core/results/models.py"
+  added:
+    - "tests/unit/platforms/test_cloud_sorted_ingestion_strategy.py"
+    - "docs/usage/cloud-sorted-ingestion.md"
+
+must_preserve:
+  - "Default behavior for existing runs remains unchanged when sorted-ingestion mode is not enabled"
+  - "Platform-native tuning behavior (Snowflake clustering, Databricks Z-ORDER, BigQuery CLUSTER BY) remains available and testable"
+  - "Dry-run mode continues to capture all emitted SQL/actions without requiring live credentials"
+  - "benchbox compare remains compatible with result schema changes"
+
+approach: |
+  Build on PlatformAdapter.apply_ctas_sort and existing cloud adapter tuning hooks,
+  but add an explicit strategy layer so sorted ingestion can be requested even on
+  platforms previously marked as CTAS-sort unsupported.
+
+  Start with strategy selection and capability gating, then implement platform
+  execution paths one adapter at a time. Record selected strategy and overhead
+  metrics in results for downstream comparison analysis.
+
+  Keep all cloud-platform behavior opt-in for safety and to preserve current defaults.
+
+anti_patterns:
+  - "DO NOT silently switch default cloud behavior to deep sort - because it can materially change runtime/cost - require explicit
+    opt-in"
+  - "DO NOT overload existing CLUSTERING/Z_ORDERING semantics - because users need separate A/B dimensions - add a dedicated
+    sorted-ingestion strategy control"
+  - "DO NOT mark a platform as supported without adapter-level tests - because dry-run regressions would be invisible - require
+    platform-specific assertions"
+
+verification:
+  - description: "New TODO validates against schema"
+    command: "uv run _project/scripts/validate_todo.py _project/DONE/physical-tuning/active/cloud-dw-sorted-data-ingestion.yaml"
+    expected_output: "Validation passed"
+  - description: "Cloud strategy tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_cloud_sorted_ingestion_strategy.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Existing cloud CTAS sort tests stay green"
+    command: "uv run -- python -m pytest tests/unit/platforms/test_cloud_platform_ctas_sort.py -v --tb=short"
+    expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  do_not_modify:
+    - "benchbox/core/benchmark.py"
+    - "benchbox/core/tpch/"
+    - "benchbox/core/tpcds/"
+
+open_questions:
+  - "Should deep-sort ingestion be represented as a new TuningType, a platform option, or both?"
+  - "Which platforms should support combined mode (deep sort + native tuning) versus exclusive mode?"
+  - "What minimum result metadata is needed to compare cost/benefit reliably across platforms?"

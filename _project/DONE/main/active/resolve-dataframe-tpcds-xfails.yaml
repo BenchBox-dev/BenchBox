@@ -1,0 +1,129 @@
+id: resolve-dataframe-tpcds-xfails
+title: "Resolve dask-df/tpcds and pyspark-df/tpcds xfail markers before they become permanent dead weight"
+worktree: main
+priority: High
+status: Completed
+category: Testing & Quality
+description: |
+  Two platform/benchmark combinations were marked xfail in the matrix integration
+  test (tests/integration/test_local_platform_benchmark_matrix.py) and in e2e tests
+  to fix a failing test suite (commit 8c0ddcb46, 2026-03-27):
+
+  1. dask-df/tpcds - Dask fails on complex TPC-DS expressions (isin and others).
+     Related: test_dataframe_platforms.py::TestDaskDataFrameE2E::test_tpch_full_execution
+     is also xfail for the same isin issue on TPC-H. Both point to the same root
+     cause: Dask's lazy evaluation doesn't support the isin() expression form that
+     the BenchBox DataFrame query translator emits.
+
+  2. pyspark-df/tpcds - PySpark TPC-DS at SF=1.0 fails in CI without full JVM/Spark
+     setup. This is an environment constraint, not a query translation bug. Likely
+     fixable by improving the availability check or guard condition rather than
+     fixing PySpark itself.
+
+  Risk: xfail markers that reference "known runtime failures" without a resolution
+  path tend to persist indefinitely. This TODO tracks explicit resolution criteria
+  and required follow-up so each xfail either gets fixed or is consciously accepted
+  as permanent and documented accordingly.
+
+metadata:
+  tags:
+    - dataframe
+    - testing
+    - xfail
+    - dask-df
+    - pyspark-df
+    - tpcds
+  estimated_effort: "Medium - dask isin fix may require query translator change; pyspark is likely a guard improvement"
+  created_date: "2026-03-27"
+  related_commits:
+    - "8c0ddcb46 - introduced the xfail markers being tracked here"
+
+work:
+  - id: w1
+    summary: "Diagnose dask-df isin failure - identify which TPC-DS queries trigger it and what expression form Dask rejects"
+    status: done
+    notes: |
+      Run: uv run -- python -m pytest tests/e2e/test_dataframe_platforms.py::TestDaskDataFrameE2E -k "tpch" -n 0 -v --runxfail
+      and the matrix test for dask-df/tpcds with --runxfail to collect actual error messages.
+      Determine if the fix is in the query translator (benchbox/platforms/dataframe/)
+      or requires a Dask-specific workaround.
+
+  - id: w2
+    summary: "Fix or work around dask-df isin expression failure in TPC-H and TPC-DS query translation"
+    needs: [w1]
+    status: done
+    notes: |
+      Options in priority order:
+      1. Emit .isin(list(…)) instead of .isin(…) if Dask requires materialized list
+      2. Add a Dask-specific expression rewriter for isin
+      3. If upstream Dask issue, pin a fix version and add a changelog note
+      Resolution criteria: dask-df/tpcds and dask-df/tpch both pass without xfail.
+
+  - id: w3
+    summary: "Remove dask-df xfail markers from matrix test and e2e test once fix is verified"
+    needs: [w2]
+    status: done
+    notes: |
+      Files to update:
+      - tests/integration/test_local_platform_benchmark_matrix.py (_DATAFRAME_XFAIL_COMBINATIONS dict)
+      - tests/e2e/test_dataframe_platforms.py (TestDaskDataFrameE2E::test_tpch_full_execution marker)
+
+  - id: w4
+    summary: "Diagnose pyspark-df/tpcds CI failure - determine if it's an is_dataframe_available gap or missing JVM guard"
+    status: done
+    notes: |
+      Check whether is_dataframe_available("pyspark-df") already returns False in the
+      CI environment (which would mean the xfail is unreachable dead code) or whether
+      PySpark imports succeed but query execution fails without a full Spark cluster.
+      Run: uv run -- python -c "from benchbox.platforms.dataframe import is_dataframe_available; print(is_dataframe_available('pyspark-df'))"
+
+  - id: w5
+    summary: "Fix pyspark-df availability guard or document as environment-only, then remove xfail marker"
+    needs: [w4]
+    status: done
+    notes: |
+      If is_dataframe_available already handles this: the xfail in matrix test is
+      unreachable - remove it and add a comment to the guard instead.
+      If PySpark imports succeed but execution fails: tighten the availability check
+      to detect missing Spark session/JVM before the test runs.
+      Resolution criteria: pyspark-df/tpcds either skips via is_dataframe_available
+      (no xfail needed) or passes when a real Spark environment is available.
+
+must_preserve:
+  - "Existing pytest.skip() guards for cudf-df (CUDA) and other DataFrame availability checks remain unchanged"
+  - "_DATAFRAME_XFAIL_COMBINATIONS dict entries not being fixed in this work are left intact"
+  - "All non-dask, non-pyspark DataFrame platform matrix tests continue to pass"
+
+approach: |
+  Start with diagnosis (w1, w4 can run in parallel - they're independent platforms).
+  For dask-df, focus on the query translator in benchbox/platforms/dataframe/ rather
+  than test-side workarounds.
+  For pyspark-df, prefer tightening the availability guard over adding more xfail
+  complexity to the test.
+  The reenable-fireducks-after-upstream-fixes TODO is a good structural reference
+  for this pattern.
+
+anti_patterns:
+  - "DO NOT raise the xfail scope to cover more queries or platforms -- because that compounds the dead weight -- fix the root cause instead"
+  - "DO NOT add strict=False to the pyspark-df xfail without diagnosing whether the test can even reach the failure -- because it may already be unreachable via is_dataframe_available"
+  - "DO NOT modify _DATAFRAME_XFAIL_COMBINATIONS to add new entries without creating a corresponding TODO -- because that is how xfails become permanent"
+
+verification:
+  - description: "dask-df/tpcds runs without xfail marker and passes"
+    command: "uv run -- python -m pytest tests/integration/test_local_platform_benchmark_matrix.py -k 'dask-df and tpcds' -n 0 -v"
+    expected_output: "1 passed"
+  - description: "dask-df tpch e2e xfail removed and test passes"
+    command: "uv run -- python -m pytest tests/e2e/test_dataframe_platforms.py::TestDaskDataFrameE2E::test_tpch_full_execution -n 0 -v"
+    expected_output: "1 passed"
+  - description: "pyspark-df/tpcds handled correctly (skip or pass, not xfail)"
+    command: "uv run -- python -m pytest tests/integration/test_local_platform_benchmark_matrix.py -k 'pyspark-df and tpcds' -n 0 -v"
+    expected_output: "1 passed or 1 skipped (not xfailed)"
+  - description: "Full DataFrame matrix test suite passes without regressions"
+    command: "uv run -- python -m pytest tests/integration/test_local_platform_benchmark_matrix.py::test_local_dataframe_platform_benchmark_matrix -n auto -q"
+    expected_output: "No failures in non-xfail tests"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/dataframe/"
+    - "tests/integration/test_local_platform_benchmark_matrix.py"
+    - "tests/e2e/test_dataframe_platforms.py"

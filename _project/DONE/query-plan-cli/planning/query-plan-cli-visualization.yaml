@@ -1,0 +1,188 @@
+id: query-plan-cli-visualization
+title: Query Plan CLI & Visualization
+worktree: query-plan-cli
+category: Core Functionality
+priority: High
+status: Completed
+completed_date: '2025-11-23'
+completion_notes: 'CLI commands and visualization fully implemented and tested.
+
+  - QueryPlanVisualizer class with ASCII tree rendering
+
+  - show-plan command with tree, summary, and JSON formats
+
+  - compare-plans command for single query and batch comparison
+
+  - Threshold filtering for regression detection
+
+  - 15 visualization tests (all passing)
+
+  - Rich terminal output with panels and tables
+
+
+  Advanced features (multi-platform comparison matrix, interactive mode,
+
+  similarity search) deferred for future implementation. Current implementation
+
+  provides complete visualization and comparison capabilities for end users.
+
+  '
+description: 'Implement CLI commands for query plan analysis and ASCII visualization of
+
+  query plans. Includes compare-plans command for cross-platform/cross-run
+
+  comparison, and visualization utilities for rendering plans as ASCII trees
+
+  with side-by-side diffs.
+
+
+  **CLI Commands**:
+
+  - `benchbox run --capture-plans`: Capture plans during benchmark (already added)
+
+  - `benchbox compare-plans`: Compare plans from different runs/platforms
+
+  - `benchbox show-plan`: Display single plan as ASCII tree
+
+  '
+context_sections:
+- name: Visualization Approach
+  summary: 'ASCII tree rendering using box-drawing characters. Side-by-side diff
+
+    view for comparisons. Highlighting of differences using colors/symbols.
+
+    Support for terminal width auto-detection.
+
+    '
+- name: CLI Integration
+  summary: 'New compare_plans.py command module. Loads results from JSON, extracts
+
+    plans, invokes comparison engine, displays results. Interactive mode
+
+    for exploring large comparisons.
+
+    '
+impact: 'MEDIUM-HIGH - User-facing interface to the feature. Makes query plan analysis
+
+  accessible to end users. Good visualizations critical for usability.
+
+  '
+dependencies:
+- workstream: Query Plan Core Infrastructure (Models & Storage)
+  reason: Requires QueryPlanDAG for rendering
+- workstream: Query Plan Platform Adapter Integration
+  reason: Requires captured plans to visualize
+- workstream: Query Plan Comparison Engine
+  reason: Requires comparison results to display
+tasks:
+- phase: 'Phase 5.1: Visualization Utilities'
+  description: ASCII tree rendering
+  items:
+  - summary: Create benchbox/core/query_plans/visualization.py
+    done: true
+  - summary: Implement QueryPlanVisualizer class
+    done: true
+  - summary: Implement ASCII tree rendering algorithm
+    done: true
+  - summary: Add plan summary statistics
+    done: true
+  - summary: Create visualization tests
+    done: true
+- phase: 'Phase 5.2: compare-plans CLI Command'
+  description: New CLI command for plan comparison
+  items:
+  - summary: Create benchbox/cli/commands/compare_plans.py
+    done: true
+  - summary: Implement command-line argument parsing
+    done: true
+  - summary: Load BenchmarkResults from JSON files
+    done: true
+  - summary: Extract query plans for comparison
+    done: true
+  - summary: Invoke QueryPlanComparator
+    done: true
+  - summary: Display comparison results with visualization
+    done: true
+  - summary: Implement JSON output mode for programmatic use
+    done: true
+  - summary: Add batch comparison for all queries
+    done: true
+  - summary: Register command in CLI
+    done: true
+- phase: 'Phase 5.4: Regression Detection'
+  description: Detect plan changes between runs
+  items:
+  - summary: Implement regression detection logic
+    done: true
+    details: Uses threshold filtering
+  - summary: Display regression summary
+    done: true
+  - summary: Add --threshold flag for regression sensitivity
+    done: true
+- phase: 'Phase 5.6: show-plan CLI Command'
+  description: Display single plan as ASCII tree
+  items:
+  - summary: Add benchbox show-plan subcommand
+    done: true
+  - summary: Implement tree format display
+    done: true
+  - summary: Implement summary format (statistics only)
+    done: true
+  - summary: Implement JSON format (raw plan export)
+    done: true
+  - summary: Add visualization options (compact, no-properties, max-depth)
+    done: true
+- phase: 'Phase 5.7: CLI Testing'
+  description: End-to-end testing
+  items:
+  - summary: Create tests/unit/core/query_plans/test_visualization.py
+    done: true
+  - summary: Test tree rendering
+    done: true
+  - summary: Test summary format
+    done: true
+  - summary: Test comparison rendering
+    done: true
+  - summary: Test visualization options
+    done: true
+  - summary: Update CLI help text and examples
+    done: true
+technical_requirements:
+- category: Visualization
+  items:
+  - Readable ASCII trees for plans up to 100 operators
+  - Box-drawing characters for tree structure
+  - Configurable depth limiting
+- category: CLI
+  items:
+  - Consistent with existing BenchBox CLI patterns
+  - Clear error messages for invalid inputs
+  - Rich terminal output with panels and tables
+- category: Performance
+  items:
+  - Render plans <100ms
+  - Compare plans <1 second for typical queries
+files_affected:
+  modified:
+  - benchbox/core/query_plans/visualization.py (491 LOC)
+  - benchbox/cli/commands/compare_plans.py (238 LOC)
+  - benchbox/cli/commands/show_plan.py (154 LOC)
+  - benchbox/cli/commands/__init__.py
+  - tests/unit/core/query_plans/test_visualization.py (15 tests)
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - cli
+  - visualization
+  depends_on:
+  - Query Plan Core Infrastructure (Models & Storage)
+  - Query Plan Platform Adapter Integration
+  - Query Plan Comparison Engine
+  estimated_effort: 1 week
+  lines_of_code: ~400 LOC (CLI + visualization + tests)
+  actual_effort: 1 day
+  actual_lines_of_code: ~1,230 LOC (includes comprehensive tests and documentation)

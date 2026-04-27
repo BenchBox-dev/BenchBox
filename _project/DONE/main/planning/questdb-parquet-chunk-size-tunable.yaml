@@ -1,0 +1,89 @@
+id: questdb-parquet-chunk-size-tunable
+title: "Make QuestDB parquet chunk row count tunable via platform config"
+worktree: main
+priority: Low
+status: Completed
+completed_date: "2026-04-19"
+category: Platform Support
+
+description: |
+  `_load_parquet_via_chunked_csv` hardcodes `batch_size=200_000`.  The comment
+  says this keeps each HTTP request "well under 50 MB", but that budget assumes
+  a narrow schema (~250 bytes/row).
+
+  The tpcds_obt table is a very wide denormalized OBT with 50+ columns.  At
+  200k rows × ~250 bytes/column × 50 columns = ~2.5 GB, far exceeding the
+  budget.  In practice pandas' CSV representation is lighter, but the estimate
+  is schema-dependent and unverifiable without the actual row width.
+
+  Hardcoded batch sizes also prevent operators from tuning the chunk count vs.
+  memory tradeoff for their specific hardware and workload.
+
+  Flagged during Phase 1 remediation review (2026-04-16) as a nit.
+
+work:
+- id: w1
+  summary: "Add parquet_chunk_rows to QuestDB __init__ and from_config"
+  needs: []
+  status: done
+  notes: |
+    In `benchbox/platforms/questdb.py`:
+
+    1. `__init__` (around line 277):
+       self.parquet_chunk_rows = int(config.get("parquet_chunk_rows", 200_000))
+
+    2. `from_config` (around line 228):
+       adapter_config["parquet_chunk_rows"] = config.get("parquet_chunk_rows", 200_000)
+
+    3. `_load_parquet_via_chunked_csv` (line 876):
+       for batch in pf.iter_batches(batch_size=self.parquet_chunk_rows):
+
+    No other files need changing.
+
+- id: w2
+  summary: "Add test and document the platform-option key"
+  needs: [w1]
+  status: done
+  notes: |
+    Add one test in TestAdapterInitEdgeCases:
+
+      def test_parquet_chunk_rows_custom(self, questdb_stubs):
+          adapter = QuestDBAdapter(parquet_chunk_rows=50_000)
+          assert adapter.parquet_chunk_rows == 50_000
+
+    And one test in TestLoadParquetViaChunkedCsv verifying the value flows
+    into iter_batches:
+
+      def test_custom_chunk_rows_passed_to_iter_batches(self, questdb_stubs, tmp_path):
+          adapter = QuestDBAdapter(parquet_chunk_rows=500)
+          ...
+          mock_pf.iter_batches.assert_called_once_with(batch_size=500)
+
+    Document in CLAUDE.md or a QuestDB platform README:
+      --platform-option parquet_chunk_rows=50000   # lower for wide tables
+
+must_preserve:
+- "Default behaviour unchanged: parquet_chunk_rows defaults to 200_000"
+- "All existing TestLoadParquetViaChunkedCsv tests continue to pass"
+- "from_config round-trip: config dict → adapter.parquet_chunk_rows"
+
+anti_patterns:
+- "DO NOT add parquet_chunk_rows to the CLI --platform-option help text for other platforms - because this is QuestDB-specific,
+  scoped to questdb.py only"
+
+verification:
+- description: "Default and custom chunk rows round-trip through adapter"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_questdb_coverage.py -k 'parquet' -v"
+  expected_output: "All parquet-related tests pass including new chunk_rows tests"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["questdb", "parquet", "performance", "configurability"]
+  estimated_effort: "Trivial (< 1 hour)"
+  created_date: "2026-04-16"
+  source_review: "Phase 1 QuestDB remediation review (Finding 5)"
+  related_files:
+  - "benchbox/platforms/questdb.py"
+  - "tests/unit/platforms/test_questdb_coverage.py"

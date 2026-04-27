@@ -1,0 +1,232 @@
+id: fix-read-primitives-datafusion-df
+title: "Fix Read Primitives DataFusion DataFrame Mode (41 Failing Queries)"
+worktree: dataframe-benchmarks
+priority: High
+status: Completed
+completed_date: "2026-02-12"
+description: |
+  Running read_primitives on datafusion-df at scale 1.0 produces 41 failures out of 146
+  queries (72% success rate). The failures stem from 8 root cause categories spanning the
+  unified DataFrame layer, missing window function plumbing, DataFusion v50 API changes,
+  and query implementation bugs.
+
+  This plan fixes 38 queries and skips 3 that are genuinely unsupported on DataFusion
+  (list.eval() is Polars-only, array_sum has no DataFusion v50 equivalent).
+
+  Root cause categories:
+  - Join equality expression not decomposed (10 queries)
+  - unique(subset) drops columns on DataFusion (6 queries)
+  - Missing window functions in adapter chain (8 queries)
+  - DataFusion v50 renamed/removed Python bindings (4 queries)
+  - Missing UnifiedExpr methods: var, struct, desc, sort_by (4 queries)
+  - Query implementation bugs: wrong method names, select/filter ordering (4 queries)
+  - Join type mapping: "outer" not mapped to "full" (1 query)
+  - unnest API change in DataFusion v50 (1 query)
+  - Genuinely unsupported: list.eval(), array_sum (3 queries skipped)
+
+category: Core Functionality
+
+must_preserve:
+  - "All existing Polars dataframe read_primitives query results - 105+ passing queries must not regress"
+  - "ExpressionFamilyContext API contract - existing window_rank, window_row_number, window_dense_rank, window_sum, window_avg,
+    window_count, window_min, window_max signatures unchanged"
+  - "UnifiedLazyFrame.join() behavior for Polars and PySpark - only DataFusion path changes, string-based join signatures unaffected"
+  - "UnifiedExpr.__eq__ return type - still returns UnifiedExpr, just with additional internal metadata"
+  - "DataFusionDataFrameAdapter existing window function implementations - only ADD new methods, don't modify existing ones"
+  - "TPC-H and TPC-DS DataFrame query correctness - no modifications to those query files"
+
+approach: |
+  Four-phase implementation, each independently testable:
+
+  Phase 1 - Infrastructure fixes in unified_frame.py (21 queries):
+    1A. Join equality decomposition: Store _eq_left/_eq_right operands in UnifiedExpr.__eq__
+        result. In UnifiedLazyFrame.join(), detect single-expression left_on with _eq_left
+        attribute and decompose into separate left_on/right_on items. (10 queries)
+    1B. Fix DataFusion unique(subset): Replace select_columns+distinct with ROW_NUMBER-based
+        dedup that preserves all columns. (6 queries)
+    1C. Map "outer" to "full" in DataFusion join path. (1 query)
+    1D. Fix unnest_columns API: singular method name for DataFusion v50. (1 query)
+    1E. Add vstack() to UnifiedLazyFrame via union. (1 query)
+    1F. Add melt() to UnifiedLazyFrame via union of per-variable selections. (1 query)
+    1G. Add desc() to UnifiedExpr for sort ordering. (1 query)
+
+  Phase 2 - DataFusion v50 function fixes in unified_frame.py (5 queries):
+    2A. UnifiedExpr.unique(): array_agg with distinct=True instead of df_f.distinct(). (1 query)
+    2B. UnifiedListExpr.min()/max(): array_sort + array_element workaround. (1 query)
+    2C. UnifiedStrExpr.split(): _DataFusionSplitListExpr proxy using split_part. (2 queries)
+    2D. UnifiedListExpr.sum(): skip - no array_sum in v50. (1 query skipped)
+
+  Phase 3 - Window function plumbing (9 queries):
+    3A. Add window_lag, window_lead, window_ntile, window_percent_rank, window_cume_dist to
+        DataFusionDataFrameAdapter + ExpressionFamilyContext following existing window_rank
+        pattern in datafusion_df.py:749.
+    3B. Rewrite 9 qualify/window/timeseries queries to use ctx.window_*() API instead of
+        non-existent Polars-style ctx.row_number/ctx.lag/ctx.avg methods.
+
+  Phase 4 - Remaining fixes (5 fixed, 3 skipped):
+    4A. Add var() to UnifiedExpr. 4B. Add struct property + UnifiedStructExpr.
+    4C. Fix sort_by DataFusion pass-through. 4D. Skip array_distinct (DataFusion Arrow bug).
+    4E. Platform skip list: list_filter, list_transform, list_reduce.
+
+anti_patterns:
+  - "DO NOT modify the query implementations to be DataFusion-specific - because the expression_impl functions must work on
+    all expression-family platforms (Polars, PySpark, DataFusion) - fix the unified layer or context API instead"
+  - "DO NOT add DataFusion imports to dataframe_queries.py - because query implementations must be platform-agnostic - all DataFusion-specific
+    logic belongs in unified_frame.py or datafusion_df.py"
+  - "DO NOT change existing window function signatures (window_rank, window_sum, etc.) - because other queries depend on them
+    - only ADD new methods"
+  - "DO NOT use Polars-specific .over() chaining in rewritten queries - because it doesn't work on DataFusion/PySpark - use
+    the ctx.window_*() API which handles windowing internally per-platform"
+
+verification:
+  - description: "Existing DataFusion adapter unit tests still pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/dataframe/test_datafusion_df.py -v"
+    expected_output: "all tests pass, 0 failures"
+  - description: "Existing read primitives tests still pass"
+    command: "uv run -- python -m pytest tests/unit/core/read_primitives/ -q"
+    expected_output: "all tests pass, 0 failures"
+  - description: "DataFusion read_primitives benchmark runs with reduced failures"
+    command: "benchbox run --platform datafusion-df --benchmark read_primitives --scale 0.01 --phases power"
+    expected_output: "Successful queries >= 140 out of 146 (was 105)"
+  - description: "Polars read_primitives doesn't regress"
+    command: "benchbox run --platform polars-df --benchmark read_primitives --scale 0.01 --phases power"
+    expected_output: "No increase in failed queries vs current baseline"
+  - description: "Lint and type checks pass"
+    command: "uv run ruff check benchbox/platforms/dataframe/ benchbox/core/read_primitives/"
+    expected_output: "All checks passed"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/dataframe/unified_frame.py"
+    - "benchbox/platforms/dataframe/datafusion_df.py"
+    - "benchbox/platforms/dataframe/expression_family.py"
+    - "benchbox/core/read_primitives/dataframe_queries.py"
+    - "benchbox/core/read_primitives/benchmark.py"
+    - "benchbox/platforms/dataframe/benchmark_mixin.py"
+    - "tests/unit/platforms/dataframe/test_datafusion_df.py"
+    - "tests/unit/core/read_primitives/"
+  do_not_modify:
+    - "benchbox/core/dataframe/query.py"
+    - "benchbox/core/dataframe/context.py"
+    - "benchbox/core/tpch/"
+    - "benchbox/core/tpcds/"
+    - "benchbox/platforms/dataframe/polars_df.py"
+    - "benchbox/platforms/dataframe/pandas_df.py"
+
+files_affected:
+  modified:
+    - "benchbox/platforms/dataframe/unified_frame.py"
+    - "benchbox/platforms/dataframe/datafusion_df.py"
+    - "benchbox/platforms/dataframe/expression_family.py"
+    - "benchbox/core/read_primitives/dataframe_queries.py"
+    - "benchbox/core/read_primitives/benchmark.py"
+    - "benchbox/platforms/dataframe/benchmark_mixin.py"
+
+work:
+  - id: w1
+    summary:
+      "Phase 1A: Fix join equality expression decomposition in UnifiedLazyFrame.join() - store _eq_left/_eq_right on
+      UnifiedExpr.__eq__ result, detect and decompose in join()"
+    status: done
+    notes:
+      "Fixes 10 queries: array_of_struct, olap_cube_analysis, olap_rollup_analysis, optimizer_aggregate_pushdown, optimizer_column_pruning,
+      optimizer_join_reordering, optimizer_limit_pushdown, optimizer_predicate_pushdown, optimizer_runtime_filter. Also fix
+      optimizer_common_subexpression query (move filter before select)."
+
+  - id: w2
+    summary:
+      "Phase 1B-G: Fix remaining unified_frame.py infrastructure - unique(subset) ROW_NUMBER dedup, 'outer'->'full' join
+      type, unnest API, vstack(), melt(), desc()"
+    needs: [w1]
+    status: done
+    notes:
+      "Fixes 11 queries: max_by_{simple,complex,with_ties}, min_by_{simple,complex,with_ties}, shuffle_full_join, array_unnest,
+      shuffle_inner_join_union_all, unpivot_basic, array_length."
+
+  - id: w3
+    summary:
+      "Phase 2: Fix DataFusion v50 function bindings - array_agg distinct, list min/max sort workaround, str.split proxy,
+      skip list_reduce"
+    needs: [w1]
+    status: done
+    notes: "Fixes 4 queries, skips 1: array_agg_distinct, array_min_max, json_extract_simple, json_extract_nested. Skips list_reduce."
+
+  - id: w4
+    summary:
+      "Phase 3A: Add 5 new window functions (lag, lead, ntile, percent_rank, cume_dist) to DataFusionDataFrameAdapter
+      + ExpressionFamilyContext"
+    needs: [w1]
+    status: done
+    notes:
+      "Follow existing window_rank pattern in datafusion_df.py:749. Methods: window_lag, window_lead, window_ntile, window_percent_rank,
+      window_cume_dist."
+
+  - id: w5
+    summary: "Phase 3B: Rewrite 9 qualify/window/timeseries query implementations to use ctx.window_*() API"
+    needs: [w4]
+    status: done
+    notes:
+      "Rewrite: window_moving_frame, timeseries_trend_analysis, qualify_row_number, qualify_dense_rank, qualify_ntile,
+      qualify_percentile, qualify_cume_dist, qualify_lag_lead. window_lead_lag_same_frame needs no rewrite (already correct,
+      just needs Phase 3A)."
+
+  - id: w6
+    summary:
+      "Phase 4: Add var(), struct property, fix sort_by, add platform skip list (array_distinct, list_filter, list_transform,
+      list_reduce)"
+    needs: [w2, w3, w5]
+    status: done
+    notes:
+      "Fixes: statistical_variance_stddev, struct_access, array_agg_simple. Skips: array_distinct, list_filter, list_transform.
+      Add get_platform_skip_queries() to benchmark.py + benchmark_mixin.py."
+
+deferred:
+  - summary: "Full string_to_array support (returning actual list expressions, not split_part proxy)"
+    reason:
+      "DataFusion v50 Python bindings lack string_to_array. Current proxy handles .split().list.get(n) pattern. Full support
+      needs upstream contribution or UDF."
+  - summary: "array_sum / list.sum() for DataFusion"
+    reason:
+      "No array_sum function in DataFusion v50. Would need unnest+aggregate workaround which is complex in expression
+      context. Skipped for now."
+  - summary: "array_distinct Arrow type normalization"
+    reason:
+      "DataFusion array_distinct returns Dictionary(Int32,Utf8) instead of Utf8 elements. This is a DataFusion bug - skip
+      until upstream fix."
+
+metadata:
+  owners:
+    - joe
+  tags:
+    - datafusion
+    - dataframe
+    - read-primitives
+    - bug-fix
+  estimated_effort: "3-4 days"
+  created_date: "2026-02-12"
+  last_updated: "2026-02-12T12:00:00"
+
+impact:
+  business_value: |
+    Brings DataFusion DataFrame read_primitives from 72% to 97% pass rate (141/146 queries).
+    This unblocks comprehensive cross-platform DataFrame benchmarking with DataFusion as a
+    first-class citizen alongside Polars and PySpark.
+  user_impact: |
+    Users can run the full read_primitives benchmark suite on DataFusion without 41 noisy
+    failures. Enables fair performance comparison between DataFusion, Polars, and PySpark
+    on identical query workloads.
+  technical_debt: |
+    Fixes architectural gaps in the unified DataFrame layer (join equality decomposition,
+    unique subset, missing window functions) that would affect any future benchmark adding
+    similar query patterns. The window function additions (lag, lead, ntile, percent_rank,
+    cume_dist) benefit all future query implementations.
+
+success_metrics:
+  - "DataFusion read_primitives passes >= 140 of 146 queries (up from 105)"
+  - "No Polars read_primitives regressions"
+  - "All existing DataFusion unit tests continue to pass"
+  - "New window functions (lag, lead, ntile, percent_rank, cume_dist) work on both DataFusion and Polars"
+
+deps: {}
+  # Removed implement-dataframe-benchmarks dep - read_primitives DataFrame queries already exist,
+  # this TODO fixes bugs in existing implementations

@@ -1,0 +1,79 @@
+id: phase-1-connection-network
+title: 'Platform Config Audit: Connection/Network Settings'
+worktree: platform-config-audit
+category: Platform Configuration
+priority: Medium
+status: Completed
+completed_date: '2025-11-27'
+description: 'Adversarial review of platform-config-audit.md identified forced connection/network
+
+  settings that are NOT documented. These are infrastructure-level configurations
+
+  (timeouts, keepalives) distinct from query-level behavior.
+
+
+  Source: docs/platform-config-audit.md adversarial review (2025-11-26)
+
+  '
+context_sections:
+- name: Redshift TCP Keepalive
+  summary: 'Location: benchbox/platforms/redshift.py:873-877
+
+    Forced: tcp_keepalive=True, tcp_keepalive_idle=600, tcp_keepalive_interval=30, tcp_keepalive_count=3
+
+    Impact: Prevents connection drops on long-running queries; NOT overridable
+
+    Recommendation: JUSTIFIED - standard practice for long-running OLAP queries
+
+    '
+- name: Redshift Connect Timeout
+  summary: 'Location: benchbox/platforms/redshift.py:94
+
+    Forced: connect_timeout=10 (default)
+
+    Impact: Controls initial connection establishment; affects psycopg2 query execution
+
+    Recommendation: JUSTIFIED - reasonable default, different from statement_timeout
+
+    '
+- name: ClickHouse Connection Timeouts
+  summary: 'Location: benchbox/platforms/clickhouse/setup.py:91-93, 121-123
+
+    Forced: connect_timeout=30, send_receive_timeout=300, sync_request_timeout=300
+
+    Impact: Socket-level timeouts (different from max_execution_time); prevents hangs
+
+    Recommendation: JUSTIFIED - prevents hanging connections
+
+    '
+- name: SQLite Lock Timeout
+  summary: 'Location: benchbox/platforms/sqlite.py:204, 181
+
+    Forced: timeout=30.0 (lock timeout)
+
+    Impact: Controls behavior when database is locked; overridable but undocumented
+
+    Recommendation: JUSTIFIED - reasonable default for concurrent access scenarios
+
+    '
+impact: Documentation completeness; ensures all forced configs are transparent to users
+tasks:
+- phase: Verification
+  done: true
+  items:
+  - summary: Verify line numbers are current in each source file
+  - summary: Confirm configurations are still forced (not user-overridable)
+- phase: Documentation Update
+  done: true
+  items:
+  - summary: Add new "Connection/Network Settings" section to docs/platform-config-audit.md
+  - summary: Document all 4 configs under "Justified Configurations"
+- phase: Testing
+  done: true
+  items:
+  - summary: Confirm no behavior changes needed (these are justified)
+files_affected:
+  modified:
+  - docs/platform-config-audit.md
+  added: []
+  removed: []

@@ -1,0 +1,100 @@
+id: drop-lxml-dev-dep-or-port-test-to-stdlib
+title: "Drop lxml dev dep (port single test to stdlib xml.etree)"
+worktree: main
+priority: Low
+status: Completed
+completed_date: "2026-04-15"
+category: Code Quality and Technical Debt
+description: |
+  `lxml>=5.0.0` is declared in `[dependency-groups] dev`. The only import
+  site in the entire repo is `tests/unit/core/tpcdi/test_etl_sources.py:22`.
+  TPC-DI ETL itself uses stdlib `xml.etree`, not lxml.
+
+  Two options:
+    A. Port the single test to `xml.etree.ElementTree` and remove the dep.
+    B. Keep the dep and add an inline comment in pyproject.toml explaining
+       why this single test needs lxml-specific behavior.
+
+  Option A is preferred unless the test relies on lxml-specific XPath /
+  validation features that stdlib cannot replicate.
+
+  Source for this finding: `docs/development/dependency-inventory.md` (F3),
+  produced by `audit-imported-dependencies-for-elimination`.
+
+work:
+  - id: w1
+    summary: "Read `tests/unit/core/tpcdi/test_etl_sources.py` and identify which lxml API surface (XPath / validation / parser) the test actually uses."
+    status: done
+
+  - id: w2
+    summary: "Decide port-vs-keep based on w1 findings: stdlib-only API → port to xml.etree; lxml-specific features → keep dep with inline rationale."
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "If ported: remove `lxml>=5.0.0` from `[dependency-groups] dev` and refresh uv.lock."
+    needs: [w2]
+    status: done
+
+  - id: w4
+    summary: "Run the affected test to confirm it still passes: `uv run -- python -m pytest tests/unit/core/tpcdi/test_etl_sources.py -v`."
+    needs: [w2]
+    status: done
+
+deferred:
+  - summary: "Audit other dev deps with single-test usage"
+    reason: "Out of scope; covered by the parent audit."
+
+files_affected:
+  modified:
+    - "pyproject.toml"
+    - "uv.lock"
+    - "tests/unit/core/tpcdi/test_etl_sources.py"
+
+must_preserve:
+  - "`tests/unit/core/tpcdi/test_etl_sources.py` continues to pass"
+  - "`benchbox/core/tpcdi/etl/` continues to use stdlib xml.etree (no lxml import added)"
+  - "Fast suite green"
+
+approach: |
+  Look-before-you-leap: read the test first, decide port vs keep based on
+  what lxml feature it actually uses. Don't blindly remove and break.
+
+anti_patterns:
+  - "DO NOT remove lxml without porting the test - because `pytest tests/unit/core/tpcdi/test_etl_sources.py` would break - port first, remove second"
+
+verification:
+  - description: "Test still passes"
+    command: "uv run -- python -m pytest tests/unit/core/tpcdi/test_etl_sources.py -v"
+    expected_output: "1 or more passed"
+  - description: "If removal path was taken, lxml not declared anywhere"
+    command: "uv run -- python -c \"import tomllib, pathlib; d = tomllib.loads(pathlib.Path('pyproject.toml').read_text()); all_specs = d['project']['dependencies'] + sum(d['project'].get('optional-dependencies', {}).values(), []) + sum((g for g in d.get('dependency-groups', {}).values()), []); has_lxml = any(isinstance(s, str) and 'lxml' in s for s in all_specs); print('LXML_PRESENT' if has_lxml else 'OK: lxml fully removed')\""
+    expected_output: "OK: lxml fully removed (or LXML_PRESENT if keep-with-rationale was chosen)"
+
+scope_limit:
+  only_modify:
+    - "pyproject.toml"
+    - "uv.lock"
+    - "tests/unit/core/tpcdi/test_etl_sources.py"
+  do_not_modify:
+    - "benchbox/"
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["maintenance", "supply-chain", "deps", "audit-followup"]
+  estimated_effort: "Small (1-2 hours)"
+  created_date: "2026-04-15"
+
+impact:
+  business_value: |
+    One fewer dep to keep installed for contributors. Smaller dev environment.
+  user_impact: |
+    None directly - lxml is dev-only today. Indirectly, faster `uv sync --group dev`.
+  technical_debt: |
+    Closes finding F3 from the dependency-inventory audit.
+
+success_metrics:
+  - "test_etl_sources.py passes after the change"
+  - "If removal path: lxml absent from all pyproject sections"

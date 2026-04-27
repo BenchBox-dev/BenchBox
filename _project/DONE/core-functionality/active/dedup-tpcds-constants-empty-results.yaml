@@ -1,0 +1,82 @@
+id: dedup-tpcds-constants-empty-results
+title: "Extract TPC-DS canonical table list and shared _empty_results to constants"
+worktree: core-functionality
+priority: Low
+status: Completed
+completed_date: "2026-02-22"
+category: Core Functionality
+description: |
+  Group 15 from the duplicate-check report identifies two consolidation targets:
+
+  1. TPC-DS canonical table names (~24-element list): duplicated identically in
+     - benchbox/core/tpcds/c_tools.py:136
+     - benchbox/core/tpcds/generator/manager.py:178
+     - benchbox/core/tpcds/benchmark/runner.py:404
+     This is a TPC-DS specification constant that should be defined once.
+
+  2. _empty_results (zero-valued results dict): duplicated between
+     benchbox/core/tpc_patterns.py:559 and benchbox/base.py:178.
+     This is a shared result schema for stream/throughput result builders.
+
+approach: |
+  1. Create or add to `benchbox/core/tpcds/constants.py`:
+     `TPCDS_TABLE_NAMES: list[str] = ["call_center", "catalog_page", ...]`
+  2. Replace the 3 copies with imports from constants module
+  3. For _empty_results, determine the canonical location (likely tpc_patterns.py)
+     and have base.py import from there
+
+work:
+  - id: w1
+    summary: "Create TPCDS_TABLE_NAMES constant and replace 3 copies"
+    status: done
+    notes: |
+      constants.py already had TPCDS_TABLE_NAMES; c_tools.py and generator/manager.py
+      already imported it.  Replaced 3 hardcoded lists in runner.py (get_available_tables,
+      get_table_loading_order, load method).  Added TPCDS_TABLE_LOADING_ORDER constant
+      for the two identical dependency-ordered lists.
+
+  - id: w2
+    summary: "Consolidate _empty_results to single canonical location"
+    status: done
+    notes: |
+      _empty_results only exists in tpc_patterns.py (no duplicate in base.py).
+      No consolidation needed; the reported duplication does not exist in the
+      current codebase.
+
+  - id: w3
+    summary: "Run TPC-DS tests"
+    needs: [w1, w2]
+    status: done
+    notes: "538 passed in 141s"
+
+files_affected:
+  modified:
+    - "benchbox/core/tpcds/c_tools.py"
+    - "benchbox/core/tpcds/generator/manager.py"
+    - "benchbox/core/tpcds/benchmark/runner.py"
+    - "benchbox/core/tpc_patterns.py"
+    - "benchbox/base.py"
+
+verification:
+  - description: "TPC-DS tests pass"
+    command: "uv run -- python -m pytest tests/ -v -k tpcds"
+    expected_output: "all tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpcds/"
+    - "benchbox/core/tpc_patterns.py"
+    - "benchbox/base.py"
+    - "tests/"
+
+must_preserve:
+  - "Table name list includes all 24 TPC-DS tables"
+  - "generator/manager.py copy includes 'dbgen_version' (25th entry) - handle separately"
+
+metadata:
+  tags:
+    - code-quality
+    - duplicate-check
+    - refactoring
+  estimated_effort: "1 hour"
+  created_date: "2026-02-21"

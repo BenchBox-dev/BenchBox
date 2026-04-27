@@ -1,0 +1,43 @@
+# SingleStore Docker Compose - DEVELOPMENT/TEST ONLY
+# SingleStore (formerly MemSQL) - distributed OLAP/OLTP with MySQL wire protocol
+# Uses the free singlestoredb-dev image (self-contained single-node cluster).
+# Plaintext credentials below are for local testing only - do not use in production.
+#
+# Usage:
+#   docker compose -f docker-compose.yml up -d --wait
+#   benchbox run --platform singlestore --benchmark tpch --scale 0.01 \
+#     --platform-option port=13306
+#
+# Ports (host → container):
+#   13306 → 3306  - MySQL wire protocol (remapped to avoid conflict with local MySQL)
+#
+# Default credentials:
+#   Username: root
+#   Password: benchbox  (ROOT_PASSWORD)
+#
+# Note: SingleStore takes 60-90 seconds to initialise the embedded cluster.
+# The healthcheck retries 20× at 10 s intervals (200 s total window).
+
+services:
+  singlestore:
+    image: ghcr.io/singlestore-labs/singlestoredb-dev:latest
+    platform: linux/amd64  # image is x86-only; Docker Desktop uses Rosetta on Apple Silicon
+    ports:
+      - "${SINGLESTORE_HOST_PORT:-13306}:3306"
+    environment:
+      ROOT_PASSWORD: benchbox
+    volumes:
+      - singlestore-data:/var/lib/singlestore
+    healthcheck:
+      test: >
+        singlestore -h127.0.0.1 -P3306 -uroot -pbenchbox -e "SELECT 1"
+        || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+    restart: unless-stopped
+
+volumes:
+  singlestore-data:
+    driver: local

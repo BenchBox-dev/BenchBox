@@ -1,0 +1,86 @@
+id: loud-loader-failures-for-contaminated-data
+title: "Raise DataLoadingError instead of silent zero-row loads in SQL/file loader"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-03-11"
+description: |
+  The shared SQL/file loader at data_loading.py silently records 0 rows when
+  manifest-listed shard paths don't exist as files on disk (line 1972-1976).
+  This causes cryptic downstream query failures instead of an immediate,
+  actionable load error. Similarly, _load_single_file doesn't fully guard
+  against directory inputs or missing explicit single-file inputs, allowing
+  IsADirectoryError or silent skip behavior to propagate.
+
+  Root cause: stale Iceberg table directories (customer/, lineitem/) coexist
+  with valid manifest-tracked files. The exists() filter passes for directories,
+  but handlers can't load them. When all shards filter out, 0 rows is recorded
+  silently.
+
+  This is the highest-value fix because it protects users regardless of the
+  contamination source - stale Iceberg dirs, bad paths, permissions, etc.
+
+category: Core Functionality
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Replace exists() shard filter with three-way categorization (files/directories/missing)"
+    status: done
+  - id: w2
+    summary: "Raise DataLoadingError when resolved shard file list is empty (replace silent table_stats = 0)"
+    needs: [w1]
+    status: done
+  - id: w3
+    summary: "Add is_dir() guard in _load_single_file before the existing exists() check"
+    status: done
+  - id: w4
+    summary: "Add loader regression tests: empty shards raises, directory shard filtered+warned, single-file directory raises"
+    needs: [w1, w2, w3]
+    status: done
+  - id: w5
+    summary: "Fail fast for missing single-file inputs when the path came from explicit manifest or benchmark table mappings instead of warn+return-0"
+    needs: [w3]
+    status: done
+  - id: w6
+    summary: "Add regression coverage for missing explicit single-file inputs while preserving legitimate loading behavior"
+    needs: [w5]
+    status: done
+
+verification:
+  - description: "Loader regression tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/ -k data_loading -v"
+    expected_output: "All loader tests, including missing-single-file coverage, pass; no regressions in existing tests"
+  - description: "Happy path: legitimate sharded and single-file loading still works"
+    command: "uv run -- python -m pytest tests/integration/ -k 'tpch and duckdb' -x -q --no-header 2>/dev/null || uv run -- python -m pytest -m fast -q"
+    expected_output: "Existing loading paths pass without regression"
+
+must_preserve:
+  - "Legitimate sharded loading still works when all shard files exist"
+  - "Handler factory and FileFormatRegistry dispatch logic unchanged"
+  - "Non-explicit discovery flows should not become noisier unless the loader can prove the missing path came from manifest or benchmark table input"
+
+approach: |
+  Target file: benchbox/platforms/base/data_loading.py
+  - Line 1972: Replace one-liner list comprehension with explicit for-loop categorizing
+    each path as is_file(), is_dir(), or missing
+  - Lines 1975-1976: Replace `table_stats[table_name] = 0` with raise DataLoadingError
+    including table name, original path count, dir/missing counts, and --force datagen hint
+  - Line 2042: Add is_dir() check before existing not-exists check in _load_single_file,
+    raising DataLoadingError with stale-data hint
+  - Follow through on the remaining single-file gap: when the missing path came
+    from explicit manifest or benchmark.tables input, raise DataLoadingError
+    instead of warning+return-0; if provenance is not currently available at the
+    call site, lift the decision to the caller or thread a narrow context flag
+  - DataLoadingError is already defined in data_loading.py
+
+anti_patterns:
+  - "DO NOT return 0 silently for manifest-provided paths - raise errors instead, because silent failures cause cryptic downstream query failures"
+  - "DO NOT leave explicit single-file manifest or benchmark-table paths on the legacy warn+return-0 branch"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/data_loading.py"
+    - "tests/unit/platforms/base/"

@@ -1,0 +1,143 @@
+id: pyspark-sql-schema-translation
+title: Implement schema creation with SQLGlot translation for PySpark
+worktree: dataframe-expansion
+priority: High
+status: Not Started
+category: Platform Expansion
+
+description: |
+  Implement create_schema() with SQLGlot translation from DuckDB dialect
+  to Spark SQL dialect, handling Spark-specific limitations.
+
+  Spark SQL has different DDL constraints than DuckDB:
+  - CHECK constraints not supported
+  - PRIMARY KEY is informational only (not enforced)
+  - Different DECIMAL precision limits
+  - Supports PARTITIONED BY for performance tuning
+  - Supports USING clause for file format (PARQUET, DELTA)
+
+context_sections:
+  "Translation Examples": |
+    DuckDB:
+    ```sql
+    CREATE TABLE lineitem (
+        l_orderkey INTEGER NOT NULL,
+        l_partkey INTEGER NOT NULL,
+        l_suppkey INTEGER NOT NULL,
+        l_linenumber INTEGER NOT NULL,
+        l_quantity DECIMAL(15,2) NOT NULL,
+        l_extendedprice DECIMAL(15,2) NOT NULL,
+        PRIMARY KEY (l_orderkey, l_linenumber),
+        CHECK (l_quantity >= 0)
+    );
+    ```
+
+    Spark SQL (translated):
+    ```sql
+    CREATE TABLE lineitem (
+        l_orderkey INT NOT NULL,
+        l_partkey INT NOT NULL,
+        l_suppkey INT NOT NULL,
+        l_linenumber INT NOT NULL,
+        l_quantity DECIMAL(15,2) NOT NULL,
+        l_extendedprice DECIMAL(15,2) NOT NULL
+    )
+    USING PARQUET;
+    ```
+
+  "Implementation Approach": |
+    ```python
+    def create_schema(self, benchmark, connection):
+        for table in benchmark.tables:
+            # Get DuckDB DDL
+            ddl = table.get_create_statement("duckdb")
+
+            # Translate to Spark SQL
+            spark_ddl = sqlglot.transpile(
+                ddl,
+                read="duckdb",
+                write="spark"
+            )[0]
+
+            # Post-process to remove unsupported features
+            spark_ddl = self._remove_check_constraints(spark_ddl)
+            spark_ddl = self._make_pk_informational(spark_ddl)
+
+            # Apply tuning (file format, partitioning)
+            spark_ddl = self._apply_tuning(spark_ddl, table.name)
+
+            # Execute
+            self._spark.sql(spark_ddl)
+    ```
+
+  "Tuning Options": |
+    - USING PARQUET: Default, efficient columnar storage
+    - USING DELTA: If Delta Lake is available
+    - PARTITIONED BY (col): For large tables (lineitem, orders)
+    - CLUSTERED BY (col) INTO N BUCKETS: For join optimization
+
+tasks:
+  phases:
+  - phase: "Phase 1: Basic Translation"
+    done: false
+    items:
+    - summary: Implement SQLGlot translation duckdb -> spark
+      done: false
+    - summary: Handle CHECK constraint removal
+      done: false
+    - summary: Handle PRIMARY KEY as informational
+      done: false
+    - summary: Adjust data type mappings if needed
+      done: false
+
+  - phase: "Phase 2: Tuning Support"
+    done: false
+    items:
+    - summary: Add USING PARQUET clause
+      done: false
+    - summary: Add optional USING DELTA support
+      done: false
+    - summary: Implement PARTITIONED BY configuration
+      done: false
+    - summary: Document tuning options
+      done: false
+
+  - phase: "Phase 3: Validation"
+    done: false
+    items:
+    - summary: Test TPC-H schema creation
+      done: false
+    - summary: Test TPC-DS schema creation
+      done: false
+    - summary: Verify all tables create successfully
+      done: false
+
+files_affected:
+  modified:
+  - benchbox/platforms/pyspark/sql_adapter.py
+
+metadata:
+  owners:
+  - "@benchbox-maintainers"
+  tags:
+  - pyspark
+  - sql
+  - schema
+  - sqlglot
+  - ddl
+  - translation
+  estimated_effort: Medium
+  created_date: "2025-12-07"
+
+success_metrics:
+- Translates CREATE TABLE from duckdb to spark dialect
+- Removes unsupported CHECK constraints
+- Handles PRIMARY KEY as informational (no enforcement)
+- Applies USING PARQUET or USING DELTA format
+- Supports PARTITIONED BY tuning
+- TPC-H schema creates successfully
+- TPC-DS schema creates successfully
+
+dependencies:
+  blocked_by:
+  - dataframe-expansion/planning/pyspark-sql-adapter-core.yaml

@@ -1,0 +1,135 @@
+id: test-suite-alignment-schema-v1-1-and-platform-enhancements
+title: ✅ Test Suite Alignment - Schema v1.1 and Platform Enhancements
+category: Testing and Quality Assurance
+status: Completed
+priority: High
+impact: Updated test suite to align with recent core code changes including schema v1.1 migration for cost estimation support,
+  ClickHouse mode-specific platform naming, Redshift query statistics enhancements, and release workflow changes. All 12 failing
+  tests now passing with zero regressions.
+sections:
+  Summary: Fixed 12 failing tests across 7 test files to align with core code changes. No backward compatibility added (project
+    not yet released). No core code modified - all fixes were test updates to match actual implementation. Completed in 6
+    phases with commits after each phase. All changes reflect production-quality code with proper schema evolution and platform
+    adapter enhancements.
+  Phase 1 - Schema Version Migration (v1.0 → v1.1): '- Updated schema version assertions from "1.0" to "1.1" for cost estimation
+    support
+
+    - Files: tests/unit/cli/test_cli_output.py (3 assertions), tests/integration/test_export_cli.py (1 assertion)
+
+    - Root cause: benchbox/core/results/schema.py SCHEMA_VERSION = "1.1" (line 20)
+
+    - All 5 schema version tests passing
+
+    - Changes already committed in earlier work'
+  Phase 2 - ClickHouse Platform Naming Enhancement: '- Updated platform_name assertions to expect mode-specific names
+
+    - Expected: "ClickHouse (Server)" and "ClickHouse (Local)" based on mode
+
+    - Fixed configuration field access: platform_info["configuration"]["host"] instead of platform_info["host"]
+
+    - Added __version__ attribute to fake chdb module mock
+
+    - File: tests/unit/platforms/test_platform_info.py (2 tests)
+
+    - Root cause: benchbox/platforms/clickhouse/metadata.py f"ClickHouse ({self.mode.title()})" (line 82)
+
+    - All ClickHouse platform_info tests passing
+
+    - Changes already committed in earlier work'
+  Phase 3 - Redshift Query Statistics Enhancement: '- Updated test to accept execution_time_seconds field in query_statistics
+
+    - Field added for cost calculation support in Redshift adapter
+
+    - File: tests/unit/platforms/test_redshift_adapter.py (1 test)
+
+    - Root cause: benchbox/platforms/redshift.py query_stats["execution_time_seconds"] = execution_time (lines 1095-1100)
+
+    - Test now verifies execution_time_seconds is present and is a float
+
+    - Commit: 9b1f8e7c'
+  Phase 4 - Redshift Transaction Mode Change: '- Updated smoke test to expect autocommit mode (0 explicit commits)
+
+    - Redshift adapter now uses connection.autocommit = True for benchmark workloads
+
+    - File: tests/integration/platforms/test_redshift_smoke.py (1 test)
+
+    - Root cause: benchbox/platforms/redshift.py connection.autocommit = True (lines 600-601, 615-616)
+
+    - Updated assertion: assert stub_state.commits == 0, "Expected no explicit commits with autocommit enabled"
+
+    - Changes already committed in earlier work'
+  Phase 5 - Release Workflow README Handling: '- Updated test to expect original README in public releases (no sanitization)
+
+    - Release workflow no longer applies sanitized README.public.md
+
+    - File: tests/unit/release/test_workflow.py (1 test)
+
+    - Root cause: benchbox/release/workflow.py - README sanitization removed (line 211 comment)
+
+    - Test now asserts: assert (target / "README.md").read_text() == "Private README\n"
+
+    - Changes already committed in earlier work'
+  Phase 6 - Marketing Site Language Accuracy: '- Updated test assertions to match actual landing page content
+
+    - Changed from "zero dependencies" to "Python-Only Core" with "optional extras"
+
+    - File: tests/unit/test_marketing_site_language.py (1 test)
+
+    - Updated assertions: "Zero Dependencies" not in contents, "Run Your Own Benchmarks" in contents, "Python-Only Core" in
+    contents, "optional extras" in contents.lower()
+
+    - Reflects accurate marketing messaging about core simplicity
+
+    - Commit: bbaec648'
+  Files Modified: '- tests/unit/cli/test_cli_output.py - Schema version "1.1" (3 assertions)
+
+    - tests/integration/test_export_cli.py - Schema version "1.1" (1 assertion)
+
+    - tests/unit/platforms/test_platform_info.py - ClickHouse mode-specific names, configuration field access (2 tests)
+
+    - tests/unit/platforms/test_redshift_adapter.py - execution_time_seconds field verification (1 test)
+
+    - tests/integration/platforms/test_redshift_smoke.py - Autocommit mode assertion (1 test)
+
+    - tests/unit/release/test_workflow.py - README handling expectation (1 test)
+
+    - tests/unit/test_marketing_site_language.py - Content assertions (1 test)'
+  Testing Results: '- All 12 originally failing tests now passing
+
+    - All 27 cost integration tests passing (verified no regressions)
+
+    - Zero test failures, zero regressions introduced
+
+    - All changes align with actual core code implementation'
+  Architectural Decisions: '- No backward compatibility added - project not yet released per user requirement
+
+    - No core code modified to make tests pass - tests updated to match implementation
+
+    - Schema evolution from v1.0 to v1.1 supports cost estimation feature
+
+    - ClickHouse naming enhancement provides clarity on connection mode (server vs embedded)
+
+    - Redshift autocommit mode improves performance for benchmark workloads'
+  Commits: '- 9b1f8e7c - test(redshift): update query_statistics test for execution_time_seconds field
+
+    - bbaec648 - test(marketing): update site language test for accurate messaging
+
+    - Earlier phases committed in prior work (a8946d7c, 55801fef)'
+  Success Metrics: '- ✅ All 12 failing tests resolved
+
+    - ✅ Zero core code changes required (tests aligned to implementation)
+
+    - ✅ No backward compatibility added (per project requirements)
+
+    - ✅ Production-quality test code with no placeholders
+
+    - ✅ All cost integration tests passing (27 tests)
+
+    - ✅ Schema evolution properly tested (v1.0 → v1.1)
+
+    - ✅ Platform adapter enhancements properly tested'
+worktree: unknown
+description: Fixed 12 failing tests across 7 test files to align with core code changes. No backward compatibility added (project
+  not yet released). No core code modified - all fixes were test updates to match actual implementation. Completed in 6 phases
+  with commits after each phase. All changes reflect production-quality code with proper schema evolution and platform adapter
+  enhancements.

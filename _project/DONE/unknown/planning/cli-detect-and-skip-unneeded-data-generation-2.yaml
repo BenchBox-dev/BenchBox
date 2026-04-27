@@ -1,0 +1,35 @@
+id: cli-detect-and-skip-unneeded-data-generation-2
+title: '"CLI: Detect and Skip Unneeded Data Generation ✅"'
+category: Core Functionality
+sections:
+  Notes: '- Implemented manifest-based detection to skip redundant data generation without scanning or decompressing data
+    files.
+
+    - "Generators (TPC-DS and TPC-H) now write `_datagen_manifest.json` containing per-table file entries with `path`, `size_bytes`,
+    and `row_count`, plus global metadata (benchmark, scale, compression, parallel, timestamp)."
+
+    - "Orchestrator preflight validates the manifest strictly: confirms benchmark/scale, verifies each listed file exists
+    and its `size_bytes` matches. When valid, it reuses data and constructs `benchmark.tables` mapping directly from the manifest."
+
+    - "Added CLI flags `--no-regenerate` and `--force-regenerate` to control regeneration."
+
+    - Added unit tests for orchestrator flag behavior and manifest creation/consumption.
+
+    - "Impact: Deterministic, fast detection for reuse (local and cloud), improved UX and run predictability."'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- Implemented manifest-based detection to skip redundant data generation without scanning or decompressing data
+  files.
+
+  - "Generators (TPC-DS and TPC-H) now write `_datagen_manifest.json` containing per-table file entries with `path`, `size_bytes`,
+  and `row_count`, plus global metadata (benchmark, scale, compression, parallel, timestamp)."
+
+  - "Orchestrator preflight validates the manifest strictly: confirms benchmark/scale, verifies each listed file exists and
+  its `size_bytes` matches. When valid, it reuses data and constructs `benchmark.tables` mapping directly from the manifest."
+
+  - "Added CLI flags `--no-regenerate` and `--force-regenerate` to control regeneration."
+
+  - Added unit tests for orchestrator flag behavior and manifest creation/consumption.
+
+  - "Impact: Deterministic, fast detection for reuse (local and cloud), improved UX and run predictability."'

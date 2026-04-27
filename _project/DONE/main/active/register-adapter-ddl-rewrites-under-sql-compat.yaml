@@ -1,0 +1,566 @@
+id: register-adapter-ddl-rewrites-under-sql-compat
+title: "Register adapter DDL rewrites under sql_compat with shared FK-strip helper and fail-CI compat_lint"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-25"
+category: Core Functionality
+
+description: |
+  Adapters perform DDL rewrites via inline regex without registering them
+  under ``benchbox/sql_compat/``, bypassing the phase-aware compatibility
+  registry that the framework uses for governance and ``compat_lint`` audit.
+
+  Audit findings:
+
+  - SingleStore (benchbox/platforms/singlestore.py) does **four** DDL
+    rewrites with **zero** registered rules: FK strip
+    (``_strip_foreign_keys``, L103-120), SHARD KEY injection
+    (``_transform_create_statement``, L847-853), SORT KEY injection
+    (L856-859), REFERENCE TABLE rewrite (L830-837), plus lowercase
+    identifier normalization (L810-823, MySQL-family operational detail
+    that stays inline).
+  - **FK stripping is duplicated across six adapters** with slightly
+    different regexes that have already drifted: SingleStore (L103-120),
+    PostgreSQL (L117), Doris (L1435), StarRocks (workload.py L135),
+    Databend (adapter.py L871), QuestDB (L482). Six implementations of the same intent.
+  - Other adapters (StarRocks, ClickHouse, Snowflake, Spark, Trino,
+    Redshift, Presto) DO have registered rule stubs in
+    ``benchbox/sql_compat/rules/ddl_optimize/`` — so the pattern exists,
+    SingleStore and a few others are simply skipping it.
+  - ``benchbox/sql_compat/inventory.py`` (``compat_lint``) detects
+    unregistered branching but doesn't fail CI today — so this drift is
+    invisible.
+
+  Pattern (verified by reading
+  ``benchbox/sql_compat/rules/ddl_optimize/starrocks_ddl_rewrites.py:25-45``):
+  a rule registers ``RewriteDDLPayload`` with a ``transformer_id`` for
+  governance/audit. The adapter still implements the transformation locally
+  via ``_optimize_table_definition()``. The registry advertises intent;
+  ``compat_lint`` enforces that no adapter does an unregistered DDL rewrite.
+
+  This TODO:
+  1. Registers SingleStore's four DDL transforms under ``ddl_optimize``.
+  2. Extracts a single shared ``strip_foreign_keys()`` helper and
+     migrates all six duplicating adapters to call it.
+  3. Audits every other adapter for unregistered DDL regex and registers
+     them (or removes them) before flipping ``compat_lint`` to fail-CI.
+  4. Promotes the implicit ``_optimize_table_definition()`` pattern to a
+     documented ``DdlOptimizer`` Protocol in ``benchbox/platforms/base/``.
+  5. Tightens ``compat_lint`` to **fail CI immediately** on unregistered
+     DDL regex — strongest enforcement, per user direction.
+
+  **Decisions baked in (confirmed with user before authoring):**
+
+  - Sequential after ``harmonize-bypass-adapters-with-manifest`` (same
+    adapter files, different code paths; lower merge-conflict risk).
+  - Extract shared FK-strip helper and migrate all six adapters
+    (SingleStore + PostgreSQL + Doris + StarRocks + Databend + QuestDB).
+  - ``compat_lint`` flips to fail-CI in this TODO — no warn-only phase.
+    Means w7 cannot land until w1-w5 have eliminated all drift across
+    every adapter, not just the six in scope.
+
+  Out of scope: query_source rules (h2odb Q9 PERCENTILE_CONT and
+  vector_search variants are already correctly registered for ``mysql``
+  dialect at ``rules/query_source/h2odb_variants.py:95-114`` and
+  ``rules/query_source/vector_search_variants.py``); VECTOR type mapping
+  (already in ``benchbox/core/vector_search/schema.py:_EMBEDDING_TYPE_MAP``);
+  identifier lowercasing in SingleStore (genuine MySQL-family detail);
+  SHARD KEY / SORT KEY / REFERENCE TABLE transformer relocation (registry
+  says register, not relocate — they stay in singlestore.py).
+
+work:
+- id: w1
+  summary: "Register SingleStore's four DDL transforms under sql_compat (governance-only, no behavior change)"
+  status: done
+  notes: |
+    Create ``benchbox/sql_compat/rules/ddl_optimize/singlestore_ddl_rewrites.py``
+    following the pattern in
+    ``benchbox/sql_compat/rules/ddl_optimize/starrocks_ddl_rewrites.py``.
+
+    Register four ``CompatibilityDecision`` entries with
+    ``CompatAction.REWRITE_DDL`` and ``RewriteDDLPayload(transformer_id=...)``:
+
+    1. ``ddl_optimize.singlestore.all.strip_foreign_keys`` — references
+       the FK-strip helper that w3 will introduce
+       (``transformer_id="singlestore_strip_foreign_keys"``). Reason:
+       "SingleStore raises error 2752 when CREATE TABLE contains
+       FOREIGN KEY clauses with referential actions."
+    2. ``ddl_optimize.singlestore.all.inject_shard_key`` —
+       ``transformer_id="singlestore_inject_shard_key"``. Reason:
+       "SingleStore columnstore tables require SHARD KEY for
+       distribution; injection mapped from _TPCH_SHARD_KEYS."
+    3. ``ddl_optimize.singlestore.all.inject_sort_key`` —
+       ``transformer_id="singlestore_inject_sort_key"``. Reason:
+       "SingleStore columnstore SORT KEY drives analytical ordering;
+       mapped from _TPCH_SORT_KEYS."
+    4. ``ddl_optimize.singlestore.all.reference_table_for_dimensions``
+       — ``transformer_id="singlestore_reference_table"``. Reason:
+       "Small dimension tables (nation, region) benefit from REFERENCE
+       TABLE replication to avoid broadcast joins."
+
+    No adapter code changes in this commit. ``transformer_id`` strings
+    name methods that currently exist in singlestore.py
+    (_strip_foreign_keys, _transform_create_statement). w4 will rename
+    / split them to match.
+
+    **Decision gate:** before merging, run
+    ``uv run --project _project/scripts -- python -m benchbox.sql_compat.inventory --platform singlestore``
+    (or whatever the existing audit invocation is) and confirm the four
+    new rules appear without changing any existing rule counts.
+
+- id: w2
+  summary: "Audit every adapter for inline DDL regex and produce a punch list"
+  status: done
+  notes: |
+    Required before w7 (fail-CI enforcement) can land safely. If we
+    flip compat_lint to fail-CI without this audit, every other
+    adapter's unregistered regex breaks CI for unrelated contributors.
+
+    For each file in benchbox/platforms/, find every:
+      - ``re.sub`` / ``re.search`` / ``re.compile`` / ``re.match``
+        with a pattern that touches CREATE TABLE / ALTER TABLE /
+        column-type substitution / identifier transformation / DDL text.
+      - Inline string replacement of DDL text (``stmt.replace("X", "Y")``).
+      - Method named ``_optimize_table_definition`` /
+        ``_transform_create_statement`` / ``_optimize_ddl`` / etc.
+
+    Cross-reference each finding against rules currently registered
+    in ``benchbox/sql_compat/rules/ddl_optimize/`` and
+    ``benchbox/sql_compat/rules/schema_emit/``. Output:
+    ``_project/audits/sql_compat_ddl_drift.md`` listing every entry as:
+    [adapter, file:line, regex/operation, registered? Y/N, target
+    rule_id if missing].
+
+    The punch list size determines the breadth of w5 — if many entries
+    surface in adapters not currently in our migration scope, we must
+    register them all (or downgrade w7 to warn-only despite user
+    preference) before fail-CI is safe.
+
+    **Decision gate:** if punch list size > 30 unregistered transforms,
+    pause and ask the user whether to expand scope or fall back to
+    warn-only enforcement.
+
+- id: w3
+  summary: "Extract strip_foreign_keys() shared helper and behavioral-equivalence corpus tests"
+  needs: [w1, w2]
+  status: done
+  notes: |
+    Six adapters duplicate the FK-strip regex with drift. Build the
+    single canonical helper that w4 will wire into each adapter.
+
+    1. Add ``benchbox/platforms/base/ddl_helpers.py`` (or
+       ``benchbox/sql_compat/transformers.py`` if the registry layer
+       is the more natural home — defer choice to implementation,
+       cite reason in the commit message). Public API:
+       ``strip_foreign_keys(stmt: str) -> str`` covering all variants
+       observed in the audit:
+         - CONSTRAINT name FK (...) REFERENCES ... [ON DELETE/UPDATE ...]
+         - bare FOREIGN KEY (...) REFERENCES ...
+         - PRIMARY+FOREIGN compound (Doris pattern)
+         - trailing-comma cleanup after removal
+       Behavior is the UNION of what the six current implementations do.
+
+    2. **Behavioural-equivalence test**: write
+       ``tests/unit/sql_compat/test_strip_foreign_keys.py`` that runs
+       each adapter's OLD regex (preserved as a private constant in the
+       test) against a corpus of representative CREATE TABLE inputs
+       (TPC-H, TPC-DS, datavault, ClickBench, custom edge cases with
+       CONSTRAINT names, ON DELETE clauses, multi-FK, no-FK) and
+       asserts the new shared helper produces the same output for each
+       input × each old-regex pair. This guarantees zero behaviour
+       drift during the migration.
+
+    **Decision gate:** before declaring w3 done, run
+    ``uv run -- python -m pytest tests/unit/sql_compat/test_strip_foreign_keys.py -q``
+    All corpus comparisons must pass — green is the prerequisite for
+    w4 to land safely.
+
+- id: w4
+  summary: "Migrate all six duplicating adapters to call strip_foreign_keys() helper"
+  needs: [w3]
+  status: done
+  notes: |
+    With the shared helper and corpus tests in place from w3, replace
+    each adapter's local FK-strip with a single call:
+
+      - benchbox/platforms/singlestore.py:103-120 →
+        ``from benchbox.platforms.base.ddl_helpers import strip_foreign_keys``
+      - benchbox/platforms/postgresql.py:117 → same
+      - benchbox/platforms/doris.py:1435 → same (preserve PRIMARY KEY
+        handling separately if needed; FK-only)
+      - benchbox/platforms/starrocks/workload.py:135 → same
+      - benchbox/platforms/databend/adapter.py:871 → same
+      - benchbox/platforms/questdb.py:482-489 → same
+
+    Each adapter migration is its own commit so individual reverts
+    are possible if a regression surfaces in adapter-specific live
+    tests.
+
+    **Decision gate:** before declaring w4 done, run
+    ``uv run -- python -m pytest tests/unit/platforms/test_singlestore_adapter.py tests/unit/platforms/test_postgresql_adapter.py tests/unit/platforms/test_doris_adapter.py tests/unit/platforms/test_starrocks_adapter.py tests/unit/platforms/test_databend_adapter.py tests/unit/platforms/test_questdb_adapter.py -q``
+    and the four adapters' Docker stress tests where available. The
+    shared helper must produce the same DDL the inline regexes did.
+
+- id: w5
+  summary: "Register every remaining unregistered DDL transform surfaced by w2 audit"
+  needs: [w2]
+  status: done
+  notes: |
+    Required precondition for w7 (fail-CI). Anything left unregistered
+    becomes a CI break.
+
+    For each entry in the w2 punch list:
+      - If the transform is genuinely needed: register a
+        ``RewriteDDLPayload`` rule under
+        ``rules/ddl_optimize/{adapter}_ddl_rewrites.py`` (create if
+        missing) with a descriptive rule_id and reason.
+      - If the transform is dead code or an obsolete fix: delete it.
+
+    Adapters where the audit is most likely to surface gaps (based on
+    prior inspection):
+      - PostgreSQL: FK strip (covered by w4) — confirm no other
+        unregistered DDL ops.
+      - Doris: type conversion (STRING→VARCHAR, ARRAY dimension strip),
+        DISTRIBUTED BY HASH injection.
+      - StarRocks: type conversion, PRIMARY KEY validation, DUPLICATE
+        KEY rewrite, DISTRIBUTED BY (governance stub exists; check if
+        it covers all transforms or just one).
+      - QuestDB: any timestamp/symbol DDL fixes.
+      - Databend: any.
+
+    Each registration commit is small (one rule per commit if
+    practical) so individual rules are revertible.
+
+    **Decision gate:** after w5 completes, re-run the w2 audit
+    script. The new "unregistered transforms" count must be zero.
+
+- id: w6
+  summary: "Promote _optimize_table_definition() to a documented DdlOptimizer Protocol"
+  needs: [w1, w3, w5]
+  status: done
+  notes: |
+    Make the implicit pattern explicit so the next platform adapter
+    (Velox, etc.) doesn't need to discover it through code-archaeology.
+
+    1. Define ``DdlOptimizer`` Protocol in
+       ``benchbox/platforms/base/ddl_optimizer.py``:
+          class DdlOptimizer(Protocol):
+              def optimize_table_definition(
+                  self, stmt: str, table_name: str
+              ) -> str: ...
+    2. Provide a base ``BaseDdlOptimizer`` mixin that walks rules
+       registered under ``Phase.DDL_OPTIMIZE`` for the adapter's
+       platform name, and dispatches to adapter-implemented methods
+       keyed on ``transformer_id``. Adapters opt in by inheriting the
+       mixin and providing the ``transformer_id``-named methods.
+    3. SingleStore is the canary: refactor
+       ``_transform_create_statement`` to dispatch through the new
+       mixin. Existing methods (FK strip is now the shared helper;
+       SHARD/SORT/REFERENCE stay in adapter) become the registered
+       transformer methods.
+    4. Document the pattern in
+       ``benchbox/sql_compat/README.md`` (create if missing) with the
+       SingleStore example as the canonical "what good looks like".
+
+    Other five adapters opt in opportunistically — not required for
+    this TODO. The Protocol just makes the contract explicit.
+
+    **Decision gate:** SingleStore unit tests still green after the
+    refactor; live stress test still passes. If the dispatch indirection
+    causes performance issues (DDL is one-time cost so unlikely), keep
+    the inline path on a fast lane.
+
+- id: w7
+  summary: "Flip compat_lint to fail-CI on unregistered DDL regex"
+  needs: [w4, w5, w6]
+  status: done
+  notes: |
+    The forcing function. Cannot land until w2's punch list is fully
+    addressed by w4 and w5 (zero unregistered DDL transforms across
+    every adapter, not just the six in our migration scope).
+
+    1. Update ``benchbox/sql_compat/inventory.py`` so the audit walk
+       exits non-zero when an unregistered DDL regex is found.
+    2. Wire it into the existing CI / pre-commit lint stage. Example:
+          uv run --project _project/scripts -- python -m benchbox.sql_compat.inventory --check-ddl-drift
+       exits 1 on any drift.
+    3. Run locally: zero exit code is the prerequisite. If the script
+       still flags anything, return to w5 to register or remove.
+    4. Add an integration smoke test in tests/integration/ that
+       imports a known-clean adapter (post-migration SingleStore) and
+       asserts compat_lint runs clean.
+
+    **Decision gate:** before merging w7, run the audit script across
+    the entire codebase one last time and paste the output (zero
+    findings) into the PR description. If even one finding remains,
+    either register it or fall back to warn-only and refile w7 as a
+    separate TODO.
+
+- id: w8
+  summary: "Tests harmonized: registry + transform asserted together"
+  needs: [w1, w3, w6]
+  status: done
+  notes: |
+    Existing DDL-shape tests in
+    tests/unit/platforms/test_singlestore_adapter.py:1125-1199 assert
+    output SQL only. Refactor to also assert the rule is registered:
+
+       def test_singlestore_strip_fk_registered_and_applied(self):
+           ctx = CompatibilityContext(
+               platform="singlestore", phase=Phase.DDL_OPTIMIZE, ...
+           )
+           decisions = REGISTRY.resolve_all(ctx)
+           assert any(
+               d.rule_id == "ddl_optimize.singlestore.all.strip_foreign_keys"
+               for d in decisions
+           )
+           # then assert transform output as before
+
+    Plus new
+    ``tests/unit/sql_compat/test_singlestore_rules.py`` covering each
+    of the four registered SingleStore rules: rule_id format, payload
+    type, transformer_id matches an actual method.
+
+    Plus the behavioural-equivalence corpus from w3 stays as a
+    regression test for the shared FK-strip helper.
+
+- id: w9
+  summary: "Document the 'register for governance, implement in adapter' pattern"
+  needs: [w6]
+  status: done
+  notes: |
+    Create / update ``benchbox/sql_compat/README.md`` with:
+      - One-paragraph explanation of the phase-aware registry.
+      - The "register intent, implement locally" design choice and
+        why (transformers are platform-specific code, but governance
+        should be uniform).
+      - SingleStore as the canonical example: rule file location,
+        adapter method, compat_lint enforcement.
+      - Checklist for adding a new platform: (1) register rules under
+        ``rules/ddl_optimize/{platform}_ddl_rewrites.py``, (2)
+        implement ``_optimize_table_definition`` (or inherit
+        ``BaseDdlOptimizer``), (3) confirm
+        ``compat_lint --platform=X`` runs clean.
+
+    Also link from CLAUDE.md (or AGENTS.md per project convention) so
+    onboarding agents find the pattern without reading source code.
+
+deferred:
+- summary: "Migrate adapter-specific transforms (SHARD/SORT/REFERENCE) into a runtime-dispatched registry"
+  reason: |
+    The audit confirms the framework's design choice: rules document
+    intent for governance; transformers stay in adapter code because
+    they're platform-specific. Runtime dispatch on transformer_id was
+    explicitly NOT implemented in the existing rules. Out of scope.
+
+- summary: "Generalize compat_lint to enforce QUERY_ADAPTER and SCHEMA_EMIT phases too"
+  reason: |
+    This TODO scopes enforcement to DDL_OPTIMIZE because that's where
+    the band-aid drift surfaced. Other phases may have similar gaps;
+    file a follow-up after this lands.
+
+- summary: "Lowercase identifier handling for SingleStore (lower_case_table_names=0)"
+  reason: |
+    MySQL-family operational detail, not a cross-platform compat
+    decision. Stays inline in singlestore.py.
+
+- summary: "VECTOR type mapping consolidation"
+  reason: |
+    Already correctly placed in
+    benchbox/core/vector_search/schema.py:_EMBEDDING_TYPE_MAP. Out of
+    scope.
+
+files_affected:
+  modified:
+  - "benchbox/platforms/singlestore.py"
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/doris.py"
+  - "benchbox/platforms/starrocks/workload.py"
+  - "benchbox/platforms/databend/adapter.py"
+  - "benchbox/platforms/questdb.py"
+  - "benchbox/platforms/firebolt.py"
+  - "benchbox/sql_compat/inventory.py"
+  - "tests/unit/platforms/test_singlestore_adapter.py"
+  - "AGENTS.md"
+  added:
+  - "benchbox/sql_compat/rules/ddl_optimize/singlestore_ddl_rewrites.py"
+  - "benchbox/sql_compat/rules/ddl_optimize/postgresql_ddl_rewrites.py"
+  - "benchbox/sql_compat/rules/ddl_optimize/questdb_ddl_rewrites.py"
+  - "benchbox/sql_compat/rules/ddl_optimize/doris_ddl_rewrites.py"
+  - "benchbox/sql_compat/rules/ddl_optimize/fabric_dw_ddl_rewrites.py"
+  - "benchbox/sql_compat/rules/ddl_optimize/pg_mooncake_ddl_rewrites.py"
+  - "benchbox/platforms/base/ddl_helpers.py"
+  - "benchbox/platforms/base/ddl_optimizer.py"
+  - "benchbox/sql_compat/README.md"
+  - "tests/unit/sql_compat/test_strip_foreign_keys.py"
+  - "tests/unit/sql_compat/test_singlestore_rules.py"
+  - "tests/integration/test_compat_lint_clean.py"
+  - "_project/audits/sql_compat_ddl_drift.md"
+
+must_preserve:
+- "Existing query_source rules for mysql/SingleStore: rules/query_source/h2odb_variants.py:95-114 (Q9 PERCENTILE_CONT verbatim)
+  and rules/query_source/vector_search_variants.py — these are correctly registered and must not be touched."
+- "VECTOR(128, F32) mapping in benchbox/core/vector_search/schema.py:_EMBEDDING_TYPE_MAP — stays in benchmark schema, not
+  sql_compat rules."
+- "13-benchmark SingleStore stress matrix that the band-aid commits validated — DDL transforms must produce byte-identical
+  output before vs after w4/w6 refactor."
+- "Existing registered rules in rules/ddl_optimize/ (clickhouse, starrocks, snowflake, spark, trino, redshift, presto) — w5
+  must not change their semantics, only ADD new rules for unregistered transforms."
+- "Phase ordering and registry specificity tiers in benchbox/sql_compat/registry.py — additive changes only."
+
+approach: |
+  Reuse the existing pattern, do not invent. The registry, payloads,
+  phases, and resolver all already exist. The work is registration +
+  consolidation, not framework design.
+
+  Reference implementations to copy from:
+  - rules/ddl_optimize/starrocks_ddl_rewrites.py:25-45 — canonical
+    RewriteDDLPayload registration shape.
+  - rules/query_source/h2odb_variants.py:95-114 — canonical
+    SelectVariantPayload (already covers SingleStore via mysql dialect).
+  - benchbox/sql_compat/registry.py:176 — register() signature.
+  - benchbox/sql_compat/decision.py:59-61 — RewriteDDLPayload definition.
+
+  Order matters: w1 lands governance (no behaviour change), w2 audits,
+  w3 extracts the shared FK-strip helper, w4 migrates adapters, w5 registers
+  remaining transforms, w6 makes the contract explicit, w7 enforces.
+  Tests and docs (w8, w9) can land in parallel with w6/w7 once their
+  prerequisites are met.
+
+  The fail-CI flip (w7) is the forcing function — it cannot succeed
+  unless the entire codebase has zero unregistered DDL drift, so w2's
+  audit must be exhaustive and w5 must address every entry.
+
+anti_patterns:
+- "DO NOT relocate SHARD KEY / SORT KEY / REFERENCE TABLE transformer logic out of singlestore.py — because the registry's
+  design says 'register intent, implement locally' and starrocks/clickhouse/snowflake all follow this pattern — keep transformers
+  in adapter, register their existence."
+- "DO NOT write six slightly-different FK-strip regexes again — because that's exactly the duplication this TODO eliminates
+  — call strip_foreign_keys() from the shared helper."
+- "DO NOT flip compat_lint to fail-CI before w2 audit and w5 registration are complete — because that breaks CI for every
+  contributor whose adapter has unrelated unregistered DDL regex — gating w7 on w2+w4+w5 is non-negotiable."
+- "DO NOT touch the query_source rules (h2odb_variants.py, vector_search_variants.py) — because they're already correctly
+  registered for the mysql dialect — out of scope."
+- "DO NOT make transformer_id runtime-dispatched — because the existing rules deliberately use it as documentary metadata
+  — preserve that design choice."
+- "DO NOT skip the behavioural-equivalence test in w3 — because subtle regex drift across six adapters is exactly what this
+  consolidation is trying to fix; without the test we may introduce new drift while removing old drift — corpus test is non-negotiable."
+
+verification:
+- description: "Four SingleStore DDL rules resolve from the registry"
+  command: "uv run -- python -m pytest tests/unit/sql_compat/test_singlestore_rules.py -q"
+  expected_output: "all green; four rules with expected rule_id format"
+- description: "Shared FK-strip helper produces output identical to each of the six original adapter regexes across the corpus"
+  command: "uv run -- python -m pytest tests/unit/sql_compat/test_strip_foreign_keys.py -q"
+  expected_output: "all green; behavioural-equivalence corpus passes"
+- description: "All six adapters' unit suites green after FK-strip migration"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_singlestore_adapter.py tests/unit/platforms/test_postgresql_adapter.py
+    tests/unit/platforms/test_doris_adapter.py tests/unit/platforms/test_starrocks_adapter.py tests/unit/platforms/test_databend_adapter.py
+    tests/unit/platforms/test_questdb_adapter.py -q"
+  expected_output: "all green"
+- description: "compat_lint reports zero unregistered DDL transforms across the entire codebase (integration
+    test invokes check_ddl_drift() directly, isolating from unrelated _validate_mandatory_sites errors in
+    the wrapping CLI)"
+  command: "uv run -- python -m pytest tests/integration/test_compat_lint_clean.py::test_ddl_drift_check_is_clean
+    -q"
+  expected_output: "1 passed; check_ddl_drift() returns 0 unregistered transforms"
+- description: "compat_lint CLI exits 0 on the DDL-drift portion (a separate pre-existing benchmark_gate
+    site validation issue may still set the overall exit; inspect ``DDL drift check: CLEAN`` line in stderr)"
+  command: "uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift 2>&1 | grep 'DDL drift check'"
+  expected_output: "DDL drift check: CLEAN (0 unregistered transforms)"
+- description: "compat_lint integration smoke test"
+  command: "uv run -- python -m pytest tests/integration/test_compat_lint_clean.py -q"
+  expected_output: "all green"
+- description: "SingleStore live stress test still passes after w4/w6 refactor (DDL output unchanged)"
+  command: "./scripts/local_stress_test.sh --scale 1 --platform singlestore"
+  expected_output: "exit 0; full benchmark matrix passes"
+- description: "Project-wide fast suite green per commit"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all green"
+- description: "Lint + typecheck per commit"
+  command: "uv run ruff check . && uv run ty check"
+  expected_output: "All checks passed!"
+
+scope_limit:
+  only_modify:
+  - "benchbox/sql_compat/"
+  - "benchbox/platforms/base/"
+  - "benchbox/platforms/singlestore.py"
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/doris.py"
+  - "benchbox/platforms/starrocks/"
+  - "benchbox/platforms/databend/adapter.py"
+  - "benchbox/platforms/questdb.py"
+  - "tests/unit/sql_compat/"
+  - "tests/unit/platforms/"
+  - "tests/integration/test_compat_lint_clean.py"
+  - "_project/audits/"
+  - "CLAUDE.md"
+  - "AGENTS.md"
+  do_not_modify:
+  - "benchbox/sql_compat/rules/query_source/"
+  - "benchbox/sql_compat/rules/query_adapter/"
+  - "benchbox/sql_compat/rules/benchmark_gate/"
+  - "benchbox/core/vector_search/schema.py"
+  - "benchbox/core/"
+  - "benchbox/cli/"
+  - "benchbox/platforms/duckdb.py"
+  - "benchbox/platforms/snowflake.py"
+  - "benchbox/platforms/clickhouse/"
+  - "benchbox/platforms/spark.py"
+  - "benchbox/platforms/trino.py"
+  - "benchbox/platforms/redshift.py"
+  - "benchbox/platforms/presto.py"
+
+success_metrics:
+- "Zero inline FK-strip regex across benchbox/platforms/ — exactly one strip_foreign_keys() helper with all six adapters delegating
+  to it."
+- "All four SingleStore DDL transforms (FK strip, SHARD KEY, SORT KEY, REFERENCE TABLE) registered in benchbox/sql_compat/rules/ddl_optimize/singlestore_ddl_rewrites.py."
+- "compat_lint exits 0 across the entire codebase; CI fails on any future drift."
+- "DdlOptimizer Protocol documented; SingleStore migrated as canonical example; benchbox/sql_compat/README.md exists with
+  onboarding checklist."
+- "Behavioural-equivalence corpus test guarantees zero DDL output drift between pre-migration adapter regexes and the consolidated
+  helper."
+- "SingleStore live stress test (./scripts/local_stress_test.sh --scale 1 --platform singlestore) passes after w4 and again
+  after w6 — proves DDL output unchanged."
+
+deps:
+  needs:
+  - "harmonize-bypass-adapters-with-manifest"
+
+metadata:
+  tags:
+  - "sql-compat"
+  - "ddl-rewrites"
+  - "platform-adapters"
+  - "harmonization"
+  - "framework-cleanup"
+  - "compat-lint"
+  - "review-followup"
+  estimated_effort: "Large (3-5 days; sequential due to fail-CI gate on w7 requiring full audit completion)"
+  created_date: "2026-04-25"
+  source: "Code review followup — recent SingleStore commits left DDL transforms unregistered under sql_compat; user feedback
+    in 2026-04-25 session pointed out the gap."
+
+context_sections:
+  "Why This Pairs With harmonize-bypass-adapters-with-manifest": |
+    The manifest TODO addresses *data layout* drift (compression, format,
+    CSV dialect) across four adapters. This TODO addresses *DDL text*
+    drift across six adapters. Same family of problem (adapters bypass
+    framework infrastructure and reinvent in slightly different ways),
+    different layer (data vs SQL).
+
+    Sequenced after the manifest TODO so adapter files only have one
+    refactor in flight at a time. Same six adapters appear in both;
+    landing them sequentially keeps live verification stable.
+
+  "Reference Locations in Existing Code": |
+    - REGISTRY singleton: benchbox/sql_compat/registry.py:176
+    - Decision/payload types: benchbox/sql_compat/decision.py
+    - Phase enum: benchbox/sql_compat/context.py
+    - Reference rule (good): benchbox/sql_compat/rules/ddl_optimize/starrocks_ddl_rewrites.py:25-45
+    - Reference rule (good): benchbox/sql_compat/rules/query_source/h2odb_variants.py:95-114
+    - SingleStore band-aids to register: benchbox/platforms/singlestore.py:103-120, 780-877
+    - FK-strip duplicates: singlestore.py:103-120, postgresql.py:117, doris.py:1435, starrocks/workload.py:135, databend/adapter.py:871, questdb.py:482-489
+    - compat_lint: benchbox/sql_compat/inventory.py

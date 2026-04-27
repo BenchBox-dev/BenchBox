@@ -1,0 +1,48 @@
+{
+  "name": "results-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:chromium": "npm run test:e2e:fixtures && npm run build && playwright test --project=chromium",
+    "test:e2e:chromium:setup": "npm run test:e2e:install:chromium && npm run test:e2e:chromium",
+    "test:e2e:full": "npm run test:e2e:fixtures && npm run build && playwright test --project=chromium && playwright test --project=firefox && playwright test --project=webkit --workers=1",
+    "test:e2e:firefox": "npm run test:e2e:fixtures && npm run build && playwright test --project=firefox",
+    "test:e2e:install": "playwright install --with-deps chromium firefox webkit",
+    "test:e2e:install:chromium": "playwright install --with-deps chromium",
+    "test:e2e:fixtures": "node scripts/generate-browser-fixtures.mjs && node scripts/verify-browser-fixtures.mjs",
+    "test:e2e:serve": "node scripts/serve-browser-tests.mjs",
+    "test:e2e:webkit": "npm run test:e2e:fixtures && npm run build && playwright test --project=webkit --workers=1"
+  },
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "^1.29.0",
+    "preact": "^10.25.4",
+    "preact-router": "^4.1.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@preact/preset-vite": "^2.9.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/preact": "^3.2.4",
+    "@types/babel__core": "^7.20.5",
+    "@types/emscripten": "^1.41.5",
+    "@types/jest": "^30.0.0",
+    "@types/jest-axe": "^3.5.9",
+    "@types/node": "^22.13.4",
+    "autoprefixer": "^10.4.20",
+    "jest-axe": "^9.0.0",
+    "jsdom": "^29.0.2",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^4.1.4"
+  }
+}

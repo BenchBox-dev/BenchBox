@@ -1,0 +1,61 @@
+id: livy-spark-adapters-open-table-format-loading
+title: "Close open-table-format loading gaps for Livy-based Spark adapters"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-03-23"
+description: |
+  Synapse Spark and Fabric Spark use their own Livy/session-driven data-loading flows
+  rather than SparkDataLoadMixin, so they remain outside the scope of the shared Spark
+  loader item.
+
+  This item tracks the adapter-specific work required to make open table formats
+  user-selectable and executable end-to-end for:
+  - synapse-spark
+  - fabric-spark
+
+category: Platform Expansion
+
+deps:
+  needs:
+    - spark-mixin-open-table-format-loading
+
+work:
+  - id: w1
+    summary: "Audit Synapse Spark and Fabric Spark load_data implementations and remote table DDL capabilities"
+    status: done
+  - id: w2
+    summary: "Implement Delta loading for synapse-spark if the current staging/session model supports it"
+    needs: [w1]
+    status: done
+  - id: w3
+    summary: "Implement Delta loading for fabric-spark if the current OneLake/Livy model supports it"
+    needs: [w1]
+    status: done
+  - id: w4
+    summary: "Re-register only adapters with verified end-to-end support in format_capabilities.py"
+    needs: [w2, w3]
+    status: done
+  - id: w5
+    summary: "Add mock-based tests for generated table DDL and remote execution flow"
+    needs: [w2, w3]
+    status: done
+
+must_preserve:
+  - "Current parquet loading paths for synapse-spark and fabric-spark"
+  - "No capability-table re-registration before runtime support is verified"
+
+verification:
+  - description: "Synapse/Fabric Spark adapter tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -v -k 'synapse or fabric' --no-header -q"
+    expected_output: "All tests pass"
+  - description: "Format capability tests pass after any re-registration"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/test_format_capabilities.py -v --no-header -q"
+    expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/azure/synapse_spark_adapter.py"
+    - "benchbox/platforms/azure/fabric_spark_adapter.py"
+    - "benchbox/platforms/base/format_capabilities.py"
+    - "tests/unit/platforms/"

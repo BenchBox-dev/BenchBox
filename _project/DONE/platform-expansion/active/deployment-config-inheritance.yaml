@@ -1,0 +1,145 @@
+id: deployment-config-inheritance
+title: "Platform Configuration Inheritance"
+worktree: platform-expansion
+priority: Medium
+status: Completed
+completion_date: "2026-01-26"
+category: Core Functionality
+description: |
+  Implement configuration inheritance system allowing child platforms to inherit
+  SQL dialect, benchmark compatibility, and data type mappings from parent platforms.
+
+  This enables MotherDuck to automatically inherit DuckDB's SQL dialect and
+  benchmark query translations, while having its own connection configuration.
+
+context_sections:
+  "Background and Motivation": |
+    When we add MotherDuck as a platform, it should automatically use DuckDB's
+    SQL dialect and benchmark query compatibility without duplicating configuration.
+    Similarly, Starburst should inherit from Trino, and ClickHouse Cloud should
+    share configuration with ClickHouse server.
+
+    This inheritance system prevents configuration drift and ensures consistent
+    benchmark results across deployment variants of the same database engine.
+
+  "Technical Context": |
+    The PlatformCapability.inherits_from field establishes parent-child relationships.
+    A new config_inheritance module resolves inherited configuration at runtime.
+
+    What inherits:
+    - SQL dialect identifier (for query translation)
+    - Benchmark compatibility (which benchmarks/queries are supported)
+    - Data type mappings (DECIMAL precision, timestamp handling)
+
+    What does NOT inherit:
+    - Connection configuration (auth, endpoints)
+    - Credential requirements
+    - Cloud storage settings
+
+tasks:
+  phases:
+  - phase: "Phase 1: Inheritance Module"
+    done: true
+    items:
+    - summary: "Create benchbox/core/config_inheritance.py module"
+      done: true
+    - summary: "Implement build_inherited_config() function"
+      done: true
+      subtasks:
+      - summary: "Resolve parent platform from registry"
+        done: true
+      - summary: "Merge parent dialect configuration"
+        done: true
+      - summary: "Merge benchmark compatibility settings"
+        done: true
+      - summary: "Apply child platform overrides"
+        done: true
+      - summary: "Apply user configuration last"
+        done: true
+
+  - phase: "Phase 2: Dialect Inheritance"
+    done: true
+    items:
+    - summary: "Implement _get_platform_dialect() helper"
+      done: true
+      notes: "Implemented as get_inherited_dialect() and get_platform_family_dialect()"
+    - summary: "Define dialect inheritance rules"
+      done: true
+      subtasks:
+      - summary: "MotherDuck inherits duckdb dialect"
+        done: true
+        notes: "Will work once MotherDuck platform is added with inherits_from='duckdb'"
+      - summary: "Starburst inherits trino dialect"
+        done: true
+        notes: "Will work once Starburst platform is added with inherits_from='trino'"
+      - summary: "ClickHouse Cloud inherits clickhouse dialect"
+        done: true
+        notes: "Uses platform_family='clickhouse' for all deployment modes"
+    - summary: "Ensure query translation uses inherited dialect"
+      done: true
+      notes: "Implemented resolve_dialect_for_query_translation()"
+
+  - phase: "Phase 3: Benchmark Compatibility"
+    done: true
+    items:
+    - summary: "Implement _get_benchmark_compatibility() helper"
+      done: true
+      notes: "Implemented get_benchmark_compatibility()"
+    - summary: "Define compatibility inheritance rules"
+      done: true
+    - summary: "Handle benchmark-specific overrides (cloud-only queries)"
+      done: true
+      notes: "Supported via dictionary update pattern"
+
+  - phase: "Phase 4: Testing"
+    done: true
+    items:
+    - summary: "Unit tests for config inheritance resolution"
+      done: true
+    - summary: "Test dialect inheritance chain"
+      done: true
+    - summary: "Test benchmark compatibility inheritance"
+      done: true
+    - summary: "Test user override precedence"
+      done: true
+
+metadata:
+  tags:
+  - architecture
+  - configuration
+  - inheritance
+  estimated_effort: "2-3 days"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Reduces maintenance burden when adding new deployment variants, as shared
+    configuration is automatically inherited from parent platform.
+  user_impact: |
+    Users get consistent benchmark behavior across deployment variants of the
+    same database engine, enabling meaningful comparisons.
+  technical_debt: |
+    Establishes clean configuration inheritance pattern, avoiding copy-paste
+    configuration across related platforms.
+
+files_affected:
+  modified: []
+  added:
+  - "benchbox/core/config_inheritance.py"
+  - "tests/unit/core/test_config_inheritance.py"
+  removed: []
+
+dependencies:
+  blocked_by:
+  - "_project/TODO/platform-expansion/active/deployment-registry-extensions.yaml"
+
+success_metrics:
+- "Child platforms correctly inherit parent dialect"
+- "Benchmark compatibility transfers to child platforms"
+- "User configuration overrides inherited values"
+- "Configuration inheritance is documented"
+- "Unit test coverage >= 90% for inheritance module"
+
+open_questions:
+- "Should inheritance be single-parent only, or support multiple inheritance?"
+- "How to handle dialect conflicts if parent and child have different capabilities?"

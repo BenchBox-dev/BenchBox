@@ -1,0 +1,383 @@
+id: make-parquet-default-for-tpcds-obt
+title: "Make Parquet the default output format for TPC-DS OBT"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-12"
+description: |
+  TPC-DS OBT currently defaults to pipe-delimited `.dat` output. At SF1 this
+  produces an 11GB uncompressed file (5,041,336 rows × 518 columns). The
+  schema is intentionally wide (One Big Table) - that is not a bug - but
+  `.dat` is a pathological storage choice for a 518-column table where:
+
+  - Every row carries ~300-400 NULL columns (store rows have NULL for all
+    web_site_*, web_page_*, call_center_*, catalog_page_* columns; web rows
+    are NULL for all store_* and call_center_* columns; etc.)
+  - Many dimension attributes repeat textual values (customer names,
+    addresses, product descriptions) that compress trivially column-wise
+  - DataFrame platforms (DataFusion, Polars, Pandas) cannot practically
+    load 11GB of pipe-delimited text into memory at SF1
+
+  Parquet's columnar encoding with null suppression and per-column
+  compression is expected to reduce the file materially - an order-of-
+  magnitude shrink is plausible given the null density and text repetition,
+  but the actual ratio is validated in w5. The transformer already
+  supports parquet output - the export
+  branch at `etl/transformer.py:730` emits parquet when
+  `output_format="parquet"` is passed. What is missing is making parquet
+  the default so DataFrame platforms work out of the box and SQL platforms
+  get a much smaller artifact for free.
+
+  This change:
+  - Flips the default `output_format` from `"dat"` to `"parquet"` in four
+    places (benchmark `__init__`, `generate_data()`, `BenchmarkOptionSpec`,
+    transformer `transform()`).
+  - Updates `_existing_obt()` to detect parquet first and trigger
+    regeneration when only a stale `.dat` exists (it will not auto-delete).
+  - Keeps `.dat` available via explicit `--benchmark-option output_format=dat`
+    so anyone reproducing older results or benchmarking a platform that
+    cannot read parquet still has a path.
+
+  Downstream impact: DuckDB, ClickHouse, DataFusion-SQL, and all DataFrame
+  platforms read parquet natively via their existing CSV/parquet auto-detect
+  loaders. No platform-side code changes are expected. SQL platforms that
+  generate DDL first and then `COPY` from file will benefit from the smaller
+  artifact and faster load times.
+
+category: Bug Fix
+
+metadata:
+  tags:
+    - tpcds-obt
+    - dataframe
+    - data-format
+    - performance
+    - parquet
+  estimated_effort: "Small"
+  created_date: "2026-04-12"
+  source_review: |
+    DataFusion DataFrame benchmark failure debug session - tpcds_obt hung
+    for 391s trying to load 11GB `.dat` into DataFusion memory.
+
+impact:
+  user_impact: |
+    Users running TPC-DS OBT at SF1+ get a materially smaller data artifact
+    by default (expected order-of-magnitude shrink vs the 11GB `.dat` at
+    SF1 - exact ratio captured in w5). DataFrame platforms (DataFusion,
+    Polars, Pandas) become viable for TPC-DS OBT. Users with existing `.dat`
+    files will see a one-time regeneration the next time they run the
+    benchmark unless they explicitly pass `--benchmark-option output_format=dat`.
+  maintainer_impact: |
+    One test file needs a parquet-default case added; existing dat-explicit
+    tests continue to work unchanged. Documentation default needs updating.
+    No new dependencies - DuckDB (the transformer engine) already supports
+    parquet export.
+  regression_risk: |
+    Low. The transformer has supported parquet output since inception - only
+    the default is changing. SQL platforms load parquet natively. Existing
+    tests that use `output_format="dat"` explicitly continue to exercise
+    that path. Main risk: a stale 11GB `.dat` file on disk consuming space
+    after users regenerate - documented in w4.
+
+justification: |
+  The OBT file size at SF1 is a practical blocker for the DataFrame platform
+  lineup BenchBox was designed to compare. The fix is mechanical - flip a
+  default - and the transformer infrastructure is already there. Postponing
+  this change means DataFrame users cannot run TPC-DS OBT and the documented
+  "DataFrame mode support: True" claim at `benchmark.py:240` is effectively
+  false.
+
+cost_benefit_analysis:
+  expected_benefits: |
+    - DataFusion, Polars, Pandas can actually run TPC-DS OBT
+    - SF1 artifact shrinks materially from 11GB (exact ratio captured in w5)
+    - Load time shrinks proportionally (Parquet parallel reads + column projection)
+    - SQL platforms also benefit from the smaller artifact
+    - Aligns with `DataFrameRunOptions.prefer_parquet=True` which is already
+      the framework default
+  expected_costs: |
+    - Users with existing SF1+ `.dat` files trigger a one-time regeneration
+      on next run (or an explicit `--benchmark-option output_format=dat` to
+      keep using the old file).
+    - A stale 11GB `.dat` remains on disk until the user deletes it manually.
+    - `docs/benchmarks/tpc-ds-obt.md` needs a default-column edit.
+  recommendation: |
+    Implement now. This unblocks the tpcds_obt branch of the DataFrame stress
+    test suite and resolves the 391s hang observed with datafusion-df.
+
+work:
+  - id: w1
+    summary: "Flip output_format default to 'parquet' in benchmark + transformer"
+    status: done
+    needs: []
+    description: |
+      Flip the default format from `"dat"` to `"parquet"` in four locations.
+      Keep `.dat` as a valid explicit choice.
+
+      1. `benchbox/core/tpcds_obt/benchmark.py`:
+         - `TPCDSOBTBenchmark.__init__`: change `output_format: str = "dat"` →
+           `output_format: str = "parquet"` (currently line ~39).
+         - `TPCDSOBTBenchmark.generate_data`: change
+           `output_format: str = "dat"` → `output_format: str = "parquet"`
+           (currently line ~137).
+         - `BenchmarkHookRegistry.register_option_specs(...)`: change
+           `BenchmarkOptionSpec(name="output_format", default="dat", ...)` →
+           `default="parquet"` (currently line ~322). Leave
+           `choices=("dat", "parquet")` untouched so `.dat` remains valid
+           when explicit.
+
+      2. `benchbox/core/tpcds_obt/etl/transformer.py`:
+         - `TPCDSOBTTransformer.transform`: change
+           `output_format: str = "dat"` → `output_format: str = "parquet"`
+           (currently line ~59). Docstring should continue to mention both
+           formats.
+
+      Verify: no other `output_format="dat"` default remains in the tpcds_obt
+      package. Search with `grep -rn 'output_format.*=.*"dat"' benchbox/core/tpcds_obt/`.
+    files:
+      - benchbox/core/tpcds_obt/benchmark.py
+      - benchbox/core/tpcds_obt/etl/transformer.py
+
+  - id: w2
+    summary: "Update _existing_obt() to prefer parquet and detect stale .dat"
+    status: done
+    needs: [w1]
+    description: |
+      `_existing_obt()` at `benchbox/core/tpcds_obt/benchmark.py:187-195` looks
+      for `tpcds_sales_returns_obt.{output_format}` matching the requested
+      format. With the new parquet default this correctly returns False when
+      only a stale `.dat` exists, triggering regeneration - which is what we
+      want.
+
+      However the method should also log an informational message when it
+      detects a stale `.dat` sitting alongside a missing parquet, so users
+      understand why regeneration is running and can manually delete the
+      `.dat` if they want the disk space back.
+
+      Implementation:
+      1. In `_existing_obt()`, after the existing check fails, detect an
+         alternate-format artifact on disk and log an INFO message pointing at
+         it. Handle both directions symmetrically:
+         - If requested format is `parquet` and
+           `self.output_dir / "tpcds_sales_returns_obt.dat"` exists, log:
+           `"Found stale .dat output at <path>. Regenerating as parquet. Delete the .dat manually to reclaim disk space."`
+         - If requested format is `dat` and
+           `self.output_dir / "tpcds_sales_returns_obt.parquet"` exists, log:
+           `"Found existing .parquet output at <path>. Regenerating as dat because output_format=dat was requested."`
+         A helper that iterates over the other candidate extensions keeps the
+         logic short.
+      2. Do NOT auto-delete the alternate-format file - the user may still
+         want it for platforms tuned against that specific artifact.
+
+      Keep the return-value contract (True when a matching artifact exists,
+      False otherwise) unchanged.
+    files:
+      - benchbox/core/tpcds_obt/benchmark.py
+
+  - id: w3
+    summary: "Update tests for new parquet default + keep explicit-dat coverage"
+    status: done
+    needs: [w1, w2]
+    description: |
+      Two unit tests currently pass `output_format="dat"` explicitly:
+      - `tests/unit/core/tpcds_obt/test_etl.py:84`
+      - `tests/unit/core/tpcds_obt/test_tpcds_obt_benchmark.py:62`
+      One integration test does the same: `tests/integration/test_tpcds_obt_etl.py:171`.
+      The other integration test at line 753 already uses `output_format="parquet"`.
+
+      Required changes:
+      1. `tests/unit/core/tpcds_obt/test_tpcds_obt_benchmark.py`:
+         - Keep the existing explicit-`.dat` test case (renamed if needed to
+           make intent clear, e.g., `test_generate_data_explicit_dat_format`).
+         - Add a new test `test_generate_data_default_format_is_parquet` that
+           constructs `TPCDSOBTBenchmark()` without `output_format`, calls
+           `generate_data()` (mock the transformer or use the tiny fixture),
+           and asserts the produced artifact has `.parquet` suffix and that
+           `benchmark.output_format == "parquet"`.
+         - Add a test for the stale-`.dat` log message from w2:
+           write a fake `.dat` into the output dir, call `_existing_obt("parquet")`,
+           assert it returns False and the INFO log line was emitted.
+
+      2. `tests/unit/core/tpcds_obt/test_etl.py`:
+         - Keep the explicit-`.dat` transformer test.
+         - Add a new test asserting `transform()` with no `output_format`
+           argument produces a `.parquet` file and manifest `output_format` field
+           equals `"parquet"`.
+
+      3. `tests/unit/core/tpcds_obt/test_etl.py` - add a size-ratio unit test:
+         `test_parquet_output_materially_smaller_than_dat`. Use a tiny
+         synthetic OBT fixture (≤1000 rows, ~20 columns is enough - mock
+         `TABLE_COLUMNS` if needed). Call `transform()` twice: once with
+         `output_format="dat"`, once with `output_format="parquet"`.
+         Assert `os.path.getsize(parquet_path) * 5 < os.path.getsize(dat_path)`
+         (parquet must be under one-fifth of .dat). This guards against a
+         future regression where parquet encoding gets accidentally
+         disabled or falls back to row format.
+
+      4. `tests/integration/test_tpcds_obt_etl.py`:
+         - The line-171 test may remain as the explicit-`.dat` integration case.
+
+      Run: `uv run -- python -m pytest tests/unit/core/tpcds_obt/ -q` - all
+      green. Integration tests optional in this work unit but should pass:
+      `uv run -- python -m pytest tests/integration/test_tpcds_obt_etl.py -q`.
+    files:
+      - tests/unit/core/tpcds_obt/test_tpcds_obt_benchmark.py
+      - tests/unit/core/tpcds_obt/test_etl.py
+      - tests/integration/test_tpcds_obt_etl.py
+
+  - id: w4
+    summary: "Update documentation to reflect new parquet default"
+    status: done
+    needs: [w1]
+    description: |
+      Only one doc page references the default explicitly:
+
+      1. `docs/benchmarks/tpc-ds-obt.md` - line ~103:
+         `| \`output_format\` | \`dat\` | Output format: \`dat\`, \`parquet\` |`
+         Change default column to `parquet`. Update the example at line ~110
+         (minimal dimensions, store channel only) so the "explicit parquet"
+         example becomes an "explicit dat" example, demonstrating how to opt
+         out of the new default:
+         ```
+         # Force the legacy pipe-delimited .dat output (rarely needed):
+         benchbox run --platform duckdb --benchmark tpcds_obt --scale 1 \\
+           --benchmark-option output_format=dat
+         ```
+
+      2. Add a brief "Storage format" subsection explaining why parquet is the
+         default (file size, DataFrame platform support) and when users might
+         want `.dat` (reproducing older runs, feeding a tool that only reads
+         pipe-delimited text). Keep it under 10 lines.
+
+      3. `docs/reference/cli/run.md` - line 127:
+         `| \`tpcds_obt\` | \`output_format\` | \`dat\` | Output format: \`dat\`, \`parquet\` |`
+         Change the default column from `dat` to `parquet`.
+
+      Grep already confirmed during planning that only these two files
+      reference the default explicitly. AGENTS.md, CLAUDE.md, and
+      docs/development/result-integrity-validation.md mention `tpcds_obt`
+      but not the default format - no change needed there.
+    files:
+      - docs/benchmarks/tpc-ds-obt.md
+      - docs/reference/cli/run.md
+
+  - id: w5
+    summary: "Verify end-to-end: DuckDB SQL path + DataFusion DataFrame path"
+    status: done
+    needs: [w1, w2, w3]
+    description: |
+      Functional verification that the default flip works for both the SQL
+      and DataFrame consumers.
+
+      1. Regenerate at SF 0.01 (fast smoke):
+         ```
+         rm -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.*
+         uv run benchbox run --platform duckdb --benchmark tpcds_obt --scale 0.01 --queries Q1
+         ```
+         Expect: a `tpcds_sales_returns_obt.parquet` file under the datagen
+         dir; no `.dat` file created; Q1 executes successfully.
+
+      2. Regenerate at SF 1 (the originally-failing case):
+         ```
+         rm -f benchmark_runs/datagen/tpcds_obt_sf1/tpcds_sales_returns_obt.parquet
+         uv run benchbox run --platform datafusion-df --benchmark tpcds_obt --scale 1 --queries Q1
+         ```
+         The stale `tpcds_sales_returns_obt.dat` (11GB) should trigger the
+         w2 log message. A `.parquet` should be produced. DataFusion should
+         load it and Q1 should return rows in < 60s.
+
+         Capture parquet file size and record it in the work-unit commit
+         message for future reference.
+
+      3. Explicit-override smoke (backward compat):
+         ```
+         uv run benchbox run --platform duckdb --benchmark tpcds_obt --scale 0.01 \\
+           --benchmark-option output_format=dat
+         ```
+         Expect: `.dat` file produced, run succeeds.
+
+      If any step fails, open a follow-up TODO with the stack trace - do not
+      patch-fix symptoms in this work unit.
+    files: []
+
+must_preserve:
+  - "Row counts match manifest (channel totals: store ~2.88M, catalog ~1.44M, web ~0.72M at SF1)"
+  - "`.dat` format remains available when user explicitly passes `--benchmark-option output_format=dat`"
+  - "TPC-DS OBT query semantics unchanged - queries still reference the same column names and types"
+  - "DuckDB SQL platform still runs tpcds_obt to completion"
+  - "Manifest JSON schema unchanged (same keys: table, mode, channels, column_count, rows_total, rows_by_channel, rows_with_returns,
+    output_file, output_format, file_size_bytes, scale_factor)"
+  - "`choices=('dat', 'parquet')` on the BenchmarkOptionSpec remains - don't narrow the allowed set"
+
+approach: |
+  This is a mechanical default-flip across four locations plus a small
+  logic addition to `_existing_obt()` for a stale-file log message. No new
+  code paths, no new dependencies. The transformer already emits parquet
+  when asked.
+
+  Work order: w1 first (the actual flip), then w2 (UX improvement for
+  stale-file detection), then w3 (tests catch any accidental regression),
+  then w4 (docs), then w5 (end-to-end smoke).
+
+  Reference existing parquet path: `etl/transformer.py:730` already emits
+  `COPY ... TO '...' (FORMAT PARQUET)`. No changes needed to the export
+  logic itself.
+
+anti_patterns:
+  - "DO NOT remove `.dat` support - because users reproducing older results need it, do keep the format as an explicit opt-in
+    via `--benchmark-option output_format=dat`"
+  - "DO NOT auto-delete stale `.dat` files - because the user may still want them for tuning comparisons, do log an INFO message
+    pointing at the path and let the user decide"
+  - "DO NOT narrow `choices=('dat', 'parquet')` on the BenchmarkOptionSpec - because it's a valid explicit override, do leave
+    the choices tuple unchanged"
+  - "DO NOT refactor the transformer or schema in this TODO - because the file size is a default-flip problem, not a schema
+    problem, do keep scope_limit to the files listed per work unit"
+  - "DO NOT change the default for other benchmarks - because each benchmark has its own generator pipeline and compliance expectations,
+    do limit this change to `tpcds_obt` only"
+
+verification:
+  - description: "All tpcds_obt unit tests pass after the default flip (pytest exits 0)"
+    command: "uv run -- python -m pytest tests/unit/core/tpcds_obt/ -q && echo OK"
+    expected_output: "OK"
+  - description: "Default path (no format arg) produces parquet"
+    command:
+      "uv run -- python -c 'from benchbox.core.tpcds_obt.benchmark import TPCDSOBTBenchmark; b = TPCDSOBTBenchmark();
+      print(b.output_format)'"
+    expected_output: "parquet"
+  - description: "Explicit dat override still works"
+    command:
+      "uv run -- python -c 'from benchbox.core.tpcds_obt.benchmark import TPCDSOBTBenchmark; b = TPCDSOBTBenchmark(output_format=\"\
+      dat\"); print(b.output_format)'"
+    expected_output: "dat"
+  - description: "BenchmarkOptionSpec default is parquet"
+    command: 'grep -n ''name="output_format"'' benchbox/core/tpcds_obt/benchmark.py -A 2 | grep default='
+    expected_output: 'default="parquet"'
+  - description: "DuckDB SQL path at SF 0.01 produces a .parquet artifact (not .dat)"
+    command:
+      "rm -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.* && uv run benchbox run --platform duckdb
+      --benchmark tpcds_obt --scale 0.01 --queries Q1 >/dev/null 2>&1 && test -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.parquet
+      && ! test -f benchmark_runs/datagen/tpcds_obt_sf001/tpcds_sales_returns_obt.dat && echo OK"
+    expected_output: "OK"
+  - description: "DataFusion DataFrame path at SF 1 produces .parquet and run exits 0 (originally-failing case)"
+    command:
+      "rm -f benchmark_runs/datagen/tpcds_obt_sf1/tpcds_sales_returns_obt.parquet && uv run benchbox run --platform datafusion-df
+      --benchmark tpcds_obt --scale 1 --queries Q1 >/dev/null 2>&1 && test -f benchmark_runs/datagen/tpcds_obt_sf1/tpcds_sales_returns_obt.parquet
+      && echo OK"
+    expected_output: "OK"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpcds_obt/benchmark.py"
+    - "benchbox/core/tpcds_obt/etl/transformer.py"
+    - "tests/unit/core/tpcds_obt/test_tpcds_obt_benchmark.py"
+    - "tests/unit/core/tpcds_obt/test_etl.py"
+    - "tests/integration/test_tpcds_obt_etl.py"
+    - "docs/benchmarks/tpc-ds-obt.md"
+    - "docs/reference/cli/run.md"
+  do_not_touch:
+    - "benchbox/core/tpcds_obt/schema.py - the 518-column schema is intentional OBT design"
+    - "benchbox/core/tpcds_obt/queries/ - query adaptations are unaffected by format"
+    - "benchbox/core/tpcds_obt/dataframe_queries.py - DataFrame query implementations unchanged"
+    - "benchbox/platforms/ - no platform-side code changes"
+    - "Other benchmark packages (tpch, tpcds, ssb, clickbench, etc.) - scope is tpcds_obt only"
+    - "The existing 11GB `.dat` file on disk - do not auto-delete"

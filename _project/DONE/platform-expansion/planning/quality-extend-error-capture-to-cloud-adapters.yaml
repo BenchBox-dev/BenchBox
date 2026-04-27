@@ -1,0 +1,105 @@
+id: quality-extend-error-capture-to-cloud-adapters
+title: "Extend ClickHouse error-capture pattern to Redshift, Firebolt, and experimental adapters"
+worktree: platform-expansion
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-12"
+category: Core Functionality
+description: |
+  Quality plan Phase 1c. The just-completed clickhouse-error-message-capture
+  TODO (Pattern G from the SF1 failure analysis) ensures str(exception) lands
+  in the result error field. The audit found 10 bare `except Exception:` sites
+  that swallow error messages the same way:
+    - benchbox/platforms/redshift.py (3)
+    - benchbox/platforms/firebolt.py (1)
+    - benchbox/experimental/gpu/metrics.py (3)
+    - benchbox/experimental/gpu/capabilities.py (1)
+    - benchbox/experimental/concurrency/pool_tester.py (2)
+
+  These distort benchmark results when failures occur silently. Apply the same
+  error-capture pattern uniformly.
+
+deps:
+  needs:
+    - clickhouse-error-message-capture
+
+work:
+  - id: w1
+    summary: "Audit redshift.py three bare-except sites; convert to typed exceptions + str(exception) in result.error_message"
+    status: done
+
+  - id: w2
+    summary: "Apply same pattern to firebolt.py"
+    needs: [w1]
+    status: done
+
+  - id: w3
+    summary: "Apply same pattern to experimental/gpu/metrics.py and capabilities.py"
+    needs: [w1]
+    status: done
+
+  - id: w4
+    summary: "Apply same pattern to experimental/concurrency/pool_tester.py"
+    needs: [w1]
+    status: done
+
+  - id: w5
+    summary:
+      "Add unit tests per adapter asserting error messages reach result objects (mirror the ClickHouse test added in
+      clickhouse-error-message-capture)"
+    needs: [w2, w3, w4]
+    status: done
+
+files_affected:
+  modified:
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/firebolt.py"
+    - "benchbox/experimental/gpu/metrics.py"
+    - "benchbox/experimental/gpu/capabilities.py"
+    - "benchbox/experimental/concurrency/pool_tester.py"
+    - "tests/unit/core/concurrency/test_pool_tester.py"
+  added:
+    - "tests/unit/platforms/test_redshift_error_capture.py"
+    - "tests/unit/platforms/test_firebolt_error_capture.py"
+    - "tests/unit/experimental/gpu/test_metrics_error_capture.py"
+    - "tests/unit/experimental/gpu/test_capabilities_error_capture.py"
+
+must_preserve:
+  - "Successful query path unchanged on each adapter"
+  - "Existing retry/backoff logic in redshift.py untouched"
+  - "Experimental adapters' opt-in behavior (off by default) unchanged"
+
+approach: |
+  Mirror the ClickHouse pattern from the just-completed
+  clickhouse-error-message-capture TODO. For each except site:
+    1. Replace bare `except Exception` with the most specific exception class
+       the underlying SDK raises (boto3, firebolt-sdk, pynvml, etc.).
+    2. Always write str(exception) to the result's error field before re-raising
+       or returning a failure result.
+    3. Add a structured log line (logger.warning) so failures are visible in
+       both the result JSON and the run log.
+  Add one unit test per file that injects a synthetic exception via mock and
+  asserts the error message round-trips to the result.
+
+  For the experimental GPU modules, keep tests hermetic: use monkeypatch/fakes
+  so CI does not require CUDA, NVML, or a real GPU.
+
+anti_patterns:
+  - "DO NOT change retry semantics - because that's a separate concern with its own risks - only touch error capture"
+  - "DO NOT add new exception classes - because the existing core/errors hierarchy is sufficient - reuse what's there"
+  - "DO NOT require a real GPU in unit tests - because CI won't provide one - mock the failure paths instead"
+
+verification:
+  - description: "All platform tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -q"
+    expected_output: "all tests pass"
+  - description: "New platform, concurrency, and GPU error-capture tests pass"
+    command:
+      "uv run -- python -m pytest tests/unit/platforms/test_redshift_error_capture.py tests/unit/platforms/test_firebolt_error_capture.py
+      tests/unit/core/concurrency/test_pool_tester.py tests/unit/experimental/gpu/ -v"
+    expected_output: "all tests pass"
+
+metadata:
+  tags: ["quality-plan", "phase-1", "error-handling", "cloud-adapters"]
+  estimated_effort: "Small-Medium (1 day)"
+  created_date: "2026-04-12"

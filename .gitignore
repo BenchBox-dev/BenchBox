@@ -92,6 +92,13 @@ release/archive/
 # These should be created outside the repo via --target ../BenchBox-public
 /benchbox-*/
 
+# Exclude everything in _project/ except TODO files and marketing/launch docs
+_project/*
+!_project/MARKETING_*.md
+!_project/LAUNCH_*.md
+!_project/CONTENT_*.md
+!_project/SOCIAL_*.md
+
 # Include pre-compiled TPC binaries for distribution
 !_binaries/
 !_binaries/tpc-h/
@@ -113,9 +120,9 @@ release/archive/
 !_sources/tpc-ds/query_templates/
 !_sources/tpc-ds/query_templates/**
 
-uv.lock
 *.tbl
 *.dat
+_sources/join-order-benchmark/
 
 # TPC source build artifacts (compiled locally, not for distribution)
 _sources/tpc-ds/tools/*.o
@@ -129,6 +136,7 @@ _sources/tpc-ds/tools/y.*
 _sources/tpc-ds/tools/tpcds.idx*
 _sources/tpc-ds/tools/.ctags*
 _sources/tpc-h/dbgen/dbgen_x86_64
+.mcp.json
 
 # TODO system infrastructure (added for distributed TODO structure)
 !_project/TODO/
@@ -137,12 +145,17 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 !_project/planning/
 !_project/compat/
 !_project/audits/
+!_project/decisions/
 !_project/TODO_SCHEMA.yaml
 !_project/PROJECT_TODO.md
 !_project/PROJECT_TODO.yaml
 !_project/PROJECT_DONE.md
 !_project/PROJECT_DONE.yaml
 !_project/TODO_ENTRY_TEMPLATE.yaml
+
+# Firebolt data and core data directories
+/firebolt-data
+/firebolt-core-data
 
 # Claude Code configuration (share skills/commands, exclude local settings)
 .claude/settings.local.json

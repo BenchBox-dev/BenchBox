@@ -1,0 +1,152 @@
+id: migrate-clickhouse-firebolt-deployment
+title: "Migrate ClickHouse/Firebolt to Deployment Registry"
+worktree: platform-expansion
+priority: Medium-High
+status: Completed
+completion_date: "2026-01-26"
+category: Core Functionality
+description: |
+  Align existing ClickHouse and Firebolt adapters with the new deployment registry
+  pattern, migrating their ad-hoc mode handling to use the standardized deployment
+  mode configuration.
+
+  Both adapters currently use a 'mode' config key for deployment selection. This
+  work migrates to 'deployment_mode' and integrates with the registry system.
+
+context_sections:
+  "Background and Motivation": |
+    ClickHouse adapter currently supports:
+    - mode="server" (self-hosted ClickHouse server)
+    - mode="local" (chDB embedded)
+
+    Firebolt adapter currently supports:
+    - mode="core" (local Docker container)
+    - mode="cloud" (Firebolt Cloud managed service)
+
+    These implementations predate the deployment registry architecture and use
+    ad-hoc mode handling. Aligning them validates the new pattern and provides
+    reference implementations for other adapters.
+
+  "Technical Context": |
+    The migration involves:
+    1. Adding deployment metadata to platform registry
+    2. Updating adapter constructors to use deployment_mode from config
+    3. Removing legacy mode parsing from adapters
+    4. Ensuring colon syntax works (clickhouse:local, firebolt:cloud)
+
+tasks:
+  phases:
+  - phase: "Phase 1: ClickHouse Migration"
+    done: true
+    items:
+    - summary: "Add ClickHouse deployment metadata to registry"
+      done: true
+      subtasks:
+      - summary: "Define 'local' deployment (chDB, no credentials)"
+        done: true
+      - summary: "Define 'server' deployment (self-hosted, credentials)"
+        done: true
+      - summary: "Set 'local' as default deployment (easiest onboarding)"
+        done: true
+    - summary: "Update ClickHouseAdapter to use deployment_mode"
+      done: true
+      subtasks:
+      - summary: "Replace self.mode with self.deployment_mode"
+        done: true
+      - summary: "Update connection logic for deployment_mode"
+        done: true
+      - summary: "Preserve backward compatibility for 'mode' config key"
+        done: true
+    - summary: "Test clickhouse:local and clickhouse:server syntax"
+      done: true
+
+  - phase: "Phase 2: Firebolt Migration"
+    done: true
+    items:
+    - summary: "Add Firebolt deployment metadata to registry"
+      done: true
+      subtasks:
+      - summary: "Define 'core' deployment (Docker, no credentials)"
+        done: true
+      - summary: "Define 'cloud' deployment (managed, credentials required)"
+        done: true
+      - summary: "Set 'core' as default deployment"
+        done: true
+    - summary: "Update FireboltAdapter to use deployment_mode"
+      done: true
+      subtasks:
+      - summary: "Replace firebolt_mode with deployment_mode"
+        done: true
+      - summary: "Update connection logic for deployment_mode"
+        done: true
+      - summary: "Preserve backward compatibility for 'firebolt_mode' config key"
+        done: true
+    - summary: "Test firebolt:core and firebolt:cloud syntax"
+      done: true
+
+  - phase: "Phase 3: Documentation and Cleanup"
+    done: true
+    items:
+    - summary: "Update platform documentation for new syntax"
+      done: true
+      notes: "Updated CLI help and run.py docstring"
+    - summary: "Add deprecation warnings for legacy mode config keys"
+      done: true
+    - summary: "Update CLI help examples"
+      done: true
+
+  - phase: "Phase 4: Testing"
+    done: true
+    items:
+    - summary: "Test ClickHouse with new deployment syntax"
+      done: true
+    - summary: "Test Firebolt with new deployment syntax"
+      done: true
+    - summary: "Test backward compatibility with legacy mode keys"
+      done: true
+    - summary: "Integration tests for full benchmark runs"
+      done: false
+      notes: "Deferred - requires actual ClickHouse/Firebolt services running"
+
+metadata:
+  tags:
+  - migration
+  - clickhouse
+  - firebolt
+  - deployment-modes
+  estimated_effort: "2-3 days"
+  created_date: "2026-01-14"
+
+impact:
+  business_value: |
+    Validates the deployment registry pattern with real-world adapters,
+    providing reference implementations for future adapter development.
+  user_impact: |
+    Users gain consistent deployment mode syntax across all platforms
+    (clickhouse:cloud, firebolt:cloud) instead of platform-specific config keys.
+  technical_debt: |
+    Eliminates ad-hoc mode handling in adapters, centralizing deployment
+    awareness in the registry and factory.
+
+files_affected:
+  modified:
+  - "benchbox/platforms/clickhouse/adapter.py"
+  - "benchbox/platforms/firebolt.py"
+  - "tests/unit/platforms/test_clickhouse_adapter.py"
+  - "tests/unit/platforms/test_clickhouse_local.py"
+  added: []
+  removed: []
+
+dependencies:
+  blocked_by:
+  - "_project/TODO/platform-expansion/active/deployment-factory-integration.yaml"
+  blocks:
+  - "_project/TODO/platform-expansion/planning/clickhouse-cloud-deployment.yaml"
+  - "_project/TODO/platform-expansion/planning/firebolt-cloud-deployment.yaml"
+
+success_metrics:
+- "clickhouse:local and clickhouse:server work correctly"
+- "firebolt:core and firebolt:cloud work correctly"
+- "Legacy mode config keys still work with deprecation warning"
+- "No regression in existing benchmark runs"
+- "Adapters serve as reference implementations"

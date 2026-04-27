@@ -1,0 +1,96 @@
+id: spark-mixin-open-table-format-loading
+title: "Add delta/iceberg/hudi loading to SparkDataLoadMixin and close shared Spark loader gaps"
+worktree: main
+priority: High
+status: Completed
+description: |
+  SparkDataLoadMixin._load_data_spark() (spark_execution_mixin.py:45-151) currently
+  only handles parquet and CSV.  Spark natively supports delta, iceberg, and hudi via
+  spark.read.format("<format>").load(path), but the mixin lacks format detection and
+  routing for these formats.
+
+  The shared mixin is only part of the Spark-family implementation story.  Some managed
+  Spark adapters have their own staging/Livy/job-submission load paths and do not
+  currently route through SparkDataLoadMixin.  This item therefore only closes the
+  shared loader gap for adapters that actually use the mixin; remaining adapter-family
+  gaps must be tracked separately.
+
+  Once mixin-backed loading code is implemented and verified, only the platforms whose
+  runtime actually uses the mixin should be re-registered in format_capabilities.py.
+
+category: Core Functionality
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Add format detection and routing to SparkDataLoadMixin._load_data_spark()"
+    status: done
+    details: |
+      In spark_execution_mixin.py, extend _load_data_spark() to detect delta/iceberg/hudi
+      directory formats (via _delta_log/, metadata/, .hoodie/ markers) and route to
+      spark.read.format("<fmt>").load(path).  Add SparkTableFormat handling for DELTA,
+      ICEBERG, HUDI alongside existing PARQUET path.
+
+  - id: w2
+    summary: "Add unit tests for Spark format loading (mock-based)"
+    needs: [w1]
+    status: done
+    details: |
+      Create tests that mock spark.read.format() calls to verify correct format detection
+      and routing for delta, iceberg, and hudi directories. Test that parquet/CSV paths
+      are unaffected.
+
+  - id: w3
+    summary: "Re-register only mixin-backed Spark platforms in format_capabilities.py"
+    needs: [w2]
+    status: done
+    details: |
+      After loading code is tested:
+      - Audit which adapters actually dispatch to SparkDataLoadMixin at runtime
+      - Re-register only those adapters in DELTA_CAPABILITY / ICEBERG_CAPABILITY /
+        HUDI_CAPABILITY as appropriate
+      - Do NOT re-register managed Spark adapters that still use separate load paths
+      - Update test_format_capabilities.py assertions
+      Audit result: the shared mixin is used by SparkAdapter and LakeSailAdapter.
+      Spark remains registered for delta/iceberg/hudi; LakeSail remains parquet-only.
+
+deferred:
+  - id: d1
+    summary: "Integration test with real Spark session loading delta/iceberg/hudi files"
+    reason: "Requires Spark cluster or local PySpark install with format jars"
+  - id: d2
+    summary: "Managed Spark adapter follow-up items"
+    reason: "Athena Spark, Dataproc-family, Synapse Spark, and Fabric Spark require separate non-mixin TODOs"
+
+must_preserve:
+  - "SparkDataLoadMixin._load_data_spark() parquet and CSV loading paths must continue to work unchanged"
+  - "All existing Spark adapter tests must pass without modification"
+  - "format_capabilities.py fail-fast check: only re-register a platform after loading code is verified working"
+
+approach: |
+  Follow the existing DuckDB pattern (duckdb.py:156-184) for directory detection:
+  - Delta: check for _delta_log/ subdirectory
+  - Iceberg: check for metadata/ subdirectory
+  - Hudi: check for .hoodie/ subdirectory
+  Then use spark.read.format("<format>").load(path) for each detected format.
+  Re-register platforms in format_capabilities.py only after tests confirm loading works.
+
+anti_patterns:
+  - "DO NOT register platforms in format_capabilities.py before loading code is tested -- because the fail-fast check will pass but load will fail at runtime -- implement and test loading first, then register"
+  - "DO NOT add external library dependencies (deltalake, pyiceberg) -- because Spark has native format support via spark.read.format() -- use the native Spark API"
+
+verification:
+  - description: "Spark adapter tests pass"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/ -v -k 'spark' --no-header -q"
+    expected_output: "All tests pass"
+  - description: "Format capabilities tests pass with updated registrations"
+    command: "uv run -- python -m pytest tests/unit/platforms/base/test_format_capabilities.py -v --no-header -q"
+    expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/spark_execution_mixin.py"
+    - "benchbox/platforms/base/format_capabilities.py"
+    - "tests/unit/platforms/base/"

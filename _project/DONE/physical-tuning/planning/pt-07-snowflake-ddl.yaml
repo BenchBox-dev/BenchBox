@@ -1,0 +1,166 @@
+# Physical Tuning #07: Snowflake DDL Generator Enhancement
+#
+# Snowflake has existing partial support - enhance it.
+
+id: pt-07-snowflake-ddl
+title: "PT-07: Snowflake Physical Tuning DDL Generator Enhancement"
+worktree: "physical-tuning"
+priority: "Medium"
+status: "Not Started"
+category: "Platform Expansion"
+
+description: |
+  Enhance the existing Snowflake DDL generation to fully utilize the tuning
+  configuration system and improve automatic clustering management.
+
+  ## Snowflake Physical Tuning Features
+
+  ### Automatic Clustering
+  Snowflake's primary tuning mechanism:
+  ```sql
+  CREATE TABLE t (...) CLUSTER BY (col1, col2);
+  ALTER TABLE t CLUSTER BY (col1, col2);
+  ```
+
+  Notes:
+  - Snowflake automatically maintains clustering in background
+  - No manual partition creation needed
+  - Best for columns used in WHERE, JOIN, ORDER BY
+
+  ### Micro-Partitions (Automatic)
+  Snowflake automatically partitions data into ~16MB micro-partitions.
+  Users cannot control this directly - it's fully automatic.
+
+  ### Search Optimization Service
+  Optional acceleration for point lookups:
+  ```sql
+  ALTER TABLE t ADD SEARCH OPTIMIZATION ON EQUALITY(col);
+  ```
+
+  ## Current State
+
+  Snowflake adapter (`benchbox/platforms/snowflake.py`) has:
+  - `generate_tuning_clause()` method (line ~1448) - generates CLUSTER BY
+  - `apply_table_tunings()` method (line ~1498) - runs ALTER CLUSTER BY
+  - Issue: Uses inline config, doesn't fully use tuning YAML
+
+context_sections:
+  "DDL Syntax Examples": |
+    ```sql
+    -- Clustered table
+    CREATE TABLE lineitem (
+        l_orderkey NUMBER(38,0) NOT NULL,
+        l_partkey NUMBER(38,0) NOT NULL,
+        l_suppkey NUMBER(38,0) NOT NULL,
+        l_linenumber NUMBER(38,0) NOT NULL,
+        l_quantity NUMBER(12,2),
+        l_extendedprice NUMBER(12,2),
+        l_discount NUMBER(12,2),
+        l_tax NUMBER(12,2),
+        l_returnflag VARCHAR(1),
+        l_linestatus VARCHAR(1),
+        l_shipdate DATE,
+        l_commitdate DATE,
+        l_receiptdate DATE,
+        l_shipinstruct VARCHAR(25),
+        l_shipmode VARCHAR(10),
+        l_comment VARCHAR(44)
+    )
+    CLUSTER BY (l_shipdate, l_orderkey);
+
+    -- Automatic clustering (enabled by default for clustered tables)
+    ALTER TABLE lineitem RESUME RECLUSTER;
+
+    -- Search optimization
+    ALTER TABLE lineitem ADD SEARCH OPTIMIZATION ON EQUALITY(l_orderkey);
+
+    -- Check clustering health
+    SELECT SYSTEM$CLUSTERING_INFORMATION('lineitem', '(l_shipdate, l_orderkey)');
+    ```
+
+  "Tuning Considerations": |
+    Snowflake-specific guidance:
+    - Don't over-cluster (3-4 columns max recommended)
+    - Leading column should have highest cardinality for filter predicates
+    - Date columns work well as first clustering key
+    - Avoid clustering on frequently updated columns
+
+    Partitioning note:
+    - Snowflake handles partitioning automatically (micro-partitions)
+    - `partitioning` in tuning config should be ignored with warning
+    - Map `partitioning` columns to `clustering` for Snowflake
+
+tasks:
+  phases:
+  - phase: "Phase 1: Enhance Existing Generator"
+    done: false
+    items:
+    - summary: "Refactor generate_tuning_clause() to use DDL generator protocol"
+      done: false
+    - summary: "Ensure tuning YAML config flows to DDL generation"
+      done: false
+    - summary: "Add warning for partitioning config (map to clustering)"
+      done: false
+
+  - phase: "Phase 2: Search Optimization Support"
+    done: false
+    items:
+    - summary: "Add search_optimization to platform config"
+      done: false
+    - summary: "Generate ALTER TABLE ADD SEARCH OPTIMIZATION"
+      done: false
+    - summary: "Support EQUALITY and SUBSTRING optimization"
+      done: false
+
+  - phase: "Phase 3: Clustering Health Monitoring"
+    done: false
+    items:
+    - summary: "Add clustering info query to dry-run output"
+      done: false
+    - summary: "Log clustering depth metrics after data load"
+      done: false
+    - summary: "Warn if clustering depth is poor"
+      done: false
+
+  - phase: "Phase 4: Testing"
+    done: false
+    items:
+    - summary: "Unit tests for enhanced generator"
+      done: false
+    - summary: "Integration test with Snowflake (credentials required)"
+      done: false
+    - summary: "Verify clustering applied via SYSTEM$CLUSTERING_INFORMATION"
+      done: false
+
+files_affected:
+  modified:
+  - "benchbox/platforms/snowflake.py"
+  - "examples/tunings/snowflake/tpch_tuned.yaml"
+  added:
+  - "benchbox/core/tuning/generators/snowflake.py"
+  - "tests/unit/core/tuning/generators/test_snowflake_ddl.py"
+
+technical_requirements:
+  constraints:
+  - "Must warn on partitioning config (not applicable)"
+  - "Must support automatic clustering enablement"
+  - "Search optimization is optional enhancement"
+
+success_metrics:
+- "Clustering keys applied from tuning YAML"
+- "SYSTEM$CLUSTERING_INFORMATION shows good clustering depth"
+- "Partitioning config gracefully mapped to clustering"
+
+dependencies:
+  blocked_by:
+  - "_project/TODO/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml"
+
+metadata:
+  owners:
+  - "joe"
+  tags:
+  - "tuning"
+  - "snowflake"
+  - "ddl-generation"
+  estimated_effort: "Small"
+  created_date: "2026-01-03"

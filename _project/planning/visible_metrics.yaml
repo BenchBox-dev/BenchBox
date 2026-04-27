@@ -1,0 +1,444 @@
+# visible_metrics.yaml
+# Registry of every user-visible metric in the BenchBox results explorer.
+#
+# This file is the G-2 parity test driver for the DuckDB-only browser metric
+# contract. Tests read this registry and dispatch on `kind`:
+#
+#   raw_copy  → assert DuckDB column == committed bundle field verbatim
+#   derived   → assert DuckDB-backed read-path value == canonical Python
+#               reference computation (benchbox.core.explorer_pipeline.*),
+#               within the `tolerance` declared per metric
+#
+# "Canonical Python reference computation" means the pipeline's own Python
+# implementation under benchbox/core/explorer_pipeline/ (plus read-only
+# imports from benchbox/core/results/). TypeScript code is NEVER a reference
+# oracle. Pre-calculated CLI JSON artifacts and bridge artifacts are NEVER
+# a reference oracle.
+#
+# Fields:
+#   table            DuckDB canonical table or view name
+#   column           column name in that table/view
+#   kind             raw_copy | derived
+#   source_field     (raw_copy) JSON path in the committed bundle
+#   canonical_ref    (derived) Python dotted path to the reference function
+#   tolerance        (derived) max relative divergence (0 = exact match)
+#   display_surfaces list of UI surfaces that render this column
+#   notes            optional clarification
+
+schema_version: 1
+generated_date: "2026-04-18"
+originating_todo: explorer-canonical-browser-duckdb-read-model
+
+metrics:
+
+  # ---------------------------------------------------------------------------
+  # results table - base table, one row per result bundle
+  # ---------------------------------------------------------------------------
+
+  - table: results
+    column: result_id
+    kind: raw_copy
+    source_field: "sha256(bundle_bytes)[:8] content-hash prefix from pipeline"
+    display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
+    notes: "Pipeline-assigned; deterministic for a given bundle file's bytes"
+
+  - table: results
+    column: benchmark
+    kind: raw_copy
+    source_field: "benchmark.name"
+    display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
+
+  - table: results
+    column: scale_factor
+    kind: raw_copy
+    source_field: "run.scale_factor"
+    display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
+
+  - table: results
+    column: platform
+    kind: raw_copy
+    source_field: "platform.name"
+    display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
+
+  - table: results
+    column: platform_id
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.models._platform_id"
+    tolerance: 0
+    display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
+    notes: "Provenance-stripped, lowercased slug derived from platform.name"
+
+  - table: results
+    column: driver_version
+    kind: raw_copy
+    source_field: "execution.driver_actual_version (preferred) or driver_resolved_version or driver_requested_version"
+    display_surfaces: [compare, result_detail, query]
+
+  - table: results
+    column: run_date
+    kind: raw_copy
+    source_field: "run.started_at[:10] (YYYY-MM-DD)"
+    display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
+
+  - table: results
+    column: power_score
+    kind: raw_copy
+    source_field: "summary.tpc_metrics.power_at_size (preferred) or qphh_at_size or qphds_at_size"
+    display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
+    notes: "Null for benchmarks without a TPC power metric; read directly from bundle"
+
+  - table: results
+    column: total_duration_s
+    kind: raw_copy
+    source_field: "run.total_duration_ms / 1000.0"
+    display_surfaces: [compare, result_detail]
+
+  - table: results
+    column: geomean_ms
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._geomean_ms"
+    tolerance: 1.0e-9
+    display_surfaces: [home, platform_index, query]
+    notes: "Geometric mean of measurement-run ms values across all queries in the bundle"
+
+  - table: results
+    column: display_geomean_ms
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._display_geomean_ms"
+    tolerance: 1.0e-9
+    display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
+    notes: >
+      Geometric mean of per-query display_ms medians - the canonical comparison metric.
+      Differs from geomean_ms (which uses all raw samples); display_geomean_ms uses
+      one median-of-passing-measurement-runs value per query.
+
+  - table: results
+    column: query_count
+    kind: raw_copy
+    source_field: "len(queries)"
+    display_surfaces: [result_detail, query]
+
+  - table: results
+    column: trust_label
+    kind: raw_copy
+    source_field: "pipeline trust_label parameter (maintainer-run | community-submission)"
+    display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
+
+  - table: results
+    column: visibility
+    kind: raw_copy
+    source_field: "pipeline visibility parameter (public-curated | public-verified)"
+    display_surfaces: [result_detail, query]
+
+  - table: results
+    column: platform_version
+    kind: raw_copy
+    source_field: "platform.version"
+    display_surfaces: [result_detail, query]
+
+  - table: results
+    column: execution_mode
+    kind: raw_copy
+    source_field: "config.execution_mode or execution.execution_mode"
+    display_surfaces: [compare, result_detail, query]
+
+  - table: results
+    column: tuning_mode
+    kind: raw_copy
+    source_field: "config.tuning_mode"
+    display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
+
+  - table: results
+    column: tuning_hash
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._tuning_hash"
+    tolerance: 0
+    display_surfaces: [query]
+    notes: "SHA-256[:8] of {mode, tuning_config} JSON; null when no tuning info present"
+
+  - table: results
+    column: test_type
+    kind: raw_copy
+    source_field: "benchmark.test_type or phases.power_test/throughput_test inference"
+    display_surfaces: [compare, result_detail, query]
+
+  - table: results
+    column: validation_status
+    kind: raw_copy
+    source_field: "summary.validation.status (or summary.validation if string)"
+    display_surfaces: [result_detail, query]
+
+  - table: results
+    column: cost_usd
+    kind: raw_copy
+    source_field: "cost.total_usd"
+    display_surfaces: [benchmark_index, query]
+
+  - table: results
+    column: compliance_class
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._compliance_class"
+    tolerance: 0
+    display_surfaces: [benchmark_index]
+    notes: "Enum: official | unofficial_subscale | unofficial_nonstandard | null"
+
+  - table: results
+    column: is_ranking_eligible
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.models.is_ranking_eligible"
+    tolerance: 0
+    display_surfaces: [benchmark_index, benchmark_rankings]
+    notes: "True when visibility in RANKING_ELIGIBLE_VISIBILITIES and trust_label in RANKING_ELIGIBLE_TRUST_LABELS"
+
+  - table: results
+    column: has_plans
+    kind: raw_copy
+    source_field: "derived from bundle - True when a .plans.json sidecar exists"
+    display_surfaces: [result_detail]
+
+  - table: results
+    column: has_tuning
+    kind: raw_copy
+    source_field: "derived from bundle - True when config.tuning_mode is set"
+    display_surfaces: [result_detail]
+
+  - table: results
+    column: bundle_download_url
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline.ExplorerPipeline.run (bundle_url_prefix)"
+    tolerance: 0
+    display_surfaces: [result_detail]
+    notes: "Constructed as {bundle_url_prefix}/{result_id}.json"
+
+  # ---------------------------------------------------------------------------
+  # query_display_timings table - one row per (result_id, query_id)
+  # ---------------------------------------------------------------------------
+
+  - table: query_display_timings
+    column: display_ms
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._query_display_ms"
+    tolerance: 1.0e-9
+    display_surfaces: [result_detail, benchmark_index, compare]
+    notes: >
+      Median of passing measurement-run ms values for this (result_id, query_id) pair.
+      Null when all runs for this query failed or the query was not run.
+
+  - table: query_display_timings
+    column: sample_count
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._query_display_ms (second return value)"
+    tolerance: 0
+    display_surfaces: [result_detail]
+    notes: "Number of passing measurement runs that contributed to display_ms"
+
+  # ---------------------------------------------------------------------------
+  # query_executions table - one row per individual query run
+  # ---------------------------------------------------------------------------
+
+  - table: query_executions
+    column: duration_ms
+    kind: raw_copy
+    source_field: "queries[].ms (preferred) or queries[].execution_time_ms"
+    display_surfaces: [result_detail]
+
+  - table: query_executions
+    column: status
+    kind: raw_copy
+    source_field: "queries[].status"
+    display_surfaces: [result_detail]
+
+  - table: query_executions
+    column: run_type
+    kind: raw_copy
+    source_field: "queries[].run_type"
+    display_surfaces: [result_detail]
+
+  - table: query_executions
+    column: iter
+    kind: raw_copy
+    source_field: "queries[].iter"
+    display_surfaces: [result_detail]
+
+  - table: query_executions
+    column: stream
+    kind: raw_copy
+    source_field: "queries[].stream"
+    display_surfaces: [result_detail]
+
+  # ---------------------------------------------------------------------------
+  # benchmark_matrix_cells table - Platform × Query display_ms per cohort
+  # ---------------------------------------------------------------------------
+
+  - table: benchmark_matrix_cells
+    column: display_ms
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._query_display_ms"
+    tolerance: 1.0e-9
+    display_surfaces: [benchmark_index]
+    notes: >
+      Same value as query_display_timings.display_ms for the same (result_id, query_id).
+      Denormalized into this table so the matrix view loads one record per
+      (benchmark, scale_factor, phase) instead of joining across all results.
+
+  # ---------------------------------------------------------------------------
+  # benchmark_rankings table - per-(benchmark, scale, phase, result_id) ranking
+  # ---------------------------------------------------------------------------
+
+  - table: benchmark_rankings
+    column: rank
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_benchmark_summaries"
+    tolerance: 0
+    display_surfaces: [benchmark_index]
+    notes: "1-based rank within (benchmark, scale_factor, phase) cohort by primary_metric"
+
+  - table: benchmark_rankings
+    column: short_id
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_short_ids"
+    tolerance: 0
+    display_surfaces: [compare]
+    notes: "sha256(result_id)[:N] where N is minimum prefix length for corpus-wide uniqueness"
+
+  - table: benchmark_rankings
+    column: percentile_p50
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._platform_percentile_stats"
+    tolerance: 1.0e-9
+    display_surfaces: [benchmark_index]
+
+  - table: benchmark_rankings
+    column: percentile_p90
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._platform_percentile_stats"
+    tolerance: 1.0e-9
+    display_surfaces: [benchmark_index]
+
+  - table: benchmark_rankings
+    column: percentile_p95
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._platform_percentile_stats"
+    tolerance: 1.0e-9
+    display_surfaces: [benchmark_index]
+
+  - table: benchmark_rankings
+    column: percentile_p99
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._platform_percentile_stats"
+    tolerance: 1.0e-9
+    display_surfaces: [benchmark_index]
+
+  - table: benchmark_rankings
+    column: speedup_vs_best
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.compare_math.speedup_vs_best"
+    tolerance: 1.0e-9
+    display_surfaces: [benchmark_index, compare]
+    notes: "∈ (0, 1] - best row in cohort = 1.0, worse rows < 1.0; direction-aware on primary_metric"
+
+  - table: benchmark_rankings
+    column: speedup_vs_slowest_in_cohort
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.compare_math.speedup_vs_slowest"
+    tolerance: 1.0e-9
+    display_surfaces: [benchmark_index, compare]
+    notes: "≥ 1.0 - slowest row in cohort = 1.0, better rows > 1.0; direction-aware on primary_metric"
+
+  # ---------------------------------------------------------------------------
+  # cohort_metadata table - meta-leaderboard cohort + per-variant ranks
+  #
+  # PRIMARY KEY is (cohort_key, result_id): one row PER PUBLISHABLE VARIANT,
+  # not per platform. Same platform may appear more than once per cohort when
+  # run with different tuning_mode or trust_label. The pipeline preserves all
+  # variants; the UI is responsible for any display-time collapsing.
+  # ---------------------------------------------------------------------------
+
+  - table: cohort_metadata
+    column: rank
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
+    tolerance: 0
+    display_surfaces: [home]
+    notes: "1-based rank within cohort by primary_metric; per result_id (variant), not per platform_id; null when metric_value is null"
+
+  - table: cohort_metadata
+    column: metric_value
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
+    tolerance: 1.0e-9
+    display_surfaces: [home]
+    notes: "power_score for power_score cohorts; display_geomean_ms otherwise; per result_id (variant)"
+
+  - table: cohort_metadata
+    column: speedup_vs_best
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
+    tolerance: 1.0e-9
+    display_surfaces: [home]
+    notes: >
+      For lower-is-better: best_val / this_val (>= 1 for non-best, == 1 for best).
+      For higher-is-better: this_val / best_val (<= 1 for non-best, == 1 for best).
+      Per result_id (variant); null when metric_value is null.
+
+  - table: cohort_metadata
+    column: short_id
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_short_ids"
+    tolerance: 0
+    display_surfaces: [home]
+    notes: "sha256(result_id) prefix for compact URLs; threaded through to cohort rows so Home can link variants without joining short_ids"
+
+  - table: cohort_metadata
+    column: tuning_mode
+    kind: raw_copy
+    source_field: "config.tuning_mode from the committed bundle (via ManifestEntry.tuning_mode)"
+    tolerance: 0
+    display_surfaces: [home]
+    notes: "Enables Home to label/group variants (e.g. 'tuned' vs 'notuning') without joining benchmark_rankings"
+
+  - table: cohort_metadata
+    column: trust_label
+    kind: raw_copy
+    source_field: "ManifestEntry.trust_label (derived at pipeline ingest, not from the raw bundle)"
+    tolerance: 0
+    display_surfaces: [home]
+    notes: "Enables Home to surface cross-trust-level comparisons on the cohort panel without a secondary query"
+
+  # ---------------------------------------------------------------------------
+  # meta_leaderboard table - pre-computed cross-cohort platform summary
+  # ---------------------------------------------------------------------------
+
+  - table: meta_leaderboard
+    column: avg_rank
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
+    tolerance: 1.0e-2
+    display_surfaces: [home]
+    notes: >
+      Mean rank across all cohorts in which this platform appeared with a non-null
+      rank. Rounded to 2 decimal places. Cohorts where metric_value is null are
+      excluded from the average (not penalized).
+
+  - table: meta_leaderboard
+    column: n_cohorts
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
+    tolerance: 0
+    display_surfaces: [home]
+    notes: "Count of cohorts in which this platform has a non-null rank"
+
+  # ---------------------------------------------------------------------------
+  # short_ids table - short_id -> result_id mapping
+  # ---------------------------------------------------------------------------
+
+  - table: short_ids
+    column: short_id
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_short_ids"
+    tolerance: 0
+    display_surfaces: [compare]
+    notes: >
+      sha256(result_id.encode())[:N].hexdigest() where N >= 8 is the minimum prefix
+      length that guarantees corpus-wide uniqueness. All short_ids in the table have
+      the same prefix length for a given pipeline build.

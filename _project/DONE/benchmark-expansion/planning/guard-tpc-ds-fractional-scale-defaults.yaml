@@ -1,0 +1,52 @@
+id: guard-tpc-ds-fractional-scale-defaults
+title: Guard TPC-DS Fractional Scale Defaults
+worktree: benchmark-expansion
+category: Pre-Release High Priority Tasks (Should-Fix Before Release)
+priority: High
+status: Completed
+completed_date: '2025-11-27'
+description: '"Prevent segmentation faults in `benchbox run --benchmark tpcds` by validating or adjusting the default fractional
+  scale before invoking `dsdgen`."'
+context_sections:
+- name: Crash Reproduction
+  summary: Calling dsdgen with scale < 1 (e.g., 0.01) crashes while generating call_center chunks, blocking new users.
+impact: Ensures the first-run experience works without manual configuration.
+tasks:
+- phase: Scale Policy Definition
+  done: true
+  items:
+  - summary: Determine minimum supported scale factor for bundled binaries.
+  - summary: Decide on fallback behavior (rounded scale, prebuilt data, or Python down-sampling).
+- phase: Generator Enforcement
+  done: true
+  items:
+  - summary: '"Add validation to `benchbox/core/tpcds/generator.py`."'
+  - summary: Update CLI defaults and error messages.
+- phase: '"Documentation & Tests"'
+  done: true
+  items:
+  - summary: Add regression test for smallest supported scale.
+  - summary: Document the new behavior in CLI help and docs/usage.
+files_affected:
+  modified:
+  - benchbox/core/tpcds/generator/manager.py
+  - benchbox/cli/benchmarks.py
+  - benchbox/cli/commands/run.py
+  - tests/unit/generators/test_tpcds_generator.py
+  added: []
+  removed: []
+sections:
+  Implementation Summary: '- Updated TPC-DS default_scale from 0.01 to 1.0 and scale_options to [1.0, 10.0, 100.0]
+
+    - Added min_scale: 1.0 constraint to TPC-DS benchmark configuration
+
+    - Added validate_scale_factor() method to BenchmarkManager for early CLI validation
+
+    - Updated TPCDSDataGenerator._validate_parameters() to raise ValueError for scale_factor < 1.0
+
+    - Added CLI validation in run.py at all BenchmarkConfig creation points
+
+    - Updated tests to verify scale factor validation works correctly'
+  Resolution: 'Users who need smaller datasets should use TPC-H (which supports fractional scale factors)
+
+    or use scale_factor=1.0 with query subsets via --queries flag.'

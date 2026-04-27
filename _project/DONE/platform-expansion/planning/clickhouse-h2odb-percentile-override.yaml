@@ -1,0 +1,63 @@
+id: clickhouse-h2odb-percentile-override
+title: "Add ClickHouse dialect override for h2odb Q9 PERCENTILE_CONT → quantile()"
+worktree: platform-expansion
+category: Platform Expansion
+priority: Medium-High
+status: Completed
+completed_date: "2026-04-08"
+description: |
+  h2odb Q9 fails on ClickHouse with SYNTAX_ERROR because it uses standard SQL
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY fare_amount). ClickHouse doesn't
+  implement ordered-set aggregate syntax.
+
+  Fix: Add a ClickHouse-specific Q9 override using quantile(0.5)(fare_amount) and
+  quantile(0.9)(fare_amount). This is a 3-line SQL change.
+
+  Part of Pattern C (PERCENTILE_CONT rewrite) which also affects read_primitives.
+
+work:
+  - id: w1
+    summary: "Create ClickHouse-specific Q9 override file using quantile(0.5)(fare_amount) / quantile(0.9)(fare_amount)"
+    status: done
+
+  - id: w2
+    summary: "Add unit test that loads h2odb Q9 for ClickHouse and asserts SQL contains 'quantile(' not 'PERCENTILE_CONT'"
+    needs: [w1]
+    status: done
+
+files_affected:
+  modified:
+    - "benchbox/core/h2odb/queries.py"
+  added:
+    - "benchbox/core/h2odb/queries/clickhouse_sql/q9.sql"
+
+must_preserve:
+  - "Base h2odb Q9 query unchanged - other platforms use standard PERCENTILE_CONT syntax"
+  - "ClickHouse override returns identical column names and semantics as the base query"
+
+anti_patterns:
+  - "DO NOT modify base queries.py or default SQL files - because other platforms depend on standard SQL PERCENTILE_CONT - create clickhouse_sql/ override instead"
+
+approach: |
+  Follow existing ClickHouse override patterns in other benchmarks. Check how
+  query overrides are loaded (likely a clickhouse_sql/ subdirectory convention).
+  The SQL change is straightforward: replace PERCENTILE_CONT(p) WITHIN GROUP
+  (ORDER BY col) with quantile(p)(col).
+
+verification:
+  - description: "ClickHouse h2odb override loads and uses quantile() syntax"
+    command: "uv run -- python -m pytest tests/ -v -k 'h2odb and clickhouse'"
+    expected_output: "Tests pass confirming quantile() override for Q9"
+
+metadata:
+  tags:
+    - clickhouse
+    - h2odb
+    - dialect-override
+    - sf1-failures
+  created_date: "2026-04-08"
+  estimated_effort: "Small"
+
+impact:
+  business_value: |
+    Fixes 3 query failures (Q9 × 3 iterations). Quick win with minimal risk.

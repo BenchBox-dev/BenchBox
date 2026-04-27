@@ -1,0 +1,39 @@
+id: implement-or-remove-incomplete-cli-commands
+title: ✅ Implement or Remove Incomplete CLI Commands
+category: Pre-Release High Priority Tasks (COMPLETED)
+sections:
+  Notes: '- "**Priority**: High"
+
+    - "**Status**: Completed ✅"
+
+    - "**Description**: The export and results CLI commands are currently incomplete and not fully functional, which may confuse
+    users and create broken experiences"
+
+    - "**Context**: Incomplete commands in public CLI create poor user experience and suggest missing functionality"
+
+    - "**Tasks**:"
+
+    - "**Files Affected**:"
+
+    - "**Success Metrics**:"
+
+    - "**Impact**: HIGH - Prevents user confusion and ensures professional CLI experience"'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Priority**: High"
+
+  - "**Status**: Completed ✅"
+
+  - "**Description**: The export and results CLI commands are currently incomplete and not fully functional, which may confuse
+  users and create broken experiences"
+
+  - "**Context**: Incomplete commands in public CLI create poor user experience and suggest missing functionality"
+
+  - "**Tasks**:"
+
+  - "**Files Affected**:"
+
+  - "**Success Metrics**:"
+
+  - "**Impact**: HIGH - Prevents user confusion and ensures professional CLI experience"'

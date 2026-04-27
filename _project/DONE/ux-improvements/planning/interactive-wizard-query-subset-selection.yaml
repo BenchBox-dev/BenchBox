@@ -1,0 +1,83 @@
+id: interactive-wizard-query-subset-selection
+title: "Add --queries subset selection to interactive wizard"
+worktree: ux-improvements
+priority: High
+status: Not Started
+description: |
+  The CLI supports query subset selection via `--queries Q1,Q6,Q17` for running specific
+  queries, but the interactive wizard explicitly sets queries to None with a comment
+  suggesting users should use smaller scales instead.
+
+  Query subset selection is critical for:
+  1. Iterative development and debugging
+  2. Quick validation of specific query performance
+  3. Testing specific query categories
+  4. Reducing benchmark runtime during development
+
+  The wizard should allow users to select specific queries or query ranges.
+
+category: User Experience
+
+tasks:
+  phases:
+  - phase: "Phase 1: Design"
+    done: false
+    items:
+    - summary: "Design query selection UI (comma-separated, range, all)"
+      done: false
+    - summary: "Add query preview with estimated complexity"
+      done: false
+    - summary: "Consider category-based selection (e.g., 'all join queries')"
+      done: false
+
+  - phase: "Phase 2: Implementation"
+    done: false
+    items:
+    - summary: "Add optional query selection prompt after benchmark selection"
+      done: false
+    - summary: "Validate query IDs against selected benchmark"
+      done: false
+    - summary: "Show query count and subset warning"
+      done: false
+    - summary: "Wire to benchmark config queries field"
+      done: false
+
+  - phase: "Phase 3: Testing"
+    done: false
+    items:
+    - summary: "Test query validation against TPC-H, TPC-DS, SSB"
+      done: false
+    - summary: "Test invalid query ID handling"
+      done: false
+
+metadata:
+  tags:
+  - cli
+  - ux
+  - interactive
+  - queries
+  estimated_effort: "Small"
+  created_date: "2025-12-21"
+
+impact:
+  user_impact: |
+    Enables faster iteration:
+    - Run specific queries for debugging
+    - Quick performance validation
+    - Reduced wait times during development
+
+files_affected:
+  modified:
+  - "benchbox/cli/benchmarks.py"
+
+context_sections:
+  "Current Code": |
+    ```python
+    # benchbox/cli/benchmarks.py:767
+    queries = None  # Users should use smaller scales or different benchmarks for faster tests
+    ```
+
+success_metrics:
+- "Query selection available in wizard"
+- "Invalid query IDs rejected with helpful message"
+- "Works with all benchmarks that support queries"

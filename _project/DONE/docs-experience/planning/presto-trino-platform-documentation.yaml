@@ -1,0 +1,103 @@
+id: presto-trino-platform-documentation
+title: Presto and Trino Platform Documentation
+worktree: docs-experience
+priority: High
+status: "Completed"
+category: Documentation and User Experience
+description: |
+  Create comprehensive platform documentation for Presto and Trino.
+
+  Both platforms share similar architecture but have diverged since the fork.
+  Documentation should cover:
+  - Coordinator connection setup
+  - Catalog selection and management
+  - Authentication methods (Kerberos, LDAP, OAuth)
+  - Key differences between Presto and Trino
+
+  Currently no user-facing documentation exists for either platform.
+
+tasks:
+- phase: "Presto Documentation"
+  done: true
+  items:
+  - summary: "Create docs/platforms/presto.md"
+    done: true
+  - summary: "Document coordinator connection"
+    done: true
+  - summary: "Document catalog discovery and selection"
+    done: true
+  - summary: "Document authentication options"
+    done: true
+  - summary: "Add query optimization tips"
+    done: true
+- phase: "Trino Documentation"
+  done: true
+  items:
+  - summary: "Create docs/platforms/trino.md"
+    done: true
+  - summary: "Document coordinator connection"
+    done: true
+  - summary: "Document catalog discovery and selection"
+    done: true
+  - summary: "Document authentication options"
+    done: true
+  - summary: "Highlight Trino-specific features"
+    done: true
+- phase: "Index Updates"
+  done: true
+  items:
+  - summary: "Update docs/platforms/index.md with both links"
+    done: true
+  - summary: "Add cross-references between Presto and Trino docs"
+    done: true
+
+completion_notes: |
+  Documentation already existed:
+
+  presto.md (82 lines):
+  - Dedicated PrestoDB guide (separate from Trino)
+  - Driver API differences from Trino explained
+  - Coordinator connection setup
+  - Catalog and schema configuration
+  - Authentication (basic auth, Kerberos notes)
+  - When to choose PrestoDB vs Trino vs Athena
+
+  trino.md (232 lines):
+  - Comprehensive Trino platform guide
+  - Installation instructions
+  - Environment variables and CLI options
+  - Platform options table
+  - Local development (Docker) and production modes
+  - Starburst Enterprise compatibility
+  - Performance tuning with session properties
+  - Query plan analysis
+  - Troubleshooting section
+  - Cross-references to Presto and Athena docs
+
+metadata:
+  owners:
+  - "@benchbox-maintainers"
+  tags:
+  - documentation
+  - presto
+  - trino
+  - platform
+  estimated_effort: 5-6 hours
+  created_date: "2025-12-13"
+
+impact:
+  business_value: |
+    Presto/Trino are widely used in enterprise data lakes.
+    Documentation enables large user segment.
+  user_impact: |
+    Clear catalog selection guidance prevents common errors.
+    Authentication setup documented for enterprise environments.
+
+success_metrics:
+- "Complete guides for both Presto and Trino"
+- "Catalog auto-selection feature documented"
+- "Troubleshooting covers connection and auth issues"
+
+files_modified:
+- docs/platforms/presto.md (existing, complete)
+- docs/platforms/trino.md (existing, comprehensive)

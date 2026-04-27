@@ -129,9 +129,11 @@ class TestQueriesFlagValidation:
         assert "max 100" in result.output
 
     def test_query_id_too_long(self):
-        """Test that query IDs >20 chars are rejected."""
+        """Test that query IDs exceeding MAX_QUERY_ID_LENGTH chars are rejected."""
+        from benchbox.utils.input_validation import MAX_QUERY_ID_LENGTH
+
         runner = CliRunner()
-        long_id = "a" * 21  # 21 characters
+        long_id = "a" * (MAX_QUERY_ID_LENGTH + 1)
         result = runner.invoke(
             run,
             ["--platform", "duckdb", "--benchmark", "tpch", "--queries", long_id],
@@ -140,7 +142,7 @@ class TestQueriesFlagValidation:
         )
         assert result.exit_code != 0
         assert "Query ID too long" in result.output
-        assert "max 20 chars" in result.output
+        assert f"max {MAX_QUERY_ID_LENGTH} chars" in result.output
 
     def test_invalid_format_special_chars(self):
         """Test that special characters are rejected."""

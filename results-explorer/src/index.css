@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        font-family:
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            Roboto,
+            "Helvetica Neue",
+            Arial,
+            sans-serif;
+    }
+
+    body {
+        @apply bg-gray-50 text-gray-900 min-h-screen;
+    }
+
+    a {
+        @apply text-brand-600 hover:text-brand-700;
+    }
+}
+
+@layer components {
+    .btn {
+        @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2;
+    }
+
+    .btn-primary {
+        @apply btn bg-brand-600 text-white hover:bg-brand-700;
+    }
+
+    .btn-secondary {
+        @apply btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-50;
+    }
+
+    .badge {
+        @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    }
+
+    .badge-blue {
+        @apply badge bg-blue-100 text-blue-800;
+    }
+
+    .badge-green {
+        @apply badge bg-green-100 text-green-800;
+    }
+
+    .badge-yellow {
+        @apply badge bg-yellow-100 text-yellow-800;
+    }
+
+    .badge-red {
+        @apply badge bg-red-100 text-red-800;
+    }
+
+    .badge-gray {
+        @apply badge bg-gray-100 text-gray-800;
+    }
+
+    .card {
+        @apply rounded-lg border border-gray-200 bg-white p-6 shadow-sm;
+    }
+
+    .table-th {
+        @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500;
+    }
+
+    .table-td {
+        @apply px-4 py-3 text-sm text-gray-700;
+    }
+
+    /* Heatmap cells: background driven by --cell-hue CSS custom property.
+     Using custom properties lets dark-mode and high-contrast media queries
+     override saturation/lightness without hard-coding color values here. */
+    .heatmap-cell {
+        background-color: hsl(var(--cell-hue) 55% 50% / 0.3);
+    }
+
+    /* Reduced-color / high-contrast mode: switch to grayscale lightness steps.
+     Activated by the .heatmap-reduced-color class (explicit user toggle) or
+     automatically by the prefers-contrast: more media query.
+     Note: must be two separate rules - a class selector cannot be comma-joined
+     with an @media at-rule in a single rule block. */
+    .heatmap-reduced-color .heatmap-cell {
+        background-color: hsl(0 0% var(--cell-lightness, 95%) / 0.75);
+    }
+    @media (prefers-contrast: more) {
+        .heatmap-cell {
+            background-color: hsl(0 0% var(--cell-lightness, 95%) / 0.75);
+        }
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .heatmap-cell {
+            background-color: hsl(var(--cell-hue) 60% 35% / 0.5);
+        }
+    }
+
+    /* Screen-reader only utility */
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border-width: 0;
+    }
+}

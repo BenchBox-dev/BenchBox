@@ -1,0 +1,49 @@
+id: cli-data-only-and-load-only-execution-options
+title: CLI Data-Only and Load-Only Execution Options
+category: '"Technical Debt & Refactoring"'
+sections:
+  Notes: '- "**Priority**: Medium"
+
+    - "**Status**: ✅ Completed"
+
+    - "**Description**: Add CLI options for selective data generation and database loading phases without running queries,
+    providing fine-grained control over benchmark preparation workflows"
+
+    - "**Context**: Users need separate control over data generation and database loading phases for data preparation, storage
+    testing, file format validation, and multi-stage benchmark workflows"
+
+    - "**Flag Definitions**:"
+
+    - "**Implementation Completed**:"
+
+    - "**Files Modified**: `benchbox/cli/main.py`, `benchbox/cli/orchestrator.py`, `benchbox/cli/dryrun.py`, `benchbox/core/ssb/benchmark.py`,
+    `tests/unit/cli/test_cli_data_load_modes.py`"
+
+    - "**Impact**: Enables efficient data preparation workflows, supports file-based data generation for external tools, reduces
+    execution time for data generation testing, and provides granular control over benchmark phases"
+
+    - "**Manual Testing Verified**: All modes working correctly with proper validation and result reporting"'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Priority**: Medium"
+
+  - "**Status**: ✅ Completed"
+
+  - "**Description**: Add CLI options for selective data generation and database loading phases without running queries, providing
+  fine-grained control over benchmark preparation workflows"
+
+  - "**Context**: Users need separate control over data generation and database loading phases for data preparation, storage
+  testing, file format validation, and multi-stage benchmark workflows"
+
+  - "**Flag Definitions**:"
+
+  - "**Implementation Completed**:"
+
+  - "**Files Modified**: `benchbox/cli/main.py`, `benchbox/cli/orchestrator.py`, `benchbox/cli/dryrun.py`, `benchbox/core/ssb/benchmark.py`,
+  `tests/unit/cli/test_cli_data_load_modes.py`"
+
+  - "**Impact**: Enables efficient data preparation workflows, supports file-based data generation for external tools, reduces
+  execution time for data generation testing, and provides granular control over benchmark phases"
+
+  - "**Manual Testing Verified**: All modes working correctly with proper validation and result reporting"'

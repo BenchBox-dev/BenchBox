@@ -1,0 +1,143 @@
+id: explorer-extend-manifest-and-pipeline
+title: "Extend explorer pipeline manifest and DuckDB schema with missing bundle fields"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-14"
+category: Core Functionality
+
+description: |
+  Post-launch audit (2026-04-14) found that the Phase 1 pipeline transformer
+  emits only 11 manifest fields from a bundle that contains 13 blocks and
+  50+ fields. This silently drops execution_mode, tuning_mode, platform_version,
+  test_type, validation_status, cost_usd, and the per-query run_type/iter/stream
+  fields needed for warmup vs measurement distinction.
+
+  The DuckDB `results` table has 11 columns; all other fidelity TODOs
+  (methodology disclosure, tuning visibility, comparability warnings, charts)
+  depend on these fields reaching the manifest and DuckDB schema first.
+
+  Target manifest additions (all sourced from existing bundle fields):
+    - geomean_ms          - exp(mean(ln(query_ms))) across measurement queries
+    - execution_mode      - "sql" | "dataframe" from config.mode
+    - tuning_mode         - "tuned" | "notuning" | "auto" from config.tuning_mode
+    - tuning_hash         - stable short hash of tuning config for grouping
+    - platform_version    - platform.version (distinct from driver_version)
+    - test_type           - "power" | "throughput" from phases
+    - validation_status   - summary.validation.status
+    - cost_usd            - cost.total_usd (null if absent)
+
+  Target query record additions:
+    - run_type            - "warmup" | "measurement" per query timing entry
+    - iter, stream        - iteration and stream IDs
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Audit transformer.py and models.py: map each target field to its bundle source path; document any fields that require computation (geomean_ms, tuning_hash) vs direct extraction."
+    status: pending
+
+  - id: w2
+    summary: "Add geomean_ms computation to transformer.py: exp(mean(ln(ms))) over measurement-only queries (run_type=measurement or all if run_type absent). Add to ManifestResult and DetailResult models."
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Add execution_mode, tuning_mode, tuning_hash, platform_version, test_type, validation_status, cost_usd to ManifestResult and DetailResult. Null-safe for older bundles."
+    needs: [w1]
+    status: pending
+
+  - id: w4
+    summary: "Add run_type, iter, stream to QueryTiming in detail JSON. Update transformer.py query extraction loop."
+    needs: [w1]
+    status: pending
+
+  - id: w5
+    summary: "Extend DuckDB schema in duckdb_builder.py: add all new manifest columns to the results table; add run_type, iter, stream columns to queries table. Regenerate for existing corpus and verify."
+    needs: [w2, w3, w4]
+    status: pending
+
+  - id: w6
+    summary: "Update TypeScript types.ts in results-explorer to match extended ManifestResult and DetailResult shapes. No UI changes - just type alignment."
+    needs: [w5]
+    status: pending
+
+  - id: w7
+    summary: "Re-run full pipeline over existing corpus; confirm no regressions in existing explorer pages; confirm new fields appear in manifest and DuckDB."
+    needs: [w6]
+    status: pending
+
+files_affected:
+  modified:
+    - "benchbox/core/explorer_pipeline/transformer.py"
+    - "benchbox/core/explorer_pipeline/models.py"
+    - "benchbox/core/explorer_pipeline/duckdb_builder.py"
+    - "results-explorer/src/types.ts"
+  modified_test:
+    - "tests/unit/core/explorer_pipeline/test_transformer.py"
+    - "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
+
+must_preserve:
+  - "Existing manifest field names and types - add fields, never rename or remove"
+  - "Existing DuckDB column names - extend schema with new columns only"
+  - "Null-safety for older bundles that predate any new field - missing → null, not error"
+  - "Explorer pages render correctly for bundles that have no tuning config, no cost data, or no run_type on queries"
+
+approach: |
+  Source-map first (w1): walk the bundle schema and write down exactly which
+  bundle key maps to which manifest field. Avoids guessing during implementation.
+
+  Compute geomean_ms at transform time, not in the browser. The browser DuckDB
+  can do it in a query, but pre-computing it means it's available in the JSON
+  manifest and in sort/filter without DuckDB being loaded.
+
+  tuning_hash: short SHA256 prefix of the serialized tuning config dict (or
+  tuning mode string if no detail is available). Purpose is grouping, not
+  cryptographic identity - 8 hex chars is enough.
+
+  test_type: infer from which phases are present in the bundle. If
+  phases.power_test is populated → "power"; if phases.throughput_test → "throughput";
+  if both → "power" (primary). If neither, leave null.
+
+anti_patterns:
+  - "DO NOT add UI changes in this TODO - because this is a pipeline/data-model change only - UI consumption comes in follow-up TODOs"
+  - "DO NOT error on missing fields - because older bundles predate many fields - null-safe extraction throughout"
+  - "DO NOT recompute geomean_ms in every browser query - because it should be precomputed - add it to the manifest at build time"
+  - "DO NOT change the tuning_hash algorithm without updating all callers - because it is used for grouping across results - stability matters more than hash quality"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/explorer_pipeline/"
+    - "results-explorer/src/types.ts"
+    - "tests/unit/core/explorer_pipeline/"
+  do_not_modify:
+    - "results-explorer/src/pages/ (no UI changes in this TODO)"
+    - "results-explorer/src/components/ (no UI changes in this TODO)"
+    - "benchbox/core/results/schema.py (bundle schema is read-only here)"
+
+verification:
+  - description: "All pipeline unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/ -q"
+    expected_output: "all tests pass"
+  - description: "Regenerated manifest contains new fields for existing bundles"
+    command: "uv run python -c \"import json; m=json.load(open('results-explorer/public/data/manifest.json')); r=m['results'][0]; assert 'geomean_ms' in r and 'execution_mode' in r and 'tuning_mode' in r, r.keys()\""
+    expected_output: "(no assertion error)"
+  - description: "DuckDB results table has new columns"
+    command: "uv run -- python -c \"import duckdb; con=duckdb.connect('results-explorer/public/data/results.duckdb'); print([c[0] for c in con.execute('PRAGMA table_info(results)').fetchall()])\""
+    expected_output: "list includes geomean_ms, execution_mode, tuning_mode, validation_status"
+  - description: "Fast suite unaffected"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "all tests pass"
+
+metadata:
+  tags: ["results", "explorer", "pipeline", "manifest", "duckdb", "fidelity"]
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-04-14"
+
+success_metrics:
+  - "Manifest row count unchanged; field count grows from 11 to ~19"
+  - "DuckDB results table column count grows from 11 to ~19"
+  - "geomean_ms populated for all bundles with ≥1 measurement query"
+  - "No regressions in existing explorer pages"

@@ -1,0 +1,25 @@
+[run]
+parallel = true
+omit =
+    */tests/*
+    */__pycache__/*
+    conftest.py
+    benchbox/__main__.py
+    **/test_*.py
+    **/conftest.py
+    benchmark_runs/*
+    benchbox/core/tpcds/dataframe_queries/queries.py
+    benchbox/core/tpcds/dataframe_queries/rollup_helper.py
+    benchbox/core/tpcds/dataframe_queries/channel_helper.py
+    benchbox/core/datavault/dataframe_queries/queries.py
+    benchbox/core/nyctaxi/dataframe_queries/queries.py
+    benchbox/core/tpcdi/etl/transformations.py
+    benchbox/core/tpcdi/etl/batch.py
+    benchbox/core/tpcdi/etl/scd_processor.py
+    benchbox/experimental/concurrency/executor.py
+    benchbox/experimental/concurrency/pool_tester.py
+    benchbox/core/clickbench/dataframe_queries/queries.py
+
+[report]
+show_missing = True
+skip_empty = False

@@ -1,0 +1,394 @@
+id: ascii-chart-polish-and-ux-refinements
+title: "Polish ASCII chart output: series naming, label truncation, metadata, colors, axes, heatmap, and histogram outliers"
+worktree: core-functionality
+priority: Medium-High
+status: Completed
+completed_date: "2026-02-06"
+category: Core Functionality
+description: |
+  The ASCII charting module (benchbox/core/visualization/ascii/, ~2,976 lines across 11 files) is
+  functionally complete with 11 chart types, but real-world usage reveals several UX issues that make
+  charts harder to read and interpret. These are cosmetic/readability issues, not functional bugs -
+  all chart types render correctly and return valid strings.
+
+  Issues identified from head_to_head and comparison template output with DataFusion SQL vs DataFrame:
+
+  1. **Asymmetric series naming**: When comparing SQL vs DataFrame, one series is labeled
+     "DataFusion" and the other "DataFusion (dataframe)". Both should carry their mode suffix
+     for symmetry - e.g., "DataFusion (sql)" vs "DataFusion (df)". Prefer abbreviated mode
+     labels: "df" not "dataframe", "sql" stays "sql".
+
+  2. **Aggressive label truncation**: Platform names are truncated to as few as 8 characters
+     (comparison_bar.py:81), causing "DataFusion" → "DataFu..". Labels should accommodate full
+     names by shrinking the data area or wrapping to a second line.
+
+  3. **No chart metadata**: Scale factor, platform version, and tuning configuration are available
+     in NormalizedResult but never displayed. Charts should include a subtitle line showing key
+     run parameters (e.g., "SF=1 | DataFusion 44.0.0 | tuned").
+
+  4. **Inconsistent color application**: Bar chart labels are not colored (bar_chart.py:141) while
+     histogram bars and box plot lines are colored. Colors should be applied uniformly across all
+     chart types that display series data.
+
+  5. **Missing axis labels**: Charts lack axis title annotations (e.g., "Query ID →" on x-axis,
+     "↑ Execution Time (ms)" on y-axis). Only tick values and query IDs are shown.
+
+  6. **Heatmap readability**: Column headers are severely truncated. The green→yellow→red color
+     scale (heatmap.py:32-38) is hard to distinguish in many terminals. User requests red→blue
+     diverging palette for better contrast.
+
+  7. **Histogram outlier bars**: All bars use the same █ block character regardless of whether
+     they represent outlier values. Outlier columns should use a visually distinct character
+     (e.g., ▓ or hatched pattern) so extreme values are immediately recognizable.
+
+  8. **Summary box dot-leader gap**: In comparison summary boxes, the percentage change is
+     right-justified against the border while metric text is left-aligned, leaving a wide blank
+     gap (80+ chars of whitespace). Replace with dot-leader pattern (·····) so the eye can trace
+     from the value to its percentage.
+
+tasks:
+  phases:
+  - title: "Phase 1: Series naming symmetry"
+    description: |
+      Fix asymmetric series naming in result_plotter.py. When two results share the same
+      platform name but differ by execution_mode, BOTH should carry their mode suffix.
+      Currently only non-SQL modes get appended (line 131: `not in ("sql", ...)`).
+      Use abbreviated mode labels: "df" not "dataframe", "sql" stays "sql".
+    items:
+    - description: "Update _normalize_dict() to always append execution_mode when comparing multiple results with same platform"
+      done: true
+      subtasks:
+      - description: "Add post-normalization pass in ResultPlotter.__init__() that detects same-platform/different-mode pairs
+          and appends mode suffix to both"
+        done: true
+      - description: "Abbreviate mode labels: 'dataframe' → 'df', 'sql' stays 'sql' - add MODE_ABBREVIATIONS dict"
+        done: true
+      - description: "Ensure single-result case still shows bare platform name (no '(sql)' suffix when there's nothing to
+          compare against)"
+        done: true
+      - description: "Handle edge case where execution_mode is None or missing - default to 'sql' for disambiguation"
+        done: true
+    - description: "Update _normalize_benchmark_result() with same logic"
+      done: true
+
+  - title: "Phase 2: Label truncation - accommodate full names"
+    description: |
+      Remove hardcoded max-length caps on label display. Instead, calculate label width
+      dynamically from actual content and shrink the data (bar/chart) area to compensate.
+      Set a reasonable floor for the data area (e.g., 40 chars minimum) and only truncate
+      if names are extraordinarily long (>30 chars).
+    items:
+    - description: "comparison_bar.py: Remove `min(max_name_len, 8)` cap at line 81, replace with dynamic sizing"
+      done: true
+      subtasks:
+      - description: "Calculate name_display_len from actual name lengths, capped at 30"
+        done: true
+      - description: "Adjust bar_width calculation to account for longer names"
+        done: true
+      - description: "Ensure bar area never shrinks below 40 chars"
+        done: true
+    - description: "box_plot.py: Remove `min(12, ...)` cap at line 188, use dynamic sizing up to 25 chars"
+      done: true
+    - description: "bar_chart.py: Remove `min(20, ...)` cap (already generous but verify)"
+      done: true
+    - description: "heatmap.py: Increase column header width to accommodate full platform names"
+      done: true
+      subtasks:
+      - description: "Calculate cell_width from actual column label lengths instead of fixed formula"
+        done: true
+      - description: "Ensure heatmap fits within terminal width by reducing value display precision if needed"
+        done: true
+
+  - title: "Phase 3: Chart metadata subtitle"
+    description: |
+      Add a subtitle line below the chart title showing key run parameters extracted from
+      NormalizedResult.raw dict and NormalizedResult fields. Display format:
+      "SF=1 | DataFusion 44.0.0 | tuned" or similar compact representation.
+    items:
+    - description: "Add _render_subtitle() method to ASCIIChartBase"
+      done: true
+      subtasks:
+      - description: "Extract scale_factor from result data"
+        done: true
+      - description: "Extract platform_version from raw dict (raw.get('platform_info', {}).get('version'))"
+        done: true
+      - description: "Extract tuning_config label from raw dict if present"
+        done: true
+      - description: "Format as compact pipe-separated string, centered below title"
+        done: true
+    - description: "Thread metadata through chart constructors - add optional metadata param to each chart class"
+      done: true
+    - description: "Update _render_single_ascii_chart() in visualization.py to pass metadata from results to chart constructors"
+      done: true
+
+  - title: "Phase 4: Uniform color application"
+    description: |
+      Apply colors consistently across all chart types. When a series has an assigned color
+      (from palette or best/worst designation), apply it to both the data element AND its label.
+    items:
+    - description: "bar_chart.py: Colorize label text to match bar color (line ~141)"
+      done: true
+    - description: "box_plot.py: Colorize series label to match box color (line ~266)"
+      done: true
+    - description: "histogram.py: Verify legend colors match bar colors (already partially done)"
+      done: true
+    - description: "comparison_bar.py: Colorize platform name labels to match their bars"
+      done: true
+
+  - title: "Phase 5: Axis labels"
+    description: |
+      Add descriptive axis title annotations to charts that have X and Y axes. These are
+      distinct from tick labels (which already exist) - they describe what the axis represents.
+    items:
+    - description: "Add _render_x_axis_label() and _render_y_axis_label() to ASCIIChartBase"
+      done: true
+      subtasks:
+      - description: "X-axis label: centered below tick labels, e.g., 'Query ID'"
+        done: true
+      - description: "Y-axis label: rotated text along left edge, or compact label at top of y-axis"
+        done: true
+    - description: "histogram.py: Add x_label='Query ID' and y_label is already used for title - add axis annotation"
+      done: true
+    - description: "box_plot.py: Add x-axis label for the value scale"
+      done: true
+    - description: "heatmap.py: Add column axis label (platform/mode) and row axis label (query)"
+      done: true
+    - description: "scatter_plot.py: Add x_label and y_label axis annotations"
+      done: true
+
+  - title: "Phase 6: Heatmap improvements"
+    description: |
+      Improve heatmap readability with a red→blue diverging color palette (blue=fast, red=slow)
+      and wider column headers to show full platform names.
+    items:
+    - description: "Add COLOR_SCALE_DIVERGING palette (blue→white→red) to heatmap.py"
+      done: true
+      subtasks:
+      - description: "Define 5-level blue→red scale: '#2166ac' (fast/blue), '#67a9cf', '#f7f7f7' (neutral), '#ef8a62', '#b2182b'
+          (slow/red)"
+        done: true
+      - description: "Make COLOR_SCALE_DIVERGING the default, keep original as COLOR_SCALE_SEQUENTIAL"
+        done: true
+      - description: "Add color_scheme parameter to ASCIIHeatmap constructor ('diverging' or 'sequential')"
+        done: true
+    - description: "Increase minimum cell width for column headers - ensure at least 12 chars for labels"
+      done: true
+    - description: "Update scale legend text to show color meaning: 'blue=fast ... red=slow'"
+      done: true
+
+  - title: "Phase 7: Histogram outlier distinction"
+    description: |
+      When a histogram bar represents an outlier value (exceeding 1.5x IQR or >2 standard
+      deviations from mean), render it with a visually distinct character instead of the
+      standard full block (█). Use ▓ (medium shade) for outlier bars so they stand out.
+    items:
+    - description: "Add outlier detection to histogram rendering"
+      done: true
+      subtasks:
+      - description: "Calculate IQR from all latency values in the dataset"
+        done: true
+      - description: "Mark bars exceeding Q3 + 1.5*IQR as outliers"
+        done: true
+      - description: "Use ▓ (INTENSITY_CHARS[3]) for outlier bar fill instead of █"
+        done: true
+    - description: "Add outlier indicator to legend (e.g., '▓ Outlier')"
+      done: true
+    - description: "Ensure ASCII fallback works (use '#' vs '@' distinction)"
+      done: true
+
+  - title: "Phase 8: Summary box dot-leader padding"
+    description: |
+      In the summary box comparison metrics, the percentage change is right-justified against
+      the box border but the metric text is left-aligned, leaving a wide blank gap that makes
+      it hard to visually trace from the value to its percentage. Replace the space padding
+      with a dot-leader pattern (· or .) so the eye can follow the line.
+
+      Current:  "Geo Mean:  18.2ms → 61.3ms                                    +236.7%"
+      Target:   "Geo Mean:  18.2ms → 61.3ms ·······························    +236.7%"
+    items:
+    - description: "Replace space padding with dot-leader in _render_comparison_metrics() (summary_box.py:180-181, 192-194)"
+      done: true
+      subtasks:
+      - description: "Use '·' (middle dot) for Unicode mode, '.' for ASCII fallback"
+        done: true
+      - description: "Add 1-char space gap before and after the dot leader for readability"
+        done: true
+      - description: "Apply same treatment to any other right-justified annotations in the summary box"
+        done: true
+    - description: "Ensure dot-leader respects use_color=False (no ANSI codes in dots)"
+      done: true
+    - description: "Use dim/muted color for dots so they don't compete with metric values"
+      done: true
+
+  - title: "Phase 9: Tests"
+    description: |
+      Add tests for all new behaviors. Extend existing test_ascii_charts.py.
+    items:
+    - description: "Test series naming symmetry (SQL vs DataFrame both get mode suffix)"
+      done: true
+    - description: "Test label non-truncation for names up to 25 chars"
+      done: true
+    - description: "Test metadata subtitle rendering"
+      done: true
+    - description: "Test colored labels in bar chart and box plot"
+      done: true
+    - description: "Test axis labels appear in histogram, box plot, heatmap, scatter"
+      done: true
+    - description: "Test heatmap blue→red palette"
+      done: true
+    - description: "Test histogram outlier bars use distinct character"
+      done: true
+    - description: "Test summary box dot-leader padding (dots present, no wide blank gap)"
+      done: true
+    - description: "Test edge cases: single result (no mode suffix), very long names (>30 chars truncated)"
+      done: true
+
+must_preserve:
+- "ASCIIChartBase.render() -> str contract unchanged"
+- "All existing factory functions (from_bar_data, from_query_latency_data, from_comparison_data, etc.) remain backward-compatible"
+- "4-tier color degradation chain (truecolor -> 256 -> 16 -> none) works for all changes"
+- "Unicode -> ASCII fallback works for new characters (outlier bars, axis labels)"
+- "ASCIIChartOptions(use_color=False) produces clean output without ANSI codes"
+- "MCP generate_chart tool continues to work for all existing chart_type values"
+- "All 6 original chart types + 3 comparison chart types render correctly"
+- "Chart width respects terminal width detection and ASCIIChartOptions.width override"
+
+approach: |
+  Work chart-by-chart, not feature-by-feature. Each phase is self-contained and testable.
+
+  Phase 1 (naming) modifies result_plotter.py only - add a _disambiguate_modes() method similar
+  to existing _disambiguate_platforms(). Call it after _disambiguate_platforms() in __init__().
+
+  Phase 2 (truncation) modifies individual chart files. Replace hardcoded caps with dynamic
+  calculation: `min(max(len(label) for label in labels), 30)`. Adjust the bar/data area width
+  by subtracting the label width from the total width, with a floor of 40 chars for data.
+
+  Phase 3 (metadata) adds a new _render_subtitle() to base.py, similar to _render_title().
+  Thread metadata as an optional dict through chart constructors. Modify _render_single_ascii_chart()
+  in visualization.py to extract metadata from NormalizedResult and pass to chart.
+
+  Phases 4-7 are localized to individual chart files - follow existing patterns in each file.
+
+anti_patterns:
+- "DO NOT add metadata to the chart title string itself - because titles are already long and metadata should be visually
+  distinct - add a separate subtitle line instead"
+- "DO NOT wrap labels by splitting platform names mid-word - because 'DataFu\\nsion' is unreadable - only wrap at natural
+  boundaries like spaces or parentheses"
+- "DO NOT hardcode platform names or mode strings in the naming logic - because new platforms and modes are added regularly
+  - use generic detection of same-platform/different-mode pairs"
+- "DO NOT make the blue→red heatmap palette the ONLY option - because some users may prefer the sequential green→red palette
+  - add a color_scheme parameter defaulting to 'diverging'"
+- "DO NOT use statistical outlier detection that requires numpy - because BenchBox has zero numpy dependency for core - use
+  simple IQR calculation with sorted() and len()"
+
+verification:
+- description: "All existing ASCII chart tests still pass"
+  command: "uv run -- python -m pytest tests/unit/visualization/ascii/test_ascii_charts.py -q"
+  expected_output: "all tests pass, 0 failures"
+- description: "No regressions in visualization module"
+  command: "uv run -- python -m pytest tests/ -k 'visualization or ascii' -q"
+  expected_output: "all tests pass, 0 failures"
+- description: "No lint errors in modified files"
+  command: "uv run ruff check benchbox/core/visualization/"
+  expected_output: "All checks passed or no output (clean)"
+- description: "MCP generate_chart still works for all chart types"
+  command: "uv run -- python -c \"from benchbox.core.visualization.ascii import ASCIIBarChart, ASCIIBoxPlot, ASCIIHeatmap,
+    ASCIIQueryHistogram, ASCIIComparisonBar, ASCIIDivergingBar, ASCIISummaryBox; print('imports ok')\""
+  expected_output: "imports ok"
+- description: "Visual regression check with real results"
+  command: "uv run benchbox visualize --template head_to_head benchmark_runs/results/tpch_sf1_datafusion_df_20260206_141251_1d7dbb77.json
+    benchmark_runs/results/tpch_sf1_datafusion_sql_20260206_141231_c20da81e.json"
+  expected_output: "Charts render without errors; series names are symmetric and untruncated"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/visualization/ascii/base.py"
+  - "benchbox/core/visualization/ascii/bar_chart.py"
+  - "benchbox/core/visualization/ascii/box_plot.py"
+  - "benchbox/core/visualization/ascii/comparison_bar.py"
+  - "benchbox/core/visualization/ascii/diverging_bar.py"
+  - "benchbox/core/visualization/ascii/heatmap.py"
+  - "benchbox/core/visualization/ascii/histogram.py"
+  - "benchbox/core/visualization/ascii/scatter_plot.py"
+  - "benchbox/core/visualization/ascii/line_chart.py"
+  - "benchbox/core/visualization/ascii/__init__.py"
+  - "benchbox/core/visualization/result_plotter.py"
+  - "benchbox/core/visualization/exporters.py"
+  - "benchbox/mcp/tools/visualization.py"
+  - "benchbox/core/visualization/ascii/summary_box.py"
+  - "tests/unit/visualization/ascii/test_ascii_charts.py"
+  do_not_modify: []
+
+files_affected:
+  modified:
+  - "benchbox/core/visualization/ascii/base.py"
+  - "benchbox/core/visualization/ascii/bar_chart.py"
+  - "benchbox/core/visualization/ascii/box_plot.py"
+  - "benchbox/core/visualization/ascii/comparison_bar.py"
+  - "benchbox/core/visualization/ascii/diverging_bar.py"
+  - "benchbox/core/visualization/ascii/heatmap.py"
+  - "benchbox/core/visualization/ascii/histogram.py"
+  - "benchbox/core/visualization/ascii/scatter_plot.py"
+  - "benchbox/core/visualization/ascii/line_chart.py"
+  - "benchbox/core/visualization/result_plotter.py"
+  - "benchbox/core/visualization/ascii/summary_box.py"
+  - "benchbox/mcp/tools/visualization.py"
+  - "tests/unit/visualization/ascii/test_ascii_charts.py"
+
+dependencies:
+  blocks: []
+  blocked_by: []
+  related:
+  - "_project/DONE/core-functionality/planning/enhance-ascii-charting.yaml"
+
+impact:
+  business_value: |
+    Charts are the primary output users see from benchmark runs. Truncated names, missing context,
+    and inconsistent formatting undermine trust in the tool and force users to cross-reference
+    result JSON files to understand what they're looking at. These fixes make charts self-contained
+    and immediately interpretable.
+  user_impact: |
+    Users will see full platform names, symmetric series labels, run parameters, and clearer
+    visual distinction for outliers and heatmap values - all without needing to examine raw
+    result files. Particularly impactful for SQL vs DataFrame comparisons and CI/CD log output.
+  technical_debt: |
+    Removes hardcoded magic numbers (8, 12, 20 char caps) in favor of dynamic sizing.
+    Adds metadata threading that can be extended for future chart enhancements.
+
+context_sections:
+  "Current Output Issues (from real DataFusion SF1 run)": |
+    1. Performance bar: "DataFusion" vs "DataFusion (datafr.." - asymmetric and truncated; should be "DataFusion (sql)" vs "DataFusion (df)"
+    2. Box plot: "DataFusion.." - truncated at 12 chars, no mode distinction
+    3. Comparison bar: "DataFu.." - truncated at 8 chars, unreadable
+    4. Heatmap: "DataF.." columns - severely truncated, green→red palette hard to read
+    5. Histogram: No visual distinction between normal and outlier bars
+    6. All charts: No scale factor, platform version, or tuning config displayed
+    7. All charts with axes: No axis title labels (only tick values shown)
+    8. Summary box: "Geo Mean: 18.2ms → 61.3ms                              +236.7%" - huge blank gap between values and percentage
+
+  "Architecture Notes": |
+    - Series names originate in result_plotter.py:130-132 (_normalize_dict)
+    - The "(dataframe)" suffix is appended only when execution_mode != "sql"
+    - Label truncation is centralized in ASCIIChartBase._truncate_label() (base.py:376-383)
+    - Each chart type applies its own max-length cap before calling _truncate_label()
+    - Metadata (scale_factor, version, tuning) exists in NormalizedResult.raw but is not threaded to charts
+    - COLOR_SCALE in heatmap.py:32-38 is hardcoded green→yellow→red
+
+metadata:
+  tags:
+  - visualization
+  - ascii
+  - charting
+  - ux
+  - polish
+  estimated_effort: "4-6 days"
+  created_date: "2026-02-06"
+
+success_metrics:
+- "All platform names display untruncated for names up to 25 characters"
+- "SQL vs DataFrame comparisons show symmetric abbreviated mode suffixes: 'Platform (sql)' vs 'Platform (df)'"
+- "Charts include subtitle with scale factor and platform version"
+- "Heatmap uses red→blue diverging palette by default"
+- "Histogram outlier bars visually distinct from normal bars"
+- "All charts with axes show axis title labels"
+- "All existing tests pass plus new tests for each enhancement"

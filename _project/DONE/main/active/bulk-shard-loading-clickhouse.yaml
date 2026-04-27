@@ -1,0 +1,199 @@
+# Bulk Shard Loading for ClickHouse via Glob Pattern
+#
+# Location: _project/TODO/main/planning/bulk-shard-loading-clickhouse.yaml
+
+id: bulk-shard-loading-clickhouse
+title: "Replace per-shard INSERT loops with glob-pattern bulk INSERT for ClickHouseNativeHandler"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-02-22"
+description: |
+  ClickHouseNativeHandler.load_table() currently processes one shard file per
+  call.  For a sharded benchmark table (e.g., lineitem.tbl.1 … lineitem.tbl.10)
+  the DataLoader loop issues 10 separate INSERT INTO ... SELECT * FROM file(path)
+  statements.
+
+  ClickHouse's table function file() (and s3() for cloud) support glob patterns:
+    file('/data/lineitem*.tbl', 'CSV', 'col1 UInt64, ...')
+  A single INSERT using a glob covers all shards in one query-plan pass.
+
+  This TODO implements load_table_bulk() in ClickHouseNativeHandler, leveraging
+  the load_table_bulk() interface introduced in bulk-shard-loading-duckdb.
+
+  Scope is ClickHouse (self-hosted) and ClickHouse Cloud adapters only.
+  It explicitly excludes platforms backed by DelimitedFileHandler (SQLite,
+  PostgreSQL, DataFusion, etc.) which have no SQL multi-file primitive.
+
+category: Core Functionality
+
+deps:
+  needs:
+  - bulk-shard-loading-duckdb
+
+work:
+- id: w1
+  summary: "Audit ClickHouseNativeHandler: locate load_table() and identify all execute call sites"
+  status: done
+  notes: |
+    File: benchbox/platforms/clickhouse/workload.py (and any subclass in clickhouse_cloud.py).
+    Confirm the exact SQL pattern used (file(), s3(), or COPY), how file paths are
+    escaped, and whether there is a dry-run mode to preserve.
+
+- id: w2
+  summary: "Implement ClickHouseNativeHandler.load_table_bulk() using file() glob pattern for self-hosted ClickHouse"
+  needs: [w1]
+  status: done
+  notes: |
+    Algorithm:
+    1. Derive a glob from the shard list. All shards for a table share a common
+       stem: if paths are ['lineitem.tbl.1', 'lineitem.tbl.2', ...] in the same
+       directory, the glob is 'lineitem.tbl.*'.
+    2. Validate: all paths share the same parent dir and the same stem prefix.
+       If not (edge case), fall back to the default loop via super().load_table_bulk().
+    3. Build SQL:
+         INSERT INTO {table}
+         SELECT * FROM file('{dir}/{stem}.*', 'CSV', '{col_schema}')
+    4. Execute and return COUNT delta (before/after) as for DuckDB.
+
+    The ClickHouse file() function requires an explicit column schema string for
+    CSV - derive it from DESCRIBE TABLE {table} (or equivalent).
+    Dry-run: capture SQL then return len(file_paths)*1000.
+
+- id: w3
+  summary: "Handle ClickHouse Cloud: verify whether cloud path already bulk-loads; add tests or implement if not"
+  needs: [w2]
+  status: done
+  notes: |
+    ClickHouse Cloud benchmarks upload files to S3 before loading.
+    TIME CAP: max 2 hrs. If the audit shows the cloud path already issues a
+    single COPY / INSERT for all shards, add a confirming test and close this unit.
+    If the cloud path still issues one INSERT per shard (using s3() or url()),
+    implement load_table_bulk() analogously to w2 using s3() glob patterns.
+    DO NOT scope-creep into refactoring the full cloud upload pipeline -
+    only add/override load_table_bulk() in the cloud adapter class.
+
+- id: w4
+  summary: "Unit tests for ClickHouseNativeHandler.load_table_bulk() - glob SQL, row count, fallback, dry-run"
+  needs: [w2]
+  status: done
+  notes: |
+    Test cases:
+    - 4 shards in same dir: assert glob pattern in SQL, single execute call, correct row count
+    - Shards in different directories: assert fallback to per-shard loop (no glob)
+    - Single-shard list: assert result equals load_table() result
+    - Dry-run: assert no execute on real connection, return == 4000
+
+deferred:
+- summary: "Investigate columnar-native bulk loading (ClickHouse Native format instead of CSV)"
+  reason: "CSV via file() is sufficient for current benchmarks; Native format has different escaping requirements"
+- summary: "Bulk loading for PostgreSQL COPY FROM PROGRAM or COPY FROM STDIN multi-file"
+  reason: "PostgreSQL COPY is fundamentally single-file per statement; would require UNION ALL construction or a PL/pgSQL
+    wrapper - different scope"
+- summary: "Bulk S3/GCS loading for ClickHouse Cloud adapter using s3() glob patterns"
+  reason: "Cloud adapter (_load_data_via_s3, _load_data_via_gcs) has its own per-file upload+insert loop that bypasses DataLoader
+    and ClickHouseNativeHandler entirely. Bulk loading requires restructuring the upload pipeline (upload all first, then
+    single INSERT with s3() glob) - a larger refactor tracked separately."
+
+metadata:
+  tags:
+  - data-loading
+  - clickhouse
+  - performance
+  - sharding
+  - bulk-insert
+  estimated_effort: "Small"
+  created_date: "2026-02-22"
+
+impact:
+  business_value: |
+    Reduces ClickHouse data-loading time for sharded TPC-H / TPC-DS tables.
+    For TPC-H SF1 with 4 shards, reduces from 4 INSERT statements to 1.
+    Consistent with the DuckDB bulk-loading improvement.
+  user_impact: |
+    Users running high-scale ClickHouse benchmarks with parallel datagen see
+    faster load phases.
+  technical_debt: |
+    Leverages the load_table_bulk() interface from bulk-shard-loading-duckdb,
+    so no additional framework changes are required here.
+
+files_affected:
+  modified:
+  - "benchbox/platforms/clickhouse/workload.py"
+  - "tests/unit/platforms/test_clickhouse_adapter.py"
+
+context_sections:
+  "ClickHouse file() Multi-File Support": |
+    ClickHouse's file() table function accepts:
+      file(path_pattern, format, structure)
+    where path_pattern can be a glob:
+      file('/data/lineitem.tbl.*', 'CSV', 'col1 UInt64, col2 String')
+    This processes all matching files in a single distributed scan.
+
+    For ClickHouse Cloud, data is typically staged in S3. The s3() table function
+    similarly supports glob patterns:
+      s3('s3://bucket/prefix/lineitem.tbl.*', 'CSV', 'col1 UInt64, ...')
+
+  "Glob Derivation from Shard List": |
+    Given shard paths ['/data/lineitem.tbl.1', '/data/lineitem.tbl.2',
+    '/data/lineitem.tbl.3'], the glob is derived as:
+      parent_dir = common parent of all paths
+      stem = longest common prefix of all filenames (e.g., 'lineitem.tbl.')
+      glob = parent_dir / (stem + '*')
+    This is safe as long as all shards share a directory and a common filename
+    prefix (true for all TPC-H and TPC-DS datagen output patterns).
+
+must_preserve:
+- "ClickHouseNativeHandler.load_table() (single-file path) continues to work unchanged"
+- "load_table_bulk() falls back to the default per-file loop when shard paths are in different directories"
+- "Dry-run mode still captures SQL without executing it"
+- "All fast-suite tests continue to pass: uv run -- python -m pytest -m fast -q must report 0 failures"
+- "All existing tests/unit/platforms/test_clickhouse_adapter.py tests pass without modification"
+
+approach: |
+  1. Read ClickHouseNativeHandler.load_table() to understand the current SQL
+     pattern, column schema retrieval, and dry-run handling.
+  2. Implement load_table_bulk(): derive glob from the shard list, build a
+     single INSERT ... SELECT * FROM file(glob) statement, execute with
+     before/after COUNT(*) for the row count delta.
+  3. Add guard: if shard paths span multiple directories, fall back to
+     super().load_table_bulk() (the default loop).
+  4. For ClickHouse Cloud: audit whether the cloud adapter already handles
+     shards in bulk; if so, just add tests.
+
+anti_patterns:
+- "DO NOT concatenate shard CSV files on disk - because that requires temp storage and file I/O - use the glob pattern in
+  SQL instead"
+- "DO NOT hardcode the glob separator as '.' - because shard naming conventions may differ (e.g., _N vs .N) - derive the common
+  prefix programmatically from the actual file names"
+- "DO NOT skip the fallback to per-file loop - because shards may legitimately be in different dirs for re-loaded manifests
+  - the fallback ensures correctness in all cases"
+
+verification:
+- description: "ClickHouse handler unit tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -v"
+  expected_output: "all tests pass, 0 failures"
+- description: "New bulk loading tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_clickhouse_adapter.py -v -k bulk"
+  expected_output: "all bulk tests pass, 0 failures"
+- description: "Full fast suite passes (no regression)"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all tests pass, 0 failures"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/base/data_loading.py"
+  - "benchbox/platforms/clickhouse_cloud.py"
+  - "tests/unit/platforms/test_clickhouse_adapter.py"
+  do_not_modify:
+  - "benchbox/platforms/clickhouse/workload.py"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/cli/commands/run.py"
+
+success_metrics:
+- "ClickHouseNativeHandler.load_table_bulk() generates a single INSERT with glob file() for N co-located shards"
+- "Fallback to per-shard loop when shards span multiple directories"
+- "Unit tests cover: glob SQL shape, correct row count delta, fallback path, dry-run mode"
+- "All fast-suite tests continue to pass"

@@ -1,0 +1,112 @@
+id: cloud-platform-example-scripts
+title: Example Scripts for Cloud Platforms
+worktree: docs-experience
+priority: Medium
+status: "Completed"
+category: Documentation and User Experience
+description: |
+  Create example Python scripts for cloud platforms currently lacking examples.
+
+  Missing examples for:
+  - Firebolt (Core and Cloud modes)
+  - Athena (with S3 staging)
+
+  Examples should be runnable scripts that demonstrate:
+  - Platform adapter initialization
+  - Benchmark configuration
+  - Result handling
+
+tasks:
+- phase: "Firebolt Examples"
+  done: true
+  items:
+  - summary: "Create examples/getting_started/cloud/firebolt_core_tpch.py"
+    done: true
+  - summary: "Create examples/getting_started/cloud/firebolt_cloud_tpch.py"
+    done: true
+- phase: "Athena Examples"
+  done: true
+  items:
+  - summary: "Create examples/getting_started/cloud/athena_tpch.py"
+    done: true
+  - summary: "Document S3 staging requirements in comments"
+    done: true
+- phase: "Testing"
+  done: true
+  items:
+  - summary: "Add tests for new example scripts"
+    done: true
+  - summary: "Verify all 19 example tests pass"
+    done: true
+
+completion_notes: |
+  Created 3 new example scripts in examples/getting_started/cloud/:
+
+  1. firebolt_core_tpch.py (159 lines)
+     - Demonstrates Firebolt Core (local Docker) deployment
+     - No authentication required - just local URL
+     - Includes Docker setup instructions
+     - Dry-run support for previewing queries
+
+  2. firebolt_cloud_tpch.py (178 lines)
+     - Demonstrates Firebolt Cloud (managed service)
+     - OAuth client credentials authentication
+     - Engine and account configuration
+     - Cost considerations documented
+
+  3. athena_tpch.py (200 lines)
+     - Demonstrates AWS Athena serverless queries
+     - S3 staging configuration
+     - Cost estimation based on data scanned
+     - Parquet format recommendations
+
+  Each script follows existing patterns from databricks_tpch_power.py:
+  - Environment variable validation
+  - Dry-run mode with execute_example_dry_run()
+  - Comprehensive docstrings with prerequisites
+  - Platform-specific concept explanations
+  - Cost optimization tips
+
+  Added 9 new tests in tests/examples/test_getting_started_examples.py:
+  - test_firebolt_core_runs_with_defaults
+  - test_firebolt_core_dry_run
+  - test_firebolt_cloud_requires_env
+  - test_firebolt_cloud_runs_with_env
+  - test_firebolt_cloud_dry_run
+  - test_athena_requires_env
+  - test_athena_runs_with_env
+  - test_athena_dry_run
+
+  All 19 example tests pass.
+
+metadata:
+  owners:
+  - "@benchbox-maintainers"
+  tags:
+  - examples
+  - firebolt
+  - athena
+  - cloud
+  estimated_effort: 3-4 hours
+  created_date: "2025-12-13"
+
+impact:
+  business_value: |
+    Examples are the most discoverable form of documentation.
+    Reduces time-to-first-benchmark for new users.
+  user_impact: |
+    Copy-paste starting point for cloud benchmarks.
+    Learn by example rather than reading docs.
+
+success_metrics:
+- "Runnable examples for Firebolt Core, Firebolt Cloud, Athena"
+- "Examples follow existing code patterns"
+- "Comments explain platform-specific configuration"
+
+files_created:
+- examples/getting_started/cloud/firebolt_core_tpch.py
+- examples/getting_started/cloud/firebolt_cloud_tpch.py
+- examples/getting_started/cloud/athena_tpch.py
+
+files_modified:
+- tests/examples/test_getting_started_examples.py

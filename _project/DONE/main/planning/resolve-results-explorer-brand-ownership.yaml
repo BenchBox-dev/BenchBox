@@ -1,0 +1,125 @@
+id: resolve-results-explorer-brand-ownership
+title: "Resolve whether the results explorer lives under BenchBox or Oxbow Research"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-03"
+category: Core Functionality
+deps:
+  needs:
+  - define-results-platform-product-and-launch-strategy
+description: |
+  The results explorer could live under the BenchBox brand (benchbox.dev/results/)
+  or the Oxbow Research brand (a separate domain/subsite). This decision affects:
+
+  - **Domain and hosting**: benchbox.dev vs a separate Oxbow Research property
+  - **Curation authority**: who curates and is responsible for published results
+  - **Visual identity**: BenchBox design system vs Oxbow Research design system
+  - **Submission model** (Phase 2+): who can submit, under which brand's trust
+  - **Business positioning**: is the explorer a BenchBox feature or a standalone
+    Oxbow Research product that happens to use BenchBox data
+
+  **Working default:** BenchBox placement (benchbox.dev/results/). All
+  implementation proceeds under this assumption. This TODO validates that default
+  or overrides it with a different brand placement. It must be resolved before
+  launch, but does not block scaffolding or implementation that uses the default.
+
+work:
+- id: w1
+  summary: "Define what Oxbow Research is and how it relates to BenchBox"
+  status: done
+  completed_note: |
+    Oxbow Research is an earlier brand concept that was deliberately separated from
+    BenchBox. Git history shows content was moved to a dedicated repository
+    (refactor: move Oxbow Research content to dedicated repository), Oxbow references
+    were removed from the blog, 8 Oxbow blog TODOs were deleted, and GitHub org links
+    were corrected from Oxbow-Research to joeharris76. Oxbow Research has no
+    independent web presence, domain, or active product identity within this codebase.
+  notes: |
+    Clarify: is Oxbow Research a parent brand, a sibling product, a company
+    entity, or something else? Research steps:
+    - Check for any existing oxbow.dev / oxbow-research.com / oxbowresearch.io
+      web presence and what it publishes
+    - Search git log for "Oxbow Research" mentions and note existing uses
+    - Check GitHub org / domain registrations for any oxbow-* properties
+    - Check README, CLAUDE.md, and _project/analysis/ for any prior positioning
+    Output: 1-paragraph summary of Oxbow Research's current identity and scope.
+
+- id: w2
+  summary: "Evaluate the tradeoffs of each brand placement"
+  needs: [w1]
+  status: done
+  completed_note: |
+    Full tradeoff analysis documented in docs/development/results-explorer-brand-ownership.md.
+    BenchBox placement is strongly favored: single domain, integrated brand, no
+    infrastructure overhead, and the explorer's reproducibility value proposition is
+    inseparable from BenchBox. Oxbow Research placement is not viable - no domain,
+    no web presence, and git history shows it was intentionally decoupled from BenchBox.
+  notes: |
+    BenchBox placement:
+    - Pro: explorer drives traffic to the tool, integrated brand, simpler deployment
+    - Con: explorer is tied to BenchBox's scope and identity
+
+    Oxbow Research placement:
+    - Pro: broader positioning, can encompass results beyond BenchBox
+    - Con: separate domain/hosting, split brand awareness, more infrastructure
+
+- id: w3
+  summary: "Make the decision and document rationale"
+  needs: [w2]
+  status: done
+  completed_note: |
+    Decision documented in docs/development/results-explorer-brand-ownership.md.
+    Strategy memo updated with a resolved Brand Decision section replacing the
+    Open Question section. Decision: BenchBox placement at benchbox.dev/results/
+    confirmed. No changes needed to existing scaffolding or CI/CD.
+  notes: |
+    Record the decision as an ADR or in the strategy memo. Update all downstream
+    TODOs with the resolved domain, base URL, and design direction.
+
+metadata:
+  tags:
+  - results
+  - explorer
+  - phase-1
+  - brand
+  - decision
+  estimated_effort: "Small"
+  created_date: "2026-03-30"
+
+impact:
+  business_value: |
+    Wrong brand placement wastes engineering effort (rebuilding under a different
+    domain) and dilutes brand awareness. Getting this right before building
+    avoids costly rework.
+  user_impact: |
+    Users get a coherent brand experience from the start - the explorer feels
+    like it belongs where it lives.
+
+must_preserve:
+- "The strategy memo must be updated with the resolved brand decision"
+- "All downstream TODOs must reflect the chosen domain and identity"
+
+approach: |
+  This is a product/business decision, not a technical one. Gather the relevant
+  context about Oxbow Research, evaluate tradeoffs, and make a clear call.
+  The working default (BenchBox placement) is valid until overridden - so this
+  decision affects domain/identity configuration, not which code to write.
+
+anti_patterns:
+- "DO NOT defer the brand decision past the Phase 1 launch -- because URL structure and domain assumptions baked into routing and CI during scaffold will need rework if the brand overrides the working default -- scaffold may proceed under the BenchBox default, but the decision must be finalized before launch-results-explorer-acceptance-and-seed executes"
+- "DO NOT split the explorer across two brands without explicit intent -- because a benchbox.dev/results/ entry point that redirects to another domain confuses users and breaks search indexing -- pick one home"
+- "DO NOT treat this as a technical spike -- because it is a product/business decision -- gather context and make a call rather than prototyping both options"
+
+verification:
+- description: "Strategy memo contains a brand decision section"
+  command: "grep -c 'brand\\|Oxbow\\|BenchBox placement' _project/analysis/benchbox-results-platform-strategy.md"
+  expected_output: "≥1 (brand decision documented in strategy memo)"
+- description: "Decision ADR or memo section exists"
+  command: "grep -rn 'brand ownership\\|Oxbow Research\\|benchbox.dev/results' _project/analysis/ | grep -c 'decision\\|resolved\\|placement'"
+  expected_output: "≥1 (decision recorded)"
+
+scope_limit:
+  only_modify:
+  - "_project/analysis/"
+  - "_project/TODO/"

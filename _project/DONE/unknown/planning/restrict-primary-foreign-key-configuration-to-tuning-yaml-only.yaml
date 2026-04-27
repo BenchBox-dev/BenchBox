@@ -1,0 +1,41 @@
+id: restrict-primary-foreign-key-configuration-to-tuning-yaml-only
+title: Restrict Primary/Foreign Key Configuration to tuning.yaml Only
+category: Project Lifecycle Management
+sections:
+  Notes: '- "**Priority**: Medium"
+
+    - "**Status**: Completed ✅"
+
+    - "**Description**: Only allow primary and foreign key configuration through `tuning.yaml` files and remove direct parameter
+    options from `run_benchmark()` method to centralize constraint management"
+
+    - "**Tasks**:"
+
+    - "**Files Affected**: All benchmark `run_benchmark()` methods, CLI modules, all example scripts in `examples/` directory
+    (25+ files), all tuning configuration files (10+ YAML files), tuning configuration validation, documentation"
+
+    - "**Implementation Summary**:"
+
+    - "**Impact**: Centralizes constraint configuration management, reduces parameter complexity in method signatures, ensures
+    consistent constraint handling across all benchmarks, simplifies the API surface by requiring configuration through dedicated
+    tuning files, and provides clear separation between execution parameters and database optimization settings"'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Priority**: Medium"
+
+  - "**Status**: Completed ✅"
+
+  - "**Description**: Only allow primary and foreign key configuration through `tuning.yaml` files and remove direct parameter
+  options from `run_benchmark()` method to centralize constraint management"
+
+  - "**Tasks**:"
+
+  - "**Files Affected**: All benchmark `run_benchmark()` methods, CLI modules, all example scripts in `examples/` directory
+  (25+ files), all tuning configuration files (10+ YAML files), tuning configuration validation, documentation"
+
+  - "**Implementation Summary**:"
+
+  - "**Impact**: Centralizes constraint configuration management, reduces parameter complexity in method signatures, ensures
+  consistent constraint handling across all benchmarks, simplifies the API surface by requiring configuration through dedicated
+  tuning files, and provides clear separation between execution parameters and database optimization settings"'

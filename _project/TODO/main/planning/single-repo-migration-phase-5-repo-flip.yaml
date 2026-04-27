@@ -1,0 +1,229 @@
+id: single-repo-migration-phase-5-repo-flip
+title: "Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)"
+worktree: main
+priority: Critical
+status: Not Started
+category: Release Tooling
+
+deps:
+  needs:
+  - single-repo-migration-phase-4-test-release-with-new-flow
+
+description: |
+  Switch the development locus from /Users/joe/Developer/BenchBox (private
+  clone) to ~/Developer/benchbox-public (public clone). Archive
+  joeharris76/benchbox-private on GitHub. No GitHub-side rename, no
+  visibility flip — under Option B the existing public repo
+  (joeharris76/BenchBox) stays canonical with its URL unchanged.
+
+  Pre-conditions:
+  - Phase 4 succeeded: v0.3.0 on PyPI, _project/** history visible on public
+    via filter-merge
+  - All in-flight work on private branches has been merged to private main
+    and synced to public via the curated flow (or cherry-picked manually
+    onto public branches)
+  - Local mirror backup of benchbox-private exists
+
+  Most steps are reversible. The only step worth pausing for is GitHub-side
+  archival of benchbox-private (reversible via "unarchive", but worth
+  thinking once).
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 5).
+
+work:
+- id: w1
+  summary: "Create local mirror backup of benchbox-private before archival"
+  status: pending
+  notes: |
+    git clone --mirror git@github.com:joeharris76/benchbox-private.git \
+      /tmp/benchbox-private-backup-$(date +%Y%m%d).git
+    Verify the clone size matches GitHub's reported repo size. Keep
+    this backup until at least Phase 8 ships green and 60-day soak passes.
+
+- id: w2
+  summary: "Confirm pre-conditions: clean public clone, no in-flight private branches with valuable work"
+  needs: [w1]
+  status: pending
+  notes: |
+    cd ~/Developer/benchbox-public
+    git status                     # must be clean
+    git log -1 --oneline           # confirm v0.3.0 release commit present
+    git log --oneline -- _project/TODO/ | head -3  # confirm filter-merge worked
+
+    cd /Users/joe/Developer/BenchBox
+    git status                     # must be clean
+    git branch -a                  # review feature branches
+    git stash list                 # nothing important stashed
+    # For each non-merged feature branch on private:
+    #   - merge to private main and sync via curated flow, OR
+    #   - cherry-pick onto a public branch via gh
+    Stop here if anything is dirty or unmerged.
+
+- id: w3
+  summary: "Verify the public clone is fully functional as the new dev locus"
+  needs: [w2]
+  status: pending
+  notes: |
+    cd ~/Developer/benchbox-public
+    uv sync     # set up venv if not already
+    uv run -- python -m pytest -m fast
+    uv run ruff check .
+    uv run ty check
+    # All green. If any test or lint fails: it is the responsibility of
+    # the migration to fix before retiring the private clone — once
+    # retired, you are in single-repo mode.
+
+- id: w4
+  summary: "Archive joeharris76/benchbox-private on GitHub"
+  needs: [w3]
+  status: pending
+  notes: |
+    GitHub UI: Settings on joeharris76/benchbox-private -> Danger zone ->
+    "Archive this repository". Confirm.
+    The repo becomes read-only. Existing collaborators (just you) lose
+    write access. URL still resolves; clones still work.
+    Reversible via "Unarchive" if needed.
+
+- id: w5
+  summary: "Retire the local private clone (rename, do not delete)"
+  needs: [w4]
+  status: pending
+  notes: |
+    mv /Users/joe/Developer/BenchBox \
+       /Users/joe/Developer/BenchBox.retired-$(date +%Y%m%d)
+    The retired path remains as a reference for 60+ days. Renaming
+    prevents shell muscle-memory from accidentally `cd`-ing into it
+    and committing/pushing somewhere stale.
+
+- id: w6
+  summary: "(Optional) Reclaim /Users/joe/Developer/BenchBox path for the public clone"
+  needs: [w5]
+  status: pending
+  notes: |
+    Two options — pick whichever:
+    - mv ~/Developer/benchbox-public /Users/joe/Developer/BenchBox
+      (rename the public clone to the canonical path)
+    - ln -s ~/Developer/benchbox-public /Users/joe/Developer/BenchBox
+      (symlink — existing IDE/shell sessions keep working)
+    Or do nothing — keep the public clone at ~/Developer/benchbox-public
+    and update muscle memory.
+
+- id: w7
+  summary: "Set up branch protection on joeharris76/BenchBox main"
+  needs: [w4]
+  status: pending
+  notes: |
+    GitHub UI: Settings -> Branches -> Add rule for main:
+      - Require pull request before merging
+      - Require status checks: select the CI workflow from Phase 2
+      - Require linear history    [add ONLY AFTER Phase 4 w6 merge commit lands]
+      - Allow squash-merge ONLY (uncheck merge commits and rebase-merge
+        in repo Settings -> General)
+      - Block force pushes
+      - Block deletions
+    Do NOT require approving review (solo maintainer would self-block).
+    Test by opening a no-op PR and squash-merging it.
+
+    Note: the linear-history rule conflicts with the Phase 4 _project/**
+    filter-merge commit. That merge is a one-time exception; enable
+    linear-history AFTER it has landed and from this point forward all
+    subsequent merges are squash-only.
+
+- id: w8
+  summary: "Verify PyPI project URLs (no change needed under Option B)"
+  needs: [w4]
+  status: pending
+  notes: |
+    PyPI Homepage already points at https://github.com/joeharris76/BenchBox,
+    which is unchanged under Option B (no rename happened). Verify by
+    visiting https://pypi.org/project/benchbox/ and checking the Homepage
+    link resolves.
+    Update only if it currently points elsewhere or if other URL fields
+    (issues, source) need correction.
+
+- id: w9
+  summary: "Strip two-remote-rule sections from CLAUDE.md and AGENTS.md (interim - full update in Phase 7)"
+  needs: [w7]
+  status: pending
+  notes: |
+    Open a PR on public to remove the "Git Remotes - CRITICAL" section
+    in CLAUDE.md and the equivalent in AGENTS.md so future sessions
+    stop pushing to the wrong (now non-existent) remote. Replace with a
+    one-line placeholder:
+      "Single repo, single origin (joeharris76/BenchBox).
+      See docs/operations/release-guide.md."
+    The rest of the docs cleanup is Phase 7. This step is the minimum
+    to prevent foot-guns in subsequent commits.
+
+- id: w10
+  summary: "(Optional) Pin a MIGRATION-NOTES.md at repo root for 60-90 days"
+  needs: [w7]
+  status: pending
+  notes: |
+    Brief note for any external visitors:
+      "BenchBox absorbed development from a private fork on YYYY-MM-DD.
+      _project/** retains the original commit history; other paths
+      arrived as a single squashed migration commit. The previous
+      private repo (joeharris76/benchbox-private) has been archived."
+    Remove in Phase 9.
+
+verification:
+- description: "Private repo is archived on GitHub"
+  command: "gh repo view joeharris76/benchbox-private --json isArchived --jq .isArchived"
+  expected_output: "true"
+- description: "Public repo URL unchanged and accessible"
+  command: "curl -sSf -o /dev/null https://github.com/joeharris76/BenchBox && echo OK"
+  expected_output: "OK"
+- description: "Retired private clone exists at expected path"
+  command: "ls -d /Users/joe/Developer/BenchBox.retired-*"
+  expected_output: "matching directory exists"
+- description: "Public clone is functional"
+  command: "cd ~/Developer/benchbox-public && uv run -- python -m pytest -m fast --collect-only -q | tail -1"
+  expected_output: "non-zero test count, no collection errors"
+- description: "CLAUDE.md no longer mentions the two-remote rule (after w9 merges)"
+  command: "grep -c 'Git Remotes - CRITICAL\\|two-remote' ~/Developer/benchbox-public/CLAUDE.md"
+  expected_output: "0"
+
+must_preserve:
+- All git history on joeharris76/BenchBox is preserved untouched (no
+  rewrites, no force-pushes).
+- All git history on joeharris76/benchbox-private is preserved (archive
+  is read-only but full history accessible).
+- The _project/** filter-merge from Phase 4 remains intact (the merge
+  commit and its preserved sub-commits).
+- The mirror backup from w1 is retained for at least 90 days as the
+  ultimate fallback.
+- PyPI wheels for previously-published versions remain installable (PyPI
+  is independent of repo state).
+
+anti_patterns:
+- DO NOT delete benchbox-private from GitHub at the end of this phase -
+  because external links, forks, and stars (if any) point to it; archiving
+  preserves them with read-only access. Deletion is Phase 9 (optional).
+- DO NOT delete the renamed local clone (BenchBox.retired-YYYYMMDD/) at
+  the end of this phase - because it is the ultimate "did I lose any
+  in-flight work" reference for 60+ days.
+- DO NOT enable branch-protection's linear-history rule before Phase 4 w6
+  lands - because that merge commit is a non-linear one-time event; the
+  rule applies from-this-point-forward, not retroactively.
+- DO NOT push commits to public main from the retired private clone
+  after w5 - because the retired clone has stale knowledge of public's
+  history (curated mirror, before the migration commits) and any push
+  from there would create divergent history. Only push from
+  ~/Developer/benchbox-public going forward.
+- DO NOT change the canonical repo URL or rename joeharris76/BenchBox -
+  because that triggers an irreversible visibility-event chain that
+  Option B specifically avoided (vs. Option A which did rename).
+
+scope_limit:
+  only_modify:
+  - /Users/joe/Developer/BenchBox  # rename via mv (no content edits)
+  - ~/Developer/benchbox-public/.git/config  # branch protection settings via GitHub UI; CLAUDE.md/AGENTS.md edits via PR
+  - ~/Developer/benchbox-public/CLAUDE.md  # interim two-remote-rule strip (full update in Phase 7)
+  - ~/Developer/benchbox-public/AGENTS.md  # interim two-remote-rule strip
+  - ~/Developer/benchbox-public/MIGRATION-NOTES.md  # optional, at repo root
+  notes: |
+    The vast majority of work in this phase happens in GitHub UI (archive,
+    branch protection) and as filesystem-level operations (mv, ln). The
+    only source-tree edits are the two-remote-rule strip in CLAUDE.md and
+    AGENTS.md, which are completed properly in Phase 7.

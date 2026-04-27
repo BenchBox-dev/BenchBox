@@ -1,0 +1,61 @@
+id: clickbench-empty-string-vs-null-constraint-issue-completed
+title: ✅ ClickBench Empty String vs NULL Constraint Issue (COMPLETED)
+category: Code Quality and Technical Debt
+sections:
+  Notes: '- "**Priority**: Medium"
+
+    - "**Status**: ✅ **COMPLETED**"
+
+    - "**Completion Date**: 2025-09-04"
+
+    - "**Description**: ClickBench data generator creates empty strings for fields that should be empty, but constraint violation
+    suggests NULL values may be generated instead"
+
+    - "**Root Cause Analysis**: The ClickBench schema correctly defines all fields as `NOT NULL` and queries use `<> ''` filtering
+    patterns, indicating empty strings are the expected representation for missing data. However, the CLI fails with \"NOT
+    NULL constraint failed: hits.Referer\" suggesting actual NULL values are being generated somewhere in the data pipeline."
+
+    - "**Final Root Cause**: DuckDB CSV loading was using default NULL handling (`nullstr=''''`), which converts empty CSV
+    fields to NULL values, violating ClickBench''s NOT NULL constraints."
+
+    - "**Solution Implemented**:"
+
+    - "**Tasks Completed**:"
+
+    - "**Files Modified**:"
+
+    - "**Technical Details**:"
+
+    - "**Validation Results**:"
+
+    - "**Impact**:"'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Priority**: Medium"
+
+  - "**Status**: ✅ **COMPLETED**"
+
+  - "**Completion Date**: 2025-09-04"
+
+  - "**Description**: ClickBench data generator creates empty strings for fields that should be empty, but constraint violation
+  suggests NULL values may be generated instead"
+
+  - "**Root Cause Analysis**: The ClickBench schema correctly defines all fields as `NOT NULL` and queries use `<> ''` filtering
+  patterns, indicating empty strings are the expected representation for missing data. However, the CLI fails with \"NOT NULL
+  constraint failed: hits.Referer\" suggesting actual NULL values are being generated somewhere in the data pipeline."
+
+  - "**Final Root Cause**: DuckDB CSV loading was using default NULL handling (`nullstr=''''`), which converts empty CSV fields
+  to NULL values, violating ClickBench''s NOT NULL constraints."
+
+  - "**Solution Implemented**:"
+
+  - "**Tasks Completed**:"
+
+  - "**Files Modified**:"
+
+  - "**Technical Details**:"
+
+  - "**Validation Results**:"
+
+  - "**Impact**:"'

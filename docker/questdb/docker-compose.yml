@@ -1,0 +1,48 @@
+# QuestDB Docker Compose
+# Single-node QuestDB for local benchmarking
+#
+# Usage:
+#   make test-docker-up-questdb
+#   benchbox run --platform questdb --benchmark tpch --scale 0.01 \
+#     --platform-option http_port=19000
+#
+# Ports (host → container):
+#   19000 → 9000  - REST API (CSV import /imp, queries /exec)
+#                   Remapped to avoid conflict with ClickHouse native TCP on 9000
+#   8812  → 8812  - PostgreSQL wire protocol (psycopg2 queries)
+#   9003  → 9003  - Health check / metrics
+#
+# ILP port (9009) is NOT exposed - BenchBox does not use InfluxDB Line Protocol
+# for QuestDB ingestion.  Expose manually if needed: add "9009:9009" to ports.
+#
+# Default credentials:
+#   Username: admin
+#   Password: quest
+#   Database: qdb
+#
+# Data persists in the container's writable layer across `docker compose restart`
+# (which preserves the container).  To clear all benchmark data, run
+# `docker compose down` (removes the container) followed by `docker compose up`.
+
+services:
+  questdb:
+    image: questdb/questdb:9.3.5
+    ports:
+      - "19000:9000"
+      - "8812:8812"
+      - "9003:9003"
+    environment:
+      # Reduce commit lag for faster data visibility after bulk loads
+      - QDB_CAIRO_COMMIT_LAG=1000
+      # Allow large batch inserts during TPC-H data loading
+      - QDB_CAIRO_MAX_UNCOMMITTED_ROWS=500000
+      # Increase HTTP receive buffer to handle large parquet-to-CSV uploads
+      # (tpcds_obt generates a ~1.1 GB OBT file; default 128 MB causes ConnectionResetError)
+      - QDB_HTTP_MAX_RECV_BUF_SIZE=2147483648
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9003"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped

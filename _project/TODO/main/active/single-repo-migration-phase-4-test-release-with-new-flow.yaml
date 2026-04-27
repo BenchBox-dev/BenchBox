@@ -1,0 +1,274 @@
+id: single-repo-migration-phase-4-test-release-with-new-flow
+title: "Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)"
+worktree: main
+priority: High
+status: In Progress
+category: Release Tooling
+
+deps:
+  needs:
+  - single-repo-migration-phase-3-new-release-flow
+
+description: |
+  Dominant phase of the migration under Option B. Three sequenced operations
+  on the public repo:
+
+  1. FINAL CURATED SYNC from private → public, with HOLD_BACK_PATHS reduced
+     to the bare minimum (per-user agent config + secrets only) AND
+     ALLOWED_ROOT_FILES expanded to include dev-tooling root files
+     (.pre-commit-config.yaml, AGENTS.md, CLAUDE.md, GEMINI.md,
+     _benchbox_pytest_xdist_safety.py, etc.). Brings explorer code, _blog/,
+     all source files, dev tooling, and the new release infrastructure
+     (Phases 1-3) onto public main as squashed migration commits.
+     Working-tree contents only — no private commit history preserved.
+
+  2. _project/** HISTORY FILTER-MERGE: on a fresh clone of private, run
+     `git filter-repo --path _project/` to keep only commits that touched
+     _project/. Push the filtered branch to public as a temporary remote
+     and merge into public main with `--allow-unrelated-histories`. Use a
+     regular merge commit (NOT squash — squashing defeats the purpose).
+     This preserves TODO/DONE archaeology per D2a.
+
+  3. CUT v0.3.0 from public using the new release flow (Makefile target +
+     release.yml workflow). Old automate_release.py is still on private
+     as a fallback; it gets deleted in Phase 6.
+
+  This is the "release that ships the explorer" — the only feature
+  genuinely held back today. Likely versioned 0.3.0 since it adds a
+  major feature.
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 4).
+
+work:
+- id: w1
+  summary: "Confirm explorer is ready to ship and remove explorer entries from HOLD_BACK_PATHS"
+  status: done
+  notes: |
+    Read benchbox/release/workflow.py:18-43. Remove from HOLD_BACK_PATHS:
+      - benchbox/core/explorer_pipeline
+      - benchbox/cli/commands/explorer.py
+      - tests/unit/core/explorer_pipeline
+      - tests/unit/cli/test_explorer_build_contract.py
+      - .github/workflows/results-explorer-browser.yml
+      - docs/development/results-explorer-*.md
+    Confirm with the user that the explorer is feature-complete and
+    documented before removing.
+
+- id: w2
+  summary: "Reduce HOLD_BACK_PATHS to the bare minimum for the final sync"
+  needs: [w1]
+  status: done
+  notes: |
+    After w1 removes explorer entries, further reduce HOLD_BACK_PATHS to
+    contain only paths that should NEVER reach public:
+      HOLD_BACK_PATHS = (
+        ".claude",       # per-user agent config
+        ".codex",        # per-user agent config
+        ".gemini",       # per-user agent config
+        # any specific secrets / .env files / credentials
+      )
+    Most of the previously-held-back paths are specific to release
+    machinery and are deleted in Phase 6 anyway. Some (like _project,
+    _blog) are now part of the canonical repo per D3/D4.
+
+    Explicitly leave on public (these become canonical):
+      - _project/ (TODO/DONE/decisions/scripts) - history via w4 below
+      - _blog/ (working tree only, no history per D4)
+      - _chart_data/, release/, scripts/automate_release.py and friends
+        (still present today; deleted in Phase 6)
+      - todo.config.yaml, skill-sync.yaml, skill-sync.lock
+
+- id: w3
+  summary: "Expand ALLOWED_ROOT_FILES to include dev-tooling root files currently silently excluded"
+  needs: [w2]
+  status: done
+  notes: |
+    The curated flow uses an ALLOWED_ROOT_FILES allowlist. Files at repo
+    root NOT in the allowlist are silently dropped — including dev-tooling
+    files that DO belong on public going forward. Verified gap (root files
+    in private, missing from public clone today):
+      - .pre-commit-config.yaml      # dev guardrail; needs to come over
+      - .coveragerc_core              # coverage config
+      - .dockerignore                 # meta-file
+      - .env.example                  # example env (no secrets)
+      - .mcp.json                     # MCP server config (verify not per-user)
+      - AGENTS.md                     # agent instructions, project-wide
+      - CLAUDE.md                     # project memory (after Phase 7 cleanup of two-remote section)
+      - GEMINI.md                     # agent instructions
+      - _benchbox_pytest_xdist_safety.py  # dev tool
+    Add each of these to ALLOWED_ROOT_FILES in benchbox/release/workflow.py
+    BEFORE running the final sync. (workflow.py is deleted in Phase 6, so
+    this edit is short-lived but load-bearing for the final sync.)
+
+    Files to keep excluded (verify they are NOT in ALLOWED_ROOT_FILES):
+      - .DS_Store, coverage.json/xml, test-results.xml — generated junk
+      - evil.duckdb, memory.db — appear to be local test artefacts
+      - setup.cfg, setup.py, tox.ini — verify load-bearing (likely vestigial
+        with pyproject.toml; if not used, exclude)
+
+- id: w4
+  summary: "Run the final curated sync (last use of prepare_release.py)"
+  needs: [w3]
+  status: pending
+  notes: |
+    cd /Users/joe/Developer/BenchBox
+    # First do a dry-run to inspect:
+    uv run python scripts/prepare_release.py --target /tmp/final-sync-preview \
+      --no-commit
+    # Diff the previewed tree against ~/Developer/benchbox-public to confirm
+    # only the expected NEW additions appear (explorer, _blog, dev-tooling
+    # root files) and no SURPRISE removals:
+    diff -rq /tmp/final-sync-preview ~/Developer/benchbox-public | head -50
+    # Investigate every "Only in" line. Surprises = bugs. Fix HOLD_BACK or
+    # ALLOWED_ROOT_FILES until happy.
+    # When clean, sync via PR (preferred over force-push since branch
+    # protection may be on public main):
+    cd ~/Developer/benchbox-public
+    git checkout -b migration/final-sync
+    # Apply tree from /tmp/final-sync-preview onto this branch:
+    rsync -a --delete --exclude='.git' /tmp/final-sync-preview/ ./
+    git add -A
+    git commit -m "Migration: final curated sync from private (explorer launch)"
+    git push origin migration/final-sync
+    gh pr create --title "Migration: final sync from private (explorer launch)" \
+      --body "Brings explorer code, _blog working tree, dev tooling, release infrastructure"
+    # Squash-merge.
+
+- id: w5
+  summary: "Filter-clone private's _project/** history into a temp directory"
+  needs: [w4]
+  status: pending
+  notes: |
+    git filter-repo lives outside core git: install it first:
+      pip install git-filter-repo  (or brew install git-filter-repo)
+
+    git clone --no-local /Users/joe/Developer/BenchBox /tmp/private-project-history
+    cd /tmp/private-project-history
+    git remote remove origin   # avoid accidental pushes
+    git filter-repo --path _project/ --force
+
+    # Verify:
+    git log --oneline | wc -l   # should be many commits
+    git ls-files | grep -v '^_project/' | wc -l   # should be 0
+    git log --oneline -- _project/TODO/ | head -5  # should show real commits
+
+- id: w6
+  summary: "Merge _project/** history into public main with --allow-unrelated-histories"
+  needs: [w5]
+  status: pending
+  notes: |
+    cd ~/Developer/benchbox-public
+    git remote add private-project-history /tmp/private-project-history
+    git fetch private-project-history
+    git checkout -b migration/project-history-merge main
+    git merge --allow-unrelated-histories private-project-history/main \
+      -m "Merge _project/** history from private (TODO/DONE archaeology preserved)"
+
+    # Verify:
+    git log --graph --oneline | head -20   # should show two roots merging
+    git log --oneline -- _project/TODO/ | head -5   # original SHAs preserved
+    git blame _project/TODO/_indexes/by-priority.yaml | head   # original authors/dates
+
+    git push origin migration/project-history-merge
+    gh pr create --title "Migration: merge _project/** history (preserve TODO/DONE archaeology)" \
+      --body "Filter-merged from private. Use a regular MERGE COMMIT not squash — squashing defeats the purpose."
+
+    # IMPORTANT: this PR is the one explicit exception to the squash-merge
+    # convention (D5). Use "Create a merge commit" in the GitHub UI, NOT
+    # "Squash and merge". If branch protection enforces squash-only at
+    # this point, temporarily disable it for this PR.
+
+- id: w7
+  summary: "Determine release version (likely v0.3.0) and cut release"
+  needs: [w6]
+  status: pending
+  notes: |
+    cd ~/Developer/benchbox-public
+    git checkout main && git pull
+    git describe --tags --abbrev=0   # current latest tag (likely v0.2.x)
+    # New public-facing feature (explorer) = minor bump = 0.3.0
+
+    make release VERSION=0.3.0
+    # Review the auto-generated changelog. Edit any awkward Claude
+    # summarisation. The Claude CLI step exercises the new generator
+    # for the first time.
+    # Squash-merge the release PR.
+
+    git checkout main && git pull
+    git tag v0.3.0
+    git push origin v0.3.0
+    # Watch .github/workflows/release.yml run.
+
+- id: w8
+  summary: "Verify the release published to PyPI and is installable"
+  needs: [w7]
+  status: pending
+  notes: |
+    Wait for release.yml to complete green.
+    pip index versions benchbox  # should show 0.3.0
+    python -m venv /tmp/post-release-test
+    /tmp/post-release-test/bin/pip install benchbox==0.3.0
+    /tmp/post-release-test/bin/benchbox --help
+    /tmp/post-release-test/bin/python -c "import benchbox; assert benchbox.__version__ == '0.3.0'"
+    # Confirm wheel content has no maintainer scaffolding:
+    /tmp/post-release-test/bin/pip show -f benchbox | \
+      grep -E '_project|_blog|automate_release|benchbox/release/|\.pre-commit'
+    # Should match nothing — Phase 1 wheel hygiene excludes these.
+
+verification:
+- description: "PyPI has v0.3.0"
+  command: "pip index versions benchbox 2>&1 | grep -c '0.3.0'"
+  expected_output: "at least 1"
+- description: "Tag exists on public main"
+  command: "git -C ~/Developer/benchbox-public rev-parse v0.3.0"
+  expected_output: "valid SHA"
+- description: "_project/** history is preserved on public"
+  command: "git -C ~/Developer/benchbox-public log --oneline -- _project/TODO/ | wc -l"
+  expected_output: "more than 1 (multiple commits, not just a single migration commit)"
+- description: ".pre-commit-config.yaml landed on public"
+  command: "test -f ~/Developer/benchbox-public/.pre-commit-config.yaml && echo OK"
+  expected_output: "OK"
+- description: "Installed wheel is clean of maintainer scaffolding"
+  command: "pip show -f benchbox | grep -E '_project|automate_release|benchbox/release/' | wc -l"
+  expected_output: "0"
+- description: "release.yml workflow concluded successfully"
+  command: "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'"
+  expected_output: "success"
+
+must_preserve:
+- The explorer code is added to the public release; this is the feature-complete launch.
+- The fallback path (automate_release.py on private) is not deleted yet - if release.yml fails for any reason, the old
+  flow is one command away.
+- _project/** retains its original commit graph on public; `git blame` on TODO/DONE files resolves to original
+  private-side commits with their original SHAs, dates, and authors.
+- PyPI versioning is monotonic - if 0.3.0 fails partway through and needs a re-cut, the next attempt is 0.3.1. PyPI
+  rejects re-uploads of the same version.
+- The 9 pre-existing curated commits on public main are preserved untouched (no force-push, no rewrite).
+
+anti_patterns:
+- DO NOT squash-merge the _project/** history PR (w6) - because squashing collapses the preserved history into a single
+  commit, defeating the D2a decision; use a regular merge commit specifically for this PR.
+- DO NOT skip the diff -rq inspection in w4 - because surprises in what the curated sync includes/excludes are the most
+  common way the final sync goes wrong; manual review is the gating step.
+- DO NOT release a version that overlaps with a prior failed attempt - because PyPI rejects, leaving you in a state
+  where pip cannot resolve the intended version; bump the patch number and move on.
+- DO NOT skip the post-publish smoke test (w8) - because release.yml going green only proves the workflow ran; it does
+  not prove the wheel is installable; only a fresh pip install does.
+- DO NOT delete automate_release.py at the end of this phase - because Phase 5 (dev locus migration) and Phase 6
+  (deletion) are separate gates; running ahead conflates two risk profiles.
+- DO NOT enable branch-protection's "linear history" rule before w6 lands - because the merge commit from w6 is a
+  one-time non-linear event; enable that rule in Phase 5 AFTER w6 merges.
+
+scope_limit:
+  only_modify:
+  - benchbox/release/workflow.py  # reduce HOLD_BACK_PATHS, expand ALLOWED_ROOT_FILES (last edits before deletion in Phase 6)
+  - benchbox/__init__.py  # via update_version.py
+  - pyproject.toml  # via update_version.py
+  - CHANGELOG.md  # via generate_changelog_entry.py
+  - docs/  # version markers via update_version.py
+  - landing/  # version badge via update_landing_page_version
+  - ~/Developer/benchbox-public/**  # the destination of the final sync and history merge
+  notes: |
+    Most touch is on the destination clone (~/Developer/benchbox-public).
+    On the source clone (private), only workflow.py changes plus the
+    standard release-time version bump in __init__.py / pyproject.toml.

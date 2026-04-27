@@ -1,0 +1,19 @@
+id: standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com
+title: Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED
+category: Core Functionality
+sections:
+  Notes: '- "**Files Affected**:"
+
+    - "**Reference Implementation**: TPC-DS dialect handling served as the template for all standardization ✅"
+
+    - "**Success Criteria**: ✅ ALL benchmarks support `get_queries(dialect=...)`, all platform adapters declare target dialect,
+    eliminated hard-coded dialect assumptions, comprehensive test validation confirms zero regressions"'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Files Affected**:"
+
+  - "**Reference Implementation**: TPC-DS dialect handling served as the template for all standardization ✅"
+
+  - "**Success Criteria**: ✅ ALL benchmarks support `get_queries(dialect=...)`, all platform adapters declare target dialect,
+  eliminated hard-coded dialect assumptions, comprehensive test validation confirms zero regressions"'

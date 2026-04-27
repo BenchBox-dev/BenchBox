@@ -1,0 +1,80 @@
+id: expand-plan-fingerprint-verification
+title: "Expand query plan fingerprint coverage and verification"
+worktree: "query-plan-remediation"
+priority: "High"
+status: "Not Started"
+description: |
+  Fingerprint fast-paths currently ignore core logical structure (join conditions,
+  grouping, projections, limits/offsets), so materially different plans hash the
+  same and are marked identical. Stored fingerprints are also trusted on ingest,
+  allowing stale/tampered hashes to bypass comparison. Tighten the structural
+  signature, recompute/verify fingerprints on load and before comparison, and
+  update regression/summary flows to refuse hashes that don’t match the current
+  tree. Ensure plan history and CLI outputs surface verification failures cleanly.
+category: "Core Functionality"
+tasks:
+  phases:
+  - phase: "Phase 1: Define invariants and schema coverage"
+    done: false
+    items:
+    - summary: "List the logical fields that must affect fingerprints (join_conditions, group_by_keys, projection_expressions,
+        limit_count/offset_count, sort_keys ordering) and document intended determinism rules."
+      done: false
+    - summary: "Decide ordering/normalization rules for expressions so equivalent plans hash the same (e.g., sorted sets vs.
+        preserved order where order matters)."
+      done: false
+  - phase: "Phase 2: Implementation"
+    done: false
+    items:
+    - summary: "Extend structural signature computation to include the newly required logical fields while keeping costs/IDs
+        excluded; add guards for None/empty cases."
+      done: false
+    - summary: "Recompute or verify fingerprints during deserialization and before comparator fast-paths; reject or mark invalid
+        when stored hash does not match tree."
+      done: false
+    - summary: "Propagate integrity failures to callers (comparison summary, plan history) with actionable messaging and without
+        crashing execution."
+      done: false
+  - phase: "Phase 3: Tests and migration"
+    done: false
+    items:
+    - summary: "Add unit tests covering changed signature fields, deterministic hashing, and mismatch detection on tampered
+        fingerprints across plan models and comparator paths."
+      done: false
+    - summary: "Update CLI/summary tests to expect new verification behavior and ensure plan_history/regression summaries
+        still work with invalid fingerprints skipped."
+      done: false
+metadata:
+  owners:
+  - "joe"
+  tags:
+  - "query-plans"
+  - "fingerprinting"
+  estimated_effort: "Medium"
+  created_date: "2025-11-26"
+impact:
+  business_value: |
+    Prevents silent regressions from being missed when plan fingerprints mask
+    real structural changes, improving reliability of performance monitoring and
+    customer trust in BenchBox comparisons.
+  user_impact: |
+    Users get accurate plan change detection and clear errors instead of false
+    “identical plan” results, reducing debugging time during benchmarks.
+  technical_debt: |
+    Reduces risk of corrupted/stale data flowing through comparison/history
+    features and establishes clearer invariants for future parser additions.
+files_affected:
+  modified:
+  - "benchbox/core/results/query_plan_models.py"
+  - "benchbox/core/query_plans/comparison.py"
+  - "benchbox/core/query_plans/history.py"
+  - "benchbox/cli/commands/compare_plans.py"
+  - "benchbox/cli/commands/show_plan.py"
+  - "tests/unit/core/results/test_query_plan_models.py"
+  - "tests/unit/core/query_plans/test_comparison.py"
+  added: []
+  removed: []
+success_metrics:
+- "Fingerprint differs whenever logical semantics differ (including joins/grouping/projections/limits)."
+- "Comparator fast-path only reports identical when verification passes; tampered hashes surface a clear integrity error."
+- "All updated tests for fingerprint coverage and verification pass under ruff+pytest suite."

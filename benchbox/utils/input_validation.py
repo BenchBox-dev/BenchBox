@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 # Maximum lengths for various inputs
 MAX_IDENTIFIER_LENGTH = 128
-MAX_QUERY_ID_LENGTH = 20
+MAX_QUERY_ID_LENGTH = 64
 MAX_DATABASE_NAME_LENGTH = 64
 MAX_SCHEMA_NAME_LENGTH = 64
 MAX_TABLE_NAME_LENGTH = 128

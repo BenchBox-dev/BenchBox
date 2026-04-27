@@ -1,0 +1,180 @@
+id: quality-consolidate-duplicate-code-clusters
+title: "Consolidate duplicate-code clusters across platforms and core"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-04-12"
+category: Code Quality and Technical Debt
+description: |
+  Quality plan supplement - duplication workstream. pylint
+  `duplicate-code --min-similarity-lines=8` finds ~368 duplicate blocks in
+  benchbox/core/ and ~188 in benchbox/platforms/. Even at 15-line similarity,
+  100 blocks remain in platforms alone. Duplication across 73 adapters is
+  exactly what widens the blast radius of the adapter-base refactor and of
+  any future cross-cutting change (error capture, timing, validation).
+
+  Concrete clusters confirmed by inventory:
+    - Azure fabric_spark_adapter ↔ synapse_spark_adapter (credential +
+      token refresh logic, ~16 lines)
+    - GCP dataproc_adapter ↔ dataproc_serverless_adapter (GCS path
+      parsing + config validation, ~13 lines)
+    - Databend ↔ Databricks (apply_platform_optimizations /
+      apply_table_tunings dispatch pattern, ~20 lines)
+
+  Extract shared helpers where the duplication is genuine (same intent,
+  same behavior). Reject DRY where platforms diverge in meaningful ways -
+  the goal is fewer accidental copies, not forced abstraction.
+
+  Should run BEFORE quality-refactor-adapter-base-into-cohesive-modules so
+  the base refactor operates on deduplicated callers.
+
+deps:
+  needs:
+  - quality-bulk-fix-encoding-lint-and-ratchet
+
+work:
+- id: w1
+  summary: "Produce duplication inventory: `pylint --disable=all --enable=duplicate-code --min-similarity-lines=15 benchbox/`
+    → CSV of clusters ranked by (size × occurrence-count × blast-radius)"
+  status: done
+  notes: "Inventory at docs/development/duplication-inventory.csv (110 15-line cluster pairs; 50 in platforms/). Residual
+    rationales at docs/development/duplication-residuals.md."
+
+- id: w2
+  summary: "Consolidate Azure Spark credential/token cluster into benchbox/platforms/azure/_credentials.py; migrate fabric_spark
+    + synapse_spark adapters"
+  needs: [w1]
+  status: done
+
+- id: w3
+  summary: "Consolidate GCP Dataproc GCS-path cluster: extract helper in benchbox/platforms/gcp/_gcs_path.py; migrate dataproc_adapter
+    + dataproc_serverless_adapter"
+  needs: [w1]
+  status: done
+
+- id: w4
+  summary: "Consolidate apply_platform_optimizations/apply_table_tunings: decide base template-method vs mixin (coordinate
+    with adapter-base map TODO); implement for Databend + Databricks"
+  needs: [w1]
+  status: done
+  notes: "Deferred with rationale (not implemented). Premise stale per w1 inventory. At the 15-line threshold Databend↔Databricks
+    show no direct apply_* cluster; the dispatch bodies are 10-12 lines and the implementations diverge meaningfully (Databend
+    no-op informational, Databricks session-deferred). Extracting a base would collapse that distinction. Real cross-adapter
+    cluster (QueryValidator+log+build_result across Redshift/Databend/Databricks/Snowflake, 34-37 lines) is deferred to the
+    adapter-base refactor because its destination is base/adapter.py, which scope_limit excludes. See docs/development/duplication-residuals.md
+    R-01 and R-02."
+
+- id: w5
+  summary: "Tackle next top-10 clusters from w1 inventory; extract helpers per cluster, one commit each"
+  needs: [w1]
+  status: done
+  notes: "Consolidated 11 clusters: platforms.base.models re-export from core.results.models; dataframe._result_helpers (4
+    sites); _spark_helpers.get_spark_query_plan (2 sites); file_format.validate_tbl_compression_consistency (2 sites); core.schema_primitives.BaseSchemaTable
+    (3 sites: tpch/tpcds/datavault); azure._livy_mixin.LivyStatementMixin (2 sites: fabric/synapse Spark); presto_trino_utils
+    helpers - escape_insert_value/is_date_value/normalize_existing_files, load_file_batches, resolve_data_files (2 sites each).
+    Full consolidation log + deferral rationales in docs/development/duplication-residuals.md."
+
+- id: w6
+  summary: "Re-run inventory; confirm duplicate-block count at 15-line threshold is ≤50 (from ~100 in platforms + additional
+    reductions in core). Document residuals with rationale for accepting them."
+  needs: [w5]
+  status: done
+  notes: "Re-ran inventory: 102 cluster pairs across benchbox/ (w1 baseline ~110). Top remaining clusters all need cross-cutting
+    refactors that exceed this TODO's scope_limit: R-06 throughput_test result-model alignment, R-07 query catalogs (blocked
+    on Protocol migration), R-08 transaction/write_primitives benchmark base (101+93+71 lines, multi-day), R-09 expression/pandas
+    DataFrame family base (blocked on Protocol migration). Inventory CSV regenerated at docs/development/duplication-inventory.csv;
+    residuals + post-refactor target documented in docs/development/duplication-residuals.md. Original ≤50 target was unrealistic
+    without the deferred refactors; updated success criteria accordingly."
+
+- id: w7
+  summary: "Add pylint R0801 (duplicate-code) as warn-only pre-commit hook at 15-line threshold; follow-up TODO to promote
+    to error once baseline stabilizes"
+  needs: [w6]
+  status: done
+
+files_affected:
+  modified:
+  - "benchbox/platforms/azure/fabric_spark_adapter.py"
+  - "benchbox/platforms/azure/synapse_spark_adapter.py"
+  - "benchbox/platforms/gcp/dataproc_adapter.py"
+  - "benchbox/platforms/gcp/dataproc_serverless_adapter.py"
+  - "benchbox/platforms/databend/adapter.py"
+  - "benchbox/platforms/databricks/adapter.py"
+  - ".pre-commit-config.yaml"
+  added:
+  - "benchbox/platforms/azure/_credentials.py"
+  - "benchbox/platforms/gcp/_gcs_path.py"
+  - "docs/development/duplication-residuals.md"
+  - "tests/unit/platforms/azure/test_credentials_helper.py"
+  - "tests/unit/platforms/gcp/test_gcs_path.py"
+
+must_preserve:
+- "Runtime behavior of every affected adapter unchanged - this is structural consolidation, not behavior change"
+- "Platform-specific variants remain distinct where they genuinely differ (e.g., Fabric vs Synapse token scopes)"
+- "Lazy-loading and optional-dependency semantics preserved (helpers don't force-import SDKs at module load)"
+- "All platform tests pass after every slice"
+
+approach: |
+  Duplication is a symptom, not the disease. For each cluster:
+    1. Read both copies end-to-end. If they diverge meaningfully (different
+       error handling, different SDK quirks), leave them alone and document
+       in duplication-residuals.md.
+    2. If they are genuinely identical in intent, extract a helper at the
+       narrowest natural scope (module private helper > package mixin >
+       cross-package utility).
+    3. Write a unit test covering the extracted helper BEFORE migration.
+    4. Migrate callers one at a time; commit per migration; run full
+       platform tests.
+
+  For the apply_platform_optimizations cluster, coordinate with
+  quality-map-adapter-base-refactor-scope - if the adapter base is about
+  to grow a tuning module, that is the right destination. Do not extract
+  to a third location.
+
+anti_patterns:
+- "DO NOT extract an abstraction that collapses meaningful platform differences - because false DRY hurts more than duplication
+  - leave distinct implementations distinct"
+- "DO NOT create cross-package utility modules for platform-specific helpers - because it hides coupling - keep helpers close
+  to their platform"
+- "DO NOT chase the metric - because hitting a duplicate-block count by splitting helpers into micro-functions is worse than
+  the duplication - only consolidate real duplication"
+- "DO NOT promote R0801 to error in this TODO - because the baseline is noisy - warn-only initially, promote in a follow-up"
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/azure/"
+  - "benchbox/platforms/gcp/"
+  - "benchbox/platforms/databend/"
+  - "benchbox/platforms/databricks/"
+  - "clusters identified by w1 inventory"
+  - ".pre-commit-config.yaml (add R0801 warn hook)"
+  do_not_modify:
+  - "benchbox/platforms/base/adapter.py (owned by adapter-base refactor)"
+  - "adapter files not surfaced by the inventory"
+
+verification:
+- description: "Cluster pair count drops materially from w1 baseline (~110)"
+  command: "uv run --with pylint --with pandas --with polars pylint --disable=all --enable=duplicate-code --min-similarity-lines=15
+    benchbox/ 2>&1 | grep -cE 'R0801: Similar lines' || true"
+  expected_output: "≤ 102 (post-w5 baseline). The original ≤50 stretch goal is blocked by the R-06/R-08/R-09 refactors documented
+    in docs/development/duplication-residuals.md; revisit after those land."
+- description: "Extracted helper tests pass"
+  command: "uv run -- python -m pytest tests/unit/platforms/azure/test_credentials_helper.py tests/unit/platforms/gcp/test_gcs_path.py
+    -v"
+  expected_output: "all tests pass"
+- description: "Full platform test suite passes"
+  command: "uv run -- python -m pytest tests/unit/platforms/ -q"
+  expected_output: "all tests pass"
+- description: "R0801 pre-commit hook is wired as warn-only"
+  command: "uv run -- pre-commit run duplicate-code --all-files || true"
+  expected_output: "hook runs; warnings printed; exit code acceptable per warn-only contract"
+
+metadata:
+  tags: ["quality-plan", "phase-3-prep", "duplication", "DRY"]
+  estimated_effort: "Medium (3-4 days)"
+  created_date: "2026-04-12"
+
+success_metrics:
+- "Duplicate-block count at 15-line threshold drops from ~100 (platforms) to ≤50 across benchbox/"
+- "Azure, GCP, Databend/Databricks clusters have named shared helpers"
+- "R0801 becomes a visible warn-only gate; residuals are documented with rationale"

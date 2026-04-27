@@ -1,0 +1,255 @@
+id: migrate-remaining-print-leaks-to-emit
+title: Migrate remaining 68 benchbox files from raw print() to emit() and clear _PENDING_MIGRATION
+worktree: main
+priority: Medium-High
+status: Completed
+category: Core Functionality
+description: "The centralize-output-control effort (completed 2026-02-18) migrated\
+  \ the high-traffic\nCLI/core/TPC-DS/MCP paths to emit() and added a global ratchet\
+  \ test that prevents new\nprint() leaks.  However, the ratchet discovered 68 pre-existing\
+  \ files that were out of\nscope for that effort and placed in _PENDING_MIGRATION.\n\
+  \nThis TODO drives the migration of all 68 files, subsystem by subsystem, until\n\
+  _PENDING_MIGRATION is empty and the global guardrail covers the entire codebase.\n\
+  \nFiles are grouped into 12 work units by subsystem to keep each session focused:\n\
+  \  w1  - utils layer         (5 files)\n  w2  - CLI help            (1 file)\n \
+  \ w3  - analysis + comparison  (5 files)\n  w4  - cost + misc core    (8 files)\n\
+  \  w5  - dataframe cluster   (5 files)\n  w6  - TPC-DI cluster      (7 files)\n\
+  \  w7  - TPC-DS misc + TPC-H skew  (5 files)\n  w8  - tuning generators   (11 files)\n\
+  \  w9  - publishing cluster  (4 files)\n  w10 - monitoring cluster  (5 files)\n\
+  \  w11 - platforms cluster   (8 files)\n  w12 - release + primitives           \
+  \     (4 files)\n  w13 - remove all entries from _PENDING_MIGRATION, verify clean\n\
+  \nAfter w13 the ratchet test enforces zero tolerance automatically - no future\n\
+  maintenance required.\n"
+metadata:
+  tags:
+    - output
+    - quiet-mode
+    - emit
+    - print-leak
+    - ratchet
+  estimated_effort: 3-4 days
+  created_date: "2026-02-18"
+  last_updated: "2026-02-18T00:00:00"
+work:
+  - id: w1
+    summary: "Migrate utils layer: compression_mixin, data_validation, dependency_validation,
+      resource_limits, timeout_manager (5 files)"
+    status: done
+  - id: w2
+    summary: "Migrate CLI help: benchbox/cli/help.py (1 file)"
+    status: done
+  - id: w3
+    summary: "Migrate analysis cluster: core/analysis/__init__, comparison, insights,
+      ranking + core/comparison/suite (5 files)"
+    status: done
+  - id: w4
+    summary: "Migrate cost + misc core: core/cost/optimizer, tco + core/joinorder/queries,
+      metadata_primitives/benchmark, pg_extension_comparison, results/normalizer, tpc_validation,
+      upload_validation (8 files)"
+    status: done
+  - id: w5
+    summary: "Migrate dataframe cluster: core/dataframe/capabilities, profiling, tuning/__init__,
+      tuning/loader, validation (5 files)"
+    status: done
+  - id: w6
+    summary: "Migrate TPC-DI cluster: core/tpcdi/etl/batch, generator/facts, metrics,
+      queries, specification_validator, validation, worker_pool_examples (7 files)"
+    status: done
+    notes: worker_pool_examples.py is example/demo code - evaluate each print() site
+      for delete vs migrate rather than blanket replacement
+  - id: w7
+    summary: "Migrate TPC-DS misc + TPC-H skew: core/tpcds/dist_parser, reporting +
+      core/tpch_skew/benchmark + benchbox/tpch_skew.py, benchbox/tpchavoc.py (5 files)"
+    status: done
+  - id: w8
+    summary: "Migrate tuning generators: core/tuning/ddl_generator + generators for
+      azure_synapse, bigquery, clickhouse, duckdb, firebolt, postgresql, redshift, snowflake,
+      spark_family, trino (11 files)"
+    status: done
+    notes: DDL generators may use print() to emit SQL that users pipe to files - read
+      each generator before migrating; stdout-destined DDL output may need a dedicated
+      --output flag rather than emit()
+  - id: w9
+    summary: "Migrate publishing cluster: core/publishing/__init__, artifacts, permalink,
+      publisher (4 files)"
+    status: done
+  - id: w10
+    summary: "Migrate monitoring cluster: monitoring/__init__, bottleneck, performance,
+      profiler, report (5 files)"
+    status: done
+  - id: w11
+    summary: "Migrate platforms cluster: aws/glue_adapter, base/cloud_spark/session+staging,
+      bigquery, clickhouse/workload, dataframe/expression_family+pandas_family, duckdb
+      (8 files)"
+    status: done
+  - id: w12
+    summary: "Migrate release + top-level + primitives: release/content_validation,
+      release/sync + ai_primitives/dataframe_operations, transaction_primitives/dataframe_operations
+      (4 files)"
+    status: done
+  - id: w13
+    summary: Remove all 68 entries from _PENDING_MIGRATION in test_output_control_static.py,
+      run full static test suite to confirm zero violations
+    needs:
+      - w1
+      - w2
+      - w3
+      - w4
+      - w5
+      - w6
+      - w7
+      - w8
+      - w9
+      - w10
+      - w11
+      - w12
+    status: done
+must_preserve:
+  - "emit() quiet-mode suppression: when set_quiet(True) is active, no output should
+    reach stdout from any migrated file"
+  - benchbox run --quiet produces no user-visible stdout/stderr output while still returning
+    correct exit codes
+  - MCP server stdout remains reserved for JSON-RPC messages only - migrated files must
+    not re-introduce print() on MCP code paths
+  - test_pending_migration_set_contains_no_stale_entries passes after each work unit
+    (remove migrated files from the set)
+  - test_no_new_raw_print_in_benchbox_runtime continues to pass throughout the migration
+approach: "For each work unit:\n1. Read each file in the cluster to identify all raw\
+  \ print() call sites.\n2. For each site, replace print(\"...\") with emit(\"...\"\
+  ) - the signatures are\n   identical for simple string output.\n3. For f-string\
+  \ or multi-arg print() calls, preserve formatting: emit() accepts\n   any Rich renderable\
+  \ or plain string, so f-strings pass through unchanged.\n4. Add `from benchbox.utils.printing\
+  \ import emit` to the imports if not present.\n   Remove any now-unused imports\
+  \ (e.g., `from rich.console import Console` if\n   the Console instance was only\
+  \ used for print-equivalent calls).\n5. After completing the cluster, remove those\
+  \ file paths from _PENDING_MIGRATION\n   in tests/unit/cli/test_output_control_static.py.\n\
+  6. Run the static guardrail test to confirm: `uv run -- python -m pytest\n   tests/unit/cli/test_output_control_static.py\
+  \ -v`.\n7. Commit the cluster migration + _PENDING_MIGRATION removal atomically.\n\
+  \nImportant notes:\n- Some files may use print() for debug/development output that\
+  \ should simply\n  be removed rather than migrated (e.g., worker_pool_examples.py\
+  \ which is\n  example/demo code). Evaluate each site: if it's debug output with\
+  \ no\n  user-facing value, delete it; if it's user-facing status, migrate to emit().\n\
+  - Tuning generators (w8) likely use print() for DDL output that users pipe to\n\
+  \  files.  These may need emit() with appropriate formatting, or may need a\n  separate\
+  \ stdout-clean path.  Read each generator before deciding.\n- TPC-DI worker_pool_examples.py\
+  \ is almost certainly example/demo code; its\n  print() calls may be intentional\
+  \ and should be evaluated for removal vs migration.\n"
+anti_patterns:
+  - DO NOT batch-replace all print() calls blindly - because some files use print()
+    for intentional stdout output (DDL generators, examples) - read each file and decide
+    per site
+  - DO NOT forget to remove migrated files from _PENDING_MIGRATION - because test_pending_migration_set_contains_no_stale_entries
+    will fail if you don't - remove each file from the set as part of the same commit
+  - DO NOT use Console() directly in migrated files - because that bypasses quiet-mode
+    control - use emit() for plain output, or get_console() / quiet_console if Rich
+    renderables are needed
+  - DO NOT add silence_output() wrappers to cover print() calls - because silence_output()
+    is an MCP boundary tool, not a migration shortcut - replace the print() calls directly
+verification:
+  - description: Static print-leak guardrail passes after each work unit
+    command: uv run -- python -m pytest tests/unit/cli/test_output_control_static.py
+      -v
+    expected_output: all 3 tests pass, 0 failures
+  - description: Quiet-mode unit tests still pass
+    command:
+      uv run -- python -m pytest tests/unit/cli/test_quiet_mode.py tests/unit/mcp/test_mcp_benchmark_stdout_suppression.py
+      -v
+    expected_output: all tests pass, 0 failures
+  - description: Full fast test suite passes
+    command: uv run -- python -m pytest -m fast -q
+    expected_output: all tests pass, 0 failures
+  - description: _PENDING_MIGRATION is empty after w13 (stale-entry test passes trivially
+      on empty set)
+    command: uv run -- python -m pytest tests/unit/cli/test_output_control_static.py
+      -v
+    expected_output: 3 passed, 0 failed
+scope_limit:
+  only_modify:
+    - benchbox/utils/compression_mixin.py
+    - benchbox/utils/data_validation.py
+    - benchbox/utils/dependency_validation.py
+    - benchbox/utils/resource_limits.py
+    - benchbox/utils/timeout_manager.py
+    - benchbox/cli/help.py
+    - benchbox/core/analysis/__init__.py
+    - benchbox/core/analysis/comparison.py
+    - benchbox/core/analysis/insights.py
+    - benchbox/core/analysis/ranking.py
+    - benchbox/core/comparison/suite.py
+    - benchbox/core/cost/optimizer.py
+    - benchbox/core/cost/tco.py
+    - benchbox/core/joinorder/queries.py
+    - benchbox/core/metadata_primitives/benchmark.py
+    - benchbox/core/pg_extension_comparison.py
+    - benchbox/core/results/normalizer.py
+    - benchbox/core/tpc_validation.py
+    - benchbox/core/upload_validation.py
+    - benchbox/core/dataframe/capabilities.py
+    - benchbox/core/dataframe/profiling.py
+    - benchbox/core/dataframe/tuning/__init__.py
+    - benchbox/core/dataframe/tuning/loader.py
+    - benchbox/core/dataframe/validation.py
+    - benchbox/core/tpcdi/etl/batch.py
+    - benchbox/core/tpcdi/generator/facts.py
+    - benchbox/core/tpcdi/metrics.py
+    - benchbox/core/tpcdi/queries.py
+    - benchbox/core/tpcdi/specification_validator.py
+    - benchbox/core/tpcdi/validation.py
+    - benchbox/core/tpcdi/worker_pool_examples.py
+    - benchbox/core/tpcds/dist_parser.py
+    - benchbox/core/tpcds/reporting.py
+    - benchbox/core/tpch_skew/benchmark.py
+    - benchbox/tpch_skew.py
+    - benchbox/tpchavoc.py
+    - benchbox/core/tuning/ddl_generator.py
+    - benchbox/core/tuning/generators/azure_synapse.py
+    - benchbox/core/tuning/generators/bigquery.py
+    - benchbox/core/tuning/generators/clickhouse.py
+    - benchbox/core/tuning/generators/duckdb.py
+    - benchbox/core/tuning/generators/firebolt.py
+    - benchbox/core/tuning/generators/postgresql.py
+    - benchbox/core/tuning/generators/redshift.py
+    - benchbox/core/tuning/generators/snowflake.py
+    - benchbox/core/tuning/generators/spark_family.py
+    - benchbox/core/tuning/generators/trino.py
+    - benchbox/core/publishing/__init__.py
+    - benchbox/core/publishing/artifacts.py
+    - benchbox/core/publishing/permalink.py
+    - benchbox/core/publishing/publisher.py
+    - benchbox/monitoring/__init__.py
+    - benchbox/monitoring/bottleneck.py
+    - benchbox/monitoring/performance.py
+    - benchbox/monitoring/profiler.py
+    - benchbox/monitoring/report.py
+    - benchbox/platforms/aws/glue_adapter.py
+    - benchbox/platforms/base/cloud_spark/session.py
+    - benchbox/platforms/base/cloud_spark/staging.py
+    - benchbox/platforms/bigquery.py
+    - benchbox/platforms/clickhouse/workload.py
+    - benchbox/platforms/dataframe/expression_family.py
+    - benchbox/platforms/dataframe/pandas_family.py
+    - benchbox/platforms/duckdb.py
+    - benchbox/release/content_validation.py
+    - benchbox/release/sync.py
+    - benchbox/core/ai_primitives/dataframe_operations.py
+    - benchbox/core/transaction_primitives/dataframe_operations.py
+    - tests/unit/cli/test_output_control_static.py
+  do_not_modify:
+    - benchbox/utils/printing.py
+    - benchbox/cli/shared.py
+    - benchbox/core/runner/
+    - benchbox/core/tpcds/generator/
+    - benchbox/core/tpcds/benchmark/
+    - benchbox/core/results/display.py
+    - benchbox/core/config_utils.py
+    - benchbox/mcp/
+    - benchmark_runs/
+    - _project/DONE/
+success_metrics:
+  - _PENDING_MIGRATION frozenset in test_output_control_static.py is empty
+  - test_no_new_raw_print_in_benchbox_runtime passes with global coverage and zero exceptions
+    beyond _PRINT_ALLOWLIST
+  - No regressions in quiet-mode or MCP suppression test suites
+  - All 68 files either migrated to emit() or print() calls deliberately removed where
+    they were debug/example code
+completed_date: "2026-02-18"

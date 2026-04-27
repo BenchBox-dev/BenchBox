@@ -1,0 +1,128 @@
+id: add-third-benchmark-cohort-to-corpus
+title: "Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+deps:
+  needs:
+  - automate-corpus-inventory-generation
+  - verify-ci-validation-workflow-end-to-end
+
+description: |
+  The strategy doc differentiates BenchBox vs. ClickBench on three axes,
+  the first being **multi-benchmark coverage**: TPC-H + TPC-DS + SSB +
+  more. The current corpus has only TPC-H and SSB. A third benchmark
+  family is needed before that differentiation claim is credible to a
+  visitor who actually clicks around the explorer.
+
+  This item picks one of TPC-DS or ClickBench, generates a 3-platform
+  cohort at SF 0.01 (and SF 0.1 if budget allows), and lands it via the
+  same submit→PR→merge flow used for SF 0.1 expansion. The choice between
+  TPC-DS and ClickBench is itself a decision (TPC-DS is more standard,
+  ClickBench is a direct head-to-head with the comparison site we
+  differentiate against) - w1 makes that call explicitly.
+
+work:
+- id: w1
+  summary: "Decide TPC-DS vs ClickBench based on platform support and runtime budget"
+  status: pending
+  notes: |
+    Compare on three axes:
+      1. Platform parity: which 3+ supported platforms can run it cleanly
+         at SF 0.01? (DuckDB and DataFusion run both; Polars/SQLite vary.)
+      2. Runtime + storage: TPC-DS has 99 queries; ClickBench has 43.
+         Estimate wall-clock per cohort.
+      3. Strategic value: TPC-DS aligns with the "TPC family" framing in
+         the strategy doc; ClickBench creates direct head-to-head visibility.
+
+    Document the decision and rationale in
+    `_project/analysis/third-cohort-selection-<date>.md` and link it from
+    this TODO before starting w2.
+
+- id: w2
+  summary: "Generate the chosen benchmark cohort on 3 platforms at SF 0.01"
+  needs: [w1]
+  status: pending
+  notes: |
+    Same approach as the SF 0.1 expansion TODO: clean tuned runs, full
+    query set, document any failures rather than shipping partial coverage.
+    For TPC-DS, do NOT use fractional scale factors below 1 (per CLAUDE.md);
+    use SF 1 if SF 0.01 isn't valid for TPC-DS.
+
+- id: w3
+  summary: "(Optional) Generate the same cohort at the next scale factor"
+  needs: [w2]
+  status: pending
+  notes: |
+    Only if the w2 cohort proves quick enough to run the higher SF in <1
+    hour per platform on local hardware. Skip if it pushes the corpus over
+    100MB or runs > 4 hours total. Document the decision in the cohort
+    selection memo.
+
+- id: w4
+  summary: "Submit, validate via CI, merge to published-results"
+  needs: [w2]
+  status: pending
+  notes: |
+    Single PR with all w2 (and w3 if generated) bundles. Same flow as the
+    SF 0.1 expansion TODO. Validate-submission CI must pass.
+
+- id: w5
+  summary: "Verify explorer adds the new benchmark to navigation"
+  needs: [w4]
+  status: pending
+  notes: |
+    After redeploy:
+      - Benchmark selector lists 3 benchmarks (or 4 if both TPC-DS and the
+        previous two)
+      - Browse view per benchmark renders
+      - Compare view restricts to within-benchmark cohorts
+      - Cross-benchmark compare attempts are hard-blocked (per strategy
+        doc cohort rules)
+
+verification:
+- description: "Inventory now lists 3+ distinct benchmark families"
+  command: "uv run python -c \"import json; d=json.load(open('results-data/corpus-inventory.json')); print(sorted(set(b['benchmark'] for b in d['bundles'])))\""
+  expected_output: "list contains tpch, ssb, and one of {tpcds, clickbench}"
+- description: "Each new bundle validates"
+  command: "uv run python results-data/validate_corpus.py"
+  expected_output: "all bundles valid"
+
+must_preserve:
+- Existing TPC-H and SSB cohorts untouched.
+- "Cohort isolation per strategy doc - never compare across benchmark families."
+- Maintainer-run trust label on all generated bundles.
+
+anti_patterns:
+- DO NOT pick the benchmark by guessing - because the choice has strategic implications (head-to-head with ClickBench vs broader TPC family); document the trade-off explicitly in w1.
+- DO NOT use TPC-DS fractional scale factors below 1 - because they violate CLAUDE.md's hard rule and produce non-standard, non-comparable results.
+- DO NOT bundle this with the SF 0.1 expansion PR - because they answer different questions (depth-per-cohort vs benchmark-coverage) and reviewer attention shouldn't be split.
+
+scope_limit:
+  only_modify:
+  - results-data/bundles/
+  - results-data/corpus-inventory.json  # via generator only
+  - _project/analysis/third-cohort-selection-*.md
+  do_not_touch:
+  - benchbox/
+  - results-explorer/
+
+metadata:
+  tags:
+  - results
+  - corpus
+  - tpcds
+  - clickbench
+  - benchmark-coverage
+  estimated_effort: "Medium"
+  created_date: "2026-04-12"
+
+impact:
+  business_value: |
+    Validates the multi-benchmark differentiation claim with concrete data
+    visible to any visitor. Without it, the strategy claim is aspirational.
+  user_impact: |
+    Visitors can compare platforms across substantially different workload
+    shapes, which is the core "why BenchBox over ClickBench" argument.

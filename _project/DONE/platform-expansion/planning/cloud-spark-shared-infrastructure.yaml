@@ -1,0 +1,121 @@
+id: cloud-spark-shared-infrastructure
+title: "Cloud Spark Shared Infrastructure"
+worktree: platform-expansion
+priority: Critical
+status: "Completed"
+category: Core Functionality
+
+description: |
+  Build shared infrastructure for all cloud Spark platforms to maximize code reuse.
+  This includes CloudSparkSessionManager, CloudSparkStaging, and SparkConfigOptimizer.
+
+  80% of logic is shared across Glue, Dataproc, Synapse, EMR, Fabric, and other
+  managed Spark platforms. Building this foundation first enables rapid development
+  of individual platform adapters.
+
+tasks:
+  phases:
+  - phase: "Phase 1: CloudSparkSessionManager"
+    done: true
+    items:
+    - summary: "Create benchbox/platforms/base/cloud_spark/session.py"
+      done: true
+      subtasks:
+      - summary: "Implement remote session lifecycle management"
+        done: true
+      - summary: "Add Livy/REST API session support"
+        done: true
+      - summary: "Add Spark Connect protocol support"
+        done: true
+      - summary: "Implement credential management abstraction"
+        done: true
+      - summary: "Add job submission and status tracking"
+        done: true
+      - summary: "Implement cost tracking (DBU/CU/slot hours)"
+        done: true
+
+  - phase: "Phase 2: CloudSparkStaging"
+    done: true
+    items:
+    - summary: "Create benchbox/platforms/base/cloud_spark/staging.py"
+      done: true
+      subtasks:
+      - summary: "Extract S3 upload helpers from athena.py"
+        done: true
+      - summary: "Extract GCS upload helpers from bigquery.py"
+        done: true
+      - summary: "Extract UC Volume upload from databricks/adapter.py"
+        done: true
+      - summary: "Implement unified staging.upload_tables() API"
+        done: true
+      - summary: "Add provider auto-detection from URI scheme"
+        done: true
+      - summary: "Support parallel multi-file uploads with progress"
+        done: true
+      - summary: "Add compression-aware uploads (zstd, gzip)"
+        done: true
+
+  - phase: "Phase 3: SparkConfigOptimizer"
+    done: true
+    items:
+    - summary: "Create benchbox/platforms/base/cloud_spark/config.py"
+      done: true
+      subtasks:
+      - summary: "Implement TPC-H optimized configs"
+        done: true
+      - summary: "Implement TPC-DS optimized configs"
+        done: true
+      - summary: "Add AQE tuning configurations"
+        done: true
+      - summary: "Add platform-specific config sections (Glue, Dataproc, Databricks)"
+        done: true
+
+  - phase: "Phase 4: Testing"
+    done: true
+    items:
+    - summary: "Create tests/unit/platforms/base/cloud_spark/test_session.py"
+      done: true
+    - summary: "Create tests/unit/platforms/base/cloud_spark/test_staging.py"
+      done: true
+    - summary: "Create tests/unit/platforms/base/cloud_spark/test_config.py"
+      done: true
+
+metadata:
+  tags:
+  - cloud-spark
+  - infrastructure
+  - shared-code
+  estimated_effort: 2 weeks
+  created_date: "2025-12-24"
+  completed_date: "2025-12-24"
+
+impact:
+  business_value: |
+    This shared infrastructure enables 80%+ code reuse across 11 managed Spark
+    platforms. Building it first dramatically reduces effort for individual
+    platform implementations.
+  technical_debt: |
+    Consolidates duplicate staging/session code from existing adapters (Athena,
+    BigQuery, Databricks) into a single maintainable location.
+
+files_affected:
+  added:
+  - benchbox/platforms/base/cloud_spark/__init__.py
+  - benchbox/platforms/base/cloud_spark/session.py
+  - benchbox/platforms/base/cloud_spark/staging.py
+  - benchbox/platforms/base/cloud_spark/config.py
+  - tests/unit/platforms/base/cloud_spark/test_session.py
+  - tests/unit/platforms/base/cloud_spark/test_staging.py
+  - tests/unit/platforms/base/cloud_spark/test_config.py
+
+success_metrics:
+- "CloudSparkStaging can upload to S3, GCS, Azure, DBFS via unified API"
+- "CloudSparkSessionManager supports Livy and Spark Connect protocols"
+- "All existing cloud adapters could be refactored to use shared infrastructure"
+
+dependencies:
+  blocks:
+  - _project/TODO/platform-expansion/planning/aws-glue-platform.yaml
+  - _project/TODO/platform-expansion/planning/gcp-dataproc-platform.yaml
+  - _project/TODO/platform-expansion/planning/emr-serverless-platform.yaml
+  - _project/TODO/platform-expansion/planning/fabric-spark-platform.yaml

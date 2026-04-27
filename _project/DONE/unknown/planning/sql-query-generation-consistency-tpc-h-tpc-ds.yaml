@@ -1,0 +1,31 @@
+id: sql-query-generation-consistency-tpc-h-tpc-ds
+title: ✅ SQL Query Generation Consistency (TPC-H/TPC-DS)
+category: Project Lifecycle Management
+sections:
+  Notes: '- Ensured all TPC-H and TPC-DS queries are generated with a tool-supported base dialect and ALWAYS normalized via
+    SQLGlot to the platform target dialect.
+
+    - "Added `get_tpc_base_dialect(benchmark_name: str) -> str` to `PlatformAdapter` (default: `ansi`)."
+
+    - "Wired adapters to pass both `base_dialect` and `dialect` into benchmark query generation."
+
+    - "Updated TPC-DS and TPC-H benchmarks to:"
+
+    - Added unit tests covering adapter dialect forwarding and translation pass-through for both TPC-H and TPC-DS.
+
+    - Simplified the query flow and removed ad-hoc translation shortcuts in favor of the standardized SQLGlot path.'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- Ensured all TPC-H and TPC-DS queries are generated with a tool-supported base dialect and ALWAYS normalized
+  via SQLGlot to the platform target dialect.
+
+  - "Added `get_tpc_base_dialect(benchmark_name: str) -> str` to `PlatformAdapter` (default: `ansi`)."
+
+  - "Wired adapters to pass both `base_dialect` and `dialect` into benchmark query generation."
+
+  - "Updated TPC-DS and TPC-H benchmarks to:"
+
+  - Added unit tests covering adapter dialect forwarding and translation pass-through for both TPC-H and TPC-DS.
+
+  - Simplified the query flow and removed ad-hoc translation shortcuts in favor of the standardized SQLGlot path.'

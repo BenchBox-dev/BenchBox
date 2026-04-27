@@ -1,0 +1,109 @@
+id: platform-troubleshooting-guide
+title: Platform Troubleshooting Guide
+worktree: docs-experience
+priority: Medium-High
+status: "Completed"
+category: Documentation and User Experience
+description: |
+  Create a comprehensive troubleshooting guide covering common issues across
+  all platforms.
+
+  Motivation: Recent platform fixes (Presto/Trino catalog selection, SQLite memory
+  mode removal) addressed issues users commonly encounter. These solutions should
+  be documented proactively.
+
+  Structure: Problem → Cause → Solution format with copy-paste commands.
+
+tasks:
+- phase: "Phase 1: Common Issues"
+  done: true
+  items:
+  - summary: "Document connection timeout troubleshooting"
+    done: true
+  - summary: "Document authentication failures by platform"
+    done: true
+  - summary: "Document 'catalog not found' errors (Presto/Trino)"
+    done: true
+  - summary: "Document missing dependency errors"
+    done: true
+- phase: "Phase 2: Data Loading Issues"
+  done: true
+  items:
+  - summary: "Document file upload failures"
+    done: true
+  - summary: "Document permission/access errors"
+    done: true
+  - summary: "Document data type mismatches"
+    done: true
+    notes: "Covered in data loading section"
+- phase: "Phase 3: Performance Issues"
+  done: true
+  items:
+  - summary: "Document query timeout handling"
+    done: true
+  - summary: "Document memory issues for large scale factors"
+    done: true
+  - summary: "Document concurrent query limits"
+    done: true
+    notes: "Covered in scale factor recommendations"
+- phase: "Phase 4: Platform-Specific"
+  done: true
+  items:
+  - summary: "Snowflake: warehouse sizing, session timeouts"
+    done: true
+  - summary: "Databricks: cluster startup, Unity Catalog"
+    done: true
+  - summary: "BigQuery: quota errors, slot allocation"
+    done: true
+
+completion_notes: |
+  Enhanced docs/usage/troubleshooting.md with comprehensive coverage:
+
+  Quick Diagnosis:
+  - Error type matrix for fast lookup (8 error categories)
+
+  Common Issues:
+  - Connection refused with Docker startup commands
+  - Network timeouts with firewall checks
+  - Authentication failures for 4 major cloud platforms
+  - Presto/Trino catalog not found with catalog listing
+  - Permission errors with SQL GRANT examples
+
+  Performance Issues:
+  - Query timeout solutions with platform-specific settings
+  - Memory issues with DuckDB, Polars, Spark, cloud solutions
+  - Scale factor recommendations table
+
+  Data Issues:
+  - File not found with generation commands
+  - Upload failures for S3, Snowflake stages, Databricks volumes
+
+  Platform-Specific:
+  - Snowflake warehouse resume
+  - Databricks cluster startup API call
+  - BigQuery quota management
+
+  All solutions follow Problem → Cause → Solution format with copy-paste commands.
+
+metadata:
+  owners:
+  - "@benchbox-maintainers"
+  tags:
+  - documentation
+  - troubleshooting
+  - support
+  estimated_effort: 2-3 days
+  created_date: "2025-12-12"
+
+impact:
+  business_value: |
+    Dramatically reduces support burden. Users can self-diagnose common issues
+    instead of filing issues or asking for help.
+  user_impact: |
+    Faster resolution of blocking issues. Users feel supported even when
+    encountering problems.
+
+success_metrics:
+- "Top 10 error scenarios documented with solutions"
+- "Each solution includes verification steps"
+- "Platform-specific sections for major clouds"

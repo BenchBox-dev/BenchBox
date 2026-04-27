@@ -1,0 +1,124 @@
+id: cli-iterations-parameter
+title: "Add --iterations CLI parameter for power test measurement count"
+worktree: main
+category: Core Functionality
+priority: Medium
+status: Completed
+completed_date: "2026-04-10"
+description: |
+  The power test runs a fixed 3 measurement iterations (GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
+  in benchbox/core/constants.py). Users have no way to control this from the CLI, which makes
+  isolation testing and statistical analysis cumbersome - the only workaround is looping the
+  CLI command manually.
+
+  The orchestrator and RunConfig already fully support variable iteration counts:
+  - benchbox/cli/orchestrator.py:427 reads options.get("power_iterations", 3)
+  - benchbox/core/schemas.py:122 carries RunConfig.iterations through to every platform adapter
+  - benchbox/core/results/schema.py derives run.iterations from actual query data automatically
+
+  Only the CLI wiring is missing.
+
+metadata:
+  tags:
+  - cli
+  - power-test
+  - iterations
+  - usability
+  estimated_effort: "Small (< 1 hour)"
+  created_date: "2026-04-09"
+
+impact:
+  user_impact: |
+    Users can run more or fewer measurement iterations without scripting a shell loop.
+    Particularly useful for isolation testing of individual queries to build statistical confidence.
+    Example: benchbox run --platform spark --benchmark tpcds --queries 37 --phases power --iterations 10
+  maintainer_impact: |
+    Minimal. One file changed (benchbox/cli/commands/run.py), no new dependencies.
+    Option is hidden from --help (uses @advanced_option), appears only in --help-topic all.
+  regression_risk: |
+    Very low. Default behaviour (3 iterations) is unchanged when --iterations is omitted.
+
+justification: |
+  Discovered during TPC-DS Spark validation: Q37 and Q24 showed timing variance across
+  iterations, requiring isolation runs. With a fixed 3 iterations, statistical confidence
+  is limited. 10+ iterations would give a reliable picture. A shell loop is a poor UX
+  and produces separate result files rather than one consolidated result.
+
+  --benchmark-option was considered but rejected: BenchmarkHookRegistry.parse_options
+  raises BenchmarkOptionError for unregistered keys, and power_iterations is not a
+  benchmark-specific setting - it's a run-control setting that applies universally.
+
+  @advanced_option (hidden from --help, visible in --help-topic all) is the right
+  tier - matches how --seed and --mode are handled.
+
+work:
+- id: w1
+  summary: "Add @advanced_option decorator, run() signature parameter, and phase-compat warning"
+  status: done
+  description: |
+    In benchbox/cli/commands/run.py:
+    1. Add after the --seed decorator (~line 570):
+       @advanced_option(
+           "--iterations",
+           type=int,
+           default=None,
+           help="Number of power test measurement iterations (default: 3). Power phase only.",
+       )
+    2. Add `iterations: int | None,` to run() signature after `seed: int | None,` (~line 633).
+    3. Add phase-compat warning near the existing --queries phase check (~line 889):
+       if iterations is not None and "power" not in phases_to_run and "standard" not in phases_to_run:
+           console.print("[yellow]Warning: --iterations has no effect without a power or standard phase.[/yellow]")
+  files:
+  - benchbox/cli/commands/run.py
+
+- id: w2
+  summary: "Propagate to all four BenchmarkConfig options dicts"
+  status: done
+  needs: [w1]
+  description: |
+    In benchbox/cli/commands/run.py, add to the options={} dict in each of the four
+    BenchmarkConfig(...) instantiations (lines ~1428, ~1600, ~1835, ~2098):
+      **({"power_iterations": iterations} if iterations is not None else {}),
+    Place immediately after the seed entry for consistency.
+  files:
+  - benchbox/cli/commands/run.py
+
+files_affected:
+- change_type: Modified
+  paths:
+  - benchbox/cli/commands/run.py
+
+must_preserve:
+- "Default behaviour: --iterations omitted → 3 measurement iterations (unchanged)"
+- "All existing CLI options and their behaviour unchanged"
+- "Orchestrator and RunConfig require no changes"
+
+anti_patterns:
+- "DO NOT use @click.option instead of @advanced_option - --iterations should be hidden from --help to avoid parameter bloat"
+- "DO NOT add --warmup-iterations in this change - out of scope"
+- "DO NOT update the MCP tool - it hardcodes phases=power and is out of scope"
+- "DO NOT change the default in constants.py - only the CLI wiring changes"
+
+verification:
+- description: "Default still produces 3 iterations"
+  command: "benchbox run --platform spark --benchmark tpcds --scale 1 --queries 37 --phases power"
+  expected_output: "run.iterations == 3 in result JSON"
+- description: "10 iterations produces correct result"
+  command: "benchbox run --platform spark --benchmark tpcds --scale 1 --queries 37 --phases power --iterations 10"
+  expected_output: "run.iterations == 10 in result JSON"
+- description: "Flag hidden from --help, visible in --help-topic all"
+  command: "benchbox run --help | grep -c iterations; benchbox run --help-topic all | grep -c iterations"
+  expected_output: "0 and 1 respectively"
+- description: "Fast tests pass"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+  - benchbox/cli/commands/run.py
+  do_not_modify:
+  - benchbox/cli/orchestrator.py
+  - benchbox/core/schemas.py
+  - benchbox/core/constants.py
+  - benchbox/core/results/schema.py
+  - benchbox/mcp/

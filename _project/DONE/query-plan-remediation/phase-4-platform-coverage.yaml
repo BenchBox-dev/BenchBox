@@ -1,0 +1,508 @@
+id: phase-4-platform-coverage
+title: 'Query Plan Remediation - Phase 4: Platform Coverage Expansion'
+worktree: query-plan-remediation
+category: Feature Completion
+priority: High
+status: Completed
+description: 'Expand query plan parser coverage from 2 to 6+ platforms to enable the
+
+  cross-platform comparison use case. Implement parsers for PostgreSQL, Redshift,
+
+  DataFusion, and document platform support clearly.
+
+
+  **Current State**: Only DuckDB (text) and SQLite parsers exist
+
+  **Target State**: All major platforms supported with documented compatibility
+
+
+  **Platforms to Add**:
+
+  - PostgreSQL (JSON format from EXPLAIN (FORMAT JSON))
+
+  - Redshift (XML/text format)
+
+  - DataFusion (tree format)
+
+  - Snowflake (JSON format) - stretch goal
+
+  - ClickHouse (tree format) - stretch goal
+
+  - BigQuery (custom format handling) - stretch goal
+
+  '
+context_sections:
+- name: Current Coverage Gap
+  summary: 'Only 2/6 platforms have working parsers:
+
+    - DuckDB: ✓ (text-based box format)
+
+    - SQLite: ✓ (simple tree format, but not tested)
+
+    - PostgreSQL: ✗ (no parser)
+
+    - Redshift: ✗ (get_query_plan exists but no parser)
+
+    - BigQuery: ✗ (returns dict with bytes_processed, not DAG)
+
+    - Snowflake: ✗ (no implementation)
+
+    - DataFusion: ✗ (no implementation)
+
+    - ClickHouse: ✗ (no adapter yet)
+
+
+    This makes cross-platform comparison impossible for most users.
+
+    '
+- name: PostgreSQL EXPLAIN Format
+  summary: 'PostgreSQL supports multiple EXPLAIN formats:
+
+    - Text (human-readable, hard to parse)
+
+    - JSON (machine-readable, structured) ← PREFERRED
+
+    - XML (structured but verbose)
+
+    - YAML (structured)
+
+
+    JSON format provides complete plan tree with node types, join types,
+
+    cost estimates, and row counts. Should use EXPLAIN (ANALYZE, FORMAT JSON)
+
+    for detailed plans.
+
+    '
+- name: Redshift Plan Format
+  summary: 'Redshift EXPLAIN returns text or XML. Plan includes:
+
+    - Distribution operations (DS_DIST_*, DS_BCAST_*)
+
+    - Network operations
+
+    - Cost estimates
+
+    - Row counts
+
+
+    Need to parse text format or request XML and parse structure.
+
+    '
+- name: DataFusion Plans
+  summary: 'DataFusion (Apache Arrow query engine) provides EXPLAIN with:
+
+    - Logical plan (tree format)
+
+    - Physical plan (execution plan)
+
+    - Text representation
+
+
+    Format similar to other Arrow-based engines. Operators include:
+
+    TableScan, Filter, Projection, HashJoin, HashAggregate, Sort, Limit
+
+    '
+impact: 'HIGH - Expanding platform coverage enables the primary use case of cross-
+
+  platform query plan comparison. Currently feature is only usable with DuckDB.
+
+
+  - PostgreSQL parser enables comparison with most popular open-source DB
+
+  - Redshift parser enables cloud warehouse comparison
+
+  - DataFusion parser covers Arrow ecosystem
+
+  - Documentation prevents user confusion about support
+
+  '
+research_value: 'Demonstrates feasibility of harmonizing diverse EXPLAIN formats into unified
+
+  representation. Validates logical operator abstraction across platforms.
+
+  '
+tasks:
+- phase: 'Task 4.1: Implement PostgreSQL Parser'
+  description: Parse PostgreSQL EXPLAIN (FORMAT JSON) output
+  items:
+  - summary: Create PostgreSQLQueryPlanParser class
+    done: false
+    details: "File: benchbox/parsers/postgresql_parser.py\n\nclass PostgreSQLQueryPlanParser(QueryPlanParser):\n    def __init__(self):\n\
+      \        super().__init__(\"postgresql\")\n\n    def _parse_impl(self, query_id, explain_output):\n        # Parse JSON\
+      \ format\n        data = json.loads(explain_output)\n        plan_data = data[0][\"Plan\"]  # Top-level plan node\n\
+      \        root = self._parse_plan_node(plan_data)\n        return QueryPlanDAG(\n            query_id=query_id,\n   \
+      \         platform=\"postgresql\",\n            logical_root=root,\n            estimated_cost=plan_data.get(\"Total\
+      \ Cost\"),\n            estimated_rows=plan_data.get(\"Plan Rows\")\n        )\n"
+  - summary: Implement _parse_plan_node() for recursive parsing
+    done: false
+    details: "def _parse_plan_node(self, node: dict) -> LogicalOperator:\n    node_type = node[\"Node Type\"]\n\n    # Map\
+      \ PostgreSQL node types to logical operators\n    operator_type = self._map_node_type(node_type)\n\n    # Extract node-specific\
+      \ properties\n    properties = self._extract_properties(node)\n\n    # Parse children recursively\n    children = []\n\
+      \    if \"Plans\" in node:\n        for child_node in node[\"Plans\"]:\n            children.append(self._parse_plan_node(child_node))\n\
+      \n    return LogicalOperator(\n        operator_type=operator_type,\n        operator_id=self._next_operator_id(),\n\
+      \        properties=properties,\n        children=children,\n        # ... other fields\n    )\n"
+  - summary: Implement _map_node_type() for operator mapping
+    done: false
+    details: "def _map_node_type(self, pg_node_type: str) -> LogicalOperatorType:\n    mapping = {\n        \"Seq Scan\":\
+      \ LogicalOperatorType.SCAN,\n        \"Index Scan\": LogicalOperatorType.SCAN,\n        \"Bitmap Heap Scan\": LogicalOperatorType.SCAN,\n\
+      \        \"Hash Join\": LogicalOperatorType.JOIN,\n        \"Nested Loop\": LogicalOperatorType.JOIN,\n        \"Merge\
+      \ Join\": LogicalOperatorType.JOIN,\n        \"Aggregate\": LogicalOperatorType.AGGREGATE,\n        \"HashAggregate\"\
+      : LogicalOperatorType.AGGREGATE,\n        \"Sort\": LogicalOperatorType.SORT,\n        \"Limit\": LogicalOperatorType.LIMIT,\n\
+      \        # ... more mappings\n    }\n    return mapping.get(pg_node_type, LogicalOperatorType.OTHER)\n"
+  - summary: Update PostgreSQL adapter to use parser
+    done: false
+    details: "File: benchbox/platforms/postgresql/adapter.py\n\ndef get_query_plan(self, connection, query):\n    explain_query\
+      \ = f\"EXPLAIN (FORMAT JSON) {query}\"\n    result = connection.execute(explain_query).fetchall()\n    return json.dumps(result[0][0])\
+      \  # Return JSON string\n\ndef get_query_plan_parser(self):\n    return PostgreSQLQueryPlanParser()\n"
+  - summary: Create test fixtures with PostgreSQL EXPLAIN output
+    done: false
+    details: "File: tests/fixtures/postgresql_plans.py\n\nSIMPLE_SELECT = \"\"\"\n[{\"Plan\": {\n    \"Node Type\": \"Seq\
+      \ Scan\",\n    \"Relation Name\": \"users\",\n    \"Total Cost\": 15.50,\n    \"Plan Rows\": 100\n}}]\n\"\"\"\n\nCOMPLEX_JOIN\
+      \ = \"\"\"... (TPC-H Q5 or similar)\"\"\"\n"
+  - summary: Create comprehensive parser tests
+    done: false
+    details: 'File: tests/parsers/test_postgresql_parser.py
+
+
+      - Test: Simple SELECT parsed correctly
+
+      - Test: JOIN with multiple tables
+
+      - Test: Aggregate with GROUP BY
+
+      - Test: Subquery/CTE
+
+      - Test: Cost and row estimates extracted
+
+      - Test: All PostgreSQL node types mapped
+
+      '
+  - summary: Integration test with real PostgreSQL
+    done: false
+    details: 'File: tests/integration/test_postgresql_plan_capture.py
+
+
+      Requires PostgreSQL connection. Use pytest marker:
+
+      @pytest.mark.postgresql
+
+      @pytest.mark.integration
+
+
+      Test actual plan capture from running PostgreSQL instance.
+
+      '
+- phase: 'Task 4.2: Implement Redshift Parser'
+  description: Parse Redshift EXPLAIN output (text or XML)
+  items:
+  - summary: Research Redshift EXPLAIN format
+    done: false
+    details: 'Investigate:
+
+      - Does Redshift support EXPLAIN (FORMAT JSON)?
+
+      - What''s the structure of text format?
+
+      - Are distribution operations clearly marked?
+
+      - Sample outputs for various query types
+
+      '
+  - summary: Create RedshiftQueryPlanParser class
+    done: false
+    details: "File: benchbox/parsers/redshift_parser.py\n\nclass RedshiftQueryPlanParser(QueryPlanParser):\n    def __init__(self):\n\
+      \        super().__init__(\"redshift\")\n\n    def _parse_impl(self, query_id, explain_output):\n        # Parse Redshift\
+      \ format (text or XML)\n        # Handle DS_DIST_* operators\n        # Extract cost and distribution info\n"
+  - summary: Handle Redshift-specific operators
+    done: false
+    details: 'Redshift has unique operators:
+
+      - DS_DIST_ALL_INNER (redistribute inner table to all nodes)
+
+      - DS_DIST_BOTH (redistribute both tables)
+
+      - DS_BCAST_INNER (broadcast inner table)
+
+
+      Map these to appropriate logical operators or preserve in
+
+      platform_metadata.
+
+      '
+  - summary: Update Redshift adapter
+    done: false
+    details: "File: benchbox/platforms/redshift/adapter.py\n\ndef get_query_plan_parser(self):\n    return RedshiftQueryPlanParser()\n\
+      \nEnsure get_query_plan() returns appropriate format.\n"
+  - summary: Create test fixtures and tests
+    done: false
+    details: 'Files:
+
+      - tests/fixtures/redshift_plans.py
+
+      - tests/parsers/test_redshift_parser.py
+
+
+      Test with sample Redshift EXPLAIN outputs.
+
+      '
+  - summary: Integration test (optional, requires Redshift)
+    done: false
+    details: '@pytest.mark.redshift
+
+      @pytest.mark.integration
+
+      @pytest.mark.slow
+
+
+      Test with actual Redshift cluster (may be expensive).
+
+      '
+- phase: 'Task 4.3: Implement DataFusion Parser'
+  description: Parse DataFusion EXPLAIN output
+  items:
+  - summary: Research DataFusion EXPLAIN format
+    done: false
+    details: "DataFusion EXPLAIN shows:\n- Logical plan (tree with indentation)\n- Physical plan (execution operators)\n\n\
+      Example:\nLogicalPlan:\n  Projection: ...\n    Filter: ...\n      TableScan: ...\n"
+  - summary: Create DataFusionQueryPlanParser class
+    done: false
+    details: "File: benchbox/parsers/datafusion_parser.py\n\nclass DataFusionQueryPlanParser(QueryPlanParser):\n    def __init__(self):\n\
+      \        super().__init__(\"datafusion\")\n\n    def _parse_impl(self, query_id, explain_output):\n        # Parse indented\
+      \ tree format\n        # Build operator hierarchy from indentation\n"
+  - summary: Implement indentation-based tree parsing
+    done: false
+    details: "def _parse_indented_tree(self, lines: list[str]) -> LogicalOperator:\n    \"\"\"Parse tree based on indentation\
+      \ levels.\"\"\"\n    # Track stack of (indent_level, operator) tuples\n    # Build parent-child relationships from indentation\n"
+  - summary: Map DataFusion operators to logical types
+    done: false
+    details: 'DataFusion operators:
+
+      - TableScan → SCAN
+
+      - Filter → FILTER
+
+      - Projection → PROJECT
+
+      - HashJoin → JOIN
+
+      - HashAggregate → AGGREGATE
+
+      - Sort → SORT
+
+      - Limit → LIMIT
+
+      '
+  - summary: Update DataFusion adapter
+    done: false
+    details: "File: benchbox/platforms/datafusion/adapter.py\n\ndef get_query_plan(self, connection, query):\n    explain_query\
+      \ = f\"EXPLAIN {query}\"\n    # Execute and return text output\n\ndef get_query_plan_parser(self):\n    return DataFusionQueryPlanParser()\n"
+  - summary: Create test fixtures and tests
+    done: false
+    details: 'Files:
+
+      - tests/fixtures/datafusion_plans.py
+
+      - tests/parsers/test_datafusion_parser.py
+
+      '
+  - summary: Integration test with DataFusion
+    done: false
+    details: '@pytest.mark.datafusion
+
+      @pytest.mark.integration
+
+
+      Test with actual DataFusion engine (Python bindings available).
+
+      '
+- phase: 'Task 4.4: Document Platform Support Matrix'
+  description: Create clear documentation of platform support
+  items:
+  - summary: Create platform support documentation
+    done: false
+    details: 'File: docs/query-plans/platform-support.md
+
+
+      # Query Plan Platform Support
+
+
+      ## Supported Platforms
+
+
+      | Platform | Parser | EXPLAIN Format | Status | Limitations |
+
+      |----------|--------|----------------|--------|-------------|
+
+      | DuckDB   | ✓      | Text (box)     | Stable | Unicode dependency |
+
+      | SQLite   | ✓      | Text (tree)    | Beta   | Limited testing |
+
+      | PostgreSQL | ✓    | JSON           | Stable | Requires v12+ |
+
+      | Redshift | ✓      | Text/XML       | Beta   | Distribution ops |
+
+      | DataFusion | ✓    | Text (indent)  | Beta   | Format varies |
+
+      | Snowflake | ✗     | -              | Planned | - |
+
+      | BigQuery | ✗     | -              | Planned | Different format |
+
+      | ClickHouse | ✗   | -              | Planned | - |
+
+      '
+  - summary: Add platform-specific examples
+    done: false
+    details: 'For each platform, include:
+
+      - Sample EXPLAIN command
+
+      - Sample output
+
+      - Notes on format variations
+
+      - Minimum version requirements
+
+      '
+  - summary: Document known limitations per platform
+    done: false
+    details: 'Example:
+
+      - DuckDB: Box-drawing characters require UTF-8
+
+      - PostgreSQL: JSON format requires PostgreSQL 12+
+
+      - Redshift: Distribution operators may not map cleanly
+
+      '
+  - summary: Create troubleshooting guide
+    done: false
+    details: 'Common issues:
+
+      - Parser not found: Platform not supported yet
+
+      - Parse failed: Format may have changed, check version
+
+      - Timeout: Complex queries may take long to EXPLAIN
+
+      '
+  - summary: Add examples to CLI help
+    done: false
+    details: "Update benchbox run --help to mention platform support:\n\nQuery Plan Capture:\n  --capture-plans: Capture query\
+      \ plans (DuckDB, PostgreSQL, DataFusion)\n  See docs/query-plans/platform-support.md for full list\n"
+  - summary: Update README with platform support info
+    done: false
+    details: 'Add section on query plan feature with link to platform support docs.
+
+      '
+- phase: 'Task 4.5: Future Platform Stubs'
+  description: Create parser stubs for future platforms
+  items:
+  - summary: Create Snowflake parser stub
+    done: false
+    details: "File: benchbox/parsers/snowflake_parser.py\n\nclass SnowflakeQueryPlanParser(QueryPlanParser):\n    def _parse_impl(self,\
+      \ query_id, explain_output):\n        raise NotImplementedError(\n            \"Snowflake query plan parsing not yet\
+      \ implemented. \"\n            \"Contributions welcome!\"\n        )\n"
+  - summary: Create BigQuery parser stub
+    done: false
+    details: 'File: benchbox/parsers/bigquery_parser.py
+
+
+      Note: BigQuery returns different format (bytes_processed, slots),
+
+      not traditional query plan tree. May need different approach.
+
+      '
+  - summary: Create ClickHouse parser stub
+    done: false
+    details: 'File: benchbox/parsers/clickhouse_parser.py
+
+      '
+  - summary: Document contribution guidelines for parsers
+    done: false
+    details: 'File: docs/contributing/adding-platform-parser.md
+
+
+      Step-by-step guide:
+
+      1. Research EXPLAIN format
+
+      2. Create parser class extending QueryPlanParser
+
+      3. Implement _parse_impl()
+
+      4. Map platform operators to LogicalOperatorType
+
+      5. Add test fixtures
+
+      6. Write comprehensive tests
+
+      7. Update platform adapter
+
+      8. Update platform support documentation
+
+      '
+technical_requirements:
+- category: Parser Implementation
+  items:
+  - Each parser extends QueryPlanParser base class
+  - All parsers reset operator ID counter per parse
+  - Parsers handle format variations gracefully
+  - Unknown operator types map to OTHER with warning
+- category: Testing
+  items:
+  - Unit tests with fixture data (no live DB required)
+  - Integration tests with real platforms (optional, marked)
+  - Test coverage ≥80% for each parser
+  - Test all operator type mappings
+- category: Documentation
+  items:
+  - Platform support table maintained
+  - Each platform has example EXPLAIN output
+  - Known limitations documented
+  - Minimum version requirements stated
+- category: Error Handling
+  items:
+  - Parse failures include platform context
+  - Format changes detected and reported
+  - Graceful degradation on unsupported features
+files_affected:
+  modified:
+  - benchbox/parsers/postgresql_parser.py
+  - benchbox/parsers/redshift_parser.py
+  - benchbox/parsers/datafusion_parser.py
+  - benchbox/parsers/snowflake_parser.py (stub)
+  - benchbox/parsers/bigquery_parser.py (stub)
+  - benchbox/parsers/clickhouse_parser.py (stub)
+  - tests/parsers/test_postgresql_parser.py
+  - tests/parsers/test_redshift_parser.py
+  - tests/parsers/test_datafusion_parser.py
+  - tests/fixtures/postgresql_plans.py
+  - tests/fixtures/redshift_plans.py
+  - tests/fixtures/datafusion_plans.py
+  - tests/integration/test_postgresql_plan_capture.py
+  - tests/integration/test_redshift_plan_capture.py
+  - tests/integration/test_datafusion_plan_capture.py
+  - docs/query-plans/platform-support.md
+  - docs/contributing/adding-platform-parser.md
+  - benchbox/platforms/postgresql/adapter.py
+  - benchbox/platforms/redshift/adapter.py
+  - benchbox/platforms/datafusion/adapter.py
+  - benchbox/cli/run.py (help text)
+  - README.md
+  added: []
+  removed: []
+metadata:
+  owners:
+  - '@benchbox-maintainers'
+  tags:
+  - query-plan
+  - parsers
+  - platform-support
+  - p1
+  dependencies:
+  - phase-1-critical-bug-fixes.yaml (operator ID fix)
+  - phase-3-robustness-validation.yaml (error handling)
+  estimated_effort: 2-3 weeks
+  lines_of_code: ~1200 LOC (3 parsers * 300 LOC + tests + docs)

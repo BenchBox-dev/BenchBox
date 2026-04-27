@@ -1,0 +1,145 @@
+id: local-ci-equivalents
+title: "Ensure local equivalents exist for all CI workflow steps"
+worktree: ci-infrastructure
+priority: High
+status: Completed
+description: |
+  Every CI step in GitHub workflows should have a local equivalent that developers
+  can run before pushing code. This prevents CI failures and speeds up development
+  by catching issues locally.
+
+  Currently, many CI steps can only be validated by pushing to GitHub and waiting
+  for the workflow to complete. This is slow and wasteful of CI resources.
+
+  This task audits all CI steps and ensures Makefile targets or scripts exist
+  for local validation.
+
+category: Testing and Quality Assurance
+
+tasks:
+  phases:
+  - phase: "Phase 1: Audit CI Steps"
+    done: true
+    items:
+    - summary: "Document all jobs in lint.yml and their local equivalents"
+      done: true
+      subtasks:
+      - summary: "lint job: verify `make lint` matches CI"
+        done: true
+      - summary: "type check: verify `make typecheck` matches CI"
+        done: true
+    - summary: "Document all jobs in test.yml and their local equivalents"
+      done: true
+      subtasks:
+      - summary: "test job: verify `make test-fast` matches CI"
+        done: true
+      - summary: "security job: add `make security-audit` target"
+        done: true
+      - summary: "integration-smoke: verify local equivalent"
+        done: true
+      - summary: "docs job: verify `make docs` matches CI"
+        done: true
+      - summary: "test-package: add `make test-package` target"
+        done: true
+      - summary: "pyspark-tests: verify `make test-pyspark` exists"
+        done: true
+    - summary: "Document all jobs in docs.yml and their local equivalents"
+      done: true
+      subtasks:
+      - summary: "build: verify `make docs` or `make docs-build`"
+        done: true
+      - summary: "example-validation: add `make validate-examples`"
+        done: true
+      - summary: "linkcheck: add `make docs-linkcheck`"
+        done: true
+      - summary: "spellcheck: add `make spellcheck`"
+        done: true
+      - summary: "docstring-coverage: add `make docs-coverage`"
+        done: true
+    - summary: "Document all jobs in release.yml"
+      done: true
+
+  - phase: "Phase 2: Add Missing Makefile Targets"
+    done: true
+    items:
+    - summary: "Add `make ci-lint` - exact CI lint command"
+      done: true
+    - summary: "Add `make ci-test` - exact CI test command"
+      done: true
+    - summary: "Add `make ci-docs` - exact CI docs build"
+      done: true
+    - summary: "Add `make security-audit` - safety check"
+      done: true
+    - summary: "Add `make validate-examples` - example validation scripts"
+      done: true
+    - summary: "Add `make docs-linkcheck` - sphinx linkcheck"
+      done: true
+    - summary: "Add `make spellcheck` - codespell check"
+      done: true
+    - summary: "Add `make docs-coverage` - interrogate coverage"
+      done: true
+    - summary: "Add `make test-package` - build and test install"
+      done: true
+
+  - phase: "Phase 3: Create Pre-Push Validation"
+    done: true
+    items:
+    - summary: "Add `make ci-local` - runs all essential CI checks locally"
+      done: true
+    - summary: "Document pre-push workflow in CONTRIBUTING.md"
+      done: true
+    - summary: "Consider git pre-push hook for automated validation"
+      done: true
+      notes: "Deferred - `make ci-local` is sufficient; hooks can be added later if needed"
+
+metadata:
+  owners:
+  - joe
+  tags:
+  - ci
+  - developer-experience
+  - quality
+  estimated_effort: "1-2 days"
+  created_date: "2026-01-18"
+  completed_date: "2026-01-18"
+
+impact:
+  business_value: |
+    Faster development cycles by catching CI failures locally before push.
+    Reduced wasted CI minutes from failed runs.
+  user_impact: |
+    Developers can validate changes locally with confidence before pushing.
+  technical_debt: |
+    Reduces divergence between local and CI environments.
+
+files_affected:
+  modified:
+  - "Makefile"
+  - "CONTRIBUTING.md"
+
+success_metrics:
+- "Every CI job has documented local equivalent"
+- "`make ci-local` passes implies CI will pass"
+- "Makefile help shows all CI-related targets"
+
+dependencies:
+  blocked_by:
+  - "_project/DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml"
+
+implementation_summary: |
+  Added 9 new Makefile targets that mirror GitHub Actions workflows:
+
+  - `ci-lint`: Runs ruff check, ruff format --check, and ty check
+  - `ci-test`: Runs fast tests with 75% coverage threshold
+  - `ci-docs`: Builds Sphinx documentation
+  - `security-audit`: Runs pip-audit security scan
+  - `spellcheck`: Runs codespell spelling check
+  - `docstring-coverage`: Runs interrogate docstring coverage
+  - `test-package`: Builds package and tests installation
+  - `test-integration-smoke`: Runs quick integration tests
+  - `ci-local`: Orchestrates all CI checks in sequence
+
+  Updated CONTRIBUTING.md with pre-push validation workflow documentation.
+
+  Commits:
+  - 07fcc144: feat(ci): add local CI equivalents for all GitHub workflow steps

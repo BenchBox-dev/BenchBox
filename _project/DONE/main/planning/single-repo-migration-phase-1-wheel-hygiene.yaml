@@ -1,0 +1,142 @@
+id: single-repo-migration-phase-1-wheel-hygiene
+title: "Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel"
+worktree: main
+priority: High
+status: Completed
+completed_date: 2026-04-27
+category: Release Tooling
+
+deps:
+  needs:
+  - single-repo-migration-phase-0-audit
+
+description: |
+  Make the wheel and sdist correct under a single-repo model: maintainer
+  scaffolding (release scripts, _project/, _blog/, drafts, dev-tooling root
+  files) is excluded from the published artefacts even when those files are
+  present in the repo on main. This is reversible, internal-only, and safe
+  to land before the dev locus migration.
+
+  Goal: pip install benchbox produces the same package contents whether
+  installed from a curated public mirror (today) or from the future
+  single-repo source (post-Phase 4).
+
+  This phase's PR is built from the private clone (current dev locus) and
+  syncs to public via the existing curated-mirror flow as one of its last
+  uses, OR is bundled into the Phase 4 final sync. Either is fine.
+
+  Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 1).
+
+work:
+- id: w1
+  summary: "Read current pyproject.toml and MANIFEST.in to see what is already excluded"
+  status: done
+  notes: |
+    pyproject.toml lines 57-68 already exclude benchbox.release in the
+    setuptools config. MANIFEST.in already prunes benchbox/release, tests,
+    docs, examples (per workflow.py exploration earlier).
+    Identify the gap: the maintainer scaffolding paths in HOLD_BACK_PATHS
+    (workflow.py:18-43) that are NOT yet in either file.
+
+- id: w2
+  summary: "Add hatch wheel/sdist excludes for HOLD_BACK_PATHS content not already covered"
+  needs: [w1]
+  status: done
+  notes: |
+    Edit pyproject.toml. Add to [tool.hatch.build.targets.wheel] (or
+    setuptools equivalent depending on what build backend is in use):
+      exclude = [ "benchbox/release/**" ]
+    Add to [tool.hatch.build.targets.sdist] exclude:
+      "_project", "_blog", ".claude", ".codex", ".gemini", "_chart_data",
+      "release", "scripts/automate_release.py", "scripts/prepare_release.py",
+      "scripts/finalize_release.py", "scripts/verify_release.py",
+      "scripts/build_release.py", "scripts/sync_repos.py",
+      "tests/unit/release/**", "tests/unit/test_release_*.py",
+      "todo.config.yaml", "skill-sync.yaml", "skill-sync.lock",
+      "_benchbox_pytest_xdist_safety.py", ".pre-commit-config.yaml",
+      ".coveragerc_core", ".dockerignore", ".env.example", ".mcp.json",
+      "AGENTS.md", "CLAUDE.md", "GEMINI.md",
+      ".mypy_cache", ".ruff_cache", "htmlcov"
+    These dev-tooling root files (.pre-commit-config.yaml etc.) are
+    project-level infrastructure that lives on main but should not ship
+    in published wheels. They land on public in Phase 4 (final sync) but
+    are excluded from the wheel by this phase's config.
+    Adapt list based on what actually exists in repo root today.
+
+- id: w3
+  summary: "Update MANIFEST.in to mirror the sdist excludes"
+  needs: [w2]
+  status: done
+  notes: |
+    Use prune and recursive-exclude directives. Result must match the
+    pyproject.toml sdist exclude list (sdist contents are determined
+    by both, intersection-style with setuptools, MANIFEST.in-only with
+    hatch - check which is in use).
+
+- id: w4
+  summary: "Build wheel and sdist locally, inspect contents"
+  needs: [w3]
+  status: done
+  notes: |
+    uv run python -m build
+    unzip -l dist/benchbox-*.whl    # inspect wheel
+    tar tzf dist/benchbox-*.tar.gz   # inspect sdist
+    Confirm: no _project/, no _blog/, no scripts/automate_release.py,
+    no benchbox/release/, no test files for release tooling.
+    Commit a script or one-line check that fails if any of these reappear.
+
+- id: w5
+  summary: "Smoke test: install the wheel in a clean venv and import"
+  needs: [w4]
+  status: done
+  notes: |
+    python -m venv /tmp/wheel-test
+    /tmp/wheel-test/bin/pip install dist/benchbox-*.whl
+    /tmp/wheel-test/bin/benchbox --help
+    /tmp/wheel-test/bin/python -c "import benchbox; print(benchbox.__version__)"
+    Confirm exit 0 on all three.
+
+- id: w6
+  summary: "Run existing wheel-content tests"
+  needs: [w4]
+  status: done
+  notes: |
+    uv run -- python -m pytest tests/unit/test_release_size_check.py \
+      tests/unit/test_release_exclusion_invariants.py
+    These tests will be deleted in Phase 6, but for now they should pass
+    against the new exclude config. If they fail, the failure points to
+    a missing exclude line; iterate w2-w4 until green.
+
+verification:
+- description: "Wheel does not contain maintainer scaffolding"
+  command: "unzip -l dist/benchbox-*.whl | grep -E '_project|_blog|automate_release|benchbox/release/' | wc -l"
+  expected_output: "0"
+- description: "Sdist does not contain maintainer scaffolding"
+  command: "tar tzf dist/benchbox-*.tar.gz | grep -E '_project|_blog|automate_release|benchbox/release/' | wc -l"
+  expected_output: "0"
+- description: "Wheel installs and imports cleanly"
+  command: "python -m venv /tmp/wt && /tmp/wt/bin/pip install dist/benchbox-*.whl && /tmp/wt/bin/python -c 'import benchbox'"
+  expected_output: "exit 0"
+
+must_preserve:
+- The actual benchbox package contents inside the wheel (everything under benchbox/) is unchanged. Only what is
+  alongside it (release scripts, _project, etc.) is now excluded.
+- Existing release-time CI (automate_release.py) continues to work unchanged - this phase does not touch the release
+  flow.
+- Existing tests continue to pass unchanged.
+
+anti_patterns:
+- DO NOT delete any source files in this phase - because file deletion is Phase 6; this phase only adjusts what gets
+  packaged.
+- DO NOT change the build backend (e.g., setuptools to hatch) as part of this phase - because that is a separate
+  decision and would mask whether the exclude changes are working correctly.
+- DO NOT skip the smoke test (w5) - because exclude config errors can produce wheels that build but fail to import
+  (e.g., excluding a package __init__.py); only an actual install proves correctness.
+
+scope_limit:
+  only_modify:
+  - pyproject.toml
+  - MANIFEST.in
+  notes: |
+    Do NOT modify any source code, tests, or scripts. The wheel hygiene
+    change is purely a build-config change.

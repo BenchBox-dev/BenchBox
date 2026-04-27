@@ -1,0 +1,260 @@
+id: fix-dataframe-parameter-parity-follow-up-findings
+title: "Fix DataFrame parameter parity follow-up findings (override lifecycle, TPC-DS stream parity, extractor coverage)"
+worktree: "core-functionality"
+priority: "Critical"
+status: "Completed"
+description: |
+  Follow-up work is required after adversarial review of the DataFrame parameter
+  substitution parity implementation (commit e6d83095). Three concrete issues were
+  identified:
+
+  1. Override lifecycle bug (P1): module-level parameter overrides can leak across
+     runs because setup happens before query discovery and cleanup is not guaranteed
+     for early returns or unexpected exceptions.
+  2. Stream parity gap (P1): TPC-DS override extraction currently ignores stream_id,
+     but DataFrame execution iterates stream IDs across warmup/measurement iterations.
+     This breaks SQL/DataFrame substitution parity for stream-varying runs.
+  3. Extractor coverage gap (P2): TPC-DS extraction supports only a narrow set of
+     parameter families, leaving many query parameters stuck on static defaults.
+     This prevents robust parity claims for broad TPC-DS coverage.
+
+  This TODO closes all three issues with minimal surface-area change, explicit
+  guardrails, and verification targeted at correctness, parity, and regression safety.
+
+category: "Core Functionality"
+
+metadata:
+  owners:
+  - "joe"
+  tags:
+  - "tpcds"
+  - "dataframe"
+  - "parameter-substitution"
+  - "stream-parity"
+  - "correctness"
+  - "follow-up"
+  estimated_effort: "2-4 days"
+  created_date: "2026-02-06"
+
+  related:
+  - dataframe-parameter-substitution-parity
+  - fix-tpch-reference-seed-and-parameter-parity
+  migration_review_required: true
+impact:
+  business_value: |
+    Without these fixes, SQL vs DataFrame comparisons remain partially invalid
+    for TPC-DS and can produce misleading benchmark conclusions under seeded or
+    multi-stream scenarios.
+  technical_debt: |
+    Current module-level override lifecycle and narrow extraction coverage create
+    latent correctness risks and brittle parity assumptions. This TODO reduces
+    hidden state leakage and formalizes parity-critical extraction behavior.
+
+files_affected:
+  modified:
+  - "benchbox/core/runner/dataframe_runner.py"
+  - "benchbox/core/tpcds/parameter_extractor.py"
+  - "tests/unit/core/test_parameter_parity.py"
+  - "tests/unit/core/test_runner_lifecycle.py"
+  added:
+  - "tests/unit/core/tpcds/test_parameter_extractor_coverage.py"
+
+must_preserve:
+- "No API/signature changes to `DataFrameContext` protocol or query registration callables"
+- "TPC-H behavior remains unchanged except for cleanup hardening where shared runner flow is touched"
+- "When no seed is provided, DataFrame queries continue using static defaults exactly as before"
+- "Runner continues emitting warmup and measurement results with existing iteration/stream metadata fields"
+- "If qgen/dsqgen extraction fails, behavior remains graceful fallback to static defaults with warning logs"
+- "TPC permutation ordering logic is untouched (TPCHStreams and TPCDSPermutationGenerator remain authoritative)"
+
+approach: |
+  Implement in smallest safe increments:
+
+  1) Fix runner lifecycle first. Introduce strict setup/teardown structure using
+     `try/finally` so overrides cannot leak on exceptions or early return paths.
+  2) Add stream-aware setup path for TPC-DS where overrides are derived per stream
+     context used by current query batch. Reuse extractor cache by `(seed, sf, stream_id)`.
+  3) Expand extractor coverage using expected-key-gated pattern extraction and
+     query-driven prioritization. Do not attempt full SQL parsing.
+  4) Add targeted tests for each failure mode and parity behavior before broader test runs.
+
+anti_patterns:
+- "DO NOT move override state into DataFrameContext or query function signatures - because this would fan out changes across
+  all adapters and query registrations - keep injection through existing parameter accessors"
+- "DO NOT clear overrides only on success paths - because runner exceptions and early returns are common enough to leak global
+  state - enforce cleanup in `finally`"
+- "DO NOT treat one extracted TPC-DS override map as valid for all streams - because stream_id influences dsqgen substitution
+  choices - derive/apply by current stream context"
+- "DO NOT introduce a full SQL parser for extraction - because query templates are known and pattern extraction is sufficient
+  and faster - extend targeted regex/pattern logic instead"
+- "DO NOT silently claim full parity coverage if unsupported parameter keys remain - because this creates false confidence
+  - explicitly track and document supported/uncovered key sets"
+
+verification:
+- description: "TODO schema validation passes for this new item"
+  command: "uv run scripts/validate_todo.py _project/TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml"
+  expected_output: "Validation successful"
+- description: "Runner lifecycle tests prove override cleanup on failure and no-query paths"
+  command: "uv run -- python -m pytest tests/unit/core/test_runner_lifecycle.py tests/unit/core/test_parameter_parity.py -k
+    'override or cleanup or lifecycle' -v"
+  expected_output: "All selected tests pass and include failure-path cleanup assertions"
+- description: "TPC-DS extractor tests cover newly supported parameter families and fallback behavior"
+  command: "uv run -- python -m pytest tests/unit/core/tpcds/test_parameter_extractor_coverage.py -v"
+  expected_output: "All extractor coverage tests pass"
+- description: "Fast smoke suite remains green after parity follow-up changes"
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "Fast marker tests pass with no regressions"
+- description: "Seeded stream-aware TPC-DS DataFrame smoke run completes"
+  command: "uv run -- python -m benchbox run --platform datafusion --benchmark tpcds --scale 0.01 --mode dataframe --phases
+    power --queries Q1 --seed 42 --non-interactive"
+  expected_output: "Run completes successfully and logs stream-specific execution metadata"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/runner/dataframe_runner.py"
+  - "benchbox/core/tpcds/parameter_extractor.py"
+  - "benchbox/core/tpcds/dataframe_queries/parameters.py"
+  - "tests/unit/core/test_parameter_parity.py"
+  - "tests/unit/core/test_runner_lifecycle.py"
+  - "tests/unit/core/tpcds/"
+  do_not_modify:
+  - "benchbox/core/tpch/queries.py"
+  - "benchbox/core/tpcds/c_tools.py"
+  - "benchbox/core/dataframe/context.py"
+  - "benchbox/core/dataframe/query.py"
+  - "benchbox/platforms/"
+  - "benchbox/cli/"
+
+commits:
+- "e6d83095"
+- "1c618ee0"
+- "19b5f1fd"
+
+context_sections:
+  "Review Findings To Resolve": |
+    1) benchbox/core/runner/dataframe_runner.py:372
+       - Override setup happens before query discovery.
+       - Early no-query return can bypass cleanup.
+
+    2) benchbox/core/runner/dataframe_runner.py:507
+       - TPC-DS extractor called without stream_id despite stream-varying execution.
+
+    3) benchbox/core/tpcds/parameter_extractor.py:95
+       - Extractor currently handles a limited key family subset compared to
+         the broader key-space present in TPCDS_DEFAULT_PARAMS.
+
+  "Definition of Done": |
+    - Overrides are guaranteed to be cleared for all execution paths.
+    - TPC-DS overrides are stream-aware for seeded runs.
+    - Extractor coverage is expanded for parity-critical missing keys and tested.
+    - Fast/unit suites relevant to runner and extractor paths pass without regressions.
+
+success_metrics:
+- "No cross-run override leakage reproduced in lifecycle tests"
+- "TPC-DS stream-specific override tests demonstrate distinct parameter application by stream"
+- "Supported extractor key families increase and are asserted in tests"
+- "Seeded DataFrame TPC-DS smoke run remains stable after changes"
+work:
+- id: w1
+  summary: "Wrap DataFrame query execution override setup/teardown in a guaranteed cleanup path"
+  status: done
+- id: w2
+  summary: "Refactor `_execute_dataframe_queries()` to clear overrides in `finally` regardless of exceptions"
+  needs:
+  - w1
+  status: done
+- id: w3
+  summary: "Ensure early exits (including no-query paths) also clear overrides before return"
+  needs:
+  - w1
+  status: done
+- id: w4
+  summary: "Preserve current behavior when seed is None (no overrides set)"
+  needs:
+  - w1
+  status: done
+- id: w5
+  summary: "Add tests that explicitly fail inside execution and verify overrides are always cleared"
+  status: done
+- id: w6
+  summary: "Add one TPC-H test and one TPC-DS test for failure-path cleanup"
+  needs:
+  - w5
+  status: done
+- id: w7
+  summary: "Add no-queries path test to prove cleanup is still executed"
+  needs:
+  - w5
+  status: done
+- id: w8
+  summary: "Thread stream ID into TPC-DS override extraction for each execution stream"
+  status: done
+- id: w9
+  summary: "Update runner override setup flow so TPC-DS extraction receives current stream context instead of a single global
+    extraction"
+  needs:
+  - w8
+  status: done
+- id: w10
+  summary: "Preserve TPC-H behavior (no stream argument) and avoid unnecessary duplicate extraction for identical seed/SF/stream
+    triples"
+  needs:
+  - w8
+  status: done
+- id: w11
+  summary: "Add stream-parity tests that prove different stream IDs can yield different effective parameters"
+  status: done
+- id: w12
+  summary: "Mock extractor responses per stream and assert query execution uses stream-specific overrides"
+  needs:
+  - w11
+  status: done
+- id: w13
+  summary: "Add regression test that SQL/DataFrame parameter source inputs align for stream-aware runs"
+  needs:
+  - w11
+  status: done
+- id: w14
+  summary: "Inventory TPCDS_DEFAULT_PARAMS keys and rank uncovered keys by query impact and parity risk"
+  status: done
+- id: w15
+  summary: "Implement extraction for high-impact uncovered parameter families"
+  status: done
+- id: w16
+  summary: "Add robust regex/pattern handlers for missing keys used by critical parity queries (for example `hours`, category/city/state-set
+    style filters)"
+  needs:
+  - w15
+  status: done
+- id: w17
+  summary: "Keep extraction generic and keyed by expected defaults to avoid injecting irrelevant fields"
+  needs:
+  - w15
+  status: done
+- id: w18
+  summary: "Document intentionally unsupported keys and fallback rationale for non-critical cases"
+  needs:
+  - w15
+  status: done
+- id: w19
+  summary: "Add unit tests for new extraction families and fallback behavior"
+  status: done
+- id: w20
+  summary: "Include positive extraction cases and malformed SQL/fallback cases"
+  needs:
+  - w19
+  status: done
+- id: w21
+  summary: "Add coverage assertion that supported parameter-key set grows and is tracked"
+  needs:
+  - w19
+  status: done
+- id: w22
+  summary: "Run focused parity tests and existing DataFrame fast/unit suites"
+  status: done
+- id: w23
+  summary: "Validate TODO scope with targeted benchmark smoke runs for seeded stream-aware TPC-DS"
+  status: done
+- id: w24
+  summary: "Capture before/after parity evidence in commit message or TODO notes"
+  status: done

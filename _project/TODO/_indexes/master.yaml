@@ -1,0 +1,600 @@
+generated_at: '2026-04-27T09:19:05.308115'
+total_items: 36
+items:
+- id: single-repo-migration-phase-5-repo-flip
+  file: TODO/main/planning/single-repo-migration-phase-5-repo-flip.yaml
+  title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
+  worktree: main
+  category: Release Tooling
+  priority: Critical
+  status: Not Started
+  work_total: 10
+  work_done: 0
+  work_ready: 1
+  needs:
+  - single-repo-migration-phase-4-test-release-with-new-flow
+- id: verify-ci-validation-workflow-end-to-end
+  file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+  title: Verify the validate-submission CI workflow end-to-end with a real PR
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Critical
+  status: Not Started
+  tags:
+  - results
+  - ci
+  - phase-2
+  - validation
+  - end-to-end
+  estimated_effort: Small
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-pr-based-result-submission-workflow
+- id: design-results-ingest-storage-and-derived-read-model
+  file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+  title: Design results ingest, storage, and derived read-model architecture
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - api
+  - storage
+  - read-model
+  - architecture
+  estimated_effort: Large
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
+- id: integrate-benchbox-cli-submit-and-service-auth
+  file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+  title: Integrate BenchBox CLI submission flow and service authentication
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - cli
+  - auth
+  - submission
+  - api
+  estimated_effort: Large
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
+- id: motherduck-cloud-features
+  file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
+  title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: High
+  status: Not Started
+  tags:
+  - motherduck
+  - cloud-features
+  - deferred-followup
+  estimated_effort: Medium - requires MotherDuck free-tier account
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: external-contributor-submission-dry-run
+  file: TODO/main/planning/external-contributor-submission-dry-run.yaml
+  title: Run a Phase 2 dry-run with one external trusted contributor
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - contributor-experience
+  - phase-2
+  - dry-run
+  - user-research
+  estimated_effort: Small
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - verify-ci-validation-workflow-end-to-end
+  - verify-trust-badge-rendering-in-explorer
+  - surface-contributor-onboarding-for-results
+- id: single-repo-migration-phase-4-test-release-with-new-flow
+  file: TODO/main/planning/single-repo-migration-phase-4-test-release-with-new-flow.yaml
+  title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Not Started
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  needs:
+  - single-repo-migration-phase-3-new-release-flow
+- id: databend-3-mode-local-server-cloud
+  file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
+  title: Add 3-mode support to Databend platform (standalone / server / cloud)
+  worktree: main
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+- id: bodo-jit-and-mpi-support
+  file: TODO/platform-expansion/planning/bodo-jit-and-mpi-support.yaml
+  title: Add @bodo.jit Compilation and MPI Distributed Execution to Bodo Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - bodo
+  - dataframe
+  - jit
+  - mpi
+  - deferred-followup
+  estimated_effort: Medium - 2-3 days
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: siriusdb-adapter
+  file: TODO/platform-expansion/planning/siriusdb-adapter.yaml
+  title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - platform
+  - gpu
+  - cuda
+  - duckdb-extension
+  - high-performance
+  - siriusdb
+  estimated_effort: Medium
+  work_total: 17
+  work_done: 0
+  work_ready: 17
+- id: future-ideas-backlog
+  file: TODO/main/planning/future-ideas-backlog.yaml
+  title: Future Ideas Backlog - Specialized Benchmarks and Infrastructure
+  worktree: main
+  category: Supporting Infrastructure
+  priority: Low
+  status: Not Started
+  tags:
+  - backlog
+  - future
+  - research-needed
+  estimated_effort: 'Research phase: 1-2 weeks per item'
+  work_total: 12
+  work_done: 0
+  work_ready: 3
+- id: geospatial-primitives-benchmark
+  file: TODO/benchmark-expansion/planning/geospatial-primitives-benchmark.yaml
+  title: Geospatial Primitives Benchmark - ST_* Functions and Spatial Operations
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Low
+  status: Not Started
+  tags:
+  - primitives
+  - benchmark
+  - geospatial
+  - geography
+  - geometry
+  - st_functions
+  - h3
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 3-4 weeks
+  work_total: 23
+  work_done: 0
+  work_ready: 23
+- id: github-archive-benchmark
+  file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
+  title: GitHub Archive Benchmark - Developer Activity Analytics Workload
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Low
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - github
+  - event-driven
+  - json
+  - semi-structured
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 3-4 weeks
+  work_total: 18
+  work_done: 0
+  work_ready: 18
+- id: review-dependency-upper-bounds-quarterly
+  file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
+  title: Quarterly review of dependency upper bounds
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Not Started
+  tags:
+  - quality-plan
+  - maintenance
+  - supply-chain
+  - deps
+  estimated_effort: Small (1-2 hours per quarter)
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: reenable-fireducks-after-upstream-fixes
+  file: TODO/main/planning/reenable-fireducks-after-upstream-fixes.yaml
+  title: Re-enable FireDucks after upstream stability fixes
+  worktree: main
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+- id: fix-git-author-history-rewrite
+  file: TODO/main/planning/fix-git-author-history-rewrite.yaml
+  title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
+  worktree: main
+  category: Repository Maintenance
+  priority: Low
+  status: Not Started
+  tags:
+  - git
+  - history-rewrite
+  - author
+  estimated_effort: Medium
+  work_total: 10
+  work_done: 0
+  work_ready: 1
+- id: evaluate-results-data-repo-extraction-checkpoint
+  file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+  title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+  worktree: main
+  category: Core Functionality
+  priority: Low
+  status: Not Started
+  tags:
+  - results
+  - architecture
+  - adr
+  - governance
+  - checkpoint
+  estimated_effort: Small
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-pr-based-result-submission-workflow
+  - define-phase-3-promotion-metrics
+- id: single-repo-migration-phase-9-decommission-archive
+  file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml
+  title: 'Single-repo migration phase 9: decommission archived benchbox-private and retired private clone after 60-90 day
+    soak'
+  worktree: main
+  category: Release Tooling
+  priority: Low
+  status: Not Started
+  work_total: 6
+  work_done: 0
+  work_ready: 3
+  needs:
+  - single-repo-migration-phase-8-first-post-migration-release
+- id: stackoverflow-benchmark
+  file: TODO/benchmark-expansion/planning/stackoverflow-benchmark.yaml
+  title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Low
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - stackoverflow
+  - olap
+  - multi-table
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 3-4 weeks
+  work_total: 17
+  work_done: 0
+  work_ready: 17
+- id: tigerdata-cloud-enhancements
+  file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
+  title: TigerData Cloud Enhancements
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Low
+  status: Not Started
+  tags:
+  - platform-adapter
+  - timescaledb
+  - tigerdata
+  - cloud
+  - enhancements
+  estimated_effort: 1-2 days
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+- id: upgrade-pandas-to-3x
+  file: TODO/main/planning/upgrade-pandas-to-3x.yaml
+  title: Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear
+  worktree: main
+  category: Code Quality and Technical Debt
+  priority: Low
+  status: Not Started
+  tags:
+  - deps
+  - pandas
+  - modin
+  - python-version
+  - breaking-change
+  estimated_effort: Medium (1-2 days once gates clear)
+  work_total: 6
+  work_done: 0
+  work_ready: 3
+  deferred_count: 2
+- id: wikipedia-pageviews-benchmark
+  file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml
+  title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
+  worktree: benchmark-expansion
+  category: Benchmark Development
+  priority: Low
+  status: Not Started
+  tags:
+  - benchmark
+  - real-world
+  - wikipedia
+  - time-series
+  - high-cardinality
+  - web-traffic
+  owners:
+  - '@benchbox-maintainers'
+  estimated_effort: 2-3 weeks
+  work_total: 17
+  work_done: 0
+  work_ready: 17
+- id: ballista-distributed-adapter
+  file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
+  title: Add Apache DataFusion Ballista Distributed Query Platform Adapter
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - platform
+  - sql
+  - distributed
+  - datafusion
+  - arrow
+  - olap
+  - ballista
+  estimated_effort: Medium-High
+  work_total: 9
+  work_done: 0
+  work_ready: 1
+- id: timing-policy-split-review-followups
+  file: TODO/main/active/timing-policy-split-review-followups.yaml
+  title: Address follow-up findings from timing-policy pre-commit split review
+  worktree: main
+  category: Testing & Quality
+  priority: Medium
+  status: In Progress
+  tags:
+  - pre-commit
+  - timing-policy
+  - review-followup
+  - tooling
+  estimated_effort: Tiny (< 1 hr total)
+  work_total: 3
+  work_done: 1
+  work_ready: 2
+- id: define-phase-3-promotion-metrics
+  file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
+  title: Define Phase 3 promotion metrics, dashboard, and review cadence
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - phase-3
+  - metrics
+  - governance
+  estimated_effort: Small
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-pr-based-result-submission-workflow
+- id: enable-duckdb-wasm-http-range-reads-for-registered-urls
+  file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
+  title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
+  worktree: main
+  category: Performance
+  priority: Medium
+  status: Identified
+  tags:
+  - results
+  - explorer
+  - duckdb-wasm
+  - performance
+  - http-range
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-results-explorer-browser-functional-tests
+- id: operate-results-platform-security-observability-and-abuse-controls
+  file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+  title: Operate results platform security, observability, and abuse controls
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - results
+  - security
+  - observability
+  - moderation
+  - operations
+  estimated_effort: Large
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
+- id: single-repo-migration-phase-8-first-post-migration-release
+  file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
+  title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
+  worktree: main
+  category: Release Tooling
+  priority: Medium
+  status: Not Started
+  work_total: 7
+  work_done: 0
+  work_ready: 2
+  needs:
+  - single-repo-migration-phase-6-delete-obsolete-tooling
+  - single-repo-migration-phase-7-docs-cleanup
+- id: singlestore-non-tpc-csv-null-marker
+  file: TODO/platform-expansion/planning/singlestore-non-tpc-csv-null-marker.yaml
+  title: 'SingleStore: set csv_null_marker for nyctaxi/clickbench/amplab before smoke tests'
+  worktree: platform-expansion
+  category: Platform Expansion
+  priority: Medium
+  status: Not Started
+  tags:
+  - singlestore
+  - csv-loading
+  - null-handling
+- id: validate-and-integrate-tpc-tuning-json
+  file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
+  title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium
+  status: Not Started
+  tags:
+  - tuning
+  - databricks
+  - tpch
+  - tpcds
+  - z-ordering
+  - cleanup
+  estimated_effort: Small
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+- id: add-hypothesis-property-tests
+  file: TODO/main/planning/add-hypothesis-property-tests.yaml
+  title: Add Hypothesis property-based tests for pure-function invariants
+  worktree: main
+  category: Testing & Quality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - testing
+  - quality
+  - property-based
+  - hypothesis
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+- id: add-third-benchmark-cohort-to-corpus
+  file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
+  title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - results
+  - corpus
+  - tpcds
+  - clickbench
+  - benchmark-coverage
+  estimated_effort: Medium
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - automate-corpus-inventory-generation
+  - verify-ci-validation-workflow-end-to-end
+- id: graduate-browser-smoke-to-blocking-gates
+  file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
+  title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - results
+  - explorer
+  - testing
+  - browser
+  - ci
+  - webkit
+  - firefox
+  estimated_effort: Trivial
+  work_total: 2
+  work_done: 0
+  work_ready: 2
+  needs:
+  - stabilize-webkit-browser-smoke-flake-under-parallel-workers
+- id: single-repo-migration-phase-6-delete-obsolete-tooling
+  file: TODO/main/planning/single-repo-migration-phase-6-delete-obsolete-tooling.yaml
+  title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'
+  worktree: main
+  category: Release Tooling
+  priority: Medium-High
+  status: Not Started
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  needs:
+  - single-repo-migration-phase-5-repo-flip
+- id: single-repo-migration-phase-7-docs-cleanup
+  file: TODO/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
+  title: 'Single-repo migration phase 7: docs and meta-files reflect the new workflow'
+  worktree: main
+  category: Documentation
+  priority: Medium-High
+  status: Not Started
+  work_total: 8
+  work_done: 0
+  work_ready: 4
+  needs:
+  - single-repo-migration-phase-5-repo-flip
+- id: generalize-database-table-reuse-detection
+  file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
+  title: Generalize benchmark table reuse detection for managed databases
+  worktree: main
+  category: Architecture & Refactoring
+  priority: Normal
+  status: Not Started
+  tags:
+  - architecture
+  - database-adapters
+  - managed-databases
+  - refactoring
+  estimated_effort: Small

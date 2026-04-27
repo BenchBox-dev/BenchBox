@@ -1,0 +1,61 @@
+id: standardize-connection-interfaces-across-all-benchmarks
+title: Standardize Connection Interfaces Across All Benchmarks
+category: Code Quality and Technical Debt
+sections:
+  Notes: '- "**Priority**: High"
+
+    - "**Status**: ✅ Completed"
+
+    - "**Description**: Fix critical connection interface inconsistencies between TPC benchmarks and other benchmarks that
+    prevent CLI compatibility and cause connection bugs"
+
+    - "**Root Cause Analysis**:"
+
+    - "**Issues Identified**:"
+
+    - "**Target Architecture**:"
+
+    - "**Tasks**:"
+
+    - "**Files Affected**:"
+
+    - "**Impact**: ✅ **COMPLETED** - Enabled CLI compatibility for all TPC benchmarks, eliminated connection-related bugs,
+    reduced code duplication, and provided consistent resource management"
+
+    - "**Breaking Change**: ✅ **IMPLEMENTED** - TPC benchmark method signatures changed from `connection_string` to `connection`
+    parameters (pre-release project - no backward compatibility needed)"
+
+    - "**Validation**: ✅ **VERIFIED** - All benchmarks now use identical connection interface and work with CLI without connection-related
+    errors"
+
+    - "**Implementation Summary**: Successfully standardized connection interfaces across all benchmarks:"'
+worktree: unknown
+priority: Medium
+status: Completed
+description: '- "**Priority**: High"
+
+  - "**Status**: ✅ Completed"
+
+  - "**Description**: Fix critical connection interface inconsistencies between TPC benchmarks and other benchmarks that prevent
+  CLI compatibility and cause connection bugs"
+
+  - "**Root Cause Analysis**:"
+
+  - "**Issues Identified**:"
+
+  - "**Target Architecture**:"
+
+  - "**Tasks**:"
+
+  - "**Files Affected**:"
+
+  - "**Impact**: ✅ **COMPLETED** - Enabled CLI compatibility for all TPC benchmarks, eliminated connection-related bugs, reduced
+  code duplication, and provided consistent resource management"
+
+  - "**Breaking Change**: ✅ **IMPLEMENTED** - TPC benchmark method signatures changed from `connection_string` to `connection`
+  parameters (pre-release project - no backward compatibility needed)"
+
+  - "**Validation**: ✅ **VERIFIED** - All benchmarks now use identical connection interface and work with CLI without connection-related
+  errors"
+
+  - "**Implementation Summary**: Successfully standardized connection interfaces across all benchmarks:"'

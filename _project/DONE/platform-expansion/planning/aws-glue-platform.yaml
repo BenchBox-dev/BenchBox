@@ -1,0 +1,126 @@
+id: aws-glue-platform
+title: "AWS Glue Managed Spark Platform"
+worktree: platform-expansion
+priority: High
+status: Completed
+category: Platform Expansion
+completed_date: "2025-12-24"
+
+description: |
+  Add AWS Glue managed Spark platform adapter supporting both SQL and DataFrame modes.
+  AWS Glue has ~60% market share for AWS Spark workloads. Implementation reuses
+  cloud-spark shared infrastructure for staging, session management, and config optimization.
+
+  Uses AWS Glue Jobs API for job submission, Glue Data Catalog for metadata,
+  and S3 for data staging.
+
+tasks:
+  phases:
+  - phase: "Phase 1: Adapter Implementation"
+    done: true
+    items:
+    - summary: "Create benchbox/platforms/aws/__init__.py"
+      done: true
+    - summary: "Create AWSGlueAdapter class"
+      done: true
+      subtasks:
+      - summary: "Implement create_connection() with Glue client"
+        done: true
+      - summary: "Implement create_schema() with Glue Data Catalog"
+        done: true
+      - summary: "Implement load_data() with S3 upload"
+        done: true
+      - summary: "Implement execute_query() with Glue Jobs API"
+        done: true
+      - summary: "Add job polling and status tracking"
+        done: true
+    - summary: "Support SQL execution mode"
+      done: true
+    - summary: "Register in platform_registry.py"
+      done: true
+
+  - phase: "Phase 2: Configuration"
+    done: true
+    items:
+    - summary: "Add CLI arguments (s3_staging_dir, job_role, worker_type, etc.)"
+      done: true
+    - summary: "Add glue dependency group to dependencies.py"
+      done: true
+    - summary: "Implement Glue-specific Spark config optimization via cloud-spark infrastructure"
+      done: true
+
+  - phase: "Phase 3: Testing"
+    done: true
+    items:
+    - summary: "Create unit tests with mocked boto3 Glue client"
+      done: true
+      note: "22 unit tests covering initialization, connection, schema, data loading, tuning, CLI, registry"
+
+  - phase: "Phase 4: Documentation"
+    done: true
+    items:
+    - summary: "Create examples/getting_started/cloud/glue_tpch.py"
+      done: true
+    - summary: "Write docs/platforms/aws-glue.md"
+      done: true
+    - summary: "Document IAM role requirements and S3 permissions"
+      done: true
+
+metadata:
+  tags:
+  - cloud-spark
+  - aws
+  - glue
+  - serverless
+  estimated_effort: 2 weeks
+  actual_effort: "1 day (leveraging cloud-spark shared infrastructure)"
+  created_date: "2025-12-24"
+
+impact:
+  business_value: |
+    AWS Glue is the dominant AWS Spark platform (~60% market share). Adding support
+    enables benchmarking for the largest segment of AWS Spark users.
+  user_impact: |
+    AWS users can benchmark their Glue ETL workloads using TPC benchmarks.
+    Cost estimation: ~$0.44/DPU-hour.
+
+files_affected:
+  modified:
+  - benchbox/core/platform_registry.py
+  - benchbox/utils/dependencies.py
+  added:
+  - benchbox/platforms/aws/__init__.py
+  - benchbox/platforms/aws/glue_adapter.py
+  - tests/unit/platforms/aws/__init__.py
+  - tests/unit/platforms/aws/test_glue_adapter.py
+  - examples/getting_started/cloud/glue_tpch.py
+  - docs/platforms/aws-glue.md
+
+technical_requirements:
+  dependencies:
+  - "boto3>=1.34.0"
+  constraints:
+  - "Requires IAM role with Glue + S3 permissions"
+  - "S3 bucket required for data staging"
+  - "Glue Data Catalog used for table metadata"
+
+implementation_notes: |
+  Implemented using the cloud-spark shared infrastructure:
+  - CloudSparkStaging.from_uri() for S3 data uploads
+  - SparkConfigOptimizer.for_tpch() for benchmark-specific Spark configs
+  - GlueJobStatus enum for job state tracking
+
+  Key adapter features:
+  - Batch execution model (jobs submitted via Glue API)
+  - Automatic job creation with optimized Spark config
+  - Job polling with timeout and DPU tracking
+  - Results written to S3 and retrieved after completion
+
+success_metrics:
+- "22 unit tests passing with full coverage of adapter functionality"
+- "Documentation complete with IAM setup guide"
+- "Example script with dry-run support"
+
+dependencies:
+  blocked_by:
+  - _project/DONE/platform-expansion/active/cloud-spark-shared-infrastructure.yaml

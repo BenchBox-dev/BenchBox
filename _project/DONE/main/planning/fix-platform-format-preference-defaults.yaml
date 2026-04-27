@@ -1,0 +1,246 @@
+id: fix-platform-format-preference-defaults
+title: "Fix data format selection to always default to platform preferences"
+worktree: main
+priority: Critical
+status: Completed
+completed_date: "2026-04-07"
+description: |
+  The manifest's format_preference field (persisted by previous --table-format
+  conversion runs) takes priority over platform default preferences. This means
+  if a user previously ran --table-format delta, ALL subsequent runs silently
+  use delta format even without --table-format.
+
+  Concrete failure: TPC-H SF1 on DuckDB fails because the existing manifest has
+  format_preference: ["delta", "parquet", "iceberg", "tbl"] from a prior
+  conversion. Delta entries are directories (is_directory: True), which the shard
+  loader can't handle via the generic file path. Same root cause for
+  read_primitives, write_primitives, and transaction_primitives (all share
+  TPC-H SF1 data).
+
+  Principle: BenchBox users should NEVER be surprised by the data format used
+  for loading. Platform preferences should always drive default format selection.
+  PLATFORM_FORMAT_PREFERENCES is already correctly configured (tbl first for
+  SQL platforms, delta first for lakehouse platforms) - it's just not being used
+  as the default.
+
+  Two orthogonal changes:
+  1. Always prefer platform defaults in native mode (one-line change)
+  2. Thread explicit --table-format to DataSourceResolver so explicit user
+     requests still override platform defaults for that run
+
+category: Bug Fix
+
+metadata:
+  tags:
+    - data-loading
+    - format-selection
+    - regression
+    - duckdb
+  estimated_effort: "Medium"
+  created_date: "2026-04-07"
+  source_review: "Stress test failures: duckdb/tpch, duckdb/read_primitives, duckdb/write_primitives, duckdb/transaction_primitives"
+
+impact:
+  user_impact: |
+    4 benchmarks fail at SF1 on DuckDB. Users who previously ran --table-format
+    conversions get silently wrong format selection on all future runs.
+  maintainer_impact: |
+    Clarifies the format selection contract: platform preferences are the
+    default, manifest format_preference is only for recording conversion history.
+  regression_risk: |
+    Low. PLATFORM_FORMAT_PREFERENCES is already correctly configured for all
+    36 platforms. The only behavioral change is that manifest preference no
+    longer silently overrides platform defaults.
+
+justification: |
+  Users expect plain text (tbl) by default for SQL platforms. The current
+  behavior violates this expectation silently. The fix aligns the code with
+  the already-documented intent in format_capabilities.py comments:
+  "SQL databases: text files (tbl) preferred."
+
+deps:
+  needs: []
+
+work:
+  - id: w1
+    summary: "Make _prefer_platform_defaults() return True for all native-mode platforms"
+    status: done
+    needs: []
+    description: |
+      Change ManifestFileSource._prefer_platform_defaults() in data_loading.py
+      (lines 252-258) to return True for ALL platforms in native mode, not just
+      those in PREFER_PLATFORM_FORMAT_ORDER.
+
+      Current:
+        return normalized_mode == "native" and normalize_platform_key(platform_name) in PREFER_PLATFORM_FORMAT_ORDER
+
+      New:
+        return normalized_mode == "native"
+
+      This makes the carefully curated PLATFORM_FORMAT_PREFERENCES table the
+      actual default for all platforms. Add deprecation comment to
+      PREFER_PLATFORM_FORMAT_ORDER in format_capabilities.py.
+    files:
+      - benchbox/platforms/base/data_loading.py
+      - benchbox/platforms/base/format_capabilities.py
+
+  - id: w2
+    summary: "Add requested_table_format attribute to PlatformAdapter base class"
+    status: done
+    needs: []
+    description: |
+      Add self.requested_table_format: str | None = None to PlatformAdapter.__init__()
+      in adapter.py (after line 278, alongside table_mode and external_format).
+      This follows the established pattern for table_mode.
+    files:
+      - benchbox/platforms/base/adapter.py
+
+  - id: w3
+    summary: "Set requested_table_format on adapter in the runner"
+    status: done
+    needs: [w2]
+    description: |
+      In runner.py, after line 826 where table_format is extracted from options,
+      set adapter.requested_table_format = table_format when adapter is not None
+      and table_format is not None. This propagates the explicit CLI --table-format
+      to the adapter so DataSourceResolver can use it.
+    files:
+      - benchbox/core/runner/runner.py
+
+  - id: w4
+    summary: "Add requested_format parameter to ManifestFileSource and DataSourceResolver"
+    status: done
+    needs: [w1]
+    description: |
+      In data_loading.py:
+      - ManifestFileSource.__init__(): add requested_format: str | None = None
+        parameter, store as self._requested_format
+      - ManifestFileSource._try_manifest_v2(): before calling get_preferred_format(),
+        if self._requested_format is set and exists in the table's available formats
+        and in platform supported formats, use it directly as preferred_format
+      - ManifestFileSource.read_format_hints(): apply same requested_format logic
+      - DataSourceResolver.__init__(): add requested_format: str | None = None,
+        pass through to ManifestFileSource constructor
+    files:
+      - benchbox/platforms/base/data_loading.py
+
+  - id: w5
+    summary: "Pass requested_format from DataLoader and all DataSourceResolver call sites"
+    status: done
+    needs: [w3, w4]
+    description: |
+      Update DataLoader.__init__() (data_loading.py line 1988) to pass
+      requested_format=getattr(adapter, 'requested_table_format', None) to
+      DataSourceResolver.
+
+      Update all ~18 other DataSourceResolver() call sites in platform adapters
+      to also pass requested_format. Key files:
+      - platforms/duckdb.py:113
+      - platforms/datafusion.py:752
+      - platforms/clickhouse_cloud.py:568
+      - platforms/snowflake.py:832
+      - platforms/bigquery.py:995
+      - platforms/polars_platform.py:373
+      - platforms/dataframe/shared_loading.py:33
+      - platforms/redshift.py:1175
+      - platforms/trino.py:665
+      - platforms/presto.py:653
+      - platforms/athena.py:884
+      - platforms/databricks/adapter.py:1163
+      - platforms/firebolt.py:696
+      - platforms/cudf.py:422
+      - platforms/azure_synapse.py:730
+      - platforms/fabric_warehouse.py:811
+      - platforms/databend/adapter.py:512
+      - platforms/base/spark_execution_mixin.py:87
+
+      Pattern: DataSourceResolver(
+          platform_name=..., table_mode=..., platform_config=...,
+          requested_format=getattr(self, 'requested_table_format', None),
+      )
+      For shared_loading.py, use getattr(adapter, 'requested_table_format', None).
+    files:
+      - benchbox/platforms/base/data_loading.py
+      - benchbox/platforms/duckdb.py
+      - benchbox/platforms/datafusion.py
+      - benchbox/platforms/clickhouse_cloud.py
+      - benchbox/platforms/snowflake.py
+      - benchbox/platforms/bigquery.py
+      - benchbox/platforms/polars_platform.py
+      - benchbox/platforms/dataframe/shared_loading.py
+      - benchbox/platforms/redshift.py
+      - benchbox/platforms/trino.py
+      - benchbox/platforms/presto.py
+      - benchbox/platforms/athena.py
+      - benchbox/platforms/databricks/adapter.py
+      - benchbox/platforms/firebolt.py
+      - benchbox/platforms/cudf.py
+      - benchbox/platforms/azure_synapse.py
+      - benchbox/platforms/fabric_warehouse.py
+      - benchbox/platforms/databend/adapter.py
+      - benchbox/platforms/base/spark_execution_mixin.py
+
+must_preserve:
+  - "PLATFORM_FORMAT_PREFERENCES table in format_capabilities.py - this is the source of truth for default format ordering per platform"
+  - "Conversion pipeline still updates manifest format_preference (conversion.py:236-239) - it just no longer drives default selection"
+  - "External table mode (table_mode='external') still uses manifest preference order (not platform defaults)"
+  - "--table-format CLI flag still works: explicit format requests override platform defaults for that run"
+  - "All 15 benchmarks that currently pass at SF1 on DuckDB continue to pass"
+
+approach: |
+  Follow the established pattern used for table_mode: attribute on adapter
+  base class, set in runner, read in DataLoader/DataSourceResolver.
+
+  The key insight is that PLATFORM_FORMAT_PREFERENCES is already correctly
+  configured for all platforms. The fix is making it the actual default instead
+  of a fallback behind manifest format_preference.
+
+anti_patterns:
+  - "DO NOT remove delta/iceberg/parquet from DuckDB's supported formats - the platform genuinely supports them when explicitly requested"
+  - "DO NOT modify the conversion pipeline's manifest update logic - it correctly records what was converted, it just shouldn't drive default selection"
+  - "DO NOT add directory-globbing hacks to the shard loader - yesterday's failed approach tried to load delta parquet parts without delta metadata, which is semantically wrong"
+  - "DO NOT change manifest format_preference to always be ['tbl', ...] - lakehouse platforms (Databricks, Trino) legitimately default to delta/iceberg via their platform preferences"
+
+verification:
+  - description: "DuckDB TPC-H SF1 passes (the primary failure)"
+    command: "uv run benchbox run --platform duckdb --benchmark tpch --scale 1 --compression zstd:3 --quiet"
+    expected_output: "Produces result JSON file, no DataLoadingError"
+  - description: "DuckDB primitives benchmarks pass"
+    command: "uv run benchbox run --platform duckdb --benchmark read_primitives --scale 1 --compression zstd:3 --quiet && uv run benchbox run --platform duckdb --benchmark write_primitives --scale 1 --compression zstd:3 --quiet && uv run benchbox run --platform duckdb --benchmark transaction_primitives --scale 1 --compression zstd:3 --quiet"
+    expected_output: "All three produce result JSON files"
+  - description: "Explicit --table-format still works"
+    command: "uv run benchbox run --platform duckdb --benchmark tpch --scale 0.01 --table-format parquet --quiet"
+    expected_output: "Produces result JSON using parquet format"
+  - description: "Unit tests pass"
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "All tests pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/data_loading.py"
+    - "benchbox/platforms/base/adapter.py"
+    - "benchbox/platforms/base/format_capabilities.py"
+    - "benchbox/core/runner/runner.py"
+    - "benchbox/platforms/duckdb.py"
+    - "benchbox/platforms/datafusion.py"
+    - "benchbox/platforms/clickhouse_cloud.py"
+    - "benchbox/platforms/snowflake.py"
+    - "benchbox/platforms/bigquery.py"
+    - "benchbox/platforms/polars_platform.py"
+    - "benchbox/platforms/dataframe/shared_loading.py"
+    - "benchbox/platforms/redshift.py"
+    - "benchbox/platforms/trino.py"
+    - "benchbox/platforms/presto.py"
+    - "benchbox/platforms/athena.py"
+    - "benchbox/platforms/databricks/adapter.py"
+    - "benchbox/platforms/firebolt.py"
+    - "benchbox/platforms/cudf.py"
+    - "benchbox/platforms/azure_synapse.py"
+    - "benchbox/platforms/fabric_warehouse.py"
+    - "benchbox/platforms/databend/adapter.py"
+    - "benchbox/platforms/base/spark_execution_mixin.py"
+  do_not_touch:
+    - "benchbox/core/manifest/preferences.py - get_preferred_format() logic is correct, just needs to be called with prefer_platform_defaults=True"
+    - "benchbox/core/runner/conversion.py - conversion pipeline is correct"
+    - "benchbox/utils/datagen_manifest.py - manifest creation is correct"
+    - "Shard validation logic in data_loading.py - no directory-globbing hacks"

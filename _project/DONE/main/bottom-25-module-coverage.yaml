@@ -1,0 +1,864 @@
+id: bottom-25-module-coverage
+title: "Raise bottom 25 modules (all <42% coverage) to 80%"
+worktree: main
+priority: High
+status: Completed
+description: |
+  After completing non-dataframe-test-coverage, 25 modules remain below 42%
+  coverage and were either not targeted by the previous TODO or only partially
+  addressed. This plan brings each one individually to 80%+.
+
+  Modules by current coverage (March 24 baseline, may be slightly higher by now):
+  - 0%:  core/pg_extension_comparison (68 miss), platforms/azure/config_utils (22),
+         platforms/credentials/shared (42)
+  - 16%: utils/dependency_validation (83 miss) - w14 targeted 70% but tests are thin
+  - 18%: platforms/databricks/dataframe_adapter (120 miss)
+  - 19%: core/tuning/generators/doris (93 miss), core/coffeeshop/benchmark (88 miss)
+  - 19%: core/tuning/generators/questdb (61 miss)
+  - 20%: core/coffeeshop/schema (29 miss)
+  - 22%: cli/commands/datagen (32 miss)
+  - 23%: platforms/dataframe/pyspark_df (200 miss)
+  - 27%: platforms/azure/spark_execution_utils (30 miss)
+  - 29%: platforms/databend/__init__ (12 miss)
+  - 31%: platforms/motherduck (99 miss)
+  - 33%: cli/commands/run_official (33 miss), core/tpcdi/schema_extensions (22 miss)
+  - 34%: platforms/bigquery (514 miss) - w21 gained stmts but not to 80%
+  - 35%: platforms/databricks/adapter (618 miss) - same
+  - 35%: mcp/__init__ (14 miss)
+  - 36%: cli/system (17 miss)
+  - 37%: platforms/redshift (639 miss)
+  - 39%: tpch_skew (27 miss)
+  - 40%: cli/commands/tuning_group (133 miss), platforms/snowflake (405 miss)
+  - 41%: platforms/athena (360 miss)
+
+  Testing philosophy: every test must assert on the actual output value or behavior
+  (SQL string content, config field value, error message). No import-only tests,
+  no assert-not-None, no mock.called checks in lieu of output assertions.
+
+  Cloud platform SQL generation tests: always assert the generated SQL string
+  contains specific clauses - COPY FROM S3, DISTRIBUTED BY, PARTITION BY, etc.
+
+category: Testing & Quality
+
+deps:
+  needs:
+    - non-dataframe-test-coverage
+
+work:
+  - id: w1
+    summary: "Test pg_extension_comparison pure functions (0% → 100%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/core/pg_extension_comparison.py: 68 stmts, 0% coverage.
+      All pure functions - no I/O, no side effects. Full coverage achievable with
+      dict fixture inputs.
+
+      File to create: tests/unit/core/test_pg_extension_comparison.py
+
+      Test _format_metric_section:
+      - Normal case: both positive values → list with ratio line "2.00x"
+      - baseline_value=None → returns []
+      - extension_value=0 → returns inf ratio
+      - baseline_value=0 → returns []
+
+      Test _format_query_comparison_section:
+      - Two queries with times → rows show speedup, summary shows geometric mean/max/min
+      - One query fails (time=0) → shows "FAILED"
+      - Empty query dicts → returns []
+      - No common queries → returns []
+
+      Test _format_summary_section:
+      - Extension faster (speedup > 1) → "X is Y.1x faster" line
+      - Baseline faster (speedup < 1) → reversed message
+      - Equal times (speedup == 1) → "Performance is equivalent"
+      - No total_execution_time fields → returns summary header only
+
+      Test generate_comparison_report:
+      - Full dict fixtures → assert "PostgreSQL Extension Comparison Report" in output
+      - Assert "Benchmark: TPCH (SF 0.01)" line present
+      - Assert geometric mean speedup line present when both have query_results
+
+      Test _geometric_mean:
+      - Empty list → 0.0
+      - All zeros → 0.0
+      - [2.0, 8.0] → 4.0 (geometric mean)
+      - [1.0] → 1.0
+
+  - id: w2
+    summary: "Test config builder pure functions: azure/config_utils + databend/__init__ (0%, 29% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/platforms/azure/config_utils.py: 22 stmts, 0% coverage.
+      benchbox/platforms/databend/__init__.py: 17 stmts, 29% coverage.
+      Both are config-builder functions that merge credentials + options + overrides
+      into a DatabaseConfig. Testable by mocking CredentialManager.
+
+      File to create: tests/unit/platforms/test_config_builders.py
+
+      azure/config_utils.build_platform_config:
+      - Mock CredentialManager.get_platform_credentials → returns {} (no saved creds)
+      - Call with minimal args (platform_type, credential_key, display_name, driver_pkg,
+        platform_fields=[], options={}, overrides={"benchmark": "tpch", "scale_factor": 1},
+        info=None) → assert config.type == platform_type, config.name == default_display_name
+      - Test option merge precedence: saved_creds has host="a", options has host="b",
+        overrides has host="c" → config.host == "c"
+      - Test info!=None path: info.display_name and info.driver_package used
+      - Test platform_fields extraction: platform_fields=["host","port"],
+        merged_options has these → config.host and config.port populated
+      - Test driver_version: overrides has driver_version → config.driver_version set
+      - Test driver_auto_install: options has "true" → config.driver_auto_install == True
+      - Test database override: overrides["database"]="mydb" → config.database == "mydb"
+
+      databend/__init__._build_databend_config:
+      - Same mock-CredentialManager approach
+      - Test all databend-specific fields: host, port, username, password, database,
+        dsn, warehouse, ssl, disable_result_cache extracted from merged_options
+      - Test saved_creds < options < overrides merge order
+      - Test info=None → name="Databend", driver_package="databend-driver"
+
+  - id: w3
+    summary: "Test schema constant modules: coffeeshop/schema + tpcdi/schema_extensions (20%, 33% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/core/coffeeshop/schema.py: 40 stmts, 20% coverage.
+      benchbox/core/tpcdi/schema_extensions.py: 22 stmts, 33% coverage.
+      Both are data constants + DDL generator functions. The constants ARE the spec -
+      test that they match expected structure, not just "they exist".
+
+      Research gate: Read both source files in full before writing tests.
+
+      Files to create:
+      - tests/unit/core/coffeeshop/test_coffeeshop_schema.py
+      - tests/unit/core/tpcdi/test_schema_extensions.py
+
+      coffeeshop/schema.py - verified public API:
+        get_create_table_sql(table_name) → str
+        get_all_create_table_sql() → str  (joined SQL, NOT a dict)
+        get_tunings() → BenchmarkTunings
+        TABLES dict with 3 keys
+
+      - Test TABLES has exactly 3 keys: "dim_locations", "dim_products", "order_lines"
+      - Test each table dict has "name", "columns", "row_count_formula" keys
+      - Test dim_locations has exactly 6 columns; assert record_id type=="INTEGER",
+        location_id type=="VARCHAR(16)"
+      - Test order_lines columns include location_record_id with
+        foreign_key=="dim_locations.record_id"
+      - Test get_create_table_sql("dim_locations") returns str starting with
+        "CREATE TABLE dim_locations"
+      - Test get_create_table_sql("unknown_table") raises ValueError
+      - Test get_all_create_table_sql() returns str containing all 3 "CREATE TABLE" headers
+      - Test get_all_create_table_sql(enable_primary_keys=False) → no "PRIMARY KEY" in output
+      - Test get_tunings() returns BenchmarkTunings; tunings contains entry for "order_lines"
+      - Assert order_lines tuning has partitioning on "order_date"
+
+      tpcdi/schema_extensions.py - verified public API:
+        EXTENSION_TABLES dict with 9 keys
+        get_extended_table_order() → list[str]
+        get_foreign_key_constraints() → dict[str, list[dict]]
+        get_extended_create_table_sql(table_name) → str
+        get_all_extended_create_table_sql() → str
+
+      - Test EXTENSION_TABLES has keys: "DimBroker", "FactCashBalances", "FactHoldings",
+        "FactMarketHistory", "FactWatches", "Industry", "StatusType", "TaxRate", "TradeType"
+      - Test DIMBROKER["name"] == "DimBroker" and "SK_BrokerID" is in column names
+      - Test get_extended_table_order() returns list where lookup tables precede fact tables
+        (assert "Industry" appears before "FactCashBalances")
+      - Test Fact tables (FactCashBalances, FactHoldings, FactMarketHistory, FactWatches)
+        all have "BatchID" column - lookup tables (Industry, StatusType, TaxRate, TradeType)
+        do NOT have BatchID (verify per-table, not as a blanket assertion)
+      - Test get_extended_create_table_sql("FactCashBalances") returns str containing
+        "CREATE TABLE IF NOT EXISTS FactCashBalances"
+      - Test get_extended_create_table_sql("unknown") raises ValueError
+      - Test get_all_extended_create_table_sql() returns str with 9 CREATE TABLE blocks
+      - Test get_foreign_key_constraints() returns dict; "DimBroker" key has FK to itself
+        (ManagerID → BrokerID self-reference)
+
+  - id: w4
+    summary: "Test dependency_validation unit functions with synthetic data (16% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/utils/dependency_validation.py: 83 stmts missing, 16% coverage.
+      The 2 existing tests only hit the happy-path on the real pyproject.toml.
+      The internal functions (_collect_locked_versions, _validate_requirement, etc.)
+      need unit tests with synthetic TOML data - not relying on real lock file.
+
+      Extend: tests/unit/utils/test_utils_dependency_validation.py
+
+      Test _collect_locked_versions with synthetic lock_data dict:
+      - {"package": [{"name": "foo", "version": "1.2.3"}]} → {"foo": {Version("1.2.3")}}
+      - Multiple versions of same package → set contains both
+      - Entry missing "name" → skipped gracefully
+      - Entry missing "version" → skipped gracefully
+      - Canonical name normalization: "PyYAML" → "pyyaml"
+
+      Test _requirements_from_strings:
+      - ["foo>=1.0", "bar==2.3.4"] → list of 2 Requirement objects with correct attrs
+      - ["foo"] → Requirement with empty specifier
+
+      Test _validate_requirement:
+      - Satisfying version present → True
+      - Version present but doesn't satisfy specifier (foo>=2.0, locked 1.0) → False
+      - No versions locked → False
+      - No specifier on requirement → True (any version acceptable)
+
+      Test _format_requirement:
+      - With specifier → "foo>=1.0"
+      - Without specifier → "foo"
+
+      Test validate_dependency_versions with synthetic data:
+      - All satisfied → returns []
+      - One unsatisfied → returns list with that package's error string
+      - Multiple failures → returns all of them
+      - Extras section: unsatisfied extra dep → error includes "(extra: <name>)"
+
+      Test build_matrix_summary with synthetic data:
+      - Extracts requires-python, resolution-markers, optional-dependencies
+      - Returns correct structure
+
+      Test _print_matrix output (capture stdout via capsys):
+      - "Python compatibility" header in output
+      - Markers section shows if present
+      - "No optional dependencies declared" when extras is empty
+
+      Test main():
+      - --matrix flag: calls build_matrix_summary and prints it
+      - Missing required dep: returns exit code 1 and writes to stderr
+      - Passing --pyproject and --lock paths to point at synthetic files (write tmp TOML)
+
+  - id: w5
+    summary: "Test CoffeeShop benchmark end-to-end with DuckDB (19% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/core/coffeeshop/benchmark.py: 88 stmts missing, 19% coverage.
+      CoffeeShopBenchmark wraps the generator and query manager. Tests should use
+      a real temp directory and DuckDB to verify the full generate → load → query cycle.
+
+      Research gate: Read the full CoffeeShopBenchmark class before writing tests.
+
+      Verified public API:
+        generate_data(tables, output_format) → dict[str, str]  (csv paths)
+        load_data_to_database(connection, tables) → None  (NOT load_data)
+        run_benchmark(connection, queries, iterations) → dict  (NOT run_queries)
+        execute_query(query_id, connection, params) → list
+        get_query(query_id) → str
+        get_queries(dialect) → dict[str, str]
+        get_create_tables_sql(dialect, tuning_config) → str
+
+      File to create: tests/unit/core/coffeeshop/test_coffeeshop_benchmark.py
+
+      Test CoffeeShopBenchmark initialization:
+      - Default scale_factor=1.0 → self.scale_factor == 1.0
+      - Custom scale_factor=0.5 → propagated to data_generator
+      - self._name == "CoffeeShop Benchmark", self._version == "2.0"
+      - query_manager is CoffeeShopQueryManager instance
+      - data_generator is CoffeeShopDataGenerator instance
+
+      Test generate_data (use tmp_path fixture):
+      - With output_format="csv" → returns dict with 3 entries
+      - Each value is a path string to an existing .csv file
+      - Table names in returned dict match TABLES.keys()
+      - With tables=["dim_locations"] → only that one key in returned dict
+      - Tables stored in self.tables after generation
+      - With output_format="parquet" → raises ValueError (only csv supported)
+      - Unknown table name → raises ValueError
+
+      Test load_data_to_database (use duckdb.connect(":memory:")):
+      - After generate_data, load_data_to_database(conn) creates tables in DuckDB
+      - conn.execute("SELECT COUNT(*) FROM dim_locations").fetchone()[0] > 0
+      - conn.execute("SELECT COUNT(*) FROM order_lines").fetchone()[0] > 0
+      - Calling load_data_to_database before generate_data → raises ValueError
+
+      Test run_benchmark (use duckdb.connect(":memory:") after load):
+      - run_benchmark(conn, queries=["Q1"]) returns dict with "query_results" list
+      - result["query_results"][0]["query_id"] == "Q1"
+      - result["query_results"][0]["success"] == True
+      - result["query_results"][0]["avg_time"] > 0
+
+      Mark tests as: @pytest.mark.unit @pytest.mark.medium (not @pytest.mark.fast)
+
+  - id: w6
+    summary: "Test Doris DDL generator SQL output (19% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/core/tuning/generators/doris.py: 93 stmts missing, 19% coverage.
+      DorisDDLGenerator produces CREATE TABLE DDL strings. Assert on SQL string
+      content and TuningClauses field values - never on mock.called.
+
+      Research gate: Read tests/unit/platforms/test_doris_adapter.py (1,670 lines) in
+      full before writing new tests - identify which DDL paths are already exercised
+      to avoid duplication. Create tests in a NEW file focused on the generator class.
+
+      File to create: tests/unit/core/tuning/test_doris_ddl_generator.py
+
+      Verified TuningClauses fields produced by DorisDDLGenerator.generate_tuning_clauses:
+        clauses.sort_by          → "l_orderkey, l_linenumber"  (DUPLICATE KEY columns)
+        clauses.distribute_by    → "l_orderkey"                 (HASH column)
+        clauses.table_properties → dict: {"replication_num": "1",
+                                           "colocate_with": "group_orders",
+                                           "bloom_filter_columns": "l_orderkey, ..."}
+        clauses.additional_clauses → ["DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 10"]
+        clauses.post_create_statements → ["CREATE INDEX ... USING BITMAP"]
+
+      Test generate_tuning_clauses with DorisDDLGenerator(benchmark_type="tpch"):
+      - table_tuning for "lineitem" → clauses.sort_by == "l_orderkey, l_linenumber"
+      - clauses.distribute_by == "l_orderkey"
+      - clauses.table_properties["colocate_with"] == "group_orders"
+      - clauses.table_properties["bloom_filter_columns"] contains "l_orderkey"
+      - clauses.additional_clauses[0] contains "DISTRIBUTED BY HASH" and "BUCKETS 10"
+      - clauses.post_create_statements[0] contains "USING BITMAP" (for l_returnflag)
+
+      Test for "nation" (no bloom/bitmap index):
+      - clauses.table_properties has no "bloom_filter_columns" key
+      - clauses.post_create_statements == []
+
+      Test for "store_sales" with benchmark_type="tpcds":
+      - clauses.distribute_by == "ss_item_sk"
+      - clauses.sort_by contains "ss_sold_date_sk"
+
+      Test generate_create_table_ddl for lineitem with real ColumnDefinition list:
+      - SQL contains "DUPLICATE KEY (`l_orderkey`, `l_linenumber`)"
+      - SQL contains "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 10"
+      - SQL contains "PROPERTIES"
+      - SQL contains '"colocate_with" = "group_orders"'
+
+      Test custom TableTuning (overrides default):
+      - TableTuning with distribution=[TuningColumn("custom_col", ...)] →
+        clauses.distribute_by == "custom_col", used in DISTRIBUTED BY clause
+
+      Test _compute_bucket_count with scale_factor > 1:
+      - DorisDDLGenerator(scale_factor=2.0, benchmark_type="tpch")
+      - lineitem base=10, scaled=20 → "BUCKETS 20" in additional_clauses
+
+      Parametrize over all 8 TPC-H tables to verify all have entries in the tuning dicts.
+
+  - id: w7
+    summary: "Test QuestDB DDL generator SQL output (19% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/core/tuning/generators/questdb.py: 61 stmts missing, 19% coverage.
+      Same DDL-string assertion pattern as Doris.
+
+      Research gate: Read tests/unit/platforms/test_questdb_adapter.py before writing
+      new tests - identify what DDL paths are already covered. New file focuses on
+      the generator class itself, not the adapter.
+
+      File to create: tests/unit/core/tuning/test_questdb_ddl_generator.py
+
+      Verified TuningClauses for QuestDB:
+        clauses.table_properties → str suffix appended after column list:
+          "timestamp(l_shipdate) PARTITION BY MONTH"
+
+      Test generate_tuning_clauses with no explicit TableTuning (None):
+      - Returns empty TuningClauses (clauses.table_properties is None or empty)
+
+      Test generate_tuning_clauses for "lineitem" with table_tuning.table_name="lineitem"
+      and no explicit partitioning columns (uses TPC-H defaults):
+      - clauses.table_properties == "timestamp(l_shipdate) PARTITION BY MONTH"
+
+      Test for "orders":
+      - clauses.table_properties contains "timestamp(o_orderdate)"
+      - clauses.table_properties contains "PARTITION BY MONTH"
+
+      Test for "partsupp" (no designated timestamp):
+      - clauses.table_properties is None or ""
+
+      Test generate_create_table_ddl for lineitem with real ColumnDefinition list:
+      - SQL contains "timestamp(l_shipdate) PARTITION BY MONTH" after closing paren
+      - SQL does NOT contain "PARTITION BY" for "partsupp"
+
+      Test _apply_type_mappings for lineitem columns:
+      - l_returnflag column (VARCHAR) → mapped type is "SYMBOL"
+      - l_shipdate column (DATE) → mapped type is "TIMESTAMP"
+      - l_orderkey (BIGINT/INT) → type unchanged
+
+      Test custom partition_by via platform_opts:
+      - platform_opts.partition_by = "DAY" → clauses.table_properties contains
+        "PARTITION BY DAY"
+
+      Parametrize over all 8 TPC-H tables to catch missing constant entries.
+
+  - id: w8
+    summary: "Test CLI wrapper commands via CliRunner: datagen + run_official (22%, 33% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/cli/commands/datagen.py: 32 stmts missing, 22% coverage.
+      benchbox/cli/commands/run_official.py: 33 stmts missing, 33% coverage.
+      Both are thin CLI wrappers that delegate to the run command. Test the
+      wrapper logic (validation, arg building) without running the full benchmark.
+
+      File to extend: tests/unit/cli/test_new_commands.py (check first, extend if exists)
+
+      datagen command:
+      - Test _parse_run_args directly (it's a standalone function):
+        * ["--benchmark", "tpch", "--scale", "0.1"] → {"benchmark": "tpch", "scale": 0.1}
+        * ["--seed", "42"] → {"seed": 42} (int, not str)
+        * ["--verbose"] → {"verbose": True} (boolean flag)
+        * ["--benchmark", "tpch", "--scale", "0.1", "--verbose"] → all three keys
+      - CliRunner: invoke datagen with --benchmark tpch --scale 0.01
+        * Mock ctx.invoke to capture forwarded args
+        * Assert forwarded args include platform="duckdb", phases="generate"
+      - CliRunner: --format csv → non-parquet warning shown in output
+      - CliRunner: --output /tmp/data → output_dir forwarded to run args
+      - CliRunner: --seed 42 → seed=42 in forwarded args
+
+      run_official command:
+      - CliRunner: scale=5 (non-TPC) → exit code 1, error message about scale factor
+      - CliRunner: scale=1 (valid) with mock ctx.invoke → deprecation warning shown
+      - CliRunner: --phases throughput (no --streams) → exit code 1, streams required
+      - CliRunner: --phases power --platform duckdb scale=1 with mock ctx.invoke
+        → official=True in forwarded run_args
+      - CliRunner: no --seed → warning about official TPC runs requiring seed
+      - CliRunner: --validate-results → validate_results=True forwarded
+      - TPC_ALLOWED_SCALE_FACTORS constant: assert 1, 10, 100, 1000, 10000 all in set
+
+  - id: w9
+    summary: "Test TPCHSkew facade validation and property delegation (39% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/tpch_skew.py: 27 stmts missing, 39% coverage.
+      The facade adds validation on top of TPCHSkewBenchmark. The interesting code
+      is the input validation branches - test those, not the underlying impl.
+
+      File to create: tests/unit/core/tpch_skew/test_tpch_skew_facade.py
+
+      Test __init__ validation:
+      - Valid scale_factor=0.5 → instantiates without error
+      - scale_factor="not_a_number" → raises TypeError
+      - scale_factor=-1 → raises ValueError
+      - skew_preset="heavy" → self.skew_preset == "heavy"
+      - No preset → default "moderate" preset used (check skew_config.skew_factor)
+
+      Test get_query validation:
+      - query_id=0 → raises ValueError("Query ID must be 1-22")
+      - query_id=23 → raises ValueError
+      - query_id="6" (str) → raises TypeError
+      - query_id=1 → returns non-empty SQL string
+      - scale_factor="bad" → raises TypeError
+      - scale_factor=0 → raises ValueError
+      - seed="x" → raises TypeError
+
+      Test static methods:
+      - get_available_presets() returns list containing "none","light","moderate","heavy"
+      - get_preset_description("heavy") returns non-empty string
+      - get_preset_description("invalid") → raises ValueError
+
+      Test property delegation:
+      - .skew_preset returns string
+      - .skew_config returns SkewConfiguration instance
+      - .tables returns dict
+
+      Test get_skew_info() → dict with "preset", "skew_factor", "distribution_type" keys
+
+  - id: w10
+    summary: "Test cli/system SystemProfiler + mcp/__init__ lazy exports (35%, 35% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/cli/system.py: 17 stmts missing, 36% coverage (30 total stmts).
+      benchbox/mcp/__init__.py: 14 stmts missing, 35% coverage (25 total stmts).
+      Small modules - targeted tests will reach 80% quickly.
+
+      Files to extend/create:
+      - tests/unit/cli/test_system_profiler.py (new)
+      - tests/unit/mcp/test_mcp_init.py (extend or create)
+
+      cli/system.SystemProfiler:
+      - Test display_profile with mocked PlatformRegistry.get_available_platforms:
+        * Returns ["duckdb"] → output contains "duckdb", no "No database libraries" warning
+        * Returns [] → output contains "No database libraries detected" recommendation
+      - Test with HAS_PSUTIL=False (monkeypatch cli.system.HAS_PSUTIL) → "Install psutil" note shown
+      - Test with HAS_PSUTIL=True → no psutil note
+      - Capture console output via capsys or mock console
+      - SystemProfiler() instantiation → self.console is quiet_console
+
+      mcp/__init__:
+      IMPORTANT: benchbox/mcp/__init__.py raises ImportError at module load if the
+      `mcp` SDK is not installed. Guard ALL tests in this file with:
+        pytest.importorskip("mcp", reason="requires benchbox[mcp] extra")
+      or run the test session with `uv run --extra mcp -- python -m pytest ...`
+
+      - Test create_server() calls create_benchbox_server with correct kwargs:
+        Mock benchbox.mcp.server.create_benchbox_server and assert called with
+        results_dir, charts_dir, log_level, env all forwarded
+      - Test run_server() → mock server.run(), assert it's called once
+      - Test __getattr__("ErrorCode") → imports and returns ErrorCode class/enum
+      - Test __getattr__("MCPError") → imports and returns MCPError class
+      - Test __getattr__("ToolCallContext") → returns ToolCallContext
+      - Test __getattr__("ExecutionStatus") → returns ExecutionStatus
+      - Test __getattr__("unknown_name") → raises AttributeError with module name in message
+
+  - id: w11
+    summary: "Test MotherDuck adapter init, config, and mocked connection (31% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/platforms/motherduck.py: 99 stmts missing, 31% coverage (154 total).
+      Existing tests cover registry/config. The adapter methods need tests with
+      a mocked duckdb.connect (no real MotherDuck credentials required).
+
+      Extend: tests/unit/platforms/test_motherduck.py
+
+      Test __init__ error paths:
+      - No token (env not set, config not set) → raises ValueError with token URL hint
+      - duckdb module = None (mock import to None) → raises ImportError
+      - Valid token from env var MOTHERDUCK_TOKEN → stored in self.token
+      - Valid token from config dict → stored in self.token
+      - database param → self.database == "my_db"
+      - memory_limit param → self.memory_limit == "8GB"
+
+      Test from_config classmethod:
+      - {"motherduck_database": "test_db", "motherduck_token": "tok123"} →
+        adapter.database == "test_db", adapter.token == "tok123"
+      - memory_limit in config → propagated
+
+      Test platform_name property → "MotherDuck"
+      Test get_target_dialect() → "duckdb"
+      Test add_cli_arguments: parser gets --motherduck-database, --motherduck-token args
+
+      Test create_connection with mocked duckdb.connect:
+      - Assert called with connection string containing "md:benchbox"
+      - Assert called with "motherduck_token" in the config string or kwargs
+      - Assert self.connection is the mock connection
+
+      Test execute_query with mocked connection:
+      - connection.execute("SELECT 1") → result forwarded
+      - Connection error → raises PlatformError wrapping original exception
+
+      Test get_platform_info() → dict with "name"=="MotherDuck", "version" key present
+
+      Test create_schema / table_exists / drop_schema via mocked connection:
+      - Assert the correct SQL statements are sent to the mock connection
+
+  - id: w12
+    summary: "Test credentials/shared interactive prompt with mocked Rich (0% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/platforms/credentials/shared.py: 42 stmts, 0% coverage.
+      prompt_default_output_location uses Rich Confirm.ask and Prompt.ask.
+      Test by monkeypatching the prompt functions.
+
+      File to create: tests/unit/platforms/credentials/test_shared_credentials.py
+
+      Setup fixture:
+      - Mock CredentialManager with mock .get_platform_credentials and .set_platform_credentials
+      - Mock console (capture .print calls)
+      - Mock is_cloud_path from benchbox.utils.cloud_storage
+
+      Test "user declines to configure":
+      - Monkeypatch Confirm.ask → False (first call)
+      - Assert credentials dict unchanged, save_credentials not called
+      - Assert "You can add --output" message shown
+
+      Test "valid cloud path, confirmed":
+      - Confirm.ask → True, Prompt.ask → "gs://my-bucket/data", second Confirm → True
+      - Mock is_cloud_path → True
+      - Assert credentials["default_output_location"] == "gs://my-bucket/data"
+      - Assert cred_manager.set_platform_credentials called with platform_name.lower()
+      - Assert cred_manager.save_credentials() called once
+
+      Test "invalid path, user proceeds anyway":
+      - Confirm.ask sequence: True (wants it), second True (proceed despite warning)
+      - Prompt.ask → "not-a-cloud-path"
+      - Mock is_cloud_path → False
+      - Third Confirm.ask → True (confirmed)
+      - Assert warning message about not looking like cloud path shown
+      - Assert credentials saved with the non-cloud path
+
+      Test "invalid path, user rejects, then valid path":
+      - First Prompt.ask → "bad-path" (is_cloud_path=False), Confirm.ask→False (don't proceed)
+      - Second Prompt.ask → "gs://bucket/path" (is_cloud_path=True), Confirm.ask→True
+      - Assert credentials saved with the valid path
+
+      Test "with bucket provided, suggested default shown":
+      - bucket="my-bucket" param → Prompt default contains "my-bucket/benchbox-data"
+
+      Test "empty path input":
+      - Prompt.ask → "" → shows "Skipping" message, credentials unchanged
+
+  - id: w13
+    summary: "Test tuning_group CLI commands via CliRunner (40% → 80%)"
+    status: done
+    needs: []
+    description: |
+      benchbox/cli/commands/tuning_group.py: 133 stmts missing, 40% coverage (242 total).
+      CLI command group with subcommands: init, validate, defaults, list, show.
+      Test via Click's CliRunner - assert on output text, not just exit codes.
+
+      Extend: tests/unit/cli/test_tuning_wizard.py (check what's there first)
+
+      tuning init --platform duckdb (SQL mode):
+      - Mock config_manager.create_sample_unified_tuning_config
+      - Assert exit code 0
+      - Assert "Tuning configuration created" in output
+      - Assert file path shown in output
+      - Assert "benchbox run --tuning" hint shown
+
+      tuning init --platform duckdb --mode dataframe (invalid combo):
+      - Assert exit code 1
+      - Assert "does not support DataFrame mode" error in output
+      - Assert DataFrame platforms list shown
+
+      tuning init --platform polars --mode dataframe:
+      - Mock load_dataframe_tuning, save_dataframe_tuning
+      - Assert DataFrameTuningConfiguration created
+      - Assert output file path shown
+
+      tuning init --platform polars --smart-defaults:
+      - Mock detect_system_profile, get_smart_defaults
+      - Assert "smart defaults" message in output
+      - Assert profile summary shown
+
+      tuning validate <config_file> --platform polars:
+      - Create temp YAML file with valid config
+      - Mock validate_dataframe_tuning → [] (no issues)
+      - Assert "valid" in output
+
+      tuning validate <config_file> with errors:
+      - Mock validate_dataframe_tuning → ["error: workers must be positive"]
+      - Assert exit code non-zero
+      - Assert error message shown
+
+      tuning defaults --platform polars:
+      - Mock get_smart_defaults → DataFrameTuningConfiguration
+      - Assert platform-specific settings displayed
+
+      tuning show <config_file>:
+      - Create temp YAML, mock display_tuning_show
+      - Assert show called with correct path
+
+      tuning list:
+      - Mock display_tuning_list
+      - Assert exit code 0
+
+  - id: w14
+    summary: "Test Redshift SQL generation - uncover remaining branches (37% → 80%)"
+    status: done
+    needs: []
+    description: |
+      platforms/redshift.py: 639 miss, 37% (1075 total stmts).
+      The previous w20 work gained some coverage. This unit targets the remaining gaps.
+
+      Research gate: Run `uv run -- python -m pytest tests/ --cov=benchbox/platforms/redshift.py
+      --cov-report=term-missing -q 2>&1 | grep -A 200 "benchbox/platforms/redshift"` to
+      identify which line ranges are still uncovered, then write tests for those branches.
+
+      Find existing test file: `grep -r "redshift" tests/unit/platforms/ --include="*.py" -l`
+      Extend that file rather than creating a new one.
+
+      Target branches (verify these are still uncovered via the research gate above):
+      - COPY FROM S3: assert SQL contains table name, s3 path, IAM_ROLE, FORMAT AS
+      - UNLOAD: assert S3 path, FORMAT, ALLOWOVERWRITE in output SQL
+      - CREATE TABLE dist_style EVEN: assert "DISTSTYLE EVEN" in DDL
+      - CREATE TABLE dist_key: assert "DISTKEY(column)" in DDL
+      - CREATE TABLE sort_key: assert "SORTKEY(col1, col2)" in DDL
+      - CREATE TABLE interleaved sort: assert "INTERLEAVED SORTKEY" in DDL
+      - Spectrum external table: assert "EXTERNAL TABLE" and schema name
+      - Type mapping: Redshift SUPER type → assert in CREATE TABLE DDL
+      - Connection config: host, port, dbname, user, sslmode assembled correctly
+      - get_connection_string(): contains host, port, dbname
+
+      All assertions on SQL strings - no mock.called.
+
+  - id: w15
+    summary: "Test Snowflake SQL generation - uncover remaining branches (40% → 80%)"
+    status: done
+    needs: []
+    description: |
+      platforms/snowflake.py: 405 miss, 40% (730 total stmts).
+      The previous w20 work gained some coverage. This unit targets the remaining gaps.
+
+      Research gate: Run `uv run -- python -m pytest tests/ --cov=benchbox/platforms/snowflake.py
+      --cov-report=term-missing -q 2>&1 | grep -A 200 "benchbox/platforms/snowflake"` to
+      identify which line ranges are still uncovered.
+
+      Find existing test file: `grep -r "snowflake" tests/unit/platforms/ --include="*.py" -l`
+      Extend that file.
+
+      Target branches (verify via research gate):
+      - COPY INTO from stage: assert "@stage_name", FORMAT = (TYPE = CSV) in SQL
+      - CREATE STAGE: assert "CREATE OR REPLACE STAGE" and URL in DDL
+      - Warehouse DDL: WAREHOUSE_SIZE, AUTO_SUSPEND, SCALING_POLICY
+      - CTAS with clustering: CLUSTER BY (col1, col2) in output
+      - PUT command path construction: local file → stage path
+      - Type mapping: VARIANT type → assert in schema DDL
+      - Connection config: account, warehouse, role assembled correctly
+      - get_connection_string(): contains account identifier
+
+      All assertions on SQL strings - no mock.called.
+
+  - id: w16
+    summary: "Test BigQuery SQL generation - uncover remaining branches (34% → 80%)"
+    status: done
+    needs: []
+    description: |
+      platforms/bigquery.py: 514 miss, 34% (838 total stmts).
+      The previous w21 work gained some coverage. This unit targets the remaining gaps.
+
+      Research gate: Run `uv run -- python -m pytest tests/ --cov=benchbox/platforms/bigquery.py
+      --cov-report=term-missing -q 2>&1 | grep -A 200 "benchbox/platforms/bigquery"` to
+      identify which line ranges are still uncovered.
+
+      Find existing test file: `grep -r "bigquery" tests/unit/platforms/ --include="*.py" -l`
+      Extend that file.
+
+      Target branches (verify via research gate):
+      - Table reference: "project.dataset.table" three-part name → assert in DDL
+      - Partitioning DDL: PARTITION BY DATE_TRUNC(col, DAY) in CREATE TABLE
+      - Clustering DDL: CLUSTER BY (col1, col2) in CREATE TABLE
+      - LOAD JOB config: sourceFormat, writeDisposition, skipLeadingRows assembled correctly
+      - BQ-specific SQL transformation: date functions (DATE_DIFF, FORMAT_DATE)
+      - Type mapping: FLOAT64, INT64, NUMERIC, BIGNUMERIC → in schema DDL
+      - Export to GCS: EXPORT DATA OPTIONS (uri=, format=) in query
+      - Dataset creation DDL: "CREATE SCHEMA IF NOT EXISTS project.dataset"
+
+      All assertions on SQL strings - no mock.called.
+
+  - id: w17
+    summary: "Test Databricks adapter SQL generation - uncover remaining branches (35% → 80%)"
+    status: done
+    needs: []
+    description: |
+      platforms/databricks/adapter.py: 618 miss, 35% (1036 total stmts).
+      The previous w21 work gained some coverage. This unit targets the remaining gaps.
+
+      Research gate: Run `uv run -- python -m pytest tests/ --cov=benchbox/platforms/databricks/adapter.py
+      --cov-report=term-missing -q 2>&1 | grep -A 200 "databricks/adapter"` to
+      identify which line ranges are still uncovered.
+
+      Extend: tests/unit/platforms/test_databricks_adapter.py
+
+      Target branches (verify via research gate):
+      - Three-level naming: catalog.schema.table in all DDL/SQL
+      - COPY INTO from cloud storage: assert "COPY INTO", FORMAT=, PATTERN= in SQL
+      - OPTIMIZE statement: "OPTIMIZE catalog.schema.table"
+      - VACUUM statement: "VACUUM catalog.schema.table RETAIN X HOURS"
+      - Z-ORDER: "OPTIMIZE ... ZORDER BY (col1, col2)"
+      - Delta table properties: TBLPROPERTIES ("delta.autoOptimize.optimizeWrite" = "true")
+      - SQL Warehouse connection config vs cluster config: different JDBC URL patterns
+      - Unity Catalog enabled path vs legacy hive_metastore
+
+      All assertions on SQL strings - no mock.called.
+
+  - id: w18
+    summary: "Test Athena SQL generation - uncover remaining branches (41% → 80%)"
+    status: done
+    needs: []
+    description: |
+      platforms/athena.py: 360 miss, 41% (651 total stmts).
+      The previous w22 work gained some coverage. This unit targets the remaining gaps.
+
+      Research gate: Run `uv run -- python -m pytest tests/ --cov=benchbox/platforms/athena.py
+      --cov-report=term-missing -q 2>&1 | grep -A 200 "benchbox/platforms/athena"` to
+      identify which line ranges are still uncovered.
+
+      Find existing test file: `grep -r "athena" tests/unit/platforms/ --include="*.py" -l`
+      Extend that file.
+
+      Target branches (verify via research gate):
+      - External table DDL: assert "CREATE EXTERNAL TABLE", "ROW FORMAT SERDE", LOCATION
+      - CTAS with format: "CREATE TABLE ... WITH (format='PARQUET', ...)"
+      - CTAS with partitioning: PARTITIONED_BY in WITH clause
+      - S3 path construction: bucket + prefix → "s3://bucket/prefix/table/"
+      - Workgroup config: workgroup name in connection config
+      - Table format Iceberg: "table_type='ICEBERG'" in WITH clause
+      - MSCK REPAIR TABLE after CTAS
+
+      All assertions on SQL strings - no mock.called.
+
+  - id: w19
+    summary: "Test Azure Synapse SQL generation - uncover remaining branches (54% → 80%)"
+    status: done
+    needs: []
+    description: |
+      platforms/azure_synapse.py: targeted by w22 previously. This unit covers
+      the branches still uncovered.
+
+      Research gate: Run `uv run -- python -m pytest tests/ --cov=benchbox/platforms/azure_synapse.py
+      --cov-report=term-missing -q 2>&1 | grep -A 200 "azure_synapse"` to identify uncovered ranges.
+
+      Find existing test file: `grep -r "azure_synapse\|synapse" tests/unit/platforms/ --include="*.py" -l`
+      Extend that file.
+
+      Target branches (verify via research gate):
+      - CTAS HASH distribution: "WITH (DISTRIBUTION = HASH(col))"
+      - CTAS ROUND_ROBIN: "WITH (DISTRIBUTION = ROUND_ROBIN)"
+      - CTAS REPLICATE: "WITH (DISTRIBUTION = REPLICATE)"
+      - External data source DDL: "CREATE EXTERNAL DATA SOURCE"
+      - External file format DDL: "CREATE EXTERNAL FILE FORMAT"
+      - COPY command (modern): "COPY INTO table FROM ..."
+      - Type mapping: Synapse-specific types (nvarchar, bigint)
+
+      All assertions on SQL strings - no mock.called.
+
+deferred:
+  - summary: "platforms/databricks/dataframe_adapter (18%, 120 miss) and platforms/dataframe/pyspark_df (23%, 200 miss)"
+    reason:
+      "Both require Spark session setup (SparkContext or SparkSession). PySpark tests already have a 1046-line test file
+      at 23% because most tests skip when PySpark is not installed. Meaningful coverage requires a PySpark fixture or the separate
+      dataframe platform CI environment. Cover in the dataframe-platform testing initiative, not here."
+  - summary: "platforms/azure/spark_execution_utils (27%, 30 miss)"
+    reason:
+      "Azure Spark utilities require mocking Synapse/Fabric Spark session internals. Low ROI (only 30 missing lines) and
+      fragile mock setup. Cover alongside other Azure Spark work when a real Spark session fixture is available."
+  - summary: "TPC-DI ETL modules (core/tpcdi/etl/batch.py 882 miss, transformations.py 1053 miss)"
+    reason:
+      "These are in the omit list of .coveragerc_core and were explicitly deferred in non-dataframe-test-coverage. Still
+      deferred: high effort, niche benchmark, requires complex CDC/SCD fixtures. Cover after 80% overall target is sustained."
+
+metadata:
+  tags:
+    - testing
+    - coverage
+    - quality
+    - cli
+    - platforms
+    - tuning
+  estimated_effort: "Large (2-3 weeks across work units)"
+  created_date: "2026-03-26"
+  last_updated: "2026-03-26"
+  coverage_baseline:
+    date: "2026-03-24"
+    note: "March 24 snapshot; some modules may have improved slightly by March 26 commits"
+
+verification:
+  command: |
+    uv run -- python -m pytest -m "fast or medium" -n auto --strict-markers --tb=short \
+      -p pytest_cov --cov=benchbox --cov-report=term -q --no-header 2>&1 \
+      | grep -E "^(TOTAL|benchbox/)" | head -30
+  expected: "Each targeted module shows >= 80% on its row; TOTAL >= 80%"
+
+must_preserve:
+  - "All existing tests must continue to pass - new tests are additive only"
+  - "No assert-not-None, assert True, or hasattr-only assertions - every assertion must fail if the code under test is broken"
+  - "Cloud adapter tests must not require real credentials - mock at the connection boundary only"
+  - "SQL-generation assertions must check the actual SQL string content, not just that a method was called"
+  - "Test file names must describe the behavior being tested, not contain 'coverage'"
+
+anti_patterns:
+  - "DO NOT test that a config field 'is not None' - because that can never fail once the field is populated - assert the actual
+    value"
+  - "DO NOT mock internal helper functions to test a dispatcher - because you then test the mock, not the code - use real inputs
+    and assert on real output"
+  - "DO NOT assert mock.called for SQL generation tests - because called=True doesn't verify the SQL is correct - always assert
+    on the SQL string"
+  - "DO NOT write a test that only calls get_available_presets() and asserts len > 0 - because that can't catch a bug where
+    a preset is removed - assert the specific preset names"
+  - "DO NOT test only the happy path for CLI wrappers - because error validation is where bugs live - test every exit(1) branch"
+
+scope_limit:
+  include:
+    - "tests/ (new and modified test files only)"
+  exclude:
+    - "benchbox/ source code (no production changes)"
+    - "pytest.ini or pyproject.toml (no config changes)"
+completed_date: "2026-03-26"

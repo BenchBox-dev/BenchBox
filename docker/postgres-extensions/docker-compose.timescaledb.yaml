@@ -1,0 +1,42 @@
+# TimescaleDB Docker Compose
+# PostgreSQL with TimescaleDB extension for time-series analytics
+#
+# Usage:
+#   docker compose -f docker-compose.timescaledb.yaml up -d
+#   benchbox run --platform timescaledb --benchmark tsbs-devops --scale 1.0 \
+#     --platform-option host=localhost --platform-option password=benchbox
+#
+# Ports:
+#   5432 - PostgreSQL with TimescaleDB
+#
+# NOTE: TimescaleDB is compatible with both pg_duckdb and pg_mooncake
+#       (no shared library conflicts).
+#
+# NOTE: This compose file now targets PostgreSQL 18. It intentionally uses a
+# fresh named volume mounted at /var/lib/postgresql, because PG18 images moved
+# PGDATA under a version-specific subdirectory below that parent path.
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg18
+    container_name: benchbox-timescaledb
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: benchbox
+      POSTGRES_DB: benchbox
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescaledb18-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    shm_size: "256mb"
+
+volumes:
+  timescaledb18-data:
+    driver: local

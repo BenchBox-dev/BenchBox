@@ -1,0 +1,16 @@
+id: ai-ml-sql-function-performance-testing
+title: AI/ML SQL Function Performance Testing
+worktree: ai-ml-functions
+category: AI/ML Capabilities
+priority: Medium
+status: Not Started
+description: 'Benchmark AI/ML SQL functions (sentiment analysis, classification, summarization,
+
+  LLM completion) across Snowflake Cortex, BigQuery ML, Databricks ML.
+
+  '
+metadata:
+  estimated_effort: 2 weeks (0.75 FTE ML engineer)
+  budget: $11K-15K
+  due_date: '2026-12-01'
+  blocking_posts: 4 AI/ML posts, $760 value

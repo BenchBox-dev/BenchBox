@@ -1,0 +1,115 @@
+id: docs-rewrite-architecture-and-structure
+title: "Rewrite architecture.md and structure.md to match current codebase"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-01"
+description: |
+  Documentation audit (2026-04-01) found that the two foundational design docs
+  are severely outdated:
+
+  1. `docs/design/architecture.md` describes a non-existent `.run()` method
+     and Template Method pattern. The actual execution model is lifecycle-based
+     via `ExecutionPhases` and `BenchmarkResults` models. Missing entirely:
+     `DataFrameContext`, `ExpressionFamilyAdapter`, `PandasFamilyAdapter`
+     classes and the whole DataFrame execution path.
+
+  2. `docs/design/structure.md` completely omits `benchbox/core/` (30+
+     subsystems) and `benchbox/platforms/` (40+ database adapters). A user
+     reading this doc cannot understand the actual project organization.
+
+  These are the docs developers read FIRST when trying to understand the
+  codebase. Getting them wrong cascades into confusion everywhere.
+
+category: Documentation
+
+metadata:
+  tags:
+  - documentation
+  - architecture
+  - design
+  - developer-experience
+  estimated_effort: "Medium"
+  created_date: "2026-04-01"
+  source_review: "Comprehensive documentation audit conversation"
+
+impact:
+  user_impact: |
+    Developers and contributors reading architecture docs will form incorrect
+    mental models of the system, leading to confusion and wasted time.
+  maintainer_impact: |
+    Architecture docs are the primary onboarding reference. Inaccuracy here
+    increases support burden and slows contributor ramp-up.
+  regression_risk: |
+    Zero - documentation-only changes.
+
+work:
+- id: w1
+  summary: "Map current execution model, key classes, and data flow"
+  status: done
+  needs: []
+  description: |
+    Research the actual codebase to document:
+    - Execution lifecycle (phases, runners, results)
+    - SQL vs DataFrame execution paths and their key classes
+    - All subsystems in benchbox/core/
+    - Platform adapter organization in benchbox/platforms/ (27 adapters)
+    - Key data models (ExecutionPhases, BenchmarkResults, etc.)
+  files:
+  - benchbox/cli/execution.py          # BenchmarkExecutor (line 30)
+  - benchbox/utils/execution_manager.py # PowerRunExecutor (line 148)
+  - benchbox/platforms/dataframe/expression_family.py  # ExpressionFamilyAdapter
+  - benchbox/platforms/dataframe/pandas_family.py      # PandasFamilyAdapter
+  - benchbox/core/dataframe/profiling.py               # DataFrameProfiler
+  - benchbox/core/                      # 30+ subsystems to enumerate
+
+- id: w2
+  summary: "Rewrite architecture.md with current execution model"
+  status: done
+  needs: [w1]
+  description: |
+    Rewrite architecture.md to describe lifecycle-based execution (not
+    Template Method). Document ExecutionPhases, BenchmarkResults models.
+    Cover both SQL and DataFrame execution paths. Mention DataFrameContext
+    and adapter families. Include diagrams or clear prose showing data flow.
+    Ensure no references to non-existent APIs.
+  approach: |
+    Key classes to document:
+    - BenchmarkExecutor (benchbox.cli.execution) - high-level orchestrator
+    - PowerRunExecutor (benchbox.utils.execution_manager) - concurrent query execution
+    - ExpressionFamilyAdapter (benchbox.platforms.dataframe.expression_family) - Polars/PySpark/DataFusion
+    - PandasFamilyAdapter (benchbox.platforms.dataframe.pandas_family) - Pandas/Modin/cuDF/Vaex/Dask
+    - DataFrameProfiler (benchbox.core.dataframe.profiling) - profiling/memory tracking
+  files:
+  - docs/design/architecture.md
+
+- id: w3
+  summary: "Rewrite structure.md with complete directory map"
+  status: done
+  needs: [w1]
+  description: |
+    Rewrite structure.md to document benchbox/core/ and all major subsystems,
+    benchbox/platforms/ and adapter organization, benchbox/benchmarks/
+    organization, and benchbox/cli/ command structure. Include accurate file
+    counts and a tree diagram matching actual directory output.
+  files:
+  - docs/design/structure.md
+
+verification:
+- description: "No references to non-existent .run() Template Method pattern"
+  command: "grep -n 'Template Method\\|\\.run()' docs/design/architecture.md || echo 'PASS: no stale pattern refs'"
+  expected_output: "PASS: no stale pattern refs"
+- description: "Key subsystems mentioned in structure.md"
+  command: "for d in core platforms benchmarks cli; do grep -q \"benchbox/$d\" docs/design/structure.md && echo \"PASS: $d\" || echo \"FAIL: $d missing\"; done"
+  expected_output: "PASS for all four directories"
+- description: "DataFrame adapter families documented in architecture.md"
+  command: "grep -c 'ExpressionFamilyAdapter\\|PandasFamilyAdapter' docs/design/architecture.md | xargs -I{} test {} -ge 2 && echo 'PASS: adapter families documented' || echo 'FAIL: adapter families missing'"
+  expected_output: "PASS: adapter families documented"
+
+scope_limit:
+  only_modify:
+  - "docs/design/architecture.md"
+  - "docs/design/structure.md"
+  do_not_touch:
+  - "Any source code files"
+  - "Other documentation files"
