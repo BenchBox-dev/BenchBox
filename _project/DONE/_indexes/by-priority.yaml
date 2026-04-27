@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T17:20:47.448116'
-total_items: 782
+generated_at: '2026-04-27T19:01:48.615985'
+total_items: 783
 priorities:
   Critical:
     count: 45
@@ -231,7 +231,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 267
+    count: 268
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -482,6 +482,11 @@ priorities:
     - id: dataframe-tpcdi-architecture
       file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
       title: Design DataFrame Architecture for TPC-DI ETL Workload
+      category: Core Functionality
+      status: Completed
+    - id: design-results-ingest-storage-and-derived-read-model
+      file: DONE/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+      title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Completed
     - id: docs-document-undocumented-cli-commands

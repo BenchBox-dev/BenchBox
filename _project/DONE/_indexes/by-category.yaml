@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T17:20:47.447941'
+generated_at: '2026-04-27T19:01:48.615809'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -701,7 +701,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 266
+    count: 267
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1117,6 +1117,11 @@ categories:
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
       priority: Critical
+      status: Completed
+    - id: design-results-ingest-storage-and-derived-read-model
+      file: DONE/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+      title: Design results ingest, storage, and derived read-model architecture
+      priority: High
       status: Completed
     - id: drop-plotly-html-charts
       file: DONE/core-functionality/active/drop-plotly-html-charts.yaml

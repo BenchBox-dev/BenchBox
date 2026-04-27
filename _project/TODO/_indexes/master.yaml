@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T17:20:45.619631'
-total_items: 31
+generated_at: '2026-04-27T19:01:46.777011'
+total_items: 30
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -20,26 +20,6 @@ items:
   work_ready: 1
   needs:
   - implement-pr-based-result-submission-workflow
-- id: design-results-ingest-storage-and-derived-read-model
-  file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
-  title: Design results ingest, storage, and derived read-model architecture
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - results
-  - api
-  - storage
-  - read-model
-  - architecture
-  estimated_effort: Large
-  work_total: 8
-  work_done: 0
-  work_ready: 1
-  needs:
-  - define-results-platform-product-and-launch-strategy
-  - define-hosted-results-contract-and-governance-model
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication

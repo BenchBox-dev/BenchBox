@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T17:20:47.447628'
-total_items: 782
+generated_at: '2026-04-27T19:01:48.615473'
+total_items: 783
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -1438,6 +1438,27 @@ items:
   - joe
   estimated_effort: Medium
   completed_date: '2026-02-07'
+- id: design-results-ingest-storage-and-derived-read-model
+  file: DONE/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+  title: Design results ingest, storage, and derived read-model architecture
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - api
+  - storage
+  - read-model
+  - architecture
+  estimated_effort: Large
+  completed_date: '2026-04-27'
+  work_total: 8
+  work_done: 8
+  work_ready: 0
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
 - id: docs-document-undocumented-cli-commands
   file: DONE/main/active/docs-document-undocumented-cli-commands.yaml
   title: Document 10 undocumented CLI commands and 13 undocumented run flags

@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T17:20:45.619676'
-total_items: 31
+generated_at: '2026-04-27T19:01:46.777054'
+total_items: 30
 priorities:
   Critical:
     count: 1
@@ -10,13 +10,8 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 5
+    count: 4
     items:
-    - id: design-results-ingest-storage-and-derived-read-model
-      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
-      title: Design results ingest, storage, and derived read-model architecture
-      category: Core Functionality
-      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication

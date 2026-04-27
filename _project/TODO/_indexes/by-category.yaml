@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T17:20:45.619659'
+generated_at: '2026-04-27T19:01:46.777038'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -46,17 +46,12 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 4
+    count: 3
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
-      status: Not Started
-    - id: design-results-ingest-storage-and-derived-read-model
-      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
-      title: Design results ingest, storage, and derived read-model architecture
-      priority: High
       status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
