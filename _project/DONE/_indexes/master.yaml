@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T10:12:01.853621'
-total_items: 777
+generated_at: '2026-04-27T12:47:46.743475'
+total_items: 778
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -556,6 +556,19 @@ items:
   work_ready: 0
   needs:
   - single-repo-migration-decisions-gate
+- id: single-repo-migration-phase-5-repo-flip
+  file: DONE/main/planning/single-repo-migration-phase-5-repo-flip.yaml
+  title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
+  worktree: main
+  category: Release Tooling
+  priority: Critical
+  status: Completed
+  completed_date: 2026-04-27
+  work_total: 10
+  work_done: 10
+  work_ready: 0
+  needs:
+  - single-repo-migration-phase-4-test-release-with-new-flow
 - id: single-repo-migration-decisions-gate
   file: DONE/main/planning/single-repo-migration-decisions-gate.yaml
   title: 'Single-repo migration: decisions gate (D1-D8) before any code or repo changes'

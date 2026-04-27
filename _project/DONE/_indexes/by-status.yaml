@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T10:12:01.854280'
-total_items: 777
+generated_at: '2026-04-27T12:47:46.744203'
+total_items: 778
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 726
+    count: 727
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3205,6 +3205,11 @@ statuses:
       file: DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
       title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
       priority: High
+      category: Release Tooling
+    - id: single-repo-migration-phase-5-repo-flip
+      file: DONE/main/planning/single-repo-migration-phase-5-repo-flip.yaml
+      title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
+      priority: Critical
       category: Release Tooling
     - id: single-repo-migration-decisions-gate
       file: DONE/main/planning/single-repo-migration-decisions-gate.yaml
