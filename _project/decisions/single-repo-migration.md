@@ -50,9 +50,13 @@ branch-to-branch use; it is no longer a two-repo bridge but a `develop` →
   2. Cut release branch:
        git checkout -b vX.Y.Z develop
   3. Curate the vX.Y.Z branch tree (drop _project/, _blog/, agent
-     configs, dev-tooling root files; apply transforms via repurposed
-     workflow.py / prepare_release.py; bump version; generate CHANGELOG
-     entry; commit on vX.Y.Z).
+     configs, dev-tooling root files via `git rm` directly in the
+     Makefile target; bump version; generate CHANGELOG entry; commit on
+     vX.Y.Z). Note: an earlier draft of this plan kept `workflow.py` /
+     `prepare_release.py` repurposed for branch-to-branch curation, but
+     the actual `make release-prepare` implementation uses `git rm`
+     directly, so those modules were deleted in Phase 6 alongside the
+     other release tooling.
   4. Squash-merge vX.Y.Z into main:
        git checkout main && git merge --squash vX.Y.Z
        git commit -m "Release vX.Y.Z"

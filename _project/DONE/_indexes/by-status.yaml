@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T14:52:32.992615'
-total_items: 779
+generated_at: '2026-04-27T15:06:34.102467'
+total_items: 780
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 728
+    count: 729
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3210,6 +3210,11 @@ statuses:
       file: DONE/main/planning/single-repo-migration-phase-5-repo-flip.yaml
       title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
       priority: Critical
+      category: Release Tooling
+    - id: single-repo-migration-phase-6-delete-obsolete-tooling
+      file: DONE/main/planning/single-repo-migration-phase-6-delete-obsolete-tooling.yaml
+      title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'
+      priority: Medium-High
       category: Release Tooling
     - id: single-repo-migration-phase-7-docs-cleanup
       file: DONE/main/planning/single-repo-migration-phase-7-docs-cleanup.yaml
