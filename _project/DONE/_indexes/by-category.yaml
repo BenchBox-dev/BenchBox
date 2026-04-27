@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T10:12:01.853933'
+generated_at: '2026-04-27T12:47:46.743858'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -3495,7 +3495,7 @@ categories:
       priority: Critical
       status: Completed
   Release Tooling:
-    count: 7
+    count: 8
     items:
     - id: single-repo-migration-phase-0-audit
       file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
@@ -3517,6 +3517,11 @@ categories:
       file: DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml
       title: 'Single-repo migration phase 3: Makefile release target and GitHub Actions release workflow'
       priority: High
+      status: Completed
+    - id: single-repo-migration-phase-5-repo-flip
+      file: DONE/main/planning/single-repo-migration-phase-5-repo-flip.yaml
+      title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
+      priority: Critical
       status: Completed
     - id: single-repo-migration-decisions-gate
       file: DONE/main/planning/single-repo-migration-decisions-gate.yaml

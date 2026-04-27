@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T10:12:00.026204'
-total_items: 36
+generated_at: '2026-04-27T12:47:44.998133'
+total_items: 35
 statuses:
   In Progress:
     count: 2
@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 33
+    count: 32
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -122,11 +122,6 @@ statuses:
       title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
       priority: Low
       category: Core Functionality
-    - id: single-repo-migration-phase-5-repo-flip
-      file: TODO/main/active/single-repo-migration-phase-5-repo-flip.yaml
-      title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
-      priority: Critical
-      category: Release Tooling
     - id: single-repo-migration-phase-6-delete-obsolete-tooling
       file: TODO/main/planning/single-repo-migration-phase-6-delete-obsolete-tooling.yaml
       title: 'Single-repo migration phase 6: delete the release scripts, sync module, and curation predicate'

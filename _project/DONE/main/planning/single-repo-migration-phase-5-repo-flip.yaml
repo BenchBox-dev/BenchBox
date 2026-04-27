@@ -2,12 +2,30 @@ id: single-repo-migration-phase-5-repo-flip
 title: "Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)"
 worktree: main
 priority: Critical
-status: In Progress
+status: Completed
+completed_date: 2026-04-27
 category: Release Tooling
 amendment_2026-04-27: |
   Phase 4 v0.3.0 release cut deferred per user direction. Phase 5
-  proceeds without v0.3.0 — dev locus migrates to public develop branch
+  proceeded without v0.3.0 — dev locus migrated to public develop branch
   while v0.3.0 is held back for later.
+
+  Outcome:
+  - joeharris76/benchbox-private archived (read-only on GitHub).
+  - /Users/joe/Developer/BenchBox renamed to BenchBox.retired-20260427/;
+    a symlink at /Users/joe/Developer/BenchBox now points at
+    ~/Developer/benchbox-public for shell-muscle-memory continuity (w6
+    option-b chosen).
+  - Mirror backup at /tmp/benchbox-private-backup-20260427.git (147 MB)
+    retained per the 60-day soak.
+  - Three rulesets applied to joeharris76/BenchBox via gh api:
+    main-release-only (id 15611783), develop-squash-only (id 15611785),
+    v-release-branches-minimal (id 15611787). Repo-level squash-only
+    merge enforced.
+  - CLAUDE.md two-remote section replaced with single-repo + version-
+    branch guidance. AGENTS.md had no equivalent section.
+  - w10 (MIGRATION-NOTES.md) skipped: not needed under Option B; URL
+    didn't change so no external visitors are misrouted.
 
 deps:
   needs:
@@ -115,7 +133,7 @@ work:
 - id: w7
   summary: "Set up branch protection on joeharris76/BenchBox main"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     GitHub UI: Settings -> Branches -> Add rule for main:
       - Require pull request before merging
@@ -148,7 +166,7 @@ work:
 - id: w9
   summary: "Strip two-remote-rule sections from CLAUDE.md and AGENTS.md (interim - full update in Phase 7)"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
     Open a PR on public to remove the "Git Remotes - CRITICAL" section
     in CLAUDE.md and the equivalent in AGENTS.md so future sessions
@@ -162,7 +180,7 @@ work:
 - id: w10
   summary: "(Optional) Pin a MIGRATION-NOTES.md at repo root for 60-90 days"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
     Brief note for any external visitors:
       "BenchBox absorbed development from a private fork on YYYY-MM-DD.

@@ -1,14 +1,9 @@
-generated_at: '2026-04-27T10:12:00.026194'
-total_items: 36
+generated_at: '2026-04-27T12:47:44.998124'
+total_items: 35
 priorities:
   Critical:
-    count: 2
+    count: 1
     items:
-    - id: single-repo-migration-phase-5-repo-flip
-      file: TODO/main/active/single-repo-migration-phase-5-repo-flip.yaml
-      title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
-      category: Release Tooling
-      status: Not Started
     - id: verify-ci-validation-workflow-end-to-end
       file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
       title: Verify the validate-submission CI workflow end-to-end with a real PR

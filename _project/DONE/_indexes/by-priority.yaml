@@ -1,8 +1,8 @@
-generated_at: '2026-04-27T10:12:01.854111'
-total_items: 777
+generated_at: '2026-04-27T12:47:46.744037'
+total_items: 778
 priorities:
   Critical:
-    count: 44
+    count: 45
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -183,6 +183,11 @@ priorities:
       file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
       title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
         check)'
+      category: Release Tooling
+      status: Completed
+    - id: single-repo-migration-phase-5-repo-flip
+      file: DONE/main/planning/single-repo-migration-phase-5-repo-flip.yaml
+      title: 'Single-repo migration phase 5: dev locus migration (archive private repo, retire private clone)'
       category: Release Tooling
       status: Completed
     - id: single-repo-migration-decisions-gate
