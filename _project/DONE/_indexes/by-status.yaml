@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T15:06:34.102467'
-total_items: 780
+generated_at: '2026-04-27T17:03:37.490471'
+total_items: 781
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 729
+    count: 730
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -1407,6 +1407,11 @@ statuses:
       title: Define DataFrameProtocol and remove Any annotations from unified frame layer
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: define-phase-3-promotion-metrics
+      file: DONE/main/planning/define-phase-3-promotion-metrics.yaml
+      title: Define Phase 3 promotion metrics, dashboard, and review cadence
+      priority: Medium
+      category: Core Functionality
     - id: define-hosted-results-contract-and-governance-model
       file: DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model

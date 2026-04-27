@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T15:06:32.171948'
-total_items: 33
+generated_at: '2026-04-27T17:03:35.576977'
+total_items: 32
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -393,24 +393,6 @@ items:
   work_total: 3
   work_done: 1
   work_ready: 2
-- id: define-phase-3-promotion-metrics
-  file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
-  title: Define Phase 3 promotion metrics, dashboard, and review cadence
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - phase-3
-  - metrics
-  - governance
-  estimated_effort: Small
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - implement-pr-based-result-submission-workflow
 - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
   file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
   title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL

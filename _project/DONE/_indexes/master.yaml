@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T15:06:34.101690'
-total_items: 780
+generated_at: '2026-04-27T17:03:37.489763'
+total_items: 781
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -6757,6 +6757,25 @@ items:
   work_total: 5
   work_done: 5
   work_ready: 0
+- id: define-phase-3-promotion-metrics
+  file: DONE/main/planning/define-phase-3-promotion-metrics.yaml
+  title: Define Phase 3 promotion metrics, dashboard, and review cadence
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Completed
+  tags:
+  - results
+  - phase-3
+  - metrics
+  - governance
+  estimated_effort: Small
+  completed_date: '2026-04-27'
+  work_total: 4
+  work_done: 4
+  work_ready: 0
+  needs:
+  - implement-pr-based-result-submission-workflow
 - id: interactive-wizard-cli-command-preview
   file: DONE/ux-improvements/active/interactive-wizard-cli-command-preview.yaml
   title: Display equivalent CLI command before benchmark execution

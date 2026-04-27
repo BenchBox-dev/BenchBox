@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T15:06:34.102069'
+generated_at: '2026-04-27T17:03:37.490103'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -701,7 +701,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 264
+    count: 265
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1097,6 +1097,11 @@ categories:
       file: DONE/dataframe-benchmarks/active/dataframe-write-primitives-model.yaml
       title: Define DataFrame Execution Model for Write Primitives
       priority: Medium-High
+      status: Completed
+    - id: define-phase-3-promotion-metrics
+      file: DONE/main/planning/define-phase-3-promotion-metrics.yaml
+      title: Define Phase 3 promotion metrics, dashboard, and review cadence
+      priority: Medium
       status: Completed
     - id: define-hosted-results-contract-and-governance-model
       file: DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml
