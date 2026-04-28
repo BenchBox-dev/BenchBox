@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - main
-      - develop
-      - 'v*'
   pull_request:
     branches:
       - main
       - develop
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -255,7 +257,9 @@ jobs:
   # CLI↔explorer visualization parity check.
   # Verifies that the checked-in JSON fixtures in tests/parity/fixtures/
   # match the current Python implementations, AND that the Vitest suite passes.
+  # Skipped on Release v* PRs (curation + version bumps don't change fixtures).
   parity:
+    if: ${{ !startsWith(github.event.pull_request.title, 'Release v') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

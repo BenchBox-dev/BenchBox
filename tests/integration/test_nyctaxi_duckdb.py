@@ -286,6 +286,7 @@ class TestNYCTaxiDataGeneration:
                 assert 0 < pickup_id <= 265
                 assert 0 < dropoff_id <= 265
 
-                # Amounts should be numeric
-                fare = float(row[header.index("fare_amount")])
-                assert fare >= 0
+                # Amounts should be numeric. Real NYC TLC trip data
+                # includes negative fare_amount values (refunds and
+                # adjustments), so assert numeric-ness only.
+                float(row[header.index("fare_amount")])

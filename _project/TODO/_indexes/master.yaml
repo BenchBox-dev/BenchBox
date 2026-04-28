@@ -1,6 +1,84 @@
-generated_at: '2026-04-28T07:38:10.000356'
-total_items: 29
+generated_at: '2026-04-28T09:25:54.350396'
+total_items: 34
 items:
+- id: verify-ci-validation-workflow-end-to-end
+  file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+  title: Verify the validate-submission CI workflow end-to-end with a real PR
+  worktree: main
+  category: Testing and Quality Assurance
+  priority: Critical
+  status: Not Started
+  tags:
+  - results
+  - ci
+  - phase-2
+  - validation
+  - end-to-end
+  estimated_effort: Small
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - implement-pr-based-result-submission-workflow
+- id: design-results-ingest-storage-and-derived-read-model
+  file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+  title: Design results ingest, storage, and derived read-model architecture
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - api
+  - storage
+  - read-model
+  - architecture
+  estimated_effort: Large
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
+- id: release-flow-dry-run-rc1
+  file: TODO/main/active/release-flow-dry-run-rc1.yaml
+  title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Not Started
+  tags:
+  - release
+  - validation
+  - rc
+  - pypi
+  estimated_effort: ~1h interactive (release-cut to release-finalize), plus ~15 min release.yml CI wait
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  needs:
+  - simplify-dev-loop-and-release-flow
+- id: integrate-benchbox-cli-submit-and-service-auth
+  file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+  title: Integrate BenchBox CLI submission flow and service authentication
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Not Started
+  tags:
+  - results
+  - cli
+  - auth
+  - submission
+  - api
+  estimated_effort: Large
+  work_total: 8
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T07:38:12.087988'
-total_items: 787
+generated_at: '2026-04-28T09:25:56.220393'
+total_items: 781
 priorities:
   Critical:
     count: 47
@@ -1289,6 +1289,11 @@ priorities:
       file: DONE/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml
       title: Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere)
       category: Core Functionality
+      status: Completed
+    - id: simplify-dev-loop-and-release-flow
+      file: DONE/main/active/simplify-dev-loop-and-release-flow.yaml
+      title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
+      category: Release Tooling
       status: Completed
     - id: single-repo-migration-phase-1-wheel-hygiene
       file: DONE/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
