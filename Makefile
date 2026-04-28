@@ -655,21 +655,26 @@ release-cut:
 	@if [ -n "$$EDITOR" ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
 		$$EDITOR CHANGELOG.md; \
-	else \
+	elif [ -t 0 ]; then \
 		echo "==> EDITOR unset; skipping interactive CHANGELOG curation"; \
+	else \
+		echo "ERROR: EDITOR unset and no TTY — refusing to skip changelog curation in headless mode." >&2; exit 1; \
 	fi
-	@# Stage version-bump + changelog edits.
-	git add -A
-	@# Curation: drop develop-only paths from the release branch.
-	@# These are paths recorded in A3 of _project/decisions/single-repo-migration.md
-	@# as "develop only". Released wheels never carry these.
+	@# Curation FIRST so dev-only paths are never staged. Order matters: git rm
+	@# before git add ensures untracked files inside _project/ etc. don't end up
+	@# staged-for-add by a later git add.
+	@# Curation list: A3 of _project/decisions/single-repo-migration.md.
 	-git rm -rf _project _blog .claude .codex .gemini
 	-git rm -f .pre-commit-config.yaml _benchbox_pytest_xdist_safety.py todo.config.yaml skill-sync.yaml skill-sync.lock .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md
+	@# Stage only the files update_version.py + generate_changelog_entry.py write.
+	@# Explicit list (not `git add -A`) to avoid staging build/cache artifacts.
+	git add pyproject.toml benchbox/__init__.py landing/index.html README.md docs/README.md benchbox/utils/VERSION_MANAGEMENT.md CHANGELOG.md
 	git commit -m "Release v$(VERSION)"
 	git push -u origin v$(VERSION)
 	gh pr create --base main --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
 	@# Option-c lifecycle: delete any prior v* branches on origin (loop sweeps stale entries).
-	@for br in $$(git ls-remote --heads origin 'v*' | awk '{print $$2}' | sed 's|refs/heads/||' | grep -v '^v$(VERSION)$$'); do \
+	@# Use grep -Fxv (literal, full-line match) so version strings with `.` aren't treated as regex.
+	@for br in $$(git ls-remote --heads origin 'v*' | awk '{print $$2}' | sed 's|refs/heads/||' | grep -Fxv "v$(VERSION)"); do \
 		echo "==> Deleting prior release branch on origin: $$br"; \
 		git push origin --delete "$$br" || true; \
 	done
@@ -686,7 +691,7 @@ release-finalize:
 	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
 	@PR=$$(gh pr list --base main --head v$(VERSION) --state open --json number --jq '.[0].number'); \
 	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → main" && exit 1); \
-	echo "==> Squash-merging PR #$$PR"; \
+	echo "==> Squash-merging PR #$$PR (ruleset main-release-only blocks merge if CI is not green)"; \
 	gh pr merge --squash "$$PR"
 	git fetch origin --tags
 	git checkout main
