@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T15:06:32.171948'
-total_items: 33
+generated_at: '2026-04-27T20:24:54.790158'
+total_items: 34
 items:
 - id: verify-ci-validation-workflow-end-to-end
   file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
@@ -97,6 +97,25 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
+- id: simplify-dev-loop-and-release-flow
+  file: TODO/main/planning/simplify-dev-loop-and-release-flow.yaml
+  title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Not Started
+  tags:
+  - release
+  - dev-loop
+  - tooling
+  - simplification
+  estimated_effort: ~6h spread across 1-2 days
+  work_total: 9
+  work_done: 0
+  work_ready: 4
+  deferred_count: 2
+  needs:
+  - single-repo-migration-phase-4-test-release-with-new-flow
 - id: single-repo-migration-phase-4-test-release-with-new-flow
   file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
   title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'

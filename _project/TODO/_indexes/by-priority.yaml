@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T15:06:32.172001'
-total_items: 33
+generated_at: '2026-04-27T20:24:54.790215'
+total_items: 34
 priorities:
   Critical:
     count: 1
@@ -10,7 +10,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   High:
-    count: 5
+    count: 6
     items:
     - id: design-results-ingest-storage-and-derived-read-model
       file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
@@ -31,6 +31,11 @@ priorities:
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
+      status: Not Started
+    - id: simplify-dev-loop-and-release-flow
+      file: TODO/main/planning/simplify-dev-loop-and-release-flow.yaml
+      title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
+      category: Release Tooling
       status: Not Started
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
