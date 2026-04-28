@@ -1,27 +1,14 @@
-generated_at: '2026-04-27T15:06:32.172001'
-total_items: 33
+generated_at: '2026-04-27T19:59:30.756425'
+total_items: 28
 priorities:
-  Critical:
-    count: 1
-    items:
-    - id: verify-ci-validation-workflow-end-to-end
-      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
-      title: Verify the validate-submission CI workflow end-to-end with a real PR
-      category: Testing and Quality Assurance
-      status: Not Started
   High:
-    count: 5
+    count: 4
     items:
-    - id: design-results-ingest-storage-and-derived-read-model
-      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
-      title: Design results ingest, storage, and derived read-model architecture
-      category: Core Functionality
-      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
       category: Core Functionality
-      status: Not Started
+      status: In Progress
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
@@ -56,7 +43,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium:
-    count: 8
+    count: 6
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -68,21 +55,11 @@ priorities:
       title: Address follow-up findings from timing-policy pre-commit split review
       category: Testing & Quality
       status: In Progress
-    - id: define-phase-3-promotion-metrics
-      file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
-      title: Define Phase 3 promotion metrics, dashboard, and review cadence
-      category: Core Functionality
-      status: Not Started
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       category: Performance
       status: Identified
-    - id: operate-results-platform-security-observability-and-abuse-controls
-      file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
-      title: Operate results platform security, observability, and abuse controls
-      category: Core Functionality
-      status: Not Started
     - id: single-repo-migration-phase-8-first-post-migration-release
       file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
       title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
@@ -99,7 +76,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Low:
-    count: 15
+    count: 14
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -145,11 +122,6 @@ priorities:
       file: TODO/main/planning/fix-git-author-history-rewrite.yaml
       title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
       category: Repository Maintenance
-      status: Not Started
-    - id: evaluate-results-data-repo-extraction-checkpoint
-      file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
-      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
-      category: Core Functionality
       status: Not Started
     - id: single-repo-migration-phase-9-decommission-archive
       file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml

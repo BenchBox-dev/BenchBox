@@ -57,23 +57,70 @@ def _get_git_username() -> str:
         return ""
 
 
-def _compute_bundle_hash(bundle_dir: Path) -> str:
-    """Compute SHA-256 hash over all files in the bundle directory.
-
-    Uses the POSIX relative path from bundle_dir (not just the filename)
-    so that files in subdirectories are distinguished.
-    """
+def _compute_file_hash(file_path: Path) -> str:
+    """Compute SHA-256 of a single file's contents."""
     h = hashlib.sha256()
-    for file_path in sorted(bundle_dir.rglob("*")):
-        if file_path.is_symlink():
-            continue
-        if file_path.is_file():
-            h.update(file_path.relative_to(bundle_dir).as_posix().encode())
-            try:
-                h.update(file_path.read_bytes())
-            except PermissionError:
-                raise PermissionError(f"Cannot read file for hashing: {file_path}") from None
+    try:
+        h.update(file_path.read_bytes())
+    except PermissionError:
+        raise PermissionError(f"Cannot read file for hashing: {file_path}") from None
     return h.hexdigest()
+
+
+def _dispatch_service_mode(
+    ctx: click.Context,
+    *,
+    source_path: Path,
+    companions: list[Path],
+    service_url: str,
+    visibility: str,
+    idempotency_key: str | None,
+    wait: bool,
+    dry_run: bool,
+) -> None:
+    """Phase 3 hosted-API submission path.
+
+    Currently a skeleton: --dry-run is fully supported (validates the
+    bundle, prints what would be uploaded, no credentials needed). The
+    real upload + auth + status-polling flow is the work in
+    `integrate-benchbox-cli-submit-and-service-auth` w4-w8 and lands
+    once the hosted ingest API is available.
+    """
+    bundle_size = source_path.stat().st_size
+    bundle_hash = _compute_file_hash(source_path)
+    companion_hashes = {comp.name: _compute_file_hash(comp) for comp in companions}
+
+    if dry_run:
+        console.print("\n[bold]Dry-run - would upload:[/bold]")
+        console.print(f"  Service URL:      {service_url}")
+        console.print(f"  Bundle file:      {source_path.name} ({bundle_size:,} bytes)")
+        console.print(f"  Bundle hash:      {bundle_hash}")
+        if companions:
+            console.print("  Companions:")
+            for comp in companions:
+                console.print(f"    {comp.name}  {companion_hashes[comp.name]}")
+        else:
+            console.print("  Companions:       (none)")
+        console.print(f"  Visibility:       {visibility}")
+        console.print(f"  Idempotency key:  {idempotency_key or '(auto-generated at upload time)'}")
+        console.print(f"  Wait for accept:  {wait}")
+        console.print("\n[yellow]Dry-run complete - no bytes sent.[/yellow]")
+        return
+
+    # Real upload path is not yet implemented. Surface that explicitly
+    # rather than silently no-op or partially-execute.
+    console.print(
+        "\n[red]Hosted submission upload is not yet implemented.[/red]\n"
+        "  --service --dry-run works today; the live upload + auth flow lands\n"
+        "  in `integrate-benchbox-cli-submit-and-service-auth` w4-w8, gated\n"
+        "  on the Phase 3 promotion metrics in\n"
+        "  _project/analysis/phase-3-promotion-metrics.md."
+    )
+    ctx.exit(1)
+
+
+_DEFAULT_SERVICE_URL = "https://api.benchbox.dev/v1"
+_VISIBILITY_CHOICES = ("public", "unlisted", "private")
 
 
 @click.command("submit")
@@ -99,41 +146,89 @@ def _compute_bundle_hash(bundle_dir: Path) -> str:
     type=click.Path(),
     default="submission",
     show_default=True,
-    help="Output directory for submission package",
+    help="Phase 2 mode: output directory for the PR-package",
+)
+@click.option(
+    "--service",
+    "service_url",
+    is_flag=False,
+    flag_value=_DEFAULT_SERVICE_URL,
+    default=None,
+    help=(
+        "Phase 3 mode: submit to the hosted ingest API. Without a value, "
+        f"uses {_DEFAULT_SERVICE_URL}. Without this flag, --output runs."
+    ),
+)
+@click.option(
+    "--visibility",
+    type=click.Choice(_VISIBILITY_CHOICES),
+    default="public",
+    show_default=True,
+    help="Phase 3 only: visibility of the submitted result.",
+)
+@click.option(
+    "--idempotency-key",
+    type=str,
+    default=None,
+    help="Phase 3 only: override the auto-generated key. Useful for resumable retries.",
+)
+@click.option(
+    "--wait/--no-wait",
+    default=True,
+    help="Phase 3 only: wait for ingest to finish and print the public URL. [default: --wait]",
 )
 @click.option(
     "--dry-run",
     is_flag=True,
-    help="Preview what would be packaged without writing files",
+    help="Preview what would be packaged or uploaded without writing files / sending bytes.",
 )
 @click.pass_context
-def submit(ctx, result_file, last, benchmark, platform, output_dir, dry_run):
-    """Package a benchmark result bundle for contribution to the hosted results platform.
+def submit(
+    ctx,
+    result_file,
+    last,
+    benchmark,
+    platform,
+    output_dir,
+    service_url,
+    visibility,
+    idempotency_key,
+    wait,
+    dry_run,
+):
+    """Submit a benchmark result bundle to the BenchBox results platform.
 
-    Creates an output directory with the canonical bundle + submission manifest
-    ready for opening a PR against results-data/.
+    Two modes, selected by the flag set:
 
-    RESULT_FILE: Path to result JSON file (optional)
+      --output PATH (Phase 2, default)
+        Package the canonical bundle + submission manifest into PATH ready
+        for opening a PR against the BenchBox repository's results-data/
+        directory. No network. No credentials. Existing v0.2.x behavior.
+
+      --service [URL] (Phase 3)
+        Upload the canonical bundle to a hosted ingest API. Requires
+        authentication via 'benchbox auth login'. With --dry-run, validates
+        the bundle and prints what would be uploaded - no credentials
+        needed for the dry-run path.
+
+    RESULT_FILE: Path to result JSON file (optional; with --last, picked
+    from history).
 
     Examples:
-        # Package specific result
-        benchbox submit results/tpch_sf1_duckdb.json
-
-        # Package most recent result
+        # Package most recent result for PR contribution (Phase 2; default)
         benchbox submit --last
 
-        # Package most recent TPC-H result
-        benchbox submit --last --benchmark tpch
+        # Submit most recent result to the hosted platform (Phase 3)
+        benchbox submit --last --service
 
-        # Preview what would be packaged
-        benchbox submit --last --dry-run
+        # Submit a specific bundle to a non-default service URL
+        benchbox submit results/tpch_sf01_duckdb.json --service https://staging.benchbox.dev/v1
 
-        # Use a custom output directory
-        benchbox submit --last --output ./my-submission
+        # Preview what would be uploaded without sending bytes
+        benchbox submit --last --service --dry-run
 
-    Note: benchbox submit packages results for PR contribution.
-          benchbox publish copies results to local or cloud storage.
-          These are different operations with different workflows.
+    Note: benchbox submit shares results publicly. To copy a result to
+    storage you control (local path, S3, etc.), use 'benchbox publish'.
     """
     if result_file:
         source_path = Path(result_file)
@@ -216,6 +311,19 @@ def submit(ctx, result_file, last, benchmark, platform, output_dir, dry_run):
         if (p := source_path.with_name(source_path.stem + suffix)).exists()
     ]
 
+    if service_url is not None:
+        _dispatch_service_mode(
+            ctx,
+            source_path=source_path,
+            companions=companions,
+            service_url=service_url,
+            visibility=visibility,
+            idempotency_key=idempotency_key,
+            wait=wait,
+            dry_run=dry_run,
+        )
+        return
+
     output_path = Path(output_dir)
     bundle_dir = output_path / "bundle"
     manifest_path = output_path / "submission-manifest.json"
@@ -237,14 +345,21 @@ def submit(ctx, result_file, last, benchmark, platform, output_dir, dry_run):
     for comp in companions:
         shutil.copy2(comp, bundle_dir / comp.name)
 
-    # Compute composite hash over ALL files in the bundle (after assembly, before manifest).
-    bundle_hash = _compute_bundle_hash(bundle_dir)
+    # Per-file hashes — bundle_hash covers the primary bundle JSON only,
+    # companion_hashes maps each companion's filename to its SHA-256.
+    # Per-file is the contract used by scripts/validate_submission.py;
+    # using a directory-level hash here would not survive the user
+    # copying the files into results-data/bundles/ where 13+ other
+    # bundles already live.
+    bundle_hash = _compute_file_hash(bundle_dir / source_path.name)
+    companion_hashes = {comp.name: _compute_file_hash(bundle_dir / comp.name) for comp in companions}
 
     manifest = {
         "submission_tool_version": f"benchbox/{benchbox.__version__}",
         "submitted_at": datetime.now(timezone.utc).isoformat(),
         "bundle_file": source_path.name,
         "bundle_hash": bundle_hash,
+        "companion_hashes": companion_hashes,
         "benchmark": result.benchmark_name,
         "platform": result.platform,
         "scale_factor": result.scale_factor,

@@ -1,0 +1,107 @@
+id: fix-chromium-result-detail-sort-flake
+title: "Fix Chromium e2e flake: ResultDetail median-table sort indicator times out"
+worktree: main
+priority: Medium-High
+completed_date: "2026-04-27"
+status: Completed
+category: Testing and Quality Assurance
+
+description: |
+  CI run 25017675976 (push to `main`, 2026-04-27) saw the Chromium
+  blocking job fail twice (initial + retry) on
+  `e2e/routes/result-detail.spec.ts:27 - sorting the median table toggles
+  the indicator arrow`. The retry timed out at 60s waiting for
+  `getByRole('columnheader', { name: /Median \(ms\)/ })` to be clickable
+  before the click could fire.
+
+  Two failing tests in this run:
+    - e2e/routes/result-detail.spec.ts:27:3 - sort indicator
+    - e2e/failures/compare-hard-block.spec.ts:26:3 - mixing scale factors
+
+  This is the **blocking** Chromium suite, not the advisory Firefox/
+  WebKit smoke jobs. A failure here gates the
+  `graduate-browser-smoke-to-blocking-gates` TODO (which needs 10
+  consecutive green runs) and any release flow that requires green
+  CI on `main`.
+
+  Surfaced during the 2026-04-27 results-explorer-TODOs sweep.
+
+work:
+  - id: w1
+    summary: "Reproduce locally and capture the flake signal"
+    status: done
+    notes: |
+      Run `cd results-explorer && npm run test:e2e:chromium -- --grep
+      "sorting the median table"` in a loop (10x). Capture which retries
+      pass and which time out. If it does not reproduce locally, run
+      under load (`--workers=4` against the same fixture) since the CI
+      runner is more contended than a workstation.
+
+  - id: w2
+    summary: "Determine whether the locator or the data load is the cause"
+    needs: [w1]
+    status: done
+    notes: |
+      Two hypotheses:
+      (a) The `getByRole('columnheader')` matches before DuckDB has
+          populated the table, so the click lands on a stale element
+          that does not have the sort handler attached yet.
+      (b) The locator is correct but the click handler races a re-render
+          triggered by snapshot reload.
+      Distinguish by replacing `await header.click()` with
+      `await header.click({ trial: true })` and inspecting the locator
+      state at that point. Trial click does not actuate the handler.
+
+  - id: w3
+    summary: "Land a focused fix; add a deterministic data-load gate"
+    needs: [w2]
+    status: done
+    notes: |
+      Likely fix: gate the click on a stable readiness signal. Either a
+      `data-loaded="true"` attribute on the table, or
+      `await page.waitForFunction(() => /* DuckDB attach complete */)`.
+      The fixtures.waitForDataLoaded helper already does the latter for
+      a different selector - extend it.
+
+verification:
+  - description: "The failing test passes 10 consecutive runs locally"
+    command: "cd results-explorer && for i in 1 2 3 4 5 6 7 8 9 10; do npx playwright test --project=chromium --grep 'sorting the median table' || break; done"
+    expected_output: "no early break"
+
+must_preserve:
+  - "Chromium blocking gate behavior. Do not flip the test to .skip; that defeats the purpose."
+  - "The existing fixtures.waitForDataLoaded contract."
+
+anti_patterns:
+  - "DO NOT add a fixed-duration sleep - because flakes return at higher load - use a deterministic readiness signal instead."
+  - "DO NOT increase the test timeout to mask the issue - because that hides the underlying race."
+
+scope_limit:
+  only_modify:
+    - "results-explorer/e2e/routes/result-detail.spec.ts"
+    - "results-explorer/e2e/support/fixtures.ts"
+    - "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+    - "results-explorer/src/routes/ResultDetail.tsx"  # if (a) is the cause
+  do_not_modify:
+    - "results-explorer/playwright.config.ts"
+    - ".github/workflows/results-explorer-browser.yml"
+
+metadata:
+  tags:
+    - "results"
+    - "explorer"
+    - "browser"
+    - "ci"
+    - "flake"
+    - "chromium"
+  estimated_effort: "Small"
+  created_date: "2026-04-27"
+
+impact:
+  business_value: |
+    Unblocks `graduate-browser-smoke-to-blocking-gates` and any release
+    that depends on green CI. A blocking-gate flake erodes trust in
+    the entire CI matrix.
+  user_impact: |
+    None directly - this is a CI-only failure. Indirect impact: feature
+    work stalls behind red CI.

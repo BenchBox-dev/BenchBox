@@ -1,8 +1,8 @@
-generated_at: '2026-04-27T15:06:34.102274'
-total_items: 780
+generated_at: '2026-04-27T19:59:32.612984'
+total_items: 787
 priorities:
   Critical:
-    count: 45
+    count: 47
     items:
     - id: interactive-wizard-dry-run-support
       file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -104,6 +104,11 @@ priorities:
       title: Fix benchmark correctness issues in Databend, Doris, and pg_duckdb adapters
       category: Platform Expansion
       status: Completed
+    - id: fix-submission-hash-mismatch-vs-validator-directory-scope
+      file: DONE/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
+      title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
+      category: Core Functionality
+      status: Completed
     - id: fix-ci-critical-issues
       file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml
       title: Fix critical CI issues for green builds
@@ -200,6 +205,11 @@ priorities:
       title: Unify TPC-DI SQL/DataFrame Execution Contract and ETL Path
       category: Core Functionality
       status: Completed
+    - id: verify-ci-validation-workflow-end-to-end
+      file: DONE/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+      title: Verify the validate-submission CI workflow end-to-end with a real PR
+      category: Testing and Quality Assurance
+      status: Not Started
     - id: visualization-framework-chart-generation-results-display
       file: DONE/content-enablement-viz/planning/visualization-framework-chart-generation-results-display.yaml
       title: Visualization Framework - Chart Generation & Results Display
@@ -231,7 +241,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 267
+    count: 268
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -482,6 +492,11 @@ priorities:
     - id: dataframe-tpcdi-architecture
       file: DONE/dataframe-benchmarks/active/dataframe-tpcdi-architecture.yaml
       title: Design DataFrame Architecture for TPC-DI ETL Workload
+      category: Core Functionality
+      status: Completed
+    - id: design-results-ingest-storage-and-derived-read-model
+      file: DONE/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+      title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Completed
     - id: docs-document-undocumented-cli-commands
@@ -1572,7 +1587,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 128
+    count: 129
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -1894,6 +1909,11 @@ priorities:
       file: DONE/core-functionality/active/complexity-field-extraction-w14.yaml
       title: Extract repetitive field assignment patterns into data-driven helpers (complexity batch 2)
       category: Core Functionality
+      status: Completed
+    - id: fix-chromium-result-detail-sort-flake
+      file: DONE/main/planning/fix-chromium-result-detail-sort-flake.yaml
+      title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
+      category: Testing and Quality Assurance
       status: Completed
     - id: clickhouse-tpchavoc-q6-decimal-bug
       file: DONE/platform-expansion/planning/clickhouse-tpchavoc-q6-decimal-bug.yaml
@@ -2217,7 +2237,7 @@ priorities:
       category: Documentation
       status: Completed
   Medium:
-    count: 296
+    count: 298
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2776,6 +2796,11 @@ priorities:
       title: Define DataFrameProtocol and remove Any annotations from unified frame layer
       category: Code Quality and Technical Debt
       status: Completed
+    - id: define-phase-3-promotion-metrics
+      file: DONE/main/planning/define-phase-3-promotion-metrics.yaml
+      title: Define Phase 3 promotion metrics, dashboard, and review cadence
+      category: Core Functionality
+      status: Completed
     - id: interactive-wizard-cli-command-preview
       file: DONE/ux-improvements/active/interactive-wizard-cli-command-preview.yaml
       title: Display equivalent CLI command before benchmark execution
@@ -3136,6 +3161,11 @@ priorities:
       file: DONE/testing-improvements/completed/open-table-format-smoke-tests.yaml
       title: Open Table Format Smoke Tests
       category: Testing and Quality Assurance
+      status: Completed
+    - id: operate-results-platform-security-observability-and-abuse-controls
+      file: DONE/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+      title: Operate results platform security, observability, and abuse controls
+      category: Core Functionality
       status: Completed
     - id: optimize-benchmark-results-json-output-format
       file: DONE/unknown/planning/optimize-benchmark-results-json-output-format.yaml
@@ -3703,7 +3733,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 44
+    count: 45
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3904,6 +3934,11 @@ priorities:
       file: DONE/platform-comparison/planning/sql-cross-platform-benchmark-suite.yaml
       title: SQL Cross-Platform Benchmark Suite
       category: Performance and Efficiency
+      status: Completed
+    - id: evaluate-results-data-repo-extraction-checkpoint
+      file: DONE/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+      category: Core Functionality
       status: Completed
     - id: starburst-platform-adapter
       file: DONE/platform-expansion/planning/starburst-platform-adapter.yaml

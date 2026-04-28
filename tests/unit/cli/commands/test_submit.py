@@ -242,3 +242,103 @@ def test_submit_generic_exception(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     result = CliRunner().invoke(sub.submit, [str(src)])
     assert result.exit_code == 1
     assert "Unexpected error" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Service mode (--service / Phase 3 hosted ingest)
+# ---------------------------------------------------------------------------
+
+
+def test_submit_service_dry_run_no_creds_required(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """--service --dry-run must work without any auth setup."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    result = CliRunner().invoke(sub.submit, [str(src), "--service", "--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert "Dry-run - would upload" in result.output
+    assert "Service URL:" in result.output
+    assert "Visibility:" in result.output
+    assert not (tmp_path / "submission").exists()
+
+
+def test_submit_service_default_url(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """--service without an explicit URL must use the documented default."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    result = CliRunner().invoke(sub.submit, [str(src), "--service", "--dry-run"])
+    assert result.exit_code == 0
+    assert sub._DEFAULT_SERVICE_URL in result.output
+
+
+def test_submit_service_custom_url_passed_through(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Explicit --service URL flows into the dry-run output unchanged."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    custom = "https://staging.benchbox.dev/v1"
+    result = CliRunner().invoke(sub.submit, [str(src), "--service", custom, "--dry-run"])
+    assert result.exit_code == 0
+    assert custom in result.output
+
+
+def test_submit_service_visibility_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """--visibility unlisted is reflected in the dry-run output."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    result = CliRunner().invoke(sub.submit, [str(src), "--service", "--dry-run", "--visibility", "unlisted"])
+    assert result.exit_code == 0
+    assert "unlisted" in result.output
+
+
+def test_submit_service_visibility_rejects_unknown(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """An unknown visibility value is rejected by Click before any work runs."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    result = CliRunner().invoke(sub.submit, [str(src), "--service", "--dry-run", "--visibility", "secret"])
+    assert result.exit_code == 2
+    assert "Invalid value" in result.output or "secret" in result.output
+
+
+def test_submit_service_idempotency_key_passthrough(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Caller-supplied --idempotency-key surfaces in the dry-run output."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    key = "11111111-2222-3333-4444-555555555555"
+    result = CliRunner().invoke(sub.submit, [str(src), "--service", "--dry-run", "--idempotency-key", key])
+    assert result.exit_code == 0
+    assert key in result.output
+
+
+def test_submit_service_real_upload_returns_not_implemented(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """--service without --dry-run must fail loudly until w5 implementation lands."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    result = CliRunner().invoke(sub.submit, [str(src), "--service"])
+    assert result.exit_code == 1
+    assert "not yet implemented" in result.output.lower()
+
+
+def test_submit_default_pr_path_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Default behavior (no --service) is unchanged: PR-package mode."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+    assert result.exit_code == 0
+    assert out_dir.is_dir()
+    assert (out_dir / "submission-manifest.json").is_file()

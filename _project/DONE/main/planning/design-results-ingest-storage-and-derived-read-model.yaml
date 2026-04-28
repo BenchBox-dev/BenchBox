@@ -2,7 +2,8 @@ id: design-results-ingest-storage-and-derived-read-model
 title: "Design results ingest, storage, and derived read-model architecture"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-27"
 category: Core Functionality
 deps:
   needs:
@@ -28,7 +29,7 @@ description: |
 work:
   - id: w1
     summary: "Catalog 3 reference ingest architectures - survey Geekbench, OpenBenchmarking, and CloudSpecs submission → storage → projection pipelines"
-    status: pending
+    status: done
     notes: |
       Output: 1-page reference matrix documenting each platform's bundle format,
       storage tier, idempotency model, and public read surface. Use as a
@@ -37,7 +38,7 @@ work:
   - id: w2
     summary: "Write submission API surface proposal: endpoints, idempotency rules, and bundle upload contract"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Define the hosted submission interface: what the CLI POSTs, how the service
       acknowledges receipt, and what guarantees are given on idempotent re-submit.
@@ -46,7 +47,7 @@ work:
   - id: w3
     summary: "Write raw bundle storage model: object key scheme, retention tiers, and integrity properties"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Define where and how raw schema-v2 bundles are stored after receipt. Key
       decisions: key naming (must survive rename/rebrand), retention policy,
@@ -57,7 +58,7 @@ work:
   - id: w4
     summary: "Define durable metadata schema for runs, submissions, actors, trust, and cohorts"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Capture the normalized data layer that separates the write path from the
       public read path. Include submission-level fields (actor, timestamp, trust
@@ -66,7 +67,7 @@ work:
   - id: w5
     summary: "Define derived public read models: manifests, projections, and DuckDB-vs-Parquet tradeoffs"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Include static manifests, leaderboard projections, and whether a Parquet or
       DuckDB snapshot is worth shipping for browser-side analysis. Document the
@@ -75,7 +76,7 @@ work:
   - id: w6
     summary: "Choose deployment boundaries: API service, async workers, object storage, and static explorer assets"
     needs: [w2, w3, w5]
-    status: pending
+    status: done
     notes: |
       Document what runs as a long-lived service vs. a triggered worker vs. a
       static asset. Include deployment topology (e.g., Fly.io + R2 or equivalent)
@@ -84,7 +85,7 @@ work:
   - id: w7
     summary: "Define backfill, rebuild, retention, and failure-recovery procedures"
     needs: [w4, w5, w6]
-    status: pending
+    status: done
     notes: |
       How does the platform recover from a corrupted read model, a failed
       submission, or a schema migration? Define rebuild triggers, retention
@@ -93,7 +94,7 @@ work:
   - id: w8
     summary: "Write architecture design doc and get peer review before Phase 3 begins"
     needs: [w2, w3, w4, w5, w6, w7]
-    status: pending
+    status: done
     notes: |
       Consolidate w1-w7 outputs into a single DESIGN.md under _project/analysis/.
       This doc is the authoritative input for implementation TODOs that follow.

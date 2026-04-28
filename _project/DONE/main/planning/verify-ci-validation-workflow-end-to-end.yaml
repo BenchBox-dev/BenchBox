@@ -29,7 +29,7 @@ description: |
 work:
 - id: w1
   summary: "Prepare a known-good submission package for the happy-path test PR"
-  status: pending
+  status: done
   notes: |
     1. Run a small bundle locally:
        `benchbox run --platform duckdb --benchmark tpch --scale 0.01 --queries Q1,Q6`
@@ -41,7 +41,7 @@ work:
 - id: w2
   summary: "Open a happy-path PR against published-results and capture workflow output"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     1. From a fresh branch off `published-results`, copy the bundle into
        `results-data/bundles/tpch/duckdb/sf0.01/<bundle-id>/` along with the
@@ -58,7 +58,7 @@ work:
 - id: w3
   summary: "Open a tampered-bundle PR and verify CI rejects with a clear error"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     1. Branch off `published-results` again with the same bundle.
     2. Mutate the bundle file AFTER the manifest hash is computed (e.g.,
@@ -74,7 +74,7 @@ work:
 - id: w4
   summary: "Verify fork-PR permissions allow comment posting"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Open one happy-path PR from a fork (use a personal fork or a throwaway
     GitHub account if required) and confirm the workflow's
@@ -86,7 +86,7 @@ work:
 - id: w5
   summary: "File follow-up TODOs for any defects, attach evidence to PR description"
   needs: [w3, w4]
-  status: pending
+  status: done
   notes: |
     - For each defect observed (missing comment, wrong status, unclear error),
       create a focused bug TODO under `_project/TODO/main/planning/`.
