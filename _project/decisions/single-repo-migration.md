@@ -174,6 +174,29 @@ dates).
 
 Phase 0 audit complete. Phase 1 (wheel hygiene) is now unblocked.
 
+## Amendment 2026-04-27 — 2-command release flow (A4 + A5 supersession)
+
+The 4-target release flow originally specified by A4 (`bump` →
+`changelog-draft` → `release-prepare` → `release-rebase-develop`) is
+replaced by a 2-target flow: `make release-cut` and `make
+release-finalize`. Two semantic changes accompany the consolidation:
+
+- **A4 step 6 (rebase develop) is removed.** `develop` is intentionally
+  NOT modified by `release-finalize`. Dev-only paths (`_project/`,
+  `_blog/`, agent configs, dev-tooling root files) live only on
+  `develop` by design (per A3); the release squash on `main` does not
+  add anything to develop's content surface that isn't already there.
+  The original A4 step 6 (`git rebase --onto main vX.Y.Z develop`)
+  would have deleted those dev-only paths from `develop` on every
+  release.
+- **A5 option-c deletion moves from manual to automatic.** The previous
+  `vX.Y.Z` branch on origin is auto-deleted by `release-cut` after the
+  new branch is pushed (loop sweeps any stale `v*` branches a hotfix
+  path may have left behind, not just the highest one).
+
+The 7-step A4 procedure block is preserved as historical record; the
+runbook of record is now `docs/operations/release-guide.md`.
+
 ## Amendment 2026-04-27 — A3 main-only allowlist extension
 
 The original A3 main-only enumeration omitted several top-level paths

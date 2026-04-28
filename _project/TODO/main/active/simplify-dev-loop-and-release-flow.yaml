@@ -224,7 +224,7 @@ work:
 - id: w8
   summary: "Update docs and templates to the new 2-command flow"
   needs: [w1, w2, w4]
-  status: pending
+  status: done
   notes: |
     Edits:
       - .github/RELEASE_PR_TEMPLATE.md: replace `make
