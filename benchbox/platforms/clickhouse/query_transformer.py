@@ -374,7 +374,10 @@ class ClickHouseQueryTransformer:
         if not stripped.upper().startswith("SELECT") and not stripped.upper().startswith("WITH"):
             return query
 
-        return f"{stripped} SETTINGS joined_subquery_requires_alias = 0"
+        # Strip trailing `;` so the appended SETTINGS clause stays inside the
+        # statement; otherwise chDB parses `...; SETTINGS ...` as a syntax error.
+        cleaned = stripped.rstrip(";").rstrip()
+        return f"{cleaned} SETTINGS joined_subquery_requires_alias = 0"
 
 
 def transform_query_for_clickhouse(query: str, verbose: bool = False) -> str:
