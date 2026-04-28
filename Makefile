@@ -881,4 +881,8 @@ help:
 	@echo "  make worktree-list   List active worktrees"
 	@echo "  make worktree-prune  Remove worktrees whose branches are gone on origin (post-merge cleanup)"
 	@echo ""
+	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
+	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs main"
+	@echo "  make release-finalize VERSION=X.Y.Z Squash-merge the release PR, tag main, push tag (fires release.yml)"
+	@echo ""
 	@echo "  make help            Show this help message"
