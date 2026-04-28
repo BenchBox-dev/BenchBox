@@ -30,4 +30,3 @@ Promotion rule (see `_project/analysis/phase-3-promotion-metrics.md`): promote P
 | 4 | Distinct requesters in 'Private/Unlisted' section | 0 | >= 3 | ok |  |
 | 5 | Distinct requesters in 'Blocked-Maintainer' section | 0 | >= 5 | ok |  |
 | 6 | Distinct requesters in 'Org-Spaces' section | 0 | >= 3 | ok |  |
-
