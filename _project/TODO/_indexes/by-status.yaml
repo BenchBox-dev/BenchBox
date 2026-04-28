@@ -2,13 +2,18 @@ generated_at: '2026-04-28T09:25:54.350447'
 total_items: 34
 statuses:
   In Progress:
-    count: 2
+    count: 3
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
       title: Address follow-up findings from timing-policy pre-commit split review
       priority: Medium
       category: Testing & Quality
+    - id: integrate-benchbox-cli-submit-and-service-auth
+      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+      title: Integrate BenchBox CLI submission flow and service authentication
+      priority: Medium-High
+      category: Core Functionality
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
       title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
@@ -47,9 +52,9 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
-    - id: define-phase-3-promotion-metrics
-      file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
-      title: Define Phase 3 promotion metrics, dashboard, and review cadence
+    - id: automate-phase2-metrics-quarterly-cadence
+      file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
+      title: Automate the Phase 3 promotion-metrics quarterly cadence
       priority: Medium
       category: Core Functionality
     - id: design-results-ingest-storage-and-derived-read-model
@@ -87,21 +92,11 @@ statuses:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       priority: Medium-High
       category: Testing and Quality Assurance
-    - id: integrate-benchbox-cli-submit-and-service-auth
-      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
-      title: Integrate BenchBox CLI submission flow and service authentication
-      priority: High
-      category: Core Functionality
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
       priority: High
       category: Platform Expansion
-    - id: operate-results-platform-security-observability-and-abuse-controls
-      file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
-      title: Operate results platform security, observability, and abuse controls
-      priority: Medium
-      category: Core Functionality
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
@@ -122,11 +117,6 @@ statuses:
       title: Run a Phase 2 dry-run with one external trusted contributor
       priority: High
       category: Testing and Quality Assurance
-    - id: evaluate-results-data-repo-extraction-checkpoint
-      file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
-      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
-      priority: Low
-      category: Core Functionality
     - id: single-repo-migration-phase-8-first-post-migration-release
       file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
       title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
@@ -162,11 +152,6 @@ statuses:
       file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
       title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
       priority: Medium
-      category: Testing and Quality Assurance
-    - id: verify-ci-validation-workflow-end-to-end
-      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
-      title: Verify the validate-submission CI workflow end-to-end with a real PR
-      priority: Critical
       category: Testing and Quality Assurance
     - id: wikipedia-pageviews-benchmark
       file: TODO/benchmark-expansion/planning/wikipedia-pageviews-benchmark.yaml

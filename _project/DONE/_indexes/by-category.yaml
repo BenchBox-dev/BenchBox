@@ -701,7 +701,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 264
+    count: 269
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1098,6 +1098,11 @@ categories:
       title: Define DataFrame Execution Model for Write Primitives
       priority: Medium-High
       status: Completed
+    - id: define-phase-3-promotion-metrics
+      file: DONE/main/planning/define-phase-3-promotion-metrics.yaml
+      title: Define Phase 3 promotion metrics, dashboard, and review cadence
+      priority: Medium
+      status: Completed
     - id: define-hosted-results-contract-and-governance-model
       file: DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
@@ -1112,6 +1117,11 @@ categories:
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
       priority: Critical
+      status: Completed
+    - id: design-results-ingest-storage-and-derived-read-model
+      file: DONE/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+      title: Design results ingest, storage, and derived read-model architecture
+      priority: High
       status: Completed
     - id: drop-plotly-html-charts
       file: DONE/core-functionality/active/drop-plotly-html-charts.yaml
@@ -1378,6 +1388,11 @@ categories:
       file: DONE/core-functionality/active/fix-tpch-reference-seed-and-parameter-parity.yaml
       title: Fix TPC-H reference seed value and restore SQL/DataFrame parameter parity
       priority: High
+      status: Completed
+    - id: fix-submission-hash-mismatch-vs-validator-directory-scope
+      file: DONE/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
+      title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
+      priority: Critical
       status: Completed
     - id: fix-datagen-layout-and-manifest-hygiene
       file: DONE/main/active/fix-datagen-layout-and-manifest-hygiene.yaml
@@ -1690,6 +1705,11 @@ categories:
       title: Move polars, clickhouse-connect, and psycopg2-binary out of core dependencies into optional extras
       priority: Medium
       status: Completed
+    - id: operate-results-platform-security-observability-and-abuse-controls
+      file: DONE/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+      title: Operate results platform security, observability, and abuse controls
+      priority: Medium
+      status: Completed
     - id: pt-01-ddl-generator-protocol
       file: DONE/physical-tuning/planning/pt-01-ddl-generator-protocol.yaml
       title: 'PT-01: DDL Generator Protocol and Base Implementation'
@@ -1909,6 +1929,11 @@ categories:
       file: DONE/main/planning/scaffold-results-explorer-frontend.yaml
       title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
       priority: High
+      status: Completed
+    - id: evaluate-results-data-repo-extraction-checkpoint
+      file: DONE/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+      priority: Low
       status: Completed
     - id: explorer-align-ranking-metric-with-tpc-standards
       file: DONE/main/planning/explorer-align-ranking-metric-with-tpc-standards.yaml
@@ -3741,7 +3766,7 @@ categories:
       priority: High
       status: Completed
   Testing and Quality Assurance:
-    count: 45
+    count: 47
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3838,6 +3863,11 @@ categories:
       file: DONE/main/active/explorer-establish-cli-explorer-parity-tests.yaml
       title: Establish CLI↔explorer visualization parity test infrastructure (fixture-driven)
       priority: Critical
+      status: Completed
+    - id: fix-chromium-result-detail-sort-flake
+      file: DONE/main/planning/fix-chromium-result-detail-sort-flake.yaml
+      title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
+      priority: Medium-High
       status: Completed
     - id: fix-ci-critical-issues
       file: DONE/ci-infrastructure/active/fix-ci-critical-issues.yaml
@@ -3949,6 +3979,11 @@ categories:
       title: Test Suite Reliability ✅ COMPLETED
       priority: Medium
       status: Completed
+    - id: verify-ci-validation-workflow-end-to-end
+      file: DONE/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+      title: Verify the validate-submission CI workflow end-to-end with a real PR
+      priority: Critical
+      status: Not Started
     - id: verify-trust-badge-rendering-in-explorer
       file: DONE/main/planning/verify-trust-badge-rendering-in-explorer.yaml
       title: Visually verify TrustBadge rendering across all 4 explorer pages

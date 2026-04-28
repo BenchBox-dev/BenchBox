@@ -269,26 +269,6 @@ items:
   work_total: 10
   work_done: 0
   work_ready: 1
-- id: evaluate-results-data-repo-extraction-checkpoint
-  file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
-  title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
-  worktree: main
-  category: Core Functionality
-  priority: Low
-  status: Not Started
-  tags:
-  - results
-  - architecture
-  - adr
-  - governance
-  - checkpoint
-  estimated_effort: Small
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - implement-pr-based-result-submission-workflow
-  - define-phase-3-promotion-metrics
 - id: single-repo-migration-phase-9-decommission-archive
   file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml
   title: 'Single-repo migration phase 9: decommission archived benchbox-private and retired private clone after 60-90 day
@@ -411,24 +391,24 @@ items:
   work_total: 3
   work_done: 1
   work_ready: 2
-- id: define-phase-3-promotion-metrics
-  file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
-  title: Define Phase 3 promotion metrics, dashboard, and review cadence
+- id: automate-phase2-metrics-quarterly-cadence
+  file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
+  title: Automate the Phase 3 promotion-metrics quarterly cadence
   worktree: main
-  category: Core Functionality
+  category: Tooling
   priority: Medium
   status: Not Started
   tags:
-  - results
   - phase-3
   - metrics
-  - governance
+  - automation
+  - ci
   estimated_effort: Small
-  work_total: 4
+  work_total: 5
   work_done: 0
   work_ready: 1
   needs:
-  - implement-pr-based-result-submission-workflow
+  - define-phase-3-promotion-metrics
 - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
   file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
   title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
@@ -444,30 +424,10 @@ items:
   - http-range
   estimated_effort: Small
   work_total: 3
-  work_done: 0
+  work_done: 1
   work_ready: 1
   needs:
   - implement-results-explorer-browser-functional-tests
-- id: operate-results-platform-security-observability-and-abuse-controls
-  file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
-  title: Operate results platform security, observability, and abuse controls
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - security
-  - observability
-  - moderation
-  - operations
-  estimated_effort: Large
-  work_total: 8
-  work_done: 0
-  work_ready: 1
-  needs:
-  - define-hosted-results-contract-and-governance-model
-  - design-results-ingest-storage-and-derived-read-model
 - id: single-repo-migration-phase-8-first-post-migration-release
   file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
   title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
@@ -567,6 +527,27 @@ items:
   work_ready: 2
   needs:
   - stabilize-webkit-browser-smoke-flake-under-parallel-workers
+- id: integrate-benchbox-cli-submit-and-service-auth
+  file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+  title: Integrate BenchBox CLI submission flow and service authentication
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: In Progress
+  tags:
+  - results
+  - cli
+  - auth
+  - submission
+  - api
+  estimated_effort: Large
+  work_total: 8
+  work_done: 3
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

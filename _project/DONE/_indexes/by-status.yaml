@@ -15,7 +15,7 @@ statuses:
       priority: High
       category: Usability
   Not Started:
-    count: 47
+    count: 48
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -252,6 +252,11 @@ statuses:
       title: Surface tuning config in explorer detail pages and enable cross-tuning comparison
       priority: Medium-High
       category: Core Functionality
+    - id: verify-ci-validation-workflow-end-to-end
+      file: DONE/main/planning/verify-ci-validation-workflow-end-to-end.yaml
+      title: Verify the validate-submission CI workflow end-to-end with a real PR
+      priority: Critical
+      category: Testing and Quality Assurance
   Identified:
     count: 2
     items:
@@ -1407,6 +1412,11 @@ statuses:
       title: Define DataFrameProtocol and remove Any annotations from unified frame layer
       priority: Medium
       category: Code Quality and Technical Debt
+    - id: define-phase-3-promotion-metrics
+      file: DONE/main/planning/define-phase-3-promotion-metrics.yaml
+      title: Define Phase 3 promotion metrics, dashboard, and review cadence
+      priority: Medium
+      category: Core Functionality
     - id: define-hosted-results-contract-and-governance-model
       file: DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml
       title: Define hosted results contract, trust labels, and governance model
@@ -1421,6 +1431,11 @@ statuses:
       file: DONE/dataframe-core/completed/design-and-implement-core-dataframe-abstractions.yaml
       title: Design and Implement Core DataFrame Abstractions
       priority: Critical
+      category: Core Functionality
+    - id: design-results-ingest-storage-and-derived-read-model
+      file: DONE/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+      title: Design results ingest, storage, and derived read-model architecture
+      priority: High
       category: Core Functionality
     - id: interactive-wizard-cli-command-preview
       file: DONE/ux-improvements/active/interactive-wizard-cli-command-preview.yaml
@@ -1828,6 +1843,11 @@ statuses:
       title: Fix CLI Power/Throughput Test Execution and Tuning Configuration Issues
       priority: Medium
       category: Core Functionality
+    - id: fix-chromium-result-detail-sort-flake
+      file: DONE/main/planning/fix-chromium-result-detail-sort-flake.yaml
+      title: 'Fix Chromium e2e flake: ResultDetail median-table sort indicator times out'
+      priority: Medium-High
+      category: Testing and Quality Assurance
     - id: clickhouse-join-memory-tuning
       file: DONE/platform-expansion/planning/clickhouse-join-memory-tuning.yaml
       title: Fix ClickHouse JOIN memory limit - restore max_bytes_in_join to 50% and verify grace_hash
@@ -1938,6 +1958,11 @@ statuses:
       title: Fix broken runtime paths in Databend, LakeSail, StarRocks, and pg_duckdb adapters
       priority: High
       category: Platform Expansion
+    - id: fix-submission-hash-mismatch-vs-validator-directory-scope
+      file: DONE/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
+      title: Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission
+      priority: Critical
+      category: Core Functionality
     - id: fix-coverage-theater
       file: DONE/main/active/fix-coverage-theater.yaml
       title: 'Fix coverage theater: replace fake assertions with real behavioral tests'
@@ -2524,6 +2549,11 @@ statuses:
       title: Open Table Format Smoke Tests
       priority: Medium
       category: Testing and Quality Assurance
+    - id: operate-results-platform-security-observability-and-abuse-controls
+      file: DONE/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
+      title: Operate results platform security, observability, and abuse controls
+      priority: Medium
+      category: Core Functionality
     - id: optimize-benchmark-results-json-output-format
       file: DONE/unknown/planning/optimize-benchmark-results-json-output-format.yaml
       title: Optimize Benchmark Results JSON Output Format
@@ -3139,6 +3169,11 @@ statuses:
       file: DONE/main/planning/scaffold-results-explorer-frontend.yaml
       title: Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM
       priority: High
+      category: Core Functionality
+    - id: evaluate-results-data-repo-extraction-checkpoint
+      file: DONE/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
+      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
+      priority: Low
       category: Core Functionality
     - id: schema-evolution-backward-compatibility-management
       file: DONE/infrastructure-schema/planning/schema-evolution-backward-compatibility-management.yaml

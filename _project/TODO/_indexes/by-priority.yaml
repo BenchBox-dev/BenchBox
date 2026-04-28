@@ -1,14 +1,6 @@
 generated_at: '2026-04-28T09:25:54.350438'
 total_items: 34
 priorities:
-  Critical:
-    count: 1
-    items:
-    - id: verify-ci-validation-workflow-end-to-end
-      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
-      title: Verify the validate-submission CI workflow end-to-end with a real PR
-      category: Testing and Quality Assurance
-      status: Not Started
   High:
     count: 6
     items:
@@ -43,7 +35,7 @@ priorities:
       category: Release Tooling
       status: In Progress
   Medium-High:
-    count: 3
+    count: 4
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -60,8 +52,13 @@ priorities:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       category: Testing and Quality Assurance
       status: Not Started
+    - id: integrate-benchbox-cli-submit-and-service-auth
+      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+      title: Integrate BenchBox CLI submission flow and service authentication
+      category: Core Functionality
+      status: In Progress
   Medium:
-    count: 8
+    count: 7
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -73,21 +70,16 @@ priorities:
       title: Address follow-up findings from timing-policy pre-commit split review
       category: Testing & Quality
       status: In Progress
-    - id: define-phase-3-promotion-metrics
-      file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
-      title: Define Phase 3 promotion metrics, dashboard, and review cadence
-      category: Core Functionality
+    - id: automate-phase2-metrics-quarterly-cadence
+      file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
+      title: Automate the Phase 3 promotion-metrics quarterly cadence
+      category: Tooling
       status: Not Started
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       category: Performance
       status: Identified
-    - id: operate-results-platform-security-observability-and-abuse-controls
-      file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
-      title: Operate results platform security, observability, and abuse controls
-      category: Core Functionality
-      status: Not Started
     - id: single-repo-migration-phase-8-first-post-migration-release
       file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
       title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
@@ -104,7 +96,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Low:
-    count: 15
+    count: 14
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -150,11 +142,6 @@ priorities:
       file: TODO/main/planning/fix-git-author-history-rewrite.yaml
       title: Rewrite git history to fix author name on 2,286 commits (user.email → Joe Harris)
       category: Repository Maintenance
-      status: Not Started
-    - id: evaluate-results-data-repo-extraction-checkpoint
-      file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
-      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
-      category: Core Functionality
       status: Not Started
     - id: single-repo-migration-phase-9-decommission-archive
       file: TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml

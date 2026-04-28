@@ -2,7 +2,8 @@ id: define-phase-3-promotion-metrics
 title: "Define Phase 3 promotion metrics, dashboard, and review cadence"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-04-27"
 category: Core Functionality
 
 deps:
@@ -27,7 +28,7 @@ description: |
 work:
 - id: w1
   summary: "Pick concrete promotion metrics and thresholds"
-  status: pending
+  status: done
   notes: |
     From the strategy doc indicators, choose 4-6 measurable signals.
     Suggested starting set:
@@ -45,7 +46,7 @@ work:
 - id: w2
   summary: "Build a minimal `scripts/phase2_metrics.py` that computes the metrics"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Inputs:
       - GitHub API (PRs against `published-results`, labels, merge dates,
@@ -59,7 +60,7 @@ work:
 - id: w3
   summary: "Schedule a quarterly review and document the promotion procedure"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Add to `_project/analysis/phase-3-promotion-metrics.md`:
       - Review cadence: quarterly (first Monday of each quarter).
@@ -76,7 +77,7 @@ work:
 - id: w4
   summary: "Run the first baseline review and capture the starting state"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Run the script today against the (currently small) Phase 2 dataset
     and commit the baseline report to

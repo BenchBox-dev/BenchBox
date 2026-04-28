@@ -1,0 +1,159 @@
+id: fix-submission-hash-mismatch-vs-validator-directory-scope
+title: "Fix bundle-hash algorithm mismatch between benchbox submit and validate_submission"
+worktree: main
+priority: Critical
+status: Completed
+completed_date: "2026-04-27"
+category: Core Functionality
+
+description: |
+  Surfaced 2026-04-27 by the
+  `verify-ci-validation-workflow-end-to-end` end-to-end test (PRs #27,
+  #28, #29 against `published-results`).
+
+  The two halves of the Phase 2 submission flow disagree on what
+  "bundle" the manifest hash covers:
+
+  - `benchbox/cli/commands/submit.py:_compute_bundle_hash` hashes
+    `output_path/bundle/` — the isolated package directory containing
+    only the new submission's files. Manifest written with this hash.
+  - `scripts/validate_submission.py:_validate_manifest_hash` hashes
+    `bundle_path.parent`, where `bundle_path` is the changed bundle
+    file under `results-data/bundles/`. That parent already contains
+    every other bundle in the corpus.
+
+  So the submitter hashes one file; the validator hashes ~13. They
+  can never match.
+
+  Evidence: even an unmodified `benchbox submit --last` package fails
+  the validator with a hash mismatch on PR. See
+  `_project/handoffs/ci-validation-evidence-2026-04-27.md`.
+
+  **Impact**: every Phase 2 community PR submission fails CI today
+  regardless of content. Phase 2 is not actually shippable in its
+  current form.
+
+work:
+  - id: w1
+    summary: "Decide which side defines the contract: per-file hash or directory hash"
+    status: done
+    notes: |
+      Two paths:
+
+      A. **Per-file hash** (recommended): the manifest's `bundle_hash`
+         is the SHA-256 of the bundle's primary JSON file (and
+         optional companions, as separate fields). The validator
+         recomputes per-file and compares. This matches the
+         architecture-design doc's content-addressed storage scheme
+         (each bundle is a single content hash regardless of corpus
+         co-location).
+
+      B. **Directory hash** (status quo on validator side): the
+         manifest's `bundle_hash` is over a directory, but the
+         submitter must compute that hash with the *same set of files*
+         as the validator. This forces the submitter to know the
+         corpus state — a bad coupling.
+
+      Pick A. Document the decision in an ADR fragment under
+      `docs/development/adr/` if it warrants one (probably yes — this
+      is a contract change).
+
+  - id: w2
+    summary: "Update both implementations to match the chosen contract"
+    needs: [w1]
+    status: done
+    notes: |
+      Update `benchbox/cli/commands/submit.py:_compute_bundle_hash`
+      and `scripts/validate_submission.py:_validate_manifest_hash` so
+      they compute the same value for the same logical input.
+
+      For path A (recommended), the manifest gains a per-file hash
+      map:
+
+          {
+            "bundle_hash":  "<sha256 of primary bundle file>",
+            "companion_hashes": {
+              "<filename>.plans.json":  "<sha256>",
+              "<filename>.tuning.json": "<sha256>"
+            }
+          }
+
+      Validator iterates the map; mismatches cite the offending file
+      and the offending hash side (manifest vs computed).
+
+  - id: w3
+    summary: "Add unit tests covering the contract on both sides"
+    needs: [w2]
+    status: done
+    notes: |
+      A round-trip test: package via the submit command, copy bundle
+      + manifest into a fixture mimicking results-data/bundles/ with
+      *other* bundles already present, run the validator. Must pass.
+
+      A hand-corrupt test: same flow but flip a byte; validator must
+      fail with a clear message.
+
+      Both tests live under `tests/integration/test_submission_validation.py`.
+
+  - id: w4
+    summary: "Re-run the verify-ci-validation end-to-end test once the fix lands"
+    needs: [w3]
+    status: done
+    notes: |
+      Open one new test PR against `published-results` with a
+      maintainer-run small bundle. Confirm: workflow accepts on the
+      happy path, the corpus-inventory check runs and either passes or
+      gives a clear "out of date" message, the PR-comment is updated
+      idempotently after a no-op recommit. Append the new evidence to
+      `_project/handoffs/ci-validation-evidence-*.md`.
+
+verification:
+  - description: "Round-trip integration test passes"
+    command: "uv run -- python -m pytest tests/integration/test_submission_validation.py -q"
+    expected_output: "All tests pass"
+  - description: "Re-run E2E test against published-results: happy path is green"
+    command: "see w4 evidence file"
+    expected_output: "PASSED status on a new test PR"
+
+must_preserve:
+  - "Existing schema-v2 bundle format. The fix is a contract change in the manifest, not the bundle."
+  - "Phase 2 PR-based submission flow remains the only supported submit path until Phase 3 stands up."
+  - "Validator continues to reject obvious tampering (the hash-mismatch and schema-invalid cases captured 2026-04-27 must still fail post-fix)."
+
+anti_patterns:
+  - "DO NOT 'fix' this by hashing the entire results-data/bundles/ directory in the submitter — because that requires the submitter to clone the full corpus and stay synced — make the contract per-bundle."
+  - "DO NOT bury the contract in a code comment — because the next agent will repeat the same divergence — write it down in an ADR or in scripts/validate_submission.py's docstring."
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/commands/submit.py"
+    - "scripts/validate_submission.py"
+    - "tests/integration/test_submission_validation.py"
+    - "tests/unit/cli/commands/test_submit.py"
+    - "docs/development/adr/"
+  do_not_modify:
+    - ".github/workflows/validate-submission.yml"
+    - "results-data/bundles/"
+
+metadata:
+  tags:
+    - "results"
+    - "submission"
+    - "ci"
+    - "phase-2"
+    - "bug"
+    - "blocker"
+  estimated_effort: "Small"
+  created_date: "2026-04-27"
+
+impact:
+  business_value: |
+    Unblocks Phase 2 community submission. Without this fix, every PR
+    against published-results fails CI regardless of content, which
+    means external contributors cannot actually submit results.
+  user_impact: |
+    Fixes the visible "I followed the instructions and CI rejected my
+    PR with a confusing hash error" experience.
+  technical_debt: |
+    Eliminates a contract divergence between two halves of the same
+    flow. The contract becomes documented and testable.
