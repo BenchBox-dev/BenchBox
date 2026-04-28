@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T20:24:54.790193'
+generated_at: '2026-04-27T20:53:41.635330'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -133,10 +133,10 @@ categories:
     count: 4
     items:
     - id: simplify-dev-loop-and-release-flow
-      file: TODO/main/planning/simplify-dev-loop-and-release-flow.yaml
+      file: TODO/main/active/simplify-dev-loop-and-release-flow.yaml
       title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
       priority: High
-      status: Not Started
+      status: In Progress
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
       title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'

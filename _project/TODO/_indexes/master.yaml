@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T20:24:54.790158'
+generated_at: '2026-04-27T20:53:41.635288'
 total_items: 34
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -98,21 +98,21 @@ items:
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
 - id: simplify-dev-loop-and-release-flow
-  file: TODO/main/planning/simplify-dev-loop-and-release-flow.yaml
+  file: TODO/main/active/simplify-dev-loop-and-release-flow.yaml
   title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
   worktree: main
   category: Release Tooling
   priority: High
-  status: Not Started
+  status: In Progress
   tags:
   - release
   - dev-loop
   - tooling
   - simplification
-  estimated_effort: ~6h spread across 1-2 days
-  work_total: 9
-  work_done: 0
-  work_ready: 4
+  estimated_effort: ~7h spread across 1-2 days (6h flow + 1h CI churn opts w10/w11/w12)
+  work_total: 12
+  work_done: 2
+  work_ready: 6
   deferred_count: 2
   needs:
   - single-repo-migration-phase-4-test-release-with-new-flow

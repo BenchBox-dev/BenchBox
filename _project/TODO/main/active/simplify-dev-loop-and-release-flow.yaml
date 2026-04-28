@@ -2,7 +2,7 @@ id: simplify-dev-loop-and-release-flow
 title: "Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Release Tooling
 
 deps:
@@ -58,7 +58,7 @@ description: |
 work:
 - id: w1
   summary: "Add `release-cut VERSION=X.Y.Z` Make target (cut + curate + bump + changelog + open PR + delete prev v*)"
-  status: pending
+  status: done
   notes: |
     Replace the existing release-prepare target. Differences from
     release-prepare:
@@ -87,7 +87,7 @@ work:
 - id: w2
   summary: "Add `release-finalize VERSION=X.Y.Z` Make target (squash-merge PR + tag + push + leave develop alone)"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace release-rebase-develop. Steps:
       1. gh pr list --base main --head v$(VERSION) → number → gh pr merge --squash
@@ -415,15 +415,21 @@ verification:
 
 must_preserve:
 - pr-open's auto-merge flow vs develop continues to work end-to-end (the /pr command and make pr-open are unchanged).
-- Worktree convention works unchanged (worktree-add/list/prune Make targets and the conventional ../BenchBox.<branch>/ path).
+- Worktree convention works unchanged (worktree-add/list/prune Make targets and the conventional ../BenchBox.<branch>/
+  path).
 - All 50+ test/coverage/docker/lint Make targets unchanged.
-- Pre-commit surface unchanged — 13 hooks across pre-commit/pre-push/manual stages still install via `pre-commit install`.
+- Pre-commit surface unchanged — 13 hooks across pre-commit/pre-push/manual stages still install via `pre-commit
+  install`.
 - Workflow file `published-results` flow (validate-submission.yml) untouched.
-- "Orthogonal workflows untouched — cross-platform-validation.yml, perf-smoke.yml, results-explorer-browser.yml, seed-corpus.yml, upload-answers.yml, docs.yml."
-- Released wheel still excludes _project/, _blog/, etc. (already enforced by pyproject.toml + MANIFEST.in; this TODO does not modify those exclusions).
+- "Orthogonal workflows untouched — cross-platform-validation.yml, perf-smoke.yml, results-explorer-browser.yml, seed-corpus.yml,
+  upload-answers.yml, docs.yml."
+- Released wheel still excludes _project/, _blog/, etc. (already enforced by pyproject.toml + MANIFEST.in; this TODO
+  does not modify those exclusions).
 - All 6 version sources stay in sync — `benchbox --version` consistency check continues to pass after every release.
-- Ruleset v-release-branches-minimal (15611787) stays at "non_fast_forward only"; w6 only tightens main and develop rulesets.
-- scripts/update_version.py and scripts/generate_changelog_entry.py untouched in their public surface; release-cut just calls them.
+- Ruleset v-release-branches-minimal (15611787) stays at "non_fast_forward only"; w6 only tightens main and develop
+  rulesets.
+- scripts/update_version.py and scripts/generate_changelog_entry.py untouched in their public surface; release-cut just
+  calls them.
 - The 9 pre-existing release commits on main (v0.1.0 through v0.2.1 tags) are not rewritten — no force-push to main.
 
 approach: |
@@ -454,15 +460,26 @@ approach: |
     - w9 (dry-run) last; it exercises every prior unit.
 
 anti_patterns:
-- "DO NOT reset develop to main in release-finalize — because develop carries dev-only paths (_project/, _blog/, agent configs) that don't exist on main; resetting would delete them on every release. The whole reason this TODO exists is to fix that latent bug."
-- "DO NOT squash-merge the version branch to main without curation first — because dev-only paths would land on main, polluting the canonical default-branch view and the released wheel. Curation is the `git rm` step inside release-cut."
-- "DO NOT consolidate the 6 version sources of truth — because user explicitly chose status quo on 2026-04-27 (decision #3); reducing the source list would silently break benchbox --version's cross-source consistency check."
-- "DO NOT skip the rc dry-run in w9 — because the latent rebase-develop bug only surfaces on a real release; w9 is the only validation gate before a real version goes out."
-- "DO NOT modify scripts/update_version.py or scripts/generate_changelog_entry.py — because they are already correct and outside the locked-in scope of this change; release-cut just invokes them."
-- "DO NOT add `merge` or `rebase` back to allowed_merge_methods on the rulesets — because the repo-wide setting is squash-only and the rulesets should match; w6 deliberately tightens, not relaxes."
-- "DO NOT mark single-repo-migration-phase-4 complete until this TODO's w9 passes — because phase-4 w7/w8 are subsumed here; closing phase-4 prematurely would lose the dependency edge that this TODO must precede phase-8 (first real post-migration release)."
-- "DO NOT remove `'v*'` from release.yml's tag trigger when doing w5 — because release.yml fires on tag push (v*), not branch push; only the branch-push trigger in lint.yml/test.yml is being trimmed."
-- "DO NOT delete the previous v* branch manually — because release-cut handles option-c deletion automatically; the make target is the single place that runs the deletion to keep the policy consistent."
+- "DO NOT reset develop to main in release-finalize — because develop carries dev-only paths (_project/, _blog/, agent configs)
+  that don't exist on main; resetting would delete them on every release. The whole reason this TODO exists is to fix that
+  latent bug."
+- "DO NOT squash-merge the version branch to main without curation first — because dev-only paths would land on main, polluting
+  the canonical default-branch view and the released wheel. Curation is the `git rm` step inside release-cut."
+- "DO NOT consolidate the 6 version sources of truth — because user explicitly chose status quo on 2026-04-27 (decision #3);
+  reducing the source list would silently break benchbox --version's cross-source consistency check."
+- "DO NOT skip the rc dry-run in w9 — because the latent rebase-develop bug only surfaces on a real release; w9 is the only
+  validation gate before a real version goes out."
+- "DO NOT modify scripts/update_version.py or scripts/generate_changelog_entry.py — because they are already correct and outside
+  the locked-in scope of this change; release-cut just invokes them."
+- "DO NOT add `merge` or `rebase` back to allowed_merge_methods on the rulesets — because the repo-wide setting is squash-only
+  and the rulesets should match; w6 deliberately tightens, not relaxes."
+- "DO NOT mark single-repo-migration-phase-4 complete until this TODO's w9 passes — because phase-4 w7/w8 are subsumed here;
+  closing phase-4 prematurely would lose the dependency edge that this TODO must precede phase-8 (first real post-migration
+  release)."
+- "DO NOT remove `'v*'` from release.yml's tag trigger when doing w5 — because release.yml fires on tag push (v*), not branch
+  push; only the branch-push trigger in lint.yml/test.yml is being trimmed."
+- "DO NOT delete the previous v* branch manually — because release-cut handles option-c deletion automatically; the make target
+  is the single place that runs the deletion to keep the policy consistent."
 
 scope_limit:
   only_modify:
@@ -561,10 +578,14 @@ metadata:
 
 success_metrics:
 - "Release flow is 2 commands (make release-cut + make release-finalize), down from 4."
-- "v0.3.0-rc.1 dry-run completes end-to-end: PR opened, CI green, squash-merged, tagged, PyPI publish succeeds, GH release created, cross-OS install matrix passes."
-- "After dry-run, develop tree is unchanged (git diff origin/develop develop is empty) AND all dev-only paths (_project/, _blog/, AGENTS.md, etc.) are still present on develop."
-- "main tree after dry-run contains zero dev-only paths (`git ls-tree -d --name-only origin/main | grep -E '_project|_blog|\\.claude'` returns nothing)."
-- "Curation-drift CI guard fails when a synthetic dev-only file is added to develop and not added to the release-cut curation list (validate by adding a test file in a throwaway branch)."
+- "v0.3.0-rc.1 dry-run completes end-to-end: PR opened, CI green, squash-merged, tagged, PyPI publish succeeds, GH release
+  created, cross-OS install matrix passes."
+- "After dry-run, develop tree is unchanged (git diff origin/develop develop is empty) AND all dev-only paths (_project/,
+  _blog/, AGENTS.md, etc.) are still present on develop."
+- "main tree after dry-run contains zero dev-only paths (`git ls-tree -d --name-only origin/main | grep -E '_project|_blog|\\\
+  .claude'` returns nothing)."
+- "Curation-drift CI guard fails when a synthetic dev-only file is added to develop and not added to the release-cut curation
+  list (validate by adding a test file in a throwaway branch)."
 - "Ruleset main-release-only and develop-squash-only return ['squash'] for allowed_merge_methods after w6."
 - "After w10: a feature PR squash-merge to develop produces zero new lint.yml + test.yml runs (only the PR-CI run remains)."
 - "After w11: force-pushing to a feature branch during CI cancels the prior lint.yml + test.yml runs (visible in Actions UI)."

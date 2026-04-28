@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T20:24:54.790215'
+generated_at: '2026-04-27T20:53:41.635349'
 total_items: 34
 priorities:
   Critical:
@@ -33,10 +33,10 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
     - id: simplify-dev-loop-and-release-flow
-      file: TODO/main/planning/simplify-dev-loop-and-release-flow.yaml
+      file: TODO/main/active/simplify-dev-loop-and-release-flow.yaml
       title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
       category: Release Tooling
-      status: Not Started
+      status: In Progress
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
       title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'

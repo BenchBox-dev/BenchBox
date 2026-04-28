@@ -624,41 +624,42 @@ run-test:
 # These targets must be run from the public clone (origin -> joeharris76/BenchBox).
 # Do NOT invoke from the legacy private clone — it has no `origin` remote.
 #
-# Flow: develop -> v$(VERSION) -> (squash) main -> rebase develop -> v$(VERSION+1)
-# See docs/operations/release-guide.md and _project/decisions/single-repo-migration.md (A4).
+# Flow: develop -> v$(VERSION) -> (squash) main -> tag main -> release.yml publishes
+#   develop is intentionally NOT modified post-release. dev-only paths
+#   (_project/, _blog/, AGENTS.md, etc.) live on develop and are removed
+#   from the release branch by release-cut's curation step.
+#
+# See docs/operations/release-guide.md and _project/decisions/single-repo-migration.md.
 
-.PHONY: bump changelog-draft release-prepare release-rebase-develop
+.PHONY: release-cut release-finalize
 
-# Bump version in __init__.py, pyproject.toml, docs landing pages.
-# Usage: make bump VERSION=X.Y.Z
-bump:
-	@test -n "$(VERSION)" || (echo "Usage: make bump VERSION=X.Y.Z" && exit 1)
-	uv run python scripts/update_version.py --version $(VERSION) --update-pyproject
-
-# Draft a CHANGELOG.md entry from conventional commits since the last v* tag.
-# Auto-summarises with Claude CLI when available; falls back to raw bullets.
-# Usage: make changelog-draft VERSION=X.Y.Z
-changelog-draft:
-	@test -n "$(VERSION)" || (echo "Usage: make changelog-draft VERSION=X.Y.Z" && exit 1)
-	uv run python scripts/generate_changelog_entry.py --version $(VERSION)
-
-# Cut the release branch from develop, drop maintainer paths, push, open PR.
-# Pre-conditions enforced:
-#   - Currently on develop branch
-#   - Working tree clean
-#   - pyproject.toml version already matches $(VERSION) (run `make bump` first)
-# Usage: make release-prepare VERSION=X.Y.Z
-release-prepare:
-	@test -n "$(VERSION)" || (echo "Usage: make release-prepare VERSION=X.Y.Z" && exit 1)
+# Cut a release branch from develop in one shot:
+#   1. Create v$(VERSION) branch off develop (develop is not modified).
+#   2. On v$(VERSION): bump version sources (scripts/update_version.py).
+#   3. On v$(VERSION): generate CHANGELOG.md entry.
+#   4. $EDITOR opens CHANGELOG.md for hand-curation (skipped if EDITOR unset).
+#   5. Curate: git rm dev-only paths (per A3 in single-repo-migration.md).
+#   6. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
+#   7. Push, open PR vs main.
+#   8. Sweep stale v* branches on origin (option-c lifecycle).
+# Pre-conditions: on develop, clean tree.
+# Usage: make release-cut VERSION=X.Y.Z
+release-cut:
+	@test -n "$(VERSION)" || (echo "Usage: make release-cut VERSION=X.Y.Z" && exit 1)
 	@[ "$$(git rev-parse --abbrev-ref HEAD)" = "develop" ] || (echo "Error: must be on develop branch" && exit 1)
 	@[ -z "$$(git status --porcelain)" ] || (echo "Error: working tree must be clean" && exit 1)
-	@grep -q '^version = "$(VERSION)"$$' pyproject.toml || (echo "Error: pyproject.toml version is not $(VERSION); run 'make bump VERSION=$(VERSION)' first" && exit 1)
 	git fetch origin
-	@# Anchor pre-release point on develop so the post-release rebase knows
-	@# which commits to drop from develop (everything up to this anchor was
-	@# squashed into the release commit; only later commits should replay).
-	git tag pre-release-v$(VERSION) develop
 	git checkout -b v$(VERSION) develop
+	uv run python scripts/update_version.py --version $(VERSION) --update-pyproject
+	uv run python scripts/generate_changelog_entry.py --version $(VERSION)
+	@if [ -n "$$EDITOR" ]; then \
+		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
+		$$EDITOR CHANGELOG.md; \
+	else \
+		echo "==> EDITOR unset; skipping interactive CHANGELOG curation"; \
+	fi
+	@# Stage version-bump + changelog edits.
+	git add -A
 	@# Curation: drop develop-only paths from the release branch.
 	@# These are paths recorded in A3 of _project/decisions/single-repo-migration.md
 	@# as "develop only". Released wheels never carry these.
@@ -667,31 +668,34 @@ release-prepare:
 	git commit -m "Release v$(VERSION)"
 	git push -u origin v$(VERSION)
 	gh pr create --base main --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
+	@# Option-c lifecycle: delete any prior v* branches on origin (loop sweeps stale entries).
+	@for br in $$(git ls-remote --heads origin 'v*' | awk '{print $$2}' | sed 's|refs/heads/||' | grep -v '^v$(VERSION)$$'); do \
+		echo "==> Deleting prior release branch on origin: $$br"; \
+		git push origin --delete "$$br" || true; \
+	done
 	@echo
 	@echo "Release PR opened. Next steps:"
-	@echo "  1. Review the PR. Confirm CHANGELOG.md is correct and curation looks right."
-	@echo "  2. Squash-merge the PR on GitHub."
-	@echo "  3. git checkout main && git pull && git tag v$(VERSION) && git push origin v$(VERSION)"
-	@echo "  4. Watch .github/workflows/release.yml run; verify PyPI publish."
-	@echo "  5. make release-rebase-develop VERSION=$(VERSION)"
+	@echo "  1. Review the PR diff; confirm CHANGELOG and curation are correct."
+	@echo "  2. Wait for CI green."
+	@echo "  3. make release-finalize VERSION=$(VERSION)"
 
-# After release-prepare's PR is squash-merged and tag pushed, rebase develop
-# onto main so the next dev cycle starts from the release-shaped state.
-# Usage: make release-rebase-develop VERSION=X.Y.Z
-release-rebase-develop:
-	@test -n "$(VERSION)" || (echo "Usage: make release-rebase-develop VERSION=X.Y.Z" && exit 1)
+# After release-cut's PR is approved and CI is green: squash-merge it,
+# tag main, push the tag (fires release.yml), and leave develop alone.
+# Usage: make release-finalize VERSION=X.Y.Z
+release-finalize:
+	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
+	@PR=$$(gh pr list --base main --head v$(VERSION) --state open --json number --jq '.[0].number'); \
+	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → main" && exit 1); \
+	echo "==> Squash-merging PR #$$PR"; \
+	gh pr merge --squash "$$PR"
 	git fetch origin --tags
-	@[ -n "$$(git tag -l v$(VERSION))" ] || (echo "Error: tag v$(VERSION) not found locally" && exit 1)
-	@[ -n "$$(git tag -l pre-release-v$(VERSION))" ] || (echo "Error: anchor tag pre-release-v$(VERSION) not found (was release-prepare run?)" && exit 1)
-	@git merge-base --is-ancestor v$(VERSION) origin/main || (echo "Error: tag v$(VERSION) is not on origin/main; squash-merge the release PR first" && exit 1)
-	git checkout develop
-	git pull --ff-only origin develop
-	git rebase --onto main pre-release-v$(VERSION) develop
-	git push --force-with-lease origin develop
-	git tag -d pre-release-v$(VERSION)
+	git checkout main
+	git pull --ff-only origin main
+	git tag v$(VERSION)
+	git push origin v$(VERSION)
 	@echo
-	@echo "develop rebased onto main."
-	@echo "Per option-c lifecycle: previous release branch (e.g. vPREV) can be deleted on the next release-prepare run."
+	@echo "Tag v$(VERSION) pushed; release.yml will publish to PyPI."
+	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
 # =============================================================================
 # PR + worktree workflow
