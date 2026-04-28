@@ -62,9 +62,11 @@ work:
       - Opens $EDITOR on CHANGELOG.md after generation for hand-curation.
       - Drops the pre-release-vX.Y.Z anchor tag (no longer needed
         without rebase-develop).
-      - Adds option-c lifecycle: after pushing the new vX.Y.Z, look up
-        the previous v* branch on origin (sort -V), and `git push origin
-        --delete` it. The just-released tag remains on main.
+      - Adds option-c lifecycle: after pushing the new vX.Y.Z, list all
+        v* branches on origin except the new one and `git push origin
+        --delete` each (loop, not `tail -1`). The just-released tag
+        remains on main. Looping rather than taking the highest sweeps
+        any stale v* branches a hotfix path may have left behind.
 
     Curation list stays identical (Makefile lines 665–666):
       git rm -rf _project _blog .claude .codex .gemini
@@ -205,6 +207,14 @@ work:
       - name: Release curation list drift check
         run: uv run python scripts/check_release_curation.py
 
+    Sequencing safety: implement the script and run it locally against
+    the current develop tree FIRST. Confirm it exits 0 against the
+    real tree AND fails (exits non-zero) against a synthetic stray
+    file (touch a throwaway file at repo root not in the curation
+    list, re-run, confirm it fails). THEN add the lint.yml step in
+    the SAME commit. `lint` is a required status check; a buggy
+    script would block every PR repo-wide.
+
 - id: w8
   summary: "Update docs and templates to the new 2-command flow"
   needs: [w1, w2, w4]
@@ -221,8 +231,9 @@ work:
         Drop bump / changelog-draft / release-prepare /
         release-rebase-develop references. Add option-c
         auto-deletion behavior in release-cut.
-      - AGENTS.md: line 69 release paragraph rewrite.
-      - CLAUDE.md: "Git workflow" section release paragraph rewrite.
+      - AGENTS.md (project file at repo root): line 69 release paragraph rewrite.
+      - CLAUDE.md (project file at repo root, NOT the user-global
+        ~/.claude/CLAUDE.md): "Git workflow" section release paragraph rewrite.
       - _project/decisions/single-repo-migration.md: append an
         "Amendment 2026-04-27" section. Note: A4 step 6 (rebase
         develop) is replaced with "develop is not modified
@@ -282,9 +293,6 @@ deferred:
     lines as a reasonable middle. Further compression can wait.
 
 verification:
-- description: "release-cut dry-runs end-to-end without error (use a sandbox version)"
-  command: "make release-cut VERSION=0.0.0-sandbox && git checkout develop && git branch -D v0.0.0-sandbox && git push origin --delete v0.0.0-sandbox || true"
-  expected_output: "PR opened against main; sandbox cleanup OK"
 - description: "After dry-run release-finalize, develop tree is unchanged from origin/develop"
   command: "git diff origin/develop develop"
   expected_output: "empty diff"
@@ -297,8 +305,8 @@ verification:
 - description: "release.yml succeeded after the dry-run"
   command: "gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'"
   expected_output: "success"
-- description: "0.3.0-rc.1 published to PyPI"
-  command: "pip index versions benchbox 2>&1 | grep -c '0.3.0-rc.1'"
+- description: "0.3.0-rc.1 published to PyPI (PyPI normalizes to 0.3.0rc1 per PEP 440)"
+  command: "pip index versions benchbox 2>&1 | grep -cE '0\\.3\\.0(rc1|-rc\\.1)'"
   expected_output: "at least 1"
 
 must_preserve:
