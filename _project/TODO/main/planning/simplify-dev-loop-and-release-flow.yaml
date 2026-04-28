@@ -49,6 +49,12 @@ description: |
   and phase-8 (first post-migration release) can proceed using the
   new flow.
 
+  Bundled in the same PR (per user direction 2026-04-27, Option A):
+  three CI churn reductions (w10/w11/w12). Net effect of the
+  simplification + opts: ~−110 CI-min per release cycle and ~−60
+  CI-min per merged feature PR vs status quo, while preserving all
+  required check signals.
+
 work:
 - id: w1
   summary: "Add `release-cut VERSION=X.Y.Z` Make target (cut + curate + bump + changelog + open PR + delete prev v*)"
@@ -242,9 +248,94 @@ work:
         release-cut. Do NOT rewrite history of the original
         document.
 
+- id: w10
+  summary: "Drop redundant push-CI on develop (lint.yml + test.yml)"
+  needs: [w5]
+  status: pending
+  notes: |
+    After a feature PR squash-merges, GitHub creates a new SHA on
+    develop and re-fires lint.yml + test.yml on identical content
+    that the PR-CI just proved green. Pure churn.
+
+    Edits:
+      .github/workflows/lint.yml `on.push.branches`:
+        Remove 'develop' (w5 already removes 'v*'; result is [main]).
+      .github/workflows/test.yml `on.push.branches`:
+        Same removal.
+
+    Keep `main` in push triggers — provides the "main is always
+    CI-green" signal that humans rely on as a badge / sanity check
+    (the deleted check-ci-passed poller no longer reads it, but
+    humans do).
+
+    Sequence after w5 to avoid editing the same `on.push.branches`
+    block twice in different commits.
+
+    Estimated savings: ~50 CI-min per merged feature PR (one full
+    lint+test cycle eliminated). At ~10 PRs/week, ~500 CI-min/week.
+
+- id: w11
+  summary: "Add concurrency cancel-in-progress to lint.yml + test.yml"
+  status: pending
+  notes: |
+    Pattern already in use on perf-smoke.yml and
+    results-explorer-browser.yml. When a PR is force-pushed during
+    CI (common during iteration), the in-flight run is superseded.
+
+    Add a top-level `concurrency:` block (NOT inside `on:` or
+    `jobs:`) to both:
+      .github/workflows/lint.yml:
+        concurrency:
+          group: lint-${{ github.ref }}
+          cancel-in-progress: true
+      .github/workflows/test.yml:
+        concurrency:
+          group: test-${{ github.ref }}
+          cancel-in-progress: true
+
+    No conflict with w5/w10 (different top-level key).
+
+    Estimated savings: bounded by force-push frequency; ~10–20%
+    of test.yml minutes during active iteration.
+
+    Risk note: if a required check is cancelled mid-flight on the
+    PR's last commit (no superseding push), GitHub may show the
+    PR as "checks pending" until the next push. Standard pattern;
+    the cancelled run only happens when a NEWER push exists.
+
+- id: w12
+  summary: "Skip perf-smoke and parity on release PRs"
+  needs: [w5]
+  status: pending
+  notes: |
+    Release PRs (title starts with `Release v`) touch only curation
+    removals + version bumps + changelog. Nothing perf-affecting
+    (perf-smoke); nothing fixture-affecting (parity job in
+    test.yml).
+
+    Edits:
+      .github/workflows/perf-smoke.yml — extend the existing `if:`
+      on the `perf-smoke` job (currently checks skip-perf-smoke
+      label):
+        if: |
+          !contains(github.event.pull_request.labels.*.name, 'skip-perf-smoke')
+          && !startsWith(github.event.pull_request.title, 'Release v')
+
+      .github/workflows/test.yml `parity` job — add `if:`:
+        if: ${{ !startsWith(github.event.pull_request.title, 'Release v') }}
+
+    The `Release v` title prefix is set by `release-cut` (see w1).
+    Don't depend on a label — release-cut doesn't apply one.
+
+    Sequence after w5 because both edit test.yml (different keys
+    but same file; serialize to avoid merge conflicts).
+
+    Estimated savings: ~25 CI-min per release PR (one perf-smoke
+    leg + one parity leg).
+
 - id: w9
   summary: "Dry-run on 0.3.0-rc.1 to validate the flow end-to-end"
-  needs: [w1, w2, w3, w4, w5, w6, w7, w8]
+  needs: [w1, w2, w3, w4, w5, w6, w7, w8, w10, w11, w12]
   status: pending
   notes: |
     The first real release after migration is the validation. Use
@@ -277,6 +368,19 @@ work:
          branch):
          git ls-remote --heads origin 'v*'
          # Should show only refs/heads/v0.3.0-rc.1.
+     10. Verify CI optimizations (w10/w11/w12):
+         a. perf-smoke skipped on release PR (w12):
+            gh pr view <release-PR#> --json statusCheckRollup \
+              --jq '.statusCheckRollup[] | select(.name|test("perf-smoke|parity"))'
+            # Both should be absent (job didn't fire).
+         b. After release-finalize, no push-CI on develop (w10):
+            (Develop didn't change, so this is trivially true. Validate
+            on the next regular feature-PR squash-merge instead:
+            gh run list --workflow=test.yml --branch develop --event push --limit 1
+            # No run after the squash-merge SHA.)
+         c. concurrency cancellation (w11): force-push to a feature
+            branch during CI; the older lint/test runs show as
+            "cancelled" in the Actions UI.
 
     If any step fails, the rc tag is the only artifact published;
     fix and bump to rc.2.
@@ -323,9 +427,12 @@ must_preserve:
 - The 9 pre-existing release commits on main (v0.1.0 through v0.2.1 tags) are not rewritten — no force-push to main.
 
 approach: |
-  Sequence: w1+w2+w3 (Make target work) → w4 (cleanup) → w5+w6+w7
-  (parallel: workflows / rulesets / curation guard) → w8 (docs catch
-  up to final names) → w9 (dry-run validates).
+  Sequence: w1+w2+w3 (Make target work) → w4 (cleanup) →
+  w5+w6+w7 (parallel: workflow trims / rulesets / curation guard) →
+  w10+w11+w12 (CI churn reductions; w10 and w12 sequence after w5
+  to avoid same-file conflicts on lint.yml / test.yml) →
+  w8 (docs catch up to final names) →
+  w9 (dry-run validates everything including the CI opts).
 
   Reuse strategy:
     - release-cut reuses scripts/update_version.py and
@@ -361,8 +468,9 @@ scope_limit:
   only_modify:
   - Makefile  # release-cut, release-finalize, pr-preflight; delete obsolete targets
   - .github/workflows/release.yml  # drop check-ci-passed
-  - .github/workflows/lint.yml  # remove v* push trigger; add curation-drift step
-  - .github/workflows/test.yml  # remove v* push trigger
+  - .github/workflows/lint.yml  # w5: remove v* push trigger; w7: add curation-drift step; w10: remove develop push trigger; w11: add concurrency
+  - .github/workflows/test.yml  # w5: remove v* push trigger; w10: remove develop push trigger; w11: add concurrency; w12: skip parity on Release v* PRs
+  - .github/workflows/perf-smoke.yml  # w12: skip on Release v* PRs
   - .github/RELEASE_PR_TEMPLATE.md  # update to release-finalize wording
   - .github/PULL_REQUEST_TEMPLATE.md  # slim
   - docs/operations/release-guide.md  # rewrite around 2 commands
@@ -376,7 +484,6 @@ scope_limit:
   - .pre-commit-config.yaml  # pre-commit surface unchanged
   - .github/workflows/docs.yml
   - .github/workflows/cross-platform-validation.yml
-  - .github/workflows/perf-smoke.yml
   - .github/workflows/results-explorer-browser.yml
   - .github/workflows/seed-corpus.yml
   - .github/workflows/upload-answers.yml
@@ -415,6 +522,12 @@ impact:
         from local preflight).
       - 4 obsolete Make targets (~120 lines total) replaced by 2
         (~60 lines total).
+      - Redundant push-CI on develop (w10): saves ~50 CI-min per
+        merged feature PR.
+      - Wasted in-flight CI runs on superseded force-pushes (w11):
+        saves ~10–20% of test.yml minutes during active iteration.
+      - perf-smoke + parity runs on release PRs (w12): saves ~25
+        CI-min per release PR.
     Adds:
       - One curation-drift CI guard (~40 lines) that prevents the
         same class of latent bug from recurring as new dev-only
@@ -426,6 +539,7 @@ files_affected:
   - .github/workflows/release.yml
   - .github/workflows/lint.yml
   - .github/workflows/test.yml
+  - .github/workflows/perf-smoke.yml
   - .github/RELEASE_PR_TEMPLATE.md
   - .github/PULL_REQUEST_TEMPLATE.md
   - docs/operations/release-guide.md
@@ -438,7 +552,7 @@ files_affected:
 
 metadata:
   created_date: "2026-04-27"
-  estimated_effort: "~6h spread across 1-2 days"
+  estimated_effort: "~7h spread across 1-2 days (6h flow + 1h CI churn opts w10/w11/w12)"
   tags:
   - release
   - dev-loop
@@ -452,6 +566,9 @@ success_metrics:
 - "main tree after dry-run contains zero dev-only paths (`git ls-tree -d --name-only origin/main | grep -E '_project|_blog|\\.claude'` returns nothing)."
 - "Curation-drift CI guard fails when a synthetic dev-only file is added to develop and not added to the release-cut curation list (validate by adding a test file in a throwaway branch)."
 - "Ruleset main-release-only and develop-squash-only return ['squash'] for allowed_merge_methods after w6."
+- "After w10: a feature PR squash-merge to develop produces zero new lint.yml + test.yml runs (only the PR-CI run remains)."
+- "After w11: force-pushing to a feature branch during CI cancels the prior lint.yml + test.yml runs (visible in Actions UI)."
+- "After w12: a Release v* PR shows perf-smoke and parity as not-fired in the status check rollup."
 
 open_questions:
 - "Does the curation-drift script need to also walk into _project/_archive/ or treat _project/ as opaque?"
