@@ -323,32 +323,32 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
-                    <th
-                      class="table-th cursor-pointer select-none"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleSort("query_id")}
-                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleSort("query_id")}
-                    >
-                      Query{sortArrow("query_id")}
+                    <th class="p-0" scope="col">
+                      <button
+                        type="button"
+                        class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                        onClick={() => toggleSort("query_id")}
+                      >
+                        Query{sortArrow("query_id")}
+                      </button>
                     </th>
-                    <th
-                      class="table-th cursor-pointer select-none"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleSort("display_ms")}
-                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleSort("display_ms")}
-                    >
-                      Median (ms){sortArrow("display_ms")}
+                    <th class="p-0" scope="col">
+                      <button
+                        type="button"
+                        class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                        onClick={() => toggleSort("display_ms")}
+                      >
+                        Median (ms){sortArrow("display_ms")}
+                      </button>
                     </th>
-                    <th
-                      class="table-th cursor-pointer select-none"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleSort("sample_count")}
-                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleSort("sample_count")}
-                    >
-                      Samples{sortArrow("sample_count")}
+                    <th class="p-0" scope="col">
+                      <button
+                        type="button"
+                        class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                        onClick={() => toggleSort("sample_count")}
+                      >
+                        Samples{sortArrow("sample_count")}
+                      </button>
                     </th>
                   </tr>
                 </thead>

@@ -65,12 +65,15 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
     // directIO=true signals to DuckDB-WASM's HTTP runtime that this file
     // is a candidate for byte-range reads. In practice - with duckdb-wasm
     // 1.32.0 and a registered URL - the runtime still falls back to a
-    // single whole-file GET on ATTACH because the file-info defaults
-    // (reliableHeadRequests=false, allowFullHttpReads=true) short-circuit
-    // the Range probe. `registerFileURL` exposes no per-URL override for
-    // those flags; `DuckDBConfig.filesystem.{reliableHeadRequests,
-    // allowFullHTTPReads}` is a public global surface but has not been
-    // validated against a pre-registered URL here. Tracked as
+    // single whole-file GET on ATTACH. A March 2026 experiment also
+    // tried `db.open({filesystem: {reliableHeadRequests: true,
+    // forceFullHTTPReads: false}})` before registering: page loads
+    // succeed but the runtime still issues a single whole-file GET (the
+    // full DB size, not <=10% per RG-2). `allowFullHTTPReads: false`
+    // makes the runtime error on first attach (upstream issue
+    // duckdb/duckdb-wasm#1984: "If false, always error"). The buggy
+    // "Perform a full GET anyways" code path in runtime_browser.ts has
+    // not been removed in 1.32.0; tracked as
     // `enable-duckdb-wasm-http-range-reads-for-registered-urls`.
     await db.registerFileURL("results.duckdb", dbUrl, duckdb.DuckDBDataProtocol.HTTP, true);
     const conn = await db.connect();

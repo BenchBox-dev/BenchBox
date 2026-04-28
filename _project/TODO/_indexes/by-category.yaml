@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T15:06:32.171985'
-total_categories: 11
+generated_at: '2026-04-28T07:38:10.000388'
+total_categories: 12
 categories:
   Architecture & Refactoring:
     count: 1
@@ -46,38 +46,18 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 6
+    count: 2
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       status: Not Started
-    - id: define-phase-3-promotion-metrics
-      file: TODO/main/planning/define-phase-3-promotion-metrics.yaml
-      title: Define Phase 3 promotion metrics, dashboard, and review cadence
-      priority: Medium
-      status: Not Started
-    - id: design-results-ingest-storage-and-derived-read-model
-      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
-      title: Design results ingest, storage, and derived read-model architecture
-      priority: High
-      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
-      priority: High
-      status: Not Started
-    - id: operate-results-platform-security-observability-and-abuse-controls
-      file: TODO/main/planning/operate-results-platform-security-observability-and-abuse-controls.yaml
-      title: Operate results platform security, observability, and abuse controls
-      priority: Medium
-      status: Not Started
-    - id: evaluate-results-data-repo-extraction-checkpoint
-      file: TODO/main/planning/evaluate-results-data-repo-extraction-checkpoint.yaml
-      title: Schedule a checkpoint to evaluate extracting results-data/ to its own repo
-      priority: Low
-      status: Not Started
+      priority: Medium-High
+      status: In Progress
   Performance:
     count: 1
     items:
@@ -178,7 +158,7 @@ categories:
       priority: Medium
       status: In Progress
   Testing and Quality Assurance:
-    count: 4
+    count: 3
     items:
     - id: graduate-browser-smoke-to-blocking-gates
       file: TODO/main/planning/graduate-browser-smoke-to-blocking-gates.yaml
@@ -195,8 +175,11 @@ categories:
       title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
       priority: Medium
       status: Not Started
-    - id: verify-ci-validation-workflow-end-to-end
-      file: TODO/main/planning/verify-ci-validation-workflow-end-to-end.yaml
-      title: Verify the validate-submission CI workflow end-to-end with a real PR
-      priority: Critical
+  Tooling:
+    count: 1
+    items:
+    - id: automate-phase2-metrics-quarterly-cadence
+      file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
+      title: Automate the Phase 3 promotion-metrics quarterly cadence
+      priority: Medium
       status: Not Started

@@ -2,7 +2,8 @@ id: evaluate-results-data-repo-extraction-checkpoint
 title: "Schedule a checkpoint to evaluate extracting results-data/ to its own repo"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-04-27"
 category: Core Functionality
 
 deps:
@@ -31,7 +32,7 @@ description: |
 work:
   - id: w1
     summary: "Define the evaluation trigger conditions"
-    status: pending
+    status: done
     notes: |
       Pick 2-3 quantitative triggers (any one fires the evaluation):
         - `results-data/` exceeds 250MB in the main repo
@@ -45,7 +46,7 @@ work:
   - id: w2
     summary: "Write the ADR template covering the trade-offs"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Template `docs/development/adr/TEMPLATE-results-data-extraction.md`:
         - Context (repo size, PR volume at time of decision)
@@ -70,7 +71,7 @@ work:
   - id: w3
     summary: "Add a one-line check in the Phase 3 metrics script that flags trigger"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Extend `scripts/phase2_metrics.py` (from `define-phase-3-promotion-metrics`)
       with a final section that runs the quantitative checks from w1 and
@@ -81,7 +82,7 @@ work:
   - id: w4
     summary: "Document the evaluation procedure"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Append to `_project/analysis/results-data-extraction-trigger.md`:
         Procedure when triggered:
