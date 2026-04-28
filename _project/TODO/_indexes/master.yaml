@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:59:30.756380'
-total_items: 28
+generated_at: '2026-04-27T20:56:29.970567'
+total_items: 29
 items:
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -16,7 +16,7 @@ items:
   - api
   estimated_effort: Large
   work_total: 8
-  work_done: 2
+  work_done: 3
   work_ready: 1
   needs:
   - define-results-platform-product-and-launch-strategy
@@ -334,6 +334,24 @@ items:
   work_total: 3
   work_done: 1
   work_ready: 2
+- id: automate-phase2-metrics-quarterly-cadence
+  file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
+  title: Automate the Phase 3 promotion-metrics quarterly cadence
+  worktree: main
+  category: Tooling
+  priority: Medium
+  status: Not Started
+  tags:
+  - phase-3
+  - metrics
+  - automation
+  - ci
+  estimated_effort: Small
+  work_total: 5
+  work_done: 0
+  work_ready: 1
+  needs:
+  - define-phase-3-promotion-metrics
 - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
   file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
   title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL

@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:59:30.756425'
-total_items: 28
+generated_at: '2026-04-27T20:56:29.970612'
+total_items: 29
 priorities:
   High:
     count: 4
@@ -43,7 +43,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Medium:
-    count: 6
+    count: 7
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -55,6 +55,11 @@ priorities:
       title: Address follow-up findings from timing-policy pre-commit split review
       category: Testing & Quality
       status: In Progress
+    - id: automate-phase2-metrics-quarterly-cadence
+      file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
+      title: Automate the Phase 3 promotion-metrics quarterly cadence
+      category: Tooling
+      status: Not Started
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL

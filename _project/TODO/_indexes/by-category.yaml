@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:59:30.756408'
-total_categories: 11
+generated_at: '2026-04-27T20:56:29.970598'
+total_categories: 12
 categories:
   Architecture & Refactoring:
     count: 1
@@ -173,5 +173,13 @@ categories:
     - id: validate-and-integrate-tpc-tuning-json
       file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
       title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
+      priority: Medium
+      status: Not Started
+  Tooling:
+    count: 1
+    items:
+    - id: automate-phase2-metrics-quarterly-cadence
+      file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
+      title: Automate the Phase 3 promotion-metrics quarterly cadence
       priority: Medium
       status: Not Started

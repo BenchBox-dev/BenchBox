@@ -290,6 +290,22 @@ def _hash_file(file_path: Path) -> str:
     return h.hexdigest()
 
 
+def _is_safe_bundle_filename(name: str) -> bool:
+    """Reject filenames that could escape the bundle directory.
+
+    The validator runs in CI on attacker-controlled PR JSON, so manifest-
+    supplied filenames must be plain leaf names, not paths.
+    """
+    if not name or name in (".", ".."):
+        return False
+    if "/" in name or "\\" in name or "\x00" in name:
+        return False
+    parts = Path(name).parts
+    if Path(name).is_absolute() or ".." in parts or len(parts) != 1:
+        return False
+    return True
+
+
 def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: ValidationResult) -> None:
     """Verify the submission manifest hashes match the bundle file contents.
 
@@ -320,6 +336,9 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
     if not isinstance(expected_hash, str) or not expected_hash:
         vr.warn("Submission manifest has no bundle_hash field")
         return
+    if not _is_safe_bundle_filename(bundle_file):
+        vr.error(f"Unsafe bundle_file in manifest: {bundle_file!r} (must be a plain filename)")
+        return
 
     primary_path = bundle_dir / bundle_file
     if not primary_path.is_file():
@@ -339,6 +358,9 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
         return
 
     for comp_name, comp_expected in companion_hashes.items():
+        if not isinstance(comp_name, str) or not _is_safe_bundle_filename(comp_name):
+            vr.error(f"Unsafe companion filename in manifest: {comp_name!r} (must be a plain filename)")
+            continue
         comp_path = bundle_dir / comp_name
         if not comp_path.is_file():
             vr.error(f"Companion file declared in manifest not found in PR: {comp_name}")

@@ -25,7 +25,7 @@ requests is enough signal that the demand is real, not anecdotal.
 | # | Metric                                            | Source                                                    | Threshold                  | Implication if breached                                     |
 |---|---------------------------------------------------|-----------------------------------------------------------|----------------------------|-------------------------------------------------------------|
 | 1 | Merged community submissions / month (90d window) | `gh pr list --base published-results --state merged`      | ≥ 50 sustained for 3 mo    | PR review at scale; hosted ingest reduces maintainer toil   |
-| 2 | Median PR review latency (open → merge, hours)    | `gh pr list --base published-results --state merged --json` | > 72h median over 30d    | Reviewers are the bottleneck; async ingest would help       |
+| 2 | Median PR open→merge time, hours (proxy for review latency) | `gh pr list --base published-results --state merged --json` | > 72h median over 30d    | Reviewers are the bottleneck; async ingest would help       |
 | 3 | PR backlog (open against published-results > 7d)  | `gh pr list --base published-results --state open --json` | ≥ 5 sustained for 30d      | Queue is growing; signals chronic capacity gap              |
 | 4 | Distinct requests for private/unlisted results    | § Private/Unlisted, count distinct **Requester**          | ≥ 3 distinct requesters    | Public-only constraint blocks legitimate use cases          |
 | 5 | Submissions blocked by maintainer-only constraints | § Blocked-Maintainer, count entries (one per **Date**)    | ≥ 5 entries                | PR-mediated trust model is gating real contributions        |
@@ -66,7 +66,11 @@ other quantitative thresholds are calibrated against that:
 
 - **72h median latency**: at 50 PRs/mo (~12/wk), > 72h median means
   more than half the queue is older than the typical reviewer rotation
-  — a clear bottleneck.
+  — a clear bottleneck. M2 measures open→merge, so it includes draft
+  and author-iteration time; treat it as a coarse proxy for review-only
+  latency. If false-positive promotion is a concern, switch to
+  first-non-author-comment → merge once gh's `--json reviews` field is
+  the bottleneck check (not at calibration time).
 - **Backlog ≥ 5 for 30d**: with 50/mo throughput, a steady-state
   backlog of 5 is ~3 days of in-flight work, which is healthy. Sustained
   ≥ 5 *for 30 days* means the queue is not draining at the arrival rate.

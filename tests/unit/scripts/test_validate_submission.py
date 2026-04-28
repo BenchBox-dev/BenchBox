@@ -294,6 +294,56 @@ class TestValidateManifestHash:
         assert not vr.ok
         assert any("Companion hash mismatch" in e and "result.plans.json" in e for e in vr.errors)
 
+    @pytest.mark.parametrize(
+        "unsafe_name",
+        [
+            "../escape.json",
+            "subdir/result.json",
+            "/etc/passwd",
+            "..",
+            "a\x00b.json",
+            "a\\b.json",
+        ],
+    )
+    def test_unsafe_bundle_filename_rejected(self, tmp_path: Path, unsafe_name: str):
+        """Manifest-supplied filenames must not escape the bundle directory."""
+        bundle_dir = tmp_path / "bundle"
+        bundle_dir.mkdir()
+        manifest = bundle_dir / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps({"bundle_file": unsafe_name, "bundle_hash": "a" * 64}),
+            encoding="utf-8",
+        )
+
+        vr = ValidationResult("test")
+        _validate_manifest_hash(manifest, bundle_dir, vr)
+        assert not vr.ok
+        assert any("Unsafe bundle_file" in e for e in vr.errors)
+
+    def test_unsafe_companion_filename_rejected(self, tmp_path: Path):
+        """Companion-hash keys must also be plain filenames."""
+        bundle_dir = tmp_path / "bundle"
+        bundle_dir.mkdir()
+        bundle_file = bundle_dir / "result.json"
+        bundle_file.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+
+        manifest = bundle_dir / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "bundle_file": "result.json",
+                    "bundle_hash": self._hash_of(bundle_file),
+                    "companion_hashes": {"../escape.plans.json": "a" * 64},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        vr = ValidationResult("test")
+        _validate_manifest_hash(manifest, bundle_dir, vr)
+        assert not vr.ok
+        assert any("Unsafe companion filename" in e for e in vr.errors)
+
     def test_robust_when_corpus_already_populated(self, tmp_path: Path):
         """Sibling bundles in the directory must not affect validation.
 
