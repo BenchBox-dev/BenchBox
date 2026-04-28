@@ -23,6 +23,17 @@ description: |
   captures friction points, and converts the friction list into actionable
   follow-up TODOs. Done before broader public promotion.
 
+  Update 2026-04-28: an agent-proxy dry-run was performed via Claude
+  Cowork as a doc-hardening pre-pass. It surfaced 11 friction items and
+  produced 6 follow-up TODOs (`dry-run-followup-*.yaml` in this
+  directory). See
+  `_project/handoffs/external-dry-run-retrospective-2026-04-28.md` for
+  the retrospective. The agent run does NOT close this TODO -- the
+  human dry-run (w1-w5) is still required because Cowork structurally
+  cannot exercise auth, push, PR open, CI validate, maintainer review,
+  trust-label apply, or explorer redeploy. The agent run reduces the
+  friction the eventual human contributor will hit.
+
 work:
 - id: w1
   summary: "Identify and recruit one external contributor"
@@ -110,6 +121,7 @@ anti_patterns:
 - DO NOT pre-coach the contributor through the docs - because that hides the friction this dry-run exists to surface.
 - DO NOT skip the external recruit and use another maintainer - because every maintainer already shares the curse of knowledge.
 - DO NOT bundle defect fixes into this TODO - because mixing observation with implementation muddies the retrospective; file separate TODOs and keep this one focused on the dry-run experience.
+- DO NOT interpret a frictionless human dry-run as evidence the human run was unnecessary - because the agent-proxy run on 2026-04-28 already pre-fixed obvious friction via the dry-run-followup-* TODOs - frictionless from a human is success of the prep, not redundancy of the test, and confirms the docs are now where they need to be.
 
 scope_limit:
   only_modify:
