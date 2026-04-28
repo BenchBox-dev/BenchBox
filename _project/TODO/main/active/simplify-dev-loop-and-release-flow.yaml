@@ -162,7 +162,7 @@ work:
 
 - id: w6
   summary: "Tighten ruleset allowed_merge_methods to ['squash'] on main + develop rulesets"
-  status: pending
+  status: done
   notes: |
     Current state (from `gh api repos/joeharris76/BenchBox/rulesets`):
       - 15611783 main-release-only: allowed_merge_methods=[merge,squash,rebase]
