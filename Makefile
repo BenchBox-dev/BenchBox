@@ -412,8 +412,11 @@ ci-lint:
 	uv run ruff check .
 	uv run ruff format --check .
 	uv run ty check
-	uv run -- python _project/scripts/sync_codex_shared_skills.py check
 	$(MAKE) lint-markers
+	uv run -- python _project/scripts/sync_codex_shared_skills.py check
+	uv run -- python _project/scripts/timing_policy_check.py --strict
+	$(MAKE) compat-docs-check
+	$(MAKE) audit-deps
 	@echo "✅ CI lint checks passed"
 
 # CI test check - exact match for test.yml workflow (fast tests with coverage)
@@ -712,12 +715,10 @@ release-finalize:
 .PHONY: pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
-# without the network roundtrip. Same checks as `lint` ruleset rule.
+# without the network roundtrip. Delegates to ci-lint so the local
+# preflight surface stays in sync with lint.yml automatically.
 pr-preflight:
-	@echo "==> ruff check"
-	@uv run ruff check .
-	@echo "==> ruff format --check"
-	@uv run ruff format --check .
+	@$(MAKE) ci-lint
 	@echo "==> fast tests"
 	@uv run -- python -m pytest -m fast -q
 

@@ -102,7 +102,7 @@ work:
 
 - id: w3
   summary: "Widen `pr-preflight` to mirror full `ci-lint` surface"
-  status: pending
+  status: done
   notes: |
     Current pr-preflight (Makefile:707–713) runs only:
       ruff check, ruff format --check, fast tests
