@@ -59,16 +59,24 @@ work:
   - id: w3
     summary: "Implement `benchbox submit` command skeleton with --dry-run and local validation"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
-      Deferred until the Phase 3 ingest API exists (per the promotion
-      rule in `_project/analysis/phase-3-promotion-metrics.md` —
-      currently 0/6 thresholds breached). Implementation order is
-      fixed by `submit-cli-surface.md` once unblocked.
-
-      Existing `benchbox/cli/commands/submit.py` (Phase 2 PR mode)
-      stays unchanged; w3 adds the `--service` dispatch path inside
-      the existing command, not a new one.
+      Landed 2026-04-27 in commit df621a787:
+        - --service / --visibility / --idempotency-key / --wait flags
+          on the existing `benchbox submit` command.
+        - New `_dispatch_service_mode` handler.
+        - --service --dry-run validates the bundle locally, prints
+          the upload preview (URL, hash, companions, visibility,
+          idempotency key, wait), and returns 0 with no credentials.
+        - --service without --dry-run surfaces a clear "not yet
+          implemented" message and exits 1, since w4-w7 (auth,
+          upload, status polling) need the real hosted ingest API
+          to integrate against.
+        - 8 new unit tests in tests/unit/cli/commands/test_submit.py
+          cover dry-run path, default URL, custom URL passthrough,
+          visibility flag + rejection, idempotency-key passthrough,
+          not-implemented refusal, and the unchanged PR-package
+          default behavior.
 
   - id: w4
     summary: "Implement authentication: token fetch, local keychain storage, and refresh flow"
