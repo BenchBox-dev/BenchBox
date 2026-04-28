@@ -190,7 +190,7 @@ work:
 - id: w7
   summary: "Add curation-drift CI guard: scripts/check_release_curation.py wired into lint.yml"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Risk: dev-only path list (5 dirs + 13 files) drifts as new
     dev-only files are added to develop without being added to the

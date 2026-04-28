@@ -173,3 +173,20 @@ dates).
    cleanup PR. Discuss after Phase 4 lands.
 
 Phase 0 audit complete. Phase 1 (wheel hygiene) is now unblocked.
+
+## Amendment 2026-04-27 — A3 main-only allowlist extension
+
+The original A3 main-only enumeration omitted several top-level paths
+that have always shipped on main but were never explicitly listed.
+Discovered while implementing the curation-drift CI guard
+(`scripts/check_release_curation.py`); the script enforces that every
+top-level tracked path is in either the main-only allowlist or the
+release-cut curation list.
+
+- **`main` only** (extension to A3): `docker/`, `quality/`, `results-data/`,
+  `results-explorer/`, `setup.cfg`, `setup.py`, `tox.ini`, `index.html`.
+
+These are all build/release/UI artefacts that belong on the released
+tree. They are therefore NOT in the release-cut curation list. This
+amendment is the source of truth for the script; the original A3 row
+remains unchanged.
