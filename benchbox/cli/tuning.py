@@ -198,8 +198,10 @@ def _prompt_save_config(config: UnifiedTuningConfiguration, platform: str, bench
     default_filename = f"{platform}_{benchmark}_tuned.yaml"
 
     # Ensure benchmark_runs directory exists
-    benchmark_runs_dir = Path("benchmark_runs")
-    benchmark_runs_dir.mkdir(exist_ok=True)
+    from benchbox.utils.path_utils import resolve_benchmark_runs_dir
+
+    benchmark_runs_dir = resolve_benchmark_runs_dir()
+    benchmark_runs_dir.mkdir(parents=True, exist_ok=True)
 
     # Default save path in benchmark_runs/
     default_path = benchmark_runs_dir / default_filename

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any
 
 from benchbox.cli.platform_hooks import (
@@ -14,6 +13,7 @@ from benchbox.cli.platform_hooks import (
 )
 from benchbox.core.platform_registry import PlatformInfo, PlatformRegistry
 from benchbox.core.schemas import DatabaseConfig
+from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 
 
 def _parse_clickhouse_mode(value: str) -> str:
@@ -99,7 +99,7 @@ def _register_clickhouse() -> None:
         name = info.display_name if info else "ClickHouse"
         # Ensure local mode has a sensible default path
         if options.get("deployment_mode") == "local" and not options.get("data_path"):
-            db_dir = Path.cwd() / "benchmark_runs" / "databases"
+            db_dir = resolve_benchmark_runs_dir() / "databases"
             db_dir.mkdir(parents=True, exist_ok=True)
             options["data_path"] = str(db_dir / "clickhouse_local.chdb")
         driver_package = info.driver_package if info else None
@@ -139,7 +139,7 @@ def _register_clickhouse_local() -> None:
     ) -> DatabaseConfig:
         name = info.display_name if info else "ClickHouse Local"
         if not options.get("data_path"):
-            db_dir = Path.cwd() / "benchmark_runs" / "databases"
+            db_dir = resolve_benchmark_runs_dir() / "databases"
             db_dir.mkdir(parents=True, exist_ok=True)
             options["data_path"] = str(db_dir / "clickhouse_local.chdb")
         driver_package = info.driver_package if info else "chdb"
@@ -284,7 +284,7 @@ def _register_sqlite() -> None:
         overrides: dict[str, Any],
         info: PlatformInfo | None,
     ) -> DatabaseConfig:
-        db_dir = Path.cwd() / "benchmark_runs" / "databases"
+        db_dir = resolve_benchmark_runs_dir() / "databases"
         db_dir.mkdir(parents=True, exist_ok=True)
         base_name = options.get("database_name") or "benchbox"
         db_path = db_dir / f"{base_name}.db"

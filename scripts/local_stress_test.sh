@@ -25,7 +25,8 @@ Options:
                                 Uses timeout(1)/gtimeout(1) when available,
                                 otherwise falls back to perl(1).
   --log-dir <dir>               Directory for captured stdout/stderr logs
-                                (default: benchmark_runs/logs)
+                                (default: \$BENCHBOX_OUTPUT_DIR/logs, falling back to
+                                ~/Developer/benchmark_runs/logs)
   --skip-unavailable            Skip platforms that fail a pre-flight connectivity check
                                 instead of counting them as failures
   -h, --help                    Show this help
@@ -47,6 +48,14 @@ EOF
   exit 1
 }
 
+# ---- BenchBox runs root ----
+# All datagen, database, log, and result files land under this root. The
+# framework reads BENCHBOX_OUTPUT_DIR to redirect benchmark_runs/{datagen,
+# databases,results,charts}; we export it here and anchor LOG_DIR to the
+# same root so a single env var controls every artifact path.
+: "${BENCHBOX_OUTPUT_DIR:=$HOME/Developer/benchmark_runs}"
+export BENCHBOX_OUTPUT_DIR
+
 # ---- args ----
 SCALE_OVERRIDE=""
 PHASES="load,power"
@@ -56,7 +65,7 @@ BENCHMARK_FILTER=""
 BENCHMARK_GROUP="all"
 COMPRESSION=""
 PER_BENCHMARK_TIMEOUT="0"
-LOG_DIR="benchmark_runs/logs"
+LOG_DIR="$BENCHBOX_OUTPUT_DIR/logs"
 SKIP_UNAVAILABLE=0
 
 while [[ $# -gt 0 ]]; do
@@ -461,9 +470,12 @@ run_benchmark() {
   local elapsed=$(( SECONDS - t0 ))
 
   if [[ "$rc" -eq 0 ]]; then
-    # Extract result JSON path from log if present.
+    # Extract result JSON path from log if present. Match either a relative
+    # benchmark_runs/results/... path (legacy) or an absolute path under
+    # $BENCHBOX_OUTPUT_DIR/results/... so the script works regardless of where
+    # the runs root lives.
     local result_path
-    result_path=$(grep -oE 'benchmark_runs/results/[^[:space:]]+\.json' "$log_file" | tail -1 || true)
+    result_path=$(grep -oE '(/[^[:space:]]+/)?benchmark_runs/results/[^[:space:]]+\.json' "$log_file" | tail -1 || true)
     if [[ -n "$result_path" ]]; then
       echo "done (${elapsed}s) → $result_path"
     else

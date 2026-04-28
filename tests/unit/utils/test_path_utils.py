@@ -14,9 +14,11 @@ import pytest
 from benchbox.utils.path_utils import (
     ensure_directory,
     get_benchmark_runs_databases_path,
+    get_benchmark_runs_dataframe_path,
     get_benchmark_runs_datagen_path,
     get_default_data_directory,
     get_results_path,
+    resolve_benchmark_runs_dir,
 )
 
 pytestmark = [
@@ -324,8 +326,8 @@ class TestPathUtilsIntegration:
             default_dir = get_default_data_directory()
             assert default_dir == custom_data_dir
 
-            # Note: get_benchmark_runs_datagen_path uses benchmark_runs/datagen by default, not env var
-            # Only get_results_path (via get_default_data_directory) uses env var
+            # get_results_path consumes BENCHBOX_DATA_DIR via get_default_data_directory.
+            # (BENCHBOX_OUTPUT_DIR is the runs-root override; covered separately below.)
             results_path = get_results_path("ssb", "20250115_150000")  # No base_dir specified
 
             # Verify results path uses environment variable
@@ -362,7 +364,10 @@ class TestGetBenchmarkRunsDatabasesPath:
 
     def test_default_databases_path(self):
         """Default path should use benchmark_runs/databases under cwd."""
-        with patch("benchbox.utils.path_utils.Path.cwd", return_value=Path("/repo")):
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("benchbox.utils.path_utils.Path.cwd", return_value=Path("/repo")),
+        ):
             result = get_benchmark_runs_databases_path("tpch", 1.0)
         assert result == Path("/repo/benchmark_runs/databases/tpch_sf1")
 
@@ -370,3 +375,55 @@ class TestGetBenchmarkRunsDatabasesPath:
         """Custom base dir should be used directly."""
         result = get_benchmark_runs_databases_path("tpcds", 0.01, "/tmp/base")
         assert result == Path("/tmp/base/tpcds_sf001")
+
+
+class TestBenchboxOutputDirRedirection:
+    """BENCHBOX_OUTPUT_DIR redirects datagen, databases, and dataframe-cache roots."""
+
+    def test_datagen_path_honors_output_dir(self, tmp_path):
+        custom_root = tmp_path / "runs"
+        with patch.dict(os.environ, {"BENCHBOX_OUTPUT_DIR": str(custom_root)}):
+            result = get_benchmark_runs_datagen_path("tpch", 1.0)
+        assert result == custom_root / "datagen" / "tpch_sf1"
+
+    def test_databases_path_honors_output_dir(self, tmp_path):
+        custom_root = tmp_path / "runs"
+        with patch.dict(os.environ, {"BENCHBOX_OUTPUT_DIR": str(custom_root)}):
+            result = get_benchmark_runs_databases_path("tpcds", 0.01)
+        assert result == custom_root / "databases" / "tpcds_sf001"
+
+    def test_dataframe_path_honors_output_dir(self, tmp_path):
+        custom_root = tmp_path / "runs"
+        with patch.dict(os.environ, {"BENCHBOX_OUTPUT_DIR": str(custom_root)}):
+            result = get_benchmark_runs_dataframe_path()
+        assert result == custom_root / "datagen"
+
+    def test_explicit_base_dir_overrides_env(self, tmp_path):
+        """An explicit base_dir takes precedence over BENCHBOX_OUTPUT_DIR."""
+        env_root = tmp_path / "from_env"
+        explicit = tmp_path / "from_arg"
+        with patch.dict(os.environ, {"BENCHBOX_OUTPUT_DIR": str(env_root)}):
+            result = get_benchmark_runs_databases_path("tpch", 1.0, explicit)
+        assert result == explicit / "tpch_sf1"
+
+    def test_resolve_benchmark_runs_dir_expands_user(self, tmp_path, monkeypatch):
+        """``~`` in the env var is expanded so callers get an absolute path."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", "~/runs")
+        assert resolve_benchmark_runs_dir() == tmp_path / "runs"
+
+    def test_resolve_benchmark_runs_dir_falls_back_to_cwd(self):
+        """When no env var is set, fall back to cwd-anchored default."""
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("benchbox.utils.path_utils.Path.cwd", return_value=Path("/repo")),
+        ):
+            assert resolve_benchmark_runs_dir() == Path("/repo/benchmark_runs")
+
+    def test_empty_env_var_falls_back_to_cwd(self):
+        """An empty BENCHBOX_OUTPUT_DIR value should not override the default."""
+        with (
+            patch.dict(os.environ, {"BENCHBOX_OUTPUT_DIR": ""}),
+            patch("benchbox.utils.path_utils.Path.cwd", return_value=Path("/repo")),
+        ):
+            assert resolve_benchmark_runs_dir() == Path("/repo/benchmark_runs")
