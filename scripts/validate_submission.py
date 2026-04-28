@@ -283,8 +283,42 @@ def _validate_bundle(data: dict, vr: ValidationResult) -> None:
     _validate_queries_section(data.get("queries", []), vr)
 
 
+def _hash_file(file_path: Path) -> str:
+    """SHA-256 of a single file's contents."""
+    h = hashlib.sha256()
+    h.update(file_path.read_bytes())
+    return h.hexdigest()
+
+
+def _is_safe_bundle_filename(name: str) -> bool:
+    """Reject filenames that could escape the bundle directory.
+
+    The validator runs in CI on attacker-controlled PR JSON, so manifest-
+    supplied filenames must be plain leaf names, not paths.
+    """
+    if not name or name in (".", ".."):
+        return False
+    if "/" in name or "\\" in name or "\x00" in name:
+        return False
+    parts = Path(name).parts
+    if Path(name).is_absolute() or ".." in parts or len(parts) != 1:
+        return False
+    return True
+
+
 def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: ValidationResult) -> None:
-    """Verify that the submission manifest hash matches the bundle directory contents."""
+    """Verify the submission manifest hashes match the bundle file contents.
+
+    Contract (see also benchbox/cli/commands/submit.py):
+      - manifest.bundle_file: filename of the primary bundle JSON.
+      - manifest.bundle_hash: SHA-256 of just that file's contents.
+      - manifest.companion_hashes: optional dict of companion-file
+        names mapped to their SHA-256s. Empty dict if no companions.
+
+    The hash is per-file. Anything wider (a directory hash) does not
+    survive the user copying the bundle files into a results-data/bundles/
+    directory that already contains other bundles.
+    """
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -294,28 +328,52 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
         vr.error(f"Cannot read submission manifest file: {exc}")
         return
 
+    bundle_file = manifest.get("bundle_file")
     expected_hash = manifest.get("bundle_hash")
+    if not isinstance(bundle_file, str) or not bundle_file:
+        vr.warn("Submission manifest has no bundle_file field")
+        return
     if not isinstance(expected_hash, str) or not expected_hash:
         vr.warn("Submission manifest has no bundle_hash field")
         return
+    if not _is_safe_bundle_filename(bundle_file):
+        vr.error(f"Unsafe bundle_file in manifest: {bundle_file!r} (must be a plain filename)")
+        return
 
-    # Recompute hash using the same algorithm as benchbox submit.
-    # Exclude the manifest itself - it contains the hash so it can't be
-    # part of its own hash computation.
-    # Uses POSIX relative path (not just filename) to distinguish files
-    # in subdirectories - must match _compute_bundle_hash() in submit.py.
-    h = hashlib.sha256()
-    for file_path in sorted(bundle_dir.rglob("*")):
-        if file_path.is_symlink():
-            vr.error(f"Symlink detected in bundle: {file_path.name} - symlinks are not allowed")
-            continue
-        if file_path.is_file() and file_path.name != "submission-manifest.json":
-            h.update(file_path.relative_to(bundle_dir).as_posix().encode())
-            h.update(file_path.read_bytes())
-    actual_hash = h.hexdigest()
+    primary_path = bundle_dir / bundle_file
+    if not primary_path.is_file():
+        vr.error(f"Bundle file declared in manifest not found in PR: {bundle_file}")
+        return
 
+    actual_hash = _hash_file(primary_path)
     if actual_hash != expected_hash:
-        vr.error(f"Bundle hash mismatch: manifest says {expected_hash[:16]}..., computed {actual_hash[:16]}...")
+        vr.error(
+            f"Bundle hash mismatch for {bundle_file}: manifest says "
+            f"{expected_hash[:16]}..., computed {actual_hash[:16]}..."
+        )
+
+    companion_hashes = manifest.get("companion_hashes") or {}
+    if not isinstance(companion_hashes, dict):
+        vr.error("companion_hashes field must be an object (filename -> hash)")
+        return
+
+    for comp_name, comp_expected in companion_hashes.items():
+        if not isinstance(comp_name, str) or not _is_safe_bundle_filename(comp_name):
+            vr.error(f"Unsafe companion filename in manifest: {comp_name!r} (must be a plain filename)")
+            continue
+        comp_path = bundle_dir / comp_name
+        if not comp_path.is_file():
+            vr.error(f"Companion file declared in manifest not found in PR: {comp_name}")
+            continue
+        if not isinstance(comp_expected, str) or not comp_expected:
+            vr.error(f"Empty companion hash for {comp_name}")
+            continue
+        comp_actual = _hash_file(comp_path)
+        if comp_actual != comp_expected:
+            vr.error(
+                f"Companion hash mismatch for {comp_name}: manifest says "
+                f"{comp_expected[:16]}..., computed {comp_actual[:16]}..."
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -32,7 +32,7 @@ Options:
 
 Platform groups:
   fast        - Fast OLAP benchmark execution:
-                duckdb datafusion lakesail clickhouse-server cedardb starrocks
+                duckdb datafusion lakesail clickhouse-local clickhouse-server cedardb starrocks
   slow        - Slower benchmark execution (OLTP, JVM, timeseries):
                 sqlite spark postgresql presto trino databend doris
                 influxdb pg-duckdb pg-mooncake timescaledb questdb singlestore
@@ -115,7 +115,7 @@ fi
 
 # ---- Platform lists ----
 # Each platform appears in exactly one list. Speed based on OLAP benchmark execution time.
-FAST_NATIVE=( duckdb datafusion lakesail )
+FAST_NATIVE=( duckdb datafusion lakesail clickhouse-local )
 FAST_DOCKER=( clickhouse-server cedardb starrocks )
 SLOW_NATIVE=( sqlite spark )
 SLOW_DOCKER=( postgresql presto trino databend doris influxdb pg-duckdb pg-mooncake timescaledb questdb singlestore velox )
@@ -535,9 +535,10 @@ done
 # Map platforms → required uv extras so optional dependencies are installed.
 get_platform_uv_extra() {
   case "$1" in
-    singlestore) echo "singlestore" ;;
-    influxdb)    echo "influxdb" ;;
-    *)           echo "" ;;
+    clickhouse-local) echo "clickhouse-local" ;;
+    singlestore)      echo "singlestore" ;;
+    influxdb)         echo "influxdb" ;;
+    *)                echo "" ;;
   esac
 }
 _uv_sync_args=()

@@ -197,25 +197,23 @@ class TestValidateBundle:
 
 
 class TestValidateManifestHash:
+    @staticmethod
+    def _hash_of(file_path: Path) -> str:
+        import hashlib
+
+        return hashlib.sha256(file_path.read_bytes()).hexdigest()
+
     def test_matching_hash_passes(self, tmp_path: Path):
         bundle_dir = tmp_path / "bundle"
         bundle_dir.mkdir()
         bundle_file = bundle_dir / "result.json"
         bundle_file.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
 
-        # Compute expected hash (same algorithm as benchbox submit -
-        # excludes submission-manifest.json)
-        import hashlib
-
-        h = hashlib.sha256()
-        for fp in sorted(bundle_dir.rglob("*")):
-            if fp.is_file() and fp.name != "submission-manifest.json":
-                h.update(fp.relative_to(bundle_dir).as_posix().encode())
-                h.update(fp.read_bytes())
-        expected = h.hexdigest()
-
-        manifest = tmp_path / "submission-manifest.json"
-        manifest.write_text(json.dumps({"bundle_hash": expected}), encoding="utf-8")
+        manifest = bundle_dir / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps({"bundle_file": "result.json", "bundle_hash": self._hash_of(bundle_file)}),
+            encoding="utf-8",
+        )
 
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, bundle_dir, vr)
@@ -226,59 +224,150 @@ class TestValidateManifestHash:
         bundle_dir.mkdir()
         (bundle_dir / "result.json").write_text("{}", encoding="utf-8")
 
-        manifest = tmp_path / "submission-manifest.json"
-        manifest.write_text(json.dumps({"bundle_hash": "deadbeef" * 8}), encoding="utf-8")
+        manifest = bundle_dir / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps({"bundle_file": "result.json", "bundle_hash": "deadbeef" * 8}),
+            encoding="utf-8",
+        )
 
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, bundle_dir, vr)
         assert not vr.ok
-        assert any("hash mismatch" in e for e in vr.errors)
+        assert any("hash mismatch" in e.lower() for e in vr.errors)
+        assert any("result.json" in e for e in vr.errors)
 
     def test_missing_hash_field_warns(self, tmp_path: Path):
         manifest = tmp_path / "submission-manifest.json"
-        manifest.write_text(json.dumps({}), encoding="utf-8")
+        manifest.write_text(json.dumps({"bundle_file": "result.json"}), encoding="utf-8")
 
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, tmp_path, vr)
         assert vr.ok
         assert any("no bundle_hash" in w for w in vr.warnings)
+
+    def test_missing_bundle_file_field_warns(self, tmp_path: Path):
+        manifest = tmp_path / "submission-manifest.json"
+        manifest.write_text(json.dumps({"bundle_hash": "deadbeef" * 8}), encoding="utf-8")
+
+        vr = ValidationResult("test")
+        _validate_manifest_hash(manifest, tmp_path, vr)
+        assert vr.ok
+        assert any("no bundle_file" in w for w in vr.warnings)
 
     @pytest.mark.parametrize("bad_hash", [123, None, ["abc"], {"hash": "x"}])
     def test_non_string_hash_warns(self, tmp_path: Path, bad_hash):
         """Non-string bundle_hash values should warn, not crash."""
         manifest = tmp_path / "submission-manifest.json"
-        manifest.write_text(json.dumps({"bundle_hash": bad_hash}), encoding="utf-8")
+        manifest.write_text(
+            json.dumps({"bundle_file": "result.json", "bundle_hash": bad_hash}),
+            encoding="utf-8",
+        )
 
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, tmp_path, vr)
         assert vr.ok
         assert any("no bundle_hash" in w for w in vr.warnings)
 
-    def test_manifest_excluded_from_hash(self, tmp_path: Path):
-        """The manifest itself must not be included in the hash computation."""
+    def test_companion_hash_mismatch_fails(self, tmp_path: Path):
+        """A companion file with a wrong hash must surface a per-file error."""
+        bundle_dir = tmp_path / "bundle"
+        bundle_dir.mkdir()
+        bundle_file = bundle_dir / "result.json"
+        bundle_file.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        plans_file = bundle_dir / "result.plans.json"
+        plans_file.write_text("{}", encoding="utf-8")
+
+        manifest = bundle_dir / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "bundle_file": "result.json",
+                    "bundle_hash": self._hash_of(bundle_file),
+                    "companion_hashes": {"result.plans.json": "wrong" + "0" * 59},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        vr = ValidationResult("test")
+        _validate_manifest_hash(manifest, bundle_dir, vr)
+        assert not vr.ok
+        assert any("Companion hash mismatch" in e and "result.plans.json" in e for e in vr.errors)
+
+    @pytest.mark.parametrize(
+        "unsafe_name",
+        [
+            "../escape.json",
+            "subdir/result.json",
+            "/etc/passwd",
+            "..",
+            "a\x00b.json",
+            "a\\b.json",
+        ],
+    )
+    def test_unsafe_bundle_filename_rejected(self, tmp_path: Path, unsafe_name: str):
+        """Manifest-supplied filenames must not escape the bundle directory."""
+        bundle_dir = tmp_path / "bundle"
+        bundle_dir.mkdir()
+        manifest = bundle_dir / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps({"bundle_file": unsafe_name, "bundle_hash": "a" * 64}),
+            encoding="utf-8",
+        )
+
+        vr = ValidationResult("test")
+        _validate_manifest_hash(manifest, bundle_dir, vr)
+        assert not vr.ok
+        assert any("Unsafe bundle_file" in e for e in vr.errors)
+
+    def test_unsafe_companion_filename_rejected(self, tmp_path: Path):
+        """Companion-hash keys must also be plain filenames."""
         bundle_dir = tmp_path / "bundle"
         bundle_dir.mkdir()
         bundle_file = bundle_dir / "result.json"
         bundle_file.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
 
-        # Compute hash of just the bundle (excluding manifest)
-        import hashlib
-
-        h = hashlib.sha256()
-        for fp in sorted(bundle_dir.rglob("*")):
-            if fp.is_file():
-                h.update(fp.relative_to(bundle_dir).as_posix().encode())
-                h.update(fp.read_bytes())
-        expected = h.hexdigest()
-
-        # Now write the manifest INTO the bundle directory
         manifest = bundle_dir / "submission-manifest.json"
-        manifest.write_text(json.dumps({"bundle_hash": expected}), encoding="utf-8")
+        manifest.write_text(
+            json.dumps(
+                {
+                    "bundle_file": "result.json",
+                    "bundle_hash": self._hash_of(bundle_file),
+                    "companion_hashes": {"../escape.plans.json": "a" * 64},
+                }
+            ),
+            encoding="utf-8",
+        )
 
-        # Validation should still pass - manifest is excluded from hash
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, bundle_dir, vr)
-        assert vr.ok, f"Expected pass but got errors: {vr.errors}"
+        assert not vr.ok
+        assert any("Unsafe companion filename" in e for e in vr.errors)
+
+    def test_robust_when_corpus_already_populated(self, tmp_path: Path):
+        """Sibling bundles in the directory must not affect validation.
+
+        Regression coverage for the directory-vs-file-scope hash bug
+        (filed and fixed 2026-04-27 via
+        fix-submission-hash-mismatch-vs-validator-directory-scope).
+        """
+        bundle_dir = tmp_path / "bundle"
+        bundle_dir.mkdir()
+        bundle_file = bundle_dir / "result.json"
+        bundle_file.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+
+        manifest = bundle_dir / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps({"bundle_file": "result.json", "bundle_hash": self._hash_of(bundle_file)}),
+            encoding="utf-8",
+        )
+
+        (bundle_dir / "other_existing_1.json").write_text("{}", encoding="utf-8")
+        (bundle_dir / "other_existing_2.json").write_text("{}", encoding="utf-8")
+
+        vr = ValidationResult("test")
+        _validate_manifest_hash(manifest, bundle_dir, vr)
+        assert vr.ok, f"Expected pass with sibling bundles present, got: {vr.errors}"
 
 
 # ---------------------------------------------------------------------------
