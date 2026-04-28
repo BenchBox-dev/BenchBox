@@ -1,9 +1,14 @@
-generated_at: '2026-04-28T07:38:10.000407'
-total_items: 29
+generated_at: '2026-04-28T09:46:27.216849'
+total_items: 35
 priorities:
   High:
-    count: 3
+    count: 4
     items:
+    - id: dry-run-followup-package-canonical-contributing
+      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
+      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
+      category: Core Functionality
+      status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
@@ -43,7 +48,7 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium:
-    count: 7
+    count: 9
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -65,6 +70,11 @@ priorities:
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       category: Performance
       status: Identified
+    - id: dry-run-followup-manifest-filename-convention
+      file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
+      title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
+      category: Core Functionality
+      status: Not Started
     - id: single-repo-migration-phase-8-first-post-migration-release
       file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
       title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
@@ -80,8 +90,13 @@ priorities:
       title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
       category: Testing and Quality Assurance
       status: Not Started
+    - id: dry-run-followup-submitted-by-flag
+      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
+      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
+      category: Core Functionality
+      status: Not Started
   Low:
-    count: 14
+    count: 17
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -98,6 +113,16 @@ priorities:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       category: Platform Expansion
       status: Not Started
+    - id: dry-run-followup-broken-getting-started-link
+      file: TODO/main/planning/dry-run-followup-broken-getting-started-link.yaml
+      title: Add a docs linkcheck rule so broken relative links can't regress
+      category: Documentation
+      status: Not Started
+    - id: dry-run-followup-bundle-table-conditionals
+      file: TODO/main/planning/dry-run-followup-bundle-table-conditionals.yaml
+      title: Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table
+      category: Documentation
+      status: Not Started
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog - Specialized Benchmarks and Infrastructure
@@ -112,6 +137,11 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
+      status: Not Started
+    - id: dry-run-followup-uv-fallback-and-schema-key
+      file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
+      title: 'Local-validation block: document non-uv fallback and schema-version key name'
+      category: Documentation
       status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml

@@ -4,7 +4,7 @@ Thank you for contributing to the BenchBox community results dataset! Community-
 
 ## Prerequisites
 
-1. **Install BenchBox** - follow the [Getting Started](getting-started.rst) guide
+1. **Install BenchBox** - follow the [Getting Started](usage/getting-started.md) guide
 2. **Run a benchmark** - you need a complete benchmark result to submit
 
 ## Step-by-Step Submission Flow
@@ -12,6 +12,8 @@ Thank you for contributing to the BenchBox community results dataset! Community-
 ### 1. Run a benchmark
 
 Run a complete benchmark suite (not a cherry-picked subset of queries):
+
+Install the platform extra first (e.g. `pip install "benchbox[duckdb]"`).
 
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 0.01

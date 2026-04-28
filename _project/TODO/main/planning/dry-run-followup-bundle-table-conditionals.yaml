@@ -1,0 +1,74 @@
+id: dry-run-followup-bundle-table-conditionals
+title: "Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table"
+worktree: main
+priority: Low
+status: Not Started
+category: Documentation
+
+description: |
+  `docs/contributing-results.md` Step 2 lists `<result>.plans.json` and
+  `<result>.tuning.json` as bundle outputs gated on `(if captured)` /
+  `(if used)`. Neither phrase is defined anywhere in the doc; nothing
+  explains how a contributor opts into plan capture or applies tuning
+  before running. First-time contributors see the rows and wonder if
+  their bundle is incomplete because those files don't appear.
+
+  Decision needed: are plans/tuning files community-submittable, or
+  maintainer-only? Either explain the opt-in or drop the rows from
+  the contributor-facing doc and surface them in advanced docs only.
+
+  Surfaced by the agent-proxy dry-run on 2026-04-28
+  (see `_project/handoffs/external-dry-run-retrospective-2026-04-28.md`).
+
+work:
+  - id: w1
+    summary: "Decide whether plans/tuning files are community-submittable"
+    status: pending
+    notes: |
+      Talk to the maintainer or check the validate-submission CI
+      behavior: does the workflow accept a community PR carrying a
+      plans.json / tuning.json sidecar? If yes -> document the
+      opt-in flags in Step 1. If no -> drop the rows from the
+      community-facing doc.
+
+  - id: w2
+    summary: "Apply the chosen change to docs/contributing-results.md"
+    needs: [w1]
+    status: pending
+    notes: |
+      If documenting opt-in: add a one-line sub-bullet under Step 1
+      naming the `benchbox run` flags that produce these files
+      (likely `--capture-plans` / `--tuning <path>` — verify against
+      the actual CLI). If dropping: remove the two rows and add a
+      brief note in `docs/operations/` for maintainers who need
+      these artifacts.
+
+verification:
+  - description: "Bundle table no longer contains undefined `(if captured)` / `(if used)` qualifiers"
+    command: "grep -cE '\\(if captured\\)|\\(if used\\)' docs/contributing-results.md"
+    expected_output: "0"
+
+must_preserve:
+  - "If plans/tuning files ARE community-submittable, the validate-submission CI continues to accept them"
+
+anti_patterns:
+  - "DO NOT leave the rows in with vague qualifiers -- because that is the failure mode this TODO exists to fix -- pick a path and apply it"
+
+scope_limit:
+  only_modify:
+    - "docs/contributing-results.md"
+    - "docs/operations/"
+
+metadata:
+  tags:
+    - docs
+    - contributor-experience
+    - dry-run-followup
+  estimated_effort: "Trivial"
+  created_date: "2026-04-28"
+
+impact:
+  business_value: |
+    Removes a doc ambiguity that makes contributors second-guess their
+    bundles. Tiny change, but it's exactly the kind of thing first-time
+    contributors notice.
