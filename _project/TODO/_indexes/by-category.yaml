@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T16:27:35.934099'
+generated_at: '2026-04-28T18:04:33.405849'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -143,8 +143,13 @@ categories:
       priority: Low
       status: Not Started
   Release Tooling:
-    count: 3
+    count: 4
     items:
+    - id: release-flow-dry-run-rc1
+      file: TODO/main/active/release-flow-dry-run-rc1.yaml
+      title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
+      priority: High
+      status: Not Started
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
       title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'

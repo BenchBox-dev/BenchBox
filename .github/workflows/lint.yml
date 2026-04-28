@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - main
-      - develop
-      - 'v*'
   pull_request:
     branches:
       - main
       - develop
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -49,3 +51,6 @@ jobs:
 
       - name: Dependency audit (no unused declarations)
         run: make audit-deps
+
+      - name: Release curation list drift check
+        run: uv run python scripts/check_release_curation.py

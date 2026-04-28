@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T16:27:37.849625'
-total_items: 787
+generated_at: '2026-04-28T18:04:35.676134'
+total_items: 788
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -4061,6 +4061,26 @@ items:
   work_ready: 0
   needs:
   - explorer-emit-benchmark-summary-artifact
+- id: simplify-dev-loop-and-release-flow
+  file: DONE/main/active/simplify-dev-loop-and-release-flow.yaml
+  title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Completed
+  tags:
+  - release
+  - dev-loop
+  - tooling
+  - simplification
+  estimated_effort: ~7h spread across 1-2 days (6h flow + 1h CI churn opts w10/w11/w12)
+  completed_date: '2026-04-28'
+  work_total: 11
+  work_done: 11
+  work_ready: 0
+  deferred_count: 2
+  needs:
+  - single-repo-migration-phase-4-test-release-with-new-flow
 - id: single-repo-migration-phase-1-wheel-hygiene
   file: DONE/main/planning/single-repo-migration-phase-1-wheel-hygiene.yaml
   title: 'Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes for clean wheel'

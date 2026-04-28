@@ -66,7 +66,7 @@ No credentials in repo; use env vars or `.env` (gitignored); redact secrets in l
 
 ## Commits & PRs
 Conventional Commits (feat:, fix:, docs:, test:). PRs link issues, include tests + docs. CI: ruff + typecheck + tests via `make test-ci`.
-Single repo (`origin` → `joeharris76/BenchBox`); two long-lived branches: `develop` (dev work) and `main` (release-only). Dev PRs target `develop`, squash-merge. Releases go through the version-branch flow (`make release-prepare VERSION=X.Y.Z` cuts `vX.Y.Z` from develop, squash-merge to main, tag, then `make release-rebase-develop`). Full runbook: `docs/operations/release-guide.md`.
+Single repo (`origin` → `joeharris76/BenchBox`); two long-lived branches: `develop` (dev work) and `main` (release-only). Dev PRs target `develop`, squash-merge. Releases use a 2-command flow: `make release-cut VERSION=X.Y.Z` (cuts `vX.Y.Z` from develop, bumps version, generates changelog, curates dev-only paths, opens PR vs main) → `make release-finalize VERSION=X.Y.Z` (squash-merges, tags `main`, pushes the tag → `release.yml` publishes to PyPI). `develop` is intentionally not modified post-release. Full runbook: `docs/operations/release-guide.md`.
 
 **`develop` is PR-gated** (no direct push). Required checks: `lint` + `test (ubuntu-latest, 3.12)`. Linear history; squash-only; 0 reviewer approvals required (self-merge is fine).
 

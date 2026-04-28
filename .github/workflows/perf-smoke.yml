@@ -12,7 +12,10 @@ jobs:
   perf-smoke:
     # Skip when maintainer attaches the skip-perf-smoke label - reserved for
     # intentional baseline shifts or CI-runner flake triage.
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-perf-smoke') }}
+    # Also skip on Release v* PRs (curation + version bumps; nothing perf-affecting).
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'skip-perf-smoke')
+      && !startsWith(github.event.pull_request.title, 'Release v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

@@ -36,12 +36,15 @@ during the single-repo migration).
   - `make worktree-prune` removes worktrees whose branches are gone
     upstream (post-merge cleanup). Pairs with auto-merge: PR merges →
     branch deleted on origin → next prune sweeps the worktree.
-- **Releases** (version-branch flow): on `develop`, run `make bump
-  VERSION=X.Y.Z` and `make changelog-draft VERSION=X.Y.Z`, then `make
-  release-prepare VERSION=X.Y.Z` cuts the `vX.Y.Z` branch with curated
-  tree → PR → squash-merge to `main` → tag `main` → `release.yml`
-  publishes to PyPI → `make release-rebase-develop VERSION=X.Y.Z`
-  rebases develop. Full runbook: `docs/operations/release-guide.md`.
+- **Releases** (2-command flow): on `develop`, `make release-cut
+  VERSION=X.Y.Z` cuts the `vX.Y.Z` branch, bumps version, drafts the
+  changelog (opens `$EDITOR`), curates dev-only paths, opens the PR vs
+  `main`, and sweeps prior `v*` branches. After CI green, `make
+  release-finalize VERSION=X.Y.Z` squash-merges the PR, tags `main`,
+  and pushes the tag → `release.yml` publishes to PyPI. **`develop` is
+  intentionally not modified post-release** — dev-only paths
+  (`_project/`, `_blog/`, agent configs, etc.) live only on develop by
+  design. Full runbook: `docs/operations/release-guide.md`.
 
 ## Commands
 
