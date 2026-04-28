@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T20:56:29.970598'
+generated_at: '2026-04-28T07:38:10.000388'
 total_categories: 12
 categories:
   Architecture & Refactoring:
@@ -56,7 +56,7 @@ categories:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
-      priority: High
+      priority: Medium-High
       status: In Progress
   Performance:
     count: 1

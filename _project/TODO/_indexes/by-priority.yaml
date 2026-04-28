@@ -1,14 +1,9 @@
-generated_at: '2026-04-27T20:56:29.970612'
+generated_at: '2026-04-28T07:38:10.000407'
 total_items: 29
 priorities:
   High:
-    count: 4
+    count: 3
     items:
-    - id: integrate-benchbox-cli-submit-and-service-auth
-      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
-      title: Integrate BenchBox CLI submission flow and service authentication
-      category: Core Functionality
-      status: In Progress
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
@@ -25,7 +20,7 @@ priorities:
       category: Release Tooling
       status: In Progress
   Medium-High:
-    count: 3
+    count: 4
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -42,6 +37,11 @@ priorities:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       category: Testing and Quality Assurance
       status: Not Started
+    - id: integrate-benchbox-cli-submit-and-service-auth
+      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+      title: Integrate BenchBox CLI submission flow and service authentication
+      category: Core Functionality
+      status: In Progress
   Medium:
     count: 7
     items:
