@@ -1,9 +1,24 @@
-generated_at: '2026-04-28T07:38:10.000407'
-total_items: 29
+generated_at: '2026-04-28T09:25:54.350438'
+total_items: 34
 priorities:
   High:
-    count: 3
+    count: 6
     items:
+    - id: design-results-ingest-storage-and-derived-read-model
+      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
+      title: Design results ingest, storage, and derived read-model architecture
+      category: Core Functionality
+      status: Not Started
+    - id: release-flow-dry-run-rc1
+      file: TODO/main/active/release-flow-dry-run-rc1.yaml
+      title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
+      category: Release Tooling
+      status: Not Started
+    - id: integrate-benchbox-cli-submit-and-service-auth
+      file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+      title: Integrate BenchBox CLI submission flow and service authentication
+      category: Core Functionality
+      status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

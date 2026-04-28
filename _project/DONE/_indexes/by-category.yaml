@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T07:38:12.087779'
+generated_at: '2026-04-28T09:25:56.220215'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -3525,8 +3525,13 @@ categories:
       priority: Critical
       status: Completed
   Release Tooling:
-    count: 9
+    count: 10
     items:
+    - id: simplify-dev-loop-and-release-flow
+      file: DONE/main/active/simplify-dev-loop-and-release-flow.yaml
+      title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
+      priority: High
+      status: Completed
     - id: single-repo-migration-phase-0-audit
       file: DONE/main/planning/single-repo-migration-phase-0-audit.yaml
       title: 'Single-repo migration phase 0: gitleaks scan and content audit (working tree + _project/** history + divergence
