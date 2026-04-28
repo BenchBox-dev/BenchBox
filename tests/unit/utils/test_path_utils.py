@@ -408,7 +408,10 @@ class TestBenchboxOutputDirRedirection:
 
     def test_resolve_benchmark_runs_dir_expands_user(self, tmp_path, monkeypatch):
         """``~`` in the env var is expanded so callers get an absolute path."""
+        # Path.expanduser() consults HOME on POSIX and USERPROFILE on Windows
+        # (ntpath.expanduser ignores HOME); set both so the test is portable.
         monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
         monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", "~/runs")
         assert resolve_benchmark_runs_dir() == tmp_path / "runs"
 
