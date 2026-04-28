@@ -164,6 +164,9 @@ def metric_merged_volume(prs: list[dict] | GhError, now: datetime) -> MetricResu
         if merged is None:
             continue
         delta_days = (now - merged).days
+        if delta_days < 0:
+            # Future-dated mergedAt (clock skew or upstream API quirk).
+            continue
         if delta_days < 30:
             buckets[0] += 1
         elif delta_days < 60:
@@ -177,8 +180,9 @@ def metric_merged_volume(prs: list[dict] | GhError, now: datetime) -> MetricResu
 
 
 def metric_review_latency(prs: list[dict] | GhError, now: datetime) -> MetricResult:
-    name = f"Median PR review latency, hours (last {LATENCY_WINDOW_DAYS}d merged)"
+    name = f"Median PR open->merge time, hours (last {LATENCY_WINDOW_DAYS}d merged)"
     threshold = f"> {THRESH_LATENCY_HOURS}h"
+    note_def = "open->merge; includes draft + author-iteration time, so this over-reports strict review-only latency"
     if isinstance(prs, GhError):
         return MetricResult(name, "n/a", None, threshold, prs.message)
 
@@ -189,13 +193,16 @@ def metric_review_latency(prs: list[dict] | GhError, now: datetime) -> MetricRes
         created = _parse_iso(pr.get("createdAt"))
         if merged is None or created is None or merged < cutoff:
             continue
+        if merged < created:
+            # Defensive: skip nonsensical negative-duration rows.
+            continue
         latencies.append((merged - created).total_seconds() / 3600.0)
 
     if not latencies:
         return MetricResult(name, "0 PRs in window", False, threshold, "no data")
     median_h = statistics.median(latencies)
     breached = median_h > THRESH_LATENCY_HOURS
-    return MetricResult(name, f"{median_h:.1f}h (n={len(latencies)})", breached, threshold)
+    return MetricResult(name, f"{median_h:.1f}h (n={len(latencies)})", breached, threshold, note_def)
 
 
 def metric_backlog(prs: list[dict] | GhError, now: datetime) -> MetricResult:
@@ -313,6 +320,8 @@ def _trigger_q2_pr_volume(prs: list[dict] | GhError, now: datetime) -> MetricRes
         if merged is None:
             continue
         delta_days = (now - merged).days
+        if delta_days < 0:
+            continue
         bucket = delta_days // 30
         if 0 <= bucket < EXTRACTION_PR_VOLUME_MONTHS:
             buckets[bucket] += 1

@@ -23,6 +23,9 @@ from benchbox.core.results.loader import (
 # Submission manifest phase - indicates the result schema generation (v2.0 = phase 2).
 _SUBMISSION_PHASE = 2
 
+_DEFAULT_SERVICE_URL = "https://api.benchbox.dev/v1"
+_VISIBILITY_CHOICES = ("public", "unlisted", "private")
+
 _CONTRIBUTING_TEXT = """\
 # Contributing a Benchmark Result
 
@@ -85,6 +88,16 @@ def _dispatch_service_mode(
     real upload + auth + status-polling flow is the work in
     `integrate-benchbox-cli-submit-and-service-auth` w4-w8 and lands
     once the hosted ingest API is available.
+
+    Hash contract for the dry-run: the values printed are SHA-256 of the
+    on-disk source files as-is. The Phase 2 PR-package path
+    (--output mode) hashes the same bytes after a `shutil.copy2` into
+    `bundle/`, so the hashes are byte-identical there. If a future
+    iteration of the real-upload path canonicalises (re-serialises) the
+    bundle JSON before sending, this dry-run hash will diverge from the
+    sent hash. In that case, hoist the canonicalisation step ahead of
+    `_compute_file_hash` here so the dry-run reports what the server
+    will actually receive.
     """
     bundle_size = source_path.stat().st_size
     bundle_hash = _compute_file_hash(source_path)
@@ -117,10 +130,6 @@ def _dispatch_service_mode(
         "  _project/analysis/phase-3-promotion-metrics.md."
     )
     ctx.exit(1)
-
-
-_DEFAULT_SERVICE_URL = "https://api.benchbox.dev/v1"
-_VISIBILITY_CHOICES = ("public", "unlisted", "private")
 
 
 @click.command("submit")

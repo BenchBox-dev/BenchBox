@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T19:59:30.756435'
-total_items: 28
+generated_at: '2026-04-27T20:56:29.970621'
+total_items: 29
 statuses:
   In Progress:
     count: 3
@@ -20,7 +20,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 24
+    count: 25
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -52,6 +52,11 @@ statuses:
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       category: Core Functionality
+    - id: automate-phase2-metrics-quarterly-cadence
+      file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
+      title: Automate the Phase 3 promotion-metrics quarterly cadence
+      priority: Medium
+      category: Tooling
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog - Specialized Benchmarks and Infrastructure

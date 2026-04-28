@@ -326,7 +326,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                     <th class="p-0" scope="col">
                       <button
                         type="button"
-                        class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0 font-inherit"
+                        class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                         onClick={() => toggleSort("query_id")}
                       >
                         Query{sortArrow("query_id")}
@@ -335,7 +335,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                     <th class="p-0" scope="col">
                       <button
                         type="button"
-                        class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0 font-inherit"
+                        class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                         onClick={() => toggleSort("display_ms")}
                       >
                         Median (ms){sortArrow("display_ms")}
@@ -344,7 +344,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                     <th class="p-0" scope="col">
                       <button
                         type="button"
-                        class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0 font-inherit"
+                        class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                         onClick={() => toggleSort("sample_count")}
                       >
                         Samples{sortArrow("sample_count")}
