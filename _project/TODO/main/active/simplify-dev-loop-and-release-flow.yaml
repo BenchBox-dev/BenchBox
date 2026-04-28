@@ -142,7 +142,7 @@ work:
 
 - id: w5
   summary: "Workflow trims: drop check-ci-passed from release.yml; remove v* push trigger from lint.yml + test.yml"
-  status: pending
+  status: done
   notes: |
     .github/workflows/release.yml:
       - Delete entire `check-ci-passed` job (lines 16–80, the JS poller).
