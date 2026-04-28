@@ -10,6 +10,21 @@ deps:
   - automate-corpus-inventory-generation
   - verify-ci-validation-workflow-end-to-end
 
+# Note (2026-04-27): both upstream deps are now done. The remaining
+# constraint is the per-benchmark scale-factor policy:
+#
+# - TPC-DS at SF<1.0 generates and runs cleanly but is `unofficial_subscale`
+#   per `_sources/tpcds-subscale-contract.md`. `benchbox submit` refuses
+#   unofficial submissions, so SF 0.01 is not submittable. SF 1.0 is the
+#   minimum for an official TPC-DS submission (~1GB data, multi-platform
+#   runs).
+# - ClickBench requires `scale_factor >= 1.0`. The runner rejects 0.01.
+#
+# So w1's scale choice in the TODO body ("SF 0.01") is incorrect for both
+# candidates and needs revisiting. Recommended path: TPC-DS at SF 1.0,
+# done in a dedicated session with budget for the data gen + 3-platform
+# runs.
+
 description: |
   The strategy doc differentiates BenchBox vs. ClickBench on three axes,
   the first being **multi-benchmark coverage**: TPC-H + TPC-DS + SSB +
