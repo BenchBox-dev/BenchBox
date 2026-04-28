@@ -1,0 +1,86 @@
+id: dry-run-followup-broken-getting-started-link
+title: "Add a docs linkcheck rule so broken relative links can't regress"
+worktree: main
+priority: Low
+status: Not Started
+category: Documentation
+
+description: |
+  The agent-proxy dry-run on 2026-04-28 found that
+  `docs/contributing-results.md` Prerequisites #1 linked to
+  `getting-started.rst` at the wrong relative path (the file lives at
+  `docs/usage/getting-started.md`, not `docs/getting-started.rst`). The
+  link itself is patched in the same PR as the retrospective; this TODO
+  exists to add a docs linkcheck rule so the same shape of breakage
+  cannot regress.
+
+  See `_project/handoffs/external-dry-run-retrospective-2026-04-28.md`
+  for the originating finding.
+
+work:
+  - id: w1
+    summary: "Audit current docs build for any existing linkcheck step"
+    status: pending
+    notes: |
+      Check `docs/Makefile` and any `make docs-*` targets, plus
+      `.github/workflows/docs.yml` if it exists, for a pre-existing
+      Sphinx linkcheck or markdown-link-check step. If one exists
+      and it didn't catch this regression, find out why (was the
+      file excluded? Did the broken link only resolve at build time
+      vs source time?).
+
+  - id: w2
+    summary: "Add markdown-link-check (or equivalent) to the docs CI"
+    needs: [w1]
+    status: pending
+    notes: |
+      If no linkcheck exists, add one. Suggested:
+      `markdown-link-check` run via `npx` in a docs CI job, scoped
+      to `docs/` and `_project/handoffs/`. Configure to fail the
+      job on broken relative links (HTTP 404s on external links can
+      stay advisory). Add an ignore-list file for known-flaky
+      external URLs.
+
+  - id: w3
+    summary: "Run the linkcheck against current docs and fix any other latent breakage"
+    needs: [w2]
+    status: pending
+    notes: |
+      First run will likely surface other broken links. Fix them in
+      the same PR or file follow-up TODOs per file scope.
+
+verification:
+  - description: "Linkcheck job exists and runs in docs CI"
+    command: "grep -rE 'markdown-link-check|sphinx-build.*linkcheck' .github/workflows/ | wc -l"
+    expected_output: ">= 1"
+  - description: "The originally-broken link resolves"
+    command: "test -f docs/usage/getting-started.md"
+    expected_output: "exit 0"
+
+must_preserve:
+  - "Existing relative links in `docs/` that currently resolve continue to resolve (no false positives from a poorly-tuned linkcheck config)"
+  - "Docs CI total wall-clock stays within the existing budget (linkcheck added as a parallel job, not serialized after the slow build)"
+  - "External-link 404s remain advisory, not blocking -- a third-party link rotting should not block a docs PR"
+
+anti_patterns:
+  - "DO NOT whitelist the originally-broken path to make linkcheck pass -- because that defeats the purpose of adding the check"
+
+scope_limit:
+  only_modify:
+    - "docs/"
+    - ".github/workflows/"
+    - "package.json"
+
+metadata:
+  tags:
+    - docs
+    - ci
+    - dry-run-followup
+  estimated_effort: "Small"
+  created_date: "2026-04-28"
+
+impact:
+  technical_debt: |
+    Closes the regression-detection gap that let the broken link
+    survive long enough for a contributor (agent or human) to
+    encounter it.

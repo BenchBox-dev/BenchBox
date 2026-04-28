@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T09:25:54.350425'
-total_categories: 11
+generated_at: '2026-04-28T18:04:33.405849'
+total_categories: 13
 categories:
   Architecture & Refactoring:
     count: 1
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 2
+    count: 5
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -58,6 +58,39 @@ categories:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: Medium-High
       status: In Progress
+    - id: dry-run-followup-package-canonical-contributing
+      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
+      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
+      priority: High
+      status: Not Started
+    - id: dry-run-followup-manifest-filename-convention
+      file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
+      title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
+      priority: Medium
+      status: Not Started
+    - id: dry-run-followup-submitted-by-flag
+      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
+      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
+      priority: Medium
+      status: Not Started
+  Documentation:
+    count: 3
+    items:
+    - id: dry-run-followup-broken-getting-started-link
+      file: TODO/main/planning/dry-run-followup-broken-getting-started-link.yaml
+      title: Add a docs linkcheck rule so broken relative links can't regress
+      priority: Low
+      status: Not Started
+    - id: dry-run-followup-bundle-table-conditionals
+      file: TODO/main/planning/dry-run-followup-bundle-table-conditionals.yaml
+      title: Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table
+      priority: Low
+      status: Identified
+    - id: dry-run-followup-uv-fallback-and-schema-key
+      file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
+      title: 'Local-validation block: document non-uv fallback and schema-version key name'
+      priority: Low
+      status: Not Started
   Performance:
     count: 1
     items:

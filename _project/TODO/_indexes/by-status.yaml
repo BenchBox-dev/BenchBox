@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T09:25:54.350447'
-total_items: 34
+generated_at: '2026-04-28T18:04:33.405879'
+total_items: 36
 statuses:
   In Progress:
     count: 3
@@ -47,6 +47,11 @@ statuses:
       title: Add SiriusDB (GPU-Native SQL Engine) Platform Adapter
       priority: Low
       category: Platform Expansion
+    - id: dry-run-followup-broken-getting-started-link
+      file: TODO/main/planning/dry-run-followup-broken-getting-started-link.yaml
+      title: Add a docs linkcheck rule so broken relative links can't regress
+      priority: Low
+      category: Documentation
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
@@ -56,12 +61,7 @@ statuses:
       file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
       title: Automate the Phase 3 promotion-metrics quarterly cadence
       priority: Medium
-      category: Core Functionality
-    - id: design-results-ingest-storage-and-derived-read-model
-      file: TODO/main/planning/design-results-ingest-storage-and-derived-read-model.yaml
-      title: Design results ingest, storage, and derived read-model architecture
-      priority: High
-      category: Core Functionality
+      category: Tooling
     - id: release-flow-dry-run-rc1
       file: TODO/main/active/release-flow-dry-run-rc1.yaml
       title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
@@ -92,11 +92,26 @@ statuses:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: dry-run-followup-uv-fallback-and-schema-key
+      file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
+      title: 'Local-validation block: document non-uv fallback and schema-version key name'
+      priority: Low
+      category: Documentation
+    - id: dry-run-followup-package-canonical-contributing
+      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
+      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
+      priority: High
+      category: Core Functionality
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
       priority: High
       category: Platform Expansion
+    - id: dry-run-followup-manifest-filename-convention
+      file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
+      title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
+      priority: Medium
+      category: Core Functionality
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
       title: Quarterly review of dependency upper bounds
@@ -158,9 +173,19 @@ statuses:
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
+    - id: dry-run-followup-submitted-by-flag
+      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
+      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
+      priority: Medium
+      category: Core Functionality
   Identified:
-    count: 1
+    count: 2
     items:
+    - id: dry-run-followup-bundle-table-conditionals
+      file: TODO/main/planning/dry-run-followup-bundle-table-conditionals.yaml
+      title: Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table
+      priority: Low
+      category: Documentation
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL

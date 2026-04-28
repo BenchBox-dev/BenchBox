@@ -1,0 +1,103 @@
+id: dry-run-followup-submitted-by-flag
+title: "benchbox submit: warn on empty submitted_by, add --submitted-by override"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+
+deps:
+  needs:
+    - dry-run-followup-package-canonical-contributing
+
+description: |
+  `docs/contributing-results.md` describes the submission manifest as
+  containing a "contributor" field. The CLI does fall back to
+  `git config user.name` via `_get_git_username()` at
+  `benchbox/cli/commands/submit.py:49-60`, but when that returns empty
+  (no git user.name configured — e.g. fresh sandbox), the manifest's
+  `submitted_by` is silently set to `""` with no warning.
+
+  Two improvements:
+    1. Warn loudly when the fallback returns empty, telling the
+       contributor exactly how to set it.
+    2. Add `--submitted-by TEXT` for explicit override (CI, automation,
+       contributors who prefer not to set git config).
+
+  Surfaced by the agent-proxy dry-run on 2026-04-28
+  (see `_project/handoffs/external-dry-run-retrospective-2026-04-28.md`).
+  The Cowork sandbox had no `git config user.name` set, which is what
+  triggered the silent-empty path that this TODO addresses.
+
+work:
+  - id: w1
+    summary: "Warn when _get_git_username returns empty and no --submitted-by was passed"
+    status: pending
+    notes: |
+      In the manifest-write path, if `submitted_by` would be empty,
+      print a warning to stderr: "submitted_by is empty — set
+      `git config user.name <name>` or pass --submitted-by NAME".
+      Do not fail the command; the empty field is a soft issue, not
+      a hard error.
+
+  - id: w2
+    summary: "Add --submitted-by TEXT flag and plumb into manifest write"
+    status: pending
+    needs: [w1]
+    notes: |
+      Add `--submitted-by TEXT` option to `benchbox submit`. Precedence:
+      explicit flag > `git config user.name` > empty (with warning).
+      Document in `docs/contributing-results.md` and in the in-bundle
+      CONTRIBUTING.md (which is being rewritten in
+      `dry-run-followup-package-canonical-contributing` — coordinate
+      the doc change there).
+
+  - id: w3
+    summary: "Add unit tests for the three precedence paths"
+    status: pending
+    needs: [w2]
+    notes: |
+      Test cases: (a) --submitted-by overrides git config, (b) git
+      config user.name is used when no flag, (c) warning is emitted
+      when both are empty. Mock `_get_git_username` for determinism.
+
+verification:
+  - description: "--submitted-by flag is in the help output"
+    command: "uv run -- benchbox submit --help | grep -c -- '--submitted-by'"
+    expected_output: "1"
+  - description: "Submit unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q"
+    expected_output: "All tests pass"
+
+must_preserve:
+  - "Existing `_get_git_username()` fallback behavior remains the default when no flag is passed"
+  - "The empty-submitted_by case stays a warning, not a hard failure -- some contributors may legitimately submit anonymously"
+
+anti_patterns:
+  - "DO NOT make empty submitted_by a hard error -- because anonymous submissions are valid -- warn and continue"
+  - "DO NOT change the default fallback source without updating the doc table in the same PR -- because contributors verifying their manifest will look for whichever field the doc names -- keep code and doc consistent"
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/commands/submit.py"
+    - "tests/unit/cli/commands/test_submit.py"
+    - "docs/contributing-results.md"
+
+metadata:
+  tags:
+    - results
+    - submit
+    - cli
+    - contributor-experience
+    - dry-run-followup
+  estimated_effort: "Small"
+  created_date: "2026-04-28"
+
+impact:
+  business_value: |
+    Closes the silent-empty failure mode for `submitted_by` so the
+    manifest's contributor metadata is reliably populated, and gives
+    automated submission paths an explicit override.
+  user_impact: |
+    Contributors get a clear warning when their setup is missing the
+    git user.name, instead of producing a manifest with empty
+    contributor metadata they discover only post-PR.
