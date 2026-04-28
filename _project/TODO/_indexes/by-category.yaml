@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T21:16:40.625894'
+generated_at: '2026-04-28T09:25:54.350425'
 total_categories: 11
 categories:
   Architecture & Refactoring:
@@ -132,11 +132,11 @@ categories:
   Release Tooling:
     count: 4
     items:
-    - id: simplify-dev-loop-and-release-flow
-      file: TODO/main/active/simplify-dev-loop-and-release-flow.yaml
-      title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
+    - id: release-flow-dry-run-rc1
+      file: TODO/main/active/release-flow-dry-run-rc1.yaml
+      title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
       priority: High
-      status: In Progress
+      status: Not Started
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
       title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'

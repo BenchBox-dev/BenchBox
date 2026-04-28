@@ -1,5 +1,5 @@
-generated_at: '2026-04-27T21:16:43.565835'
-total_items: 780
+generated_at: '2026-04-28T09:25:56.220559'
+total_items: 781
 statuses:
   In Progress:
     count: 2
@@ -266,7 +266,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 729
+    count: 730
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3180,6 +3180,11 @@ statuses:
       title: Simplify data generator and pipeline loading functions (complexity batch 5)
       priority: Medium
       category: Core Functionality
+    - id: simplify-dev-loop-and-release-flow
+      file: DONE/main/active/simplify-dev-loop-and-release-flow.yaml
+      title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
+      priority: High
+      category: Release Tooling
     - id: simplify-dataframe-extra-naming
       file: DONE/main/active/simplify-dataframe-extra-naming.yaml
       title: 'Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras'

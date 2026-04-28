@@ -2,7 +2,8 @@ id: simplify-dev-loop-and-release-flow
 title: "Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-28"
 category: Release Tooling
 
 deps:
@@ -332,58 +333,6 @@ work:
 
     Estimated savings: ~25 CI-min per release PR (one perf-smoke
     leg + one parity leg).
-
-- id: w9
-  summary: "Dry-run on 0.3.0-rc.1 to validate the flow end-to-end"
-  needs: [w1, w2, w3, w4, w5, w6, w7, w8, w10, w11, w12]
-  status: pending
-  notes: |
-    The first real release after migration is the validation. Use
-    a pre-release tag so a botched dry-run isn't catastrophic
-    (PyPI accepts rc tags).
-
-    Procedure:
-      1. From a worktree on develop:
-         make release-cut VERSION=0.3.0-rc.1
-      2. Inspect PR diff:
-         gh pr diff <PR#> | head -200
-         Confirm: only curation removals + version bumps + changelog;
-         no surprise additions.
-      3. Inspect release branch tree:
-         git ls-tree -d --name-only origin/v0.3.0-rc.1
-         Confirm absent: _project, _blog, .claude, .codex, .gemini.
-      4. Wait for CI green on PR.
-      5. From develop worktree:
-         make release-finalize VERSION=0.3.0-rc.1
-      6. Verify develop unchanged:
-         git diff origin/develop develop  # empty
-      7. Verify dev-only paths preserved on develop:
-         test -d _project && test -d _blog && test -f AGENTS.md && \
-           test -f CLAUDE.md && test -f GEMINI.md && echo OK
-      8. Verify release.yml published:
-         gh run list --workflow=release.yml --limit 1 --json conclusion --jq '.[0].conclusion'
-         pip index versions benchbox 2>&1 | grep 0.3.0-rc.1
-      9. Verify previous v* branch deletion (no-op for first run
-         since v0.2.1 was a legacy two-repo release without a v*
-         branch):
-         git ls-remote --heads origin 'v*'
-         # Should show only refs/heads/v0.3.0-rc.1.
-     10. Verify CI optimizations (w10/w11/w12):
-         a. perf-smoke skipped on release PR (w12):
-            gh pr view <release-PR#> --json statusCheckRollup \
-              --jq '.statusCheckRollup[] | select(.name|test("perf-smoke|parity"))'
-            # Both should be absent (job didn't fire).
-         b. After release-finalize, no push-CI on develop (w10):
-            (Develop didn't change, so this is trivially true. Validate
-            on the next regular feature-PR squash-merge instead:
-            gh run list --workflow=test.yml --branch develop --event push --limit 1
-            # No run after the squash-merge SHA.)
-         c. concurrency cancellation (w11): force-push to a feature
-            branch during CI; the older lint/test runs show as
-            "cancelled" in the Actions UI.
-
-    If any step fails, the rc tag is the only artifact published;
-    fix and bump to rc.2.
 
 deferred:
 - summary: "Consolidate version sources from 6 to 2 (pyproject.toml + __init__.py)"

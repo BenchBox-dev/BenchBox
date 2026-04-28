@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T21:16:40.625917'
+generated_at: '2026-04-28T09:25:54.350438'
 total_items: 34
 priorities:
   Critical:
@@ -17,6 +17,11 @@ priorities:
       title: Design results ingest, storage, and derived read-model architecture
       category: Core Functionality
       status: Not Started
+    - id: release-flow-dry-run-rc1
+      file: TODO/main/active/release-flow-dry-run-rc1.yaml
+      title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
+      category: Release Tooling
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
@@ -32,11 +37,6 @@ priorities:
       title: Run a Phase 2 dry-run with one external trusted contributor
       category: Testing and Quality Assurance
       status: Not Started
-    - id: simplify-dev-loop-and-release-flow
-      file: TODO/main/active/simplify-dev-loop-and-release-flow.yaml
-      title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
-      category: Release Tooling
-      status: In Progress
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
       title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'

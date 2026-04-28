@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T21:16:40.625848'
+generated_at: '2026-04-28T09:25:54.350396'
 total_items: 34
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -40,6 +40,24 @@ items:
   needs:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
+- id: release-flow-dry-run-rc1
+  file: TODO/main/active/release-flow-dry-run-rc1.yaml
+  title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
+  worktree: main
+  category: Release Tooling
+  priority: High
+  status: Not Started
+  tags:
+  - release
+  - validation
+  - rc
+  - pypi
+  estimated_effort: ~1h interactive (release-cut to release-finalize), plus ~15 min release.yml CI wait
+  work_total: 6
+  work_done: 0
+  work_ready: 1
+  needs:
+  - simplify-dev-loop-and-release-flow
 - id: integrate-benchbox-cli-submit-and-service-auth
   file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
   title: Integrate BenchBox CLI submission flow and service authentication
@@ -97,25 +115,6 @@ items:
   - verify-ci-validation-workflow-end-to-end
   - verify-trust-badge-rendering-in-explorer
   - surface-contributor-onboarding-for-results
-- id: simplify-dev-loop-and-release-flow
-  file: TODO/main/active/simplify-dev-loop-and-release-flow.yaml
-  title: 'Simplify dev loop + release flow: 2-command release, fix latent develop-rebase bug'
-  worktree: main
-  category: Release Tooling
-  priority: High
-  status: In Progress
-  tags:
-  - release
-  - dev-loop
-  - tooling
-  - simplification
-  estimated_effort: ~7h spread across 1-2 days (6h flow + 1h CI churn opts w10/w11/w12)
-  work_total: 12
-  work_done: 11
-  work_ready: 1
-  deferred_count: 2
-  needs:
-  - single-repo-migration-phase-4-test-release-with-new-flow
 - id: single-repo-migration-phase-4-test-release-with-new-flow
   file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
   title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
