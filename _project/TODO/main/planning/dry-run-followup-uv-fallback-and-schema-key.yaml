@@ -44,12 +44,20 @@ work:
       `python3 -c "import json; print(json.load(open('bundle.json'))['version'])"`.
 
 verification:
-  - description: "Doc names the version key"
-    command: "grep -c 'version.*2\\.1\\|`version`' docs/contributing-results.md"
+  - description: "Doc names the top-level version JSON key explicitly"
+    command: "grep -cE 'top-level `version`|JSON key `version`|`version` field' docs/contributing-results.md"
     expected_output: ">= 1"
-  - description: "Doc mentions a non-uv fallback"
+  - description: "Doc mentions a non-uv fallback for the validation block"
     command: "grep -ciE 'without uv|no uv|don.t have uv' docs/contributing-results.md"
     expected_output: ">= 1"
+
+must_preserve:
+  - "The existing `uv run -- python` examples remain in the doc as the canonical invocation -- the fallback is added as an alternative, not a replacement"
+  - "The Quality Expectations section still names schema v2 as the accepted format"
+
+anti_patterns:
+  - "DO NOT remove the `uv run` examples in favor of plain `python` -- because most contributors do have uv and removing it would break the canonical Python tooling pattern -- add the fallback as an alternative line"
+  - "DO NOT name a different JSON key than the bundle actually emits -- because a contributor grepping their bundle should find what the doc says is there -- check a real bundle's top-level keys before naming one"
 
 scope_limit:
   only_modify:

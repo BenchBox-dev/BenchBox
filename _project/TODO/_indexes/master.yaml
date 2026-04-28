@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T09:46:27.216794'
+generated_at: '2026-04-28T16:27:35.934069'
 total_items: 35
 items:
 - id: dry-run-followup-package-canonical-contributing
@@ -15,7 +15,7 @@ items:
   - contributor-experience
   - dry-run-followup
   estimated_effort: Small
-  work_total: 1
+  work_total: 3
   work_done: 0
   work_ready: 1
 - id: motherduck-cloud-features
@@ -132,7 +132,7 @@ items:
   worktree: main
   category: Documentation
   priority: Low
-  status: Not Started
+  status: Identified
   tags:
   - docs
   - contributor-experience
@@ -428,6 +428,8 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
+  needs:
+  - dry-run-followup-package-canonical-contributing
 - id: single-repo-migration-phase-8-first-post-migration-release
   file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
   title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
@@ -487,6 +489,8 @@ items:
   work_total: 3
   work_done: 0
   work_ready: 1
+  needs:
+  - dry-run-followup-package-canonical-contributing
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants

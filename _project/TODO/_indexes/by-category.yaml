@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T09:46:27.216831'
+generated_at: '2026-04-28T16:27:35.934099'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -85,7 +85,7 @@ categories:
       file: TODO/main/planning/dry-run-followup-bundle-table-conditionals.yaml
       title: Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table
       priority: Low
-      status: Not Started
+      status: Identified
     - id: dry-run-followup-uv-fallback-and-schema-key
       file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
       title: 'Local-validation block: document non-uv fallback and schema-version key name'

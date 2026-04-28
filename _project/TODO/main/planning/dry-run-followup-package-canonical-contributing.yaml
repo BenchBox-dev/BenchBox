@@ -32,21 +32,57 @@ description: |
 
 work:
   - id: w1
-    summary: "Regenerate the in-bundle CONTRIBUTING.md from the canonical doc, or replace it with a checklist that points to the canonical URL"
+    summary: "Pick option A (regenerate from canonical doc at build time) or option B (static checklist + canonical URL)"
+    status: pending
+    notes: |
+      A vs B is a real architectural call:
+        - A: harder-to-drift but introduces a build-time read of
+          `docs/contributing-results.md` from `submit.py`. Requires
+          packaging the doc into the wheel or reading it relative to
+          the repo root.
+        - B: simpler; ships a checklist that names the four required
+          steps and points contributors to docs.benchbox.dev for the
+          full doc. Requires updating the checklist whenever the
+          canonical doc changes -- but the checklist is small and
+          stable.
+      Default recommendation: option B unless wheel-packaging the doc
+      is already cheap. Document the choice + rationale in a one-line
+      comment above `_CONTRIBUTING_TEXT` so future maintainers don't
+      re-litigate it.
+
+  - id: w2
+    summary: "Implement the chosen option in benchbox/cli/commands/submit.py"
+    needs: [w1]
     status: pending
     notes: |
       Touch `benchbox/cli/commands/submit.py` (`_CONTRIBUTING_TEXT`).
-      Either copy `docs/contributing-results.md` verbatim into the
-      bundle, or rewrite the stub to include: regenerate inventory,
-      target `published-results`, run `validate_submission.py` before
-      pushing, link to the canonical doc URL on docs.benchbox.dev.
-      Add a regression test that asserts the bundled file mentions
-      both `published-results` and `generate_corpus_inventory`.
+      The new file content MUST include all four:
+        - `published-results` as the PR base branch (not `main`)
+        - `generate_corpus_inventory.py --write` before commit
+        - `validate_submission.py` for local pre-push check
+        - canonical doc URL (https://docs.benchbox.dev/contributing-results
+          or wherever the canonical doc lives at land time)
+      Coordinate with `dry-run-followup-submitted-by-flag` and
+      `dry-run-followup-manifest-filename-convention` since both
+      will edit the same template after this lands.
+
+  - id: w3
+    summary: "Add a regression test asserting the in-bundle file mentions all four required items"
+    needs: [w2]
+    status: pending
+    notes: |
+      Add to `tests/unit/cli/commands/test_submit.py`: run
+      `benchbox submit --last --output <tmp>` against a fixture result,
+      read the resulting CONTRIBUTING.md, assert presence of
+      `published-results`, `generate_corpus_inventory`,
+      `validate_submission`, and the canonical doc URL. The test
+      pins the contract independent of which option (A or B) was
+      chosen.
 
 verification:
-  - description: "Packaged CONTRIBUTING.md mentions published-results and inventory regeneration"
-    command: "grep -E 'published-results|generate_corpus_inventory' submission/CONTRIBUTING.md | wc -l"
-    expected_output: ">= 2"
+  - description: "Packaged CONTRIBUTING.md mentions all four required items"
+    command: "uv run -- benchbox submit --last --output /tmp/dry-run-canonical && grep -cE 'published-results|generate_corpus_inventory|validate_submission|docs\\.benchbox\\.dev' /tmp/dry-run-canonical/CONTRIBUTING.md"
+    expected_output: ">= 4"
   - description: "Submit unit tests still pass"
     command: "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q"
     expected_output: "All tests pass"

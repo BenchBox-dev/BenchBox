@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T09:46:27.216849'
+generated_at: '2026-04-28T16:27:35.934120'
 total_items: 35
 priorities:
   High:
@@ -122,7 +122,7 @@ priorities:
       file: TODO/main/planning/dry-run-followup-bundle-table-conditionals.yaml
       title: Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table
       category: Documentation
-      status: Not Started
+      status: Identified
     - id: future-ideas-backlog
       file: TODO/main/planning/future-ideas-backlog.yaml
       title: Future Ideas Backlog - Specialized Benchmarks and Infrastructure

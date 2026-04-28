@@ -5,6 +5,10 @@ priority: Medium
 status: Not Started
 category: Core Functionality
 
+deps:
+  needs:
+    - dry-run-followup-package-canonical-contributing
+
 description: |
   `docs/contributing-results.md` describes the submission manifest as
   containing a "contributor" field. The CLI does fall back to
@@ -70,7 +74,7 @@ must_preserve:
 
 anti_patterns:
   - "DO NOT make empty submitted_by a hard error -- because anonymous submissions are valid -- warn and continue"
-  - "DO NOT switch the default fallback from user.name to user.email -- because user.name has been the convention since the field was added -- changing it silently breaks existing reproducible workflows"
+  - "DO NOT change the default fallback source without updating the doc table in the same PR -- because contributors verifying their manifest will look for whichever field the doc names -- keep code and doc consistent"
 
 scope_limit:
   only_modify:

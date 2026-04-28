@@ -121,6 +121,7 @@ anti_patterns:
 - DO NOT pre-coach the contributor through the docs - because that hides the friction this dry-run exists to surface.
 - DO NOT skip the external recruit and use another maintainer - because every maintainer already shares the curse of knowledge.
 - DO NOT bundle defect fixes into this TODO - because mixing observation with implementation muddies the retrospective; file separate TODOs and keep this one focused on the dry-run experience.
+- DO NOT interpret a frictionless human dry-run as evidence the human run was unnecessary - because the agent-proxy run on 2026-04-28 already pre-fixed obvious friction via the dry-run-followup-* TODOs - frictionless from a human is success of the prep, not redundancy of the test, and confirms the docs are now where they need to be.
 
 scope_limit:
   only_modify:

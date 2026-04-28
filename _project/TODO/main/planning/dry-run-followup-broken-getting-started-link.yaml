@@ -58,7 +58,9 @@ verification:
     expected_output: "exit 0"
 
 must_preserve:
-  - "The contributor-facing link from contributing-results.md to the Getting Started guide continues to resolve"
+  - "Existing relative links in `docs/` that currently resolve continue to resolve (no false positives from a poorly-tuned linkcheck config)"
+  - "Docs CI total wall-clock stays within the existing budget (linkcheck added as a parallel job, not serialized after the slow build)"
+  - "External-link 404s remain advisory, not blocking -- a third-party link rotting should not block a docs PR"
 
 anti_patterns:
   - "DO NOT whitelist the originally-broken path to make linkcheck pass -- because that defeats the purpose of adding the check"

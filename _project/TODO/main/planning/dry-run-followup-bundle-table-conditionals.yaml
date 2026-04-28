@@ -2,10 +2,14 @@ id: dry-run-followup-bundle-table-conditionals
 title: "Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table"
 worktree: main
 priority: Low
-status: Not Started
+status: Identified
 category: Documentation
 
 description: |
+  **Status note:** marked `Identified` rather than `Not Started`
+  because `w1` requires a maintainer decision before any code or doc
+  edit can begin. Move to `Not Started` once the decision is recorded.
+
   `docs/contributing-results.md` Step 2 lists `<result>.plans.json` and
   `<result>.tuning.json` as bundle outputs gated on `(if captured)` /
   `(if used)`. Neither phrase is defined anywhere in the doc; nothing

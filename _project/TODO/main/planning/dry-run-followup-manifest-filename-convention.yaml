@@ -5,6 +5,10 @@ priority: Medium
 status: Not Started
 category: Core Functionality
 
+deps:
+  needs:
+    - dry-run-followup-package-canonical-contributing
+
 description: |
   `benchbox submit` always writes the submission manifest as the literal
   filename `submission-manifest.json` (constant
