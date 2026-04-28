@@ -4,11 +4,14 @@ on:
   push:
     branches:
       - main
-      - develop
   pull_request:
     branches:
       - main
       - develop
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:

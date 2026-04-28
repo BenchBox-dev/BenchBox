@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T21:10:41.524094'
+generated_at: '2026-04-27T21:13:51.676460'
 total_items: 34
 items:
 - id: verify-ci-validation-workflow-end-to-end
@@ -111,8 +111,8 @@ items:
   - simplification
   estimated_effort: ~7h spread across 1-2 days (6h flow + 1h CI churn opts w10/w11/w12)
   work_total: 12
-  work_done: 7
-  work_ready: 4
+  work_done: 10
+  work_ready: 1
   deferred_count: 2
   needs:
   - single-repo-migration-phase-4-test-release-with-new-flow

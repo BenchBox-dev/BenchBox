@@ -251,7 +251,7 @@ work:
 - id: w10
   summary: "Drop redundant push-CI on develop (lint.yml + test.yml)"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     After a feature PR squash-merges, GitHub creates a new SHA on
     develop and re-fires lint.yml + test.yml on identical content
@@ -276,7 +276,7 @@ work:
 
 - id: w11
   summary: "Add concurrency cancel-in-progress to lint.yml + test.yml"
-  status: pending
+  status: done
   notes: |
     Pattern already in use on perf-smoke.yml and
     results-explorer-browser.yml. When a PR is force-pushed during
@@ -306,7 +306,7 @@ work:
 - id: w12
   summary: "Skip perf-smoke and parity on release PRs"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Release PRs (title starts with `Release v`) touch only curation
     removals + version bumps + changelog. Nothing perf-affecting
