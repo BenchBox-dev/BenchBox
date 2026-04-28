@@ -1,4 +1,4 @@
-generated_at: '2026-04-27T20:56:29.970621'
+generated_at: '2026-04-28T07:38:10.000418'
 total_items: 29
 statuses:
   In Progress:
@@ -12,7 +12,7 @@ statuses:
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
-      priority: High
+      priority: Medium-High
       category: Core Functionality
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml

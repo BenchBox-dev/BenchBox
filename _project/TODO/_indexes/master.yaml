@@ -1,27 +1,6 @@
-generated_at: '2026-04-27T20:56:29.970567'
+generated_at: '2026-04-28T07:38:10.000356'
 total_items: 29
 items:
-- id: integrate-benchbox-cli-submit-and-service-auth
-  file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
-  title: Integrate BenchBox CLI submission flow and service authentication
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: In Progress
-  tags:
-  - results
-  - cli
-  - auth
-  - submission
-  - api
-  estimated_effort: Large
-  work_total: 8
-  work_done: 3
-  work_ready: 1
-  needs:
-  - define-results-platform-product-and-launch-strategy
-  - define-hosted-results-contract-and-governance-model
-  - design-results-ingest-storage-and-derived-read-model
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
@@ -470,6 +449,27 @@ items:
   work_ready: 2
   needs:
   - stabilize-webkit-browser-smoke-flake-under-parallel-workers
+- id: integrate-benchbox-cli-submit-and-service-auth
+  file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
+  title: Integrate BenchBox CLI submission flow and service authentication
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: In Progress
+  tags:
+  - results
+  - cli
+  - auth
+  - submission
+  - api
+  estimated_effort: Large
+  work_total: 8
+  work_done: 3
+  work_ready: 1
+  needs:
+  - define-results-platform-product-and-launch-strategy
+  - define-hosted-results-contract-and-governance-model
+  - design-results-ingest-storage-and-derived-read-model
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases
