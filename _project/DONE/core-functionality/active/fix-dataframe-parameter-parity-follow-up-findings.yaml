@@ -92,7 +92,7 @@ anti_patterns:
 
 verification:
 - description: "TODO schema validation passes for this new item"
-  command: "uv run scripts/validate_todo.py _project/TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml"
+  command: "uv run _project/scripts/validate_todo.py _project/TODO/core-functionality/planning/fix-dataframe-parameter-parity-follow-up-findings.yaml"
   expected_output: "Validation successful"
 - description: "Runner lifecycle tests prove override cleanup on failure and no-query paths"
   command: "uv run -- python -m pytest tests/unit/core/test_runner_lifecycle.py tests/unit/core/test_parameter_parity.py -k
