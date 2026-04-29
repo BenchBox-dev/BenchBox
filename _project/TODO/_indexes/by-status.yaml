@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T18:04:33.405879'
+generated_at: '2026-04-28T19:49:03.533832'
 total_items: 36
 statuses:
   In Progress:
@@ -110,7 +110,7 @@ statuses:
     - id: dry-run-followup-manifest-filename-convention
       file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
       title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
-      priority: Medium
+      priority: Medium-High
       category: Core Functionality
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
@@ -176,7 +176,7 @@ statuses:
     - id: dry-run-followup-submitted-by-flag
       file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
       title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
-      priority: Medium
+      priority: Medium-High
       category: Core Functionality
   Identified:
     count: 2
