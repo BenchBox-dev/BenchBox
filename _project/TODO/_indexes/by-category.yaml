@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T21:08:45.212594'
+generated_at: '2026-04-28T21:19:47.421657'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 6
+    count: 7
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -63,6 +63,11 @@ categories:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: Medium-High
       status: In Progress
+    - id: results-explorer-qa-pass1-fixes
+      file: TODO/main/planning/results-explorer-qa-pass1-fixes.yaml
+      title: Investigate and remediate Results Explorer QA pass-1 findings
+      priority: High
+      status: Not Started
     - id: dry-run-followup-manifest-filename-convention
       file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
       title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/

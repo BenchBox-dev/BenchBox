@@ -61,8 +61,21 @@ work:
       made it look like a failure mid-run. Downgrade to amber/yellow
       with a "rebuilding..." spinner; reserve red ❌ for actually
       unrecoverable errors.
-      Find the emit site: grep `benchbox/` for `Missing tables` and
-      identify the path that auto-recovers vs the path that hard-fails.
+
+      Audit findings (2026-04-29) — emit sites:
+        - `benchbox/cli/output.py:172` -- `[red]• Missing tables:[/red]`
+          (this is the most likely red ❌ Codex saw)
+        - `benchbox/platforms/base/result_capture.py:1372` -- already
+          uses `⚠️` (amber); not the offending site
+        - `benchbox/platforms/base/validation.py:174` -- adds error
+          to a result object; check if it propagates to the [red] path
+        - `benchbox/utils/data_validation.py:426` -- emit helper
+        - `benchbox/core/validation/engines.py:432` -- error append
+
+      Trace the auto-recovery path: which caller catches the
+      validation error, deletes+rebuilds the DuckDB file, and re-runs?
+      Downgrade `cli/output.py:172` to amber/yellow IF the caller is
+      recoverable; keep red only for hard-fail paths.
 
   - id: w4
     summary: "Drop 'Interactive Benchmark Runner' header in non-interactive `benchbox run`"
@@ -73,15 +86,33 @@ work:
       misleading. Suppress the header when stdin is not a TTY OR
       when explicit `--platform` / `--benchmark` args are provided.
 
+      Audit findings (2026-04-29) — emit site:
+        - `benchbox/cli/commands/run.py:706` --
+          `Text("BenchBox Interactive Benchmark Runner", style="bold blue")`
+      Single-site fix; gate on `sys.stdin.isatty() and not (platform
+      and benchmark)` or equivalent.
+
   - id: w5
-    summary: "Sync `benchbox profile` docs ('Platform Availability' table → actual 'Available Databases' line)"
+    summary: "Sync `benchbox profile` docs ('Platform Availability' → actual 'Available Databases')"
     status: pending
     notes: |
-      The doc says contributors will see a 'Platform Availability'
-      table; the actual CLI prints a simpler 'Available Databases'
-      line. Either add the table to the CLI output, or update the
-      docs to match what the CLI prints. Latter is cheaper. Find
-      the doc with `grep -rn "Platform Availability" docs/`.
+      The doc references a 'Platform Availability' surface; the actual
+      CLI prints 'Available Databases'. Either add the doc-claimed
+      table to the CLI, or update docs to match what the CLI prints.
+      Latter is cheaper.
+
+      Audit findings (2026-04-29) — file pins:
+        - Doc: `docs/platforms/dataframe.md:358` (`## Checking Platform
+          Availability`) -- main mismatch surface
+        - Doc: `docs/usage/intelligent-guidance.md:49,83` -- already
+          uses 'Available Databases' (ASCII tree examples); aligned
+        - CLI: `benchbox/cli/system.py:42` -- prints
+          `[cyan]Available Databases:[/cyan]`
+        - CLI: `benchbox/cli/database.py:395,504` --
+          `Table(title="Available Databases")`
+      Recommended: rename the doc heading + body in
+      `docs/platforms/dataframe.md:358` to 'Available Databases'
+      and align the prose.
 
   - id: w6
     summary: "Align `benchbox submit --dry-run` output format with real submit output"
@@ -99,25 +130,41 @@ work:
     notes: |
       Codex's run hit a warning that validation was disabled for
       stream_id != 0 and was unsure whether the result was actually
-      fully validated. Either:
-        - Reword to make clear that this is expected behavior (per
-          TPC-H spec, multi-stream validation is only meaningful at
-          stream_id == 0), or
-        - Suppress the warning for the contributor-facing
-          single-stream case.
-      Find the emit site: grep for `stream_id` + `validation` in
-      benchbox/core/ or wherever the TPC-H runner lives.
+      fully validated.
+
+      Audit findings (2026-04-29) — emit site:
+        - `benchbox/core/tpch/power_test.py:172-176`:
+            if stream_id != 0 and validation and validation_mode is None:
+                actual_validation_mode = "disabled"
+                self.logger.warning(
+                    "⚠️  TPC-H answer sets are only available for stream 0. "
+                    "Disabling validation for stream_id != 0."
+                )
+
+      The warning IS correct (TPC-H answer sets only exist for stream 0),
+      but Codex's confusion shows the wording leaves room for "did my
+      result get validated or not?" doubt. Reword to explicitly state:
+      "Stream 0 was validated against the answer set; streams > 0 are
+      run for timing only (per TPC-H spec)." Suppression is the wrong
+      call -- the warning protects users running multi-stream from
+      claiming false validation.
 
 verification:
-  - description: "Doc invocation consistency: a single grep finds zero of the non-canonical forms in contributor-facing docs"
-    command: "grep -cE '^[^#]*\\buv run benchbox\\b' docs/contributing-results.md docs/usage/*.md README.md"
+  - description: "Doc invocation consistency: zero non-canonical `uv run benchbox` (without `--`) in contributor docs"
+    command: "grep -rEc '^[^#]*\\buv run benchbox\\b(?! --)' docs/contributing-results.md docs/usage/ README.md 2>/dev/null | awk -F: '{s+=$2}END{print s}'"
     expected_output: "0 (assuming `uv run -- benchbox` is the canonical form chosen in w1)"
   - description: "`benchbox submit` output mentions the PR target branch inline"
-    command: "uv run -- benchbox submit --last --output /tmp/bb-test 2>&1 | grep -c 'published-results'"
+    command: "rm -rf /tmp/bb-test && uv run -- benchbox submit --last --output /tmp/bb-test 2>&1 | grep -c 'published-results'"
     expected_output: ">= 1"
   - description: "`benchbox run` non-interactive does not print the interactive header"
     command: "uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 2>&1 | grep -c 'Interactive Benchmark Runner'"
     expected_output: "0"
+  - description: "Missing-tables auto-recovery does not print in red"
+    command: "uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 --force datagen 2>&1 | grep -E '\\[red\\][^[]*Missing tables|❌[^\\n]*Missing tables' | wc -l"
+    expected_output: "0"
+  - description: "Stream-id warning explicitly mentions 'timing only' or 'per TPC-H spec'"
+    command: "grep -cE 'timing only|per TPC-H spec' benchbox/core/tpch/power_test.py"
+    expected_output: ">= 1"
 
 must_preserve:
   - "Existing user-facing behavior on the success path -- these are output / UX tweaks only, not flow changes"
@@ -130,14 +177,17 @@ anti_patterns:
 
 scope_limit:
   only_modify:
-    - "benchbox/cli/commands/submit.py"
-    - "benchbox/cli/commands/run.py"
-    - "benchbox/cli/commands/profile.py"
-    - "benchbox/core/ (TPC-H runner for w7)"
-    - "docs/contributing-results.md"
-    - "docs/usage/"
-    - "README.md"
-    - "tests/unit/cli/"
+    - "benchbox/cli/commands/submit.py (w2: print next commands)"
+    - "benchbox/cli/commands/run.py (w4: drop Interactive header at line 706)"
+    - "benchbox/cli/output.py (w3: downgrade red `Missing tables` at line 172)"
+    - "benchbox/core/tpch/power_test.py (w7: reword stream_id warning at lines 172-176)"
+    - "docs/contributing-results.md (w1: invocation consistency)"
+    - "docs/usage/ (w1: invocation consistency)"
+    - "docs/platforms/dataframe.md (w5: rename 'Platform Availability' at line 358)"
+    - "README.md (w1: invocation consistency)"
+    - "tests/unit/cli/ (regression tests for w2, w3, w4, w6)"
+  do_not_touch:
+    - "benchbox/platforms/base/result_capture.py (w3 audit confirmed already amber)"
 
 metadata:
   tags:
