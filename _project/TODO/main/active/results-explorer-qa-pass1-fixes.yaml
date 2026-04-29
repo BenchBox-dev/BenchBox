@@ -88,19 +88,38 @@ work:
 
   - id: w2
     summary: "Resolve Q1 — confirm whether ResultDetail/Compare primary-metric toggle should exist"
-    status: pending
+    status: done
     notes: |
-      Both pages declare `useState<'power_score' | 'display_geomean_ms'>`
-      and read the value from `?metric=` URL params, but neither renders
-      a button or select that lets the user flip it. Decide between:
-        (a) Intentional URL-only contract → update the test plan; remove
-            §4.2 and §5.3 expectations of an in-page toggle.
-        (b) Regression / missing feature → file a separate TODO and add
-            the toggle UI back. Verify against git history of
-            ResultDetail.tsx and Compare.tsx for a removed button.
+      DECISION: No toggle should exist. The original Q1 framing was
+      based on an incomplete read of the code; the actual contract is
+      stronger than "URL-only" — it is "benchmark-derived, not
+      user-configurable."
 
-      Output: a one-line decision recorded in this work unit's notes,
-      plus either a test-plan diff or a follow-up TODO id.
+      Evidence:
+        - `git log -G"primaryMetric"` returns ONE commit ever
+          touching the symbol in pages/ — f9d08d38b, the migration
+          that originally populated develop. There is no removed
+          button in history.
+        - ResultDetail.tsx:64-66 calls
+          `getPrimaryMetricForBenchmark(data.benchmark)` and feeds
+          the result into `setPrimaryMetric`. Compare.tsx:82-84 does
+          the same with `details[0]!.benchmark`. The setter is NEVER
+          fired from a user-driven event in either file.
+        - The metric is therefore determined by the benchmark family's
+          ranking config (e.g. ClickBench → power_score, TPC-H →
+          display_geomean_ms). Letting users override it via a toggle
+          would produce incorrect cross-benchmark comparisons.
+
+      Implication for w7:
+        - Drop §4.2 ("Primary metric toggle (power_score ↔
+          display_geomean_ms) updates the chart") from the test plan.
+        - Drop §5.3 (same expectation in Compare).
+        - Optionally add a positive assertion: "On ClickBench detail
+          pages the chart labels read 'Power Score', on TPC-H pages
+          they read 'Geomean (ms)'" — confirms the benchmark-derived
+          contract instead of expecting a non-existent toggle.
+
+      No follow-up TODO needed; the feature should not be added.
 
   - id: w3
     summary: "Fix B2 — instrument first, then apply mitigation matching the confirmed mechanism"

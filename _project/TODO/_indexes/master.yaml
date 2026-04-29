@@ -1,4 +1,4 @@
-generated_at: '2026-04-29T07:28:12.553853'
+generated_at: '2026-04-29T07:29:45.617699'
 total_items: 38
 items:
 - id: dry-run-followup-validator-hash-contract-mismatch
@@ -54,7 +54,7 @@ items:
   - polars
   estimated_effort: Medium (1-2 days end-to-end including the re-test)
   work_total: 8
-  work_done: 1
+  work_done: 2
   work_ready: 5
   deferred_count: 4
 - id: motherduck-cloud-features
