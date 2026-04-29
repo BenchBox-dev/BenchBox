@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T21:08:45.212627'
-total_items: 37
+generated_at: '2026-04-28T21:19:47.421686'
+total_items: 38
 statuses:
   In Progress:
     count: 3
@@ -20,7 +20,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 32
+    count: 33
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -97,6 +97,11 @@ statuses:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: results-explorer-qa-pass1-fixes
+      file: TODO/main/planning/results-explorer-qa-pass1-fixes.yaml
+      title: Investigate and remediate Results Explorer QA pass-1 findings
+      priority: High
+      category: Core Functionality
     - id: dry-run-followup-uv-fallback-and-schema-key
       file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
       title: 'Local-validation block: document non-uv fallback and schema-version key name'

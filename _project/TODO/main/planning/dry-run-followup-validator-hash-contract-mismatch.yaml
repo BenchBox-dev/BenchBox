@@ -71,28 +71,34 @@ work:
     needs: [w2]
     status: pending
     notes: |
-      Add a test (or a CI step) that validates the writer's emitted
-      hashes match what the validator on `published-results` computes.
-      Could live in `tests/integration/` as a fixture-based check
-      that:
-        - runs `benchbox submit` to produce a bundle + manifest,
-        - reads `scripts/validate_submission.py` from a checkout of
-          `published-results` (or a vendored copy under tests/fixtures/),
-        - applies that validator to the freshly-emitted bundle,
-        - asserts no hash mismatch.
-      Prevents the same drift from happening again the next time
-      either side of the contract changes.
+      Add `tests/integration/test_cross_branch_validator_contract.py`
+      that validates the writer's emitted hashes match what the
+      validator on `published-results` computes. Implementation shape:
+        - Run `benchbox submit` to produce a bundle + manifest in a
+          temp dir.
+        - Fetch `scripts/validate_submission.py` from
+          `origin/published-results` (via `git show
+          origin/published-results:scripts/validate_submission.py`)
+          and exec it against the freshly-emitted bundle.
+        - Assert no hash mismatch.
+      Vendor the published-results validator into
+      `tests/fixtures/` if pulling it live makes the test flaky
+      (network, branch state). Prevents the same drift from
+      happening again the next time either side of the contract
+      changes.
 
 verification:
   - description: "Validator on published-results passes against a develop-submitted bundle"
     command: |
-      git fetch origin published-results && \
-      git worktree add /tmp/bb-pr-validator origin/published-results 2>/dev/null || true && \
-      python3 /tmp/bb-pr-validator/scripts/validate_submission.py /Users/joe/Developer/BenchBox/submission/bundle/tpch_sf001_duckdb_sql_20260428_205018_e4f24ee2.json 2>&1 | tail -3
+      git fetch --quiet origin published-results && \
+      TMP=$(mktemp) && \
+      git show origin/published-results:scripts/validate_submission.py > "$TMP" && \
+      python3 "$TMP" /Users/joe/Developer/BenchBox/submission/bundle/tpch_sf001_duckdb_sql_20260428_205018_e4f24ee2.json 2>&1 | tail -3; \
+      rc=$?; rm -f "$TMP"; exit $rc
     expected_output: "0 error(s), 0 warning(s)"
-  - description: "Cross-branch contract test exists and passes"
-    command: "uv run -- python -m pytest tests/integration/ -k 'cross_branch or hash_contract' -q"
-    expected_output: "All tests pass"
+  - description: "Cross-branch contract test (added by w3) passes"
+    command: "uv run -- python -m pytest tests/integration/test_cross_branch_validator_contract.py -q"
+    expected_output: "All tests pass (test file is created by w3; this verification only meaningful after w3 lands)"
 
 must_preserve:
   - "develop's per-file hash contract (per-file is the right design -- bundles are individually addressable in results-data/bundles/)"
@@ -104,10 +110,11 @@ anti_patterns:
 
 scope_limit:
   only_modify:
-    - "scripts/validate_submission.py (on published-results)"
-    - "tests/integration/ (cross-branch contract test)"
+    - "scripts/validate_submission.py (on published-results branch)"
+    - "tests/integration/test_cross_branch_validator_contract.py (new file, w3)"
+    - "tests/fixtures/ (only if w3 vendors the validator instead of pulling live)"
   do_not_touch:
-    - "benchbox/cli/commands/submit.py (the writer is correct)"
+    - "benchbox/cli/commands/submit.py (the writer is correct; per-file is the right contract)"
     - "results-data/bundles/ (no existing manifests need fixing)"
 
 metadata:
