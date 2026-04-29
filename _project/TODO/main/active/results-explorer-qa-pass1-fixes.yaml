@@ -322,27 +322,39 @@ work:
   - id: w7
     summary: "Promote QA test plan to docs/operations/results-explorer-qa.md and apply tester findings"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      Decision (resolved during review): the QA test plan must be
-      checked in, not kept in chat history. The first version was lost
-      to context reset; the second cannot be allowed to die the same
-      way. Target path: docs/operations/results-explorer-qa.md.
+      Promoted the test plan to docs/operations/results-explorer-qa.md.
+      All five deliverables landed in a single commit:
 
-      Concrete deliverables (all in one commit):
-        1. Create docs/operations/results-explorer-qa.md from the
-           agent's drafted §1-§7 plan + report template.
-        2. Drop the "/results/ssb/" instruction from §2 (data uses
-           benchmark="star_schema"; SSB is a display label only).
-        3. Reflect w2's decision on §4.2 / §5.3 (remove the
-           primary-metric toggle test if URL-only is intentional, or
-           keep it if a separate TODO has been filed to add the UI).
-        4. Add a "Prereqs (operator)" block at the top making the dev
-           server requirement explicit (cd results-explorer && npm run dev).
-        5. Add an "Expected hidden controls" note: trust chips and
-           tuning dropdown auto-hide when the dataset has only one
-           value — not a bug on the current corpus (12 results, all
+        1. Doc created with the §1-§7 sections and the filled-in
+           report template at the end.
+        2. The "/results/ssb/" instruction was dropped from §2; in
+           its place is a paragraph explaining that SSB is a display
+           label for `star_schema`, that visiting /results/ssb/ now
+           shows an empty-corpus message (after w5's R1 fix), and
+           that the tester should test /results/star_schema/ instead.
+        3. w2's decision applied: §4 and §5 no longer expect a
+           primary-metric toggle. §4.7 is a new positive assertion
+           naming the contract — "the chart axis label reflects the
+           benchmark's primary metric; the metric is benchmark-derived,
+           not user-toggleable." §5 has a parallel note plus a
+           reference to the cross-benchmark guard at Compare.tsx:64-71.
+        4. "Prereqs (operator)" block at the top has the explicit
+           `cd results-explorer && npm run dev` recipe plus the
+           optional production-shape DB rebuild via
+           `uv run benchbox explorer build --data-dir results-data/
+           --output results-explorer/public/data/`.
+        5. "Expected hidden controls" section explains that trust
+           chips and tuning dropdown auto-hide when the dataset has
+           one value, with the current-corpus values noted (all
            maintainer-run, all tuning_mode=NULL).
+
+      Bonus: §3 has a one-line note pointing the tester at the B2
+      cold-load known-flake (with the manual-repro doc reference) so
+      they don't false-fail on the intermittent empty-rows symptom.
+
+      Verification: doc committed; no code changes in this work unit.
 
   - id: w8
     summary: "Re-run the QA pass against the fixed build and confirm closure"
