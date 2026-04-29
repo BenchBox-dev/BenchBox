@@ -1,4 +1,4 @@
-generated_at: '2026-04-29T08:20:43.941717'
+generated_at: '2026-04-29T08:21:36.851591'
 total_items: 38
 items:
 - id: dry-run-followup-validator-hash-contract-mismatch
@@ -55,7 +55,7 @@ items:
   estimated_effort: Medium (1-2 days end-to-end including the re-test)
   work_total: 8
   work_done: 6
-  work_ready: 0
+  work_ready: 1
   deferred_count: 5
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml

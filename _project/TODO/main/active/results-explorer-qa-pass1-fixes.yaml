@@ -132,19 +132,20 @@ work:
   - id: w3
     summary: "Fix B2 — instrument first, then apply mitigation matching the confirmed mechanism"
     needs: [w1]
-    status: blocked
-    blocker: |
-      Requires a focused instrumentation+repro session: add console.log
-      probes in PlatformIndex/db.ts/getPlatformIndexRows, run the manual
-      repro 5+ times until both passing and failing log sets are
-      captured, and identify which of three plausible mechanisms (cold-
-      load partial data / Preact useEffect cleanup race / shared
-      initPromise race) actually fires. Cannot be done correctly in a
-      single short session because the symptom is intermittent — a
-      "fix" applied without confirmed instrumentation evidence risks
-      patching the wrong layer (exactly what w1's review warned
-      against). Tracked here so the next session can pick it up cleanly
-      using the one-liner repro recipe in w1's notes.
+    status: pending
+    notes: |
+      BLOCKED — requires a focused instrumentation+repro session: add
+      console.log probes in PlatformIndex/db.ts/getPlatformIndexRows,
+      run the manual repro 5+ times until both passing and failing log
+      sets are captured, and identify which of three plausible
+      mechanisms (cold-load partial data / Preact useEffect cleanup
+      race / shared initPromise race) actually fires. Cannot be done
+      correctly in a single short session because the symptom is
+      intermittent — a "fix" applied without confirmed instrumentation
+      evidence risks patching the wrong layer (exactly what w1's
+      review warned against). Tracked here so the next session can
+      pick it up cleanly using the one-liner repro recipe in w1's
+      notes.
     notes: |
       w1 ruled out projection/casing and equality-mismatch as causes
       but did NOT confirm a mechanism for the intermittency. Three
@@ -407,10 +408,10 @@ work:
   - id: w8
     summary: "Re-run the QA pass against the fixed build and confirm closure"
     needs: [w3, w4, w5, w6]
-    status: blocked
-    blocker: |
-      Cannot run the full retest until w3 is implemented (B2 cold-load
-      mitigation). The QA test plan's §3 explicitly warns the tester
+    status: pending
+    notes: |
+      BLOCKED on w3 — cannot run the full retest until B2 cold-load
+      mitigation lands. The QA test plan's §3 explicitly warns the tester
       about the empty-rows symptom and points them at the known-flakes
       doc — running a tester against the current build would still mark
       §3 as BUG/SLOW intermittently.
