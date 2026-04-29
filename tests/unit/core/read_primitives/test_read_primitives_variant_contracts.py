@@ -121,26 +121,31 @@ def test_linter_compares_variants_to_declared_contract_columns():
     ]
 
 
-def test_linter_requires_contract_for_high_risk_variant_query():
-    """High-risk variant families need explicit shape and capability metadata."""
+def test_linter_requires_contract_for_any_variant_query():
+    """Every active variant needs explicit shape and capability metadata."""
     catalog = PrimitiveCatalog(
         version=1,
         queries={
-            "json_aggregates": PrimitiveQuery(
-                id="json_aggregates",
-                category="json",
-                sql="SELECT JSON_ARRAYAGG(p_name) AS part_names FROM part",
-                variants={"duckdb": "SELECT JSON_GROUP_ARRAY(p_name) AS part_names FROM part"},
+            "orderby_all_simple": PrimitiveQuery(
+                id="orderby_all_simple",
+                category="orderby",
+                sql="SELECT r_name, n_name, COUNT(*) AS supplier_count FROM supplier GROUP BY r_name, n_name",
+                variants={
+                    "datafusion": (
+                        "SELECT r_name, n_name, COUNT(*) AS supplier_count "
+                        "FROM supplier GROUP BY r_name, n_name ORDER BY r_name, n_name, supplier_count"
+                    )
+                },
             )
         },
     )
 
     assert collect_variant_contract_issues(catalog, require_contracts=True) == [
         VariantContractIssue(
-            query_id="json_aggregates",
+            query_id="orderby_all_simple",
             dialect=None,
             kind="missing_result_contract",
-            detail="High-risk variant-bearing query must declare result_contract",
+            detail="Variant-bearing query must declare result_contract",
         )
     ]
 
