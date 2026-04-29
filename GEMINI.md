@@ -67,7 +67,7 @@ Gemini can run these without permission:
 ### TODO Management
 - `uv run _project/scripts/todo_cli.py list|show|stats|ready|next|done|check-graph`
 - `uv run _project/scripts/validate_todo.py*`
-- `uv run _project/scripts/generate_indexes.py`
+- `uv run _project/scripts/generate_indexes.py` (or `make todo-reindex`)
 - `uv run _project/scripts/migrate_todo_format.py*`
 
 ### Timing & Audit
@@ -82,7 +82,7 @@ Gemini can run these without permission:
 - Stable `id` = filename slug.
 - Flat `work[]` with `needs` edges. Inter-item deps: `deps.needs: [slug-ids]`.
 - CLI: `uv run _project/scripts/todo_cli.py list|show|stats|ready|next|done|check-graph`.
-- After changes, reindex: `uv run _project/scripts/generate_indexes.py`.
+- Indexes are gitignored; `make todo-reindex` to rebuild (also auto-runs on first read).
 - Refer to `TODO_ENTRY_TEMPLATE.yaml` and `TODO_SCHEMA.yaml` for format.
 - Standard format in files: Priority/Status/Description/Files/Solution/Impact.
 
