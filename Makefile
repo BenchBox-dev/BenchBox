@@ -1,7 +1,7 @@
 # BenchBox Makefile
 # This makefile provides commands for building, testing and development
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json codex-skills-sync codex-skills-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -380,12 +380,26 @@ audit-deps:
 lint-markers:
 	uv run -- python -m pytest --collect-only -q -p no:warnings
 
-# Sync/check repo-local shared skill mirrors for Codex portability
-codex-skills-sync:
-	uv run -- python _project/scripts/sync_codex_shared_skills.py sync
+# skill-sync — materialize project-local skill mirrors from ~/.skill-sync/skills.
+# Manifest is tracked (skill-sync.yaml/skill-sync.lock); the materialized
+# .claude/skills, .codex/skills, .gemini/skills are gitignored and regenerated
+# locally per developer. Override SKILL_SYNC to point at a different install
+# (e.g. an npm-installed copy).
+SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js
 
-codex-skills-check:
-	uv run -- python _project/scripts/sync_codex_shared_skills.py check
+skill-sync:
+	@if [ -f "$(SKILL_SYNC)" ]; then \
+		node "$(SKILL_SYNC)" sync; \
+	else \
+		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
+	fi
+
+skill-sync-check:
+	@if [ -f "$(SKILL_SYNC)" ]; then \
+		node "$(SKILL_SYNC)" doctor; \
+	else \
+		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
+	fi
 
 # Duplicate code detection (AST structural clone detection)
 duplicate-check:
@@ -413,7 +427,7 @@ ci-lint:
 	uv run ruff format --check .
 	uv run ty check
 	$(MAKE) lint-markers
-	uv run -- python _project/scripts/sync_codex_shared_skills.py check
+	$(MAKE) skill-sync-check
 	uv run -- python _project/scripts/timing_policy_check.py --strict
 	$(MAKE) compat-docs-check
 	$(MAKE) audit-deps
@@ -712,7 +726,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune
+.PHONY: pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -758,6 +772,13 @@ worktree-add:
 worktree-list:
 	@git worktree list
 
+# Regenerate _project/{TODO,DONE}/_indexes/*.yaml from per-item YAML files.
+# Indexes are gitignored — run this whenever you want a fresh local copy.
+# todo_cli.py auto-runs the same script on first read, so this is a
+# convenience target for explicit regen (e.g. before grepping the indexes).
+todo-reindex:
+	@uv run _project/scripts/generate_indexes.py
+
 # Remove worktrees whose branches are gone on origin (already merged).
 # Pairs with auto-merge: PR merges → branch deleted → worktree pruned.
 worktree-prune:
@@ -773,6 +794,16 @@ worktree-prune:
 			fi; \
 		done
 	@git worktree prune
+
+# Blind-spot finding triage (file-first capture; see _project/blind-spots/README.md).
+blind-spots-list:
+	@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py list
+
+blind-spots-report:
+	@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py report
+
+# Alias: 'sweep' as the verb users will reach for; report is the v1 sweep view.
+blind-spots-sweep: blind-spots-report
 
 # Help
 help:
@@ -880,6 +911,11 @@ help:
 	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"
 	@echo "  make worktree-list   List active worktrees"
 	@echo "  make worktree-prune  Remove worktrees whose branches are gone on origin (post-merge cleanup)"
+	@echo ""
+	@echo "Blind-Spot Findings (see _project/blind-spots/README.md):"
+	@echo "  make blind-spots-list   List open findings (one row each)"
+	@echo "  make blind-spots-report Counts by status + kind, oldest open first"
+	@echo "  make blind-spots-sweep  Alias for blind-spots-report"
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
 	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs main"
