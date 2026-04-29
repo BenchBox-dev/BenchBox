@@ -2,7 +2,8 @@ id: ensure-read-primitives-variant-comparability
 title: "Ensure read_primitives query variants are meaningfully comparable"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-29"
 category: Testing and Quality Assurance
 description: |
   Previous review found that `read_primitives` platform variants can diverge enough
@@ -39,7 +40,7 @@ work:
 - id: w6
   summary: "Update read_primitives catalog docs and skip reference to require comparable variants or skip_on"
   needs: [w3, w4]
-  status: pending
+  status: done
 
 deferred:
 - summary: "Expose query comparability metadata in CLI output and persisted result artifacts"
