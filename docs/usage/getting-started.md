@@ -24,7 +24,7 @@ If you have not installed BenchBox yet, follow the dedicated [installation guide
 Already installed? Verify the CLI is on your PATH:
 
 ```bash
-uv run benchbox --version
+uv run -- benchbox --version
 ```
 
 ## Step 2 - Profile Your Environment
@@ -32,17 +32,17 @@ uv run benchbox --version
 The profile command confirms CPU, memory, and available adapters. BenchBox uses this information to suggest scale factors and concurrency levels.
 
 ```bash
-uv run benchbox profile
+uv run -- benchbox profile
 ```
 
-Look for the *Platform Availability* table,`duckdb` should be **Ready** immediately. If you plan to use cloud platforms later, run `uv run benchbox check-deps --platform <name>` or use the guided `benchbox platforms setup` wizard once you have credentials handy.
+Look for the *Available Databases* table,`duckdb` should be **Ready** immediately. If you plan to use cloud platforms later, run `uv run -- benchbox check-deps --platform <name>` or use the guided `benchbox platforms setup` wizard once you have credentials handy.
 
 ## Step 3 - Run Your First Benchmark
 
 Run a minimal TPC-H benchmark to generate data, load it into DuckDB, and execute the standard power test.
 
 ```bash
-uv run benchbox run \
+uv run -- benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --scale 0.01
@@ -55,7 +55,7 @@ Unattended execution? Add `--non-interactive` to skip prompts. BenchBox stores o
 Summarize the most recent run:
 
 ```bash
-uv run benchbox results --limit 1
+uv run -- benchbox results --limit 1
 ```
 
 The results display shows timing, validation status, and per-query metrics from your benchmark execution.
@@ -66,13 +66,13 @@ Share your results in different formats without re-running the benchmark:
 
 ```bash
 # Export to CSV for spreadsheet analysis
-uv run benchbox export --last --format csv
+uv run -- benchbox export --last --format csv
 
 # Generate HTML report for sharing with team
-uv run benchbox export --last --format html --output-dir ./reports/
+uv run -- benchbox export --last --format html --output-dir ./reports/
 
 # Export to all formats
-uv run benchbox export --last --format json --format csv --format html
+uv run -- benchbox export --last --format json --format csv --format html
 ```
 
 The export command is useful for:
@@ -89,19 +89,19 @@ BenchBox also supports benchmarking DataFrame libraries using their native APIs.
 
 ```bash
 # Polars DataFrame (included in base install)
-uv run benchbox run --platform polars-df --benchmark tpch --scale 0.01
+uv run -- benchbox run --platform polars-df --benchmark tpch --scale 0.01
 
 # Pandas DataFrame (requires extra)
 uv add benchbox --extra pandas
-uv run benchbox run --platform pandas-df --benchmark tpch --scale 0.01
+uv run -- benchbox run --platform pandas-df --benchmark tpch --scale 0.01
 ```
 
 ### Compare SQL vs DataFrame
 
 ```bash
 # Run the same benchmark with different paradigms
-uv run benchbox run --platform duckdb --benchmark tpch --scale 0.1     # SQL
-uv run benchbox run --platform polars-df --benchmark tpch --scale 0.1  # DataFrame
+uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.1     # SQL
+uv run -- benchbox run --platform polars-df --benchmark tpch --scale 0.1  # DataFrame
 ```
 
 For more details, see the [DataFrame Platforms Guide](../platforms/dataframe.md).

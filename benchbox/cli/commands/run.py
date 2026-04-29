@@ -700,7 +700,12 @@ def _derive_exec_type_and_banner(s: types.SimpleNamespace) -> None:
         s.logger.debug(f"Test execution type: {s.test_execution_type}")
     s.execution_mode = s.test_execution_type
 
-    if not s.quiet:
+    # Only show the "Interactive Benchmark Runner" header in actually-interactive
+    # contexts: a TTY and no explicit platform+benchmark args. Showing it when
+    # the user already provided --platform/--benchmark (or when piping output
+    # to a log) misrepresents the run as interactive.
+    is_interactive = sys.stdin.isatty() and not (s.platform and s.benchmark)
+    if not s.quiet and is_interactive:
         console.print(
             Panel.fit(
                 Text("BenchBox Interactive Benchmark Runner", style="bold blue"),

@@ -155,6 +155,58 @@ def _dispatch_service_mode(
     ctx.exit(1)
 
 
+def _print_submission_summary(
+    *,
+    bundle_dir: Path,
+    source_path: Path,
+    companions: list[Path],
+    manifest_path: Path,
+    contributing_path: Path,
+    output_path: Path,
+    result,
+    dry_run: bool,
+) -> None:
+    """Print the file list + next-step commands for the contributor.
+
+    Same shape for dry-run and real-run so contributors see exactly
+    what the real run will print before they commit. Dry-run swaps
+    only the header and the trailing footer; the file list and
+    next-steps block are identical (the commands reference the paths
+    the real run would create — useful as a preview).
+    """
+    if dry_run:
+        console.print("\n[bold]Dry-run preview — would create:[/bold]")
+    else:
+        console.print("\n[bold green]✓ Submission package created![/bold green]")
+
+    bundle_filename = source_path.name
+    bundle_target = f"results-data/bundles/{bundle_filename}"
+
+    console.print(f"  {bundle_dir / bundle_filename}")
+    for comp in companions:
+        console.print(f"  {bundle_dir / comp.name}")
+    console.print(f"  {manifest_path}")
+    console.print(f"  {contributing_path}")
+
+    if not dry_run:
+        console.print(f"\n[dim]Output: {output_path.absolute()}[/dim]")
+
+    pr_title = f"results: {result.benchmark_name} {result.platform} sf{result.scale_factor}"
+    console.print("\n[bold]Next steps:[/bold]")
+    console.print(f"  1. cp [cyan]{bundle_dir / bundle_filename}[/cyan] [cyan]{bundle_target}[/cyan]")
+    for comp in companions:
+        console.print(f"     cp [cyan]{bundle_dir / comp.name}[/cyan] [cyan]results-data/bundles/{comp.name}[/cyan]")
+    console.print(f"     cp [cyan]{manifest_path}[/cyan] [cyan]results-data/bundles/{manifest_path.name}[/cyan]")
+    console.print("  2. uv run -- python scripts/generate_corpus_inventory.py --write")
+    console.print(f"  3. uv run -- python scripts/validate_submission.py {bundle_target}")
+    console.print(f"  4. PR title:  [cyan]{pr_title}[/cyan]")
+    console.print("     PR target: [cyan]published-results[/cyan]")
+    console.print("[dim]Full guide: https://docs.benchbox.dev/contributing-results[/dim]")
+
+    if dry_run:
+        console.print("\n[yellow](dry run; no files written)[/yellow]")
+
+
 @click.command("submit")
 @click.argument("result_file", required=False, type=click.Path(exists=True))
 @click.option(
@@ -362,13 +414,16 @@ def submit(
     contributing_path = output_path / "CONTRIBUTING.md"
 
     if dry_run:
-        console.print("\n[bold]Dry-run - would create:[/bold]")
-        console.print(f"  {bundle_dir / source_path.name}")
-        for comp in companions:
-            console.print(f"  {bundle_dir / comp.name}")
-        console.print(f"  {manifest_path}")
-        console.print(f"  {contributing_path}")
-        console.print("[yellow]Dry-run complete - no files written[/yellow]")
+        _print_submission_summary(
+            bundle_dir=bundle_dir,
+            source_path=source_path,
+            companions=companions,
+            manifest_path=manifest_path,
+            contributing_path=contributing_path,
+            output_path=output_path,
+            result=result,
+            dry_run=True,
+        )
         return
 
     bundle_dir.mkdir(parents=True, exist_ok=True)
@@ -403,15 +458,16 @@ def submit(
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     contributing_path.write_text(_CONTRIBUTING_TEXT, encoding="utf-8")
 
-    console.print("\n[bold green]✓ Submission package created![/bold green]")
-    console.print(f"  {bundle_dir / source_path.name}")
-    for comp in companions:
-        console.print(f"  {bundle_dir / comp.name}")
-    console.print(f"  {manifest_path.name}")
-    console.print(f"  {contributing_path.name}")
-    console.print(f"\n[dim]Output: {output_path.absolute()}[/dim]")
-    console.print("\n[bold]Next step:[/bold] Open a PR against results-data/ using the files above.")
-    console.print("[dim]See CONTRIBUTING.md in the output directory for instructions.[/dim]")
+    _print_submission_summary(
+        bundle_dir=bundle_dir,
+        source_path=source_path,
+        companions=companions,
+        manifest_path=manifest_path,
+        contributing_path=contributing_path,
+        output_path=output_path,
+        result=result,
+        dry_run=False,
+    )
 
 
 __all__ = ["submit"]

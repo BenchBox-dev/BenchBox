@@ -84,7 +84,7 @@ Yes! Install BenchBox with the `[duckdb]` extra and you can run benchmarks immed
 
 ```bash
 uv add benchbox --extra duckdb
-uv run benchbox run --platform duckdb --benchmark tpch --scale 0.01
+uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01
 ```
 
 ### How do I verify my installation?
@@ -283,7 +283,7 @@ Configure with tuning files or command-line options. See the [Data Generation](d
 The `benchbox` CLI is not in your PATH. Solutions:
 1. Ensure your virtual environment is activated
 2. Add Python's scripts directory to PATH
-3. Run with `uv run benchbox` instead
+3. Run with `uv run -- benchbox` instead
 
 See the [Troubleshooting Guide](troubleshooting.md) Installation Issues section.
 
