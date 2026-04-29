@@ -1,4 +1,4 @@
-generated_at: '2026-04-29T07:29:45.617699'
+generated_at: '2026-04-29T07:37:23.919523'
 total_items: 38
 items:
 - id: dry-run-followup-validator-hash-contract-mismatch
@@ -56,7 +56,7 @@ items:
   work_total: 8
   work_done: 2
   work_ready: 5
-  deferred_count: 4
+  deferred_count: 5
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

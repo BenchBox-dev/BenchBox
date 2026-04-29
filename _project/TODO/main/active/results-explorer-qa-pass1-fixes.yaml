@@ -109,15 +109,23 @@ work:
           ranking config (e.g. ClickBench → power_score, TPC-H →
           display_geomean_ms). Letting users override it via a toggle
           would produce incorrect cross-benchmark comparisons.
+        - Cross-benchmark comparisons are foreclosed by Compare.tsx:64-71,
+          which rejects mixed-benchmark sets with "Cannot compare results
+          from different benchmarks: ...". Since every Compare and
+          ResultDetail view is single-benchmark, the per-benchmark metric
+          is unambiguous — a toggle would only enable wrong metric choices,
+          not legitimate ones.
 
       Implication for w7:
         - Drop §4.2 ("Primary metric toggle (power_score ↔
           display_geomean_ms) updates the chart") from the test plan.
         - Drop §5.3 (same expectation in Compare).
-        - Optionally add a positive assertion: "On ClickBench detail
-          pages the chart labels read 'Power Score', on TPC-H pages
-          they read 'Geomean (ms)'" — confirms the benchmark-derived
-          contract instead of expecting a non-existent toggle.
+        - Optionally add a positive assertion that confirms the
+          benchmark-derived contract — but capture the actual axis-label
+          text emitted by chartRegistry.ts:233-240 for each benchmark's
+          primary_metric (run the relevant pages once and copy the
+          rendered label). Do NOT guess the text; the labels are
+          generated, not hard-coded.
 
       No follow-up TODO needed; the feature should not be added.
 
@@ -264,6 +272,18 @@ deferred:
       Tester did not have lhci installed and elected not to install new
       tooling for this pass. Re-attempt next QA round once tooling is
       provisioned (or run ad-hoc via Chrome DevTools Lighthouse panel).
+
+  - summary: "Type-enforce the benchmark-derived primaryMetric contract"
+    reason: |
+      The contract recorded in w2 ("setPrimaryMetric is only ever fed
+      from getPrimaryMetricForBenchmark") is observed by convention
+      across the two existing callers (ResultDetail.tsx, Compare.tsx).
+      A future contributor adding a third caller could violate it
+      silently. Type-enforcement (e.g. a `usePrimaryMetric(benchmark)`
+      hook that wraps useState + getPrimaryMetricForBenchmark together
+      so direct setState is unreachable) would make the contract
+      structural rather than tribal. Low priority while only two
+      callsites exist; revisit when a third page emerges.
 
 files_affected:
   modified:
