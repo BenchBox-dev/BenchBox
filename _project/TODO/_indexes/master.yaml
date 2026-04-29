@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T19:49:03.533770'
-total_items: 36
+generated_at: '2026-04-28T20:13:51.359335'
+total_items: 35
 items:
 - id: release-flow-dry-run-rc1
   file: TODO/main/active/release-flow-dry-run-rc1.yaml
@@ -19,23 +19,6 @@ items:
   work_ready: 1
   needs:
   - simplify-dev-loop-and-release-flow
-- id: dry-run-followup-package-canonical-contributing
-  file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
-  title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - results
-  - submit
-  - cli
-  - contributor-experience
-  - dry-run-followup
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 1
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

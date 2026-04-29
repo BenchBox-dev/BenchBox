@@ -1,18 +1,13 @@
-generated_at: '2026-04-28T19:49:03.533821'
-total_items: 36
+generated_at: '2026-04-28T20:13:51.359396'
+total_items: 35
 priorities:
   High:
-    count: 5
+    count: 4
     items:
     - id: release-flow-dry-run-rc1
       file: TODO/main/active/release-flow-dry-run-rc1.yaml
       title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
       category: Release Tooling
-      status: Not Started
-    - id: dry-run-followup-package-canonical-contributing
-      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
-      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
-      category: Core Functionality
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml

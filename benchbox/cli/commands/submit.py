@@ -26,23 +26,46 @@ _SUBMISSION_PHASE = 2
 _DEFAULT_SERVICE_URL = "https://api.benchbox.dev/v1"
 _VISIBILITY_CHOICES = ("public", "unlisted", "private")
 
+# Static checklist (Option B from
+# dry-run-followup-package-canonical-contributing): the four required steps
+# are inlined so an offline contributor can complete a submission, and the
+# canonical URL is included for the full guide. Drift risk is real but
+# bounded; the pinned regression test in tests/unit/cli/commands/test_submit.py
+# asserts the four required tokens stay present.
 _CONTRIBUTING_TEXT = """\
 # Contributing a Benchmark Result
 
 Thank you for contributing to the BenchBox community results dataset!
 
-## How to open the PR
+This is a packaged checklist. The full guide lives at:
+https://docs.benchbox.dev/contributing-results
 
-1. Fork https://github.com/joeharris76/BenchBox (or use your existing fork)
-2. Copy the contents of `bundle/` into `results-data/bundles/` in your fork
-3. Copy `submission-manifest.json` alongside the bundle files
-4. Open a pull request with the title:
+## Quick checklist
+
+1. Fork https://github.com/joeharris76/BenchBox (or use your existing fork).
+2. Copy the contents of `bundle/` into `results-data/bundles/` in your fork.
+3. Copy `submission-manifest.json` alongside the bundle files.
+4. Regenerate the corpus inventory before you commit:
+
+       uv run -- python scripts/generate_corpus_inventory.py --write
+
+5. (Optional) Validate the bundle locally before pushing:
+
+       uv run -- python scripts/validate_submission.py path/to/bundle.json
+
+6. Open a pull request against the **`published-results`** branch (NOT
+   `main`) with the title:
    `results: <benchmark> <platform> sf<scale>`
-5. The CI will validate the bundle hash against the manifest automatically
+7. CI (Validate Submission) verifies the bundle hash against the manifest
+   and posts a summary comment on your PR.
 
 ## Questions?
 
-Open an issue at https://github.com/joeharris76/BenchBox or start a discussion.
+Open an issue or start a discussion at
+https://github.com/joeharris76/BenchBox.
+
+For the full guide (trust labels, quality expectations, troubleshooting),
+see https://docs.benchbox.dev/contributing-results.
 """
 
 
