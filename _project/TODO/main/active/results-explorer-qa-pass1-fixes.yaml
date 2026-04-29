@@ -36,58 +36,55 @@ work:
     summary: "Investigate B2 — root-cause empty PlatformIndex for duckdb/polars"
     status: done
     notes: |
-      DECISION: B2 is real, intermittent, and looks like a DuckDB-WASM
-      cold-load symptom (H1) — NOT a casing/projection/equality bug
-      (H2/H3 ruled out).
+      DECISION: B2 is real and intermittent. The casing/projection bug
+      and the equality-mismatch bug are both ruled out. The mechanism
+      that produces the intermittency is NOT YET PINNED — w3 must
+      instrument before implementing a fix.
 
-      Evidence:
-        - Direct DuckDB inspection: platform_index_rows for the production
-          corpus contains clean ASCII slugs ('duckdb', 'polars',
-          'datafusion', 'sqlite') with no whitespace, casing, or NULL
-          oddities. → eliminates H2.
+      Evidence (what we know):
+        - Direct DuckDB inspection: `platform_index_rows` for the
+          production corpus contains clean ASCII slugs ('duckdb',
+          'polars', 'datafusion', 'sqlite') with no whitespace, casing,
+          or NULL oddities. → rules out the projection/casing class.
         - PlatformIndex.tsx:48 filter is `r.platform_id === platform`
-          (strict-equality ASCII strings). The same code path renders the
-          same data shape for every platform; if it failed for "polars"
-          it would also fail for "sqlite". → eliminates H3.
-        - New e2e regression spec (e2e/routes/platform-index-prod-data.spec.ts)
-          asserts 4 DuckDB rows + Polars heading on a build seeded with
-          the production results.duckdb. Run 3× serially:
-            run 1: DuckDB FAIL (heading stayed "duckdb Results", body
-                   "No results found"), Polars PASS.
-            run 2: BOTH FAIL.
-            run 3: BOTH PASS, in 1s and 2.6s — WASM warmed up.
-          Highly intermittent, no platform consistently fails. → H1.
+          (strict-equality ASCII strings). The same code path renders
+          the same data shape for every platform; if it failed for
+          "polars" it would also fail for "sqlite". → rules out the
+          equality-mismatch class.
+        - Three serial invocations of the manual repro (see
+          docs/development/known-flakes/b2-cold-load.md) produced
+          P/F, F/F, P/P with the warm run finishing in 1-3s — strong
+          intermittency signal correlated with WASM warmth.
 
-      Mechanism (best inference): on cold load, DuckDB-WASM attaches but
-      the subsequent `SELECT * FROM platform_index_rows` can resolve
-      before the runtime has fetched all of the table's pages. The query
-      returns a *partial* row set; whichever platform_ids didn't make
-      that partial set show up as "No results found" on their platform
-      page. Underlying DuckDB-WASM range-read issue is tracked
-      separately as
-      `enable-duckdb-wasm-http-range-reads-for-registered-urls`
-      (see results-explorer/src/db.ts:67-77).
+      Mechanism (NOT confirmed — three plausible candidates):
+        1. DuckDB-WASM cold-load partial data: a SELECT resolves
+           before the runtime has fetched all of the table's pages.
+           Underlying range-read issue tracked as
+           `enable-duckdb-wasm-http-range-reads-for-registered-urls`
+           (see results-explorer/src/db.ts:67-77).
+        2. Preact useEffect cleanup race: PlatformIndex.tsx:24-40
+           uses `let cancelled = false; if (!cancelled) setRows(r)`.
+           A fast navigation between platform pages could drop the
+           setRows call.
+        3. Shared `initPromise` race in db.ts:48-96: `getDb()` reuses
+           `initPromise` across mounts; component-ordering quirks
+           could leave the cached `dbInstance` in an inconsistent
+           state.
 
-      Implication for w3:
-        - This is not a code bug in PlatformIndex; the filter and
-          projection are correct.
-        - The remediation is UX, not data-binding: distinguish "DB is
-          still warming" from "DB returned zero rows for this platform".
-          Two cleanest options for w3 to choose between:
-            (a) Switch PlatformIndex to call the parameterized form,
-                `getPlatformIndexRows(platform)`, and treat an empty
-                response as "loading" if the page just mounted —
-                retry/wait once before showing the empty state.
-            (b) Add a "data ready" handshake in db.ts: a sentinel
-                SELECT (e.g. `SELECT COUNT(*) FROM bench.results`) that
-                must succeed AND return >0 before any page-level query
-                resolves. Not strictly correct (could still race) but
-                catches the most common cold-load partial-data case.
+      None of the three has direct evidence yet. Picking a fix without
+      instrumentation risks fixing the wrong layer.
 
-      Reproduction guard kept as
-      e2e/routes/platform-index-prod-data.spec.ts. The spec is currently
-      flaky against headless Chromium cold-loads; mark with `test.fixme()`
-      until w3's mitigation lands, then flip back to `test()`.
+      One-liner reproduction (full procedure in
+      docs/development/known-flakes/b2-cold-load.md):
+
+          cd results-explorer && npm run test:e2e:fixtures && npm run build \
+          && cp ../results-explorer/public/data/results.duckdb \
+                test-fixtures/.generated/data/results.duckdb \
+          && for i in 1 2 3 4 5; do echo "=== run $i ==="; \
+                npx playwright test --project=chromium --workers=1 \
+                  --grep "PlatformIndex" 2>&1 | tail -3; done
+
+      Expected: ~50% failure rate against fresh chromium contexts.
 
   - id: w2
     summary: "Resolve Q1 — confirm whether ResultDetail/Compare primary-metric toggle should exist"
@@ -106,21 +103,51 @@ work:
       plus either a test-plan diff or a follow-up TODO id.
 
   - id: w3
-    summary: "Fix B2 — apply remediation from w1's root cause"
+    summary: "Fix B2 — instrument first, then apply mitigation matching the confirmed mechanism"
     needs: [w1]
     status: pending
     notes: |
-      Implementation depends on w1's diagnosis. Most likely surfaces:
-        - If H2: tweak the SQL projection in
-          results-explorer/src/lib/duckdbQueries.ts so duckdb/polars rows
-          aren't dropped, plus a unit test against the committed
-          test-fixtures DB.
-        - If H3: tighten the equality check at
-          results-explorer/src/pages/PlatformIndex.tsx:48 (likely
-          normalize both sides via `String()` or `.trim()`).
-        - If H1 (race): add a loading/empty-vs-cold-start distinction so
-          the page doesn't say "0 results" before DuckDB-WASM finishes
-          attaching, and document the warm-up budget.
+      w1 ruled out projection/casing and equality-mismatch as causes
+      but did NOT confirm a mechanism for the intermittency. Three
+      candidates remain (full detail in w1's notes):
+        1. DuckDB-WASM cold-load partial data.
+        2. Preact useEffect cleanup race in PlatformIndex.tsx:24-40.
+        3. Shared `initPromise` race in db.ts:48-96.
+
+      Step 1 — instrument (mandatory, before any fix):
+        Add temporary `console.log` calls in:
+          - getPlatformIndexRows() — log `r.length` and the distinct
+            platform_ids seen.
+          - PlatformIndex.tsx useEffect — log the `cancelled` value at
+            both promise resolution sites.
+          - db.ts getDb() — log `initFailures`, whether `dbInstance`
+            was cached vs newly built.
+        Run the manual repro 5+ times, collect logs from passing and
+        failing runs, and identify which of the three candidates
+        actually fires. ONE of these will be empty in the failing-run
+        logs and populated in the passing-run logs.
+
+      Step 2 — pick the mitigation that matches:
+        - Cold-load partial: switch PlatformIndex to the parameterized
+          `getPlatformIndexRows(platform)` form and treat an empty
+          response as "loading" if the page just mounted. Optionally
+          add a sentinel-handshake SELECT in db.ts.
+        - Preact cleanup race: replace the `cancelled` flag pattern
+          with `AbortController`, or restructure the effect so the
+          cleanup pre-empts the in-flight query.
+        - initPromise race: rework getDb() so concurrent callers
+          either all wait on the same fully-resolved promise or
+          retry from scratch.
+
+      Step 3 — convert the manual repro to an automated regression
+      guard. Use Playwright route interception to mock
+      `/results/data/results.duckdb` with a production-shape DB so
+      the spec runs through the standard harness without manual
+      seeding. Place the spec in e2e/failures/.
+
+      Step 4 — remove the debug `console.log` calls AND
+      docs/development/known-flakes/b2-cold-load.md before the work
+      unit closes.
 
   - id: w4
     summary: "Fix B1 — add sort handlers to PlatformIndex table headers"
@@ -228,6 +255,7 @@ files_affected:
   added:
     - "results-explorer/e2e/unknown-benchmark.spec.ts"
     - "docs/operations/results-explorer-qa.md"
+    - "docs/development/known-flakes/b2-cold-load.md"
 
 must_preserve:
   - "Existing PlatformIndex default sort (geomean_ms ascending, nulls last) remains the initial state"
@@ -293,6 +321,7 @@ scope_limit:
     - "results-explorer/src/lib/duckdbQueries.ts"
     - "results-explorer/e2e/"
     - "docs/operations/results-explorer-qa.md"
+    - "docs/development/known-flakes/"
   do_not_modify:
     - "benchbox/core/explorer_pipeline/"
     - "benchbox/cli/commands/explorer.py"
