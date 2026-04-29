@@ -2989,6 +2989,27 @@ queries:
           MAP_EXTRACT(part_costs, '5')[1] as cost_for_part_5
       FROM supplier_costs
       LIMIT 10;
+    clickhouse: |2
+
+      -- ClickHouse builds Map via CAST((Array(K), Array(V)) AS Map(K, V));
+      -- match the map_construction / map_keys_values convention.
+      WITH supplier_costs AS (
+          SELECT
+              ps_suppkey,
+              CAST(
+                  (groupArray(CAST(ps_partkey AS String)), groupArray(ps_supplycost)),
+                  'Map(String, Decimal(15,2))'
+              ) as part_costs
+          FROM partsupp
+          WHERE ps_suppkey <= 10
+          GROUP BY ps_suppkey
+      )
+      SELECT
+          ps_suppkey,
+          part_costs['1'] as cost_for_part_1,
+          part_costs['5'] as cost_for_part_5
+      FROM supplier_costs
+      LIMIT 10;
   skip_on: [bigquery, redshift]
 - id: map_keys_values
   category: map
