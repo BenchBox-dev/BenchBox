@@ -1,5 +1,7 @@
 # Results Explorer — manual QA test plan
 
+> **Created**: 2026-04-29 · **Owner**: results-explorer maintainers · **Last revised**: 2026-04-29
+
 End-to-end manual QA pass against the live Results Explorer. Hand this
 file to a tester (or run it yourself); they fill in the report template
 at the end and return it. Per-section findings map cleanly to bug fixes
@@ -102,9 +104,9 @@ For each of `tpch` and `star_schema`:
 3. Tick 2 rows → **Compare** button enables and navigates correctly.
 
 If you see "No results found for platform: duckdb." on the DuckDB or
-Polars pages, that's a known cold-load race (B2 in
-`_project/TODO/main/active/results-explorer-qa-pass1-fixes.yaml`). Wait
-30-60s and reload; if it still empty, mark as BUG.
+Polars pages, that's a known cold-load race (see
+[known-flakes/b2-cold-load.md](../development/known-flakes/b2-cold-load.md)).
+Wait 30-60s and reload; if still empty, mark as BUG.
 
 ## 4. Result detail (`/results/r/<short_id>`)
 
@@ -117,13 +119,15 @@ Open one from each platform via the links from §2-3.
 3. **Raw timings** section: same sort behavior.
 4. Expand **Tuning** disclosure: it lazy-loads JSON; no infinite
    spinner.
-5. **Download bundle** link returns the JSON with HTTP 200.
+5. **Download bundle**: open DevTools → Network, click the link, and
+   confirm the response status is **200** in the network log. The
+   browser will also drop a `.json` file in your Downloads folder.
 6. Charts (CDF, percentile ladder, histogram, distribution box, stacked
    phase) all render with axis labels and no clipping.
 7. The chart axis label reflects the benchmark's primary metric:
    ClickBench / TSBS-style benchmarks use power-score; TPC-H / TPC-DS
    use geomean (ms). The metric is **benchmark-derived, not user-
-   toggleable** — this is by design (see Q1 in the parent TODO).
+   toggleable** — this is by design.
 
 ## 5. Compare (`/results/compare?ids=<short_id>,<short_id>`)
 
@@ -150,10 +154,15 @@ results from different benchmarks."
 3. **Column visibility** toggles add/remove columns immediately.
 4. Sort by every visible column; both directions correct.
 5. **SQL** text area: run the default query — rows render. Edit to
-   `SELECT 1` → renders 1 row. Edit to invalid SQL → an error is shown
-   inline (no white screen).
-6. **Download CSV** (or whatever the export is) produces a non-empty
-   file with the current filtered rows.
+   `SELECT 1` → renders 1 row. Edit to deliberately-invalid SQL such
+   as `SELECT FROM` (parse error) or `SELECT * FROM nonexistent_table`
+   (binding error) → an error is shown inline (no white screen).
+6. **Download buttons**: the page exposes both **JSON** and **CSV**
+   downloads (the CSV button reads "Download CSV", the JSON one reads
+   "Download JSON"). Click each in turn and confirm both produce a
+   non-empty file matching the current filtered rows. Filenames look
+   like `benchbox-query-export-<timestamp>.csv` /
+   `benchbox-query-export-<timestamp>.json`.
 
 ## 7. Cross-cutting
 
@@ -168,46 +177,114 @@ results from different benchmarks."
    during the run.
 4. DevTools Network: confirm `results.duckdb` loads once per
    page-session, not on every navigation.
-5. Lighthouse → Accessibility on Home and one BenchmarkIndex; report
-   scores <90.
+5. **Lighthouse**: open DevTools → Lighthouse panel (Chrome only),
+   choose the "Accessibility" category and "Desktop" device, click
+   "Analyze page load" on Home and on one BenchmarkIndex page (e.g.
+   `/results/tpch/`). Record the two scores; flag any score below 90.
+   No need to install `lhci` or any other tooling — the in-browser
+   panel is sufficient.
 
 ## Report template (paste this back filled in)
+
+Mark each item **OK / BUG / SLOW** with a one-line note. Leave items
+blank only if a prior failure made them untestable; explain in the
+report why.
 
 ```
 Browser: Chrome <ver> / Firefox <ver>
 Build commit: <git rev-parse --short HEAD output>
 
 §1 Home
-  1.1 OK
-  1.2 BUG: filter "phase=throughput" leaves table empty even though results exist
-  ...
+  1.1 <OK / BUG / SLOW + note>
+  1.2 <…>
+  1.3 <…>
+  1.4 <…>
+  1.5 <…>
 
 §2 Benchmark index
   /results/tpch/
-    2.1 OK
-    2.3 view-mode "chart": x-axis labels overlap on narrow window — SLOW
-    ...
+    2.1 <…>
+    2.2 <…>
+    2.3 <…>
+    2.4 <…>
+    2.5 <…>
+    2.6 <…>
+    2.7 <…>
+  /results/star_schema/
+    2.1 <…>
+    2.2 <…>
+    2.3 <…>
+    2.4 <…>
+    2.5 <…>
+    2.6 <…>
+    2.7 <…>
 
 §3 Platform index
-  ...
+  /results/p/duckdb/
+    3.1 <…>
+    3.2 <…>
+    3.3 <…>
+  /results/p/polars/
+    3.1 <…>
+    3.2 <…>
+    3.3 <…>
+  /results/p/datafusion/
+    3.1 <…>
+    3.2 <…>
+    3.3 <…>
+  /results/p/sqlite/
+    3.1 <…>
+    3.2 <…>
+    3.3 <…>
 
-§4 Result detail (<short_id1>, <short_id2>)
-  ...
+§4 Result detail (<short_id1>, <short_id2>, …)
+  4.1 <…>
+  4.2 <…>
+  4.3 <…>
+  4.4 <…>
+  4.5 <…>
+  4.6 <…>
+  4.7 <…>
 
 §5 Compare
-  ...
+  5.1 <…>
+  5.2 <…>
+  5.3 <…>
+  5.4 <…>
+  5.5 <…>
 
 §6 Query
-  ...
+  6.1 <…>
+  6.2 <…>
+  6.3 <…>
+  6.4 <…>
+  6.5 <…>
+  6.6 <…>
 
 §7 Cross-cutting
-  Console errors:
-    - <verbatim message + page>
-  Network anomalies:
-    - <e.g. results.duckdb fetched 7× during 4 navigations>
-  Lighthouse a11y: Home=<n>, /results/tpch/=<n>
+  7.1 <…>
+  7.2 <…>
+  7.3 Console errors:
+        - <verbatim message + page>
+  7.4 Network anomalies:
+        - <e.g. results.duckdb fetched 7× during 4 navigations>
+  7.5 Lighthouse a11y: Home=<n>, /results/tpch/=<n>
 ```
 
-That structure is enough for the operator to diff against expected
-behaviour and open issues per §-numbered failure. Start with §1, work
-down — if §1 is broken don't bother with §4+.
+Start with §1, work down — if §1 is broken don't bother with §4+.
+
+## When the tester reports BUG/SLOW (operator)
+
+These pointers help you triage findings — they're not part of the
+test plan and the tester does not need to read them.
+
+- §3 platform pages showing "No results found" with lowercase heading:
+  see [docs/development/known-flakes/b2-cold-load.md](../development/known-flakes/b2-cold-load.md)
+  for reproduction and the open mitigation work
+  ([_project/TODO/main/active/results-explorer-qa-pass1-fixes.yaml](../../_project/TODO/main/active/results-explorer-qa-pass1-fixes.yaml),
+  work unit `w3`).
+- Generally: per-section findings map to bug fixes or follow-up TODOs
+  by §-number. Open a new TODO via `/todo create` and reference the
+  failing section so the next QA round can verify closure.
+- After a bug fix lands, update this doc if a step's expectation
+  changed, and bump the "Last revised" line at the top.

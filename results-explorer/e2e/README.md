@@ -41,3 +41,12 @@ and routes `/results/data/` to `test-fixtures/.generated/data/`.
   over internal state or console noise.
 - Never mutate `results-explorer/public/data/` or `results-data/bundles/`;
   use the fixture generator or Playwright route interception instead.
+
+## See also
+
+- [docs/operations/results-explorer-qa.md](../../docs/operations/results-explorer-qa.md)
+  — the manual end-to-end QA test plan that pairs with this automated
+  suite. Run it before declaring a release candidate green.
+- [docs/development/known-flakes/](../../docs/development/known-flakes/)
+  — known intermittent failures that are tracked as documentation
+  rather than skipped tests.

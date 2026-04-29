@@ -356,6 +356,42 @@ work:
 
       Verification: doc committed; no code changes in this work unit.
 
+      Post-review (W7 review): seven findings applied.
+
+      R1 — replaced the §3 cold-load TODO-YAML reference with a link
+      to docs/development/known-flakes/b2-cold-load.md. Added an
+      "Operator: when the tester reports BUG/SLOW" appendix at the
+      bottom with the operator-targeted pointers; the tester section
+      is now free of operator metadata.
+
+      R2 — tightened under-specified steps:
+        - §4.5: added the DevTools → Network status-200 verification.
+        - §6.5: gave concrete invalid-SQL examples (`SELECT FROM`,
+          `SELECT * FROM nonexistent_table`).
+        - §6.6: pinned both export buttons (CSV + JSON), gave the
+          actual filename pattern (`benchbox-query-export-<ts>.{csv,json}`).
+        - §7.5: promoted "DevTools Lighthouse panel" to the primary
+          instruction, naming the category, device, and threshold.
+
+      C1 — stripped "(see Q1 in the parent TODO)" from §4.7. "by
+      design" alone is sufficient at the tester layer.
+
+      N1 — expanded the report template to enumerate every sub-item
+      across §1.1-§7.5 so reports come back uniformly structured.
+
+      N2 — converted tester-relevant file paths to markdown links
+      (the b2-cold-load.md link in §3 and the appendix links).
+
+      N3 — added a top-of-file metadata block (Created / Owner /
+      Last revised) so future drift has a maintenance trail.
+
+      N4 — added a "See also" section to results-explorer/e2e/README.md
+      pointing at the QA doc and the known-flakes directory; reduces
+      orphan-doc rot risk.
+
+      Verification: doc revised; no code changes; markdownlint clean
+      via the pre-commit gate.
+
   - id: w8
     summary: "Re-run the QA pass against the fixed build and confirm closure"
     needs: [w3, w4, w5, w6]
