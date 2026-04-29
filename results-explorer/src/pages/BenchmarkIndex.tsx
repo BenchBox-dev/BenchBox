@@ -3,7 +3,7 @@ import type { RoutableProps } from "preact-router";
 import type { BenchmarkSummary } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getBenchmarkSummaryFromDuckDB, listResults } from "@/lib/duckdbQueries";
-import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
+import { humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
 import { useUrlState, stringSerde } from "@/lib/useUrlState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -143,11 +143,41 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
   // preact-router's `:benchmark/` slug matches any single segment, so an
   // unknown slug like /results/does-not-exist/ would otherwise render an
-  // empty BenchmarkIndex shell. Once results are loaded, treat a slug
-  // with zero matching rows as a 404 instead. Scoped to BenchmarkIndex —
-  // genuinely-unknown top-level routes still flow to NotFound via the
-  // preact-router `default` route in App.tsx.
-  if (benchmarkResults.length === 0) return <NotFound />;
+  // empty BenchmarkIndex shell. Once results are loaded, distinguish:
+  //   - Unknown slug (not in BENCHMARK_LABELS) → NotFound with a
+  //     specific message so the user knows it's the slug that's wrong.
+  //   - Known benchmark with no published rows yet → an "empty corpus"
+  //     state that explains TPC-DS / ClickBench / etc. are supported
+  //     but haven't been ingested yet.
+  // Note: the summary-fetch useEffect above is incidentally safe for
+  // both cases because its `phases.length === 0` early-return catches
+  // them — `phases` is derived from `benchmarkResults` so it's always
+  // [] when this guard fires. A future refactor that decouples them
+  // would need to add an explicit early-return there.
+  if (benchmarkResults.length === 0) {
+    if (!isKnownBenchmark(benchmark)) {
+      return (
+        <NotFound
+          message={`Benchmark "${benchmark}" is not part of the published corpus.`}
+        />
+      );
+    }
+    return (
+      <div class="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
+        <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: humanizeBenchmark(benchmark) }]} />
+        <h1 class="mt-6 text-3xl font-bold text-gray-900">{humanizeBenchmark(benchmark)}</h1>
+        <p class="mt-4 text-lg text-gray-600">
+          No published results yet for {humanizeBenchmark(benchmark)}.
+        </p>
+        <p class="mt-2 text-sm text-gray-500">
+          The benchmark is supported by BenchBox but no runs have been ingested into the public corpus.
+        </p>
+        <a href="/results/" class="mt-6 inline-block btn btn-primary no-underline">
+          Back to Results
+        </a>
+      </div>
+    );
+  }
 
   const title = humanizeBenchmark(benchmark);
 

@@ -223,29 +223,49 @@ work:
     summary: "Fix B3 — route unknown-benchmark slugs to NotFound"
     status: done
     notes: |
-      Implemented approach (a): inside BenchmarkIndex.tsx, after results
-      finish loading and before the title is rendered, check whether
-      `benchmarkResults.length === 0` (no row in the loaded set whose
-      `benchmark` matches the URL slug). If so, render <NotFound />
-      instead of the empty BenchmarkIndex shell.
+      Implemented approach (a): inside BenchmarkIndex.tsx, after
+      results finish loading and before the title is rendered, check
+      whether `benchmarkResults.length === 0` (no row in the loaded
+      set whose `benchmark` matches the URL slug). Approach (b) —
+      maintaining a known-benchmarks set from cohort_metadata — was
+      rejected because `results` already carries the answer; threading
+      a second source of truth would invite drift.
 
-      Approach (b) — maintaining a known-benchmarks set from
-      cohort_metadata — was rejected because it would require a second
-      fetch and add a layer of state that could go stale. The data is
-      already in `results`; using it directly costs nothing.
+      Post-review (W5 review): the original guard conflated "unknown
+      slug" with "known slug, no data yet." The published corpus has
+      data for 2 of the 8 entries in BENCHMARK_LABELS (src/utils.ts);
+      the other 6 (tpcds, clickbench, nyctaxi, h2odb, datavault, plus
+      ssb-as-alias) all 404'd, suggesting they were unsupported. Now
+      a 3-state guard:
+        - Unknown slug (not in BENCHMARK_LABELS) →
+          <NotFound message="Benchmark X is not part of the published corpus." />
+        - Known benchmark with no rows → an inline empty-corpus state
+          ("No published results yet for ClickBench. The benchmark is
+          supported by BenchBox but no runs have been ingested into
+          the public corpus.").
+        - Known benchmark with rows → the existing BenchmarkIndex flow.
 
-      Guard is BenchmarkIndex-local per the anti_patterns directive.
-      Genuinely-unknown top-level paths (e.g. /results/foo/bar/baz/)
-      still flow through preact-router's `<NotFound default />` route
-      in App.tsx, unchanged.
+      Supporting changes:
+        - utils.ts: BENCHMARK_LABELS exported; new helper
+          isKnownBenchmark(slug) returns slug in BENCHMARK_LABELS.
+        - NotFound: gained an optional `message` prop so callers can
+          give the user a more specific 404 reason than the default
+          "Page not found.".
 
-      New e2e spec covers /results/does-not-exist/: asserts the 404
-      heading and "Page not found" copy. The pre-existing 3-segment
-      "no/such/route" test remains as a regression guard for the
-      preact-router default path. Both pass under chromium.
+      Comment near the guard documents an incidental safety property:
+      the summary-fetch useEffect is safe for both empty cases because
+      its `phases.length === 0` early-return catches them. A future
+      decoupling of `phases` from `benchmarkResults` would need to add
+      its own early-return.
 
-      Verification: 285/285 vitest pass; tsc clean; 2/2
-      e2e/routes/not-found.spec.ts pass.
+      e2e coverage: three specs in routes/not-found.spec.ts —
+        - 3-segment unknown path → preact-router default → 404.
+        - Unknown :benchmark slug → 404 with benchmark-specific message.
+        - Known benchmark (clickbench) with no rows → empty-corpus
+          heading, NOT a 404.
+
+      Verification: 285/285 vitest pass; tsc clean; 3/3 chromium e2e
+      pass.
 
   - id: w6
     summary: "Fix B4 — TimeSeries duplicate-key warning on platform pages"
