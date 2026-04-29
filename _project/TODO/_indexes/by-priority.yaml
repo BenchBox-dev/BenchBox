@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T18:04:33.405869'
-total_items: 36
+generated_at: '2026-04-28T20:18:58.986555'
+total_items: 35
 priorities:
   High:
     count: 5
@@ -53,7 +53,7 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium:
-    count: 9
+    count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -94,11 +94,6 @@ priorities:
       file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
       title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
       category: Testing and Quality Assurance
-      status: Not Started
-    - id: dry-run-followup-submitted-by-flag
-      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
-      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
-      category: Core Functionality
       status: Not Started
   Low:
     count: 17

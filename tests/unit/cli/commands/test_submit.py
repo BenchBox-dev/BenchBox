@@ -342,3 +342,65 @@ def test_submit_default_pr_path_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert result.exit_code == 0
     assert out_dir.is_dir()
     assert (out_dir / "submission-manifest.json").is_file()
+
+
+# ---------------------------------------------------------------------------
+# --submitted-by precedence (dry-run-followup-submitted-by-flag)
+# ---------------------------------------------------------------------------
+
+
+def test_submit_submitted_by_flag_overrides_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Explicit --submitted-by wins over git config user.name."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    monkeypatch.setattr(sub, "_get_git_username", lambda: "git-config-name")
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(
+        sub.submit,
+        [str(src), "--output", str(out_dir), "--submitted-by", "Explicit Name"],
+    )
+
+    assert result.exit_code == 0
+    manifest = json.loads((out_dir / "submission-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["submitted_by"] == "Explicit Name"
+
+
+def test_submit_submitted_by_falls_back_to_git_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Without --submitted-by, git config user.name is used."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    monkeypatch.setattr(sub, "_get_git_username", lambda: "git-config-name")
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    assert result.exit_code == 0
+    manifest = json.loads((out_dir / "submission-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["submitted_by"] == "git-config-name"
+
+
+def test_submit_submitted_by_warns_when_empty(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """When both flag and git config are empty, warn but do not fail."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    monkeypatch.setattr(sub, "_get_git_username", lambda: "")
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    assert result.exit_code == 0
+    assert "submitted_by is empty" in result.output
+    assert "--submitted-by" in result.output
+    manifest = json.loads((out_dir / "submission-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["submitted_by"] == ""
+
+
+def test_submit_submitted_by_in_help_output() -> None:
+    """The --submitted-by option appears in the help."""
+    result = CliRunner().invoke(sub.submit, ["--help"])
+    assert result.exit_code == 0
+    assert "--submitted-by" in result.output

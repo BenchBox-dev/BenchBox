@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T18:04:33.405849'
+generated_at: '2026-04-28T20:18:58.986534'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 5
+    count: 4
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -66,11 +66,6 @@ categories:
     - id: dry-run-followup-manifest-filename-convention
       file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
       title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
-      priority: Medium
-      status: Not Started
-    - id: dry-run-followup-submitted-by-flag
-      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
-      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
       priority: Medium
       status: Not Started
   Documentation:

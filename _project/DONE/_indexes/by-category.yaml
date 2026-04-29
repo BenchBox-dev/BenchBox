@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T18:04:35.676509'
+generated_at: '2026-04-28T20:19:01.648458'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -701,7 +701,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 269
+    count: 270
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -2039,6 +2039,11 @@ categories:
       file: DONE/core-functionality/active/validate-isolated-runtime-importability.yaml
       title: Validate isolated runtime importability before treating as cache hit
       priority: High
+      status: Completed
+    - id: dry-run-followup-submitted-by-flag
+      file: DONE/main/planning/dry-run-followup-submitted-by-flag.yaml
+      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
+      priority: Medium-High
       status: Completed
     - id: add-platform-info-to-benchmark-results
       file: DONE/unknown/planning/add-platform-info-to-benchmark-results.yaml
