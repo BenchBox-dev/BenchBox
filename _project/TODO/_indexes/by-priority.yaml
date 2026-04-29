@@ -1,6 +1,14 @@
-generated_at: '2026-04-28T22:48:59.583227'
-total_items: 36
+generated_at: '2026-04-29T07:50:09.115730'
+total_items: 37
 priorities:
+  Critical:
+    count: 1
+    items:
+    - id: dry-run-followup-validator-hash-contract-mismatch
+      file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
+      title: Sync published-results validator with develop's per-file hash contract (release-blocker)
+      category: Core Functionality
+      status: Not Started
   High:
     count: 4
     items:
@@ -58,7 +66,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   Medium:
-    count: 8
+    count: 9
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -74,6 +82,11 @@ priorities:
       file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
       title: Automate the Phase 3 promotion-metrics quarterly cadence
       category: Tooling
+      status: Not Started
+    - id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
+      file: TODO/main/planning/dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml
+      title: CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run
+      category: Core Functionality
       status: Not Started
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
@@ -101,7 +114,7 @@ priorities:
       category: Testing and Quality Assurance
       status: Not Started
   Low:
-    count: 17
+    count: 16
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -142,11 +155,6 @@ priorities:
       file: TODO/benchmark-expansion/planning/github-archive-benchmark.yaml
       title: GitHub Archive Benchmark - Developer Activity Analytics Workload
       category: Benchmark Development
-      status: Not Started
-    - id: dry-run-followup-uv-fallback-and-schema-key
-      file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
-      title: 'Local-validation block: document non-uv fallback and schema-version key name'
-      category: Documentation
       status: Not Started
     - id: review-dependency-upper-bounds-quarterly
       file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml

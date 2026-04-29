@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T22:48:59.583208'
+generated_at: '2026-04-29T07:50:09.115711'
 total_categories: 14
 categories:
   Architecture & Refactoring:
@@ -46,12 +46,17 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 4
+    count: 6
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
+      status: Not Started
+    - id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
+      file: TODO/main/planning/dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml
+      title: CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run
+      priority: Medium
       status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -63,13 +68,18 @@ categories:
       title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
       priority: Medium-High
       status: Not Started
+    - id: dry-run-followup-validator-hash-contract-mismatch
+      file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
+      title: Sync published-results validator with develop's per-file hash contract (release-blocker)
+      priority: Critical
+      status: Not Started
     - id: dry-run-followup-submitted-by-flag
       file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
       title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
       priority: Medium-High
       status: Not Started
   Documentation:
-    count: 3
+    count: 2
     items:
     - id: dry-run-followup-broken-getting-started-link
       file: TODO/main/planning/dry-run-followup-broken-getting-started-link.yaml
@@ -81,11 +91,6 @@ categories:
       title: Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table
       priority: Low
       status: Identified
-    - id: dry-run-followup-uv-fallback-and-schema-key
-      file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
-      title: 'Local-validation block: document non-uv fallback and schema-version key name'
-      priority: Low
-      status: Not Started
   Performance:
     count: 1
     items:
