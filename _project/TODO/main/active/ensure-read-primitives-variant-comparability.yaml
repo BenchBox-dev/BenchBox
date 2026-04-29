@@ -22,7 +22,7 @@ work:
 - id: w2
   summary: "Add static comparability linting for base/variant output columns, nested shape, row identity, and measured capability"
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Fix or skip scalar and capability-divergent variants: fulltext, window_moving_frame, statistical_percentiles,
     timeseries_trend_analysis, and any_value"
