@@ -46,6 +46,16 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
+      # Validate any blind-spot finding files staged in this commit.
+      # Each finding is its own markdown file with strict YAML frontmatter;
+      # see _project/blind-spots/README.md for the protocol.
+      - id: blind-spot-validate
+        name: blind-spot frontmatter validation
+        entry: uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py
+        language: system
+        files: ^_project/blind-spots/.*\.md$
+        exclude: ^_project/blind-spots/README\.md$
+
       # Warn-only duplicate-code gate. Manual stage so it doesn't slow
       # every commit (pylint over benchbox/ takes ~60s). Run with
       # `pre-commit run duplicate-code-warn --all-files --hook-stage manual`.
