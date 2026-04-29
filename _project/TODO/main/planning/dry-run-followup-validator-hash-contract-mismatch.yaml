@@ -1,0 +1,141 @@
+id: dry-run-followup-validator-hash-contract-mismatch
+title: "Sync published-results validator with develop's per-file hash contract (release-blocker)"
+worktree: main
+priority: Critical
+status: Not Started
+category: Core Functionality
+
+description: |
+  The `scripts/validate_submission.py` on the `published-results` branch
+  (pinned at v0.2.1, commit `0182c9556`) uses a per-DIRECTORY hash
+  algorithm (`hashlib.sha256()` over `path.encode() + file.read_bytes()`
+  for every file in `bundle_dir` excluding the manifest). The same
+  script on `develop` (post-PR #33) uses a per-FILE hash (just
+  `sha256(bundle_file)` plus a `companion_hashes` map). The writer in
+  `develop`'s `submit.py` also uses per-file. Result: a bundle produced
+  by current `develop`'s `benchbox submit` will fail CI on
+  `published-results` with `Bundle hash mismatch: manifest says XXXX,
+  computed YYYY`.
+
+  This was confirmed empirically during the 2026-04-29 Codex
+  agent-proxy dry-run:
+    - Codex's manifest: `bundle_hash: 799c80a2...` (per-file SHA-256)
+    - Validator on published-results computed: `8a89ab6f...` (per-dir)
+    - `shasum -a 256` on the actual bundle file: `799c80a2...` (matches
+      the manifest exactly)
+
+  Forensic and full reproduction at
+  `_project/handoffs/external-dry-run-retrospective-2026-04-29.md`
+  (Appendix B).
+
+  This is a release-blocker for the community submission flow: until
+  the validator on `published-results` matches the writer's contract,
+  no contributor can successfully submit a result regardless of how
+  closely they follow the docs. The bug is invisible to maintainers
+  who only run the validator inside `develop`, because both sides
+  agree there.
+
+work:
+  - id: w1
+    summary: "Decide path: cherry-pick develop's validator to published-results, or land a release first"
+    status: pending
+    notes: |
+      Two paths:
+      A. Cherry-pick the post-PR-#33 `scripts/validate_submission.py`
+         (and any related changes) onto `published-results`. Quickest
+         unblock; doesn't depend on a release.
+      B. Cut the next benchbox release (per
+         `release-flow-dry-run-rc1`) which propagates the validator
+         to v0.x.y, then sync `published-results` from the release tag.
+      Recommend A for speed (the validator is a script, not a wheel
+      artefact -- it runs from the PR's checkout of published-results
+      regardless of whether benchbox is installed). B is cleaner long
+      term but blocks on the release-flow dry-run already in flight.
+
+  - id: w2
+    summary: "Apply chosen path; verify with a round-trip test"
+    needs: [w1]
+    status: pending
+    notes: |
+      After sync, re-run the validator on `published-results` against
+      a freshly-submitted bundle:
+        cd <published-results checkout>
+        python3 scripts/validate_submission.py /path/to/bundle.json
+      Expected: 0 errors, 0 warnings.
+      Use the artefacts Codex left at
+      `/Users/joe/Developer/BenchBox/submission/` (or regenerate via
+      `benchbox submit --last`) for the round-trip.
+
+  - id: w3
+    summary: "Add a CI cross-branch contract test to prevent recurrence"
+    needs: [w2]
+    status: pending
+    notes: |
+      Add a test (or a CI step) that validates the writer's emitted
+      hashes match what the validator on `published-results` computes.
+      Could live in `tests/integration/` as a fixture-based check
+      that:
+        - runs `benchbox submit` to produce a bundle + manifest,
+        - reads `scripts/validate_submission.py` from a checkout of
+          `published-results` (or a vendored copy under tests/fixtures/),
+        - applies that validator to the freshly-emitted bundle,
+        - asserts no hash mismatch.
+      Prevents the same drift from happening again the next time
+      either side of the contract changes.
+
+verification:
+  - description: "Validator on published-results passes against a develop-submitted bundle"
+    command: |
+      git fetch origin published-results && \
+      git worktree add /tmp/bb-pr-validator origin/published-results 2>/dev/null || true && \
+      python3 /tmp/bb-pr-validator/scripts/validate_submission.py /Users/joe/Developer/BenchBox/submission/bundle/tpch_sf001_duckdb_sql_20260428_205018_e4f24ee2.json 2>&1 | tail -3
+    expected_output: "0 error(s), 0 warning(s)"
+  - description: "Cross-branch contract test exists and passes"
+    command: "uv run -- python -m pytest tests/integration/ -k 'cross_branch or hash_contract' -q"
+    expected_output: "All tests pass"
+
+must_preserve:
+  - "develop's per-file hash contract (per-file is the right design -- bundles are individually addressable in results-data/bundles/)"
+  - "Backwards-compat with already-merged community submissions in results-data/bundles/ (zero exist today, so this is theoretical)"
+
+anti_patterns:
+  - "DO NOT revert develop's writer to per-directory hash -- because per-file is the right contract for individually-addressable bundles -- fix the validator instead"
+  - "DO NOT skip the cross-branch contract test (w3) -- because the same drift will happen again the next time either side changes -- the test is the regression-prevention story for this whole class of bug"
+
+scope_limit:
+  only_modify:
+    - "scripts/validate_submission.py (on published-results)"
+    - "tests/integration/ (cross-branch contract test)"
+  do_not_touch:
+    - "benchbox/cli/commands/submit.py (the writer is correct)"
+    - "results-data/bundles/ (no existing manifests need fixing)"
+
+metadata:
+  tags:
+    - results
+    - submit
+    - validator
+    - dry-run-followup
+    - release-blocker
+  estimated_effort: "Small"
+  created_date: "2026-04-29"
+
+impact:
+  business_value: |
+    Without this fix, the entire community submission flow is broken
+    in production: any contributor following the docs will produce a
+    bundle that fails CI on the documented PR target branch. Surfaced
+    by the 2026-04-29 Codex dry-run only because it actually tried
+    the round-trip end-to-end -- the 2026-04-28 Cowork run could not
+    reach this layer because it lacked a clone of published-results.
+  user_impact: |
+    Contributors who attempt a submission today will hit a hash
+    mismatch with no obvious way to resolve it -- the writer says
+    `799c80a2...`, the CI says `8a89ab6f...`, and there is no
+    contributor-side knob that explains the discrepancy.
+  technical_debt: |
+    The same drift will recur the next time either the writer or the
+    validator changes unless the cross-branch contract test (w3)
+    lands. Today the only signal that the contract is broken comes
+    from running an end-to-end round-trip -- which neither CI nor
+    the existing test suite does.

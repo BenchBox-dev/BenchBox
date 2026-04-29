@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T20:13:51.359377'
+generated_at: '2026-04-28T21:08:45.212594'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -46,12 +46,17 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 4
+    count: 6
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
+      status: Not Started
+    - id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
+      file: TODO/main/planning/dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml
+      title: CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run
+      priority: Medium
       status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
@@ -62,6 +67,11 @@ categories:
       file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
       title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
       priority: Medium-High
+      status: Not Started
+    - id: dry-run-followup-validator-hash-contract-mismatch
+      file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
+      title: Sync published-results validator with develop's per-file hash contract (release-blocker)
+      priority: Critical
       status: Not Started
     - id: dry-run-followup-submitted-by-flag
       file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml

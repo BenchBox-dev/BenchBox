@@ -1,6 +1,14 @@
-generated_at: '2026-04-28T20:13:51.359396'
-total_items: 35
+generated_at: '2026-04-28T21:08:45.212616'
+total_items: 37
 priorities:
+  Critical:
+    count: 1
+    items:
+    - id: dry-run-followup-validator-hash-contract-mismatch
+      file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
+      title: Sync published-results validator with develop's per-file hash contract (release-blocker)
+      category: Core Functionality
+      status: Not Started
   High:
     count: 4
     items:
@@ -58,7 +66,7 @@ priorities:
       category: Core Functionality
       status: Not Started
   Medium:
-    count: 7
+    count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -74,6 +82,11 @@ priorities:
       file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
       title: Automate the Phase 3 promotion-metrics quarterly cadence
       category: Tooling
+      status: Not Started
+    - id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
+      file: TODO/main/planning/dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml
+      title: CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run
+      category: Core Functionality
       status: Not Started
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
