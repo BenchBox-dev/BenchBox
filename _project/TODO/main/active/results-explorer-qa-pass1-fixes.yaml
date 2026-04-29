@@ -2,7 +2,7 @@ id: results-explorer-qa-pass1-fixes
 title: "Investigate and remediate Results Explorer QA pass-1 findings"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
