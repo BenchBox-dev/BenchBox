@@ -12,7 +12,7 @@
  */
 
 import { render } from "@testing-library/preact";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { BenchmarkSummary, PlatformRow } from "@/types";
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 
@@ -295,6 +295,26 @@ describe("TimeSeries", () => {
     const { container } = render(<TimeSeries entries={entries} />);
     expect(container.querySelector("svg")).not.toBeNull();
     expect(container.querySelector("path")).not.toBeNull();
+  });
+
+  it("does not warn about duplicate keys when two runs share a run_date", () => {
+    // Pre-w6 behaviour: each <circle> used `key={p.date}`, so two runs on
+    // the same date for the same platform collided and Preact emitted a
+    // duplicate-key warning. With the fix, the key is `result_id`.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const entries = [
+      makeEntry({ result_id: "r1", run_date: "2026-04-03", display_geomean_ms: 15 }),
+      makeEntry({ result_id: "r2", run_date: "2026-04-03", display_geomean_ms: 12 }),
+      makeEntry({ result_id: "r3", run_date: "2026-04-04", display_geomean_ms: 10 }),
+    ];
+    const { container } = render(<TimeSeries entries={entries} />);
+    // Three points = three circles, all with distinct keys.
+    expect(container.querySelectorAll("circle").length).toBe(3);
+    const allCalls = [...warn.mock.calls, ...error.mock.calls].flat().join(" ");
+    expect(allCalls).not.toMatch(/duplicate.*key|Each child in a list should have a unique/i);
+    warn.mockRestore();
+    error.mockRestore();
   });
 });
 

@@ -269,14 +269,24 @@ work:
 
   - id: w6
     summary: "Fix B4 — TimeSeries duplicate-key warning on platform pages"
-    status: pending
+    status: done
     notes: |
-      In results-explorer/src/components/TimeSeries.tsx the row key is
-      currently the run_date string. Multiple results sharing the same
-      date (common for batch runs) collide. Switch to `result_id` (or a
-      composite `${result_id}-${run_date}`) so Preact reconciliation is
-      stable. Verify by opening /results/p/duckdb/ in a dev build and
-      confirming the console is clean.
+      Root cause: TimeSeries.tsx:173 used `key={p.date}` for each
+      <circle>, but two runs of the same platform on the same date
+      produced two points with the same `date`. Preact's reconciliation
+      then emitted "Each child in a list should have a unique key prop."
+
+      Fix: thread `result_id` from the source ChartHistoricalEntry into
+      the SeriesPoint shape, then key the circle on `p.resultId`.
+      result_id is guaranteed unique per result (it's the canonical ID
+      assigned by ExplorerPipeline) so no composite is needed.
+
+      New unit test in charts.smoke.test.tsx asserts:
+        - Three runs (two sharing a date) render three circles.
+        - No duplicate-key warning is emitted on console.warn or
+          console.error.
+
+      Verification: 286/286 vitest pass; tsc clean.
 
   - id: w7
     summary: "Promote QA test plan to docs/operations/results-explorer-qa.md and apply tester findings"
