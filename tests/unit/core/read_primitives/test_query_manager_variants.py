@@ -197,8 +197,8 @@ class TestQueryManagerVariantIntegration:
             assert "MAP(" in query.upper()
             assert "MAP_FROM_ENTRIES" not in query.upper()
 
-        distinct_query = manager.get_query("array_distinct", dialect="datafusion")
-        assert "ARRAY_AGG(DISTINCT" in distinct_query.upper()
+        with pytest.raises(ValueError, match="not supported on dialect"):
+            manager.get_query("array_distinct", dialect="datafusion")
 
     def test_actual_catalog_datafusion_rewrites_for_known_failures(self):
         """DataFusion should use variants for known unsupported base functions."""

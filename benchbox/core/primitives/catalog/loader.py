@@ -15,10 +15,35 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from importlib import resources
+from inspect import Parameter, signature
 from typing import Any
 
 import yaml
+
+
+@dataclass(frozen=True)
+class ResultColumnContract:
+    """Contract for one projected query-result column."""
+
+    name: str
+    type_class: str = "scalar"
+    order_sensitive: bool = False
+
+
+@dataclass(frozen=True)
+class ResultContract:
+    """Machine-readable result shape and capability contract for query variants."""
+
+    columns: tuple[ResultColumnContract, ...]
+    row_identity: tuple[str, ...] = ()
+    capability: str | None = None
+
+
+_RESULT_CONTRACT_KEYS = {"columns", "row_identity", "capability"}
+_RESULT_COLUMN_CONTRACT_KEYS = {"name", "type_class", "order_sensitive"}
+_RESULT_TYPE_CLASSES = {"scalar", "json", "array", "struct", "map"}
 
 
 def load_operations_catalog(
@@ -176,6 +201,7 @@ def load_query_catalog(
         raise error_class(f"{label} query catalog must define a 'queries' list")
 
     queries: dict[str, Any] = {}
+    build_query_accepts_result_contract = _callable_accepts_keyword(build_query, "result_contract")
 
     for index, entry in enumerate(raw_entries):
         if not isinstance(entry, dict):
@@ -207,17 +233,171 @@ def load_query_catalog(
 
         variants = _parse_variants(entry, query_id, error_class)
         skip_on = _parse_skip_on(entry, query_id, error_class)
+        result_contract = _parse_result_contract(entry, query_id, error_class)
+
+        query_kwargs = {
+            "id": query_id,
+            "category": category,
+            "sql": raw_sql,
+            "description": description,
+            "variants": variants,
+            "skip_on": skip_on,
+        }
+        if build_query_accepts_result_contract:
+            query_kwargs["result_contract"] = result_contract
+        elif result_contract is not None:
+            raise error_class(
+                f"Catalog entry '{query_id}' declares result_contract, but this query model does not support it"
+            )
 
         queries[query_id] = build_query(
-            id=query_id,
-            category=category,
-            sql=raw_sql,
-            description=description,
-            variants=variants,
-            skip_on=skip_on,
+            **query_kwargs,
         )
 
     return build_catalog(version=version, queries=queries)
+
+
+def _callable_accepts_keyword(callable_obj: Any, keyword: str) -> bool:
+    """Return whether *callable_obj* can be called with *keyword*."""
+    try:
+        parameters = signature(callable_obj).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(parameter.kind == Parameter.VAR_KEYWORD or parameter.name == keyword for parameter in parameters)
+
+
+def _parse_result_contract(
+    entry: dict[str, Any],
+    query_id: str,
+    error_class: type[RuntimeError],
+) -> ResultContract | None:
+    """Parse optional result-shape contract metadata from a query entry."""
+    raw_contract = entry.get("result_contract")
+    if raw_contract is None:
+        return None
+
+    if not isinstance(raw_contract, dict):
+        raise error_class(f"Catalog entry '{query_id}' has invalid 'result_contract'; expected mapping")
+
+    unknown_keys = set(raw_contract) - _RESULT_CONTRACT_KEYS
+    if unknown_keys:
+        unknown = ", ".join(sorted(unknown_keys))
+        raise error_class(f"Catalog entry '{query_id}' result_contract has unknown field(s): {unknown}")
+
+    raw_columns = raw_contract.get("columns")
+    if not isinstance(raw_columns, list) or not raw_columns:
+        raise error_class(f"Catalog entry '{query_id}' result_contract.columns must be a non-empty list")
+
+    columns = tuple(
+        _parse_result_column_contract(column, query_id, index, error_class) for index, column in enumerate(raw_columns)
+    )
+    row_identity = _parse_result_contract_row_identity(
+        raw_contract,
+        query_id,
+        {column.name for column in columns},
+        error_class,
+    )
+    capability = _parse_optional_contract_string(raw_contract, "capability", query_id, error_class)
+
+    return ResultContract(columns=columns, row_identity=row_identity, capability=capability)
+
+
+def _parse_result_column_contract(
+    raw_column: Any,
+    query_id: str,
+    index: int,
+    error_class: type[RuntimeError],
+) -> ResultColumnContract:
+    """Parse one result_contract column entry."""
+    if isinstance(raw_column, str):
+        name = raw_column.strip()
+        if not name:
+            raise error_class(f"Catalog entry '{query_id}' result_contract column {index} must be non-empty")
+        return ResultColumnContract(name=name)
+
+    if not isinstance(raw_column, dict):
+        raise error_class(f"Catalog entry '{query_id}' result_contract column {index} must be a string or mapping")
+
+    unknown_keys = set(raw_column) - _RESULT_COLUMN_CONTRACT_KEYS
+    if unknown_keys:
+        unknown = ", ".join(sorted(unknown_keys))
+        raise error_class(f"Catalog entry '{query_id}' result_contract column {index} has unknown field(s): {unknown}")
+
+    name = _parse_contract_string_field(raw_column, "name", query_id, index, error_class)
+    type_class = raw_column.get("type_class", "scalar")
+    if not isinstance(type_class, str) or not type_class.strip():
+        raise error_class(
+            f"Catalog entry '{query_id}' result_contract column '{name}' type_class must be a non-empty string"
+        )
+    type_class = type_class.lower().strip()
+    if type_class not in _RESULT_TYPE_CLASSES:
+        allowed = ", ".join(sorted(_RESULT_TYPE_CLASSES))
+        raise error_class(
+            f"Catalog entry '{query_id}' result_contract column '{name}' type_class must be one of: {allowed}"
+        )
+
+    order_sensitive = raw_column.get("order_sensitive", False)
+    if not isinstance(order_sensitive, bool):
+        raise error_class(
+            f"Catalog entry '{query_id}' result_contract column '{name}' order_sensitive must be a boolean"
+        )
+
+    return ResultColumnContract(name=name, type_class=type_class, order_sensitive=order_sensitive)
+
+
+def _parse_result_contract_row_identity(
+    raw_contract: dict[str, Any],
+    query_id: str,
+    column_names: set[str],
+    error_class: type[RuntimeError],
+) -> tuple[str, ...]:
+    """Parse and validate result_contract.row_identity."""
+    raw_row_identity = raw_contract.get("row_identity", [])
+    if raw_row_identity is None:
+        return ()
+    if not isinstance(raw_row_identity, list):
+        raise error_class(f"Catalog entry '{query_id}' result_contract.row_identity must be a list")
+
+    row_identity = []
+    for index, column_name in enumerate(raw_row_identity):
+        if not isinstance(column_name, str) or not column_name.strip():
+            raise error_class(
+                f"Catalog entry '{query_id}' result_contract.row_identity entry {index} must be a non-empty string"
+            )
+        normalized = column_name.strip()
+        if normalized not in column_names:
+            raise error_class(
+                f"Catalog entry '{query_id}' result_contract.row_identity references unknown column '{normalized}'"
+            )
+        row_identity.append(normalized)
+    return tuple(row_identity)
+
+
+def _parse_contract_string_field(
+    payload: dict[str, Any],
+    field: str,
+    query_id: str,
+    index: int,
+    error_class: type[RuntimeError],
+) -> str:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise error_class(f"Catalog entry '{query_id}' result_contract column {index} must include non-empty '{field}'")
+    return value.strip()
+
+
+def _parse_optional_contract_string(
+    payload: dict[str, Any],
+    field: str,
+    query_id: str,
+    error_class: type[RuntimeError],
+) -> str | None:
+    value = payload.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise error_class(f"Catalog entry '{query_id}' result_contract.{field} must be a non-empty string")
+    return value.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -367,6 +547,8 @@ def _parse_skip_on(
 
 
 __all__ = [
+    "ResultColumnContract",
+    "ResultContract",
     "load_operations_catalog",
     "load_query_catalog",
 ]
