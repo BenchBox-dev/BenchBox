@@ -1,7 +1,7 @@
 id: dry-run-followup-submitted-by-flag
 title: "benchbox submit: warn on empty submitted_by, add --submitted-by override"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 
