@@ -41,7 +41,7 @@ Procedure:
 ```
 # 1. Run locally on a quiet machine (or trigger the workflow and grab
 #    the uploaded artifact from the green run on main after merge).
-uv run benchbox run \
+uv run -- benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --scale 0.01 \

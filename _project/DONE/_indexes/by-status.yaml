@@ -2399,6 +2399,11 @@ statuses:
       title: Make QuestDB parquet chunk row count tunable via platform config
       priority: Low
       category: Platform Support
+    - id: dry-run-followup-package-canonical-contributing
+      file: DONE/main/planning/dry-run-followup-package-canonical-contributing.yaml
+      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
+      priority: High
+      category: Core Functionality
     - id: provable-cli-command-generation
       file: DONE/core-functionality/planning/provable-cli-command-generation.yaml
       title: Make generate_cli_command provably complete - all behavior-affecting CLI params round-trip

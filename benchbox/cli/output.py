@@ -169,7 +169,10 @@ class ConsoleResultFormatter:
                 if "empty_tables" in validation_details and validation_details["empty_tables"]:
                     console.print(f"   [red]• Empty tables:[/red] {', '.join(validation_details['empty_tables'])}")
                 if "missing_tables" in validation_details and validation_details["missing_tables"]:
-                    console.print(f"   [red]• Missing tables:[/red] {', '.join(validation_details['missing_tables'])}")
+                    console.print(
+                        f"   [yellow]• Missing tables:[/yellow] {', '.join(validation_details['missing_tables'])} "
+                        "[dim](recoverable — runner will rebuild via --force datagen)[/dim]"
+                    )
                 if "inaccessible_tables" in validation_details and validation_details["inaccessible_tables"]:
                     console.print(
                         f"   [red]• Inaccessible tables:[/red] {', '.join(validation_details['inaccessible_tables'])}"

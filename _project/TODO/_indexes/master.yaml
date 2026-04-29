@@ -1,6 +1,23 @@
 generated_at: '2026-04-28T20:39:20.703826'
 total_items: 35
 items:
+- id: dry-run-followup-validator-hash-contract-mismatch
+  file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
+  title: Sync published-results validator with develop's per-file hash contract (release-blocker)
+  worktree: main
+  category: Core Functionality
+  priority: Critical
+  status: Not Started
+  tags:
+  - results
+  - submit
+  - validator
+  - dry-run-followup
+  - release-blocker
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
 - id: release-flow-dry-run-rc1
   file: TODO/main/active/release-flow-dry-run-rc1.yaml
   title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
@@ -19,23 +36,24 @@ items:
   work_ready: 1
   needs:
   - simplify-dev-loop-and-release-flow
-- id: dry-run-followup-package-canonical-contributing
-  file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
-  title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
+- id: results-explorer-qa-pass1-fixes
+  file: TODO/main/planning/results-explorer-qa-pass1-fixes.yaml
+  title: Investigate and remediate Results Explorer QA pass-1 findings
   worktree: main
   category: Core Functionality
   priority: High
   status: Not Started
   tags:
-  - results
-  - submit
-  - cli
-  - contributor-experience
-  - dry-run-followup
-  estimated_effort: Small
-  work_total: 3
+  - results-explorer
+  - qa-followup
+  - ui
+  - preact
+  - duckdb-wasm
+  estimated_effort: Medium (1-2 days end-to-end including the re-test)
+  work_total: 8
   work_done: 0
-  work_ready: 1
+  work_ready: 5
+  deferred_count: 4
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
@@ -396,6 +414,22 @@ items:
   work_ready: 1
   needs:
   - define-phase-3-promotion-metrics
+- id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
+  file: TODO/main/planning/dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml
+  title: CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - cli
+  - docs
+  - contributor-experience
+  - dry-run-followup
+  estimated_effort: Medium
+  work_total: 7
+  work_done: 0
+  work_ready: 7
 - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
   file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
   title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
@@ -415,24 +449,6 @@ items:
   work_ready: 1
   needs:
   - implement-results-explorer-browser-functional-tests
-- id: dry-run-followup-manifest-filename-convention
-  file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
-  title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - submit
-  - tooling
-  - dry-run-followup
-  estimated_effort: Medium
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - dry-run-followup-package-canonical-contributing
 - id: single-repo-migration-phase-8-first-post-migration-release
   file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
   title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
@@ -475,25 +491,6 @@ items:
   work_total: 4
   work_done: 0
   work_ready: 1
-- id: dry-run-followup-submitted-by-flag
-  file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
-  title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - submit
-  - cli
-  - contributor-experience
-  - dry-run-followup
-  estimated_effort: Small
-  work_total: 3
-  work_done: 0
-  work_ready: 1
-  needs:
-  - dry-run-followup-package-canonical-contributing
 - id: add-hypothesis-property-tests
   file: TODO/main/planning/add-hypothesis-property-tests.yaml
   title: Add Hypothesis property-based tests for pure-function invariants
@@ -572,6 +569,43 @@ items:
   - define-results-platform-product-and-launch-strategy
   - define-hosted-results-contract-and-governance-model
   - design-results-ingest-storage-and-derived-read-model
+- id: dry-run-followup-manifest-filename-convention
+  file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
+  title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - results
+  - submit
+  - tooling
+  - dry-run-followup
+  estimated_effort: Medium
+  work_total: 4
+  work_done: 0
+  work_ready: 1
+  needs:
+  - dry-run-followup-package-canonical-contributing
+- id: dry-run-followup-submitted-by-flag
+  file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
+  title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
+  worktree: main
+  category: Core Functionality
+  priority: Medium-High
+  status: Not Started
+  tags:
+  - results
+  - submit
+  - cli
+  - contributor-experience
+  - dry-run-followup
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
+  needs:
+  - dry-run-followup-package-canonical-contributing
 - id: generalize-database-table-reuse-detection
   file: TODO/main/planning/generalize-database-table-reuse-detection.yaml
   title: Generalize benchmark table reuse detection for managed databases

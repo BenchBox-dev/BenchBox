@@ -98,6 +98,83 @@ def test_submit_creates_output_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
 
 # ---------------------------------------------------------------------------
+# 4b. Packaged CONTRIBUTING.md aligns with canonical docs/contributing-results.md
+#     (regression for dry-run-followup-package-canonical-contributing)
+# ---------------------------------------------------------------------------
+
+
+def test_submit_contributing_md_includes_canonical_required_items(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    assert result.exit_code == 0
+    contributing = (out_dir / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    for required in (
+        "published-results",
+        "generate_corpus_inventory",
+        "validate_submission",
+        "docs.benchbox.dev",
+    ):
+        assert required in contributing, f"missing {required!r} in packaged CONTRIBUTING.md"
+
+
+# ---------------------------------------------------------------------------
+# 4c. Next-steps block is printed inline after a real submit
+#     (regression for dry-run-followup-cli-ux-and-doc-polish-2026-04-29 W2)
+# ---------------------------------------------------------------------------
+
+
+def test_submit_prints_next_steps_with_pr_target_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    assert result.exit_code == 0
+    for required in (
+        "published-results",
+        "generate_corpus_inventory.py --write",
+        "validate_submission.py",
+        "results: tpch duckdb sf0.01",
+        "results-data/bundles/tpch_duckdb.json",
+    ):
+        assert required in result.output, f"missing {required!r} in submit next-steps"
+
+
+def test_submit_dry_run_matches_real_run_shape(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """W6: dry-run output prints the same file/manifest/next-steps shape
+    as a real submit, plus a "(dry run; no files written)" footer."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--dry-run", "--output", str(out_dir)])
+
+    assert result.exit_code == 0
+    assert not out_dir.exists(), "dry-run must not write files"
+    for required in (
+        "Dry-run preview",
+        "published-results",
+        "generate_corpus_inventory.py --write",
+        "results: tpch duckdb sf0.01",
+        "(dry run; no files written)",
+    ):
+        assert required in result.output, f"missing {required!r} in dry-run output"
+
+
+# ---------------------------------------------------------------------------
 # 5. Manifest contains bundle_hash
 # ---------------------------------------------------------------------------
 
