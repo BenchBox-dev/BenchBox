@@ -1,5 +1,5 @@
-generated_at: '2026-04-29T07:40:18.728615'
-total_items: 36
+generated_at: '2026-04-29T07:58:13.113506'
+total_items: 35
 statuses:
   In Progress:
     count: 3
@@ -20,7 +20,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 31
+    count: 30
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -97,11 +97,6 @@ statuses:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       priority: Medium-High
       category: Testing and Quality Assurance
-    - id: dry-run-followup-uv-fallback-and-schema-key
-      file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
-      title: 'Local-validation block: document non-uv fallback and schema-version key name'
-      priority: Low
-      category: Documentation
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

@@ -1,4 +1,4 @@
-generated_at: '2026-04-29T07:40:21.828892'
+generated_at: '2026-04-29T07:58:15.162851'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -2175,7 +2175,7 @@ categories:
       priority: Medium-High
       status: Completed
   Documentation:
-    count: 25
+    count: 26
     items:
     - id: add-blog-with-ablog
       file: DONE/docs-experience/active/add-blog-with-ablog.yaml
@@ -2246,6 +2246,11 @@ categories:
       file: DONE/main/planning/docs-fix-critical-accuracy-errors.yaml
       title: Fix critical documentation accuracy errors - broken code, phantom benchmark, wrong flags
       priority: High
+      status: Completed
+    - id: dry-run-followup-uv-fallback-and-schema-key
+      file: DONE/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
+      title: 'Local-validation block: document non-uv fallback and schema-version key name'
+      priority: Low
       status: Completed
     - id: query-plan-documentation-testing
       file: DONE/query-plan-docs/planning/query-plan-documentation-testing.yaml

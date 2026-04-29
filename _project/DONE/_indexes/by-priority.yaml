@@ -1,5 +1,5 @@
-generated_at: '2026-04-29T07:40:21.829125'
-total_items: 790
+generated_at: '2026-04-29T07:58:15.163060'
+total_items: 791
 priorities:
   Critical:
     count: 47
@@ -3748,7 +3748,7 @@ priorities:
       category: Project Lifecycle Management
       status: Completed
   Low:
-    count: 45
+    count: 46
     items:
     - id: interactive-wizard-platform-options
       file: DONE/ux-improvements/planning/interactive-wizard-platform-options.yaml
@@ -3919,6 +3919,11 @@ priorities:
       file: DONE/main/active/explorer-phase-a-f-review-followups.yaml
       title: Fix nit-level findings from six explorer phase A-F code reviews (2026-04-17 TODOs)
       category: Code Quality
+      status: Completed
+    - id: dry-run-followup-uv-fallback-and-schema-key
+      file: DONE/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
+      title: 'Local-validation block: document non-uv fallback and schema-version key name'
+      category: Documentation
       status: Completed
     - id: questdb-parquet-chunk-size-tunable
       file: DONE/main/planning/questdb-parquet-chunk-size-tunable.yaml
