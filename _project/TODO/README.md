@@ -6,7 +6,7 @@ This directory contains TODO items organized in a distributed structure.
 
 ```
 TODO/
-├── _indexes/                    # Auto-generated index files
+├── _indexes/                    # Auto-generated index files (gitignored, rebuilt on demand)
 │   ├── master.yaml             # Complete listing with metadata
 │   ├── by-category.yaml        # Grouped by category
 │   ├── by-priority.yaml        # Grouped by priority
@@ -53,7 +53,7 @@ uv run scripts/todo_cli.py reindex
 1. Use the template: `_project/TODO_ENTRY_TEMPLATE.yaml`
 2. Create file in appropriate location: `TODO/{worktree}/{phase}/{slug}.yaml`
 3. Validate: `uv run scripts/validate_todo.py <file>`
-4. Regenerate indexes: `uv run scripts/generate_indexes.py`
+4. Regenerate indexes: `make todo-reindex` (or let `todo_cli.py` regen on next read — indexes are gitignored)
 
 ## Claude Skills
 

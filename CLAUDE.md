@@ -46,6 +46,28 @@ during the single-repo migration).
   (`_project/`, `_blog/`, agent configs, etc.) live only on develop by
   design. Full runbook: `docs/operations/release-guide.md`.
 
+## Review workflow — blind-spot capture (mandatory)
+
+When you produce a **Blind-Spot Audit (L2)** during any review (ultrareview,
+`/review`, ad-hoc code review, research, planning), you MUST:
+
+1. **Write the finding to disk first** at
+   `_project/blind-spots/YYYY-MM-DD-HHMMSS-<slug>.md`, using the frontmatter
+   schema and body shape in `_project/blind-spots/README.md`.
+2. **Then** quote the finding in your chat reply, prefixed with one line:
+   `Recorded: _project/blind-spots/<file>.md`.
+
+Do not skip the file write because the finding "feels minor" — sweep-time
+triage is where dismissals belong, not write-time. Findings printed only in
+chat get lost; file-first capture is what makes the L2 audit habit pay off.
+
+Sweep / triage findings with `make blind-spots-{list,report,sweep}`. Promotion
+to a TODO is a sweep-step decision, not a write-step decision. See
+`_project/blind-spots/README.md` for the full protocol.
+
+The `/blind-spot` slash command (`.claude/commands/blind-spot.md`) wraps the
+file-first capture flow when you want to record one explicitly outside a review.
+
 ## Commands
 
 | Task | Command |
@@ -95,4 +117,5 @@ benchbox run --help | --help-topic all | --help-topic examples | --help-topic be
 - **Python**: `uv tree`, `uv pip list`, `uv pip show*`, `uv export`, `uv run -- python -c*`, `uv run -- python -m*`
 - **TPC**: `timeout 30s _binaries/tpc-{h,ds}/<platform>/dsdgen*`, `timeout 60s _binaries/tpc-{h,ds}/<platform>/dsqgen*`
 - **TODO**: `uv run --project _project/scripts -- python _project/scripts/todo_cli.py list*|show*|stats|ready|next*|done*|check-graph`, `uv run --project _project/scripts -- python _project/scripts/validate_todo.py*`, `uv run _project/scripts/generate_indexes.py`, `uv run _project/scripts/migrate_todo_format.py*`
+- **Blind-spots**: `make blind-spots-list`, `make blind-spots-report`, `make blind-spots-sweep`, `uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py *`, `uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py *`
 - **System**: `ps*`, `uname*`, `whoami`, `pwd`, `env | grep*`

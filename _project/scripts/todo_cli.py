@@ -35,16 +35,38 @@ class TodoCLI:
         self.done_dir = project_root / "_project" / "DONE"
 
     def load_master_index(self, tree: str = "TODO") -> dict[str, Any]:
-        """Load master index file."""
+        """Load master index file, regenerating it on first use if absent.
+
+        Indexes are gitignored build artifacts — a fresh clone has no
+        `_indexes/` files until something triggers a regen. Rather than
+        making every caller remember that, we regenerate on demand and
+        cache nothing else.
+        """
         index_path = self.project_root / "_project" / tree / "_indexes" / "master.yaml"
 
         if not index_path.exists():
-            print(f"⚠️  Index not found: {index_path}", file=sys.stderr)
-            print("   Run 'uv run scripts/generate_indexes.py' to create indexes", file=sys.stderr)
+            self._regenerate_indexes_silent()
+
+        if not index_path.exists():
+            print(f"⚠️  Index not found and could not be generated: {index_path}", file=sys.stderr)
+            print("   Run 'uv run _project/scripts/generate_indexes.py' manually", file=sys.stderr)
             return {"items": []}
 
         with open(index_path, encoding="utf-8") as f:
             return yaml.safe_load(f)
+
+    def _regenerate_indexes_silent(self) -> None:
+        """Run generate_indexes.py; swallow output. Used for first-use bootstrap."""
+        import subprocess
+
+        index_script = self.project_root / "_project" / "scripts" / "generate_indexes.py"
+        if not index_script.exists():
+            return
+        subprocess.run(
+            [sys.executable, str(index_script)],
+            capture_output=True,
+            check=False,
+        )
 
     def list_items(
         self,
@@ -716,9 +738,7 @@ class TodoCLI:
                 print(f"  {u.get('id', '?'):5s}  {u.get('summary', '')}")
 
         # Check if all work is done
-        all_done = all(
-            u.get("status") == "done" or u.get("id") == work_id for u in work if isinstance(u, dict)
-        )
+        all_done = all(u.get("status") == "done" or u.get("id") == work_id for u in work if isinstance(u, dict))
         if all_done:
             print("\nAll work units are done! Consider completing the TODO item:")
             print(f"  uv run _project/scripts/todo_cli.py show {path.relative_to(self.project_root)}")
