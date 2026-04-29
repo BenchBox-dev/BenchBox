@@ -138,6 +138,14 @@ _sources/tpc-ds/tools/.ctags*
 _sources/tpc-h/dbgen/dbgen_x86_64
 .mcp.json
 
+# skill-sync materialized skill mirrors (regenerate locally via `make skill-sync`).
+# The manifest (skill-sync.yaml + skill-sync.lock) is tracked; these mirrors are not.
+.claude/skills/
+.codex/skills/
+.codex/shared-skills/
+.codex/shared-skills.lock.json
+.gemini/skills/
+
 # TODO system infrastructure (added for distributed TODO structure)
 !_project/TODO/
 !_project/DONE/
