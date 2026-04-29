@@ -1,4 +1,4 @@
-generated_at: '2026-04-29T08:18:31.504616'
+generated_at: '2026-04-29T08:20:43.941762'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -212,7 +212,7 @@ categories:
       file: TODO/main/active/results-explorer-qa-pass1-fixes.yaml
       title: Investigate and remediate Results Explorer QA pass-1 findings
       priority: High
-      status: In Progress
+      status: Blocked
     - id: external-contributor-submission-dry-run
       file: TODO/main/planning/external-contributor-submission-dry-run.yaml
       title: Run a Phase 2 dry-run with one external trusted contributor

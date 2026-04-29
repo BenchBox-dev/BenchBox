@@ -1,4 +1,4 @@
-generated_at: '2026-04-29T08:18:31.504583'
+generated_at: '2026-04-29T08:20:43.941717'
 total_items: 38
 items:
 - id: dry-run-followup-validator-hash-contract-mismatch
@@ -42,7 +42,7 @@ items:
   worktree: main
   category: Testing and Quality Assurance
   priority: High
-  status: In Progress
+  status: Blocked
   tags:
   - results-explorer
   - qa-followup
@@ -55,7 +55,7 @@ items:
   estimated_effort: Medium (1-2 days end-to-end including the re-test)
   work_total: 8
   work_done: 6
-  work_ready: 1
+  work_ready: 0
   deferred_count: 5
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml

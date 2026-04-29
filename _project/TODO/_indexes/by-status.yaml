@@ -1,8 +1,16 @@
-generated_at: '2026-04-29T08:18:31.504643'
+generated_at: '2026-04-29T08:20:43.941789'
 total_items: 38
 statuses:
+  Blocked:
+    count: 1
+    items:
+    - id: results-explorer-qa-pass1-fixes
+      file: TODO/main/active/results-explorer-qa-pass1-fixes.yaml
+      title: Investigate and remediate Results Explorer QA pass-1 findings
+      priority: High
+      category: Testing and Quality Assurance
   In Progress:
-    count: 4
+    count: 3
     items:
     - id: timing-policy-split-review-followups
       file: TODO/main/active/timing-policy-split-review-followups.yaml
@@ -14,11 +22,6 @@ statuses:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: Medium-High
       category: Core Functionality
-    - id: results-explorer-qa-pass1-fixes
-      file: TODO/main/active/results-explorer-qa-pass1-fixes.yaml
-      title: Investigate and remediate Results Explorer QA pass-1 findings
-      priority: High
-      category: Testing and Quality Assurance
     - id: single-repo-migration-phase-4-test-release-with-new-flow
       file: TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml
       title: 'Single-repo migration phase 4: final sync, _project/** history merge, first release on public (v0.3.0)'
