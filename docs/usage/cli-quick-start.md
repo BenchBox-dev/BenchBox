@@ -20,7 +20,7 @@ BenchBox ships with a full-featured CLI implemented with Click. This guide focus
 | `benchbox tuning init` | Scaffold a tuning YAML grouped by platform and benchmark. |
 | `benchbox results --limit N` | Display recent benchmark summaries. |
 
-> Tip: `uv run benchbox <command>` automatically uses the project’s virtual environment. Activate the venv manually if you prefer to invoke `benchbox` directly.
+> Tip: `uv run -- benchbox <command>` automatically uses the project’s virtual environment. Activate the venv manually if you prefer to invoke `benchbox` directly.
 
 ## Running Benchmarks
 
@@ -62,31 +62,31 @@ The `run` subcommand accepts a rich set of options. The defaults favor the inter
 
 ```bash
 # Interactive workflow with guided prompts
-uv run benchbox run
+uv run -- benchbox run
 
 # Non-interactive run for CI or cron jobs
-uv run benchbox run \
+uv run -- benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --scale 0.1 \
   --non-interactive
 
 # Preview the entire plan (queries, file layout, seeds) without running it
-uv run benchbox run \
+uv run -- benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --scale 0.1 \
   --dry-run ./preview
 
 # Run specific queries only (for debugging or focused testing)
-uv run benchbox run \
+uv run -- benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --queries "Q1,Q6,Q17" \
   --phases power
 
 # Debug a single failing query with verbose output
-uv run benchbox run \
+uv run -- benchbox run \
   --platform postgres \
   --benchmark tpcds \
   --queries "Q42" \
@@ -94,19 +94,19 @@ uv run benchbox run \
   --phases power
 
 # See all CLI examples
-uv run benchbox run --help-topic examples
+uv run -- benchbox run --help-topic examples
 
 # View platform status and capabilities
-uv run benchbox platforms status databricks
+uv run -- benchbox platforms status databricks
 
 # Compare two DuckDB releases without switching environments
-uv run benchbox run \
+uv run -- benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --platform-option driver_version=1.0.0 \
   --output ./runs/v1.0.0
 
-uv run benchbox run \
+uv run -- benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --platform-option driver_version=1.1.0 \
@@ -117,7 +117,7 @@ uv run benchbox run \
 
 ```bash
 # Show the latest run summary (duration, validation status, failures)
-uv run benchbox results --limit 1
+uv run -- benchbox results --limit 1
 ```
 
 ## Exporting Results
@@ -126,19 +126,19 @@ Re-export existing benchmark results in different formats without re-running:
 
 ```bash
 # Export most recent result to CSV
-uv run benchbox export --last --format csv
+uv run -- benchbox export --last --format csv
 
 # Export specific result to HTML report
-uv run benchbox export benchmark_runs/results/tpch_sf1_duckdb.json --format html
+uv run -- benchbox export benchmark_runs/results/tpch_sf1_duckdb.json --format html
 
 # Export to multiple formats at once
-uv run benchbox export --last --format csv --format html --format json
+uv run -- benchbox export --last --format csv --format html --format json
 
 # Export latest TPC-H result with filtering
-uv run benchbox export --last --benchmark tpc_h --format csv
+uv run -- benchbox export --last --benchmark tpc_h --format csv
 
 # Export to custom directory
-uv run benchbox export --last --format html --output-dir ./reports/
+uv run -- benchbox export --last --format html --output-dir ./reports/
 ```
 
 **Common Use Cases:**
@@ -152,19 +152,19 @@ Generate ASCII charts from benchmark results directly in the terminal:
 
 ```bash
 # Auto-detect latest result and render all applicable charts
-uv run benchbox visualize
+uv run -- benchbox visualize
 
 # Visualize a specific result file
-uv run benchbox visualize benchmark_runs/results/tpch_duckdb_sf0.01_*.json
+uv run -- benchbox visualize benchmark_runs/results/tpch_duckdb_sf0.01_*.json
 
 # Compare multiple result files
-uv run benchbox visualize duckdb.json sqlite.json --template head_to_head
+uv run -- benchbox visualize duckdb.json sqlite.json --template head_to_head
 
 # Specific chart type
-uv run benchbox visualize --last --chart-type performance_bar
+uv run -- benchbox visualize --last --chart-type performance_bar
 
 # Save plain-text output to file (strip ANSI colors)
-uv run benchbox visualize --last --no-color > charts.txt
+uv run -- benchbox visualize --last --no-color > charts.txt
 ```
 
 See the [Visualization Guide](../visualization/overview.md) for chart types, templates, and customization options.
@@ -175,25 +175,25 @@ The `platforms` command helps you discover, enable, and configure database platf
 
 ```bash
 # List all available platforms with their status
-uv run benchbox platforms list
+uv run -- benchbox platforms list
 
 # Show detailed information about a specific platform
-uv run benchbox platforms status duckdb
+uv run -- benchbox platforms status duckdb
 
 # Enable a platform for use in benchmarks
-uv run benchbox platforms enable clickhouse
+uv run -- benchbox platforms enable clickhouse
 
 # Disable a platform
-uv run benchbox platforms disable sqlite
+uv run -- benchbox platforms disable sqlite
 
 # Get installation guidance for missing dependencies
-uv run benchbox platforms install databricks
+uv run -- benchbox platforms install databricks
 
 # Check if enabled platforms are ready
-uv run benchbox platforms check --enabled-only
+uv run -- benchbox platforms check --enabled-only
 
 # Interactive setup wizard
-uv run benchbox platforms setup
+uv run -- benchbox platforms setup
 ```
 
 **Platform Management vs Credential Setup:**
@@ -204,19 +204,19 @@ uv run benchbox platforms setup
 **Typical Cloud Platform Workflow:**
 ```bash
 # 1. Check if platform dependencies are installed
-uv run benchbox platforms status databricks
+uv run -- benchbox platforms status databricks
 
 # 2. Install dependencies if needed (follow the guidance shown)
 uv add databricks-sql-connector
 
 # 3. Enable the platform
-uv run benchbox platforms enable databricks
+uv run -- benchbox platforms enable databricks
 
 # 4. Configure credentials
-uv run benchbox setup --platform databricks
+uv run -- benchbox setup --platform databricks
 
 # 5. Verify everything is ready
-uv run benchbox platforms check databricks
+uv run -- benchbox platforms check databricks
 ```
 
 ## Interactive SQL Shell
@@ -225,25 +225,25 @@ Open an interactive SQL shell to explore benchmark databases, debug queries, and
 
 ```bash
 # Discover and connect to available databases interactively
-uv run benchbox shell
+uv run -- benchbox shell
 
 # List all available databases
-uv run benchbox shell --list
+uv run -- benchbox shell --list
 
 # Connect to most recent database
-uv run benchbox shell --last
+uv run -- benchbox shell --last
 
 # Connect to specific benchmark database
-uv run benchbox shell --last --benchmark tpch
+uv run -- benchbox shell --last --benchmark tpch
 
 # Filter by scale factor
-uv run benchbox shell --benchmark tpch --scale 1.0
+uv run -- benchbox shell --benchmark tpch --scale 1.0
 
 # Direct connection to database file
-uv run benchbox shell --database benchmark.duckdb
+uv run -- benchbox shell --database benchmark.duckdb
 
 # Use custom output directory
-uv run benchbox shell --output ./my-benchmarks
+uv run -- benchbox shell --output ./my-benchmarks
 ```
 
 **Shell Features:**
@@ -262,18 +262,18 @@ uv run benchbox shell --output ./my-benchmarks
 
 ```bash
 # Summarize optional dependencies and extras guidance
-uv run benchbox check-deps --matrix
+uv run -- benchbox check-deps --matrix
 
 # Focus on a single adapter with verbose remediation
-uv run benchbox check-deps --platform snowflake --verbose
+uv run -- benchbox check-deps --platform snowflake --verbose
 
 # Generate a tuning skeleton for your project
-uv run benchbox tuning init --platform duckdb
+uv run -- benchbox tuning init --platform duckdb
 ```
 
 ## Working With uv
 
-- `uv run benchbox …` keeps dependency management simple: no manual activation required.
+- `uv run -- benchbox …` keeps dependency management simple: no manual activation required.
 - Use `uvx benchbox …` to execute without installing into the current project.
 - If you are using a traditional virtual environment, run `source .venv/bin/activate` (or the Windows equivalent) and call `benchbox` directly.
 

@@ -9,7 +9,7 @@ BenchBox reads configuration from three layers, highest precedence first:
 2. **Environment variables** - primarily tuning overrides (see below).
 3. **Configuration files** - `benchbox.yaml` in the working directory or `~/.benchbox/config.yaml`.
 
-If no file is present, BenchBox uses sensible defaults. You can generate a tuning template with `uv run benchbox tuning init --platform duckdb`.
+If no file is present, BenchBox uses sensible defaults. You can generate a tuning template with `uv run -- benchbox tuning init --platform duckdb`.
 
 ## Minimal Example
 
@@ -38,7 +38,7 @@ execution:
 Save the file next to your project and run:
 
 ```bash
-uv run benchbox run --benchmark tpch --platform duckdb
+uv run -- benchbox run --benchmark tpch --platform duckdb
 ```
 
 CLI flags still win. For example `--scale 1` overrides `benchmarks.default_scale` for that invocation only.
@@ -99,18 +99,18 @@ Before running large jobs, dry-run the plan and validate dependencies:
 
 ```bash
 # Render the execution plan without running anything
-uv run benchbox run --dry-run ./plan --platform duckdb --benchmark tpch
+uv run -- benchbox run --dry-run ./plan --platform duckdb --benchmark tpch
 
 # Check platform requirements declared in the config
-uv run benchbox check-deps --matrix
+uv run -- benchbox check-deps --matrix
 ```
 
 `benchbox run` respects values from `benchbox.yaml`, so you can set project defaults once and execute repeatable runs with only a few flags.
 
 ## Related Commands
 
-- `uv run benchbox tuning init` - scaffold a tuning YAML file for a specific platform.
-- `uv run benchbox validate --config benchbox.yaml` - ensure configuration syntax and schema are valid.
-- `uv run benchbox platforms setup` - interactively enable adapters defined in your config.
+- `uv run -- benchbox tuning init` - scaffold a tuning YAML file for a specific platform.
+- `uv run -- benchbox validate --config benchbox.yaml` - ensure configuration syntax and schema are valid.
+- `uv run -- benchbox platforms setup` - interactively enable adapters defined in your config.
 
 See the [CLI reference](../reference/cli-reference.md) for detailed command usage and the [examples library](examples.md) for advanced automation patterns.

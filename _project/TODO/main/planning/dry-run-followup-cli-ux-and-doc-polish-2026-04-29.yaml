@@ -1,0 +1,210 @@
+id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
+title: "CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+
+description: |
+  Seven smaller friction items surfaced by the 2026-04-29 Codex
+  agent-proxy dry-run. Each work unit is independently verifiable and
+  small; consolidated into one TODO to avoid TODO sprawl. None of these
+  are blocking by themselves, but cumulatively they make the difference
+  between a smooth and a frustrating first submission.
+
+  See `_project/handoffs/external-dry-run-retrospective-2026-04-29.md`
+  for the full report and Codex's verbatim feedback (Appendix A there).
+
+  Note: the release-blocker hash-contract mismatch from the same
+  dry-run is tracked separately as
+  `dry-run-followup-validator-hash-contract-mismatch.yaml` (Critical).
+  This TODO is polish; that one is correctness.
+
+work:
+  - id: w1
+    summary: "Audit doc invocation consistency: pick canonical form between `benchbox`, `uv run benchbox`, `uv run -- benchbox`"
+    status: pending
+    notes: |
+      Codex re-read steps to figure out which form to use. Pick one
+      canonical form for contributor-facing docs and normalize.
+      Recommend `uv run -- benchbox` (matches the repo's uv-first
+      convention, matches the `uv run -- python` examples in the
+      validation block). Bare `benchbox` only where the doc explicitly
+      assumes a system install.
+      Files to scan: docs/contributing-results.md, docs/usage/,
+      README.md, docs/development/.
+
+  - id: w2
+    summary: "Make `benchbox submit` print the exact next commands"
+    status: pending
+    notes: |
+      Codex's recommendation #2: after writing the bundle, print the
+      exact next commands the contributor should run, with paths
+      filled in:
+        - cp <bundle_path> results-data/bundles/<bundle_filename>
+        - uv run -- python scripts/generate_corpus_inventory.py --write
+        - uv run -- python scripts/validate_submission.py results-data/bundles/<bundle_filename>
+        - PR title: `results: <benchmark> <platform> sf<scale>`
+        - PR target branch: `published-results`
+      Reduces re-read load and removes the "where does this go?"
+      friction. The information is already in the in-bundle
+      CONTRIBUTING.md after PR #43; this surfaces it inline at submit
+      time so contributors don't have to switch contexts.
+
+  - id: w3
+    summary: "Downgrade `benchbox run` recoverable Missing-tables from red ❌ to amber recovery message"
+    status: pending
+    notes: |
+      Codex hit `❌ Missing tables...` printed in red, then the runner
+      automatically deleted+rebuilt the DuckDB file and the run
+      succeeded. The user-visible result was success, but the red ❌
+      made it look like a failure mid-run. Downgrade to amber/yellow
+      with a "rebuilding..." spinner; reserve red ❌ for actually
+      unrecoverable errors.
+
+      Audit findings (2026-04-29) — emit sites:
+        - `benchbox/cli/output.py:172` -- `[red]• Missing tables:[/red]`
+          (this is the most likely red ❌ Codex saw)
+        - `benchbox/platforms/base/result_capture.py:1372` -- already
+          uses `⚠️` (amber); not the offending site
+        - `benchbox/platforms/base/validation.py:174` -- adds error
+          to a result object; check if it propagates to the [red] path
+        - `benchbox/utils/data_validation.py:426` -- emit helper
+        - `benchbox/core/validation/engines.py:432` -- error append
+
+      Trace the auto-recovery path: which caller catches the
+      validation error, deletes+rebuilds the DuckDB file, and re-runs?
+      Downgrade `cli/output.py:172` to amber/yellow IF the caller is
+      recoverable; keep red only for hard-fail paths.
+
+  - id: w4
+    summary: "Drop 'Interactive Benchmark Runner' header in non-interactive `benchbox run`"
+    status: pending
+    notes: |
+      Codex called this out: showing 'Interactive Benchmark Runner'
+      when running with explicit flags (no interactive prompt) is
+      misleading. Suppress the header when stdin is not a TTY OR
+      when explicit `--platform` / `--benchmark` args are provided.
+
+      Audit findings (2026-04-29) — emit site:
+        - `benchbox/cli/commands/run.py:706` --
+          `Text("BenchBox Interactive Benchmark Runner", style="bold blue")`
+      Single-site fix; gate on `sys.stdin.isatty() and not (platform
+      and benchmark)` or equivalent.
+
+  - id: w5
+    summary: "Sync `benchbox profile` docs ('Platform Availability' → actual 'Available Databases')"
+    status: pending
+    notes: |
+      The doc references a 'Platform Availability' surface; the actual
+      CLI prints 'Available Databases'. Either add the doc-claimed
+      table to the CLI, or update docs to match what the CLI prints.
+      Latter is cheaper.
+
+      Audit findings (2026-04-29) — file pins:
+        - Doc: `docs/platforms/dataframe.md:358` (`## Checking Platform
+          Availability`) -- main mismatch surface
+        - Doc: `docs/usage/intelligent-guidance.md:49,83` -- already
+          uses 'Available Databases' (ASCII tree examples); aligned
+        - CLI: `benchbox/cli/system.py:42` -- prints
+          `[cyan]Available Databases:[/cyan]`
+        - CLI: `benchbox/cli/database.py:395,504` --
+          `Table(title="Available Databases")`
+      Recommended: rename the doc heading + body in
+      `docs/platforms/dataframe.md:358` to 'Available Databases'
+      and align the prose.
+
+  - id: w6
+    summary: "Align `benchbox submit --dry-run` output format with real submit output"
+    status: pending
+    notes: |
+      Codex noted the dry-run path output format and real output
+      format differ slightly. Make `--dry-run` print the same
+      file/manifest/contributing list shape as the real run, just
+      with a "(dry run; no files written)" footer. Today they're
+      similar but the dry-run formatting is its own one-off.
+
+  - id: w7
+    summary: "Clarify the `stream_id != 0 validation disabled` TPC-H warning"
+    status: pending
+    notes: |
+      Codex's run hit a warning that validation was disabled for
+      stream_id != 0 and was unsure whether the result was actually
+      fully validated.
+
+      Audit findings (2026-04-29) — emit site:
+        - `benchbox/core/tpch/power_test.py:172-176`:
+            if stream_id != 0 and validation and validation_mode is None:
+                actual_validation_mode = "disabled"
+                self.logger.warning(
+                    "⚠️  TPC-H answer sets are only available for stream 0. "
+                    "Disabling validation for stream_id != 0."
+                )
+
+      The warning IS correct (TPC-H answer sets only exist for stream 0),
+      but Codex's confusion shows the wording leaves room for "did my
+      result get validated or not?" doubt. Reword to explicitly state:
+      "Stream 0 was validated against the answer set; streams > 0 are
+      run for timing only (per TPC-H spec)." Suppression is the wrong
+      call -- the warning protects users running multi-stream from
+      claiming false validation.
+
+verification:
+  - description: "Doc invocation consistency: zero non-canonical `uv run benchbox` (without `--`) in contributor docs"
+    command: "grep -rEc '^[^#]*\\buv run benchbox\\b(?! --)' docs/contributing-results.md docs/usage/ README.md 2>/dev/null | awk -F: '{s+=$2}END{print s}'"
+    expected_output: "0 (assuming `uv run -- benchbox` is the canonical form chosen in w1)"
+  - description: "`benchbox submit` output mentions the PR target branch inline"
+    command: "rm -rf /tmp/bb-test && uv run -- benchbox submit --last --output /tmp/bb-test 2>&1 | grep -c 'published-results'"
+    expected_output: ">= 1"
+  - description: "`benchbox run` non-interactive does not print the interactive header"
+    command: "uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 2>&1 | grep -c 'Interactive Benchmark Runner'"
+    expected_output: "0"
+  - description: "Missing-tables auto-recovery does not print in red"
+    command: "uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 --force datagen 2>&1 | grep -E '\\[red\\][^[]*Missing tables|❌[^\\n]*Missing tables' | wc -l"
+    expected_output: "0"
+  - description: "Stream-id warning explicitly mentions 'timing only' or 'per TPC-H spec'"
+    command: "grep -cE 'timing only|per TPC-H spec' benchbox/core/tpch/power_test.py"
+    expected_output: ">= 1"
+
+must_preserve:
+  - "Existing user-facing behavior on the success path -- these are output / UX tweaks only, not flow changes"
+  - "Hard-failure red ❌ for actually-unrecoverable errors -- don't make every error look amber and dilute the signal"
+  - "The canonical `uv run -- python` examples in the validation block (those are unambiguous and contributor-tested)"
+
+anti_patterns:
+  - "DO NOT bundle the validator hash mismatch fix into this TODO -- that's release-blocker scope and tracked separately as `dry-run-followup-validator-hash-contract-mismatch`"
+  - "DO NOT block on completing all 7 work units before landing any -- each is independently shippable; ship as ready"
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/commands/submit.py (w2: print next commands)"
+    - "benchbox/cli/commands/run.py (w4: drop Interactive header at line 706)"
+    - "benchbox/cli/output.py (w3: downgrade red `Missing tables` at line 172)"
+    - "benchbox/core/tpch/power_test.py (w7: reword stream_id warning at lines 172-176)"
+    - "docs/contributing-results.md (w1: invocation consistency)"
+    - "docs/usage/ (w1: invocation consistency)"
+    - "docs/platforms/dataframe.md (w5: rename 'Platform Availability' at line 358)"
+    - "README.md (w1: invocation consistency)"
+    - "tests/unit/cli/ (regression tests for w2, w3, w4, w6)"
+  do_not_touch:
+    - "benchbox/platforms/base/result_capture.py (w3 audit confirmed already amber)"
+
+metadata:
+  tags:
+    - cli
+    - docs
+    - contributor-experience
+    - dry-run-followup
+  estimated_effort: "Medium"
+  created_date: "2026-04-29"
+
+impact:
+  user_impact: |
+    Polish layer that reduces "is this working?" anxiety for first-time
+    contributors. None of these are blocking by themselves, but
+    cumulatively they make the difference between a smooth and a
+    frustrating first submission. Consolidated from 7 individual
+    candidate TODOs to keep the planning surface manageable.
+  technical_debt: |
+    Low. Each work unit is a small, focused fix in a stable area of
+    the CLI / docs. No architectural implications.

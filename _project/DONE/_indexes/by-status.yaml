@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T20:19:01.648983'
-total_items: 789
+generated_at: '2026-04-29T07:35:38.543037'
+total_items: 790
 statuses:
   In Progress:
     count: 2
@@ -271,7 +271,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 737
+    count: 738
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -2394,6 +2394,11 @@ statuses:
       title: Make QuestDB parquet chunk row count tunable via platform config
       priority: Low
       category: Platform Support
+    - id: dry-run-followup-package-canonical-contributing
+      file: DONE/main/planning/dry-run-followup-package-canonical-contributing.yaml
+      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
+      priority: High
+      category: Core Functionality
     - id: provable-cli-command-generation
       file: DONE/core-functionality/planning/provable-cli-command-generation.yaml
       title: Make generate_cli_command provably complete - all behavior-affecting CLI params round-trip
