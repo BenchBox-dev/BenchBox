@@ -527,18 +527,36 @@ class TestModernSQLFeatures:
         assert "SELECT DISTINCT" in percentile_sql
         assert "OVER (PARTITION BY" in percentile_sql
 
-    def test_redshift_uses_scalar_fallback_for_array_contains(self):
-        """Test Redshift keeps array_contains coverage via scalar membership logic."""
+    def test_redshift_skips_non_comparable_array_scalar_fallbacks(self):
+        """Redshift should skip array queries when only scalar rewrites are available."""
         benchmark = ReadPrimitivesBenchmark()
         queries_redshift = benchmark.get_queries(dialect="redshift")
 
-        array_contains_sql = queries_redshift.get("array_contains", "")
+        redshift_skipped = [
+            "array_contains",
+            "array_length",
+            "array_min_max",
+        ]
+        for qid in redshift_skipped:
+            assert qid not in queries_redshift, f"Redshift should skip: {qid}"
 
-        assert array_contains_sql
-        assert "CASE WHEN" in array_contains_sql.upper()
-        assert "MAX(" in array_contains_sql.upper()
-        assert "ARRAY_CONTAINS" not in array_contains_sql.upper()
-        assert "ARRAY_AGG" not in array_contains_sql.upper()
+    def test_datafusion_skips_non_comparable_semistructured_fallbacks(self):
+        """DataFusion should skip variants that do not exercise nested/list semantics."""
+        benchmark = ReadPrimitivesBenchmark()
+        queries_datafusion = benchmark.get_queries(dialect="datafusion")
+
+        datafusion_skipped = [
+            "array_contains",
+            "array_length",
+            "array_min_max",
+            "array_distinct",
+            "list_transform",
+            "list_filter",
+            "list_reduce",
+            "asof_join_basic",
+        ]
+        for qid in datafusion_skipped:
+            assert qid not in queries_datafusion, f"DataFusion should skip: {qid}"
 
     def test_duckdb_uses_row_for_struct(self):
         """Test that DuckDB dialect uses ROW() for struct construction."""

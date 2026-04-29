@@ -149,12 +149,6 @@ def test_linter_detects_contract_column_mismatch_and_missing_capability():
     ]
 
 
-def test_actual_catalog_static_linter_reports_no_column_drift_after_scalar_skips():
-    """Catalog variants should not project different top-level columns after W3 scalar fixes."""
-    issues = collect_variant_contract_issues(load_primitives_catalog(), require_contracts=False)
-
-    column_drift = {(issue.query_id, issue.dialect) for issue in issues if issue.kind == "column_mismatch"}
-    parse_drift = {(issue.query_id, issue.dialect) for issue in issues if issue.kind == "variant_parse_error"}
-
-    assert column_drift == set()
-    assert parse_drift == {("asof_join_basic", "datafusion")}
+def test_actual_catalog_static_linter_reports_no_variant_contract_issues():
+    """Every active catalog variant must declare and satisfy a comparability contract."""
+    assert collect_variant_contract_issues(load_primitives_catalog(), require_contracts=True) == []

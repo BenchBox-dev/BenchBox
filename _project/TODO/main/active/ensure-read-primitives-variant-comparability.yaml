@@ -31,7 +31,7 @@ work:
 - id: w4
   summary: "Fix or skip semi-structured variants with nested-shape risk: JSON, arrays, structs, maps, and lambda/list operations"
   needs: [w2]
-  status: pending
+  status: done
 - id: w5
   summary: "Add focused runtime parity tests for risky read_primitives families against DuckDB reference at SF=0.01"
   needs: [w3, w4]
