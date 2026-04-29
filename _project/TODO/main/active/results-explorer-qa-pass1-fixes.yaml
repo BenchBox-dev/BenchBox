@@ -51,8 +51,7 @@ work:
           the same data shape for every platform; if it failed for
           "polars" it would also fail for "sqlite". → rules out the
           equality-mismatch class.
-        - Three serial invocations of the manual repro (see
-          docs/development/known-flakes/b2-cold-load.md) produced
+        - Three serial invocations of the original manual repro produced
           P/F, F/F, P/P with the warm run finishing in 1-3s — strong
           intermittency signal correlated with WASM warmth.
 
@@ -74,17 +73,9 @@ work:
       None of the three has direct evidence yet. Picking a fix without
       instrumentation risks fixing the wrong layer.
 
-      One-liner reproduction (full procedure in
-      docs/development/known-flakes/b2-cold-load.md):
-
-          cd results-explorer && npm run test:e2e:fixtures && npm run build \
-          && cp ../results-explorer/public/data/results.duckdb \
-                test-fixtures/.generated/data/results.duckdb \
-          && for i in 1 2 3 4 5; do echo "=== run $i ==="; \
-                npx playwright test --project=chromium --workers=1 \
-                  --grep "PlatformIndex" 2>&1 | tail -3; done
-
-      Expected: ~50% failure rate against fresh chromium contexts.
+      The manual overlay repro was replaced in w3 by the route-backed
+      regression guard at
+      `results-explorer/e2e/failures/platform-index-cold-load.spec.ts`.
 
   - id: w2
     summary: "Resolve Q1 — confirm whether ResultDetail/Compare primary-metric toggle should exist"
@@ -168,10 +159,27 @@ work:
         logs and populated in the passing-run logs.
 
       Step 2 — pick the mitigation that matches:
-        - Cold-load partial: switch PlatformIndex to the parameterized
-          `getPlatformIndexRows(platform)` form and treat an empty
-          response as "loading" if the page just mounted. Optionally
-          add a sentinel-handshake SELECT in db.ts.
+        - Cold-load partial: add a sentinel-handshake SELECT in db.ts
+          that scans projected row columns from `platform_index_rows`.
+          Do NOT use `COUNT(*)` as the readiness fence: post-review
+          investigation showed DuckDB can satisfy
+          `COUNT(*) FROM platform_index_rows` as a `COLUMN_DATA_SCAN`
+          over catalog/storage metadata, while the real PlatformIndex
+          query performs a sequential scan over `results`.
+        - Use a bounded retry around the row-scan fence. If a genuinely
+          empty future corpus is attached, the UI should still be able to
+          render its empty state after the retry window rather than
+          treating "zero rows" as a hard attach error.
+        - After applying a mitigation, run the strict cold-load
+          regression 10 times serially:
+            `cd results-explorer && npm run build && for i in 1 2 3 4 5 6 7 8 9 10; do npx playwright test --project=chromium --workers=1 --grep "cold-load regression" --reporter=list; done`
+          Any failure means STOP and report. Do not try a second
+          mitigation in the same pass; otherwise the evidence chain gets
+          muddied.
+        - Replace the temporary/manual repro with a route-interception
+          Playwright spec that serves the production-shape DB from
+          `public/data/results.duckdb` without mutating
+          `test-fixtures/.generated/`.
         - Preact cleanup race: replace the `cancelled` flag pattern
           with `AbortController`, or restructure the effect so the
           cleanup pre-empts the in-flight query.
@@ -183,11 +191,11 @@ work:
       guard. Use Playwright route interception to mock
       `/results/data/results.duckdb` with a production-shape DB so
       the spec runs through the standard harness without manual
-      seeding. Place the spec in e2e/failures/.
+      seeding. Place the spec in
+      `results-explorer/e2e/failures/platform-index-cold-load.spec.ts`.
 
-      Step 4 — remove the debug `console.log` calls AND
-      docs/development/known-flakes/b2-cold-load.md before the work
-      unit closes.
+      Step 4 — remove the debug `console.log` calls and the temporary
+      manual known-flake doc before the work unit closes.
 
   - id: w4
     summary: "Fix B1 — add sort handlers to PlatformIndex table headers"
@@ -371,11 +379,12 @@ work:
 
       Post-review (W7 review): seven findings applied.
 
-      R1 — replaced the §3 cold-load TODO-YAML reference with a link
-      to docs/development/known-flakes/b2-cold-load.md. Added an
-      "Operator: when the tester reports BUG/SLOW" appendix at the
-      bottom with the operator-targeted pointers; the tester section
-      is now free of operator metadata.
+      R1 — replaced the §3 cold-load TODO-YAML reference with a
+      tester-facing cold-load warning. Added an "Operator: when the
+      tester reports BUG/SLOW" appendix at the bottom with the
+      operator-targeted pointers; the tester section is now free of
+      operator metadata. After w3, the warning was tightened to mark
+      any recurrence as BUG and point operators at the regression spec.
 
       R2 — tightened under-specified steps:
         - §4.5: added the DevTools → Network status-200 verification.
@@ -392,15 +401,15 @@ work:
       N1 — expanded the report template to enumerate every sub-item
       across §1.1-§7.5 so reports come back uniformly structured.
 
-      N2 — converted tester-relevant file paths to markdown links
-      (the b2-cold-load.md link in §3 and the appendix links).
+      N2 — converted tester-relevant file paths to markdown links in
+      the QA appendix.
 
       N3 — added a top-of-file metadata block (Created / Owner /
       Last revised) so future drift has a maintenance trail.
 
       N4 — added a "See also" section to results-explorer/e2e/README.md
-      pointing at the QA doc and the known-flakes directory; reduces
-      orphan-doc rot risk.
+      pointing at the QA doc. The known-flake pointer was removed after
+      w3 replaced the manual repro with an automated regression.
 
       Verification: doc revised; no code changes; markdownlint clean
       via the pre-commit gate.
@@ -411,10 +420,9 @@ work:
     status: pending
     notes: |
       BLOCKED on w3 — cannot run the full retest until B2 cold-load
-      mitigation lands. The QA test plan's §3 explicitly warns the tester
-      about the empty-rows symptom and points them at the known-flakes
-      doc — running a tester against the current build would still mark
-      §3 as BUG/SLOW intermittently.
+      mitigation lands. Once w3 verification passes, run the full
+      docs/operations/results-explorer-qa.md plan against the dev server
+      and attach the filled report template here.
 
       Partial verification done in lieu of a full retest:
         - npm run typecheck: clean (0 errors).
@@ -473,14 +481,17 @@ deferred:
 
 files_affected:
   modified:
+    - "results-explorer/src/db.ts"
     - "results-explorer/src/pages/PlatformIndex.tsx"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/components/TimeSeries.tsx"
     - "results-explorer/src/lib/duckdbQueries.ts"
+    - "docs/operations/results-explorer-qa.md"
+    - "results-explorer/e2e/README.md"
   added:
     - "results-explorer/e2e/unknown-benchmark.spec.ts"
+    - "results-explorer/e2e/failures/platform-index-cold-load.spec.ts"
     - "docs/operations/results-explorer-qa.md"
-    - "docs/development/known-flakes/b2-cold-load.md"
 
 must_preserve:
   - "Existing PlatformIndex default sort (geomean_ms ascending, nulls last) remains the initial state"
@@ -540,17 +551,16 @@ verification:
 
 scope_limit:
   only_modify:
+    - "results-explorer/src/db.ts"
     - "results-explorer/src/pages/PlatformIndex.tsx"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/components/TimeSeries.tsx"
     - "results-explorer/src/lib/duckdbQueries.ts"
     - "results-explorer/e2e/"
     - "docs/operations/results-explorer-qa.md"
-    - "docs/development/known-flakes/"
   do_not_modify:
     - "benchbox/core/explorer_pipeline/"
     - "benchbox/cli/commands/explorer.py"
-    - "results-explorer/src/db.ts"
 
 metadata:
   tags:

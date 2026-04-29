@@ -103,10 +103,9 @@ For each of `tpch` and `star_schema`:
    — arrows update, ordering is correct.
 3. Tick 2 rows → **Compare** button enables and navigates correctly.
 
-If you see "No results found for platform: duckdb." on the DuckDB or
-Polars pages, that's a known cold-load race (see
-[known-flakes/b2-cold-load.md](../development/known-flakes/b2-cold-load.md)).
-Wait 30-60s and reload; if still empty, mark as BUG.
+If DuckDB or Polars shows "No results found" or a lowercase slug
+heading, mark as BUG. The cold-load race that previously caused this
+has a route-backed regression test in the browser-functional suite.
 
 ## 4. Result detail (`/results/r/<short_id>`)
 
@@ -279,10 +278,10 @@ These pointers help you triage findings — they're not part of the
 test plan and the tester does not need to read them.
 
 - §3 platform pages showing "No results found" with lowercase heading:
-  see [docs/development/known-flakes/b2-cold-load.md](../development/known-flakes/b2-cold-load.md)
-  for reproduction and the open mitigation work
-  ([_project/TODO/main/active/results-explorer-qa-pass1-fixes.yaml](../../_project/TODO/main/active/results-explorer-qa-pass1-fixes.yaml),
-  work unit `w3`).
+  rerun `results-explorer/e2e/failures/platform-index-cold-load.spec.ts`
+  and inspect
+  [_project/TODO/main/active/results-explorer-qa-pass1-fixes.yaml](../../_project/TODO/main/active/results-explorer-qa-pass1-fixes.yaml)
+  work unit `w3` for the cold-load mitigation history.
 - Generally: per-section findings map to bug fixes or follow-up TODOs
   by §-number. Open a new TODO via `/todo create` and reference the
   failing section so the next QA round can verify closure.
