@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T20:39:20.703890'
-total_items: 35
+generated_at: '2026-04-28T22:48:59.583240'
+total_items: 36
 statuses:
   In Progress:
     count: 3
@@ -20,7 +20,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 30
+    count: 31
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -62,11 +62,6 @@ statuses:
       title: Automate the Phase 3 promotion-metrics quarterly cadence
       priority: Medium
       category: Tooling
-    - id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
-      file: TODO/main/planning/dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml
-      title: CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run
-      priority: Medium
-      category: Core Functionality
     - id: release-flow-dry-run-rc1
       file: TODO/main/active/release-flow-dry-run-rc1.yaml
       title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
@@ -97,16 +92,6 @@ statuses:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       priority: Medium-High
       category: Testing and Quality Assurance
-    - id: dry-run-followup-package-canonical-contributing
-      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
-      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
-      priority: High
-      category: Core Functionality
-    - id: results-explorer-qa-pass1-fixes
-      file: TODO/main/planning/results-explorer-qa-pass1-fixes.yaml
-      title: Investigate and remediate Results Explorer QA pass-1 findings
-      priority: High
-      category: Core Functionality
     - id: dry-run-followup-uv-fallback-and-schema-key
       file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
       title: 'Local-validation block: document non-uv fallback and schema-version key name'
@@ -163,16 +148,16 @@ statuses:
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: dry-run-followup-validator-hash-contract-mismatch
-      file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
-      title: Sync published-results validator with develop's per-file hash contract (release-blocker)
-      priority: Critical
-      category: Core Functionality
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
       priority: Low
       category: Platform Expansion
+    - id: track-upstream-platform-workarounds
+      file: TODO/main/planning/track-upstream-platform-workarounds.yaml
+      title: Track ClickHouse-local platform workarounds upstream so they can be removed
+      priority: Medium
+      category: Technical Debt
     - id: upgrade-pandas-to-3x
       file: TODO/main/planning/upgrade-pandas-to-3x.yaml
       title: Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear
