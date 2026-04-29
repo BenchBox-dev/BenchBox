@@ -1,0 +1,129 @@
+id: dry-run-followup-package-canonical-contributing
+title: "Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-04-28"
+category: Core Functionality
+
+description: |
+  `benchbox submit` writes a 16-line CONTRIBUTING.md into every submission
+  bundle (hardcoded as `_CONTRIBUTING_TEXT` at
+  `benchbox/cli/commands/submit.py:29-46`), and the CLI's "Next step"
+  message tells contributors to follow it. That file does NOT include
+  three steps the canonical `docs/contributing-results.md` requires:
+
+    1. Regenerate `corpus-inventory.json` before commit.
+    2. Target the `published-results` branch (not `main`).
+    3. Optionally validate the bundle locally with
+       `scripts/validate_submission.py`.
+
+  A contributor who reads only the in-bundle file will open a PR against
+  `main` with a stale inventory. CI catches it, but that's wasted
+  maintainer cycles and a worse first-time UX. Surfaced by the
+  agent-proxy dry-run on 2026-04-28
+  (see `_project/handoffs/external-dry-run-retrospective-2026-04-28.md`).
+
+  Fix options (pick one):
+    A. Generate the in-bundle file from `docs/contributing-results.md`
+       at package-build time so the two cannot drift.
+    B. Replace the in-bundle file with a one-page checklist that points
+       to the canonical doc URL and lists the three required commands
+       inline.
+
+work:
+- id: w1
+  summary: "Pick option A (regenerate from canonical doc at build time) or option B (static checklist + canonical URL)"
+  status: done
+  notes: |
+    A vs B is a real architectural call:
+      - A: harder-to-drift but introduces a build-time read of
+        `docs/contributing-results.md` from `submit.py`. Requires
+        packaging the doc into the wheel or reading it relative to
+        the repo root.
+      - B: simpler; ships a checklist that names the four required
+        steps and points contributors to docs.benchbox.dev for the
+        full doc. Requires updating the checklist whenever the
+        canonical doc changes -- but the checklist is small and
+        stable.
+    Default recommendation: option B unless wheel-packaging the doc
+    is already cheap. Document the choice + rationale in a one-line
+    comment above `_CONTRIBUTING_TEXT` so future maintainers don't
+    re-litigate it.
+
+- id: w2
+  summary: "Implement the chosen option in benchbox/cli/commands/submit.py"
+  needs: [w1]
+  status: done
+  notes: |
+    Touch `benchbox/cli/commands/submit.py` (`_CONTRIBUTING_TEXT`).
+    The new file content MUST include all four:
+      - `published-results` as the PR base branch (not `main`)
+      - `generate_corpus_inventory.py --write` before commit
+      - `validate_submission.py` for local pre-push check
+      - canonical doc URL (https://docs.benchbox.dev/contributing-results
+        or wherever the canonical doc lives at land time)
+    Coordinate with `dry-run-followup-submitted-by-flag` and
+    `dry-run-followup-manifest-filename-convention` since both
+    will edit the same template after this lands.
+
+- id: w3
+  summary: "Add a regression test asserting the in-bundle file mentions all four required items"
+  needs: [w2]
+  status: done
+  notes: |
+    Add to `tests/unit/cli/commands/test_submit.py`: run
+    `benchbox submit --last --output <tmp>` against a fixture result,
+    read the resulting CONTRIBUTING.md, assert presence of
+    `published-results`, `generate_corpus_inventory`,
+    `validate_submission`, and the canonical doc URL. The test
+    pins the contract independent of which option (A or B) was
+    chosen.
+
+verification:
+- description: "Packaged CONTRIBUTING.md mentions all four required items"
+  command: "uv run -- benchbox submit --last --output /tmp/dry-run-canonical && grep -cE 'published-results|generate_corpus_inventory|validate_submission|docs\\\
+    .benchbox\\.dev' /tmp/dry-run-canonical/CONTRIBUTING.md"
+  expected_output: ">= 4"
+- description: "Submit unit tests still pass"
+  command: "uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q"
+  expected_output: "All tests pass"
+
+must_preserve:
+- "`benchbox submit --output` continues to package a self-contained bundle directory"
+- "The CLI's existing 'Next step' message still points contributors at the in-bundle file"
+
+anti_patterns:
+- "DO NOT silently keep the in-bundle template diverged from the canonical doc -- because that is the exact failure mode this
+  TODO exists to fix -- regenerate at build time or include a clear pointer"
+- "DO NOT remove the in-bundle file entirely -- because contributors offline / on planes still need a packaged copy of the
+  steps -- ship a checklist + canonical URL instead"
+
+scope_limit:
+  only_modify:
+  - "benchbox/cli/commands/submit.py"
+  - "tests/unit/cli/commands/test_submit.py"
+  - "docs/contributing-results.md"
+
+metadata:
+  tags:
+  - results
+  - submit
+  - cli
+  - contributor-experience
+  - dry-run-followup
+  estimated_effort: "Small"
+  created_date: "2026-04-28"
+
+impact:
+  business_value: |
+    Removes the silent footgun where contributors follow stale in-bundle
+    instructions and open wrong-target PRs with stale inventory. Saves
+    maintainer review cycles and improves first-time contributor UX.
+  user_impact: |
+    Community contributors get one consistent set of instructions
+    regardless of which file they read first.
+  technical_debt: |
+    Eliminates a duplicate-truth surface: today the in-bundle CONTRIBUTING.md
+    and `docs/contributing-results.md` can drift independently; only one
+    is exercised by CI.

@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T20:35:37.974214'
-total_items: 35
+generated_at: '2026-04-29T07:40:18.728615'
+total_items: 36
 statuses:
   In Progress:
     count: 3
@@ -20,7 +20,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 30
+    count: 31
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -62,6 +62,11 @@ statuses:
       title: Automate the Phase 3 promotion-metrics quarterly cadence
       priority: Medium
       category: Tooling
+    - id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
+      file: TODO/main/planning/dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml
+      title: CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run
+      priority: Medium
+      category: Core Functionality
     - id: release-flow-dry-run-rc1
       file: TODO/main/active/release-flow-dry-run-rc1.yaml
       title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
@@ -97,11 +102,6 @@ statuses:
       title: 'Local-validation block: document non-uv fallback and schema-version key name'
       priority: Low
       category: Documentation
-    - id: dry-run-followup-package-canonical-contributing
-      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
-      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
-      priority: High
-      category: Core Functionality
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
@@ -148,6 +148,11 @@ statuses:
       title: Stack Overflow Dataset Benchmark - Q&A Analytics Workload
       priority: Low
       category: Benchmark Development
+    - id: dry-run-followup-validator-hash-contract-mismatch
+      file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
+      title: Sync published-results validator with develop's per-file hash contract (release-blocker)
+      priority: Critical
+      category: Core Functionality
     - id: tigerdata-cloud-enhancements
       file: TODO/platform-expansion/planning/tigerdata-cloud-enhancements.yaml
       title: TigerData Cloud Enhancements
@@ -171,7 +176,7 @@ statuses:
     - id: dry-run-followup-submitted-by-flag
       file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
       title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
-      priority: Medium
+      priority: Medium-High
       category: Core Functionality
   Identified:
     count: 2

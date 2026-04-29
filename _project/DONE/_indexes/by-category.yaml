@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T20:35:39.970056'
+generated_at: '2026-04-29T07:40:21.828892'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -701,7 +701,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 270
+    count: 271
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1653,6 +1653,11 @@ categories:
     - id: explorer-canonical-browser-duckdb-read-model
       file: DONE/main/planning/explorer-canonical-browser-duckdb-read-model.yaml
       title: Make DuckDB-WASM the sole browser store for all user-visible explorer metrics
+      priority: High
+      status: Completed
+    - id: dry-run-followup-package-canonical-contributing
+      file: DONE/main/planning/dry-run-followup-package-canonical-contributing.yaml
+      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
       priority: High
       status: Completed
     - id: provable-cli-command-generation

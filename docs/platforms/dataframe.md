@@ -355,7 +355,7 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
 - Quick iteration
 - Compatibility with existing codebases
 
-## Checking Platform Availability
+## Available Databases
 
 ```bash
 # Check which DataFrame platforms are installed

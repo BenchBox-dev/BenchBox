@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T20:35:37.974179'
+generated_at: '2026-04-29T07:40:18.728557'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -46,27 +46,32 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 4
+    count: 5
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
       title: Add a third benchmark cohort (TPC-DS or ClickBench) to the public corpus
       priority: Medium-High
       status: Not Started
+    - id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
+      file: TODO/main/planning/dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml
+      title: CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run
+      priority: Medium
+      status: Not Started
     - id: integrate-benchbox-cli-submit-and-service-auth
       file: TODO/main/planning/integrate-benchbox-cli-submit-and-service-auth.yaml
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: Medium-High
       status: In Progress
-    - id: dry-run-followup-package-canonical-contributing
-      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
-      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
-      priority: High
+    - id: dry-run-followup-validator-hash-contract-mismatch
+      file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
+      title: Sync published-results validator with develop's per-file hash contract (release-blocker)
+      priority: Critical
       status: Not Started
     - id: dry-run-followup-submitted-by-flag
       file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
       title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
-      priority: Medium
+      priority: Medium-High
       status: Not Started
   Documentation:
     count: 3

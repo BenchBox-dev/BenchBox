@@ -34,6 +34,28 @@ description: |
   trust-label apply, or explorer redeploy. The agent run reduces the
   friction the eventual human contributor will hit.
 
+  Update 2026-04-29: a SECOND agent-proxy dry-run was performed via
+  Codex against PyPI `benchbox 0.2.1` on a clone of `published-results`.
+  Each surface friction item the 2026-04-28 PR cluster (PRs #43-#46)
+  pre-fixed was either not hit by Codex or hit-and-resolved-cleanly,
+  validating the doc-hardening pre-pass. Critically, Codex reached one
+  layer deeper than Cowork could and surfaced a release-blocker: the
+  `published-results` validator's hash algorithm (per-directory) does
+  not match `develop`'s writer (per-file), so any submission produced
+  by current `benchbox submit` will fail CI on the documented PR target
+  branch. Filed as
+  `dry-run-followup-validator-hash-contract-mismatch.yaml` (Critical).
+  Plus 7 polish items consolidated as
+  `dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml` (Medium).
+  See `_project/handoffs/external-dry-run-retrospective-2026-04-29.md`
+  for the retrospective + maintainer forensic.
+
+  This TODO still does NOT close. The human dry-run remains required:
+  (a) the Critical hash-contract fix must land + ship before recruiting
+  a human, (b) only a human can validate the post-CI maintainer review
+  and explorer redeploy (Step 5), and (c) public promotion timing
+  depends on a frictionless human run.
+
 work:
 - id: w1
   summary: "Identify and recruit one external contributor"

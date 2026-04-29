@@ -1,18 +1,21 @@
-generated_at: '2026-04-28T20:35:37.974203'
-total_items: 35
+generated_at: '2026-04-29T07:40:18.728590'
+total_items: 36
 priorities:
+  Critical:
+    count: 1
+    items:
+    - id: dry-run-followup-validator-hash-contract-mismatch
+      file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
+      title: Sync published-results validator with develop's per-file hash contract (release-blocker)
+      category: Core Functionality
+      status: Not Started
   High:
-    count: 5
+    count: 4
     items:
     - id: release-flow-dry-run-rc1
       file: TODO/main/active/release-flow-dry-run-rc1.yaml
       title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
       category: Release Tooling
-      status: Not Started
-    - id: dry-run-followup-package-canonical-contributing
-      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
-      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
-      category: Core Functionality
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
@@ -30,7 +33,7 @@ priorities:
       category: Release Tooling
       status: In Progress
   Medium-High:
-    count: 4
+    count: 5
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -52,6 +55,11 @@ priorities:
       title: Integrate BenchBox CLI submission flow and service authentication
       category: Core Functionality
       status: In Progress
+    - id: dry-run-followup-submitted-by-flag
+      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
+      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
+      category: Core Functionality
+      status: Not Started
   Medium:
     count: 8
     items:
@@ -69,6 +77,11 @@ priorities:
       file: TODO/main/planning/automate-phase2-metrics-quarterly-cadence.yaml
       title: Automate the Phase 3 promotion-metrics quarterly cadence
       category: Tooling
+      status: Not Started
+    - id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
+      file: TODO/main/planning/dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml
+      title: CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run
+      category: Core Functionality
       status: Not Started
     - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
       file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
@@ -89,11 +102,6 @@ priorities:
       file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
       title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
       category: Testing and Quality Assurance
-      status: Not Started
-    - id: dry-run-followup-submitted-by-flag
-      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
-      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
-      category: Core Functionality
       status: Not Started
   Low:
     count: 17

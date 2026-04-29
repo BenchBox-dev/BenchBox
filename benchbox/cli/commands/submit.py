@@ -26,23 +26,46 @@ _SUBMISSION_PHASE = 2
 _DEFAULT_SERVICE_URL = "https://api.benchbox.dev/v1"
 _VISIBILITY_CHOICES = ("public", "unlisted", "private")
 
+# Static checklist (Option B from
+# dry-run-followup-package-canonical-contributing): the four required steps
+# are inlined so an offline contributor can complete a submission, and the
+# canonical URL is included for the full guide. Drift risk is real but
+# bounded; the pinned regression test in tests/unit/cli/commands/test_submit.py
+# asserts the four required tokens stay present.
 _CONTRIBUTING_TEXT = """\
 # Contributing a Benchmark Result
 
 Thank you for contributing to the BenchBox community results dataset!
 
-## How to open the PR
+This is a packaged checklist. The full guide lives at:
+https://docs.benchbox.dev/contributing-results
 
-1. Fork https://github.com/joeharris76/BenchBox (or use your existing fork)
-2. Copy the contents of `bundle/` into `results-data/bundles/` in your fork
-3. Copy `submission-manifest.json` alongside the bundle files
-4. Open a pull request with the title:
+## Quick checklist
+
+1. Fork https://github.com/joeharris76/BenchBox (or use your existing fork).
+2. Copy the contents of `bundle/` into `results-data/bundles/` in your fork.
+3. Copy `submission-manifest.json` alongside the bundle files.
+4. Regenerate the corpus inventory before you commit:
+
+       uv run -- python scripts/generate_corpus_inventory.py --write
+
+5. (Optional) Validate the bundle locally before pushing:
+
+       uv run -- python scripts/validate_submission.py path/to/bundle.json
+
+6. Open a pull request against the **`published-results`** branch (NOT
+   `main`) with the title:
    `results: <benchmark> <platform> sf<scale>`
-5. The CI will validate the bundle hash against the manifest automatically
+7. CI (Validate Submission) verifies the bundle hash against the manifest
+   and posts a summary comment on your PR.
 
 ## Questions?
 
-Open an issue at https://github.com/joeharris76/BenchBox or start a discussion.
+Open an issue or start a discussion at
+https://github.com/joeharris76/BenchBox.
+
+For the full guide (trust labels, quality expectations, troubleshooting),
+see https://docs.benchbox.dev/contributing-results.
 """
 
 
@@ -130,6 +153,58 @@ def _dispatch_service_mode(
         "  _project/analysis/phase-3-promotion-metrics.md."
     )
     ctx.exit(1)
+
+
+def _print_submission_summary(
+    *,
+    bundle_dir: Path,
+    source_path: Path,
+    companions: list[Path],
+    manifest_path: Path,
+    contributing_path: Path,
+    output_path: Path,
+    result,
+    dry_run: bool,
+) -> None:
+    """Print the file list + next-step commands for the contributor.
+
+    Same shape for dry-run and real-run so contributors see exactly
+    what the real run will print before they commit. Dry-run swaps
+    only the header and the trailing footer; the file list and
+    next-steps block are identical (the commands reference the paths
+    the real run would create — useful as a preview).
+    """
+    if dry_run:
+        console.print("\n[bold]Dry-run preview — would create:[/bold]")
+    else:
+        console.print("\n[bold green]✓ Submission package created![/bold green]")
+
+    bundle_filename = source_path.name
+    bundle_target = f"results-data/bundles/{bundle_filename}"
+
+    console.print(f"  {bundle_dir / bundle_filename}")
+    for comp in companions:
+        console.print(f"  {bundle_dir / comp.name}")
+    console.print(f"  {manifest_path}")
+    console.print(f"  {contributing_path}")
+
+    if not dry_run:
+        console.print(f"\n[dim]Output: {output_path.absolute()}[/dim]")
+
+    pr_title = f"results: {result.benchmark_name} {result.platform} sf{result.scale_factor}"
+    console.print("\n[bold]Next steps:[/bold]")
+    console.print(f"  1. cp [cyan]{bundle_dir / bundle_filename}[/cyan] [cyan]{bundle_target}[/cyan]")
+    for comp in companions:
+        console.print(f"     cp [cyan]{bundle_dir / comp.name}[/cyan] [cyan]results-data/bundles/{comp.name}[/cyan]")
+    console.print(f"     cp [cyan]{manifest_path}[/cyan] [cyan]results-data/bundles/{manifest_path.name}[/cyan]")
+    console.print("  2. uv run -- python scripts/generate_corpus_inventory.py --write")
+    console.print(f"  3. uv run -- python scripts/validate_submission.py {bundle_target}")
+    console.print(f"  4. PR title:  [cyan]{pr_title}[/cyan]")
+    console.print("     PR target: [cyan]published-results[/cyan]")
+    console.print("[dim]Full guide: https://docs.benchbox.dev/contributing-results[/dim]")
+
+    if dry_run:
+        console.print("\n[yellow](dry run; no files written)[/yellow]")
 
 
 @click.command("submit")
@@ -344,13 +419,16 @@ def submit(
     contributing_path = output_path / "CONTRIBUTING.md"
 
     if dry_run:
-        console.print("\n[bold]Dry-run - would create:[/bold]")
-        console.print(f"  {bundle_dir / source_path.name}")
-        for comp in companions:
-            console.print(f"  {bundle_dir / comp.name}")
-        console.print(f"  {manifest_path}")
-        console.print(f"  {contributing_path}")
-        console.print("[yellow]Dry-run complete - no files written[/yellow]")
+        _print_submission_summary(
+            bundle_dir=bundle_dir,
+            source_path=source_path,
+            companions=companions,
+            manifest_path=manifest_path,
+            contributing_path=contributing_path,
+            output_path=output_path,
+            result=result,
+            dry_run=True,
+        )
         return
 
     bundle_dir.mkdir(parents=True, exist_ok=True)
@@ -385,15 +463,16 @@ def submit(
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     contributing_path.write_text(_CONTRIBUTING_TEXT, encoding="utf-8")
 
-    console.print("\n[bold green]✓ Submission package created![/bold green]")
-    console.print(f"  {bundle_dir / source_path.name}")
-    for comp in companions:
-        console.print(f"  {bundle_dir / comp.name}")
-    console.print(f"  {manifest_path.name}")
-    console.print(f"  {contributing_path.name}")
-    console.print(f"\n[dim]Output: {output_path.absolute()}[/dim]")
-    console.print("\n[bold]Next step:[/bold] Open a PR against results-data/ using the files above.")
-    console.print("[dim]See CONTRIBUTING.md in the output directory for instructions.[/dim]")
+    _print_submission_summary(
+        bundle_dir=bundle_dir,
+        source_path=source_path,
+        companions=companions,
+        manifest_path=manifest_path,
+        contributing_path=contributing_path,
+        output_path=output_path,
+        result=result,
+        dry_run=False,
+    )
 
 
 __all__ = ["submit"]
