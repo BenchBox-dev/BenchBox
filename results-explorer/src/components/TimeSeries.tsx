@@ -54,9 +54,20 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   const metric = primaryMetric ?? "display_geomean_ms";
   const higherIsBetter = metric === "power_score";
 
+  // Defensive dedup on result_id: TimeSeries trusts the caller, but if any
+  // upstream JOIN regression ever produces duplicate entries the chart
+  // would silently render stacked points. Drop the second copy.
+  const seenIds = new Set<string>();
+  const dedupedEntries: ChartHistoricalEntry[] = [];
+  for (const e of entries) {
+    if (seenIds.has(e.result_id)) continue;
+    seenIds.add(e.result_id);
+    dedupedEntries.push(e);
+  }
+
   // Group by platform_id, sort by run_date within each group
   const byPlatform = new Map<string, ChartHistoricalEntry[]>();
-  for (const e of entries) {
+  for (const e of dedupedEntries) {
     const arr = byPlatform.get(e.platform_id) ?? [];
     arr.push(e);
     byPlatform.set(e.platform_id, arr);
@@ -173,7 +184,14 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
             <g key={s.platformId}>
               <path d={d} stroke={s.color} strokeWidth={2} fill="none" strokeLinejoin="round" />
               {s.points.map((p) => (
-                <circle key={p.resultId} cx={xFor(p.date)} cy={yFor(p.value)} r={3} fill={s.color}>
+                <circle
+                  key={p.resultId}
+                  data-result-id={p.resultId}
+                  cx={xFor(p.date)}
+                  cy={yFor(p.value)}
+                  r={3}
+                  fill={s.color}
+                >
                   <title>{`${s.label}: ${p.date} = ${p.value.toFixed(1)}`}</title>
                 </circle>
               ))}

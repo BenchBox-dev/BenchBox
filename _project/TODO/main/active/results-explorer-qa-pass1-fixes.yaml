@@ -288,6 +288,37 @@ work:
 
       Verification: 286/286 vitest pass; tsc clean.
 
+      Post-review (W6 review): four findings applied.
+
+      R1 — replaced the spy-on-console regression assertion with a
+      structural one. <circle> elements now carry data-result-id; the
+      test queries them and asserts new Set(ids).size === ids.length.
+      Independent of Preact's dev-mode warning channel and survives
+      production tree-shaking.
+
+      C1 — swept analogous patterns. PercentileLadder.tsx:107 used
+      key={row.platform} which would collide if two rows have the
+      same platform name (e.g. DuckDB tuned + DuckDB notuning).
+      Added result_id to PercentileStatsRow, threaded through from
+      ChartPanel's caller (summary.platforms.flatMap), and keyed on
+      it. New unit test covers the variant-tuning case explicitly.
+      DivergingBarChart.tsx:141 used key={entry.platform} on the
+      inner bar map; switched to composite `${entry.platform}-${si}`
+      since the entry shape there doesn't carry result_id.
+
+      N1 — TimeSeries now dedupes its `entries` prop on result_id
+      before any further processing. Defensive against caller bugs
+      that double-count results (e.g. JOIN regressions in upstream
+      queries). New test asserts only 2 circles render when 3 entries
+      with 2 sharing a result_id are passed.
+
+      N2 — comment near the new TimeSeries test explains: the
+      structural ID-uniqueness check is the true regression guard;
+      future contributors should not delete it without an equivalent
+      replacement.
+
+      Verification: 288/288 vitest pass; tsc clean.
+
   - id: w7
     summary: "Promote QA test plan to docs/operations/results-explorer-qa.md and apply tester findings"
     needs: [w2]

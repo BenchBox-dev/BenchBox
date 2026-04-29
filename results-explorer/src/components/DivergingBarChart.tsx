@@ -138,7 +138,12 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
                 const isRegression = entry.deltaPct > 0;
                 const barX = isRegression ? centerX : centerX - barW;
                 return (
-                  <g key={entry.platform}>
+                  // Composite key: a single platform name can appear twice
+                  // in `entries` if the caller passes variant rows (same
+                  // platform, different tuning_mode). The loop index `si`
+                  // disambiguates within the queryId group; the outer <g>
+                  // key={queryId} disambiguates across groups.
+                  <g key={`${entry.platform}-${si}`}>
                     <rect
                       x={barX}
                       y={barY}
