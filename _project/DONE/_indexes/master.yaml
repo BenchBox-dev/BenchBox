@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T18:04:35.676134'
-total_items: 788
+generated_at: '2026-04-28T20:13:53.230930'
+total_items: 789
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -2924,6 +2924,24 @@ items:
   completed_date: '2026-04-12'
   work_total: 5
   work_done: 5
+  work_ready: 0
+- id: dry-run-followup-package-canonical-contributing
+  file: DONE/main/planning/dry-run-followup-package-canonical-contributing.yaml
+  title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
+  worktree: main
+  category: Core Functionality
+  priority: High
+  status: Completed
+  tags:
+  - results
+  - submit
+  - cli
+  - contributor-experience
+  - dry-run-followup
+  estimated_effort: Small
+  completed_date: '2026-04-28'
+  work_total: 3
+  work_done: 3
   work_ready: 0
 - id: provable-cli-command-generation
   file: DONE/core-functionality/planning/provable-cli-command-generation.yaml

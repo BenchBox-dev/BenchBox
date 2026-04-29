@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T18:04:33.405879'
-total_items: 36
+generated_at: '2026-04-28T20:13:51.359406'
+total_items: 35
 statuses:
   In Progress:
     count: 3
@@ -20,7 +20,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 31
+    count: 30
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -97,11 +97,6 @@ statuses:
       title: 'Local-validation block: document non-uv fallback and schema-version key name'
       priority: Low
       category: Documentation
-    - id: dry-run-followup-package-canonical-contributing
-      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
-      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
-      priority: High
-      category: Core Functionality
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
       title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control

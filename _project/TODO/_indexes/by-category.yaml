@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T18:04:33.405849'
+generated_at: '2026-04-28T20:13:51.359377'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -46,7 +46,7 @@ categories:
       priority: Low
       status: Not Started
   Core Functionality:
-    count: 5
+    count: 4
     items:
     - id: add-third-benchmark-cohort-to-corpus
       file: TODO/main/planning/add-third-benchmark-cohort-to-corpus.yaml
@@ -58,11 +58,6 @@ categories:
       title: Integrate BenchBox CLI submission flow and service authentication
       priority: Medium-High
       status: In Progress
-    - id: dry-run-followup-package-canonical-contributing
-      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
-      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
-      priority: High
-      status: Not Started
     - id: dry-run-followup-manifest-filename-convention
       file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
       title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/

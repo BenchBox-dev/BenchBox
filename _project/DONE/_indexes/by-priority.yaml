@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T18:04:35.676712'
-total_items: 788
+generated_at: '2026-04-28T20:13:53.231440'
+total_items: 789
 priorities:
   Critical:
     count: 47
@@ -241,7 +241,7 @@ priorities:
       category: Benchmark Implementation - Critical Fixes
       status: Completed
   High:
-    count: 269
+    count: 270
     items:
     - id: standardize-primitives-tpc-h-data-sharing-manifest-reuse
       file: DONE/unknown/completed/standardize-primitives-tpc-h-data-sharing-manifest-reuse.yaml
@@ -929,6 +929,11 @@ priorities:
       file: DONE/main/make-parquet-default-for-tpcds-obt.yaml
       title: Make Parquet the default output format for TPC-DS OBT
       category: Bug Fix
+      status: Completed
+    - id: dry-run-followup-package-canonical-contributing
+      file: DONE/main/planning/dry-run-followup-package-canonical-contributing.yaml
+      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
+      category: Core Functionality
       status: Completed
     - id: provable-cli-command-generation
       file: DONE/core-functionality/planning/provable-cli-command-generation.yaml
