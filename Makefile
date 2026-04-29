@@ -712,7 +712,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -780,6 +780,16 @@ worktree-prune:
 			fi; \
 		done
 	@git worktree prune
+
+# Blind-spot finding triage (file-first capture; see _project/blind-spots/README.md).
+blind-spots-list:
+	@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py list
+
+blind-spots-report:
+	@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py report
+
+# Alias: 'sweep' as the verb users will reach for; report is the v1 sweep view.
+blind-spots-sweep: blind-spots-report
 
 # Help
 help:
@@ -887,6 +897,11 @@ help:
 	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"
 	@echo "  make worktree-list   List active worktrees"
 	@echo "  make worktree-prune  Remove worktrees whose branches are gone on origin (post-merge cleanup)"
+	@echo ""
+	@echo "Blind-Spot Findings (see _project/blind-spots/README.md):"
+	@echo "  make blind-spots-list   List open findings (one row each)"
+	@echo "  make blind-spots-report Counts by status + kind, oldest open first"
+	@echo "  make blind-spots-sweep  Alias for blind-spots-report"
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
 	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs main"
