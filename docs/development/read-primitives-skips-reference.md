@@ -8,8 +8,11 @@ This document is the authoritative reference for every `skip_on` entry in
 explains **why** the skip exists and **where to look** to determine whether the
 skip can be removed.
 
-There are currently **26 skipped query/platform pairs** across 6 platforms.
-They fall into three root-cause classes:
+As of 2026-04-29, there are **77 skipped query/target-dialect pairs** across 7
+target dialects. Deployment aliases inherit their adapter target dialects: for
+example, MotherDuck uses the DuckDB dialect skips, while ClickHouse local,
+server, and cloud deployments use the ClickHouse dialect skips.
+They fall into four root-cause classes:
 
 1. **Missing function**: the SQL function is simply absent from the platform's
    catalog and no semantics-preserving rewrite exists.
@@ -17,6 +20,8 @@ They fall into three root-cause classes:
    required by the query.
 3. **Data quality**: the TPC-H column used by the query (`o_comment`,
    `c_comment`) contains plain text, not the structured data the query expects.
+4. **Semantic gap**: a runnable fallback exists, but it would measure a related
+   capability rather than the query's declared `result_contract.capability`.
 
 ---
 
@@ -24,36 +29,45 @@ They fall into three root-cause classes:
 
 | Query ID | Skipped on | Root cause | Category |
 |----------|-----------|------------|----------|
-| `asof_join_basic` | bigquery, databricks, redshift | Missing syntax | timeseries |
+| `any_value_simple` | datafusion | Semantic gap | aggregation |
+| `any_value_with_filter` | datafusion | Semantic gap | aggregation |
+| `asof_join_basic` | bigquery, datafusion, databricks, redshift | Missing syntax | timeseries |
 | `array_agg_distinct` | redshift | Missing type | array |
 | `array_agg_simple` | redshift | Missing type | array |
-| `array_distinct` | bigquery, redshift | Missing function | array |
-| `array_min_max` | bigquery | Missing function | array |
+| `array_contains` | datafusion, redshift | Semantic gap / missing type | array |
+| `array_distinct` | bigquery, datafusion, redshift | Missing function / semantic gap | array |
+| `array_length` | datafusion, redshift | Semantic gap / missing type | array |
+| `array_min_max` | bigquery, datafusion, redshift | Missing function / semantic gap | array |
 | `array_of_struct` | redshift | Missing type | struct |
 | `array_slice` | redshift | Missing type | array |
 | `array_sort` | bigquery, redshift | Missing function | array |
 | `array_unnest` | redshift | Missing type | array |
+| `fulltext_boolean_search` | bigquery, clickhouse, datafusion, databricks, duckdb, redshift, snowflake | Semantic gap | fulltext |
+| `fulltext_phrase_search` | bigquery, clickhouse, datafusion, databricks, duckdb, redshift, snowflake | Semantic gap | fulltext |
+| `fulltext_simple_search` | bigquery, clickhouse, datafusion, databricks, duckdb, redshift, snowflake | Semantic gap | fulltext |
+| `intrinsic_appx_median` | clickhouse | Semantic gap | intrinsic |
 | `json_aggregates` | datafusion, redshift | Missing function | json |
 | `json_extract_nested` | datafusion, redshift | Missing function | json |
 | `json_extract_simple` | duckdb, datafusion, redshift | Data quality | json |
-| `list_filter` | bigquery, redshift | Missing function | lambda |
-| `list_reduce` | bigquery, redshift | Missing function | lambda |
-| `list_transform` | bigquery, redshift | Missing function | lambda |
+| `list_filter` | bigquery, datafusion, redshift | Missing function / semantic gap | lambda |
+| `list_reduce` | bigquery, datafusion, redshift | Missing function / semantic gap | lambda |
+| `list_transform` | bigquery, datafusion, redshift | Missing function / semantic gap | lambda |
 | `map_access` | bigquery, redshift | Missing type | map |
 | `map_construction` | bigquery, redshift | Missing type | map |
 | `map_keys_values` | bigquery, redshift | Missing type | map |
 | `pivot_basic` | clickhouse | Incompatible syntax | pivot |
 | `statistical_correlation` | redshift | Missing function | statistical |
+| `statistical_percentiles` | clickhouse | Semantic gap | statistical |
 | `struct_access` | redshift | Missing type | struct |
 | `struct_construction` | redshift | Missing type | struct |
 | `timeseries_trend_analysis` | redshift | Missing function | timeseries |
 | `unpivot_basic` | clickhouse | Incompatible syntax | pivot |
-| `window_moving_frame` | redshift | Semantic gap | window |
+| `window_moving_frame` | clickhouse, redshift | Semantic gap | window |
 | `window_running_sum` | redshift | Semantic gap | window |
 
 ---
 
-## Amazon Redshift (23 queries skipped)
+## Amazon Redshift (29 queries skipped)
 
 Redshift has the largest skip set because it predates many modern SQL extensions
 and has diverged significantly from PostgreSQL in the area of complex types.
@@ -104,20 +118,17 @@ specifically the `frame_clause` section describing `RANGE` offset types.
 
 ---
 
-### Array operations: 8 queries
+### Array operations: 9 queries
 
-`array_agg_simple`, `array_agg_distinct`, `array_unnest`, `array_slice`,
-`array_sort`, `array_distinct`, `array_of_struct`
+`array_agg_simple`, `array_agg_distinct`, `array_unnest`, `array_contains`,
+`array_length`, `array_slice`, `array_min_max`, `array_sort`, `array_distinct`
 
 **Why skipped**: Redshift does not have a native array type. `ARRAY_AGG`,
-`UNNEST`, `ARRAY_SLICE`, `ARRAY_SORT`, and `ARRAY_DISTINCT` all require an
-array column as input or produce one as output. There is no semantics-preserving
-rewrite that avoids materialising an array.
-
-Note: `array_min_max` is **not** skipped on Redshift; it has a Redshift variant
-that rewrites the query as a plain `MIN`/`MAX` aggregate, which is semantically
-equivalent for that specific test. The variant was viable because the query's
-intent is to find the extremes of a value set, not to manipulate an array object.
+`ARRAY_CONTAINS`, `CARDINALITY`, `UNNEST`, `ARRAY_SLICE`, `ARRAY_MIN`,
+`ARRAY_MAX`, `ARRAY_SORT`, and `ARRAY_DISTINCT` all require an array column as
+input or produce one as output. Redshift scalar rewrites such as `COUNT(*)`,
+`MIN`/`MAX`, or `CASE WHEN` can produce the same values for the current data,
+but they do not test the array capability declared in the query contract.
 
 **Re-enable when**: AWS adds native array type support to Redshift. Monitor:
 - [What's new in Amazon Redshift](https://aws.amazon.com/about-aws/whats-new/database/?whats-new-content.sort-by=item.additionalFields.postDateTime&whats-new-content.sort-order=desc&awsf.whats-new-product=product%23amazon-redshift)
@@ -126,7 +137,7 @@ intent is to find the extremes of a value set, not to manipulate an array object
 
 ---
 
-### Struct operations: `struct_construction`, `struct_access`
+### Struct operations: `struct_construction`, `struct_access`, `array_of_struct`
 
 **Why skipped**: Redshift has no `STRUCT(...)` constructor and does not support
 accessing struct fields via dot notation. The base queries and the `array_of_struct`
@@ -186,6 +197,19 @@ constraint, not a platform constraint.
 
 ---
 
+### Full-text search: `fulltext_simple_search`, `fulltext_boolean_search`, `fulltext_phrase_search`
+
+**Why skipped**: Redshift can express coarse `LIKE` filters, but those do not
+preserve MySQL full-text tokenization, boolean operators, phrase matching, or
+relevance scores. Keeping the old `LIKE` variants would make Redshift look
+comparable while measuring a different capability.
+
+**Re-enable when**: Redshift exposes comparable full-text search syntax and the
+variant passes contract validation plus a live Redshift run for the declared
+result contract.
+
+---
+
 ### ASOF JOIN: `asof_join_basic`
 
 **Why skipped**: Redshift does not support `ASOF JOIN` syntax. No rewrite of
@@ -197,7 +221,7 @@ semantics efficiently enough to be meaningful as a benchmark primitive.
 
 ---
 
-## Google BigQuery (10 queries skipped)
+## Google BigQuery (13 queries skipped)
 
 ### Array functions: `array_min_max`, `array_sort`, `array_distinct`
 
@@ -242,7 +266,19 @@ in the [BigQuery data types reference](https://cloud.google.com/bigquery/docs/re
 
 ---
 
-## Apache DataFusion (3 queries skipped)
+### Full-text search: `fulltext_simple_search`, `fulltext_boolean_search`, `fulltext_phrase_search`
+
+**Why skipped**: The base SQL uses MySQL `MATCH(...) AGAINST (...)`. BigQuery
+has `SEARCH` and text analyzers, but the syntax and scoring behavior are not a
+drop-in equivalent for MySQL natural-language, boolean, and phrase modes.
+
+**Re-enable when**: A BigQuery variant is written that preserves tokenization,
+boolean operators, phrase matching, and relevance-score semantics for the
+declared full-text capability.
+
+---
+
+## Apache DataFusion (16 queries skipped)
 
 ### JSON functions: `json_extract_simple`, `json_extract_nested`, `json_aggregates`
 
@@ -266,7 +302,60 @@ in [DataFusion's function catalog](https://datafusion.apache.org/user-guide/sql/
 
 ---
 
-## DuckDB (1 query skipped)
+### Full-text search: `fulltext_simple_search`, `fulltext_boolean_search`, `fulltext_phrase_search`
+
+**Why skipped**: DataFusion does not implement MySQL-style
+`MATCH(...) AGAINST (...)` full-text search. A `LIKE` rewrite runs, but it does
+not preserve ranking, boolean search operators, phrase matching, tokenization,
+or indexing behavior, so it would violate the full-text result contract.
+
+**Re-enable when**: DataFusion exposes full-text search syntax with comparable
+boolean and phrase semantics.
+
+---
+
+### Array and lambda semantic gaps
+
+`array_contains`, `array_length`, `array_min_max`, `array_distinct`,
+`list_transform`, `list_filter`, `list_reduce`
+
+**Why skipped**: DataFusion can express some value-equivalent rewrites using
+plain aggregates, `UNNEST`, or re-aggregation. Those rewrites do not exercise
+the same nested-array or higher-order lambda capability as the base query. The
+catalog keeps DataFusion's MAP variants because they use DataFusion MAP
+functions and pass the DuckDB-reference runtime parity test.
+
+**Re-enable when**: DataFusion supports the corresponding array and
+higher-order functions directly, or a variant can be written that exercises the
+same declared capability and passes
+`tests/integration/validation/test_read_primitives_variant_parity.py`.
+
+---
+
+### Arbitrary-value aggregate: `any_value_simple`, `any_value_with_filter`
+
+**Why skipped**: Rewriting `ANY_VALUE` to `MIN` makes the query deterministic
+but changes the capability from arbitrary representative aggregate to ordered
+minimum aggregate.
+
+**Re-enable when**: DataFusion supports `ANY_VALUE` or an equivalent arbitrary
+aggregate.
+
+---
+
+### ASOF JOIN: `asof_join_basic`
+
+**Why skipped**: The prior DataFusion variant used Snowflake-style
+`MATCH_CONDITION`, which is not a portable DataFusion syntax and could not be
+statically parsed for contract validation. No verified DataFusion SQL variant is
+currently retained.
+
+**Re-enable when**: DataFusion documents a SQL `ASOF JOIN` form that can express
+the query exactly and passes the DuckDB-reference parity test.
+
+---
+
+## DuckDB (4 queries skipped)
 
 ### `json_extract_simple`
 
@@ -280,7 +369,19 @@ with valid JSON. DuckDB fully supports `JSON_EXTRACT` and complex paths.
 
 ---
 
-## ClickHouse (2 queries skipped)
+### Full-text search: `fulltext_simple_search`, `fulltext_boolean_search`, `fulltext_phrase_search`
+
+**Why skipped**: DuckDB does not implement MySQL-style
+`MATCH(...) AGAINST (...)` full-text semantics. `LIKE` rewrites were removed
+because they produce a different shape for scored queries and a different
+matching capability for every full-text query.
+
+**Re-enable when**: DuckDB exposes comparable full-text search syntax, including
+score/rank output for boolean and phrase queries.
+
+---
+
+## ClickHouse (8 queries skipped)
 
 ### `pivot_basic`, `unpivot_basic`
 
@@ -294,7 +395,41 @@ query structure that tests different capabilities than `PIVOT`/`UNPIVOT`.
 
 ---
 
-## Databricks (1 query skipped)
+### Full-text search: `fulltext_simple_search`, `fulltext_boolean_search`, `fulltext_phrase_search`
+
+**Why skipped**: ClickHouse string predicates can approximate parts of the
+filtering behavior, but they do not preserve MySQL full-text tokenization,
+boolean operators, phrase matching, or relevance scores.
+
+**Re-enable when**: ClickHouse exposes comparable full-text search semantics for
+these three query families.
+
+---
+
+### Percentile semantics: `intrinsic_appx_median`, `statistical_percentiles`
+
+**Why skipped**: ClickHouse `quantile` functions are approximate by default.
+The base queries declare exact continuous percentile/median capabilities.
+Running approximate percentiles against exact percentile queries would produce a
+misleading benchmark signal even when the query executes successfully.
+
+**Re-enable when**: A ClickHouse variant uses exact percentile functions with
+matching interpolation semantics and passes the runtime parity test.
+
+---
+
+### Window frame semantics: `window_moving_frame`
+
+**Why skipped**: The old ClickHouse variant replaced a date `RANGE` frame with a
+row-count `ROWS` frame. That changes results whenever order dates are sparse or
+duplicate.
+
+**Re-enable when**: ClickHouse supports the original interval-valued `RANGE`
+frame, or a variant preserves the exact frame semantics.
+
+---
+
+## Databricks (4 queries skipped)
 
 ### `asof_join_basic`
 
@@ -307,19 +442,45 @@ available as a SQL clause.
 
 ---
 
+### Full-text search: `fulltext_simple_search`, `fulltext_boolean_search`, `fulltext_phrase_search`
+
+**Why skipped**: The base SQL uses MySQL `MATCH(...) AGAINST (...)`, which
+Databricks SQL does not support. `LIKE`, `contains`, or Spark text functions do
+not preserve MySQL full-text ranking, boolean operators, phrase matching, or
+index-backed search semantics.
+
+**Re-enable when**: Databricks SQL exposes comparable full-text search syntax or
+a verified variant can preserve the declared full-text result contract.
+
+---
+
+## Snowflake (3 queries skipped)
+
+### Full-text search: `fulltext_simple_search`, `fulltext_boolean_search`, `fulltext_phrase_search`
+
+**Why skipped**: The base SQL uses MySQL `MATCH(...) AGAINST (...)`. Snowflake
+has text search functions, but they do not provide a direct equivalent for the
+MySQL natural-language, boolean, and phrase modes used by these primitives.
+
+**Re-enable when**: A Snowflake variant preserves the declared full-text
+capability, including boolean operators, phrase semantics, and relevance-score
+shape for scored queries.
+
+---
+
 ## Validation workflow
 
-Three assets work together to validate whether a skip is still needed and
+Five assets work together to validate whether a skip is still needed and
 whether removing it is safe. Understanding how they relate prevents both
 false confidence (unit test passes but live run fails) and unnecessary work
 (live run attempted before the catalog change is consistent).
 
 ```
-Reference doc          queries.yaml          Unit test             Live run
-─────────────          ────────────          ─────────             ────────
-Check URL         →    Remove skip_on    →   pytest passes    →    benchbox run passes
-condition met           (+ variant if         skip set matches      query returns rows,
-                         needed)              catalog reality       no SQL errors
+Reference doc      queries.yaml      Static/unit tests      Runtime parity      Platform run
+─────────────      ────────────      ────────────────       ──────────────      ────────────
+Check URL     →    Remove skip  →    contracts pass    →    DuckDB ref    →    benchbox run
+condition met       (+ variant)       skip set matches       matches local      passes
+                                      catalog reality        variant
 ```
 
 **Reference doc** (`docs/development/read-primitives-skips-reference.md`, this
@@ -333,16 +494,31 @@ change to `queries.yaml`:
 
 ```bash
 uv run -- python -m pytest tests/unit/core/read_primitives/test_benchmark_variants.py -q
+uv run -- python -m pytest tests/unit/core/read_primitives/test_read_primitives_variant_contracts.py -q
 ```
 
 A passing unit test means the catalog and the test expectations are internally
-consistent. It does **not** mean the SQL executes correctly on the platform.
+consistent and every active high-risk variant has a declared comparable shape.
+It does **not** mean the SQL executes correctly on the platform.
 
-**Live benchmark run** is the ground-truth check. Run it after the unit test
-passes:
+**Runtime parity test**
+(`tests/integration/validation/test_read_primitives_variant_parity.py`) is the
+credential-free check for local engines. It runs DuckDB SF=0.01 as the
+reference, then compares retained DataFusion and ClickHouse-local variants under
+the declared result contracts:
 
 ```bash
-benchbox run --platform <platform> --benchmark read_primitives --queries <query_id> --scale 0.01
+uv run -- python -m pytest tests/integration/validation/test_read_primitives_variant_parity.py -q
+```
+
+Optional engines may skip when their packages are unavailable. If an installed
+engine diverges, keep or restore `skip_on` until the variant is truly comparable.
+
+**Live benchmark run** is the ground-truth check. Run it after the unit test
+and runtime parity test pass:
+
+```bash
+uv run -- benchbox run --platform <platform> --benchmark read_primitives --queries <query_id> --scale 0.01
 ```
 
 A passing live run (non-empty result set, no SQL errors) is the definitive
@@ -371,12 +547,14 @@ it still fails, so the next maintainer has a complete picture.
 
    ```bash
    uv run -- python -m pytest tests/unit/core/read_primitives/test_benchmark_variants.py -q
+   uv run -- python -m pytest tests/unit/core/read_primitives/test_read_primitives_variant_contracts.py -q
+   uv run -- python -m pytest tests/integration/validation/test_read_primitives_variant_parity.py -q
    ```
 
 5. Run the live benchmark against the platform:
 
    ```bash
-   benchbox run --platform <platform> --benchmark read_primitives --queries <query_id> --scale 0.01
+   uv run -- benchbox run --platform <platform> --benchmark read_primitives --queries <query_id> --scale 0.01
    ```
 
 6. Confirm the query passes and produces a non-empty result set.
