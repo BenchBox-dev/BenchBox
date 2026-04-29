@@ -2271,7 +2271,8 @@ queries:
         c_mktsegment,
         ARRAY_AGG(DISTINCT c_nationkey ORDER BY c_nationkey) as nation_keys
     FROM customer
-    GROUP BY c_mktsegment;
+    GROUP BY c_mktsegment
+    ORDER BY c_mktsegment;
   result_contract:
     capability: ordered_distinct_array_aggregation
     row_identity: [c_mktsegment]
@@ -2287,7 +2288,8 @@ queries:
           c_mktsegment,
           arraySort(groupUniqArray(c_nationkey)) as nation_keys
       FROM customer
-      GROUP BY c_mktsegment;
+      GROUP BY c_mktsegment
+      ORDER BY c_mktsegment;
   skip_on: [redshift]
 - id: array_unnest
   category: array
@@ -2831,7 +2833,12 @@ queries:
           o_orderkey,
           arraySort(
               x -> x.1,
-              groupArray(tuple(l_linenumber, l_partkey, l_quantity, l_extendedprice))
+              groupArray(
+                  CAST(
+                      (l_linenumber, l_partkey, l_quantity, l_extendedprice),
+                      'Tuple(l_linenumber Int32, l_partkey Int32, l_quantity Decimal(15,2), l_extendedprice Decimal(15,2))'
+                  )
+              )
           ) as line_items
       FROM orders o
       JOIN lineitem l ON o.o_orderkey = l.l_orderkey

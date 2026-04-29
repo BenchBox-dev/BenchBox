@@ -35,7 +35,7 @@ work:
 - id: w5
   summary: "Add focused runtime parity tests for risky read_primitives families against DuckDB reference at SF=0.01"
   needs: [w3, w4]
-  status: pending
+  status: done
 - id: w6
   summary: "Update read_primitives catalog docs and skip reference to require comparable variants or skip_on"
   needs: [w3, w4]
