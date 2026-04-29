@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T20:39:22.689617'
-total_items: 789
+generated_at: '2026-04-29T07:35:38.543037'
+total_items: 790
 statuses:
   In Progress:
     count: 2
@@ -271,7 +271,7 @@ statuses:
       priority: High
       category: Pre-Release High Priority Tasks (Should-Fix Before Release)
   Completed:
-    count: 737
+    count: 738
     items:
     - id: cli-test-coverage-enhancement-to-80
       file: DONE/unknown/planning/cli-test-coverage-enhancement-to-80.yaml
@@ -3577,6 +3577,11 @@ statuses:
       title: '[Tutorials] Verify benchmark commands in tutorial posts'
       priority: Medium
       category: Blog Revision
+    - id: dry-run-followup-submitted-by-flag
+      file: DONE/main/planning/dry-run-followup-submitted-by-flag.yaml
+      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
+      priority: Medium-High
+      category: Core Functionality
     - id: add-end-to-end-cli-testing
       file: DONE/unknown/planning/add-end-to-end-cli-testing.yaml
       title: ✅ Add End-to-End CLI Testing

@@ -83,6 +83,25 @@ def _get_git_username() -> str:
         return ""
 
 
+def _resolve_submitted_by(explicit: str | None) -> str:
+    """Resolve the manifest's submitted_by field.
+
+    Precedence: explicit --submitted-by > git config user.name > "" (with warning).
+    The empty case stays a soft warning, not a hard failure: anonymous
+    submissions are valid.
+    """
+    if explicit:
+        return explicit.strip()
+    from_git = _get_git_username()
+    if from_git:
+        return from_git
+    console.print(
+        "[yellow]warning:[/yellow] submitted_by is empty - "
+        "set `git config user.name <name>` or pass `--submitted-by NAME`."
+    )
+    return ""
+
+
 def _compute_file_hash(file_path: Path) -> str:
     """Compute SHA-256 of a single file's contents."""
     h = hashlib.sha256()
@@ -266,6 +285,16 @@ def _print_submission_summary(
     is_flag=True,
     help="Preview what would be packaged or uploaded without writing files / sending bytes.",
 )
+@click.option(
+    "--submitted-by",
+    "submitted_by",
+    type=str,
+    default=None,
+    help=(
+        "Override the manifest's submitted_by field. "
+        "Precedence: this flag > git config user.name > empty (with warning)."
+    ),
+)
 @click.pass_context
 def submit(
     ctx,
@@ -279,6 +308,7 @@ def submit(
     idempotency_key,
     wait,
     dry_run,
+    submitted_by,
 ):
     """Submit a benchmark result bundle to the BenchBox results platform.
 
@@ -452,7 +482,7 @@ def submit(
         "scale_factor": result.scale_factor,
         "phase": _SUBMISSION_PHASE,
         "submission_path": "PR-based",
-        "submitted_by": _get_git_username(),
+        "submitted_by": _resolve_submitted_by(submitted_by),
     }
 
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

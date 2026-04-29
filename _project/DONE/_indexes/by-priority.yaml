@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T20:39:22.689426'
-total_items: 789
+generated_at: '2026-04-29T07:35:38.542832'
+total_items: 790
 priorities:
   Critical:
     count: 47
@@ -1597,7 +1597,7 @@ priorities:
       category: Core Functionality - Benchmarks
       status: Completed
   Medium-High:
-    count: 129
+    count: 130
     items:
     - id: ai-ml-primitives-benchmark
       file: DONE/benchmark-expansion/planning/ai-ml-primitives-benchmark.yaml
@@ -2245,6 +2245,11 @@ priorities:
       file: DONE/main/planning/add-maintainer-release-guide.yaml
       title: '[OBSOLETED] Add a maintainer-facing release guide at docs/operations/release-guide.md'
       category: Documentation
+      status: Completed
+    - id: dry-run-followup-submitted-by-flag
+      file: DONE/main/planning/dry-run-followup-submitted-by-flag.yaml
+      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
+      category: Core Functionality
       status: Completed
   Medium:
     count: 298

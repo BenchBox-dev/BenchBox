@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T20:39:20.703890'
-total_items: 35
+generated_at: '2026-04-29T07:35:34.399752'
+total_items: 36
 statuses:
   In Progress:
     count: 3
@@ -20,7 +20,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 30
+    count: 31
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -188,11 +188,6 @@ statuses:
       title: Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload
       priority: Low
       category: Benchmark Development
-    - id: dry-run-followup-submitted-by-flag
-      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
-      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
-      priority: Medium-High
-      category: Core Functionality
   Identified:
     count: 2
     items:

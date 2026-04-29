@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T20:39:20.703826'
-total_items: 35
+generated_at: '2026-04-29T07:35:34.399667'
+total_items: 36
 items:
 - id: dry-run-followup-validator-hash-contract-mismatch
   file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
@@ -36,24 +36,6 @@ items:
   work_ready: 1
   needs:
   - simplify-dev-loop-and-release-flow
-- id: results-explorer-qa-pass1-fixes
-  file: TODO/main/planning/results-explorer-qa-pass1-fixes.yaml
-  title: Investigate and remediate Results Explorer QA pass-1 findings
-  worktree: main
-  category: Core Functionality
-  priority: High
-  status: Not Started
-  tags:
-  - results-explorer
-  - qa-followup
-  - ui
-  - preact
-  - duckdb-wasm
-  estimated_effort: Medium (1-2 days end-to-end including the re-test)
-  work_total: 8
-  work_done: 0
-  work_ready: 5
-  deferred_count: 4
 - id: motherduck-cloud-features
   file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
   title: MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control
@@ -583,25 +565,6 @@ items:
   - dry-run-followup
   estimated_effort: Medium
   work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - dry-run-followup-package-canonical-contributing
-- id: dry-run-followup-submitted-by-flag
-  file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
-  title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
-  worktree: main
-  category: Core Functionality
-  priority: Medium-High
-  status: Not Started
-  tags:
-  - results
-  - submit
-  - cli
-  - contributor-experience
-  - dry-run-followup
-  estimated_effort: Small
-  work_total: 3
   work_done: 0
   work_ready: 1
   needs:

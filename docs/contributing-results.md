@@ -46,6 +46,11 @@ This creates a `submission/` directory containing:
 | `submission-manifest.json` | Metadata: hash, benchmark, platform, contributor |
 | `CONTRIBUTING.md` | PR instructions (for reference) |
 
+The manifest's `submitted_by` field defaults to your `git config user.name`.
+If that is empty (e.g. a fresh sandbox or CI runner), `benchbox submit` warns
+and writes the field as `""`. Override with `--submitted-by "Your Name"` if
+you prefer not to set git config or want a different attribution.
+
 ### 3. Fork and open a PR
 
 1. Fork the [BenchBox repository](https://github.com/joeharris76/BenchBox) on GitHub (or use your existing fork)

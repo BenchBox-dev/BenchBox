@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T20:39:20.703879'
-total_items: 35
+generated_at: '2026-04-29T07:35:34.399740'
+total_items: 36
 priorities:
   Critical:
     count: 1
@@ -10,17 +10,12 @@ priorities:
       category: Core Functionality
       status: Not Started
   High:
-    count: 5
+    count: 4
     items:
     - id: release-flow-dry-run-rc1
       file: TODO/main/active/release-flow-dry-run-rc1.yaml
       title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
       category: Release Tooling
-      status: Not Started
-    - id: results-explorer-qa-pass1-fixes
-      file: TODO/main/planning/results-explorer-qa-pass1-fixes.yaml
-      title: Investigate and remediate Results Explorer QA pass-1 findings
-      category: Core Functionality
       status: Not Started
     - id: motherduck-cloud-features
       file: TODO/platform-expansion/planning/motherduck-cloud-features.yaml
@@ -38,7 +33,7 @@ priorities:
       category: Release Tooling
       status: In Progress
   Medium-High:
-    count: 6
+    count: 5
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -63,11 +58,6 @@ priorities:
     - id: dry-run-followup-manifest-filename-convention
       file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
       title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
-      category: Core Functionality
-      status: Not Started
-    - id: dry-run-followup-submitted-by-flag
-      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
-      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
       category: Core Functionality
       status: Not Started
   Medium:
