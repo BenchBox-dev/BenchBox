@@ -171,6 +171,7 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 # pure functions of the per-item _project/{TODO,DONE}/**/*.yaml files.
 _project/TODO/_indexes/
 _project/DONE/_indexes/
+_project/blind-spots/_indexes/
 
 # Firebolt data and core data directories
 /firebolt-data
