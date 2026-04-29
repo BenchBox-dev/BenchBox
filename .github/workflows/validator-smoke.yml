@@ -38,7 +38,9 @@ jobs:
         run: python -m pip install --quiet pytest
 
       - name: Run validator smoke test
-        # `-c /dev/null` bypasses the repo-root pytest.ini, which references
-        # benchbox-internal plugins (xdist safety, pytest-benchmark) that
-        # aren't installed in this slim, standalone smoke-test environment.
-        run: python -m pytest -c /dev/null tests/test_validate_submission_smoke.py -v
+        # `-c /dev/null` bypasses the repo-root pytest.ini (benchbox-internal
+        # plugins like xdist/benchmark aren't installed here). `--noconftest`
+        # skips tests/conftest.py, which imports the full benchbox package
+        # (rich, polars, etc.) — overkill for a subprocess-driven validator
+        # smoke test on a slim runner.
+        run: python -m pytest -c /dev/null --noconftest tests/test_validate_submission_smoke.py -v
