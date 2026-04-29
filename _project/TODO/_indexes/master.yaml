@@ -1,6 +1,23 @@
-generated_at: '2026-04-28T20:13:51.359335'
-total_items: 35
+generated_at: '2026-04-28T21:08:45.212559'
+total_items: 37
 items:
+- id: dry-run-followup-validator-hash-contract-mismatch
+  file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
+  title: Sync published-results validator with develop's per-file hash contract (release-blocker)
+  worktree: main
+  category: Core Functionality
+  priority: Critical
+  status: Not Started
+  tags:
+  - results
+  - submit
+  - validator
+  - dry-run-followup
+  - release-blocker
+  estimated_effort: Small
+  work_total: 3
+  work_done: 0
+  work_ready: 1
 - id: release-flow-dry-run-rc1
   file: TODO/main/active/release-flow-dry-run-rc1.yaml
   title: Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end
@@ -394,6 +411,22 @@ items:
   work_ready: 1
   needs:
   - define-phase-3-promotion-metrics
+- id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
+  file: TODO/main/planning/dry-run-followup-cli-ux-and-doc-polish-2026-04-29.yaml
+  title: CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run
+  worktree: main
+  category: Core Functionality
+  priority: Medium
+  status: Not Started
+  tags:
+  - cli
+  - docs
+  - contributor-experience
+  - dry-run-followup
+  estimated_effort: Medium
+  work_total: 7
+  work_done: 0
+  work_ready: 7
 - id: enable-duckdb-wasm-http-range-reads-for-registered-urls
   file: TODO/main/planning/enable-duckdb-wasm-http-range-reads-for-registered-urls.yaml
   title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
