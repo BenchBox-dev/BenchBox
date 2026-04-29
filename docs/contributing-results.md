@@ -43,14 +43,14 @@ This creates a `submission/` directory containing:
 | `bundle/<result>.json` | The canonical schema-v2 result bundle |
 | `bundle/<result>.plans.json` | Query execution plans (if captured) |
 | `bundle/<result>.tuning.json` | Tuning configuration (if used) |
-| `submission-manifest.json` | Metadata: hash, benchmark, platform, contributor |
+| `<result>.manifest.json` | Metadata: hash, benchmark, platform, contributor |
 | `CONTRIBUTING.md` | PR instructions (for reference) |
 
 ### 3. Fork and open a PR
 
 1. Fork the [BenchBox repository](https://github.com/joeharris76/BenchBox) on GitHub (or use your existing fork)
 2. Copy the contents of `submission/bundle/` into `results-data/bundles/` in your fork
-3. Copy `submission/submission-manifest.json` alongside the bundle files
+3. Copy `submission/<result>.manifest.json` alongside the bundle files (the per-bundle manifest filename inherits the bundle stem so two contributors submitting the same week cannot collide)
 4. Regenerate the inventory before you commit:
 
    ```bash

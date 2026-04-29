@@ -389,7 +389,7 @@ def discover_bundles(path: Path) -> list[Path]:
             continue
         if f.name == "corpus-inventory.json":
             continue
-        if f.name == "submission-manifest.json":
+        if f.name == "submission-manifest.json" or f.name.endswith(".manifest.json"):
             continue
         bundles.append(f)
     return bundles
@@ -420,9 +420,16 @@ def validate_bundles(paths: list[Path]) -> list[ValidationResult]:
 
         _validate_bundle(data, vr)
 
-        # Check for submission manifest alongside the bundle
-        manifest_path = bundle_path.parent / "submission-manifest.json"
-        if manifest_path.exists():
+        # Check for submission manifest alongside the bundle.
+        # Prefer per-bundle name (<stem>.manifest.json), fall back to legacy.
+        per_bundle_manifest = bundle_path.parent / f"{bundle_path.stem}.manifest.json"
+        legacy_manifest = bundle_path.parent / "submission-manifest.json"
+        manifest_path = (
+            per_bundle_manifest
+            if per_bundle_manifest.exists()
+            else (legacy_manifest if legacy_manifest.exists() else None)
+        )
+        if manifest_path is not None:
             _validate_manifest_hash(manifest_path, bundle_path.parent, vr)
 
         results.append(vr)

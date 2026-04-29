@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T18:04:33.405811'
-total_items: 36
+generated_at: '2026-04-28T20:35:37.974146'
+total_items: 35
 items:
 - id: release-flow-dry-run-rc1
   file: TODO/main/active/release-flow-dry-run-rc1.yaml
@@ -430,24 +430,6 @@ items:
   work_ready: 1
   needs:
   - implement-results-explorer-browser-functional-tests
-- id: dry-run-followup-manifest-filename-convention
-  file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
-  title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
-  worktree: main
-  category: Core Functionality
-  priority: Medium
-  status: Not Started
-  tags:
-  - results
-  - submit
-  - tooling
-  - dry-run-followup
-  estimated_effort: Medium
-  work_total: 4
-  work_done: 0
-  work_ready: 1
-  needs:
-  - dry-run-followup-package-canonical-contributing
 - id: single-repo-migration-phase-8-first-post-migration-release
   file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
   title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'

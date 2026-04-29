@@ -93,7 +93,7 @@ def test_submit_creates_output_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
     assert result.exit_code == 0
     assert (out_dir / "bundle" / src.name).exists()
-    assert (out_dir / "submission-manifest.json").exists()
+    assert (out_dir / "tpch_duckdb.manifest.json").exists()
     assert (out_dir / "CONTRIBUTING.md").exists()
 
 
@@ -111,7 +111,7 @@ def test_submit_manifest_contains_bundle_hash(monkeypatch: pytest.MonkeyPatch, t
     out_dir = tmp_path / "submission"
     CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
 
-    manifest = json.loads((out_dir / "submission-manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads((out_dir / "tpch_duckdb.manifest.json").read_text(encoding="utf-8"))
     assert "bundle_hash" in manifest
     assert len(manifest["bundle_hash"]) == 64  # SHA-256 hex
     assert "submitted_by" in manifest  # Phase 2: optional, may be empty string
@@ -341,4 +341,43 @@ def test_submit_default_pr_path_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_p
     result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
     assert result.exit_code == 0
     assert out_dir.is_dir()
-    assert (out_dir / "submission-manifest.json").is_file()
+    assert (out_dir / "tpch_duckdb.manifest.json").is_file()
+
+
+# ---------------------------------------------------------------------------
+# Per-bundle manifest filename (dry-run-followup-manifest-filename-convention)
+# ---------------------------------------------------------------------------
+
+
+def test_submit_manifest_filename_inherits_bundle_stem(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Manifest is named `<bundle_stem>.manifest.json`, not the legacy literal."""
+    src = tmp_path / "tpch_sf001_duckdb_20260403_093653_9c0925d1.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    assert result.exit_code == 0
+    assert (out_dir / "tpch_sf001_duckdb_20260403_093653_9c0925d1.manifest.json").is_file()
+    # Legacy singleton filename must NOT be written.
+    assert not (out_dir / "submission-manifest.json").exists()
+
+
+def test_submit_two_consecutive_submits_do_not_collide(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Two submits to the same output dir produce two distinct manifest files."""
+    src_a = tmp_path / "tpch_duckdb.json"
+    src_a.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    src_b = tmp_path / "tpch_clickhouse.json"
+    src_b.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    runner = CliRunner()
+    result_a = runner.invoke(sub.submit, [str(src_a), "--output", str(out_dir)])
+    result_b = runner.invoke(sub.submit, [str(src_b), "--output", str(out_dir)])
+
+    assert result_a.exit_code == 0
+    assert result_b.exit_code == 0
+    assert (out_dir / "tpch_duckdb.manifest.json").is_file()
+    assert (out_dir / "tpch_clickhouse.manifest.json").is_file()

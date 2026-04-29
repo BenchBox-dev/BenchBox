@@ -11,6 +11,7 @@ bundles = [
     path
     for path in bundles_dir.rglob("*.json")
     if path.name != "submission-manifest.json"
+    and not path.name.endswith(".manifest.json")
     and not path.name.endswith(".plans.json")
     and not path.name.endswith(".tuning.json")
 ]

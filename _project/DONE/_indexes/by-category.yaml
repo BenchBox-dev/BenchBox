@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T18:04:35.676509'
+generated_at: '2026-04-28T20:35:39.970056'
 total_categories: 81
 categories:
   '"Bug Fixes & Reliability"':
@@ -701,7 +701,7 @@ categories:
       priority: Medium
       status: Completed
   Core Functionality:
-    count: 269
+    count: 270
     items:
     - id: cli-detect-and-skip-unneeded-data-generation-2
       file: DONE/unknown/planning/cli-detect-and-skip-unneeded-data-generation-2.yaml
@@ -1739,6 +1739,11 @@ categories:
       file: DONE/tpch-stdout-fix/planning/patch-tpch-source-stdout.yaml
       title: Patch TPC-H source to fix stdout data generation
       priority: High
+      status: Completed
+    - id: dry-run-followup-manifest-filename-convention
+      file: DONE/main/planning/dry-run-followup-manifest-filename-convention.yaml
+      title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
+      priority: Medium-High
       status: Completed
     - id: dataframe-tpcds-obt-adaptation
       file: DONE/dataframe-benchmarks/active/dataframe-tpcds-obt-adaptation.yaml

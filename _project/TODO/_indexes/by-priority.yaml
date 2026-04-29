@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T18:04:33.405869'
-total_items: 36
+generated_at: '2026-04-28T20:35:37.974203'
+total_items: 35
 priorities:
   High:
     count: 5
@@ -53,7 +53,7 @@ priorities:
       category: Core Functionality
       status: In Progress
   Medium:
-    count: 9
+    count: 8
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -75,11 +75,6 @@ priorities:
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       category: Performance
       status: Identified
-    - id: dry-run-followup-manifest-filename-convention
-      file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
-      title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
-      category: Core Functionality
-      status: Not Started
     - id: single-repo-migration-phase-8-first-post-migration-release
       file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
       title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
