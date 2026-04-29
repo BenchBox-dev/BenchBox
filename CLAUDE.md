@@ -17,9 +17,15 @@ during the single-repo migration).
   `develop`. Required CI: `lint` + `test (ubuntu-latest, 3.12)`.
 - **One-shot PR flow** (the canonical path — use this, not bare git):
   - From a feature branch: `make pr-preflight && make pr-open`. Opens
-    the PR vs `develop` with `gh pr create --fill` and enables
-    `gh pr merge --auto --squash` so it lands the moment CI is green.
-    Walk away — don't poll.
+    the PR vs `develop` and enables `gh pr merge --auto --squash` so it
+    lands the moment CI is green. Walk away — don't poll.
+  - `make pr-open` is **idempotent** — safe to rerun. If a PR already
+    exists for the branch it reuses it; auto-merge is (re)enabled either
+    way. Use this to flip auto-merge on for a PR opened via the GitHub
+    UI or `gh pr create` directly.
+  - Before pushing, `pr-open` runs `git merge-tree` against every other
+    open PR head and warns on textual conflicts (~1s, no CI). Warn-only
+    — does not block. Catches the modify-vs-delete class deterministically.
   - In Claude Code, the project-local `/pr` slash command
     (`.claude/commands/pr.md`) wraps this end-to-end (commit if needed,
     preflight, push, open PR, enable auto-merge). Prefer `/pr` over the
@@ -27,15 +33,36 @@ during the single-repo migration).
     `develop`, runs preflight, and enables auto-merge.
   - Pre-push hook (`pr-preflight-fast-tests` in `.pre-commit-config.yaml`)
     runs the fast lane on every push. Activate once with `pre-commit install`.
-- **Worktrees** for parallel branches (the convention):
+  - **Backstop**: `.github/workflows/auto-merge-on-open.yml` enables
+    squash auto-merge on any non-draft PR opened against develop, so PRs
+    opened outside `make pr-open` still auto-land.
+- **Concurrent sessions / multiple worktrees**:
   - `~/Developer/BenchBox/` stays on `develop`, always. Don't swap
     branches in the main clone.
   - `make worktree-add BRANCH=fix/foo` creates `../BenchBox.fix-foo/`
     off `origin/develop` with branch `fix/foo` checked out. `cd` into it,
     run `uv sync --group dev`, work, `make pr-open` from inside.
+  - `make pr-fanout` walks every worktree (skipping the main clone) and
+    runs `make pr-open` sequentially. Use this when you've worked across
+    several branches and want to ensure each has a PR with auto-merge on.
+    Sequential by design — the pre-push fast-test hook serializes via a
+    flock, so parallelizing invites lock-contention failures.
+  - **One PR per file area at a time.** Don't open three PRs touching the
+    same file in 25 minutes; sequence them so the second sees the first
+    landed. The cost of a 10-minute wait beats a multi-PR semantic
+    conflict resolution. The pairwise warning above will flag obvious
+    overlap; convention covers the rest.
+  - **Drafts are intentional.** Open as draft when you don't want
+    auto-merge yet (spike, RFC, parked work). Mark ready when you do —
+    the auto-merge-on-open workflow respects this.
   - `make worktree-prune` removes worktrees whose branches are gone
     upstream (post-merge cleanup). Pairs with auto-merge: PR merges →
-    branch deleted on origin → next prune sweeps the worktree.
+    branch deleted on origin → next prune sweeps the worktree. Run
+    this at end-of-session.
+  - **`.gitignore` ∩ tracked-files** is CI-blocked
+    (`.github/workflows/gitignore-lint.yml`). If you add a path to
+    `.gitignore`, you must `git rm -r --cached <paths>` in the same PR,
+    or open branches will all conflict on merge.
 - **Releases** (2-command flow): on `develop`, `make release-cut
   VERSION=X.Y.Z` cuts the `vX.Y.Z` branch, bumps version, drafts the
   changelog (opens `$EDITOR`), curates dev-only paths, opens the PR vs
@@ -114,7 +141,7 @@ benchbox run --help | --help-topic all | --help-topic examples | --help-topic be
 
 ## Pre-approved Commands
 - **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `uv run -- python -m pytest *`
-- **PR/Worktree**: `make pr-preflight`, `make pr-status`, `make worktree-list`, `make worktree-prune`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
+- **PR/Worktree**: `make pr-preflight`, `make pr-status`, `make pr-fanout`, `make worktree-list`, `make worktree-prune`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
 - **Files**: `ls*`, `find*`, `cat*`, `head*`, `tail*`, `wc*`, `file*`, `stat*`, `du*`, `tree*`, `which*`
 - **Git**: `git status`, `git diff*`, `git log*`, `git show*`, `git branch*`, `git remote*`, `git config --list`, `git worktree list*`
 - **Python**: `uv tree`, `uv pip list`, `uv pip show*`, `uv export`, `uv run -- python -c*`, `uv run -- python -m*`

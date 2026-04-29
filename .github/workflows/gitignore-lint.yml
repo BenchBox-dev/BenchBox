@@ -1,0 +1,73 @@
+name: gitignore lint
+
+# Block PRs that add a .gitignore pattern matching files HEAD still tracks.
+# This is the failure mode that produced the PR #53 → #45/#52/#54/#58 fan-out
+# (8 conflicts each across 4 open PRs): paths were added to .gitignore but
+# the same PR didn't `git rm -r --cached` them, leaving every other open
+# branch with tracked-and-modified copies that conflicted on merge.
+#
+# The fix the author needs is always one of:
+#   (a) include `git rm -r --cached <paths>` in the same PR, or
+#   (b) drop the .gitignore addition.
+# This check tells them which.
+
+on:
+  pull_request:
+    branches: [develop]
+    paths: ['.gitignore']
+
+permissions:
+  contents: read
+
+jobs:
+  ignore-vs-tracked:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect newly-ignored paths still tracked in HEAD
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # Diff the .gitignore in this PR against base. Take added lines only
+          # (lines starting with '+' but not the '+++' file header). Strip
+          # comments and blanks. Negation patterns ('!foo') are ignores being
+          # turned off — they cannot create the modify-vs-delete trap, so skip.
+          added=$(git diff "$BASE_SHA"..HEAD -- .gitignore \
+            | awk '/^\+[^+]/ {sub(/^\+/, ""); print}' \
+            | sed 's/[[:space:]]*#.*$//' \
+            | grep -v '^[[:space:]]*$' \
+            | grep -v '^!' \
+            || true)
+
+          if [ -z "$added" ]; then
+            echo "No new ignore patterns in this PR."
+            exit 0
+          fi
+
+          echo "Newly-added ignore patterns:"
+          echo "$added" | sed 's/^/  /'
+          echo
+
+          fail=0
+          while IFS= read -r pat; do
+            [ -z "$pat" ] && continue
+            # `git ls-files -- <pattern>` honours pathspec semantics; matches
+            # tracked files at HEAD. We deliberately do not use --ignored here
+            # because the .gitignore in HEAD already includes this PR's edits
+            # if the workflow runs on the merge ref (default for pull_request).
+            matches=$(git ls-files -- "$pat" 2>/dev/null || true)
+            if [ -n "$matches" ]; then
+              echo "::error file=.gitignore::Pattern '$pat' is in this PR's .gitignore but HEAD still tracks matching files. Either (a) add 'git rm -r --cached $pat' in this PR, or (b) drop the .gitignore line. Tracked matches:"
+              echo "$matches" | sed 's/^/  /'
+              fail=1
+            fi
+          done <<EOF
+          $added
+          EOF
+
+          exit $fail
