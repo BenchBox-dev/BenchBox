@@ -13,6 +13,7 @@ import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
 import { RankTable } from "@/components/RankTable";
 import { ChartPanel } from "@/components/ChartPanel";
+import { NotFound } from "@/pages/NotFound";
 
 interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
@@ -139,6 +140,14 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
   if (error) return <ErrorMessage message={error} />;
   if (!results) return <LoadingSpinner message="Loading results..." />;
+
+  // preact-router's `:benchmark/` slug matches any single segment, so an
+  // unknown slug like /results/does-not-exist/ would otherwise render an
+  // empty BenchmarkIndex shell. Once results are loaded, treat a slug
+  // with zero matching rows as a 404 instead. Scoped to BenchmarkIndex —
+  // genuinely-unknown top-level routes still flow to NotFound via the
+  // preact-router `default` route in App.tsx.
+  if (benchmarkResults.length === 0) return <NotFound />;
 
   const title = humanizeBenchmark(benchmark);
 

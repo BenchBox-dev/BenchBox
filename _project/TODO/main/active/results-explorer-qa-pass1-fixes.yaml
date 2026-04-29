@@ -221,18 +221,31 @@ work:
 
   - id: w5
     summary: "Fix B3 — route unknown-benchmark slugs to NotFound"
-    status: pending
+    status: done
     notes: |
-      Two acceptable approaches; pick one:
-        (a) Inside BenchmarkIndex.tsx, after the data load, if the
-            `benchmark` URL prop matches no rows in the meta-leaderboard
-            cohorts list, render <NotFound /> instead of the empty page.
-        (b) Maintain a known-benchmarks set (built from
-            cohort_metadata.benchmark distinct values) and validate
-            BenchmarkIndex's prop against it on mount.
+      Implemented approach (a): inside BenchmarkIndex.tsx, after results
+      finish loading and before the title is rendered, check whether
+      `benchmarkResults.length === 0` (no row in the loaded set whose
+      `benchmark` matches the URL slug). If so, render <NotFound />
+      instead of the empty BenchmarkIndex shell.
 
-      Either way, add an e2e test under results-explorer/e2e/ that hits
-      /results/does-not-exist/ and asserts the NotFound copy is shown.
+      Approach (b) — maintaining a known-benchmarks set from
+      cohort_metadata — was rejected because it would require a second
+      fetch and add a layer of state that could go stale. The data is
+      already in `results`; using it directly costs nothing.
+
+      Guard is BenchmarkIndex-local per the anti_patterns directive.
+      Genuinely-unknown top-level paths (e.g. /results/foo/bar/baz/)
+      still flow through preact-router's `<NotFound default />` route
+      in App.tsx, unchanged.
+
+      New e2e spec covers /results/does-not-exist/: asserts the 404
+      heading and "Page not found" copy. The pre-existing 3-segment
+      "no/such/route" test remains as a regression guard for the
+      preact-router default path. Both pass under chromium.
+
+      Verification: 285/285 vitest pass; tsc clean; 2/2
+      e2e/routes/not-found.spec.ts pass.
 
   - id: w6
     summary: "Fix B4 — TimeSeries duplicate-key warning on platform pages"

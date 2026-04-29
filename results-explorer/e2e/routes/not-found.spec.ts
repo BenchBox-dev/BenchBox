@@ -15,4 +15,17 @@ test.describe("NotFound", () => {
     const backLink = page.getByRole("link", { name: /Back to Results/i });
     await expect(backLink).toHaveAttribute("href", "/results/");
   });
+
+  test("an unknown :benchmark slug renders 404 instead of empty BenchmarkIndex", async ({ page }) => {
+    // /results/:benchmark/ matches any single segment, so without the
+    // BenchmarkIndex unknown-slug guard, /results/does-not-exist/ would
+    // render an empty BenchmarkIndex shell that looks like a real but
+    // empty page. The guard added in w5 of results-explorer-qa-pass1-fixes
+    // routes unknown slugs to NotFound instead.
+    await page.goto("/results/does-not-exist/");
+    await waitForShell(page);
+
+    await expect(page.getByRole("heading", { name: "404" })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Page not found/i)).toBeVisible();
+  });
 });
