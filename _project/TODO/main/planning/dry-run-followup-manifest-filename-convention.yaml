@@ -1,7 +1,7 @@
 id: dry-run-followup-manifest-filename-convention
 title: "Per-bundle manifest filenames to avoid PR collision in results-data/bundles/"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Core Functionality
 

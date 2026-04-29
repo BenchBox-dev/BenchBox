@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T18:04:33.405869'
+generated_at: '2026-04-28T19:49:03.533821'
 total_items: 36
 priorities:
   High:
@@ -30,7 +30,7 @@ priorities:
       category: Release Tooling
       status: In Progress
   Medium-High:
-    count: 4
+    count: 6
     items:
     - id: add-hypothesis-property-tests
       file: TODO/main/planning/add-hypothesis-property-tests.yaml
@@ -52,8 +52,18 @@ priorities:
       title: Integrate BenchBox CLI submission flow and service authentication
       category: Core Functionality
       status: In Progress
+    - id: dry-run-followup-manifest-filename-convention
+      file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
+      title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
+      category: Core Functionality
+      status: Not Started
+    - id: dry-run-followup-submitted-by-flag
+      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
+      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
+      category: Core Functionality
+      status: Not Started
   Medium:
-    count: 9
+    count: 7
     items:
     - id: ballista-distributed-adapter
       file: TODO/platform-expansion/planning/ballista-distributed-adapter.yaml
@@ -75,11 +85,6 @@ priorities:
       title: Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL
       category: Performance
       status: Identified
-    - id: dry-run-followup-manifest-filename-convention
-      file: TODO/main/planning/dry-run-followup-manifest-filename-convention.yaml
-      title: Per-bundle manifest filenames to avoid PR collision in results-data/bundles/
-      category: Core Functionality
-      status: Not Started
     - id: single-repo-migration-phase-8-first-post-migration-release
       file: TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml
       title: 'Single-repo migration phase 8: cut the first release after deletion and docs cleanup'
@@ -94,11 +99,6 @@ priorities:
       file: TODO/main/planning/validate-and-integrate-tpc-tuning-json.yaml
       title: Validate tpc-tuning.json z-ordering recommendations and integrate or discard
       category: Testing and Quality Assurance
-      status: Not Started
-    - id: dry-run-followup-submitted-by-flag
-      file: TODO/main/planning/dry-run-followup-submitted-by-flag.yaml
-      title: 'benchbox submit: warn on empty submitted_by, add --submitted-by override'
-      category: Core Functionality
       status: Not Started
   Low:
     count: 17
