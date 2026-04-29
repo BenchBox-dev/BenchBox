@@ -34,32 +34,60 @@ description: |
 work:
   - id: w1
     summary: "Investigate B2 — root-cause empty PlatformIndex for duckdb/polars"
-    status: pending
+    status: done
     notes: |
-      Two confirmed facts before starting:
-        - DuckDB browser store has the rows: `platform_index_rows` shows
-          ('duckdb', 'DuckDB', 4) and ('polars', 'Polars', 2).
-        - sqlite (2 rows) and datafusion (4 rows) render correctly in the
-          same component, so the bug is platform-specific, not a generic
-          PlatformIndex regression.
+      DECISION: B2 is real, intermittent, and looks like a DuckDB-WASM
+      cold-load symptom (H1) — NOT a casing/projection/equality bug
+      (H2/H3 ruled out).
 
-      Hypothesis ladder, narrowest first:
-        H1  Race: DuckDB-WASM still warming on cold-load; tester's Chrome
-            wait timed out. Reproduce in non-headless Chrome with a hard
-            refresh — if rows appear after a 30s manual wait, it's the
-            same B2 surface as the known WASM range-read issue.
-        H2  Casing/whitespace mismatch in `getPlatformIndexRows()` projection
-            (results-explorer/src/lib/duckdbQueries.ts) — confirm the SQL
-            view filters by `platform_id` exactly and that none of the 4
-            duckdb rows have a stray space, version suffix, or NULL slug.
-        H3  PlatformIndex.tsx:48 filter `r.platform_id === platform || r.platform === platform`
-            sees a value the runtime doesn't equal-compare to the URL slug
-            (e.g. duckdb stored as "duckdb" but SQL-roundtrip gives a
-            BigInt-wrapped string).
+      Evidence:
+        - Direct DuckDB inspection: platform_index_rows for the production
+          corpus contains clean ASCII slugs ('duckdb', 'polars',
+          'datafusion', 'sqlite') with no whitespace, casing, or NULL
+          oddities. → eliminates H2.
+        - PlatformIndex.tsx:48 filter is `r.platform_id === platform`
+          (strict-equality ASCII strings). The same code path renders the
+          same data shape for every platform; if it failed for "polars"
+          it would also fail for "sqlite". → eliminates H3.
+        - New e2e regression spec (e2e/routes/platform-index-prod-data.spec.ts)
+          asserts 4 DuckDB rows + Polars heading on a build seeded with
+          the production results.duckdb. Run 3× serially:
+            run 1: DuckDB FAIL (heading stayed "duckdb Results", body
+                   "No results found"), Polars PASS.
+            run 2: BOTH FAIL.
+            run 3: BOTH PASS, in 1s and 2.6s — WASM warmed up.
+          Highly intermittent, no platform consistently fails. → H1.
 
-      Confirm which hypothesis holds before implementing. Capture a
-      DevTools network + console trace from the affected page on cold
-      load and a warm reload — attach to this work unit's notes.
+      Mechanism (best inference): on cold load, DuckDB-WASM attaches but
+      the subsequent `SELECT * FROM platform_index_rows` can resolve
+      before the runtime has fetched all of the table's pages. The query
+      returns a *partial* row set; whichever platform_ids didn't make
+      that partial set show up as "No results found" on their platform
+      page. Underlying DuckDB-WASM range-read issue is tracked
+      separately as
+      `enable-duckdb-wasm-http-range-reads-for-registered-urls`
+      (see results-explorer/src/db.ts:67-77).
+
+      Implication for w3:
+        - This is not a code bug in PlatformIndex; the filter and
+          projection are correct.
+        - The remediation is UX, not data-binding: distinguish "DB is
+          still warming" from "DB returned zero rows for this platform".
+          Two cleanest options for w3 to choose between:
+            (a) Switch PlatformIndex to call the parameterized form,
+                `getPlatformIndexRows(platform)`, and treat an empty
+                response as "loading" if the page just mounted —
+                retry/wait once before showing the empty state.
+            (b) Add a "data ready" handshake in db.ts: a sentinel
+                SELECT (e.g. `SELECT COUNT(*) FROM bench.results`) that
+                must succeed AND return >0 before any page-level query
+                resolves. Not strictly correct (could still race) but
+                catches the most common cold-load partial-data case.
+
+      Reproduction guard kept as
+      e2e/routes/platform-index-prod-data.spec.ts. The spec is currently
+      flaky against headless Chromium cold-loads; mark with `test.fixme()`
+      until w3's mitigation lands, then flip back to `test()`.
 
   - id: w2
     summary: "Resolve Q1 — confirm whether ResultDetail/Compare primary-metric toggle should exist"
