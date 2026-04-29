@@ -1,0 +1,304 @@
+id: results-explorer-qa-pass1-fixes
+title: "Investigate and remediate Results Explorer QA pass-1 findings"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  First end-to-end QA pass of the Results Explorer (run on Chromium 147 and
+  Firefox 148 against the dev server at http://localhost:5173/results/) found
+  four real product bugs, plus one open question about a possibly-removed UI
+  control. This item tracks the investigation and remediation of each.
+
+  Source: QA tester report on commit ca9a8ed9b, scored against the test plan
+  written by the agent. Filtered out test-plan errors (the SSB route mistake)
+  and known-upstream warnings (DuckDB-WASM exception-handling, JSX-source
+  babel plugin warning, Chrome-headless cold-load latency tracked separately
+  as `enable-duckdb-wasm-http-range-reads-for-registered-urls`).
+
+  Bugs to fix:
+    B1  PlatformIndex tables have static <th> headers — no sort handlers.
+    B2  /results/p/duckdb/ and /results/p/polars/ render empty even though
+        the DuckDB browser store has 4 + 2 rows for those platforms.
+    B3  /results/does-not-exist/ renders an empty BenchmarkIndex instead of
+        the NotFound page (preact-router ":benchmark/" matches anything).
+    B4  TimeSeries on platform pages emits a Preact duplicate-key warning
+        when multiple results share a run_date.
+
+  Open question (resolve before any UI change):
+    Q1  ResultDetail and Compare both have `primaryMetric` state read from
+        `?metric=` URL param, but no in-page toggle UI. Is this an
+        intentional URL-only contract or a regression?
+
+work:
+  - id: w1
+    summary: "Investigate B2 — root-cause empty PlatformIndex for duckdb/polars"
+    status: pending
+    notes: |
+      Two confirmed facts before starting:
+        - DuckDB browser store has the rows: `platform_index_rows` shows
+          ('duckdb', 'DuckDB', 4) and ('polars', 'Polars', 2).
+        - sqlite (2 rows) and datafusion (4 rows) render correctly in the
+          same component, so the bug is platform-specific, not a generic
+          PlatformIndex regression.
+
+      Hypothesis ladder, narrowest first:
+        H1  Race: DuckDB-WASM still warming on cold-load; tester's Chrome
+            wait timed out. Reproduce in non-headless Chrome with a hard
+            refresh — if rows appear after a 30s manual wait, it's the
+            same B2 surface as the known WASM range-read issue.
+        H2  Casing/whitespace mismatch in `getPlatformIndexRows()` projection
+            (results-explorer/src/lib/duckdbQueries.ts) — confirm the SQL
+            view filters by `platform_id` exactly and that none of the 4
+            duckdb rows have a stray space, version suffix, or NULL slug.
+        H3  PlatformIndex.tsx:48 filter `r.platform_id === platform || r.platform === platform`
+            sees a value the runtime doesn't equal-compare to the URL slug
+            (e.g. duckdb stored as "duckdb" but SQL-roundtrip gives a
+            BigInt-wrapped string).
+
+      Confirm which hypothesis holds before implementing. Capture a
+      DevTools network + console trace from the affected page on cold
+      load and a warm reload — attach to this work unit's notes.
+
+  - id: w2
+    summary: "Resolve Q1 — confirm whether ResultDetail/Compare primary-metric toggle should exist"
+    status: pending
+    notes: |
+      Both pages declare `useState<'power_score' | 'display_geomean_ms'>`
+      and read the value from `?metric=` URL params, but neither renders
+      a button or select that lets the user flip it. Decide between:
+        (a) Intentional URL-only contract → update the test plan; remove
+            §4.2 and §5.3 expectations of an in-page toggle.
+        (b) Regression / missing feature → file a separate TODO and add
+            the toggle UI back. Verify against git history of
+            ResultDetail.tsx and Compare.tsx for a removed button.
+
+      Output: a one-line decision recorded in this work unit's notes,
+      plus either a test-plan diff or a follow-up TODO id.
+
+  - id: w3
+    summary: "Fix B2 — apply remediation from w1's root cause"
+    needs: [w1]
+    status: pending
+    notes: |
+      Implementation depends on w1's diagnosis. Most likely surfaces:
+        - If H2: tweak the SQL projection in
+          results-explorer/src/lib/duckdbQueries.ts so duckdb/polars rows
+          aren't dropped, plus a unit test against the committed
+          test-fixtures DB.
+        - If H3: tighten the equality check at
+          results-explorer/src/pages/PlatformIndex.tsx:48 (likely
+          normalize both sides via `String()` or `.trim()`).
+        - If H1 (race): add a loading/empty-vs-cold-start distinction so
+          the page doesn't say "0 results" before DuckDB-WASM finishes
+          attaching, and document the warm-up budget.
+
+  - id: w4
+    summary: "Fix B1 — add sort handlers to PlatformIndex table headers"
+    status: pending
+    notes: |
+      Copy the button-in-th pattern from
+      results-explorer/src/pages/ResultDetail.tsx:326-352 (each <th>
+      wraps a transparent <button> with onClick={toggleSort(key)} and a
+      sortArrow(key) suffix). Apply to PlatformIndex.tsx columns
+      Benchmark, Scale, Date, Power Score. Keep the existing default
+      (geomean_ms ascending) as initial sort state.
+
+  - id: w5
+    summary: "Fix B3 — route unknown-benchmark slugs to NotFound"
+    status: pending
+    notes: |
+      Two acceptable approaches; pick one:
+        (a) Inside BenchmarkIndex.tsx, after the data load, if the
+            `benchmark` URL prop matches no rows in the meta-leaderboard
+            cohorts list, render <NotFound /> instead of the empty page.
+        (b) Maintain a known-benchmarks set (built from
+            cohort_metadata.benchmark distinct values) and validate
+            BenchmarkIndex's prop against it on mount.
+
+      Either way, add an e2e test under results-explorer/e2e/ that hits
+      /results/does-not-exist/ and asserts the NotFound copy is shown.
+
+  - id: w6
+    summary: "Fix B4 — TimeSeries duplicate-key warning on platform pages"
+    status: pending
+    notes: |
+      In results-explorer/src/components/TimeSeries.tsx the row key is
+      currently the run_date string. Multiple results sharing the same
+      date (common for batch runs) collide. Switch to `result_id` (or a
+      composite `${result_id}-${run_date}`) so Preact reconciliation is
+      stable. Verify by opening /results/p/duckdb/ in a dev build and
+      confirming the console is clean.
+
+  - id: w7
+    summary: "Promote QA test plan to docs/operations/results-explorer-qa.md and apply tester findings"
+    needs: [w2]
+    status: pending
+    notes: |
+      Decision (resolved during review): the QA test plan must be
+      checked in, not kept in chat history. The first version was lost
+      to context reset; the second cannot be allowed to die the same
+      way. Target path: docs/operations/results-explorer-qa.md.
+
+      Concrete deliverables (all in one commit):
+        1. Create docs/operations/results-explorer-qa.md from the
+           agent's drafted §1-§7 plan + report template.
+        2. Drop the "/results/ssb/" instruction from §2 (data uses
+           benchmark="star_schema"; SSB is a display label only).
+        3. Reflect w2's decision on §4.2 / §5.3 (remove the
+           primary-metric toggle test if URL-only is intentional, or
+           keep it if a separate TODO has been filed to add the UI).
+        4. Add a "Prereqs (operator)" block at the top making the dev
+           server requirement explicit (cd results-explorer && npm run dev).
+        5. Add an "Expected hidden controls" note: trust chips and
+           tuning dropdown auto-hide when the dataset has only one
+           value — not a bug on the current corpus (12 results, all
+           maintainer-run, all tuning_mode=NULL).
+
+  - id: w8
+    summary: "Re-run the QA pass against the fixed build and confirm closure"
+    needs: [w3, w4, w5, w6]
+    status: pending
+    notes: |
+      After all fixes land, run the (corrected) test plan once more
+      against http://localhost:5173/results/ in Chrome and Firefox.
+      Acceptance: §1, §3, §4, §5, §6, §7 all green; §2 green for
+      tpch+star_schema. Console is clean of the TimeSeries warning.
+      Capture a fresh report and attach as evidence on this work unit.
+
+deferred:
+  - summary: "Investigate Chrome-headless 30-45s cold-load latency"
+    reason: |
+      Already tracked separately by the
+      `enable-duckdb-wasm-http-range-reads-for-registered-urls` work
+      (see results-explorer/src/db.ts:67-77 for the full annotation).
+      Do not duplicate here.
+
+  - summary: "Suppress / upgrade Firefox WebAssembly exception-handling deprecation warning"
+    reason: |
+      Upstream DuckDB-WASM. No local action available until the runtime
+      drops the deprecated `try` form.
+
+  - summary: "Silence Preact dev-mode '@babel/plugin-transform-react-jsx-source' warning"
+    reason: |
+      Dev-only; zero user impact. Can be batched with a future Vite/Preact
+      tooling bump.
+
+  - summary: "Run Lighthouse a11y audit"
+    reason: |
+      Tester did not have lhci installed and elected not to install new
+      tooling for this pass. Re-attempt next QA round once tooling is
+      provisioned (or run ad-hoc via Chrome DevTools Lighthouse panel).
+
+files_affected:
+  modified:
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/components/TimeSeries.tsx"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+  added:
+    - "results-explorer/e2e/unknown-benchmark.spec.ts"
+    - "docs/operations/results-explorer-qa.md"
+
+must_preserve:
+  - "Existing PlatformIndex default sort (geomean_ms ascending, nulls last) remains the initial state"
+  - "DuckDB-WASM single-attach behaviour: results.duckdb is fetched once per page-session, not per navigation"
+  - "ResultDetail's existing sort UI (button-in-th + sortArrow) keeps working unchanged"
+  - "NotFound page continues to render for genuinely unknown top-level routes (preact-router default)"
+  - "Compare's `?ids=zzz` invalid-id error path keeps showing 'Cannot compare' rather than crashing"
+
+approach: |
+  Investigate before patching. w1 and w2 are research units that produce
+  decisions; w3-w7 are mechanical once those decisions exist. Run them in
+  the order: w1 → (w3, w4, w5, w6 in parallel) → w7 → w8.
+
+  Note on file surface: `files_affected.modified` lists the maximal set
+  across all hypotheses. The actual files touched in w3 depend on which
+  hypothesis (H1/H2/H3) wins in w1 — H1 may not require any code change
+  in duckdbQueries.ts or PlatformIndex.tsx at all (loading-state nuance
+  only). Re-baseline files_affected at the start of w3 if needed.
+
+  Reuse existing patterns:
+    - Sort handlers (B1): copy ResultDetail's `<th><button onClick=toggleSort()>`
+      pattern verbatim.
+    - Unknown-benchmark guard (B3): the cohort_metadata table already
+      enumerates valid benchmarks; query it once on mount.
+    - Key uniqueness (B4): every result has a stable `result_id`; use it
+      directly rather than inventing a new key.
+
+  For the failing PlatformIndex (B2), do NOT skip the diagnosis step. The
+  test report data shows the rows are in the DB, so jumping to a fix risks
+  patching the wrong layer.
+
+anti_patterns:
+  - "DO NOT add the missing primary-metric toggle UI before w2 confirms it was actually removed — because it may be a deliberate URL-only contract — gather git evidence first."
+  - "DO NOT special-case duckdb/polars in PlatformIndex — because the bug is almost certainly a generic data-binding mismatch — find the equality / projection bug and fix it for all platforms at once."
+  - "DO NOT delete or rewrite the existing default-sort logic in PlatformIndex while adding click-sort — because the empty-state ordering is observable behavior — extend, don't replace."
+  - "DO NOT widen B3's NotFound guard to top-level routes — because preact-router's `default` already handles those — guard only the `:benchmark/` slug match."
+
+verification:
+  - description: "Vitest unit tests pass after all fixes"
+    command: "cd results-explorer && npm run test"
+    expected_output: "Test Files  ... passed ... 0 failed"
+  - description: "TypeScript clean across the explorer"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "exit code 0; no `error TS` lines emitted"
+  - description: "Playwright e2e Chromium suite passes (includes new unknown-benchmark spec)"
+    command: "cd results-explorer && npm run test:e2e:chromium"
+    expected_output: "passed (... ms); 0 failed"
+  - description: "Manual smoke: /results/p/duckdb/ shows 4 rows, /results/p/polars/ shows 2 rows"
+    command: "open http://localhost:5173/results/p/duckdb/ && open http://localhost:5173/results/p/polars/"
+    expected_output: "DuckDB page lists 4 result rows; Polars page lists 2 result rows; neither shows the 'No results' empty state"
+  - description: "Manual smoke: /results/does-not-exist/ shows the NotFound page"
+    command: "open http://localhost:5173/results/does-not-exist/"
+    expected_output: "Page renders the NotFound component (404 copy), not an empty BenchmarkIndex shell"
+  - description: "Manual smoke: console clean on /results/p/duckdb/ (no Preact duplicate-key warning)"
+    command: "open http://localhost:5173/results/p/duckdb/  # then check DevTools Console"
+    expected_output: "No 'Each child in a list should have a unique \"key\" prop' warnings; no red error entries"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/components/TimeSeries.tsx"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/e2e/"
+    - "docs/operations/results-explorer-qa.md"
+  do_not_modify:
+    - "benchbox/core/explorer_pipeline/"
+    - "benchbox/cli/commands/explorer.py"
+    - "results-explorer/src/db.ts"
+
+metadata:
+  tags:
+    - "results-explorer"
+    - "qa-followup"
+    - "bug"
+    - "ui"
+    - "preact"
+    - "duckdb-wasm"
+    - "duckdb"
+    - "polars"
+  estimated_effort: "Medium (1-2 days end-to-end including the re-test)"
+  created_date: "2026-04-28"
+  source: "QA tester report on commit ca9a8ed9b, 2026-04-28"
+
+impact:
+  user_impact: |
+    Two of the four bugs (B2, B3) make pages appear broken to a first-time
+    visitor: empty rows on common platform pages, and a confusing empty
+    state instead of a clear 404. B1 reduces the usefulness of the
+    PlatformIndex tables (no way to re-sort by date or score). B4 is a
+    silent dev-console issue today but signals real Preact reconciliation
+    risk if the corpus grows.
+  technical_debt: |
+    The investigation work (w1, w2) closes two unknowns about the
+    explorer's runtime contract that the team should not have to
+    re-discover next QA round.
+
+success_metrics:
+  - "All four bugs (B1, B2, B3, B4) resolved with passing verification commands"
+  - "Q1 has a recorded decision in w2 notes; test plan reflects it"
+  - "QA test plan is checked in at docs/operations/results-explorer-qa.md"
+  - "Re-run of the corrected test plan returns zero BUG markers in §1-§7"
