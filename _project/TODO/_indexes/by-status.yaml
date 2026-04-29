@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T21:19:47.421686'
-total_items: 38
+generated_at: '2026-04-28T20:39:20.703890'
+total_items: 35
 statuses:
   In Progress:
     count: 3
@@ -20,7 +20,7 @@ statuses:
       priority: High
       category: Release Tooling
   Not Started:
-    count: 33
+    count: 30
     items:
     - id: databend-3-mode-local-server-cloud
       file: TODO/main/planning/databend-3-mode-local-server-cloud.yaml
@@ -97,6 +97,11 @@ statuses:
       title: Graduate Firefox and WebKit @smoke CI jobs to blocking gates
       priority: Medium-High
       category: Testing and Quality Assurance
+    - id: dry-run-followup-package-canonical-contributing
+      file: TODO/main/planning/dry-run-followup-package-canonical-contributing.yaml
+      title: Make benchbox submit's packaged CONTRIBUTING.md match docs/contributing-results.md
+      priority: High
+      category: Core Functionality
     - id: results-explorer-qa-pass1-fixes
       file: TODO/main/planning/results-explorer-qa-pass1-fixes.yaml
       title: Investigate and remediate Results Explorer QA pass-1 findings

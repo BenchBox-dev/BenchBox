@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T21:19:47.421616'
-total_items: 38
+generated_at: '2026-04-28T20:39:20.703826'
+total_items: 35
 items:
 - id: dry-run-followup-validator-hash-contract-mismatch
   file: TODO/main/planning/dry-run-followup-validator-hash-contract-mismatch.yaml
@@ -233,21 +233,6 @@ items:
   work_total: 18
   work_done: 0
   work_ready: 18
-- id: dry-run-followup-uv-fallback-and-schema-key
-  file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
-  title: 'Local-validation block: document non-uv fallback and schema-version key name'
-  worktree: main
-  category: Documentation
-  priority: Low
-  status: Not Started
-  tags:
-  - docs
-  - contributor-experience
-  - dry-run-followup
-  estimated_effort: Trivial
-  work_total: 2
-  work_done: 0
-  work_ready: 2
 - id: review-dependency-upper-bounds-quarterly
   file: TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml
   title: Quarterly review of dependency upper bounds

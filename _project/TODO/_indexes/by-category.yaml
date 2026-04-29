@@ -1,4 +1,4 @@
-generated_at: '2026-04-28T21:19:47.421657'
+generated_at: '2026-04-28T20:39:20.703859'
 total_categories: 13
 categories:
   Architecture & Refactoring:
@@ -84,7 +84,7 @@ categories:
       priority: Medium-High
       status: Not Started
   Documentation:
-    count: 3
+    count: 2
     items:
     - id: dry-run-followup-broken-getting-started-link
       file: TODO/main/planning/dry-run-followup-broken-getting-started-link.yaml
@@ -96,11 +96,6 @@ categories:
       title: Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table
       priority: Low
       status: Identified
-    - id: dry-run-followup-uv-fallback-and-schema-key
-      file: TODO/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
-      title: 'Local-validation block: document non-uv fallback and schema-version key name'
-      priority: Low
-      status: Not Started
   Performance:
     count: 1
     items:
