@@ -426,9 +426,14 @@ class TestClickHouseAdapter:
             assert "Array(Float64)" in adapter._optimize_table_definition(duckdb_double_array)
 
             # \b word boundary must protect identifiers that merely contain the
-            # FLOAT/DOUBLE substring; the rewrite is for type tokens only.
-            id_with_float_suffix = "CREATE TABLE t (my_float_type INTEGER, payload INT)"
-            assert "my_float_type INTEGER" in adapter._optimize_table_definition(id_with_float_suffix)
+            # FLOAT/DOUBLE substring; the rewrite is for type tokens only. The
+            # mixed case asserts both: the real FLOAT[N] type token IS rewritten
+            # while the column name `my_float_col` survives untouched.
+            mixed = "CREATE TABLE t (vec FLOAT[10], my_float_col INT)"
+            mixed_out = adapter._optimize_table_definition(mixed)
+            assert "vec Array(Float32)" in mixed_out
+            assert "my_float_col INT" in mixed_out
+            assert "FLOAT[" not in mixed_out
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_get_platform_metadata(self, mock_client_class):

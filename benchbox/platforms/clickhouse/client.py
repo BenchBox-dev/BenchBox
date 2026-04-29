@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import io
 import logging
 import re
+
+import pandas as pd
+import pyarrow as pa
 
 logger = logging.getLogger(__name__)
 
@@ -135,11 +139,6 @@ class ClickHouseLocalClient:
         decode here can be reverted to a direct DataFrame fetch. File / track
         this in the chdb upstream issue tracker.
         """
-        import io
-
-        import pandas as pd
-        import pyarrow as pa
-
         data = result.bytes()
         if not data:
             return pd.DataFrame()
