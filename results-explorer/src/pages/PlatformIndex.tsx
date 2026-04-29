@@ -10,16 +10,25 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { ChartPanel } from "@/components/ChartPanel";
+import type { SortState } from "@/types";
 
 interface PlatformIndexProps extends RoutableProps {
   platform?: string;
 }
+
+type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score" | "geomean_ms";
 
 export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const [rows, setRows] = useState<PlatformIndexRowRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [tuningFilter, setTuningFilter] = useUrlState<string>("tuning", "all", stringSerde);
+  // Default: geomean_ms ascending (fastest first), nulls last. The empty-state
+  // ordering is observable behaviour — must_preserve in the parent TODO.
+  const [sort, setSort] = useState<SortState<PlatformSortKey>>({
+    key: "geomean_ms",
+    direction: "asc",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -57,13 +66,30 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const platformResultsRaw =
     tuningFilter === "all" ? allPlatformResults : allPlatformResults.filter((r) => r.tuning_mode === tuningFilter);
 
-  // Sort by geomean_ms ascending (fastest first); nulls last.
   const platformResults = [...platformResultsRaw].sort((a, b) => {
-    if (a.geomean_ms === null && b.geomean_ms === null) return 0;
-    if (a.geomean_ms === null) return 1;
-    if (b.geomean_ms === null) return -1;
-    return a.geomean_ms - b.geomean_ms;
+    const dir = sort.direction === "asc" ? 1 : -1;
+    if (sort.key === "benchmark") return dir * a.benchmark.localeCompare(b.benchmark);
+    if (sort.key === "run_date") return dir * a.run_date.localeCompare(b.run_date);
+    const av = a[sort.key];
+    const bv = b[sort.key];
+    if (av === null && bv === null) return 0;
+    if (av === null) return 1; // nulls always last, regardless of direction
+    if (bv === null) return -1;
+    return dir * (av - bv);
   });
+
+  function toggleSort(key: PlatformSortKey) {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: "asc" },
+    );
+  }
+
+  function sortArrow(key: PlatformSortKey) {
+    if (sort.key !== key) return " ↕";
+    return sort.direction === "asc" ? " ↑" : " ↓";
+  }
 
   function toggleSelect(resultId: string) {
     setSelected((prev) => {
@@ -128,15 +154,54 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 <th class="table-th w-8">
                   <span class="sr-only">Compare</span>
                 </th>
-                <th class="table-th">Benchmark</th>
-                <th class="table-th">Scale</th>
-                <th class="table-th">Date</th>
-                <th class="table-th">Power Score</th>
+                <th class="p-0" scope="col">
+                  <button
+                    type="button"
+                    class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                    onClick={() => toggleSort("benchmark")}
+                  >
+                    Benchmark{sortArrow("benchmark")}
+                  </button>
+                </th>
+                <th class="p-0" scope="col">
+                  <button
+                    type="button"
+                    class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                    onClick={() => toggleSort("scale_factor")}
+                  >
+                    Scale{sortArrow("scale_factor")}
+                  </button>
+                </th>
+                <th class="p-0" scope="col">
+                  <button
+                    type="button"
+                    class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                    onClick={() => toggleSort("run_date")}
+                  >
+                    Date{sortArrow("run_date")}
+                  </button>
+                </th>
+                <th class="p-0" scope="col">
+                  <button
+                    type="button"
+                    class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                    onClick={() => toggleSort("power_score")}
+                  >
+                    Power Score{sortArrow("power_score")}
+                  </button>
+                </th>
                 <th
-                  class="table-th"
+                  class="p-0"
+                  scope="col"
                   title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
                 >
-                  Geomean (ms)
+                  <button
+                    type="button"
+                    class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                    onClick={() => toggleSort("geomean_ms")}
+                  >
+                    Geomean (ms){sortArrow("geomean_ms")}
+                  </button>
                 </th>
                 <th class="table-th">Source</th>
                 <th class="table-th" />

@@ -178,14 +178,28 @@ work:
 
   - id: w4
     summary: "Fix B1 — add sort handlers to PlatformIndex table headers"
-    status: pending
+    status: done
     notes: |
-      Copy the button-in-th pattern from
-      results-explorer/src/pages/ResultDetail.tsx:326-352 (each <th>
-      wraps a transparent <button> with onClick={toggleSort(key)} and a
-      sortArrow(key) suffix). Apply to PlatformIndex.tsx columns
-      Benchmark, Scale, Date, Power Score. Keep the existing default
-      (geomean_ms ascending) as initial sort state.
+      Copied the button-in-th pattern from ResultDetail.tsx:326-352
+      and applied to all five sortable columns in PlatformIndex.tsx
+      (Benchmark, Scale, Date, Power Score, Geomean). Geomean was
+      added beyond the original four to keep the UX consistent —
+      otherwise the user would see four sort arrows and a stuck
+      Geomean column.
+
+      Initial sort state is `{ key: "geomean_ms", direction: "asc" }`,
+      preserving the prior default (fastest first, nulls last) per
+      the must_preserve guard. The new sort comparator routes string
+      columns through localeCompare and numeric columns through `av - bv`,
+      with nulls always last regardless of direction.
+
+      New tests in src/pages/__tests__/PlatformIndex.test.tsx cover:
+        - default sort = geomean_ms asc, nulls last
+        - Geomean click → direction flip (asc → desc, nulls still last)
+        - Benchmark click → alphabetical asc, stable sort within ties
+        - Power Score click → nulls last in both directions
+
+      Verification: 283/283 vitest passes, tsc clean.
 
   - id: w5
     summary: "Fix B3 — route unknown-benchmark slugs to NotFound"
