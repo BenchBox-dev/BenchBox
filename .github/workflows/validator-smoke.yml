@@ -1,0 +1,41 @@
+name: Validator Smoke
+
+# Standalone CI gate for `scripts/validate_submission.py` on this branch.
+# The repo-wide test.yml / lint.yml workflows only fire on PRs targeting
+# `main` / `develop`, and `validate-submission.yml` only fires when bundle
+# data changes. Without this workflow, a PR that edits *only* the
+# validator script (the typical sync-from-develop PR) would have no CI
+# gating at all on this branch.
+
+on:
+  pull_request:
+    branches:
+      - published-results
+    paths:
+      - "scripts/validate_submission.py"
+      - "tests/test_validate_submission_smoke.py"
+      - ".github/workflows/validator-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Validator round-trip smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pytest
+        # Standalone — no benchbox import needed, so we don't pay the
+        # cost of `uv sync --group dev`. Just pytest is enough.
+        run: python -m pip install --quiet pytest
+
+      - name: Run validator smoke test
+        run: python -m pytest tests/test_validate_submission_smoke.py -v
