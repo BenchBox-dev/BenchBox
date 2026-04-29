@@ -28,6 +28,7 @@ if step 1 (sync to develop's script) is skipped; sync to
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import subprocess
@@ -144,6 +145,71 @@ def test_writer_companion_hashes_validator_accepts(monkeypatch: pytest.MonkeyPat
 
     assert proc.returncode == 0, f"Validator rejected bundle with companions. Output:\n{output}"
     assert "0 error(s)" in output, output
+
+
+def test_validator_rejects_symlinked_bundle(tmp_path: Path) -> None:
+    """Symlink defense: a bundle that resolves through a symlink must be
+    rejected by the validator regardless of whether the symlink target's
+    bytes happen to hash correctly. The validator runs on PR-supplied
+    content; without this check, a malicious PR could redirect the hash
+    computation to attacker-chosen bytes."""
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+
+    real = tmp_path / "real_target.json"
+    real.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
+
+    # Symlink lives inside bundle_dir, points to a file outside it.
+    bundle_filename = "tpch_duckdb.json"
+    symlink_path = bundle_dir / bundle_filename
+    symlink_path.symlink_to(real)
+
+    # Manifest sits beside the bundle (where the validator discovers it
+    # via bundle_path.parent / "submission-manifest.json"). Hash matches
+    # the real target's bytes — the validator must reject *because of*
+    # the symlink, not because of a hash mismatch.
+    real_hash = hashlib.sha256(real.read_bytes()).hexdigest()
+    manifest = {
+        "bundle_file": bundle_filename,
+        "bundle_hash": real_hash,
+        "companion_hashes": {},
+    }
+    (bundle_dir / "submission-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    proc = subprocess.run(
+        [sys.executable, str(VENDORED_VALIDATOR), str(symlink_path)],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+    )
+    output = proc.stdout + proc.stderr
+
+    assert proc.returncode != 0, f"Validator wrongly accepted a symlinked bundle. Output:\n{output}"
+    assert "symlink" in output.lower(), f"Expected a symlink-specific error. Output:\n{output}"
+
+
+def test_validator_surfaces_both_missing_manifest_fields(tmp_path: Path) -> None:
+    """Early-return UX: a manifest missing both bundle_file and bundle_hash
+    should warn about both in one pass, not just the first."""
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    bundle_path = bundle_dir / "tpch_duckdb.json"
+    bundle_path.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
+    # Manifest is intentionally empty to exercise the both-fields-missing path.
+    # Sits beside the bundle where the validator discovers it.
+    (bundle_dir / "submission-manifest.json").write_text("{}", encoding="utf-8")
+
+    proc = subprocess.run(
+        [sys.executable, str(VENDORED_VALIDATOR), str(bundle_path)],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+    )
+    output = proc.stdout + proc.stderr
+
+    # Both fields are missing — both warnings should surface in one pass.
+    assert "bundle_file" in output, output
+    assert "bundle_hash" in output, output
 
 
 def test_vendored_validator_matches_develop_script() -> None:

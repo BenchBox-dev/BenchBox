@@ -328,19 +328,35 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
         vr.error(f"Cannot read submission manifest file: {exc}")
         return
 
+    # Surface ALL missing required fields in one pass so a contributor
+    # whose manifest is missing both `bundle_file` and `bundle_hash`
+    # sees both warnings instead of having to fix-and-retry one at a time.
     bundle_file = manifest.get("bundle_file")
     expected_hash = manifest.get("bundle_hash")
+    missing_fields: list[str] = []
     if not isinstance(bundle_file, str) or not bundle_file:
-        vr.warn("Submission manifest has no bundle_file field")
-        return
+        missing_fields.append("bundle_file")
     if not isinstance(expected_hash, str) or not expected_hash:
-        vr.warn("Submission manifest has no bundle_hash field")
+        missing_fields.append("bundle_hash")
+    if missing_fields:
+        for field in missing_fields:
+            vr.warn(f"Submission manifest has no {field} field")
         return
+
     if not _is_safe_bundle_filename(bundle_file):
         vr.error(f"Unsafe bundle_file in manifest: {bundle_file!r} (must be a plain filename)")
         return
 
     primary_path = bundle_dir / bundle_file
+    # Symlink defense: the validator runs on PR-supplied content, so a
+    # malicious symlink (committed via a crafted git tree) could redirect
+    # the hash to attacker-chosen bytes outside the bundle. Reject before
+    # is_file() — is_file() follows symlinks. The writer (benchbox submit)
+    # uses shutil.copy2, which copies file contents not symlinks, so any
+    # symlink in a submitted bundle is suspicious by construction.
+    if primary_path.is_symlink():
+        vr.error(f"Bundle file is a symlink, not a regular file: {bundle_file} (symlinks not allowed)")
+        return
     if not primary_path.is_file():
         vr.error(f"Bundle file declared in manifest not found in PR: {bundle_file}")
         return
@@ -362,6 +378,9 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
             vr.error(f"Unsafe companion filename in manifest: {comp_name!r} (must be a plain filename)")
             continue
         comp_path = bundle_dir / comp_name
+        if comp_path.is_symlink():
+            vr.error(f"Companion file is a symlink, not a regular file: {comp_name} (symlinks not allowed)")
+            continue
         if not comp_path.is_file():
             vr.error(f"Companion file declared in manifest not found in PR: {comp_name}")
             continue
