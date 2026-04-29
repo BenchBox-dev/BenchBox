@@ -33,7 +33,15 @@ ACTION_TO_STATUS = {
     "actioned": "actioned",
     "promote": "merged-to-todo",
 }
-FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
+FINDING_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*$")
+FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---(?:\n|\Z)", re.DOTALL)
+TRIAGE_LOG_HEADING_RE = re.compile(r"(?m)^## Triage log\s*$")
+SECTION_HEADING_RE = re.compile(r"(?m)^## .+$")
+
+
+def normalize_newlines(text: str) -> str:
+    """Normalize markdown line endings before parsing or rewriting."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def find_blind_spots_dir(start: Path) -> Path:
@@ -48,6 +56,7 @@ def find_blind_spots_dir(start: Path) -> Path:
 
 def split_frontmatter(text: str) -> tuple[dict, str, str]:
     """Return (data, raw_frontmatter, body)."""
+    text = normalize_newlines(text)
     m = FRONTMATTER_RE.match(text)
     if not m:
         raise ValueError("file does not start with a YAML frontmatter block")
@@ -74,13 +83,28 @@ def load_findings(bs_dir: Path) -> list[tuple[Path, dict, str]]:
     return out
 
 
-def find_one(bs_dir: Path, finding_id: str) -> tuple[Path, dict, str]:
-    candidate = bs_dir / f"{finding_id}.md"
+def find_one(bs_dir: Path, finding_id: str) -> tuple[Path, dict, str, str]:
+    if not FINDING_ID_RE.match(finding_id):
+        print(f"error: invalid finding id '{finding_id}'", file=sys.stderr)
+        sys.exit(2)
+
+    root = bs_dir.resolve()
+    candidate = (bs_dir / f"{finding_id}.md").resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        print(f"error: invalid finding id '{finding_id}'", file=sys.stderr)
+        sys.exit(2)
+
     if not candidate.exists():
         print(f"error: no finding with id '{finding_id}'", file=sys.stderr)
         sys.exit(2)
-    data, _raw, body = split_frontmatter(candidate.read_text(encoding="utf-8"))
-    return candidate, data, body
+    try:
+        data, raw, body = split_frontmatter(candidate.read_text(encoding="utf-8"))
+    except (ValueError, yaml.YAMLError) as exc:
+        print(f"error: finding '{finding_id}' is malformed: {exc}", file=sys.stderr)
+        sys.exit(1)
+    return candidate, data, raw, body
 
 
 def extract_title(body: str) -> str:
@@ -99,7 +123,7 @@ def fmt_date(value) -> str:
 
 def cmd_list(bs_dir: Path, args: argparse.Namespace) -> int:
     findings = load_findings(bs_dir)
-    findings.sort(key=lambda t: t[1].get("date", ""))
+    findings.sort(key=lambda t: fmt_date(t[1].get("date", "")))
 
     rows = []
     for path, data, body in findings:
@@ -110,9 +134,9 @@ def cmd_list(bs_dir: Path, args: argparse.Namespace) -> int:
         rows.append(
             (
                 fmt_date(data.get("date", "????-??-??")),
-                data.get("status", "?"),
-                data.get("finding_kind", "?"),
-                data.get("id", path.stem),
+                str(data.get("status", "?")),
+                str(data.get("finding_kind", "?")),
+                str(data.get("id", path.stem)),
                 extract_title(body),
             )
         )
@@ -138,7 +162,7 @@ def cmd_list(bs_dir: Path, args: argparse.Namespace) -> int:
 
 
 def cmd_show(bs_dir: Path, args: argparse.Namespace) -> int:
-    path, data, body = find_one(bs_dir, args.id)
+    path, data, _raw, body = find_one(bs_dir, args.id)
     print(f"# {path.relative_to(bs_dir.parent.parent)}\n")
     print("---")
     print(yaml.safe_dump(data, sort_keys=False).rstrip())
@@ -188,43 +212,72 @@ def cmd_report(bs_dir: Path, args: argparse.Namespace) -> int:
     return 0
 
 
-def stamp_frontmatter(path: Path, data: dict, body: str, new_status: str, todo_id: str | None) -> None:
-    """Rewrite the file with updated status (and optional todo_id)."""
-    data["status"] = new_status
+def render_scalar_field(field: str, value: str) -> str:
+    """Render one simple YAML scalar assignment without reformatting the block."""
+    rendered = yaml.safe_dump({field: value}, sort_keys=False, width=10_000).strip()
+    if "\n" in rendered:
+        raise ValueError(f"{field} must render as a single YAML line")
+    return rendered
+
+
+def replace_frontmatter_field(raw: str, field: str, value: str) -> str:
+    line = render_scalar_field(field, value)
+    pattern = re.compile(rf"(?m)^{re.escape(field)}:.*$")
+    if pattern.search(raw):
+        return pattern.sub(line, raw, count=1)
+    return raw.rstrip() + f"\n{line}"
+
+
+def stamp_frontmatter(path: Path, raw_frontmatter: str, body: str, new_status: str, todo_id: str | None) -> None:
+    """Rewrite only status/todo_id while preserving the rest of the frontmatter."""
+    new_raw = replace_frontmatter_field(raw_frontmatter, "status", new_status)
     if todo_id is not None:
-        data["todo_id"] = todo_id
-    new_raw = yaml.safe_dump(data, sort_keys=False).rstrip()
+        new_raw = replace_frontmatter_field(new_raw, "todo_id", todo_id)
     new_text = f"---\n{new_raw}\n---\n{body}"
     path.write_text(new_text, encoding="utf-8")
 
 
 def append_triage_log(path: Path, line: str) -> None:
-    text = path.read_text(encoding="utf-8")
-    if "\n## Triage log\n" in text:
-        # Append under existing section.
-        new_text = text.rstrip() + f"\n- {line}\n"
-    else:
+    text = normalize_newlines(path.read_text(encoding="utf-8"))
+    match = TRIAGE_LOG_HEADING_RE.search(text)
+    if match is None:
         new_text = text.rstrip() + f"\n\n## Triage log\n\n- {line}\n"
+    else:
+        next_section = SECTION_HEADING_RE.search(text, match.end())
+        insert_at = next_section.start() if next_section else len(text)
+        before = text[:insert_at].rstrip()
+        after = text[insert_at:].lstrip("\n")
+        if before.endswith("## Triage log"):
+            before += "\n"
+        new_text = f"{before}\n- {line}\n"
+        if after:
+            new_text += f"\n{after}"
     path.write_text(new_text, encoding="utf-8")
 
 
 def cmd_triage(bs_dir: Path, args: argparse.Namespace) -> int:
     new_status = ACTION_TO_STATUS[args.action]
-    path, data, body = find_one(bs_dir, args.id)
 
     if args.action == "promote":
+        if args.reason:
+            print("error: --reason cannot be combined with --action promote", file=sys.stderr)
+            return 2
         if not args.todo_id:
             print("error: --todo-id is required for --action promote", file=sys.stderr)
             return 2
         todo_id: str | None = args.todo_id
         log_line = f"{datetime.now().date().isoformat()}: promoted to TODO `{todo_id}`"
     else:
+        if args.todo_id:
+            print("error: --todo-id is only valid with --action promote", file=sys.stderr)
+            return 2
         todo_id = None
         reason = args.reason or ""
         suffix = f" — {reason}" if reason else ""
         log_line = f"{datetime.now().date().isoformat()}: {args.action}{suffix}"
 
-    stamp_frontmatter(path, data, body, new_status, todo_id)
+    path, _data, raw, body = find_one(bs_dir, args.id)
+    stamp_frontmatter(path, raw, body, new_status, todo_id)
     append_triage_log(path, log_line)
     print(f"OK   {path.relative_to(bs_dir.parent.parent)} → status={new_status}")
     if todo_id:
