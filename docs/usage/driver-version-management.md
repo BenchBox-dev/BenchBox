@@ -28,7 +28,7 @@ Running tpch on duckdb at scale 1.0 [driver 1.4.3]
 
 ## Why Your Manually-Installed Version May Not Be Respected
 
-If you run BenchBox via `uv run benchbox run ...`, uv syncs your environment against
+If you run BenchBox via `uv run -- benchbox run ...`, uv syncs your environment against
 `uv.lock` **before Python starts**. Any version you installed manually with
 `uv pip install "duckdb==1.5.0"` may be silently reverted to the lock-file-pinned
 version (e.g. `1.4.3`).

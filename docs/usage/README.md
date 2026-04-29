@@ -29,9 +29,9 @@ BenchBox keeps everyday workflows concise. Use this page as the jumping-off poin
 
 ## Next Steps
 
-1. Run `uv run benchbox profile` to capture a baseline system profile.
-2. Pick a platform with `uv run benchbox platforms list` and enable it if required.
-3. Execute a benchmark with `uv run benchbox run --platform duckdb --benchmark tpch --scale 0.01`.
-4. Inspect results via `uv run benchbox results --limit 1` or export JSON for CI with `uv run benchbox export`.
+1. Run `uv run -- benchbox profile` to capture a baseline system profile.
+2. Pick a platform with `uv run -- benchbox platforms list` and enable it if required.
+3. Execute a benchmark with `uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01`.
+4. Inspect results via `uv run -- benchbox results --limit 1` or export JSON for CI with `uv run -- benchbox export`.
 
 Bookmark this page to keep the most relevant references a single click away.
