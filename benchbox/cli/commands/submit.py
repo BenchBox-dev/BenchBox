@@ -440,7 +440,12 @@ def submit(
 
     output_path = Path(output_dir)
     bundle_dir = output_path / "bundle"
-    manifest_path = output_path / "submission-manifest.json"
+    # Per-bundle manifest filename: <bundle_stem>.manifest.json so two
+    # contributors submitting the same week cannot collide on a single
+    # `submission-manifest.json`. Readers (validate_submission.py,
+    # generate_corpus_inventory.py, explorer_pipeline) glob *.manifest.json
+    # and fall back to the legacy filename for backwards-compat.
+    manifest_path = output_path / f"{source_path.stem}.manifest.json"
     contributing_path = output_path / "CONTRIBUTING.md"
 
     if dry_run:
