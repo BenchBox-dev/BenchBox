@@ -2,7 +2,7 @@
 
 → **See AGENTS.md for full guidance.** Claude Code-specific shortcuts only.
 
-**Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`). Never `git add -A`. TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
+**Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`/`ty`). Never `git add -A`. Dev PRs target `develop`, never `main` (`main` is release-only and `develop` is PR-gated — no direct push to either). TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
 
 ## Git workflow
 
@@ -10,6 +10,14 @@ Single repo, single remote (`origin` → `joeharris76/BenchBox`). Working
 clone: `/Users/joe/Developer/BenchBox` (the canonical path; the old
 private clone was retired to `BenchBox.retired-20260427/` alongside it
 during the single-repo migration).
+
+> **Remote sanity check.** If `git remote -v` shows anything other than
+> a single `origin → joeharris76/BenchBox`, stop and ask — that's a
+> leftover from the pre-migration two-remote setup (`private` /
+> `public`) and pushing without confirming could leak intent across
+> repos. There is **no** `private` or `public` remote anymore; all
+> work goes to `origin` and PRs target `develop` (or `main` for
+> releases).
 
 - **Branches**: `develop` is the long-lived dev branch; `main` is
   release-only.
@@ -114,7 +122,9 @@ benchbox run --help | --help-topic all | --help-topic examples | --help-topic be
 
 ## Pre-approved Commands
 - **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `uv run -- python -m pytest *`
-- **PR/Worktree**: `make pr-preflight`, `make pr-status`, `make worktree-list`, `make worktree-prune`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
+- **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-status`, `make worktree-list`, `make worktree-prune`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
+- **PR/Worktree (write — feature branches only)**: `make pr-open`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `git push origin chore/*`, `git push origin fix/*`, `git push origin feat/*`, `git push origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
+  - **Never auto-allowed**: `git push * develop`, `git push * main`, `git push --force*`, `gh pr create --base main*`. These remain prompt-on-use.
 - **Files**: `ls*`, `find*`, `cat*`, `head*`, `tail*`, `wc*`, `file*`, `stat*`, `du*`, `tree*`, `which*`
 - **Git**: `git status`, `git diff*`, `git log*`, `git show*`, `git branch*`, `git remote*`, `git config --list`, `git worktree list*`
 - **Python**: `uv tree`, `uv pip list`, `uv pip show*`, `uv export`, `uv run -- python -c*`, `uv run -- python -m*`
