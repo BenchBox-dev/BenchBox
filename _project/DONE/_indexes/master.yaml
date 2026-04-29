@@ -1,5 +1,5 @@
-generated_at: '2026-04-28T18:04:35.676134'
-total_items: 788
+generated_at: '2026-04-28T20:39:22.688845'
+total_items: 789
 items:
 - id: interactive-wizard-dry-run-support
   file: DONE/ux-improvements/planning/interactive-wizard-dry-run-support.yaml
@@ -5246,6 +5246,22 @@ items:
   - explorer-result-detail-median-first
   - explorer-unified-chart-panel
   - explorer-url-synced-filter-state
+- id: dry-run-followup-uv-fallback-and-schema-key
+  file: DONE/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
+  title: 'Local-validation block: document non-uv fallback and schema-version key name'
+  worktree: main
+  category: Documentation
+  priority: Low
+  status: Completed
+  tags:
+  - docs
+  - contributor-experience
+  - dry-run-followup
+  estimated_effort: Trivial
+  completed_date: '2026-04-28'
+  work_total: 2
+  work_done: 2
+  work_ready: 0
 - id: questdb-parquet-chunk-size-tunable
   file: DONE/main/planning/questdb-parquet-chunk-size-tunable.yaml
   title: Make QuestDB parquet chunk row count tunable via platform config
