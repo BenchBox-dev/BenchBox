@@ -2369,6 +2369,11 @@ statuses:
       title: 'Launch results explorer: acceptance testing, seed corpus verification, and go-live'
       priority: Medium-High
       category: Core Functionality
+    - id: dry-run-followup-uv-fallback-and-schema-key
+      file: DONE/main/planning/dry-run-followup-uv-fallback-and-schema-key.yaml
+      title: 'Local-validation block: document non-uv fallback and schema-version key name'
+      priority: Low
+      category: Documentation
     - id: logging-standardization
       file: DONE/observability-quality/active/logging-standardization.yaml
       title: Logging Standardization
