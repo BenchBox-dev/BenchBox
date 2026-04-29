@@ -449,15 +449,7 @@ queries:
         PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l_quantity) as median_quantity
     FROM lineitem
     GROUP BY l_shipmode;
-  variants:
-    clickhouse: |2
-
-      -- ClickHouse uses quantile(0.5)(col) instead of PERCENTILE_CONT WITHIN GROUP
-      SELECT
-          l_shipmode,
-          quantile(0.5)(l_quantity) as median_quantity
-      FROM lineitem
-      GROUP BY l_shipmode;
+  skip_on: [clickhouse]
 - id: intrinsic_to_date
   category: intrinsic
   sql: |2
@@ -864,27 +856,7 @@ queries:
     WHERE o_orderdate >= DATE '1995-01-01'
       AND o_orderdate < DATE '1996-01-01'
     ORDER BY o_orderdate;
-  variants:
-    clickhouse: |2
-
-      -- ClickHouse does not support RANGE BETWEEN INTERVAL ... PRECEDING; use ROWS BETWEEN instead
-      SELECT
-          o_orderkey,
-          o_orderdate,
-          o_totalprice,
-          AVG(o_totalprice) OVER (
-              ORDER BY o_orderdate
-              ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
-          ) as moving_avg_6_orders,
-          SUM(o_totalprice) OVER (
-              ORDER BY o_orderdate
-              ROWS BETWEEN 30 PRECEDING AND CURRENT ROW
-          ) as monthly_running_total
-      FROM orders
-      WHERE o_orderdate >= toDate('1995-01-01')
-        AND o_orderdate < toDate('1996-01-01')
-      ORDER BY o_orderdate;
-  skip_on: [redshift]
+  skip_on: [clickhouse, redshift]
 - id: window_unbounded_frame
   category: window
   sql: |2
@@ -974,54 +946,7 @@ queries:
     FROM part
     WHERE MATCH(p_name, p_comment) AGAINST ('STEEL COPPER' IN NATURAL LANGUAGE MODE)
     LIMIT 100;
-  variants:
-    duckdb: |2
-
-      -- DuckDB doesn't support MATCH...AGAINST, use LIKE instead
-      SELECT
-          p_partkey,
-          p_name,
-          p_mfgr,
-          p_comment
-      FROM part
-      WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
-         OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
-      LIMIT 100;
-    datafusion: |2
-
-      SELECT
-          p_partkey,
-          p_name,
-          p_mfgr,
-          p_comment
-      FROM part
-      WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
-         OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
-      LIMIT 100;
-    redshift: |2
-
-      -- Redshift doesn't support MATCH...AGAINST, use LIKE instead
-      SELECT
-          p_partkey,
-          p_name,
-          p_mfgr,
-          p_comment
-      FROM part
-      WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
-         OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
-      LIMIT 100;
-    clickhouse: |2
-
-      -- ClickHouse doesn't support MATCH...AGAINST, use LIKE instead
-      SELECT
-          p_partkey,
-          p_name,
-          p_mfgr,
-          p_comment
-      FROM part
-      WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
-         OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
-      LIMIT 100;
+  skip_on: [clickhouse, datafusion, duckdb, redshift]
 - id: fulltext_boolean_search
   category: fulltext
   sql: |2
@@ -1036,50 +961,7 @@ queries:
     WHERE MATCH(c_comment) AGAINST ('+BUILDING -FURNITURE' IN BOOLEAN MODE)
     ORDER BY relevance_score DESC
     LIMIT 50;
-  variants:
-    duckdb: |2
-
-      -- DuckDB doesn't support MATCH...AGAINST, use LIKE with AND/NOT logic
-      SELECT
-          c_custkey,
-          c_name,
-          c_comment
-      FROM customer
-      WHERE c_comment LIKE '%BUILDING%'
-        AND c_comment NOT LIKE '%FURNITURE%'
-      LIMIT 50;
-    datafusion: |2
-
-      SELECT
-          c_custkey,
-          c_name,
-          c_comment
-      FROM customer
-      WHERE c_comment LIKE '%BUILDING%'
-        AND c_comment NOT LIKE '%FURNITURE%'
-      LIMIT 50;
-    redshift: |2
-
-      -- Redshift doesn't support MATCH...AGAINST, use LIKE with AND/NOT logic
-      SELECT
-          c_custkey,
-          c_name,
-          c_comment
-      FROM customer
-      WHERE c_comment LIKE '%BUILDING%'
-        AND c_comment NOT LIKE '%FURNITURE%'
-      LIMIT 50;
-    clickhouse: |2
-
-      -- ClickHouse doesn't support MATCH...AGAINST, use LIKE with AND/NOT logic
-      SELECT
-          c_custkey,
-          c_name,
-          c_comment
-      FROM customer
-      WHERE c_comment LIKE '%BUILDING%'
-        AND c_comment NOT LIKE '%FURNITURE%'
-      LIMIT 50;
+  skip_on: [clickhouse, datafusion, duckdb, redshift]
 - id: fulltext_phrase_search
   category: fulltext
   sql: |2
@@ -1093,46 +975,7 @@ queries:
     FROM supplier
     WHERE MATCH(s_comment) AGAINST ('"Customer Complaints"' IN BOOLEAN MODE)
     ORDER BY phrase_match_score DESC;
-  variants:
-    duckdb: |2
-
-      -- DuckDB doesn't support MATCH...AGAINST, use LIKE with exact phrase
-      SELECT
-          s_suppkey,
-          s_name,
-          s_comment
-      FROM supplier
-      WHERE s_comment LIKE '%Customer Complaints%'
-      ORDER BY s_suppkey;
-    datafusion: |2
-
-      SELECT
-          s_suppkey,
-          s_name,
-          s_comment
-      FROM supplier
-      WHERE s_comment LIKE '%Customer Complaints%'
-      ORDER BY s_suppkey;
-    redshift: |2
-
-      -- Redshift doesn't support MATCH...AGAINST, use LIKE with exact phrase
-      SELECT
-          s_suppkey,
-          s_name,
-          s_comment
-      FROM supplier
-      WHERE s_comment LIKE '%Customer Complaints%'
-      ORDER BY s_suppkey;
-    clickhouse: |2
-
-      -- ClickHouse doesn't support MATCH...AGAINST, use LIKE with exact phrase
-      SELECT
-          s_suppkey,
-          s_name,
-          s_comment
-      FROM supplier
-      WHERE s_comment LIKE '%Customer Complaints%'
-      ORDER BY s_suppkey;
+  skip_on: [clickhouse, datafusion, duckdb, redshift]
 - id: statistical_percentiles
   category: statistical
   sql: |2
@@ -1148,20 +991,18 @@ queries:
         PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l_extendedprice) as price_p95
     FROM lineitem
     GROUP BY l_returnflag, l_linestatus;
+  result_contract:
+    capability: exact_continuous_percentiles
+    row_identity: [l_returnflag, l_linestatus]
+    columns:
+      - l_returnflag
+      - l_linestatus
+      - record_count
+      - quantity_q1
+      - quantity_median
+      - quantity_q3
+      - price_p95
   variants:
-    clickhouse: |2
-
-      -- ClickHouse uses quantile(p)(col) instead of PERCENTILE_CONT WITHIN GROUP
-      SELECT
-          l_returnflag,
-          l_linestatus,
-          COUNT(*) as record_count,
-          quantile(0.25)(l_quantity) as quantity_q1,
-          quantile(0.5)(l_quantity) as quantity_median,
-          quantile(0.75)(l_quantity) as quantity_q3,
-          quantile(0.95)(l_extendedprice) as price_p95
-      FROM lineitem
-      GROUP BY l_returnflag, l_linestatus;
     redshift: |2
 
       -- Redshift supports PERCENTILE_CONT only as a window function, not aggregate
@@ -1174,6 +1015,7 @@ queries:
           PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY l_quantity) OVER (PARTITION BY l_returnflag, l_linestatus) as quantity_q3,
           PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l_extendedprice) OVER (PARTITION BY l_returnflag, l_linestatus) as price_p95
       FROM lineitem;
+  skip_on: [clickhouse]
 - id: statistical_variance_stddev
   category: statistical
   sql: |2
@@ -1206,6 +1048,15 @@ queries:
     FROM lineitem
     WHERE l_shipdate >= DATE '1995-01-01'
       AND l_shipdate < DATE '1996-01-01';
+  result_contract:
+    capability: correlation_covariance_regression
+    columns:
+      - qty_price_correlation
+      - qty_discount_covariance
+      - tax_price_covariance
+      - price_qty_slope
+      - price_qty_intercept
+      - regression_r_squared
   variants:
     clickhouse: |2
 
@@ -1269,22 +1120,49 @@ queries:
   sql: |2
 
     -- Time series trend analysis with linear regression
-    SELECT
+    WITH monthly_totals AS (
+      SELECT
         DATE_TRUNC('month', o_orderdate) as order_month,
         COUNT(*) as order_count,
         SUM(o_totalprice) as monthly_revenue,
         AVG(o_totalprice) as avg_order_value,
-        -- Linear trend calculation
-        REGR_SLOPE(SUM(o_totalprice), EXTRACT(EPOCH FROM o_orderdate)) as revenue_trend_slope,
-        -- Month-over-month growth
-        LAG(SUM(o_totalprice), 1) OVER (ORDER BY DATE_TRUNC('month', o_orderdate)) as prev_month_revenue,
-        (SUM(o_totalprice) - LAG(SUM(o_totalprice), 1) OVER (ORDER BY DATE_TRUNC('month', o_orderdate)))
-        / NULLIF(LAG(SUM(o_totalprice), 1) OVER (ORDER BY DATE_TRUNC('month', o_orderdate)), 0) * 100 as mom_growth_pct
-    FROM orders
-    WHERE o_orderdate >= DATE '1995-01-01'
-      AND o_orderdate < DATE '1997-01-01'
-    GROUP BY DATE_TRUNC('month', o_orderdate)
+        EXTRACT(EPOCH FROM DATE_TRUNC('month', o_orderdate)) as month_epoch
+      FROM orders
+      WHERE o_orderdate >= DATE '1995-01-01'
+        AND o_orderdate < DATE '1997-01-01'
+      GROUP BY DATE_TRUNC('month', o_orderdate)
+    ),
+    monthly_with_lag AS (
+      SELECT
+        order_month,
+        order_count,
+        monthly_revenue,
+        avg_order_value,
+        month_epoch,
+        LAG(monthly_revenue, 1) OVER (ORDER BY order_month) as prev_month_revenue
+      FROM monthly_totals
+    )
+    SELECT
+      order_month,
+      order_count,
+      monthly_revenue,
+      avg_order_value,
+      REGR_SLOPE(monthly_revenue, month_epoch) OVER () as revenue_trend_slope,
+      prev_month_revenue,
+      (monthly_revenue - prev_month_revenue) / NULLIF(prev_month_revenue, 0) * 100 as mom_growth_pct
+    FROM monthly_with_lag
     ORDER BY order_month;
+  result_contract:
+    capability: monthly_time_series_regression
+    row_identity: [order_month]
+    columns:
+      - order_month
+      - order_count
+      - monthly_revenue
+      - avg_order_value
+      - revenue_trend_slope
+      - prev_month_revenue
+      - mom_growth_pct
   variants:
     duckdb: |2
 
@@ -2158,6 +2036,13 @@ queries:
         COUNT(*) as customer_count
     FROM customer
     GROUP BY c_mktsegment;
+  result_contract:
+    capability: arbitrary_value_aggregate
+    row_identity: [c_mktsegment]
+    columns:
+      - c_mktsegment
+      - sample_customer
+      - customer_count
   variants:
     clickhouse: |2
 
@@ -2167,14 +2052,7 @@ queries:
           COUNT(*) as customer_count
       FROM customer
       GROUP BY c_mktsegment;
-    datafusion: |2
-
-      SELECT
-          c_mktsegment,
-          MIN(c_name) as sample_customer,
-          COUNT(*) as customer_count
-      FROM customer
-      GROUP BY c_mktsegment;
+  skip_on: [datafusion]
 - id: any_value_with_filter
   category: aggregation
   sql: |2
@@ -2187,6 +2065,14 @@ queries:
         COUNT(*) as nation_count
     FROM nation
     GROUP BY n_regionkey;
+  result_contract:
+    capability: arbitrary_value_aggregate
+    row_identity: [n_regionkey]
+    columns:
+      - n_regionkey
+      - sample_nation
+      - sample_comment
+      - nation_count
   variants:
     clickhouse: |2
 
@@ -2197,15 +2083,7 @@ queries:
           COUNT(*) as nation_count
       FROM nation
       GROUP BY n_regionkey;
-    datafusion: |2
-
-      SELECT
-          n_regionkey,
-          MIN(n_name) as sample_nation,
-          MIN(n_comment) as sample_comment,
-          COUNT(*) as nation_count
-      FROM nation
-      GROUP BY n_regionkey;
+  skip_on: [datafusion]
 
 # GROUP BY ALL - automatic grouping by all non-aggregate columns
 - id: groupby_all_simple

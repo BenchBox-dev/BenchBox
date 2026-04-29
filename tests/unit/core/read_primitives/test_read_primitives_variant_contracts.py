@@ -149,21 +149,12 @@ def test_linter_detects_contract_column_mismatch_and_missing_capability():
     ]
 
 
-def test_actual_catalog_static_linter_reports_known_current_drift():
-    """Current catalog drift is explicit until W3/W4 fix or skip those variants."""
+def test_actual_catalog_static_linter_reports_no_column_drift_after_scalar_skips():
+    """Catalog variants should not project different top-level columns after W3 scalar fixes."""
     issues = collect_variant_contract_issues(load_primitives_catalog(), require_contracts=False)
 
     column_drift = {(issue.query_id, issue.dialect) for issue in issues if issue.kind == "column_mismatch"}
     parse_drift = {(issue.query_id, issue.dialect) for issue in issues if issue.kind == "variant_parse_error"}
 
-    assert column_drift == {
-        ("fulltext_boolean_search", "clickhouse"),
-        ("fulltext_boolean_search", "datafusion"),
-        ("fulltext_boolean_search", "duckdb"),
-        ("fulltext_boolean_search", "redshift"),
-        ("fulltext_phrase_search", "clickhouse"),
-        ("fulltext_phrase_search", "datafusion"),
-        ("fulltext_phrase_search", "duckdb"),
-        ("fulltext_phrase_search", "redshift"),
-    }
+    assert column_drift == set()
     assert parse_drift == {("asof_join_basic", "datafusion")}

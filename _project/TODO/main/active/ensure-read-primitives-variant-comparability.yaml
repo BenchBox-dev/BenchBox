@@ -27,7 +27,7 @@ work:
   summary: "Fix or skip scalar and capability-divergent variants: fulltext, window_moving_frame, statistical_percentiles,
     timeseries_trend_analysis, and any_value"
   needs: [w2]
-  status: pending
+  status: done
 - id: w4
   summary: "Fix or skip semi-structured variants with nested-shape risk: JSON, arrays, structs, maps, and lambda/list operations"
   needs: [w2]

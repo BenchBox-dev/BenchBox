@@ -252,17 +252,21 @@ class TestBenchmarkWithActualCatalog:
         # Should have all queries (136 as of December 2025 with modern SQL features)
         assert len(queries) >= 136
 
-    def test_get_queries_with_duckdb_skips_one_query(self):
-        """Test DuckDB skips json_extract_simple (data quality issue)."""
+    def test_get_queries_with_duckdb_skips_known_non_comparable_queries(self):
+        """Test DuckDB skips queries that cannot be compared with base semantics."""
         benchmark = ReadPrimitivesBenchmark()
 
-        queries_no_dialect = benchmark.get_queries()
         queries_duckdb = benchmark.get_queries(dialect="duckdb")
 
         # json_extract_simple is skipped on DuckDB (TPC-H data contains plain text, not JSON)
-        # Total queries minus 1 for json_extract_simple
-        assert len(queries_no_dialect) >= 136
-        assert len(queries_duckdb) == len(queries_no_dialect) - 1
+        # Fulltext MATCH...AGAINST queries are skipped because LIKE fallbacks are not equivalent.
+        duckdb_skipped = {
+            "fulltext_simple_search",
+            "fulltext_boolean_search",
+            "fulltext_phrase_search",
+            "json_extract_simple",
+        }
+        assert duckdb_skipped.isdisjoint(queries_duckdb)
 
     def test_clickhouse_keeps_timeout_only_query_available(self):
         """Timeout-only ClickHouse queries should remain runnable unless truly unsupported."""
@@ -459,6 +463,30 @@ class TestModernSQLFeatures:
         for qid in clickhouse_skipped:
             assert qid not in queries_clickhouse, f"ClickHouse should skip: {qid}"
 
+    def test_clickhouse_skips_non_comparable_scalar_fallbacks(self):
+        """ClickHouse should skip scalar rewrites that change the measured capability."""
+        benchmark = ReadPrimitivesBenchmark()
+        queries_clickhouse = benchmark.get_queries(dialect="clickhouse")
+
+        clickhouse_skipped = [
+            "intrinsic_appx_median",
+            "window_moving_frame",
+            "fulltext_simple_search",
+            "fulltext_boolean_search",
+            "fulltext_phrase_search",
+            "statistical_percentiles",
+        ]
+        for qid in clickhouse_skipped:
+            assert qid not in queries_clickhouse, f"ClickHouse should skip: {qid}"
+
+    def test_datafusion_skips_non_comparable_any_value_fallbacks(self):
+        """DataFusion should skip MIN fallbacks for arbitrary-value aggregate queries."""
+        benchmark = ReadPrimitivesBenchmark()
+        queries_datafusion = benchmark.get_queries(dialect="datafusion")
+
+        assert "any_value_simple" not in queries_datafusion
+        assert "any_value_with_filter" not in queries_datafusion
+
     def test_duckdb_uses_list_functions_for_arrays(self):
         """Test that DuckDB dialect uses list_* functions for array operations."""
         benchmark = ReadPrimitivesBenchmark()
@@ -488,6 +516,16 @@ class TestModernSQLFeatures:
 
         assert "statistical_correlation" not in queries_redshift
         assert "timeseries_trend_analysis" not in queries_redshift
+
+    def test_redshift_percentile_variant_preserves_group_cardinality(self):
+        """Redshift percentile window rewrite should still emit one row per base group."""
+        benchmark = ReadPrimitivesBenchmark()
+        queries_redshift = benchmark.get_queries(dialect="redshift")
+
+        percentile_sql = queries_redshift["statistical_percentiles"].upper()
+
+        assert "SELECT DISTINCT" in percentile_sql
+        assert "OVER (PARTITION BY" in percentile_sql
 
     def test_redshift_uses_scalar_fallback_for_array_contains(self):
         """Test Redshift keeps array_contains coverage via scalar membership logic."""
