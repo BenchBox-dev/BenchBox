@@ -199,7 +199,25 @@ work:
         - Benchmark click → alphabetical asc, stable sort within ties
         - Power Score click → nulls last in both directions
 
-      Verification: 283/283 vitest passes, tsc clean.
+      Scope note: the original B1 listed four columns (Benchmark, Scale,
+      Date, Power Score). w4 deliberately extended click-sort to Geomean
+      as well — leaving four sortable headers next to a static fifth
+      adjacent numeric column would have looked like a bug rather than
+      a constraint. Default state is unchanged so the must_preserve
+      guard still holds.
+
+      Post-review (W4 review): added aria-sort="ascending|descending|none"
+      to each sortable <th>; added an sr-only direction announcement
+      inside the active button so screen readers communicate state on
+      sort change. Replaced localeCompare on run_date with strict
+      lexicographic compare (ISO 8601 makes this chronologically
+      correct without dragging in locale collation). Documented the
+      "nulls last in both directions" choice in code. Tests now resolve
+      row order via data-testid on PlatformRow's <tr>, not via parsing
+      aria-label substrings; added a keyboard-activation test (focus +
+      keyDown Enter + click) and an aria-sort assertion test.
+
+      Verification: 285/285 vitest passes, tsc clean.
 
   - id: w5
     summary: "Fix B3 — route unknown-benchmark slugs to NotFound"

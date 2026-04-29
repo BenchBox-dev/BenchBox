@@ -69,11 +69,20 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const platformResults = [...platformResultsRaw].sort((a, b) => {
     const dir = sort.direction === "asc" ? 1 : -1;
     if (sort.key === "benchmark") return dir * a.benchmark.localeCompare(b.benchmark);
-    if (sort.key === "run_date") return dir * a.run_date.localeCompare(b.run_date);
+    // run_date is "YYYY-MM-DD" (ISO 8601); strict lexicographic compare matches
+    // chronological order without dragging in locale-sensitive collation.
+    if (sort.key === "run_date") {
+      if (a.run_date === b.run_date) return 0;
+      return dir * (a.run_date < b.run_date ? -1 : 1);
+    }
     const av = a[sort.key];
     const bv = b[sort.key];
+    // Nulls sort last in BOTH directions. Convention varies (Excel flips
+    // null position with direction; React Table / AG Grid default to
+    // always-last). We pick always-last so a click never buries the
+    // populated rows below the gaps.
     if (av === null && bv === null) return 0;
-    if (av === null) return 1; // nulls always last, regardless of direction
+    if (av === null) return 1;
     if (bv === null) return -1;
     return dir * (av - bv);
   });
@@ -89,6 +98,20 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   function sortArrow(key: PlatformSortKey) {
     if (sort.key !== key) return " ↕";
     return sort.direction === "asc" ? " ↑" : " ↓";
+  }
+
+  function ariaSort(key: PlatformSortKey): "ascending" | "descending" | "none" {
+    if (sort.key !== key) return "none";
+    return sort.direction === "asc" ? "ascending" : "descending";
+  }
+
+  function ariaSortAnnouncement(key: PlatformSortKey) {
+    if (sort.key !== key) return null;
+    return (
+      <span class="sr-only">
+        {sort.direction === "asc" ? "sorted ascending" : "sorted descending"}
+      </span>
+    );
   }
 
   function toggleSelect(resultId: string) {
@@ -154,45 +177,50 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 <th class="table-th w-8">
                   <span class="sr-only">Compare</span>
                 </th>
-                <th class="p-0" scope="col">
+                <th class="p-0" scope="col" aria-sort={ariaSort("benchmark")}>
                   <button
                     type="button"
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                     onClick={() => toggleSort("benchmark")}
                   >
                     Benchmark{sortArrow("benchmark")}
+                    {ariaSortAnnouncement("benchmark")}
                   </button>
                 </th>
-                <th class="p-0" scope="col">
+                <th class="p-0" scope="col" aria-sort={ariaSort("scale_factor")}>
                   <button
                     type="button"
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                     onClick={() => toggleSort("scale_factor")}
                   >
                     Scale{sortArrow("scale_factor")}
+                    {ariaSortAnnouncement("scale_factor")}
                   </button>
                 </th>
-                <th class="p-0" scope="col">
+                <th class="p-0" scope="col" aria-sort={ariaSort("run_date")}>
                   <button
                     type="button"
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                     onClick={() => toggleSort("run_date")}
                   >
                     Date{sortArrow("run_date")}
+                    {ariaSortAnnouncement("run_date")}
                   </button>
                 </th>
-                <th class="p-0" scope="col">
+                <th class="p-0" scope="col" aria-sort={ariaSort("power_score")}>
                   <button
                     type="button"
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                     onClick={() => toggleSort("power_score")}
                   >
                     Power Score{sortArrow("power_score")}
+                    {ariaSortAnnouncement("power_score")}
                   </button>
                 </th>
                 <th
                   class="p-0"
                   scope="col"
+                  aria-sort={ariaSort("geomean_ms")}
                   title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
                 >
                   <button
@@ -201,6 +229,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     onClick={() => toggleSort("geomean_ms")}
                   >
                     Geomean (ms){sortArrow("geomean_ms")}
+                    {ariaSortAnnouncement("geomean_ms")}
                   </button>
                 </th>
                 <th class="table-th">Source</th>
@@ -246,7 +275,7 @@ interface PlatformRowProps {
 
 function PlatformRow({ entry, checked, onToggle }: PlatformRowProps) {
   return (
-    <tr class="hover:bg-gray-50">
+    <tr class="hover:bg-gray-50" data-testid={entry.result_id}>
       <td class="table-td">
         <input
           type="checkbox"

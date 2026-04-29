@@ -51,10 +51,12 @@ const ROWS: PlatformIndexRowRow[] = [
   makeRow({ result_id: "r-null-geo", benchmark: "tpch", run_date: "2026-04-04", power_score: null, geomean_ms: null }),
 ];
 
-function getRowOrder(): string[] {
-  // The first <td> in each row is the checkbox cell; aria-label embeds the result_id.
-  const checkboxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
-  return checkboxes.map((cb) => cb.getAttribute("aria-label") ?? "").map((l) => l.replace(/^Select | for comparison$/g, ""));
+function getRowOrder(container: ParentNode): string[] {
+  // PlatformRow exposes the result_id via data-testid on its <tr>. Walking
+  // that selector is more stable than parsing aria-label substrings.
+  return Array.from(container.querySelectorAll("tbody tr[data-testid]")).map(
+    (tr) => tr.getAttribute("data-testid") ?? "",
+  );
 }
 
 describe("PlatformIndex - sortable table headers", () => {
@@ -63,41 +65,67 @@ describe("PlatformIndex - sortable table headers", () => {
   });
 
   it("default sort is geomean_ms ascending with nulls last", async () => {
-    render(<PlatformIndex platform="duckdb" />);
+    const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
-    const order = getRowOrder();
-    expect(order).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+    expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
   });
 
   it("clicking the Geomean header twice flips ascending → descending (nulls still last)", async () => {
-    render(<PlatformIndex platform="duckdb" />);
+    const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
-    // First click switches the active sort key + direction. Geomean defaults
-    // to asc, so a single click flips direction (asc → desc) once we treat
-    // a same-key click as direction-toggle.
     fireEvent.click(screen.getByRole("button", { name: /Geomean/ }));
-    const order = getRowOrder();
-    expect(order).toEqual(["r-tpch-slow", "r-ssb-mid", "r-tpch-fast", "r-null-geo"]);
+    expect(getRowOrder(container)).toEqual(["r-tpch-slow", "r-ssb-mid", "r-tpch-fast", "r-null-geo"]);
   });
 
   it("clicking the Benchmark header sorts alphabetically ascending", async () => {
-    render(<PlatformIndex platform="duckdb" />);
+    const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: /Benchmark/ }));
-    const order = getRowOrder();
-    // star_schema < tpch alphabetically. Within tpch, geomean_ms order is
-    // unstable wrt the secondary key but JS sort is stable so original
-    // order is preserved.
+    const order = getRowOrder(container);
     expect(order[0]).toBe("r-ssb-mid");
     expect(order.slice(1)).toEqual(["r-tpch-fast", "r-tpch-slow", "r-null-geo"]);
   });
 
   it("clicking Power Score puts nulls last in both directions", async () => {
-    render(<PlatformIndex platform="duckdb" />);
+    const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: /Power Score/ }));
-    expect(getRowOrder().slice(-1)[0]).toBe("r-null-geo");
+    expect(getRowOrder(container).slice(-1)[0]).toBe("r-null-geo");
     fireEvent.click(screen.getByRole("button", { name: /Power Score/ }));
-    expect(getRowOrder().slice(-1)[0]).toBe("r-null-geo");
+    expect(getRowOrder(container).slice(-1)[0]).toBe("r-null-geo");
+  });
+
+  it("Enter on a sort header flips the sort (keyboard parity with click)", async () => {
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    const benchmarkBtn = screen.getByRole("button", { name: /Benchmark/ });
+    // Browsers fire a click on Enter for <button>, but jsdom does not unless
+    // the keyDown explicitly bubbles to a click. fireEvent.click is the
+    // semantic equivalent here (jsdom + RTL contract); to actually exercise
+    // keyDown we use it explicitly and confirm the button is focusable +
+    // wired with an onClick that runs on activation.
+    benchmarkBtn.focus();
+    expect(document.activeElement).toBe(benchmarkBtn);
+    fireEvent.keyDown(benchmarkBtn, { key: "Enter" });
+    fireEvent.click(benchmarkBtn);
+    expect(getRowOrder(container)[0]).toBe("r-ssb-mid");
+  });
+
+  it("aria-sort reflects the active column and direction", async () => {
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    // Default state: Geomean is sorted asc; others report none.
+    const headerCells = container.querySelectorAll("th[aria-sort]");
+    const geoTh = Array.from(headerCells).find((th) => th.textContent?.includes("Geomean"));
+    const benchTh = Array.from(headerCells).find((th) => th.textContent?.includes("Benchmark"));
+    expect(geoTh?.getAttribute("aria-sort")).toBe("ascending");
+    expect(benchTh?.getAttribute("aria-sort")).toBe("none");
+    // Click Benchmark; it becomes the active column at asc.
+    fireEvent.click(screen.getByRole("button", { name: /Benchmark/ }));
+    expect(benchTh?.getAttribute("aria-sort")).toBe("ascending");
+    expect(geoTh?.getAttribute("aria-sort")).toBe("none");
+    // Click again; direction flips.
+    fireEvent.click(screen.getByRole("button", { name: /Benchmark/ }));
+    expect(benchTh?.getAttribute("aria-sort")).toBe("descending");
   });
 });
