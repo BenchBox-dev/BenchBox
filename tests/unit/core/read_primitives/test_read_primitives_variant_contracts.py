@@ -82,7 +82,41 @@ def test_linter_detects_variant_column_mismatch():
             query_id="fulltext_boolean_search",
             dialect="duckdb",
             kind="column_mismatch",
-            detail="base columns ('c_custkey', 'c_name', 'relevance_score') != variant columns ('c_custkey', 'c_name')",
+            detail=(
+                "result_contract columns ('c_custkey', 'c_name', 'relevance_score') "
+                "!= variant columns ('c_custkey', 'c_name')"
+            ),
+        )
+    ]
+
+
+def test_linter_compares_variants_to_declared_contract_columns():
+    """A variant matching the declared contract should not be blamed for base SQL drift."""
+    catalog = PrimitiveCatalog(
+        version=1,
+        queries={
+            "array_agg_simple": PrimitiveQuery(
+                id="array_agg_simple",
+                category="array",
+                sql="SELECT ps_suppkey, ARRAY_AGG(ps_partkey) AS raw_parts FROM partsupp",
+                variants={"clickhouse": "SELECT ps_suppkey, groupArray(ps_partkey) AS supplied_parts FROM partsupp"},
+                result_contract=ResultContract(
+                    columns=(
+                        ResultColumnContract("ps_suppkey"),
+                        ResultColumnContract("supplied_parts", type_class="array"),
+                    ),
+                    capability="ordered_array_aggregation",
+                ),
+            )
+        },
+    )
+
+    assert collect_variant_contract_issues(catalog, require_contracts=True) == [
+        VariantContractIssue(
+            query_id="array_agg_simple",
+            dialect=None,
+            kind="contract_column_mismatch",
+            detail="base columns ('ps_suppkey', 'raw_parts') != result_contract columns ('ps_suppkey', 'supplied_parts')",
         )
     ]
 
@@ -145,6 +179,12 @@ def test_linter_detects_contract_column_mismatch_and_missing_capability():
             dialect=None,
             kind="missing_capability",
             detail="result_contract must declare measured capability",
+        ),
+        VariantContractIssue(
+            query_id="array_agg_simple",
+            dialect="clickhouse",
+            kind="column_mismatch",
+            detail="result_contract columns ('ps_suppkey', 'parts') != variant columns ('ps_suppkey', 'supplied_parts')",
         ),
     ]
 

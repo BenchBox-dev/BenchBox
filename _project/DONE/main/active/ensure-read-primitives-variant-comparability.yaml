@@ -46,6 +46,10 @@ deferred:
 - summary: "Expose query comparability metadata in CLI output and persisted result artifacts"
   reason: "The first implementation should fix benchmark correctness at the catalog/test layer; CLI/result-report integration
     can follow once the contract shape stabilizes."
+- summary: "Expand runtime parity coverage for retained read_primitives variants not covered by the first local parity suite"
+  reason: "The first pass targets the highest-risk families. Follow-up coverage should include array_unnest (clickhouse,
+    bigquery), array_agg_simple (clickhouse), struct_construction (clickhouse), list_transform (clickhouse), and the duckdb/clickhouse
+    paths of map_construction so retained variants do not drift silently."
 
 files_affected:
   modified:

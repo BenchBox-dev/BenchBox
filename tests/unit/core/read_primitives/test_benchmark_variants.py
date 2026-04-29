@@ -268,6 +268,27 @@ class TestBenchmarkWithActualCatalog:
         }
         assert duckdb_skipped.isdisjoint(queries_duckdb)
 
+    def test_duckdb_array_of_struct_variant_preserves_inner_order(self):
+        """DuckDB reference SQL must sort line-item structs inside each aggregated array."""
+        benchmark = ReadPrimitivesBenchmark()
+
+        queries_duckdb = benchmark.get_queries(dialect="duckdb")
+        array_sql = queries_duckdb["array_of_struct"].lower()
+
+        assert "struct_pack" in array_sql
+        assert "order by l_linenumber" in array_sql
+
+    @pytest.mark.parametrize("dialect", ["bigquery", "databricks", "snowflake"])
+    def test_cloud_dialects_skip_mysql_fulltext_queries(self, dialect):
+        """MySQL MATCH...AGAINST full-text queries should not reach non-MySQL translators."""
+        benchmark = ReadPrimitivesBenchmark()
+
+        queries = benchmark.get_queries(dialect=dialect)
+
+        assert "fulltext_simple_search" not in queries
+        assert "fulltext_boolean_search" not in queries
+        assert "fulltext_phrase_search" not in queries
+
     def test_clickhouse_keeps_timeout_only_query_available(self):
         """Timeout-only ClickHouse queries should remain runnable unless truly unsupported."""
         benchmark = ReadPrimitivesBenchmark()
@@ -439,6 +460,9 @@ class TestModernSQLFeatures:
 
         # BigQuery should skip MAP, lambda, and some array functions
         bigquery_skipped = [
+            "fulltext_simple_search",
+            "fulltext_boolean_search",
+            "fulltext_phrase_search",
             "map_construction",
             "map_access",
             "map_keys_values",

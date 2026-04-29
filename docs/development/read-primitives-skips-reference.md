@@ -8,7 +8,10 @@ This document is the authoritative reference for every `skip_on` entry in
 explains **why** the skip exists and **where to look** to determine whether the
 skip can be removed.
 
-There are currently **68 skipped query/platform pairs** across 6 platforms.
+As of 2026-04-29, there are **77 skipped query/target-dialect pairs** across 7
+target dialects. Deployment aliases inherit their adapter target dialects: for
+example, MotherDuck uses the DuckDB dialect skips, while ClickHouse local,
+server, and cloud deployments use the ClickHouse dialect skips.
 They fall into four root-cause classes:
 
 1. **Missing function**: the SQL function is simply absent from the platform's
@@ -39,9 +42,9 @@ They fall into four root-cause classes:
 | `array_slice` | redshift | Missing type | array |
 | `array_sort` | bigquery, redshift | Missing function | array |
 | `array_unnest` | redshift | Missing type | array |
-| `fulltext_boolean_search` | clickhouse, datafusion, duckdb, redshift | Semantic gap | fulltext |
-| `fulltext_phrase_search` | clickhouse, datafusion, duckdb, redshift | Semantic gap | fulltext |
-| `fulltext_simple_search` | clickhouse, datafusion, duckdb, redshift | Semantic gap | fulltext |
+| `fulltext_boolean_search` | bigquery, clickhouse, datafusion, databricks, duckdb, redshift, snowflake | Semantic gap | fulltext |
+| `fulltext_phrase_search` | bigquery, clickhouse, datafusion, databricks, duckdb, redshift, snowflake | Semantic gap | fulltext |
+| `fulltext_simple_search` | bigquery, clickhouse, datafusion, databricks, duckdb, redshift, snowflake | Semantic gap | fulltext |
 | `intrinsic_appx_median` | clickhouse | Semantic gap | intrinsic |
 | `json_aggregates` | datafusion, redshift | Missing function | json |
 | `json_extract_nested` | datafusion, redshift | Missing function | json |
@@ -218,7 +221,7 @@ semantics efficiently enough to be meaningful as a benchmark primitive.
 
 ---
 
-## Google BigQuery (10 queries skipped)
+## Google BigQuery (13 queries skipped)
 
 ### Array functions: `array_min_max`, `array_sort`, `array_distinct`
 
@@ -260,6 +263,18 @@ in the [BigQuery data types reference](https://cloud.google.com/bigquery/docs/re
 
 **Re-enable when**: `ASOF JOIN` appears in the
 [BigQuery JOIN reference](https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#join_types).
+
+---
+
+### Full-text search: `fulltext_simple_search`, `fulltext_boolean_search`, `fulltext_phrase_search`
+
+**Why skipped**: The base SQL uses MySQL `MATCH(...) AGAINST (...)`. BigQuery
+has `SEARCH` and text analyzers, but the syntax and scoring behavior are not a
+drop-in equivalent for MySQL natural-language, boolean, and phrase modes.
+
+**Re-enable when**: A BigQuery variant is written that preserves tokenization,
+boolean operators, phrase matching, and relevance-score semantics for the
+declared full-text capability.
 
 ---
 
@@ -414,7 +429,7 @@ frame, or a variant preserves the exact frame semantics.
 
 ---
 
-## Databricks (1 query skipped)
+## Databricks (4 queries skipped)
 
 ### `asof_join_basic`
 
@@ -424,6 +439,32 @@ available as a SQL clause.
 
 **Re-enable when**: `ASOF JOIN` appears in the
 [Databricks SQL reference](https://docs.databricks.com/sql/language-manual/sql-ref-syntax-qry-select-join.html).
+
+---
+
+### Full-text search: `fulltext_simple_search`, `fulltext_boolean_search`, `fulltext_phrase_search`
+
+**Why skipped**: The base SQL uses MySQL `MATCH(...) AGAINST (...)`, which
+Databricks SQL does not support. `LIKE`, `contains`, or Spark text functions do
+not preserve MySQL full-text ranking, boolean operators, phrase matching, or
+index-backed search semantics.
+
+**Re-enable when**: Databricks SQL exposes comparable full-text search syntax or
+a verified variant can preserve the declared full-text result contract.
+
+---
+
+## Snowflake (3 queries skipped)
+
+### Full-text search: `fulltext_simple_search`, `fulltext_boolean_search`, `fulltext_phrase_search`
+
+**Why skipped**: The base SQL uses MySQL `MATCH(...) AGAINST (...)`. Snowflake
+has text search functions, but they do not provide a direct equivalent for the
+MySQL natural-language, boolean, and phrase modes used by these primitives.
+
+**Re-enable when**: A Snowflake variant preserves the declared full-text
+capability, including boolean operators, phrase semantics, and relevance-score
+shape for scored queries.
 
 ---
 

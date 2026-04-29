@@ -4,6 +4,8 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import importlib.resources
+
 import pytest
 
 from benchbox.core.read_primitives.catalog import (
@@ -18,6 +20,26 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+@pytest.fixture
+def mock_catalog_yaml(monkeypatch, tmp_path):
+    """Patch importlib.resources.files() to return a temp query catalog."""
+
+    class MockPath:
+        def __init__(self, path):
+            self.path = path
+
+        def joinpath(self, name):
+            return self.path / name
+
+    def write(catalog_yaml: str):
+        catalog_file = tmp_path / "queries.yaml"
+        catalog_file.write_text(catalog_yaml)
+        monkeypatch.setattr(importlib.resources, "files", lambda pkg: MockPath(tmp_path))
+        return catalog_file
+
+    return write
 
 
 class TestPrimitiveQueryDataclass:
@@ -80,7 +102,7 @@ class TestPrimitiveQueryDataclass:
 class TestCatalogLoaderResultContractParsing:
     """Test result_contract parsing from YAML."""
 
-    def test_load_query_with_result_contract(self, monkeypatch, tmp_path):
+    def test_load_query_with_result_contract(self, mock_catalog_yaml):
         """Test loading a query with typed result contract metadata."""
         catalog_yaml = """
 version: 1
@@ -97,22 +119,7 @@ queries:
           type_class: array
           order_sensitive: true
 """
-        catalog_file = tmp_path / "queries.yaml"
-        catalog_file.write_text(catalog_yaml)
-
-        import importlib.resources
-
-        class MockPath:
-            def __init__(self, path):
-                self.path = path
-
-            def joinpath(self, name):
-                return self.path / name
-
-            def open(self, *args, **kwargs):
-                return open(self.path / "queries.yaml", *args, **kwargs)
-
-        monkeypatch.setattr(importlib.resources, "files", lambda pkg: MockPath(tmp_path))
+        mock_catalog_yaml(catalog_yaml)
 
         catalog = load_primitives_catalog()
         contract = catalog.queries["test_query"].result_contract
@@ -126,7 +133,7 @@ queries:
             capability="ordered_array_aggregate",
         )
 
-    def test_result_contract_columns_must_be_non_empty_list(self, monkeypatch, tmp_path):
+    def test_result_contract_columns_must_be_non_empty_list(self, mock_catalog_yaml):
         """Test result_contract.columns validation."""
         catalog_yaml = """
 version: 1
@@ -137,27 +144,12 @@ queries:
     result_contract:
       columns: []
 """
-        catalog_file = tmp_path / "queries.yaml"
-        catalog_file.write_text(catalog_yaml)
-
-        import importlib.resources
-
-        class MockPath:
-            def __init__(self, path):
-                self.path = path
-
-            def joinpath(self, name):
-                return self.path / name
-
-            def open(self, *args, **kwargs):
-                return open(self.path / "queries.yaml", *args, **kwargs)
-
-        monkeypatch.setattr(importlib.resources, "files", lambda pkg: MockPath(tmp_path))
+        mock_catalog_yaml(catalog_yaml)
 
         with pytest.raises(PrimitivesCatalogError, match="result_contract.columns must be a non-empty list"):
             load_primitives_catalog()
 
-    def test_result_contract_rejects_unknown_row_identity_column(self, monkeypatch, tmp_path):
+    def test_result_contract_rejects_unknown_row_identity_column(self, mock_catalog_yaml):
         """Test row_identity must reference declared columns."""
         catalog_yaml = """
 version: 1
@@ -169,27 +161,12 @@ queries:
       columns: [result]
       row_identity: [missing]
 """
-        catalog_file = tmp_path / "queries.yaml"
-        catalog_file.write_text(catalog_yaml)
-
-        import importlib.resources
-
-        class MockPath:
-            def __init__(self, path):
-                self.path = path
-
-            def joinpath(self, name):
-                return self.path / name
-
-            def open(self, *args, **kwargs):
-                return open(self.path / "queries.yaml", *args, **kwargs)
-
-        monkeypatch.setattr(importlib.resources, "files", lambda pkg: MockPath(tmp_path))
+        mock_catalog_yaml(catalog_yaml)
 
         with pytest.raises(PrimitivesCatalogError, match="row_identity references unknown column 'missing'"):
             load_primitives_catalog()
 
-    def test_result_contract_rejects_unknown_type_class(self, monkeypatch, tmp_path):
+    def test_result_contract_rejects_unknown_type_class(self, mock_catalog_yaml):
         """Test type_class validation."""
         catalog_yaml = """
 version: 1
@@ -202,22 +179,7 @@ queries:
         - name: result
           type_class: nested_blob
 """
-        catalog_file = tmp_path / "queries.yaml"
-        catalog_file.write_text(catalog_yaml)
-
-        import importlib.resources
-
-        class MockPath:
-            def __init__(self, path):
-                self.path = path
-
-            def joinpath(self, name):
-                return self.path / name
-
-            def open(self, *args, **kwargs):
-                return open(self.path / "queries.yaml", *args, **kwargs)
-
-        monkeypatch.setattr(importlib.resources, "files", lambda pkg: MockPath(tmp_path))
+        mock_catalog_yaml(catalog_yaml)
 
         with pytest.raises(PrimitivesCatalogError, match="type_class must be one of"):
             load_primitives_catalog()

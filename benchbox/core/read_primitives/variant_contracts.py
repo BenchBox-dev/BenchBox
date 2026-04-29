@@ -45,6 +45,8 @@ _HIGH_RISK_CATEGORIES = {
 _HIGH_RISK_QUERY_IDS = {
     "any_value_simple",
     "any_value_with_filter",
+    # Guard for future approximate-median variants: no active variant exists
+    # today, but any reintroduced variant must declare its comparability contract.
     "intrinsic_appx_median",
 }
 
@@ -74,7 +76,19 @@ def collect_variant_contract_issues(
             )
 
         issues.extend(_contract_metadata_issues(query_id, entry, base_columns, require_contracts=require_contracts))
-        issues.extend(_variant_projection_issues(query_id, variants, base_columns))
+        contract_columns = (
+            tuple(column.name for column in entry.result_contract.columns)
+            if entry.result_contract is not None
+            else None
+        )
+        issues.extend(
+            _variant_projection_issues(
+                query_id,
+                variants,
+                expected_columns=contract_columns or base_columns,
+                expected_source="result_contract" if contract_columns is not None else "base",
+            )
+        )
 
     return issues
 
@@ -148,7 +162,9 @@ def _contract_metadata_issues(
 def _variant_projection_issues(
     query_id: str,
     variants: dict[str, str],
-    base_columns: tuple[str, ...] | None,
+    *,
+    expected_columns: tuple[str, ...] | None,
+    expected_source: str,
 ) -> list[VariantContractIssue]:
     issues = []
     for dialect, sql in variants.items():
@@ -162,13 +178,13 @@ def _variant_projection_issues(
                     detail="Could not parse variant projection columns",
                 )
             )
-        elif base_columns is not None and variant_columns != base_columns:
+        elif expected_columns is not None and variant_columns != expected_columns:
             issues.append(
                 VariantContractIssue(
                     query_id=query_id,
                     dialect=dialect,
                     kind="column_mismatch",
-                    detail=f"base columns {base_columns!r} != variant columns {variant_columns!r}",
+                    detail=(f"{expected_source} columns {expected_columns!r} != variant columns {variant_columns!r}"),
                 )
             )
     return issues
