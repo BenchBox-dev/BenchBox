@@ -1,7 +1,7 @@
 # BenchBox Makefile
 # This makefile provides commands for building, testing and development
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json codex-skills-sync codex-skills-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json codex-skills-sync codex-skills-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -712,7 +712,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune
+.PHONY: pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune todo-reindex
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -757,6 +757,13 @@ worktree-add:
 
 worktree-list:
 	@git worktree list
+
+# Regenerate _project/{TODO,DONE}/_indexes/*.yaml from per-item YAML files.
+# Indexes are gitignored — run this whenever you want a fresh local copy.
+# todo_cli.py auto-runs the same script on first read, so this is a
+# convenience target for explicit regen (e.g. before grepping the indexes).
+todo-reindex:
+	@uv run _project/scripts/generate_indexes.py
 
 # Remove worktrees whose branches are gone on origin (already merged).
 # Pairs with auto-merge: PR merges → branch deleted → worktree pruned.

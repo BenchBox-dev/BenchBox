@@ -157,6 +157,12 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 !_project/PROJECT_DONE.yaml
 !_project/TODO_ENTRY_TEMPLATE.yaml
 
+# Auto-generated TODO/DONE indexes (rebuilt locally via `make todo-reindex`).
+# Tracking them caused routine merge conflicts on every TODO PR; they are
+# pure functions of the per-item _project/{TODO,DONE}/**/*.yaml files.
+_project/TODO/_indexes/
+_project/DONE/_indexes/
+
 # Firebolt data and core data directories
 /firebolt-data
 /firebolt-core-data
