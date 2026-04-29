@@ -4,14 +4,42 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import importlib.resources
+
 import pytest
 
-from benchbox.core.read_primitives.catalog import PrimitiveQuery, PrimitivesCatalogError, load_primitives_catalog
+from benchbox.core.read_primitives.catalog import (
+    PrimitiveQuery,
+    PrimitivesCatalogError,
+    ResultColumnContract,
+    ResultContract,
+    load_primitives_catalog,
+)
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+@pytest.fixture
+def mock_catalog_yaml(monkeypatch, tmp_path):
+    """Patch importlib.resources.files() to return a temp query catalog."""
+
+    class MockPath:
+        def __init__(self, path):
+            self.path = path
+
+        def joinpath(self, name):
+            return self.path / name
+
+    def write(catalog_yaml: str):
+        catalog_file = tmp_path / "queries.yaml"
+        catalog_file.write_text(catalog_yaml)
+        monkeypatch.setattr(importlib.resources, "files", lambda pkg: MockPath(tmp_path))
+        return catalog_file
+
+    return write
 
 
 class TestPrimitiveQueryDataclass:
@@ -30,6 +58,7 @@ class TestPrimitiveQueryDataclass:
         assert query.description is None
         assert query.variants is None
         assert query.skip_on is None
+        assert query.result_contract is None
 
     def test_primitive_query_with_variants(self):
         """Test PrimitiveQuery with dialect variants."""
@@ -55,6 +84,10 @@ class TestPrimitiveQueryDataclass:
             description="Test query description",
             variants={"duckdb": "SELECT 1 AS result"},
             skip_on=["sqlite"],
+            result_contract=ResultContract(
+                columns=(ResultColumnContract(name="result"),),
+                capability="scalar_projection",
+            ),
         )
         assert query.id == "test_query"
         assert query.category == "test"
@@ -62,6 +95,94 @@ class TestPrimitiveQueryDataclass:
         assert query.description == "Test query description"
         assert query.variants == {"duckdb": "SELECT 1 AS result"}
         assert query.skip_on == ["sqlite"]
+        assert query.result_contract is not None
+        assert query.result_contract.capability == "scalar_projection"
+
+
+class TestCatalogLoaderResultContractParsing:
+    """Test result_contract parsing from YAML."""
+
+    def test_load_query_with_result_contract(self, mock_catalog_yaml):
+        """Test loading a query with typed result contract metadata."""
+        catalog_yaml = """
+version: 1
+queries:
+  - id: test_query
+    category: test
+    sql: SELECT k, ARRAY_AGG(v ORDER BY v) AS values FROM t GROUP BY k
+    result_contract:
+      capability: ordered_array_aggregate
+      row_identity: [k]
+      columns:
+        - k
+        - name: values
+          type_class: array
+          order_sensitive: true
+"""
+        mock_catalog_yaml(catalog_yaml)
+
+        catalog = load_primitives_catalog()
+        contract = catalog.queries["test_query"].result_contract
+
+        assert contract == ResultContract(
+            columns=(
+                ResultColumnContract(name="k"),
+                ResultColumnContract(name="values", type_class="array", order_sensitive=True),
+            ),
+            row_identity=("k",),
+            capability="ordered_array_aggregate",
+        )
+
+    def test_result_contract_columns_must_be_non_empty_list(self, mock_catalog_yaml):
+        """Test result_contract.columns validation."""
+        catalog_yaml = """
+version: 1
+queries:
+  - id: test_query
+    category: test
+    sql: SELECT 1
+    result_contract:
+      columns: []
+"""
+        mock_catalog_yaml(catalog_yaml)
+
+        with pytest.raises(PrimitivesCatalogError, match="result_contract.columns must be a non-empty list"):
+            load_primitives_catalog()
+
+    def test_result_contract_rejects_unknown_row_identity_column(self, mock_catalog_yaml):
+        """Test row_identity must reference declared columns."""
+        catalog_yaml = """
+version: 1
+queries:
+  - id: test_query
+    category: test
+    sql: SELECT 1 AS result
+    result_contract:
+      columns: [result]
+      row_identity: [missing]
+"""
+        mock_catalog_yaml(catalog_yaml)
+
+        with pytest.raises(PrimitivesCatalogError, match="row_identity references unknown column 'missing'"):
+            load_primitives_catalog()
+
+    def test_result_contract_rejects_unknown_type_class(self, mock_catalog_yaml):
+        """Test type_class validation."""
+        catalog_yaml = """
+version: 1
+queries:
+  - id: test_query
+    category: test
+    sql: SELECT 1 AS result
+    result_contract:
+      columns:
+        - name: result
+          type_class: nested_blob
+"""
+        mock_catalog_yaml(catalog_yaml)
+
+        with pytest.raises(PrimitivesCatalogError, match="type_class must be one of"):
+            load_primitives_catalog()
 
 
 class TestCatalogLoaderVariantParsing:

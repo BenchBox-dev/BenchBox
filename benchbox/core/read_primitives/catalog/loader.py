@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from importlib import resources as _resources
 
-from benchbox.core.primitives.catalog.loader import load_query_catalog
+from benchbox.core.primitives.catalog.loader import ResultContract, load_query_catalog
 
 CATALOG_FILENAME = "queries.yaml"
 # Backward compatibility for tests that monkeypatch loader.resources.files.
@@ -26,6 +26,7 @@ class PrimitiveQuery:
     description: str | None = None
     variants: dict[str, str] | None = None  # dialect -> SQL mapping
     skip_on: list[str] | None = None  # list of dialects to skip this query on
+    result_contract: ResultContract | None = None
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,7 @@ __all__ = [
     "PrimitiveCatalog",
     "PrimitiveQuery",
     "PrimitivesCatalogError",
+    "ResultContract",
     "load_primitives_catalog",
     "resources",
 ]

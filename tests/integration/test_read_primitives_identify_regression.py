@@ -39,9 +39,13 @@ class TestReadPrimitivesIdentifyRegression:
         # Get queries translated to DuckDB with identify=True (the default)
         translated_queries = benchmark.get_queries(dialect="duckdb")
 
-        # DuckDB should have all but the skipped json_extract_simple query
-        assert len(translated_queries) + 1 == len(base_queries), "Expected one DuckDB skip (json_extract_simple)"
-        assert "json_extract_simple" not in translated_queries, "Skipped query should not appear in translations"
+        # DuckDB skips queries that cannot preserve comparable semantics.
+        assert set(base_queries) - set(translated_queries) == {
+            "fulltext_simple_search",
+            "fulltext_boolean_search",
+            "fulltext_phrase_search",
+            "json_extract_simple",
+        }
 
         # Verify all translated queries are non-empty and contain SQL
         for query_id, query_sql in translated_queries.items():
@@ -80,9 +84,13 @@ class TestReadPrimitivesIdentifyRegression:
         base_queries = benchmark.get_queries()
         queries = benchmark.get_queries(dialect="duckdb")
 
-        # All non-skipped queries should translate successfully
-        assert len(queries) + 1 == len(base_queries), "All non-skipped queries should translate"
-        assert "json_extract_simple" not in queries, "json_extract_simple is skipped on DuckDB"
+        # All non-skipped queries should translate successfully.
+        assert set(base_queries) - set(queries) == {
+            "fulltext_simple_search",
+            "fulltext_boolean_search",
+            "fulltext_phrase_search",
+            "json_extract_simple",
+        }
 
         # Verify that common table names are quoted (these could be keywords in some dialects)
         # We're looking for patterns like "orders", "customer", etc.
@@ -164,7 +172,6 @@ class TestReadPrimitivesIdentifyRegression:
         # Test queries that have DuckDB variants
         variant_query_ids = [
             "json_aggregates",  # Has DuckDB variant
-            "fulltext_simple_search",  # Has DuckDB variant
             "timeseries_trend_analysis",  # Has DuckDB variant
         ]
 

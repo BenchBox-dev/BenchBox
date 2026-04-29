@@ -4,7 +4,7 @@
 ```
 
 The Read Primitives benchmark queries now live outside Python source in
-`benchbox/core/primitives/catalog/queries.yaml`. This keeps the runtime module
+`benchbox/core/read_primitives/catalog/queries.yaml`. This keeps the runtime module
 small and makes it easier to audit or extend the workload.
 
 ## File layout
@@ -27,6 +27,8 @@ default to the `id` prefix.
 * `description` (optional) - free-form text for future tooling.
 * `variants` (optional) - dict mapping dialect names to platform-specific SQL.
 * `skip_on` (optional) - list of dialects where this query should be skipped.
+* `result_contract` (required for high-risk variant queries) - machine-readable
+  result shape and measured capability metadata.
 
 ## Platform-Specific Variants
 
@@ -42,29 +44,77 @@ Define alternative SQL for specific platforms using the `variants` field:
   sql: |-
     -- Standard SQL version (MySQL syntax)
     SELECT
+        p_brand,
         JSON_ARRAYAGG(p_name) as part_names,
-        JSON_OBJECTAGG(p_partkey, p_retailprice) as part_prices
+        JSON_OBJECTAGG(p_partkey, p_retailprice) as part_prices,
+        COUNT(*) as part_count
     FROM part
+    GROUP BY p_brand
+    ORDER BY p_brand
     LIMIT 100
+  result_contract:
+    capability: json_array_object_aggregation
+    row_identity: [p_brand]
+    columns:
+      - p_brand
+      - name: part_names
+        type_class: json
+      - name: part_prices
+        type_class: json
+      - part_count
   variants:
     duckdb: |-
       -- DuckDB uses different function names
       SELECT
+          p_brand,
           JSON_GROUP_ARRAY(p_name) as part_names,
-          JSON_GROUP_OBJECT(p_partkey, p_retailprice) as part_prices
+          JSON_GROUP_OBJECT(p_partkey, p_retailprice) as part_prices,
+          COUNT(*) as part_count
       FROM part
+      GROUP BY p_brand
+      ORDER BY p_brand
       LIMIT 100
 ```
 
 **When to use variants:**
 - Platform uses different function names (e.g., `JSON_ARRAYAGG` vs `JSON_GROUP_ARRAY`)
-- Platform requires different syntax for same functionality (e.g., `MATCH...AGAINST` vs `LIKE`)
+- Platform requires different syntax for the same functionality
 - Query needs structural changes but tests same capability (e.g., CTE to avoid nested aggregates)
+- Output columns, row identity, nested shape, and measured capability remain comparable
 
 **How it works:**
 1. When `get_query(query_id, dialect="duckdb")` is called, the query manager returns the DuckDB variant if it exists
 2. If no variant exists for the requested dialect, returns the base `sql` query
-3. Variant SQL goes through the same translation pipeline as base queries
+3. Variant SQL is authored as final target SQL; `ReadPrimitivesBenchmark.get_queries()` does not rerun it through SQLGlot
+
+### Result Contracts
+
+Every active variant in a high-risk family (`json`, `array`, `struct`, `map`,
+`lambda`, `window`, `statistical`, `timeseries`, `fulltext`, and selected scalar
+edge cases) must declare `result_contract`.
+
+```yaml
+result_contract:
+  capability: ordered_array_slice
+  row_identity: [o_custkey]
+  columns:
+    - o_custkey
+    - name: top_3_orders
+      type_class: array
+      order_sensitive: true
+```
+
+Contract fields:
+
+* `capability` - the database capability the query measures. Variants that
+  produce the same values by testing a different capability should be skipped.
+* `row_identity` - result columns that identify a row for cross-platform
+  alignment. If the query has `LIMIT`, order deterministically by this identity.
+* `columns` - projected columns in exact output order. Use mappings when a
+  nested type or order sensitivity matters.
+* `type_class` - one of `scalar`, `json`, `array`, `struct`, or `map`.
+* `order_sensitive` - set `true` when array/list order is part of the result
+  semantics.
 
 ### Skipping Queries
 
@@ -87,6 +137,9 @@ Some queries cannot be meaningfully tested on certain platforms due to data limi
 - Data quality issues make query meaningless (e.g., JSON functions on non-JSON data)
 - Platform fundamentally lacks required feature and no reasonable alternative exists
 - Query would always fail due to platform limitations, not bugs
+- Platform can only express a related-but-not-equivalent fallback, such as
+  full-text search rewritten as `LIKE`, approximate percentile substituted for
+  exact percentile, or array capability rewritten as a scalar aggregate
 
 For a complete reference of all current skips, their root causes, and instructions on how to re-enable them, see {doc}`read-primitives-skips-reference`.
 
@@ -98,13 +151,14 @@ For a complete reference of all current skips, their root causes, and instructio
 ### Best Practices
 
 **Prefer variants over skip_on:**
-- Only skip when no reasonable alternative exists
-- Most syntax differences can be handled with variants
+- Only skip when no comparable alternative exists
+- Most syntax differences can be handled with variants, but capability changes cannot
 
 **Keep variants semantically equivalent:**
 - Variants should test the same database capability
-- Results may differ slightly, but behavior should be comparable
+- Results must have comparable columns, nested shape, row identity, and ordering
 - Document why variant is needed in comments
+- Do not keep runnable but non-comparable fallbacks in benchmark scoring
 
 **Dialect names:**
 - Use lowercase: `duckdb`, `bigquery`, `snowflake`, `postgres`
@@ -112,9 +166,9 @@ For a complete reference of all current skips, their root causes, and instructio
 - Case-insensitive matching during query retrieval
 
 **Validation:**
-- Run benchmark with variant to ensure it works: `benchbox run --platform duckdb --benchmark read_primitives --scale 1`
-- Check success rate in results
-- Unit tests automatically validate catalog structure
+- Run static contracts: `uv run -- python -m pytest tests/unit/core/read_primitives/test_read_primitives_variant_contracts.py -q`
+- Run focused runtime parity: `uv run -- python -m pytest tests/integration/validation/test_read_primitives_variant_parity.py -q`
+- Run the platform query at SF=0.01 before removing a skip
 
 ### Example: Complex Variant (timeseries_trend_analysis)
 
@@ -164,18 +218,20 @@ This example shows:
 
    ```bash
    uv run -- python - <<'PY'
-   from benchbox.core.primitives.queries import PrimitivesQueryManager
+   from benchbox.core.read_primitives.queries import ReadPrimitivesQueryManager
 
-   manager = PrimitivesQueryManager()
+   manager = ReadPrimitivesQueryManager()
    print(f"queries: {len(manager.get_all_queries())}")
    print(f"categories: {manager.get_query_categories()}")
    PY
 
-   uv run -- python -m pytest tests/unit/primitives/test_query_catalog.py
+   uv run -- python -m pytest tests/unit/core/read_primitives/test_catalog_loader.py
+   uv run -- python -m pytest tests/unit/core/read_primitives/test_read_primitives_variant_contracts.py
    ```
 
    The test suite exercises catalog parsing, duplicate detection, and category
-   filters.
+   filters. The contract suite also rejects active high-risk variants without
+   comparable result-shape metadata.
 3. Run the full test suite (`uv run -- python -m pytest`) before committing.
 
 ## Adding many queries
