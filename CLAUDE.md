@@ -2,7 +2,37 @@
 
 → **See AGENTS.md for full guidance.** Claude Code-specific shortcuts only.
 
-**Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`/`ty`). Never `git add -A`. Dev PRs target `develop`, never `main` (`main` is release-only and `develop` is PR-gated — no direct push to either). TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
+**Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`/`ty`). Never `git add -A`. Dev PRs target `develop`, never `main` (`main` is release-only and `develop` is PR-gated — no direct push to either). **All agent edits and commits happen in a worktree off `develop`. If a session begins in the main clone (`/Users/joe/Developer/BenchBox`), creating a worktree is the FIRST action (see "Session start" below). Never `git checkout`/`switch`/`branch -m` in the main clone without explicit user approval — that clone stays on `develop`.** TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
+
+## Session start
+
+**First action of any new session that might write to the repo**: confirm
+you are in a worktree, not the main clone.
+
+```bash
+git rev-parse --show-toplevel
+# If the output is /Users/joe/Developer/BenchBox you are in the main
+# clone. Stop. Create a worktree BEFORE any edit, commit, or branch
+# switch:
+make worktree-add BRANCH=<type>/<short-slug>   # type: chore|fix|feat|docs
+cd ../BenchBox.<type>-<short-slug>/
+uv sync --group dev
+```
+
+Pick the branch name from the user's stated task (e.g.
+`fix/explorer-cold-load`, `chore/claude-md-rules`,
+`feat/query-row-limit`). If the task is unclear, ask the user before
+creating the worktree.
+
+**Read-only carveout.** Pure Q&A / exploration sessions — no edits,
+no commits, no state-mutating commands — may stay in the main clone.
+The instant the session turns into a write task, create a worktree
+before the first edit.
+
+**If you find the main clone on a non-`develop` branch**, surface it
+to the user and ask before writing anything to it — that may be the
+user's in-progress work; do not reflexively `git checkout develop` to
+"clean up", that can discard uncommitted state.
 
 ## Git workflow
 
@@ -35,9 +65,13 @@ during the single-repo migration).
     `develop`, runs preflight, and enables auto-merge.
   - Pre-push hook (`pr-preflight-fast-tests` in `.pre-commit-config.yaml`)
     runs the fast lane on every push. Activate once with `pre-commit install`.
-- **Worktrees** for parallel branches (the convention):
-  - `~/Developer/BenchBox/` stays on `develop`, always. Don't swap
-    branches in the main clone.
+- **Worktrees** for parallel branches (this is how agents work in
+  this repo — see "Session start" above; not an optional optimisation):
+  - `~/Developer/BenchBox/` stays on `develop`, always. **Agents must
+    not run `git checkout`, `git switch`, `git branch -m`, or any
+    other command that changes the current branch in the main clone
+    without explicit user approval.** All feature work happens in a
+    worktree (`make worktree-add BRANCH=...`).
   - `make worktree-add BRANCH=fix/foo` creates `../BenchBox.fix-foo/`
     off `origin/develop` with branch `fix/foo` checked out. `cd` into it,
     run `uv sync --group dev`, work, `make pr-open` from inside.
