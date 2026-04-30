@@ -27,7 +27,7 @@ default to the `id` prefix.
 * `description` (optional) - free-form text for future tooling.
 * `variants` (optional) - dict mapping dialect names to platform-specific SQL.
 * `skip_on` (optional) - list of dialects where this query should be skipped.
-* `result_contract` (required for high-risk variant queries) - machine-readable
+* `result_contract` (required for every active variant query) - machine-readable
   result shape and measured capability metadata.
 
 ## Platform-Specific Variants
@@ -89,9 +89,10 @@ Define alternative SQL for specific platforms using the `variants` field:
 
 ### Result Contracts
 
-Every active variant in a high-risk family (`json`, `array`, `struct`, `map`,
-`lambda`, `window`, `statistical`, `timeseries`, `fulltext`, and selected scalar
-edge cases) must declare `result_contract`.
+Every active platform variant must declare `result_contract`. This includes
+syntax-only rewrites and scalar variants, not only high-risk nested families.
+Contracts are intentionally required everywhere so future variants cannot bypass
+the static comparability lint by falling outside a category allowlist.
 
 ```yaml
 result_contract:
@@ -230,8 +231,8 @@ This example shows:
    ```
 
    The test suite exercises catalog parsing, duplicate detection, and category
-   filters. The contract suite also rejects active high-risk variants without
-   comparable result-shape metadata.
+   filters. The contract suite also rejects any active variant without comparable
+   result-shape metadata.
 3. Run the full test suite (`uv run -- python -m pytest`) before committing.
 
 ## Adding many queries

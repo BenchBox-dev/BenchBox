@@ -2,7 +2,7 @@
 // Shared display utilities
 // ---------------------------------------------------------------------------
 
-const BENCHMARK_LABELS: Record<string, string> = {
+export const BENCHMARK_LABELS: Record<string, string> = {
   tpch: "TPC-H",
   tpcds: "TPC-DS",
   ssb: "SSB",
@@ -15,6 +15,12 @@ const BENCHMARK_LABELS: Record<string, string> = {
 
 export function humanizeBenchmark(benchmark: string): string {
   return BENCHMARK_LABELS[benchmark] ?? benchmark.toUpperCase();
+}
+
+/** True when the slug names a benchmark family the explorer knows about,
+ *  even if no rows have been ingested yet. */
+export function isKnownBenchmark(benchmark: string): boolean {
+  return benchmark in BENCHMARK_LABELS;
 }
 
 export function fmtScore(score: number | null): string {

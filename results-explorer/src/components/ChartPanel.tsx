@@ -252,7 +252,14 @@ function renderChart(
         <PercentileLadder
           rows={summary.platforms.flatMap((platform, index) =>
             platform.percentile_stats !== null
-              ? [{ platform: platform.platform, percentile_stats: platform.percentile_stats, colorIdx: index }]
+              ? [
+                  {
+                    result_id: platform.result_id,
+                    platform: platform.platform,
+                    percentile_stats: platform.percentile_stats,
+                    colorIdx: index,
+                  },
+                ]
               : [],
           )}
         />

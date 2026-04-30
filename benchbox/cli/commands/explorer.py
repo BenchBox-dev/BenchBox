@@ -89,20 +89,17 @@ def explorer_build(
 
     pipeline = ExplorerPipeline()
     try:
-        pipeline.run(
+        stats = pipeline.run(
             data_dir=data_dir,
             output_dir=output_dir,
             trust_label=trust_label,
             visibility=visibility,
         )
-        # Count artifacts written
-        manifest_path = output_dir / "manifest.json"
-        total = 0
-        if manifest_path.exists():
-            with open(manifest_path, encoding="utf-8") as fh:
-                total = json.load(fh).get("total_results", 0)
-
-        console.print(f"[green]Done.[/green] Processed {total} result(s) → {output_dir}")
+        skipped_note = f" ({stats.skipped} skipped)" if stats.skipped else ""
+        console.print(
+            f"[green]Done.[/green] Processed {stats.processed} result(s){skipped_note} "
+            f"across {stats.cohorts} cohort(s) → {stats.output_dir}"
+        )
     except Exception as exc:
         console.print(f"[red]Pipeline failed: {exc}[/red]")
         raise SystemExit(1) from exc

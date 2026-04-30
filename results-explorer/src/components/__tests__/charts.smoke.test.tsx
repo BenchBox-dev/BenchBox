@@ -96,6 +96,7 @@ describe("PercentileLadder", () => {
       <PercentileLadder
         rows={[
           {
+            result_id: "r-duckdb-tuned",
             platform: "DuckDB",
             percentile_stats: { p50: 10, p90: 25, p95: 40, p99: 90 },
           },
@@ -103,6 +104,33 @@ describe("PercentileLadder", () => {
       />,
     );
     expect(container.querySelector("svg")).not.toBeNull();
+  });
+
+  it("uses unique data-result-id even when two rows share a platform name", () => {
+    // Variant-tuning case: same platform with different tuning_modes
+    // produces two PlatformRows with the same `platform` display name but
+    // different result_ids. Pre-w6-review, key={row.platform} collided.
+    const { container } = render(
+      <PercentileLadder
+        rows={[
+          {
+            result_id: "r-duckdb-tuned",
+            platform: "DuckDB",
+            percentile_stats: { p50: 10, p90: 25, p95: 40, p99: 90 },
+          },
+          {
+            result_id: "r-duckdb-notuning",
+            platform: "DuckDB",
+            percentile_stats: { p50: 12, p90: 28, p95: 45, p99: 100 },
+          },
+        ]}
+      />,
+    );
+    const ids = Array.from(container.querySelectorAll("[data-result-id]")).map(
+      (el) => el.getAttribute("data-result-id") ?? "",
+    );
+    expect(ids).toEqual(["r-duckdb-tuned", "r-duckdb-notuning"]);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 
@@ -295,6 +323,43 @@ describe("TimeSeries", () => {
     const { container } = render(<TimeSeries entries={entries} />);
     expect(container.querySelector("svg")).not.toBeNull();
     expect(container.querySelector("path")).not.toBeNull();
+  });
+
+  it("uses unique data-result-id per circle when two runs share a run_date", () => {
+    // Pre-w6 behaviour: each <circle> used `key={p.date}`, so two runs on
+    // the same date for the same platform collided. Preact still mounted
+    // both circles but reconciliation broke and a duplicate-key warning
+    // fired (in dev mode only). The structural check below is the true
+    // regression guard: it asserts each circle's data-result-id is
+    // unique across the rendered set, which is independent of Preact's
+    // dev-mode warning channel and survives production tree-shaking.
+    const entries = [
+      makeEntry({ result_id: "r1", run_date: "2026-04-03", display_geomean_ms: 15 }),
+      makeEntry({ result_id: "r2", run_date: "2026-04-03", display_geomean_ms: 12 }),
+      makeEntry({ result_id: "r3", run_date: "2026-04-04", display_geomean_ms: 10 }),
+    ];
+    const { container } = render(<TimeSeries entries={entries} />);
+    const ids = Array.from(container.querySelectorAll("[data-result-id]")).map(
+      (el) => el.getAttribute("data-result-id") ?? "",
+    );
+    expect(ids.length).toBe(3);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("dedupes duplicate result_id entries before plotting", () => {
+    // Defence in depth: if a future JOIN regression in an upstream query
+    // emits the same result_id twice, the chart should render one circle
+    // for that result, not two stacked at the same coordinates.
+    const entries = [
+      makeEntry({ result_id: "r1", run_date: "2026-03-01", display_geomean_ms: 15 }),
+      makeEntry({ result_id: "r1", run_date: "2026-03-01", display_geomean_ms: 15 }),
+      makeEntry({ result_id: "r2", run_date: "2026-04-01", display_geomean_ms: 10 }),
+    ];
+    const { container } = render(<TimeSeries entries={entries} />);
+    const ids = Array.from(container.querySelectorAll("[data-result-id]")).map(
+      (el) => el.getAttribute("data-result-id") ?? "",
+    );
+    expect(new Set(ids).size).toBe(2);
   });
 });
 

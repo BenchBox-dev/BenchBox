@@ -1,10 +1,18 @@
 import type { RoutableProps } from "preact-router";
 
-export function NotFound(_: RoutableProps) {
+interface NotFoundProps extends RoutableProps {
+  /** Optional context-specific copy that replaces the default
+   *  "Page not found." sub-heading. Pass when the caller can give the user
+   *  a more informative reason than the generic 404 (e.g. "Benchmark
+   *  `foo` is not part of the published corpus."). */
+  message?: string;
+}
+
+export function NotFound({ message }: NotFoundProps = {}) {
   return (
     <div class="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
       <h1 class="text-4xl font-bold text-gray-900">404</h1>
-      <p class="mt-4 text-lg text-gray-600">Page not found.</p>
+      <p class="mt-4 text-lg text-gray-600">{message ?? "Page not found."}</p>
       <a href="/results/" class="mt-6 inline-block btn btn-primary no-underline">
         Back to Results
       </a>
