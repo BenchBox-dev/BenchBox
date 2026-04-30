@@ -98,7 +98,7 @@ work:
     needs: [w2]
 
   - id: w6
-    summary: "Deprecate make pr-refresh and update CLAUDE.md/AGENTS.md"
+    summary: "Deprecate make pr-refresh and update CLAUDE.md/AGENTS.md CI guidance"
     status: pending
     notes: |
       With strict-base off, pr-refresh is no longer routine. Modify
@@ -108,6 +108,16 @@ work:
       Remove pr-refresh from the routine workflow paragraphs in
       CLAUDE.md ("PR/Worktree (write — feature branches only)" still
       lists it as escape hatch but not as routine).
+
+      Update the agent-facing CI prose in both CLAUDE.md and AGENTS.md:
+        - Develop PRs now run only lightweight required checks: lint/type
+          plus Ubuntu 3.12 fast tests.
+        - Full OS/Python matrix, integration/table-format/package/parity,
+          and PySpark validation moved to nightly/workflow_dispatch.
+        - `main` PRs and tag releases remain release-grade and must keep
+          full validation.
+        - Agents should not wait for nightly before ordinary develop PRs;
+          nightly failures are surfaced separately by `incident:nightly-red`.
     needs: [w5]
 
   - id: w7
@@ -143,6 +153,9 @@ verification:
   - description: "make pr-refresh prints deprecation notice"
     command: "make -n pr-refresh 2>&1 | grep -c 'DEPRECATED' || make pr-refresh 2>&1 | head -3 | grep -c 'DEPRECATED'"
     expected_output: ">= 1"
+  - description: "Agent docs describe light develop CI, nightly matrix, and release-grade main"
+    command: "grep -cE 'lightweight|required checks|nightly|full.*matrix|release-grade|tag releases|main PR' CLAUDE.md AGENTS.md"
+    expected_output: ">= 6"
 
 must_preserve:
   - "Full matrix + package + release validation remains REQUIRED for main PRs and tag releases — Step 3 only changes develop, not main"
@@ -179,8 +192,8 @@ scope_limit:
     - ".github/workflows/nightly.yml (new)"
     - ".github/workflows/release.yml (audit + comment-only)"
     - "Makefile (pr-refresh deprecation notice only)"
-    - "CLAUDE.md (pr-refresh paragraph)"
-    - "AGENTS.md (pr-refresh paragraph)"
+    - "CLAUDE.md (pr-refresh and CI guidance paragraphs)"
+    - "AGENTS.md (pr-refresh and CI guidance paragraphs)"
   do_not_modify:
     - ".github/workflows/develop-post-merge.yml (Step 4 owns this)"
     - ".github/workflows/lint.yml (only edit if a required PR-tier check moves; otherwise leave alone)"

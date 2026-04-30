@@ -118,6 +118,10 @@ work:
       Implementation: `gh run list --workflow develop-post-merge.yml
       --json conclusion,databaseId | gh run download <id> -n metrics`,
       then aggregate the JSON files.
+      Document this target in CLAUDE.md and AGENTS.md near the post-merge
+      safety-net / dev-loop workflow text. In CLAUDE.md, add it to the
+      pre-approved read-only PR/Worktree or metrics bucket; the command
+      reads workflow artifacts through `gh` and does not mutate repo state.
     needs: [w3]
 
   - id: w6
@@ -148,6 +152,9 @@ verification:
   - description: "make dev-loop-metrics produces a non-empty summary"
     command: "make dev-loop-metrics 2>&1 | grep -cE 'P50|P95|red rate|runner'"
     expected_output: ">= 4"
+  - description: "dev-loop-metrics is documented for agents and pre-approved in CLAUDE.md"
+    command: "grep -cE 'dev-loop-metrics|P50|P95|post-merge red|runner minutes' CLAUDE.md AGENTS.md"
+    expected_output: ">= 3"
   - description: "Failure flow is documented in agent-facing docs"
     command: "grep -cE 'incident:develop-red|auto-revert' CLAUDE.md AGENTS.md"
     expected_output: ">= 2"
@@ -195,8 +202,8 @@ scope_limit:
   only_modify:
     - ".github/workflows/develop-post-merge.yml"
     - "Makefile (dev-loop-metrics target only)"
-    - "CLAUDE.md (failure flow section)"
-    - "AGENTS.md (failure flow section)"
+    - "CLAUDE.md (failure flow, dev-loop metrics, and Pre-approved Commands sections)"
+    - "AGENTS.md (failure flow and dev-loop metrics sections)"
     - "_project/decisions/dev-loop-auto-revert-fork-test-*.md (new fork validation evidence)"
   do_not_modify:
     - ".github/workflows/test.yml (Step 3 owns this)"

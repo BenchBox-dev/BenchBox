@@ -135,6 +135,9 @@ verification:
   - description: "Step 6 TODO status updated to reflect decision"
     command: "grep -E '^status:' _project/TODO/main/planning/dev-loop-step-6-queue-decision-gate.yaml"
     expected_output: "Either 'Not Started' (if BUILD), 'Blocked' (if REASSESS), or moved to DONE (if DO NOT BUILD)"
+  - description: "Agent docs include current dev-loop status summary"
+    command: "grep -cE 'Dev-loop status \\(as of|P95 PR-to-merged|post-merge red rate|BUILD QUEUE|DO NOT BUILD QUEUE|REASSESS' CLAUDE.md AGENTS.md"
+    expected_output: ">= 3"
 
 must_preserve:
   - "Steps 1-4 implementation untouched during measurement — no code changes during the window"

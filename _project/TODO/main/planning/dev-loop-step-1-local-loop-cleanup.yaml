@@ -73,8 +73,14 @@ work:
         - "Drain one at a time, oldest first" (and surrounding pr-refresh prose)
         - "One PR per file area at a time"
         - "Sequential by design" notes around pr-fanout
+        - Any claim that the pre-push hook reruns the fast lane
+          automatically on every push
       Replace with a one-paragraph summary of the new model: pool
       worktrees + auto-merge + post-merge auto-revert as safety net.
+      Update the pre-push-hook guidance to say expensive pre-push hooks
+      are opt-in via `BENCHBOX_PREPUSH=1`; `make pr-preflight` is the
+      explicit local gate for humans/agents that want the fast lane before
+      pushing.
       Note that this paragraph will be expanded by Steps 2 and 4 once
       those land; here, just remove the now-incorrect guidance.
 
@@ -125,8 +131,11 @@ verification:
     command: "uv run -- python -c \"from pathlib import Path; from tests.conftest import _get_test_lock_path; print(_get_test_lock_path() == Path.home() / '.benchbox' / 'test.lock')\""
     expected_output: "True"
   - description: "Stale guidance removed from agent-facing docs"
-    command: "grep -cE '(Drain one at a time|One PR per file area|Sequential by design)' CLAUDE.md AGENTS.md"
+    command: "grep -cE '(Drain one at a time|One PR per file area|Sequential by design|pre-push hook.*runs the fast lane|re-runs the fast lane automatically)' CLAUDE.md AGENTS.md"
     expected_output: "0"
+  - description: "Agent docs say pre-push fast lane is opt-in and pr-preflight is explicit"
+    command: "grep -cE 'BENCHBOX_PREPUSH=1|pre-push hooks.*opt-in|make pr-preflight.*explicit|explicit.*make pr-preflight' CLAUDE.md AGENTS.md"
+    expected_output: ">= 2"
   - description: "Six blind-spot findings recorded"
     command: "ls _project/blind-spots/2026-04-30-*.md | wc -l"
     expected_output: "6"
@@ -164,8 +173,8 @@ scope_limit:
     - "Makefile (pr-fanout target only)"
     - "tests/conftest.py (lock-path logic only)"
     - "tests/README.md (around line 257)"
-    - "CLAUDE.md (manual-coordination paragraphs)"
-    - "AGENTS.md (manual-coordination paragraphs)"
+    - "CLAUDE.md (manual-coordination and pre-push hook paragraphs)"
+    - "AGENTS.md (manual-coordination and pre-push hook paragraphs)"
     - "_project/blind-spots/2026-04-30-*.md (6 new files)"
   do_not_modify:
     - ".github/workflows/test.yml (Step 3 owns this)"

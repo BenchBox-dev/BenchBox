@@ -139,6 +139,16 @@ work:
       `worktree-pool-reset POOL=NN` if needed).
       Note that `make worktree-add` remains as a deprecated alias for
       one release with a stderr deprecation notice.
+
+      Update Claude-specific pre-approved command buckets in CLAUDE.md:
+        - Read-only: `make worktree-pool-status`, `make worktree-list`,
+          `git worktree list*`
+        - Write, feature/pool worktrees only: `make worktree-claim
+          BRANCH=...`, `make worktree-release`
+        - Manual/admin escape hatches, not broad auto-allow:
+          `make worktree-pool-init`, `make worktree-pool-reset POOL=NN`
+      AGENTS.md should describe the same lifecycle in prose even though it
+      does not have Claude's pre-approved-command table.
     needs: [w2, w3, w4]
 
   - id: w7
@@ -189,6 +199,12 @@ verification:
   - description: "worktree-add prints deprecation notice"
     command: "make worktree-add BRANCH=chore/legacy-test 2>&1 | grep -c 'DEPRECATED'"
     expected_output: ">= 1"
+  - description: "Claude command permissions list new pool commands explicitly"
+    command: "grep -cE 'worktree-claim|worktree-release|worktree-pool-status|worktree-pool-init|worktree-pool-reset' CLAUDE.md"
+    expected_output: ">= 5"
+  - description: "Agent-facing docs describe claim/release pool lifecycle"
+    command: "grep -cE 'worktree-claim|worktree-release|worktree-pool-status|worktree-pool-reset' CLAUDE.md AGENTS.md"
+    expected_output: ">= 8"
 
 must_preserve:
   - "Existing make worktree-add target keeps working — only adds deprecation notice; do not break legacy non-pool worktree workflows mid-session"
@@ -231,7 +247,7 @@ anti_patterns:
 scope_limit:
   only_modify:
     - "Makefile (worktree-* targets only)"
-    - "CLAUDE.md (Session start section)"
+    - "CLAUDE.md (Session start, Worktrees, and Pre-approved Commands sections)"
     - "AGENTS.md (Session start / Worktree section)"
     - ".gitignore (add .git/pool.lock if needed)"
   do_not_modify:
