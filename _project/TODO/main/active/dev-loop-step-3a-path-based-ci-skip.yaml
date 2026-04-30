@@ -346,7 +346,7 @@ work:
 
   - id: w6
     summary: "Open and merge the workflow PR before touching branch protection"
-    status: pending
+    status: done
     needs: [w1, w2, w3, w4, w5]
     notes: |
       `make lint format typecheck`; `BENCHBOX_PREPUSH=1 make pr-preflight`;
@@ -357,6 +357,28 @@ work:
       Include smoke-test fork run URLs and confirmation that PR
       #66/#67-style TODO-only PRs would now skip Python code CI while
       still running content validation.
+
+      Implementation record (2026-04-30):
+        - Rebased the branch onto `origin/develop` after PR #78 landed.
+          Resolved the Makefile conflict by preserving upstream worktree-pool
+          targets and Step 3a's `pr-preflight-fast-tests` / `pr-content-guard`
+          targets in the same phony lists.
+        - Ran `make lint format typecheck`; ruff passed, format left files
+          unchanged, and `ty check` exited 0 while reporting the repo's existing
+          426 diagnostics.
+        - Ran `BENCHBOX_PREPUSH=1 make pr-preflight`; CI lint checks passed,
+          timing policy reported 0 violations, dependency audit reported 0
+          violations, and the path-aware fast-test lane ran because this branch
+          touches code/workflow paths.
+        - Fast tests reported `21268 passed, 6 skipped, 41 warnings, 4 subtests
+          passed in 63.30s`.
+        - Final W6 review confirmed the branch classifies as
+          `needs_code_ci=true`, develop PR checks moved out of `lint.yml` and
+          `test.yml`, and `.github/workflows/pr.yml` supplies `lint`,
+          `test (ubuntu-latest, 3.12)`, and `ci-required-result`.
+        - W6 follow-up for PR creation: after this commit, run `make pr-open`
+          and set the PR body to state that the required-check ruleset edit is
+          W7 and happens only after this workflow PR lands.
 
   - id: w7
     summary: "Post-merge: update branch-protection required checks"
