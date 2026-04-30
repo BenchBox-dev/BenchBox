@@ -2,7 +2,8 @@ id: dev-loop-step-3a-path-based-ci-skip
 title: "Dev-loop simplification — Step 3a: path-based CI skip for content-only PRs"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-30"
 category: Core Functionality
 
 description: |
@@ -397,7 +398,7 @@ work:
 
   - id: w7
     summary: "Post-merge: update branch-protection required checks"
-    status: pending
+    status: done
     needs: [w6]
     notes: |
       Apply via `gh api -X PATCH repos/joeharris76/BenchBox/branches/
@@ -414,6 +415,22 @@ work:
       record for audit. Do not change strict-base, dismiss-stale-reviews,
       enforce-admins, or review settings in this step.
 
+      Implementation record (2026-04-30):
+        - Confirmed PR #79 merged to `develop` at `2026-04-30T20:29:55Z`
+          as squash commit `9c82b61f5be83cf018af216a7cf99866b7a4da04`.
+        - Captured ruleset `develop-squash-only` (`15611785`) before the edit:
+          required checks were `lint` and `test (ubuntu-latest, 3.12)`;
+          `strict_required_status_checks_policy` was already `false`.
+        - Updated the repository ruleset with a full `PUT` body derived from
+          the live ruleset JSON, changing only the required status check list
+          to `ci-required-result`.
+        - Re-read the live ruleset after the update and confirmed required
+          checks now contain only `ci-required-result`; squash-only review
+          settings, strict-base policy, linear history, non-fast-forward, and
+          deletion rules were preserved.
+        - Recorded the before/after JSON in
+          `_project/decisions/dev-loop-path-filter-smoke-test-2026-04-30.md`.
+
 verification:
   - description: "Path filter ruleset exists and has safe-content plus fail-closed code categories"
     command: "test -f .github/path-filters.yml && grep -cE 'safe[-_]?content|content[-_]?only|needs[-_]?code|code[-_]?ci|unknown' .github/path-filters.yml"
@@ -428,7 +445,7 @@ verification:
     command: "grep -cE 'needs: \\[.*code-lint|code-lint:|ci-required-result:' .github/workflows/test.yml .github/workflows/pr.yml 2>/dev/null | awk -F: '{s+=$2}END{print s}'"
     expected_output: ">= 2"
   - description: "Branch-protection required check is the umbrella, not the subordinate jobs"
-    command: "gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '.required_status_checks.contexts' 2>/dev/null || gh api repos/joeharris76/BenchBox/rulesets --jq '[.[] | select((.conditions.ref_name.include // []) | any(. == \"refs/heads/develop\" or . == \"~DEFAULT_BRANCH\")) | .rules[]? | select(.type == \"required_status_checks\") | .parameters.required_status_checks[]?.context]'"
+    command: "gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '[.rules[] | select(.type == \"required_status_checks\") | .parameters.required_status_checks[]?.context]'"
     expected_output: "list contains 'ci-required-result' and does NOT contain bare 'lint' or 'test (ubuntu-latest, 3.12)'"
   - description: "Smoke-test decision record proves content-only skip, code fallback, unknown fallback, and gitignore handling"
     command: "grep -cE 'TODO.only|docs/|under 60 seconds|unknown.*full|gitignore|code-lint|code-test|content guard' _project/decisions/dev-loop-path-filter-smoke-test-*.md"
@@ -437,9 +454,9 @@ verification:
     command: "make pr-preflight 2>&1 | grep -cE 'No code changes detected|skipping fast tests' || echo 'requires a doc-only diff to demonstrate'"
     expected_output: ">= 1 when run on a doc-only branch; absent on a code-changed branch"
   - description: "Agent and contributor docs document the new required check and path behavior"
-    command: "grep -cE 'ci-required-result|_paths\\.yml|content-only|path.*filter|skipping fast tests' CLAUDE.md AGENTS.md CONTRIBUTING.md .claude/commands/pr.md"
+    command: "grep -cE 'ci-required-result|path-filters\\.yml|content-only|path.*filter|skipping fast tests' CLAUDE.md AGENTS.md CONTRIBUTING.md .claude/commands/pr.md"
     expected_output: ">= 4"
-  - description: "dorny/paths-filter is pinned by SHA, not the mutable v3 tag"
+  - description: "No mutable dorny/paths-filter v3 tag is present"
     command: "! grep -R \"dorny/paths-filter@v3\" .github/workflows"
     expected_output: "no matches"
 
@@ -459,12 +476,10 @@ approach: |
   `ci-required-result`, plus a small local helper for `make pr-preflight`
   and the pre-push hook.
 
-  Use `dorny/paths-filter@<pinned-sha>` rather than rolling a custom diff parser:
-  it handles edge cases (renames, submodules, merge-commit diffs)
-  correctly. Pin to a SHA for supply-chain safety, not to `@v3`. If the
-  local helper needs to parse `path-filters.yml`, prefer a small Python helper
-  over ad hoc shell parsing; the repo already standardizes on `uv run --`
-  for Python execution.
+  Final implementation uses `scripts/path_filter_decision.py`, a stdlib-only
+  helper, instead of a third-party path-filter action. That keeps CI and local
+  `make pr-preflight` on the same code path, avoids a mutable action tag, and
+  lets content-only PRs classify paths before dependency installation.
 
   Required-check aggregation has one hard GitHub Actions constraint:
   `needs:` only works inside one workflow. If the required `lint` gate
