@@ -104,7 +104,7 @@ work:
 
   - id: w2
     summary: "Add ci-required umbrella, content guard, and gated code jobs"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Edit the workflow that runs on `pull_request` to develop (Step 3
@@ -207,6 +207,31 @@ work:
       The required check on develop branch protection becomes
       `ci-required-result`, NOT bare `lint` or `test` directly, only after
       the workflow has landed on develop.
+
+      Implementation record (2026-04-30):
+        - Added `.github/workflows/pr.yml` for `pull_request` events targeting
+          `develop`; `.github/workflows/test.yml` and
+          `.github/workflows/lint.yml` now keep main/push surfaces while this
+          workflow owns the develop PR gate.
+        - Added always-reporting `ci-paths` and `ci-required-result` jobs.
+          `ci-paths` writes a JSON decision artifact and exposes
+          `safe-content-only`, `needs-code-ci`, `content-guard-needed`,
+          changed paths, code paths, and unknown paths as job outputs.
+        - Added `content-guard` for content paths. It validates changed YAML
+          with `check-yaml`, markdown with the existing markdownlint hook,
+          TODO/DONE YAML with `validate_todo.py` plus `todo_cli.py check-graph`,
+          and `docs/**` changes with `make docs-validate`.
+        - Added gated `code-lint` and `code-test` jobs. Their displayed check
+          names remain `lint` and `test (ubuntu-latest, 3.12)` so the current
+          pre-W7 ruleset still receives the required contexts until the
+          post-merge ruleset edit switches to `ci-required-result`.
+        - Added `scripts/path_filter_decision.py`, a stdlib-only classifier
+          that reads `.github/workflows/_paths.yml`, fails closed on unknown
+          paths, writes GitHub outputs, emits helper path lists, and supports
+          local/CI callers without duplicating rules.
+        - W2 review issue fixed: added explicit `git fetch` steps for the base
+          branch before diff classification so Actions runners do not depend
+          on checkout-specific remote-ref behavior.
 
   - id: w3
     summary: "Add the equivalent local skip in pr-preflight"
