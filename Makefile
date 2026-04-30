@@ -2,8 +2,10 @@
 # This makefile provides commands for building, testing and development
 
 PR_FANOUT_JOBS ?= 4
+POOL_SIZE ?= 10
+WORKTREE_POOL_PARENT ?= ..
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-pool-reset worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -728,7 +730,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-pool-reset worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -822,11 +824,168 @@ pr-status:
 	@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
+# Initialize retained pool worktrees. Existing pool-NN paths are left untouched.
+worktree-pool-init:
+	@git fetch origin develop --quiet
+	@set -e; \
+	POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	i=1; \
+	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
+		pool=$$(printf 'pool-%02d' "$$i"); \
+		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
+		if [ -e "$$wt" ]; then \
+			git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { \
+				echo "Path exists but is not a git worktree: $$wt" >&2; \
+				exit 1; \
+			}; \
+			echo "$$pool exists: $$wt"; \
+		else \
+			echo "$$pool create: $$wt"; \
+			git worktree add --detach "$$wt" origin/develop; \
+			( cd "$$wt" && uv sync --group dev && uv run -- pre-commit install ); \
+		fi; \
+		i=$$((i + 1)); \
+	done
+	@POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	printf '%-8s | %-60s | %s\n' "pool" "path" "branch"; \
+	i=1; \
+	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
+		pool=$$(printf 'pool-%02d' "$$i"); \
+		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
+		if [ -d "$$wt/.git" ] || git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+			branch=$$(git -C "$$wt" branch --show-current 2>/dev/null); \
+			[ -n "$$branch" ] || branch="(detached)"; \
+		else \
+			branch="(missing)"; \
+		fi; \
+		printf '%-8s | %-60s | %s\n' "$$pool" "$$wt" "$$branch"; \
+		i=$$((i + 1)); \
+	done
+
+# Claim the first free pool worktree for a feature branch.
+worktree-claim:
+	@test -n "$(BRANCH)" || { echo "Usage: make worktree-claim BRANCH=<branch-name>"; exit 1; }
+	@case "$(BRANCH)" in chore/?*|fix/?*|feat/?*|docs/?*) ;; *) echo "BRANCH must match ^(chore|fix|feat|docs)/.+"; exit 1 ;; esac
+	@git check-ref-format --branch "$(BRANCH)" >/dev/null || { echo "Invalid git branch name: $(BRANCH)"; exit 1; }
+	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
+	touch "$$LOCK"; \
+	if command -v lockf >/dev/null 2>&1; then \
+		lockf -t 30 "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; \
+	elif command -v flock >/dev/null 2>&1; then \
+		flock -w 30 "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; \
+	else \
+		uv run -- python -c 'import fcntl, signal, subprocess, sys; signal.signal(signal.SIGALRM, lambda *_: sys.exit("Timed out waiting for pool lock")); signal.alarm(30); lock = open(sys.argv[1], "a", encoding="utf-8"); fcntl.flock(lock, fcntl.LOCK_EX); signal.alarm(0); raise SystemExit(subprocess.call(sys.argv[2:]))' "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; \
+	fi
+
+worktree-claim-locked:
+	@git fetch origin develop --quiet
+	@set -e; \
+	POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	i=1; \
+	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
+		pool=$$(printf 'pool-%02d' "$$i"); \
+		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
+		if git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+			branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
+			status=$$(git -C "$$wt" status --porcelain); \
+			if [ -z "$$branch" ] && [ -z "$$status" ]; then \
+				git -C "$$wt" fetch origin develop --quiet; \
+				git -C "$$wt" reset --hard origin/develop >/dev/null; \
+				git -C "$$wt" checkout -b "$(BRANCH)" >/dev/null; \
+				( cd "$$wt" && uv sync --group dev >/dev/null ); \
+				printf 'WORKTREE_PATH=%s\n' "$$(cd "$$wt" && pwd -P)"; \
+				exit 0; \
+			fi; \
+		fi; \
+		i=$$((i + 1)); \
+	done; \
+	echo "No free pool worktree available. Run: make worktree-pool-status" >&2; \
+	exit 1
+
+worktree-release:
+	@set -e; \
+	top=$$(git rev-parse --show-toplevel); \
+	case "$$top" in *.pool-[0-9][0-9]) ;; *) echo "Refusing: worktree-release must run inside a pool-NN worktree."; exit 1 ;; esac; \
+	branch=$$(git branch --show-current); \
+	test -n "$$branch" || { echo "Refusing: this pool worktree is already detached/free."; exit 1; }; \
+	case "$$branch" in develop|main) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
+	if [ "$(FORCE)" != "1" ]; then \
+		state=$$(gh pr view "$$branch" --json state --jq .state 2>/dev/null || true); \
+		[ "$$state" = "MERGED" ] || { echo "Refusing: PR for $$branch is not MERGED; open or close PR first, or rerun with FORCE=1."; exit 1; }; \
+	fi; \
+	git checkout --detach origin/develop; \
+	git fetch origin develop --quiet; \
+	git reset --hard origin/develop; \
+	git branch -D "$$branch"; \
+	git remote prune origin; \
+	echo "Released $$branch; worktree is detached at origin/develop."
+
+worktree-pool-status:
+	@POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	printf '%-8s | %-60s | %-28s | %-7s | %s\n' "pool" "path" "branch" "state" "claim_age"; \
+	i=1; \
+	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
+		pool=$$(printf 'pool-%02d' "$$i"); \
+		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
+		branch="-"; state="missing"; age="-"; \
+		if git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+			current=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
+			dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+			if [ -z "$$current" ]; then \
+				branch="(detached)"; \
+				if [ -z "$$dirty" ]; then state="free"; else state="dirty"; fi; \
+			else \
+				branch="$$current"; \
+				age=$$(git -C "$$wt" log -1 --format=%ar 2>/dev/null || echo "-"); \
+				if [ -n "$$dirty" ]; then \
+					state="dirty"; \
+				else \
+					pr_state=$$(gh pr view "$$current" --json state --jq .state 2>/dev/null || true); \
+					if [ "$$pr_state" = "MERGED" ]; then state="stale"; else state="claimed"; fi; \
+				fi; \
+			fi; \
+		fi; \
+		printf '%-8s | %-60s | %-28s | %-7s | %s\n' "$$pool" "$$wt" "$$branch" "$$state" "$$age"; \
+		i=$$((i + 1)); \
+	done
+
+worktree-pool-reset:
+	@test -n "$(POOL)" || { echo "Usage: make worktree-pool-reset POOL=NN"; exit 1; }
+	@case "$(POOL)" in [0-9][0-9]) ;; *) echo "POOL must be two digits, e.g. POOL=03"; exit 1 ;; esac
+	@set -e; \
+	POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.pool-$(POOL)"; \
+	git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "No pool worktree found: $$wt"; exit 1; }; \
+	branch=$$(git -C "$$wt" branch --show-current 2>/dev/null || true); \
+	dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+	if [ -n "$$dirty" ] && [ "$(FORCE)" != "1" ]; then \
+		echo "Refusing to reset dirty pool worktree $$wt. Review changes or rerun with FORCE=1."; \
+		echo "$$dirty"; \
+		exit 1; \
+	fi; \
+	if [ "$(FORCE)" = "1" ]; then \
+		echo "About to reset $$wt to origin/develop."; \
+		if [ -n "$$branch" ]; then echo "Current branch: $$branch"; else echo "Current branch: (detached)"; fi; \
+		if [ -n "$$dirty" ]; then echo "Uncommitted changes to discard:"; echo "$$dirty"; fi; \
+		printf 'Type RESET to continue: '; \
+		read answer; \
+		[ "$$answer" = "RESET" ] || { echo "Aborted."; exit 1; }; \
+	fi; \
+	git -C "$$wt" fetch origin develop --quiet; \
+	git -C "$$wt" checkout --detach origin/develop; \
+	git -C "$$wt" reset --hard origin/develop; \
+	if [ "$(FORCE)" = "1" ]; then git -C "$$wt" clean -fd -e .benchbox >/dev/null; fi; \
+	if [ "$(FORCE)" = "1" ] && [ -n "$$branch" ]; then \
+		case "$$branch" in develop|main) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
+	fi; \
+	echo "Reset pool-$(POOL): $$wt"
+
 # Create a worktree off origin/develop. Usage: make worktree-add BRANCH=fix/foo
 # Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
 # After: cd into the path, work, run `make pr-open` from inside.
 worktree-add:
 	@test -n "$(BRANCH)" || { echo "Usage: make worktree-add BRANCH=<branch-name>"; exit 1; }
+	@echo "DEPRECATED: use \`make worktree-claim BRANCH=...\` instead. The pool model retains worktrees rather than creating new ones. \`worktree-add\` will be removed in the next release." >&2
 	@WTNAME=$$(echo "$(BRANCH)" | tr '/' '-'); \
 	WTPATH="../BenchBox.$$WTNAME"; \
 	test ! -e "$$WTPATH" || { echo "Path exists: $$WTPATH"; exit 1; }; \
@@ -848,12 +1007,16 @@ todo-reindex:
 	@uv run _project/scripts/generate_indexes.py
 
 # Remove worktrees whose branches are gone on origin (already merged).
-# Pairs with auto-merge: PR merges → branch deleted → worktree pruned.
+# Legacy cleanup only. Pool worktrees are retained and released instead.
 worktree-prune:
 	@git fetch --prune --quiet
-	@git worktree list --porcelain | awk '/^worktree /{wt=$$2} /^branch /{br=$$2; print wt"|"br}' | \
+	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
+	git worktree list --porcelain | awk 'function emit(){if (wt != "") print wt "|" br} /^worktree /{emit(); wt=$$2; br=""} /^branch /{br=$$2} END{emit()}' | \
 		while IFS='|' read -r wt br; do \
-			[ "$$wt" = "$$(git rev-parse --show-toplevel)" ] && continue; \
+			[ "$$wt" = "$$MAIN_CLONE" ] && continue; \
+			base=$$(basename "$$wt"); \
+			case "$$base" in *.pool-[0-9][0-9]) pool=$${base##*.}; echo "Skipping pool worktree $$pool (retained)"; continue ;; esac; \
+			[ -n "$$br" ] || continue; \
 			short=$${br#refs/heads/}; \
 			if ! git ls-remote --exit-code --heads origin "$$short" >/dev/null 2>&1; then \
 				echo "Removing worktree (branch gone on origin): $$wt [$$short]"; \
@@ -978,9 +1141,14 @@ help:
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
 	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
-	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"
+	@echo "  make worktree-pool-init  Create retained pool worktrees (POOL_SIZE=$(POOL_SIZE))"
+	@echo "  make worktree-pool-status  Show retained pool worktree state"
+	@echo "  make worktree-claim BRANCH=name  Claim a retained pool worktree for a branch"
+	@echo "  make worktree-release  Release a merged pool branch back to detached origin/develop"
+	@echo "  make worktree-pool-reset POOL=NN  Reset a retained pool worktree manually"
+	@echo "  make worktree-add BRANCH=name  Deprecated legacy worktree creator"
 	@echo "  make worktree-list   List active worktrees"
-	@echo "  make worktree-prune  Remove worktrees whose branches are gone on origin (post-merge cleanup)"
+	@echo "  make worktree-prune  Remove legacy non-pool worktrees whose branches are gone on origin"
 	@echo ""
 	@echo "Blind-Spot Findings (see _project/blind-spots/README.md):"
 	@echo "  make blind-spots-list   List open findings (one row each)"

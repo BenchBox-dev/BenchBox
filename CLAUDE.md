@@ -12,11 +12,11 @@ you are in a worktree, not the main clone.
 ```bash
 git rev-parse --show-toplevel
 # If the output is /Users/joe/Developer/BenchBox you are in the main
-# clone. Stop. Create a worktree BEFORE any edit, commit, or branch
-# switch:
-make worktree-add BRANCH=<type>/<short-slug>   # type: chore|fix|feat|docs
-cd ../BenchBox.<type>-<short-slug>/
-uv sync --group dev
+# clone. Stop. Claim a retained pool worktree BEFORE any edit, commit,
+# or branch switch:
+BRANCH=fix/short-slug   # choose chore|fix|feat|docs
+WORKTREE_PATH=$(make -s worktree-claim BRANCH="$BRANCH" | sed -n 's/^WORKTREE_PATH=//p')
+cd "$WORKTREE_PATH"
 ```
 
 Pick the branch name from the user's stated task (e.g.
@@ -28,6 +28,16 @@ creating the worktree.
 no commits, no state-mutating commands — may stay in the main clone.
 The instant the session turns into a write task, create a worktree
 before the first edit.
+
+BenchBox uses a retained pool of 10 worktrees. `make worktree-claim`
+atomically picks a free `BenchBox.pool-NN`, resets it to current
+`origin/develop`, checks out the requested branch, and prints
+`WORKTREE_PATH=...`. After the PR merges, run `make worktree-release`
+inside that pool worktree to return it to detached `origin/develop`.
+If a prior session died, run `make worktree-pool-status`; reset a stale
+or dirty slot only with `make worktree-pool-reset POOL=NN` after
+reviewing what will be discarded. `make worktree-add` remains as a
+deprecated one-release compatibility path for legacy non-pool worktrees.
 
 **If you find the main clone on a non-`develop` branch**, surface it
 to the user and ask before writing anything to it — that may be the
@@ -85,10 +95,18 @@ during the single-repo migration).
     not run `git checkout`, `git switch`, `git branch -m`, or any
     other command that changes the current branch in the main clone
     without explicit user approval.** All feature work happens in a
-    worktree (`make worktree-add BRANCH=...`).
-  - `make worktree-add BRANCH=fix/foo` creates `../BenchBox.fix-foo/`
-    off `origin/develop` with branch `fix/foo` checked out. `cd` into it,
-    run `uv sync --group dev`, work, `make pr-open` from inside.
+    retained pool worktree (`make worktree-claim BRANCH=...`).
+  - `make worktree-claim BRANCH=fix/foo` atomically claims a free
+    `BenchBox.pool-NN`, resets it to current `origin/develop`, checks out
+    `fix/foo`, runs `uv sync --group dev`, and prints `WORKTREE_PATH=...`.
+    `cd` into that path, work, run `make pr-open`, then release it with
+    `make worktree-release` after the PR merges.
+  - `make worktree-pool-status` lists free, claimed, stale, and dirty
+    slots. For stale recovery, inspect the slot first; use
+    `make worktree-pool-reset POOL=NN` only as a manual escape hatch.
+  - `make worktree-add BRANCH=fix/foo` remains for one release as a
+    deprecated legacy creator for non-pool worktrees; prefer
+    `worktree-claim`.
   - `make pr-fanout` walks every worktree (skipping the main clone) and
     runs `make pr-open` with bounded parallelism (`PR_FANOUT_JOBS ?= 4`).
     Use this when you've worked across several branches and want to ensure
@@ -103,10 +121,9 @@ during the single-repo migration).
   - **Drafts are intentional.** Open as draft when you don't want
     auto-merge yet (spike, RFC, parked work). Mark ready when you do —
     the auto-merge-on-open workflow respects this.
-  - `make worktree-prune` removes worktrees whose branches are gone
-    upstream (post-merge cleanup). Pairs with auto-merge: PR merges →
-    branch deleted on origin → next prune sweeps the worktree. Run
-    this at end-of-session.
+  - `make worktree-prune` removes legacy non-pool worktrees whose branches
+    are gone upstream. Pool worktrees are retained and returned with
+    `make worktree-release`.
   - **`.gitignore` ∩ tracked-files** is CI-blocked
     (`.github/workflows/gitignore-lint.yml`). New ignore rules that match
     tracked files on the PR head must untrack them in the same PR. Rules
@@ -192,8 +209,9 @@ benchbox run --help | --help-topic all | --help-topic examples | --help-topic be
 
 ## Pre-approved Commands
 - **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `uv run -- python -m pytest *`
-- **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-status`, `make worktree-list`, `make worktree-prune`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
-- **PR/Worktree (write — feature branches only)**: `make pr-open`, `make pr-fanout`, `make pr-refresh`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `git push origin chore/*`, `git push origin fix/*`, `git push origin feat/*`, `git push origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
+- **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-status`, `make worktree-pool-status`, `make worktree-list`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
+- **PR/Worktree (write — feature/pool worktrees only)**: `make pr-open`, `make pr-fanout`, `make pr-refresh`, `make worktree-claim BRANCH=*`, `make worktree-release`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `git push origin chore/*`, `git push origin fix/*`, `git push origin feat/*`, `git push origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
+  - **Manual/admin escape hatches, not broad auto-allow**: `make worktree-pool-init`, `make worktree-pool-reset POOL=NN`, `make worktree-prune`
   - **Never auto-allowed**: `git push * develop`, `git push * main`, `git push --force*`, `gh pr create --base main*`. These remain prompt-on-use.
 - **Files**: `ls*`, `find*`, `cat*`, `head*`, `tail*`, `wc*`, `file*`, `stat*`, `du*`, `tree*`, `which*`
 - **Git**: `git status`, `git diff*`, `git log*`, `git show*`, `git branch*`, `git remote*`, `git config --list`, `git worktree list*`
