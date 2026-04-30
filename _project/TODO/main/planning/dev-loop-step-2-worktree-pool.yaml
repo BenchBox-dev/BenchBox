@@ -128,7 +128,7 @@ work:
 
   - id: w6
     summary: "Update Session-start docs in CLAUDE.md and AGENTS.md"
-    status: pending
+    status: done
     notes: |
       Replace the existing "Session start" instructions:
         - Old: `make worktree-add BRANCH=<type>/<short-slug>`
