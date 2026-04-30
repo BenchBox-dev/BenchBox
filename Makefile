@@ -918,13 +918,24 @@ worktree-claim-locked:
 
 # Single-pass claim attempt. Iterates the pool once; on the first
 # detached, clean, non-claim-aborted slot, mutates it to the requested
-# branch under a trap that rolls back on any failure (including SIGINT).
+# branch under an EXIT trap that rolls back on any failure (including
+# SIGINT/SIGTERM). EXIT is POSIX (works in dash/sh/bash); ERR is not.
 # A `.benchbox/claim_in_progress` marker is written before mutation and
 # removed on success or rollback; if the process is SIGKILL'd between
 # write and removal, the marker survives and `worktree-pool-status`
 # reports the slot as `aborted` so the operator knows it needs reset.
 worktree-claim-attempt:
 	@set -e; \
+	marker=""; wt=""; pool=""; claim_ok=0; \
+	cleanup() { \
+		if [ "$$claim_ok" != "1" ] && [ -n "$$marker" ]; then \
+			rm -f "$$marker"; \
+			git -C "$$wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
+			git -C "$$wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
+			echo "claim of $$pool failed; slot returned to detached origin/develop" >&2; \
+		fi; \
+	}; \
+	trap cleanup EXIT INT TERM; \
 	POOL_REPO=$$($(POOL_REPO_CMD)); \
 	i=1; \
 	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
@@ -939,14 +950,6 @@ worktree-claim-attempt:
 		marker="$$wt/.benchbox/claim_in_progress"; \
 		mkdir -p "$$wt/.benchbox"; \
 		printf 'pid=%s started=%s branch=%s\n' "$$$$" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(BRANCH)" > "$$marker"; \
-		rollback() { \
-			rm -f "$$marker"; \
-			git -C "$$wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
-			git -C "$$wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
-			echo "claim of $$pool failed; slot returned to detached origin/develop" >&2; \
-			exit 1; \
-		}; \
-		trap rollback ERR INT TERM; \
 		git -C "$$wt" reset --hard origin/develop >/dev/null; \
 		git -C "$$wt" checkout -b "$(BRANCH)" >/dev/null; \
 		if [ ! -f "$$wt/.venv/pyvenv.cfg" ] \
@@ -954,7 +957,8 @@ worktree-claim-attempt:
 			( cd "$$wt" && uv sync --group dev >/dev/null ); \
 		fi; \
 		rm -f "$$marker"; \
-		trap - ERR INT TERM; \
+		marker=""; \
+		claim_ok=1; \
 		printf 'WORKTREE_PATH=%s\n' "$$(cd "$$wt" && pwd -P)"; \
 		exit 0; \
 	done; \
@@ -1009,10 +1013,13 @@ worktree-release-locked:
 ##
 ## PR-state lookup is batched: a single `gh pr list --state all` runs up
 ## front and an associative awk lookup per slot replaces N per-slot
-## `gh pr view` calls.
+## `gh pr view` calls. The bulk window is bumped to 1000 (gh's
+## effective max for one page); for any pool branch whose PR falls
+## outside the window, a per-branch `gh pr view` fallback fills in the
+## state so long-lived stale slots don't get misclassified as `claimed`.
 worktree-pool-status:
 	@POOL_REPO=$$($(POOL_REPO_CMD)); \
-	pr_table=$$(gh pr list --state all --base develop --limit 200 \
+	pr_table=$$(gh pr list --state all --base develop --limit 1000 \
 		--json headRefName,state \
 		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\n"}}{{end}}' 2>/dev/null); \
 	pr_lookup_failed=0; \
@@ -1051,6 +1058,9 @@ worktree-pool-status:
 					state="dirty"; \
 				else \
 					pr_state=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$current" '$$1 == b {print $$2; exit}'); \
+					if [ -z "$$pr_state" ] && [ "$$pr_lookup_failed" = "0" ]; then \
+						pr_state=$$(gh pr view "$$current" --json state --jq .state 2>/dev/null || true); \
+					fi; \
 					if [ "$$pr_lookup_failed" = "1" ]; then \
 						state="unknown"; \
 					elif [ "$$pr_state" = "MERGED" ]; then \
@@ -1119,7 +1129,7 @@ worktree-pool-sweep-stale:
 worktree-pool-sweep-stale-locked:
 	@set -e; \
 	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	pr_table=$$(gh pr list --state all --base develop --limit 200 \
+	pr_table=$$(gh pr list --state all --base develop --limit 1000 \
 		--json headRefName,state \
 		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\n"}}{{end}}' 2>/dev/null); \
 	if [ -z "$$pr_table" ]; then \
@@ -1141,6 +1151,9 @@ worktree-pool-sweep-stale-locked:
 			continue; \
 		fi; \
 		pr_state=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$current" '$$1 == b {print $$2; exit}'); \
+		if [ -z "$$pr_state" ]; then \
+			pr_state=$$(gh pr view "$$current" --json state --jq .state 2>/dev/null || true); \
+		fi; \
 		if [ "$$pr_state" != "MERGED" ]; then \
 			echo "skip $$pool: PR not merged (state=$${pr_state:-none})"; \
 			continue; \
