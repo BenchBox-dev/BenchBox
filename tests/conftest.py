@@ -50,8 +50,14 @@ pytest_plugins = [
 ]
 
 # ── Parallel test run mutual exclusion ──────────────────────────────────────
-_TEST_LOCK_PATH = Path.home() / ".benchbox" / "test.lock"
 _test_lock_fd: int | None = None  # Kept open to hold the flock for the session lifetime.
+
+
+def _get_test_lock_path() -> Path:
+    """Return the inter-process lock path used by parallel pytest runs."""
+    lock_dir = os.environ.get("BENCHBOX_TEST_LOCK_DIR")
+    base_dir = Path(lock_dir).expanduser() if lock_dir else Path.home() / ".benchbox"
+    return base_dir / "test.lock"
 
 
 def _should_acquire_test_lock(config: pytest.Config) -> bool:
@@ -124,8 +130,9 @@ def pytest_configure(config) -> None:
     # Acquire exclusive lock to prevent concurrent parallel test runs from
     # competing for CPU. Only the controller process (not xdist workers) locks.
     if _should_acquire_test_lock(config):
-        _TEST_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
-        fd = os.open(str(_TEST_LOCK_PATH), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
+        test_lock_path = _get_test_lock_path()
+        test_lock_path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(str(test_lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
         try:
             if sys.platform == "win32":
                 import msvcrt
@@ -138,7 +145,7 @@ def pytest_configure(config) -> None:
         except (BlockingIOError, OSError):
             # Another parallel run holds the lock - fail fast with a clear message.
             try:
-                holder_info = _TEST_LOCK_PATH.read_text().strip()
+                holder_info = test_lock_path.read_text(encoding="utf-8").strip()
             except OSError:
                 holder_info = "(could not read lock file)"
             os.close(fd)
@@ -147,7 +154,7 @@ def pytest_configure(config) -> None:
             # os._exit() terminates the process immediately with the given code.
             sys.stderr.write(
                 f"\n\033[91m[benchbox] BLOCKED: A parallel test run is already active.\033[0m\n"
-                f"  Lock file : {_TEST_LOCK_PATH}\n"
+                f"  Lock file : {test_lock_path}\n"
                 f"  Holder    : {holder_info}\n\n"
                 f"  Options:\n"
                 f"    \u2022 Wait for the other run to finish and retry.\n"

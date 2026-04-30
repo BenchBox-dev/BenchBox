@@ -41,8 +41,9 @@ test-fast:
 	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short
 
 test-unlock:
-	@echo "Removing stale BenchBox test lock..."
-	@rm -f ~/.benchbox/test.lock
+	@LOCK_DIR="$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}"; \
+	echo "Removing stale BenchBox test lock at $$LOCK_DIR/test.lock..."; \
+	rm -f "$$LOCK_DIR/test.lock"
 	@echo "Lock cleared."
 
 test-medium:

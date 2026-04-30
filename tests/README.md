@@ -259,12 +259,21 @@ uv run -- python -m pytest -m "not memory_intensive"
 prevents two concurrent `pytest -n auto` runs from fighting for CPU, which
 would otherwise double runtime and produce flaky timing assertions.
 
-**Contract** (`tests/conftest.py:52-209`):
+The default is intentionally global across worktrees: ten retained worktrees
+can otherwise start ten independent `pytest -n auto` runs and saturate a
+developer workstation. For isolated debugging or sandboxed CI, set
+`BENCHBOX_TEST_LOCK_DIR=/path/to/dir`; BenchBox will use
+`$BENCHBOX_TEST_LOCK_DIR/test.lock` instead. `make test-unlock` honors the same
+override.
+
+**Contract** (`tests/conftest.py:52-216`):
 
 - Only the **xdist controller** process locks - workers do not. `pytest_configure`
   checks `hasattr(config, "workerinput")` to distinguish them.
 - Lock is skipped when `numprocesses` is 0/None (no `-n auto`) or when
   `BENCHBOX_SKIP_TEST_LOCK=1` is set in the environment.
+- Lock path defaults to `~/.benchbox/test.lock`; `BENCHBOX_TEST_LOCK_DIR`
+  changes only the directory, not the filename.
 - Uses `fcntl.flock(LOCK_EX | LOCK_NB)` on POSIX, `msvcrt.locking` on Windows.
 - On contention, the second run **fails fast** with a message identifying the
   holder (pid, start time, command) and three recovery options. See

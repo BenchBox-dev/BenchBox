@@ -52,7 +52,7 @@ work:
 
   - id: w3
     summary: "Keep global test lock; add BENCHBOX_TEST_LOCK_DIR override"
-    status: pending
+    status: done
     notes: |
       Read `tests/conftest.py` and locate the lock acquisition logic
       (currently `~/.benchbox/test.lock`). Do NOT change the default —
