@@ -502,6 +502,7 @@ dev = [
     "delta-spark>=4.1.0",
     "presto-python-client>=0.8.4",
     "codespell>=2.4.2",
+    "pre-commit>=4.6.0",
 ]
 
 [tool.mutmut]

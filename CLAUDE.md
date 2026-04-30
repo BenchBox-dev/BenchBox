@@ -72,20 +72,27 @@ during the single-repo migration).
 - **Branches**: `develop` is the long-lived dev branch; `main` is
   release-only.
 - **Dev PRs**: feature branch off `develop` → PR → squash-merge to
-  `develop`. Required CI is intentionally minimal: `lint` +
-  `test (ubuntu-latest, 3.12)`. The active `develop` ruleset already has
-  strict-base off; do not treat routine dev work as a branch-protection
-  deployment.
-- **CI split**: routine `develop` PRs run the required lightweight gate.
+  `develop`. Required CI reports through the `ci-required-result`
+  umbrella. The active `develop` ruleset has strict-base off; do not treat
+  routine dev work as a branch-protection deployment.
+- **CI split**: routine `develop` PRs run the required lightweight gate
+  through `.github/workflows/pr.yml`. The shared path ruleset is
+  `.github/path-filters.yml`: content-only PRs run content validation
+  and skip Python fast tests; code, infra, workflow, tooling, and unknown
+  paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate.
   Broad non-required validation (OS/Python compatibility, security,
   integration smoke/table-format, package install, parity, and PySpark)
   runs through `.github/workflows/nightly.yml` on schedule or
   `workflow_dispatch`, and remains available on `main`/release paths.
   `main` PRs and tag releases keep release-grade validation.
 - **One-shot PR flow** (the canonical path — use this, not bare git):
-  - From a feature branch: `make pr-preflight && make pr-open`. Opens
-    the PR vs `develop` and enables `gh pr merge --auto --squash` so it
-    lands the moment CI is green. Walk away — don't poll.
+  - From a feature branch: `make pr-preflight && make pr-open`.
+    `make pr-preflight` uses the same `path-filters.yml` classifier as CI:
+    content-only branches run the cheap content guard and skip only the
+    local Python fast-test lane, while code/infra/unknown branches run
+    the full local lint + fast-test gate. `make pr-open` opens the PR vs
+    `develop` and enables `gh pr merge --auto --squash` so it lands the
+    moment CI is green. Walk away — don't poll.
   - `make pr-open` is **idempotent** — safe to rerun. If a PR already
     exists for the current branch it reuses that open PR; auto-merge is
     (re)enabled either way. Use this to flip auto-merge on for a PR
@@ -101,7 +108,8 @@ during the single-repo migration).
     `develop`, runs preflight, and enables auto-merge.
   - Expensive pre-push hooks are opt-in. Set `BENCHBOX_PREPUSH=1` for pushes
     where you want `.pre-commit-config.yaml` to run the timing fast lane and
-    pytest fast lane. Otherwise, `make pr-preflight` is the explicit local gate.
+    the path-aware fast-test lane. Otherwise, `make pr-preflight` is the
+    explicit local gate.
   - **Backstop**: `.github/workflows/auto-merge-on-open.yml` enables
     squash auto-merge on any non-draft PR opened against develop, so PRs
     opened outside `make pr-open` still auto-land.
@@ -228,7 +236,7 @@ benchbox run --help | --help-topic all | --help-topic examples | --help-topic be
 
 ## Pre-approved Commands
 - **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `uv run -- python -m pytest *`
-- **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-status`, `make worktree-pool-status`, `make worktree-list`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
+- **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-preflight-fast-tests`, `make pr-content-guard *`, `make pr-status`, `make worktree-pool-status`, `make worktree-list`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
 - **PR/Worktree (write — feature/pool worktrees only)**: `make pr-open`, `make pr-fanout`, `make pr-refresh`, `make worktree-claim BRANCH=*`, `make worktree-release`, `make worktree-pool-sweep-stale`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `git push origin chore/*`, `git push origin fix/*`, `git push origin feat/*`, `git push origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
   - **Manual/admin escape hatches, not broad auto-allow**: `make worktree-pool-init`, `make worktree-pool-reset POOL=NN`, `make worktree-prune`
   - **Never auto-allowed**: `git push * develop`, `git push * main`, `git push --force*`, `gh pr create --base main*`. These remain prompt-on-use.

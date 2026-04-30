@@ -44,7 +44,7 @@ repos:
       # plus the fast test lane.
       - id: pr-preflight-fast-tests
         name: pr-preflight (fast tests, mirrors CI)
-        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec uv run -- python -m pytest -m fast -q; fi'
+        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec make pr-preflight-fast-tests; fi'
         language: system
         pass_filenames: false
         stages: [pre-push]

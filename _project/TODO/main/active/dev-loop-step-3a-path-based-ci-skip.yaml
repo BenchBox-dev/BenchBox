@@ -2,7 +2,7 @@ id: dev-loop-step-3a-path-based-ci-skip
 title: "Dev-loop simplification — Step 3a: path-based CI skip for content-only PRs"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 
 description: |
@@ -46,7 +46,7 @@ deps:
 work:
   - id: w1
     summary: "Define a fail-closed path-filter ruleset"
-    status: pending
+    status: done
     notes: |
       Decide what is explicitly safe to treat as content-only. The rule is
       fail-closed: a PR can skip code CI only when EVERY changed path is in
@@ -82,13 +82,29 @@ work:
       PR-tier (failsafe). The filter is "all paths safe → skip code CI";
       anything else runs code CI.
 
-      Document the ruleset in `.github/workflows/_paths.yml` (a reusable
+      Document the ruleset in `.github/path-filters.yml` (a reusable
       filter file referenced by the umbrella and local helper) so it has
       a single source of truth.
 
+      Implementation record (2026-04-30):
+        - Added `.github/path-filters.yml` with a `safe-content` allowlist
+          covering TODO/DONE records, blind spots, decisions, handoffs, notes,
+          research/planning records, blog drafts, docs, root markdown, and
+          agent docs.
+        - Added `content-guard` patterns matching the safe content surface so
+          content-only PRs still run targeted validation before the umbrella
+          can report green.
+        - Added explicit `code-ci` examples for code, tests, tooling, workflow,
+          Makefile, config, lockfile, git behavior, and agent-command paths.
+        - Kept unknown paths implicit and fail-closed so a new top-level path
+          runs full PR-tier CI instead of silently skipping code checks.
+        - W1 review issue fixed: removed a broad `**` code-ci pattern because
+          it would make path-filter tooling report code CI for every content
+          change and defeat the skip.
+
   - id: w2
     summary: "Add ci-required umbrella, content guard, and gated code jobs"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Edit the workflow that runs on `pull_request` to develop (Step 3
@@ -148,7 +164,7 @@ work:
               - uses: dorny/paths-filter@<pinned-sha>
                 id: filter
                 with:
-                  filters: .github/workflows/_paths.yml
+                  filters: .github/path-filters.yml
               - id: classify
                 run: scripts/path_filter_decision.sh
 
@@ -192,9 +208,34 @@ work:
       `ci-required-result`, NOT bare `lint` or `test` directly, only after
       the workflow has landed on develop.
 
+      Implementation record (2026-04-30):
+        - Added `.github/workflows/pr.yml` for `pull_request` events targeting
+          `develop`; `.github/workflows/test.yml` and
+          `.github/workflows/lint.yml` now keep main/push surfaces while this
+          workflow owns the develop PR gate.
+        - Added always-reporting `ci-paths` and `ci-required-result` jobs.
+          `ci-paths` writes a JSON decision artifact and exposes
+          `safe-content-only`, `needs-code-ci`, `content-guard-needed`,
+          changed paths, code paths, and unknown paths as job outputs.
+        - Added `content-guard` for content paths. It validates changed YAML
+          with `check-yaml`, markdown with the existing markdownlint hook,
+          TODO/DONE YAML with `validate_todo.py` plus `todo_cli.py check-graph`,
+          and `docs/**` changes with `make docs-validate`.
+        - Added gated `code-lint` and `code-test` jobs. Their displayed check
+          names remain `lint` and `test (ubuntu-latest, 3.12)` so the current
+          pre-W7 ruleset still receives the required contexts until the
+          post-merge ruleset edit switches to `ci-required-result`.
+        - Added `scripts/path_filter_decision.py`, a stdlib-only classifier
+          that reads `.github/path-filters.yml`, fails closed on unknown
+          paths, writes GitHub outputs, emits helper path lists, and supports
+          local/CI callers without duplicating rules.
+        - W2 review issue fixed: added explicit `git fetch` steps for the base
+          branch before diff classification so Actions runners do not depend
+          on checkout-specific remote-ref behavior.
+
   - id: w3
     summary: "Add the equivalent local skip in pr-preflight"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Step 1 made pre-push hooks opt-in via BENCHBOX_PREPUSH=1. When
@@ -209,13 +250,34 @@ work:
       "No code changes detected; skipping fast tests.", and skip only the
       Python fast-test lane.
 
-      Reuse the path-filter ruleset from `.github/workflows/_paths.yml`
+      Reuse the path-filter ruleset from `.github/path-filters.yml`
       via a small helper (`scripts/path_filter_decision.sh` or Python if
       YAML parsing is needed) so the rule lives in exactly one place.
 
+      Implementation record (2026-04-30):
+        - Updated `make pr-preflight` so lint/type checks still run first,
+          then the Python fast-test lane delegates to `make
+          pr-preflight-fast-tests`.
+        - Added `pr-preflight-fast-tests`, which classifies
+          `origin/develop...HEAD` with `scripts/path_filter_decision.py`.
+          Code/infra/unknown-path diffs still run `uv run -- python -m pytest
+          -m fast -q`; content-only diffs run the cheap content guard and
+          print `No code changes detected; skipping fast tests.`
+        - Added `pr-content-guard` so local preflight mirrors CI content
+          validation for YAML, markdown, TODO/DONE graph, and docs reference
+          checks.
+        - Updated the opt-in `pr-preflight-fast-tests` pre-push hook to call
+          the same Make target when `BENCHBOX_PREPUSH=1`, avoiding a separate
+          hook-only path decision.
+        - Extended `scripts/path_filter_decision.py` with `--json-in` and
+          `--check` so Makefile logic can consume the same classifier output
+          without duplicating JSON parsing in shell.
+        - W3 review found no actionable issues after checking quoting,
+          content-only guard behavior, and code-path fallback behavior.
+
   - id: w4
     summary: "Add a tiny test that proves the skip path works"
-    status: pending
+    status: done
     needs: [w2]
     notes: |
       In a fork or via `act` locally, simulate two PR diffs:
@@ -233,9 +295,24 @@ work:
       Document the test in `_project/decisions/dev-loop-path-filter-
       smoke-test-<date>.md` with workflow run URLs and timings.
 
+      Implementation record (2026-04-30):
+        - Checked for `act`; it is not installed in this environment, so a
+          local classifier/content-guard smoke run was used before the workflow
+          PR exists on GitHub.
+        - Added `_project/decisions/dev-loop-path-filter-smoke-test-2026-04-30.md`
+          with the five required cases: TODO-only, `docs/**`, code,
+          unknown top-level path, and `.gitignore`.
+        - Confirmed TODO-only and docs paths classify as safe content-only,
+          run content validation, and skip Python fast tests.
+        - Confirmed code, unknown, and `.gitignore` paths classify as
+          `needs_code_ci=true`, routing through `code-lint` and `code-test`.
+        - W4 review caveat recorded: GitHub workflow run URLs are not available
+          until the workflow PR is opened; W6 must use the branch PR run as the
+          first hosted workflow evidence.
+
   - id: w5
     summary: "Document the umbrella in agent and contributor docs"
-    status: pending
+    status: done
     needs: [w2, w3]
     notes: |
       Update every place that currently hard-codes the old
@@ -251,12 +328,25 @@ work:
           tests.
         - Code/infra/unknown-path PRs run the post-Step-3 lint/type +
           Ubuntu 3.12 fast-test gate.
-        - The shared path ruleset is `.github/workflows/_paths.yml`.
+        - The shared path ruleset is `.github/path-filters.yml`.
         - Local `make pr-preflight` uses the same classifier.
+
+      Implementation record (2026-04-30):
+        - Updated `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, and
+          `.claude/commands/pr.md` to describe `ci-required-result` as the
+          develop PR umbrella.
+        - Documented `.github/path-filters.yml` as the shared path ruleset.
+        - Documented that content-only PRs run content validation and skip
+          Python fast tests, while code/infra/workflow/tooling/unknown paths run
+          the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate.
+        - Documented that local `make pr-preflight` uses the same classifier
+          and skips only the Python fast-test lane on content-only branches.
+        - W5 review found no stale docs that still describe the develop
+          required gate as bare `lint` + `test (ubuntu-latest, 3.12)`.
 
   - id: w6
     summary: "Open and merge the workflow PR before touching branch protection"
-    status: pending
+    status: done
     needs: [w1, w2, w3, w4, w5]
     notes: |
       `make lint format typecheck`; `BENCHBOX_PREPUSH=1 make pr-preflight`;
@@ -267,6 +357,43 @@ work:
       Include smoke-test fork run URLs and confirmation that PR
       #66/#67-style TODO-only PRs would now skip Python code CI while
       still running content validation.
+
+      Implementation record (2026-04-30):
+        - Rebased the branch onto `origin/develop` after PR #78 landed.
+          Resolved the Makefile conflict by preserving upstream worktree-pool
+          targets and Step 3a's `pr-preflight-fast-tests` / `pr-content-guard`
+          targets in the same phony lists.
+        - Ran `make lint format typecheck`; ruff passed, format left files
+          unchanged, and `ty check` exited 0 while reporting the repo's existing
+          426 diagnostics.
+        - Ran `BENCHBOX_PREPUSH=1 make pr-preflight`; CI lint checks passed,
+          timing policy reported 0 violations, dependency audit reported 0
+          violations, and the path-aware fast-test lane ran because this branch
+          touches code/workflow paths.
+        - Fast tests reported `21268 passed, 6 skipped, 41 warnings, 4 subtests
+          passed in 63.30s`.
+        - Final W6 review confirmed the branch classifies as
+          `needs_code_ci=true`, develop PR checks moved out of `lint.yml` and
+          `test.yml`, and `.github/workflows/pr.yml` supplies `lint`,
+          `test (ubuntu-latest, 3.12)`, and `ci-required-result`.
+        - Hosted PR run #25186848736 exposed one W6 issue:
+          `content-guard` ran `pre-commit` without first syncing dev
+          dependencies. Fixed by adding `uv sync --group dev` to the
+          `content-guard` job before YAML/markdown validation.
+        - Hosted push runs exposed a second W6 issue: a reusable rules file
+          under `.github/workflows/` is treated by GitHub as a workflow file.
+          Moved the shared ruleset to `.github/path-filters.yml` and updated
+          the classifier/docs to avoid an invalid workflow named after the
+          rules file.
+        - Hosted PR run #25187095898 exposed a third W6 issue: the project
+          environment did not include the `pre-commit` executable, so
+          `uv run -- pre-commit` resolved only on machines with a global
+          install. Added `pre-commit` to the dev dependency group and refreshed
+          `uv.lock` so CI and local content guard runs use the locked CLI;
+          also documented/allowlisted it as a CLI-only dev dependency.
+        - W6 follow-up for PR creation: after this commit, run `make pr-open`
+          and set the PR body to state that the required-check ruleset edit is
+          W7 and happens only after this workflow PR lands.
 
   - id: w7
     summary: "Post-merge: update branch-protection required checks"
@@ -289,7 +416,7 @@ work:
 
 verification:
   - description: "Path filter ruleset exists and has safe-content plus fail-closed code categories"
-    command: "test -f .github/workflows/_paths.yml && grep -cE 'safe[-_]?content|content[-_]?only|needs[-_]?code|code[-_]?ci|unknown' .github/workflows/_paths.yml"
+    command: "test -f .github/path-filters.yml && grep -cE 'safe[-_]?content|content[-_]?only|needs[-_]?code|code[-_]?ci|unknown' .github/path-filters.yml"
     expected_output: ">= 1"
   - description: "ci-required umbrella/result jobs and content guard are present in PR-tier workflow"
     command: "grep -cE 'ci-paths:|ci-required-result:|content-guard:' .github/workflows/test.yml .github/workflows/pr.yml 2>/dev/null | awk -F: '{s+=$2}END{print s}'"
@@ -323,10 +450,10 @@ must_preserve:
   - "Fail-closed path behavior — unknown paths, .gitignore, .gitattributes, workflow/config/tooling changes run full PR-tier unless explicitly and safely reclassified"
   - "Code-touching PRs continue to run full PR-tier CI as today (post-Step-3 narrowed) — the skip applies only when every changed path is in the safe content-only allowlist"
   - "Step 4's develop-post-merge.yml safety net is unchanged — post-merge auto-revert still runs on every landed SHA, doc-only or not"
-  - "Single source of truth for the path ruleset — `_paths.yml` is referenced by both CI and local pr-preflight; do not duplicate the rules"
+  - "Single source of truth for the path ruleset — `path-filters.yml` is referenced by both CI and local pr-preflight; do not duplicate the rules"
 
 approach: |
-  Minimum implementation surface: `.github/workflows/_paths.yml`
+  Minimum implementation surface: `.github/path-filters.yml`
   (ruleset), the PR-tier workflow (`test.yml` or `pr.yml`) that adds
   `ci-paths`, `content-guard`, `code-lint`, `code-test`, and
   `ci-required-result`, plus a small local helper for `make pr-preflight`
@@ -335,7 +462,7 @@ approach: |
   Use `dorny/paths-filter@<pinned-sha>` rather than rolling a custom diff parser:
   it handles edge cases (renames, submodules, merge-commit diffs)
   correctly. Pin to a SHA for supply-chain safety, not to `@v3`. If the
-  local helper needs to parse `_paths.yml`, prefer a small Python helper
+  local helper needs to parse `path-filters.yml`, prefer a small Python helper
   over ad hoc shell parsing; the repo already standardizes on `uv run --`
   for Python execution.
 
@@ -365,7 +492,7 @@ anti_patterns:
   - "DO NOT assume docs.yml protects develop docs PRs — because it currently triggers PR checks for main only — add develop content validation or classify docs/** as code"
   - "DO NOT mark .gitignore or .gitattributes as safe content-only — because they affect repository behavior and tracked-file conflict guardrails — route them through full PR-tier or a blocking gitignore-lint aggregation"
   - "DO NOT make ci-required-result the only required check while required lint remains isolated in lint.yml — because the result job cannot aggregate another workflow — move the develop PR lint gate under the umbrella first"
-  - "DO NOT duplicate the path ruleset between CI and local pr-preflight — because they will drift and the local skip will lie to agents — share via `.github/workflows/_paths.yml` or a single shell helper"
+  - "DO NOT duplicate the path ruleset between CI and local pr-preflight — because they will drift and the local skip will lie to agents — share via `.github/path-filters.yml` or a single shell helper"
   - "DO NOT pin `dorny/paths-filter@v3` by tag — because tags are mutable and a compromised release could exfil secrets — pin by SHA"
   - "DO NOT mark Makefile changes as non-code — because Makefile edits change developer-facing surface and have caused real regressions — keep Makefile in the code path list"
   - "DO NOT apply branch-protection changes before the workflow PR lands — because the required check name will not exist on develop yet — merge workflow changes first, then patch branch protection/rulesets"
@@ -373,7 +500,7 @@ anti_patterns:
 
 scope_limit:
   only_modify:
-    - ".github/workflows/_paths.yml (new path-filter ruleset)"
+    - ".github/path-filters.yml (new path-filter ruleset)"
     - ".github/workflows/test.yml or .github/workflows/pr.yml (whichever Step 3 ended up with as PR-tier; add umbrella/result/content/code jobs)"
     - ".github/workflows/lint.yml (remove/disable duplicated develop PR trigger after its required gate moves under the umbrella, or leave as non-required reporting only)"
     - "scripts/path_filter_decision.sh or scripts/path_filter_decision.py (new local helper)"
@@ -425,7 +552,7 @@ impact:
     50% reduction in PR-tier runner minutes on top of Step 3's matrix
     cut. Compounds over the measurement window in Step 5.
   technical_debt: |
-    One additional path ruleset (`_paths.yml`), a small classifier helper,
+    One additional path ruleset (`path-filters.yml`), a small classifier helper,
     and one required-result aggregation job. The complexity is justified
     only because the design fails closed and keeps content validation in
     place for content-only PRs. Net debt: low-to-medium.
