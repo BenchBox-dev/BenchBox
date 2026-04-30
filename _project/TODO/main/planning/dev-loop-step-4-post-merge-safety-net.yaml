@@ -1,0 +1,230 @@
+id: dev-loop-step-4-post-merge-safety-net
+title: "Dev-loop simplification — Step 4: develop-post-merge auto-revert + dev-loop metrics"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Strengthens `develop-post-merge.yml` so that relaxing strict-base in
+  Step 3 has a credible safety net, not just a notification. When
+  develop goes red post-merge, the workflow automatically opens a revert
+  PR for the offending SHA (or an issue if revert conflicts), and emits
+  basic dev-loop metrics that feed Step 5's measurement window.
+
+  Sequence: this MUST land after Step 3 (relaxed strict-base), because
+  the auto-revert is the mitigation for the increased post-merge risk
+  introduced by Step 3.
+
+  Single PR via `make pr-open`.
+
+deps:
+  needs:
+    - dev-loop-step-3-ci-rebalance-and-strict-base-off
+
+work:
+  - id: w1
+    summary: "Set cancel-in-progress: false on develop-post-merge.yml"
+    status: pending
+    notes: |
+      Currently the workflow likely has a `concurrency:` block that
+      may cancel in-progress runs when a new push lands. Change:
+        concurrency:
+          group: develop-post-merge-${{ github.sha }}
+          cancel-in-progress: false
+      Group key on `github.sha` (not `github.ref`) so each landed SHA
+      gets its own concurrency lane and runs to completion. This is
+      necessary so fast-landing PRs don't cause the workflow to skip
+      checking intermediate SHAs.
+
+  - id: w2
+    summary: "Add auto-revert PR generation on red"
+    status: pending
+    notes: |
+      New job `auto-revert-on-failure` triggered by
+      `workflow_run.conclusion == 'failure'` (or as a continuation
+      job in the same workflow with `if: failure()`). Steps:
+        1. Identify the failing SHA (`github.sha` of the post-merge run)
+        2. Identify the PR that introduced the SHA via
+           `gh pr list --state merged --search "<sha>"`
+        3. Create branch `auto-revert/<short-sha>` from develop
+        4. `git revert --no-edit <sha>` (single SHA, no merge commits)
+        5. If revert succeeds: push branch, open PR with title
+           `Revert <pr-title> (#<pr-num>) — develop went red post-merge`,
+           body includes failing run URL + originating PR link, label
+           `incident:develop-red`, request review from PR author
+        6. If revert fails (conflict): open issue with same metadata,
+           label `incident:develop-red-revert-conflict`, no PR
+      Use `peter-evans/create-pull-request@v6` action or a small
+      gh-cli script.
+    needs: [w1]
+
+  - id: w3
+    summary: "Emit per-PR dev-loop metrics as workflow artifact"
+    status: pending
+    notes: |
+      Add a `metrics` job that runs on every successful merge to develop.
+      Computes and writes JSON artifact:
+        {
+          "merged_at": "<ISO-8601>",
+          "pr_number": N,
+          "pr_open_to_merged_seconds": N,
+          "post_merge_red": false,
+          "conflict_on_merge": <bool from PR labels>,
+          "ci_runner_minutes": N
+        }
+      Artifact retention: 90 days (covers the Step 5 measurement window).
+      One file per merge. Step 5 aggregates these.
+
+  - id: w4
+    summary: "Document the new failure flow in CLAUDE.md and AGENTS.md"
+    status: pending
+    notes: |
+      Add a section "If develop goes red":
+        - The post-merge workflow detects the failure within ~5 min
+        - It auto-opens a revert PR (label: incident:develop-red) OR
+          an issue if revert conflicts
+        - Original PR author gets review-requested on the revert
+        - Agents do NOT need to monitor CI proactively
+        - To repair: `make worktree-claim BRANCH=fix/<original-issue>`,
+          fix, resubmit
+      Replace any older "monitor your PR until green" guidance.
+    needs: [w2]
+
+  - id: w5
+    summary: "Add make dev-loop-metrics target for ad-hoc inspection"
+    status: pending
+    notes: |
+      `make dev-loop-metrics` downloads the last N (default 30) days
+      of metrics artifacts and prints a summary:
+        - P50/P95 PR-to-merged time
+        - Post-merge red rate
+        - Conflict rate
+        - Runner minutes total
+      Used by Step 5 reviewer (manual or scripted) to check thresholds.
+      Implementation: `gh run list --workflow develop-post-merge.yml
+      --json conclusion,databaseId | gh run download <id> -n metrics`,
+      then aggregate the JSON files.
+    needs: [w3]
+
+  - id: w6
+    summary: "Run smoke test against a known-bad SHA in a fork"
+    status: pending
+    needs: [w1, w2, w3, w4, w5]
+    notes: |
+      Before merging this PR, validate the auto-revert path end-to-end
+      in a fork: cherry-pick a commit that fails the post-merge tests,
+      push to a fork's develop, confirm the workflow opens a revert PR
+      with correct title/body/labels. If revert conflicts, confirm the
+      fallback issue is opened correctly.
+      Document the test in PR description.
+
+verification:
+  - description: "develop-post-merge.yml uses cancel-in-progress: false"
+    command: "grep -A 3 'concurrency:' .github/workflows/develop-post-merge.yml | grep -c 'cancel-in-progress: false'"
+    expected_output: ">= 1"
+  - description: "Auto-revert job exists in develop-post-merge.yml"
+    command: "grep -cE '(auto-revert|revert.*failure)' .github/workflows/develop-post-merge.yml"
+    expected_output: ">= 1"
+  - description: "Metrics job emits an artifact named 'metrics'"
+    command: "grep -cE 'name: metrics' .github/workflows/develop-post-merge.yml"
+    expected_output: ">= 1"
+  - description: "make dev-loop-metrics produces a non-empty summary"
+    command: "make dev-loop-metrics 2>&1 | grep -cE 'P50|P95|red rate|runner'"
+    expected_output: ">= 4"
+  - description: "Failure flow is documented in agent-facing docs"
+    command: "grep -cE 'incident:develop-red|auto-revert' CLAUDE.md AGENTS.md"
+    expected_output: ">= 2"
+  - description: "PR description includes fork-test evidence"
+    command: "echo 'manual check at review time'"
+    expected_output: "PR description references the fork-validation test"
+
+must_preserve:
+  - "Existing develop-post-merge.yml job definitions and their pass/fail signal — Step 4 ADDS auto-revert, does not replace existing checks"
+  - "Issue and PR labels are namespaced (incident:*) so they don't conflict with existing labels"
+  - "GITHUB_TOKEN scope: auto-revert needs `contents: write` and `pull-requests: write` — confirm permissions block in workflow declares these"
+  - "Metrics artifacts are JSON, not human-readable text — Step 5 aggregator depends on machine-parseable shape"
+
+approach: |
+  Build the workflow changes incrementally:
+    1. cancel-in-progress (w1) is a small, low-risk YAML edit
+    2. Auto-revert (w2) is the substantive change — use peter-evans/
+       create-pull-request@v6 (mature, well-tested) rather than rolling
+       a custom revert script
+    3. Metrics (w3) is independent of auto-revert; both can run in
+       parallel jobs in the same workflow
+    4. Make target (w5) is the human-facing surface for w3
+    5. Docs (w4) once the behavior is confirmed
+    6. Smoke test in fork (w6) BEFORE merging — auto-revert that
+       opens spurious PRs would be very noisy to roll back
+
+  For revert conflicts: the fallback to "open an issue" is intentional.
+  An auto-revert that conflicts probably means later commits depend on
+  the broken one, so a human needs to decide whether to revert the
+  whole stack or fix forward.
+
+  For metrics: keep it simple. JSON files in workflow artifacts, no
+  database, no service. Step 5 reads the last 30 days and aggregates.
+  If we end up wanting longer retention, push to a `metrics` orphan
+  branch instead — but that's a Step 5 decision, not Step 4.
+
+anti_patterns:
+  - "DO NOT auto-merge the revert PR — because a human should decide whether to revert vs fix-forward — open it but require manual approval"
+  - "DO NOT cancel-in-progress on develop-post-merge — because fast PR landings would skip safety checks on intermediate SHAs — every landed SHA must be verified independently"
+  - "DO NOT page or alert on every red — because the auto-revert PR IS the alert — over-paging trains agents to ignore the channel"
+  - "DO NOT chain to Step 5 work in this PR — because metrics emission is the deliverable here; aggregation/threshold-checking is Step 5 — keep the surface small"
+  - "DO NOT skip the fork smoke test (w6) — because a buggy auto-revert on production develop would be loud and embarrassing — 30 minutes in a fork is cheap insurance"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/develop-post-merge.yml"
+    - "Makefile (dev-loop-metrics target only)"
+    - "CLAUDE.md (failure flow section)"
+    - "AGENTS.md (failure flow section)"
+  do_not_modify:
+    - ".github/workflows/test.yml (Step 3 territory)"
+    - ".github/workflows/release.yml"
+    - "Branch protection rules (Step 3)"
+    - "Makefile worktree-* or pr-* targets (Steps 1-2)"
+
+deferred:
+  - summary: "Slack/Discord notifications on develop-red"
+    reason: "Out of scope; the auto-revert PR is the notification. Add only if Step 5 shows reverts are missed."
+  - summary: "Auto-merge of revert PRs after green CI"
+    reason: "Intentional human gate. A human decides revert vs fix-forward. Revisit if revert PRs accumulate unmerged."
+  - summary: "Metrics dashboard / Grafana"
+    reason: "JSON artifacts + make dev-loop-metrics is sufficient for Step 5. Build a dashboard only if the metrics become a routine inspection target."
+
+metadata:
+  tags:
+    - dev-loop
+    - ci
+    - safety-net
+    - metrics
+    - post-merge
+  estimated_effort: "Medium (1-2h including fork smoke test)"
+  created_date: "2026-04-30"
+
+impact:
+  user_impact: |
+    Agents stop monitoring CI proactively; if their PR breaks develop
+    they get review-requested on an auto-revert PR. The recovery loop
+    is explicit and fast (under 10 min from red to revert PR open),
+    not "hope someone notices."
+  business_value: |
+    Lets Step 3 (relaxed strict-base) be safe in production. Without
+    Step 4, Step 3 trades author babysitting for unbounded develop
+    breakage. Together they are the simplification.
+  technical_debt: |
+    Adds workflow complexity (a new job + revert action). Standard,
+    well-trodden pattern (peter-evans/create-pull-request is widely
+    used). Net debt: low.
+
+success_metrics:
+  - "P95 time-from-develop-red to revert-PR-open under 10 minutes"
+  - "Zero false-positive auto-revert PRs in the first 30 days post-merge (Step 5 verifies)"
+  - "Metrics artifacts present for >= 95% of merges (some merges may fail to emit due to runner issues; tolerate)"
+
+open_questions:
+  - "Should auto-revert PRs include a checklist for the original PR author (rerun tests, identify root cause, etc.) or stay minimal? (Plan: minimal body with run URL + originating PR link; checklist creates clutter.)"
+  - "If the metrics job fails, should it block the merge? (Plan: no — metrics are observability, not gates.)"

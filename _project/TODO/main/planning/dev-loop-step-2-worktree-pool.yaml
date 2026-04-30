@@ -1,0 +1,257 @@
+id: dev-loop-step-2-worktree-pool
+title: "Dev-loop simplification — Step 2: fixed pool of 10 retained worktrees with claim/release"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Replace the create-and-destroy worktree model with a fixed pool of 10
+  worktrees retained indefinitely. New agent sessions claim an available
+  worktree, update it from current `develop`, work there until merge,
+  then release it back to the pool.
+
+  This formalizes how concurrent agents share the workstation. The pool
+  size of 10 is a hard cap that bounds the parallelism (which is also
+  why Step 1 keeps the test lock global — even with the pool bounded,
+  10 concurrent xdist runs would saturate the machine).
+
+  Single PR via `make pr-open`. After merge, run `make worktree-pool-init`
+  on the workstation as a one-time bootstrap.
+
+deps:
+  needs:
+    - dev-loop-step-0-verify-assumptions
+
+work:
+  - id: w1
+    summary: "Add make worktree-pool-init target — creates pool-01..10 from develop"
+    status: pending
+    notes: |
+      One-time bootstrap. Creates `BenchBox.pool-01` through
+      `BenchBox.pool-10` as siblings of the main clone, each on
+      `develop`, each with `uv sync --group dev` run, each with
+      `pre-commit install`. Idempotent: if a pool-NN worktree already
+      exists, leave it alone (do not touch its branch state).
+      Print summary table at end: pool-NN | path | branch.
+
+  - id: w2
+    summary: "Add make worktree-claim BRANCH=<name> — atomic claim under flock"
+    status: pending
+    notes: |
+      Selects the first **Free** pool worktree (HEAD on `develop`,
+      working tree clean, no local feature branch beyond `develop`).
+      Steps:
+        1. Acquire flock on `<main-clone>/.git/pool.lock` (timeout 30s)
+        2. Iterate pool-01..10; first match is "Free"
+        3. In that worktree: `git fetch origin`, `git reset --hard
+           origin/develop`, `git checkout -b $BRANCH`, `uv sync --group dev`
+        4. Release flock
+        5. Print: `WORKTREE_PATH=<absolute-path>`
+      Refuses (exit 1) if pool is fully claimed; suggests
+      `make worktree-pool-status` to investigate.
+      Refuses if BRANCH is empty or doesn't match `^(chore|fix|feat|docs)/.+`.
+    needs: [w1]
+
+  - id: w3
+    summary: "Add make worktree-release — verify merged, return to develop"
+    status: pending
+    notes: |
+      Run from inside a pool worktree (refuses if cwd is not a pool-NN
+      path). Steps:
+        1. Identify current branch
+        2. Verify PR for this branch is in MERGED state via
+           `gh pr view --json state` (refuse if not, with explicit
+           "open or close PR first" message; FORCE=1 escapes)
+        3. `git checkout develop`
+        4. `git fetch origin`
+        5. `git reset --hard origin/develop`
+        6. `git branch -D <feature-branch>` (the one just released)
+        7. `git remote prune origin`
+      Worktree returns to **Free** state.
+    needs: [w1]
+
+  - id: w4
+    summary: "Add make worktree-pool-status — tabular state listing"
+    status: pending
+    notes: |
+      Prints table with columns: pool-NN | path | branch | state |
+      claim_age. State is one of:
+        - free: HEAD on develop, working tree clean, no untracked files
+                outside expected (`.benchbox/`, `.venv/`, etc.)
+        - claimed: HEAD on a non-develop branch
+        - stale: claimed branch has been merged upstream (gh pr view
+                 returns MERGED) but worktree still on the branch
+        - dirty: claimed with uncommitted changes — needs review
+      claim_age is `git log -1 --format=%ar` of the most recent commit
+      on the current branch (or "—" for free).
+    needs: [w1]
+
+  - id: w5
+    summary: "Add make worktree-pool-reset POOL=NN — manual escape hatch"
+    status: pending
+    notes: |
+      Forcibly returns pool-NN to Free state. Refuses if working tree
+      has uncommitted changes UNLESS `FORCE=1` is set. Even with FORCE,
+      prints what it's about to discard and requires interactive
+      confirmation (read -p). Useful when an agent died mid-session
+      leaving the worktree in an inconsistent state.
+    needs: [w1]
+
+  - id: w6
+    summary: "Update Session-start docs in CLAUDE.md and AGENTS.md"
+    status: pending
+    notes: |
+      Replace the existing "Session start" instructions:
+        - Old: `make worktree-add BRANCH=<type>/<short-slug>`
+        - New: `make worktree-claim BRANCH=<type>/<short-slug>`
+      Add a paragraph explaining the pool model: 10 worktrees,
+      retained indefinitely, claim/release lifecycle. Document the
+      Stale recovery flow (run `worktree-pool-status`, then
+      `worktree-pool-reset POOL=NN` if needed).
+      Note that `make worktree-add` remains as a deprecated alias for
+      one release with a stderr deprecation notice.
+    needs: [w2, w3, w4]
+
+  - id: w7
+    summary: "Mark worktree-add as deprecated alias of worktree-claim"
+    status: pending
+    notes: |
+      `worktree-add` keeps current semantics but prints to stderr:
+      "DEPRECATED: use `make worktree-claim BRANCH=...` instead. The
+      pool model retains worktrees rather than creating new ones.
+      `worktree-add` will be removed in the next release." Then
+      proceeds normally. Pool-NN worktrees are never created via
+      worktree-add; they only come from worktree-pool-init.
+    needs: [w2]
+
+  - id: w8
+    summary: "Update worktree-prune to skip pool-NN worktrees"
+    status: pending
+    notes: |
+      Pool worktrees are retained indefinitely; `worktree-prune` should
+      no longer be a routine end-of-session command. Modify the target
+      to:
+        1. Detect pool-NN paths and skip them
+        2. Print: "Skipping pool worktree pool-NN (retained)"
+        3. Continue pruning legacy non-pool worktrees as today
+      Update help text to note: `worktree-prune` is for legacy
+      worktrees only; pool worktrees are released via `worktree-release`.
+    needs: [w1]
+
+  - id: w9
+    summary: "Run worktree-pool-init on Joe's workstation post-merge"
+    status: pending
+    needs: [w1, w2, w3, w4, w5, w6, w7, w8]
+    notes: |
+      One-time runbook step after the PR lands. Verify:
+        - 10 worktrees present at BenchBox.pool-01..10
+        - Each on develop, clean
+        - Each has .venv/ populated
+        - `make worktree-pool-status` shows all 10 free
+      Track in PR description as a follow-up checklist item.
+
+verification:
+  - description: "make worktree-pool-init creates 10 worktrees idempotently"
+    command: "make worktree-pool-init && ls -d ../BenchBox.pool-* | wc -l && make worktree-pool-init"
+    expected_output: "10 (first run) and second run completes without error"
+  - description: "worktree-claim refuses invalid branch names"
+    command: "make worktree-claim BRANCH=bad-name 2>&1 | grep -c 'must match'"
+    expected_output: ">= 1"
+  - description: "worktree-claim selects an available pool worktree"
+    command: "make worktree-claim BRANCH=chore/test-pool-claim 2>&1 | grep -E 'WORKTREE_PATH=.*pool-[0-9]+'"
+    expected_output: "WORKTREE_PATH=<absolute path containing pool-NN>"
+  - description: "worktree-pool-status reports all pool worktrees"
+    command: "make worktree-pool-status 2>&1 | grep -cE '^pool-[0-9]+'"
+    expected_output: "10"
+  - description: "Concurrent claims do not race"
+    command: "for i in 1 2 3; do (make worktree-claim BRANCH=chore/race-test-$i &); done; wait; make worktree-pool-status | grep -cE 'chore/race-test-' && make worktree-pool-status | sort -u"
+    expected_output: "3 distinct claims, each on a different pool-NN worktree"
+  - description: "worktree-prune skips pool worktrees"
+    command: "make worktree-prune 2>&1 | grep -c 'Skipping pool worktree'"
+    expected_output: ">= 0 (skips logged for any pool worktrees on develop)"
+  - description: "worktree-add prints deprecation notice"
+    command: "make worktree-add BRANCH=chore/legacy-test 2>&1 | grep -c 'DEPRECATED'"
+    expected_output: ">= 1"
+
+must_preserve:
+  - "Existing make worktree-add target keeps working — only adds deprecation notice; do not break legacy non-pool worktree workflows mid-session"
+  - "Pool worktrees retain their .venv/ across release/claim cycles — uv sync only runs at claim time after a fetch, and only if pyproject.toml/uv.lock changed"
+  - "Atomic claim semantics — two concurrent `make worktree-claim` calls must always pick different pool-NN worktrees, never collide"
+  - "make worktree-pool-init is idempotent — re-running must not destroy or reset existing pool worktrees"
+
+approach: |
+  Build the targets in dependency order: pool-init (w1) is foundational,
+  then claim (w2) and release (w3) are the core lifecycle, then status
+  (w4) and reset (w5) are operational tooling, then docs (w6) and
+  deprecation (w7-w8) update the rest of the surface.
+
+  Use `flock` (via `flock(1)` on Linux/macOS) for atomic claim. Lock
+  file at `<main-clone>/.git/pool.lock`. Single shared lock across all
+  pool worktrees — claim is fast (seconds) so contention is fine.
+
+  For state detection in worktree-pool-status:
+    - free: `git rev-parse --abbrev-ref HEAD` == "develop" AND
+            `git status --porcelain` is empty AND no extra branches
+    - claimed: not on develop, working tree may or may not be clean
+    - stale: claimed AND `gh pr view --json state` returns MERGED
+    - dirty: claimed AND `git status --porcelain` non-empty
+
+  Refer to existing `make worktree-add` and `make worktree-prune`
+  targets for patterns; reuse their git-worktree command structure.
+
+anti_patterns:
+  - "DO NOT auto-reap stale claims — because an agent crash mid-session may leave valuable uncommitted work — surface as 'stale' in status, require explicit `worktree-pool-reset` to free"
+  - "DO NOT skip flock on claim selection — because two concurrent agents racing to claim would both pick pool-01 and one would clobber the other's branch — atomic selection is required"
+  - "DO NOT delete pool-NN worktrees in worktree-prune — because the pool is the contract — prune is for legacy non-pool worktrees only"
+  - "DO NOT remove make worktree-add in this PR — because in-flight work in non-pool worktrees needs continuity — deprecate-with-notice now, remove next release"
+  - "DO NOT hardcode pool size to 10 — because the workstation may want a different cap — read POOL_SIZE ?= 10 from the environment"
+
+scope_limit:
+  only_modify:
+    - "Makefile (worktree-* targets only)"
+    - "CLAUDE.md (Session start section)"
+    - "AGENTS.md (Session start / Worktree section)"
+    - ".gitignore (add .git/pool.lock if needed)"
+  do_not_modify:
+    - ".github/workflows/ (Step 3 and Step 4 territory)"
+    - "tests/ (test lock is Step 1)"
+    - ".pre-commit-config.yaml (Step 1)"
+    - "Branch protection or rulesets (Step 3)"
+
+deferred:
+  - summary: "Auto-update of pool worktrees while idle (background pull of develop)"
+    reason: "Reasonable enhancement but out of scope; claim already updates at claim-time. Revisit if pool-status shows worktrees consistently lagging develop."
+  - summary: "Per-worktree resource quotas (CPU/memory limits)"
+    reason: "Pool size of 10 + global test lock is sufficient for now. Add only if metrics in Step 5 show resource-contention failures."
+
+metadata:
+  tags:
+    - dev-loop
+    - worktree
+    - infrastructure
+    - makefile
+  estimated_effort: "Medium (2h)"
+  created_date: "2026-04-30"
+
+impact:
+  user_impact: |
+    New session start is one command (`make worktree-claim BRANCH=...`)
+    and the worktree is updated to current develop automatically. No
+    create/destroy churn. End-of-session is `make worktree-release`,
+    a no-op on the filesystem (worktree stays, just returns to
+    develop). Concurrent agents can't race-claim the same worktree.
+  technical_debt: |
+    Reduces "stale worktree" debt (where pruning lagged because no one
+    ran `make worktree-prune` end-of-session). Replaces with explicit
+    pool-status visibility.
+
+success_metrics:
+  - "Concurrent claims (3+ simultaneous) always select distinct worktrees"
+  - "Pool worktrees survive multiple claim/release cycles without state corruption"
+  - "Subsequent agent sessions report 'session start' as one command, not three"
+
+open_questions:
+  - "Should pool-NN worktrees share a venv or each have their own? (Plan: each their own — uv handles this fine, isolation is cheap.)"
+  - "Should we cap concurrent test runs to less than 10 even with the pool? (Defer to Step 5 measurement; the global test lock is the safety valve.)"
+  - "What happens if the user has uncommitted work in the main clone when running pool-init? (Plan: pool-init only operates on sibling paths; main clone is untouched.)"

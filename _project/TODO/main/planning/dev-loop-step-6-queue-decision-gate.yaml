@@ -1,0 +1,256 @@
+id: dev-loop-step-6-queue-decision-gate
+title: "Dev-loop simplification — Step 6: queue (native MQ or steward) — DEFERRED until Step 5 justifies"
+worktree: main
+priority: Low
+status: Blocked
+
+description: |
+  Deferred queue implementation. Locked design decisions captured here
+  so that IF Step 5 measurement returns BUILD QUEUE, this work can
+  execute against a pre-agreed spec rather than re-designed from scratch.
+
+  Status starts as Blocked (on Step 5). Three resolution paths:
+    - Step 5 → DO NOT BUILD: this TODO moves to DONE with completion
+      note "queue not needed; closed by Step 5 measurement <date>"
+    - Step 5 → BUILD QUEUE: this TODO unblocks, status → Not Started,
+      work units below execute
+    - Step 5 → REASSESS: stays Blocked, deps point to next measurement
+
+  Critical guardrail: if this TODO unblocks, the design decisions in
+  the work units are LOCKED — they were debated extensively in the
+  planning rounds. Re-debating them at build time is out of scope.
+  Modify only if Step 5 measurement findings explicitly contradict
+  a specific decision (e.g., trust-lane assumption was wrong).
+
+deps:
+  needs:
+    - dev-loop-step-5-measurement-window
+
+work:
+  - id: w1
+    summary: "Confirm path: native GitHub Merge Queue vs BenchBox Merge Steward"
+    status: pending
+    notes: |
+      Re-read Step 0 w6 finding (native MQ availability) and Step 5
+      decision record. Path A (native MQ) requires repo to be
+      org-owned (and possibly Enterprise Cloud for private). Path B
+      (steward) is the fallback.
+
+      If Step 0 confirmed user-owned repo, Path B is mandatory unless
+      user has since transferred to an org. If org transfer is on the
+      table, evaluate it as a separate decision (one-time friction
+      vs ongoing steward maintenance).
+
+      Lock the choice in a sub-decision-record before w2.
+
+  - id: w2
+    summary: "PATH A — Enable native GitHub Merge Queue on develop"
+    status: pending
+    needs: [w1]
+    notes: |
+      ONLY if w1 selected Path A. Otherwise mark this w2 as skipped.
+      Steps:
+        1. Enable "Require merge queue" on develop branch protection
+        2. Add `merge_group:` trigger to lint.yml, test.yml (queue-tier
+           jobs), nightly is unaffected (it's scheduled, not PR-tied)
+        3. Reduce PR-required checks to only what should gate "is this
+           PR plausibly good" — keep Step 3's lighter set
+        4. Update make pr-open / pr-submit to call
+           `gh pr merge --auto --squash` (already does this on develop)
+        5. Update CLAUDE.md/AGENTS.md to describe the queue-managed flow
+
+  - id: w3
+    summary: "PATH B — Implement BenchBox Merge Steward as a single-concurrency workflow"
+    status: pending
+    needs: [w1]
+    notes: |
+      ONLY if w1 selected Path B. Workflow:
+        - Trigger: PR labeled `queue:ready` (set by pr-submit after
+          PR-tier CI passes)
+        - Concurrency: `group: benchbox-develop-integrator,
+          cancel-in-progress: false` — single-flight integrator
+        - Loop oldest-first by `queue:ready` label timestamp:
+            a. Reset to current origin/develop
+            b. Apply PR branch onto that tip (rebase or 3-way merge)
+            c. Run queue-tier checks against rebased SHA
+            d. Pass: push squash commit to develop, close PR, delete
+               branch
+            e. Conflict: label `queue:conflict`, comment with files,
+               continue to next PR
+            f. Test fail: label `queue:failed`, comment with job,
+               continue to next PR
+        - Each PR re-evaluates against the current develop tip;
+          staleness is impossible by construction
+      Use a narrow GitHub App (not a long-lived PAT) with permissions:
+      `contents: write`, `pull_requests: write`. App credentials in
+      org secrets.
+
+  - id: w4
+    summary: "Define queue-tier CI separately from PR-tier"
+    status: pending
+    needs: [w2, w3]
+    notes: |
+      Queue-tier CI is LIGHT, not heavy. Same as Step 3's PR-tier
+      (lint + Ubuntu 3.12 fast tests) — the queue's job is "rebase
+      and re-test against current base," not "release qualification."
+      Heavy validation stays in nightly.
+      For Path A: workflows that report to merge_group gate the queue.
+      For Path B: the steward runs the same lint+fast-test against
+      the rebased SHA before merging.
+
+  - id: w5
+    summary: "Add make pr-submit with hygiene checks (rename of pr-open semantics)"
+    status: pending
+    needs: [w2, w3]
+    notes: |
+      pr-submit is pr-open + queue handoff + hygiene:
+        - Refuse dirty worktree (`git status --porcelain` non-empty)
+        - Capture immutable head SHA at submission; if HEAD changes
+          after submit, requeue (Path B) or auto-cancel and resubmit
+          (Path A)
+        - Drafts skip the queue (do not add queue:ready label)
+        - PRs touching `.github/workflows/**` or steward source bypass
+          auto-queue and require manual review
+      Keep `make pr-open` as deprecated alias for one release.
+
+  - id: w6
+    summary: "Define trust lanes — agent PRs vs external contributor PRs"
+    status: pending
+    needs: [w2, w3]
+    notes: |
+      Two queue lanes (or two labels: `queue:trusted` vs
+      `queue:untrusted`):
+        - Trusted: PRs from project members / Joe / known agents.
+          Auto-queue on `queue:ready` label.
+        - Untrusted: PRs from external contributors. Require manual
+          `queue:approved` label from Joe before queueing. Steward
+          NEVER runs PR-controlled code (workflow files, scripts) with
+          elevated tokens — `pull_request_target` is forbidden in any
+          steward-related workflow.
+      Document the lane policy in CONTRIBUTING.md.
+
+  - id: w7
+    summary: "Define bounce ownership and retry budget"
+    status: pending
+    needs: [w2, w3]
+    notes: |
+      For PRs ejected from queue with `queue:conflict` or
+      `queue:failed`:
+        - Repair owner: original PR author (auto-assigned)
+        - Retry budget: 3 ejections per PR; on the 4th, label
+          `queue:abandoned` and require manual triage
+        - Stale-branch cleanup: PRs with `queue:abandoned` older than
+          14 days get auto-closed with a polite comment
+      Document in CLAUDE.md/AGENTS.md.
+
+  - id: w8
+    summary: "Smoke test in fork (Path B only) before enabling on develop"
+    status: pending
+    needs: [w3, w4, w5, w6, w7]
+    notes: |
+      For Path B: validate the steward workflow end-to-end in a fork
+      with a mix of clean PRs, conflicting PRs, and failing PRs.
+      Confirm:
+        - Single-flight: two `queue:ready` PRs land sequentially
+        - Conflict ejection: `queue:conflict` label and comment
+        - Test-fail ejection: `queue:failed` label and comment
+        - Trust lane: untrusted PR doesn't auto-queue
+      Document the test in PR description.
+
+verification:
+  - description: "Path A or Path B chosen with rationale recorded"
+    command: "grep -cE '^Selected path: (A|B) \\(' _project/decisions/dev-loop-queue-path-*.md"
+    expected_output: "1"
+  - description: "Queue-tier CI is light (not full matrix)"
+    command: "grep -cE 'merge_group|queue:ready' .github/workflows/*.yml | awk -F: '{s+=$2}END{print s}'"
+    expected_output: ">= 1 (Path A) or steward script references it"
+  - description: "make pr-submit refuses dirty worktree"
+    command: "cd $(mktemp -d) && git init && touch dirty && make -f /Users/joe/Developer/BenchBox/Makefile pr-submit BRANCH=test 2>&1 | grep -c 'dirty'"
+    expected_output: ">= 1"
+  - description: "Trust lanes documented in CONTRIBUTING.md"
+    command: "grep -cE 'queue:trusted|queue:untrusted|queue:approved' CONTRIBUTING.md"
+    expected_output: ">= 1"
+  - description: "Bounce/retry policy documented"
+    command: "grep -cE 'queue:abandoned|retry budget' CLAUDE.md AGENTS.md"
+    expected_output: ">= 1"
+
+must_preserve:
+  - "Step 3's lightweight PR-tier CI — the queue does not promote develop to release-grade gating"
+  - "Heavy validation stays in nightly — do not move it back to the queue path"
+  - "develop-post-merge.yml safety net (Step 4) remains active even with the queue — belt-and-suspenders is correct here because queue-tier CI runs against rebased SHA, not the post-merge SHA"
+  - "Existing pr-open semantics during deprecation period — don't break in-flight workflows mid-rollout"
+
+approach: |
+  Lock path selection (w1) FIRST. Everything else depends on the choice.
+  Path A is significantly simpler if available; Path B is a real
+  software project (workflow + bot creds + state machine).
+
+  For Path B specifically, do not roll a custom merge driver. Use
+  `git merge-tree` for conflict detection (already used by pr-open),
+  `gh pr merge --squash` for the actual merge, and the
+  peter-evans/create-pull-request action for any auxiliary PRs.
+
+  Trust lanes (w6) and bounce ownership (w7) are policy decisions
+  that benefit from being written down BEFORE the implementation.
+  If they emerge from rollout incidents, they encode the wrong
+  defaults.
+
+  Smoke test (w8) is mandatory for Path B because the steward writes
+  to develop. A buggy steward is louder than a buggy workflow change.
+
+anti_patterns:
+  - "DO NOT add full matrix to queue-tier CI — because that's exactly the over-engineering Steps 3-5 prevented — keep queue light, heavy stays nightly"
+  - "DO NOT use a long-lived PAT for the steward — because rotation burden and audit trail are worse than a GitHub App — use App with scoped permissions"
+  - "DO NOT skip trust lanes — because public repos with write-token bots are a known exfil vector — `pull_request_target` is forbidden anywhere in steward workflows"
+  - "DO NOT remove develop-post-merge.yml just because the queue runs queue-tier CI — because the queue-tier and post-merge are checking different SHAs (rebased vs landed) — both protect different failure modes"
+  - "DO NOT auto-queue PRs that modify workflows or steward source — because they could compromise the queue itself — manual review required for those"
+  - "DO NOT begin queue work without Step 5 saying BUILD — because Step 5 might say DO NOT BUILD — premature start wastes effort"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/ (new merge_group triggers if Path A; new steward.yml if Path B)"
+    - "Makefile (pr-submit target, deprecate pr-open)"
+    - "CLAUDE.md, AGENTS.md (queue flow, trust lanes, bounce policy)"
+    - "CONTRIBUTING.md (trust lanes, queue:approved process)"
+    - "_project/decisions/dev-loop-queue-path-*.md (new decision record)"
+  do_not_modify:
+    - "develop-post-merge.yml (Step 4 — keep as-is)"
+    - "test.yml or nightly.yml (Step 3 — keep as-is)"
+    - "Pool worktree targets (Step 2 — orthogonal)"
+
+deferred:
+  - summary: "Native MQ migration via org transfer"
+    reason: "Org transfer is a separate decision with broader implications (URLs, integrations, billing). If Step 5 says BUILD AND Step 6 w1 prefers Path A, escalate that decision separately."
+  - summary: "Queue dashboard / observability beyond labels"
+    reason: "Labels + comments are sufficient for one-person ops. Add dashboard if queue volume justifies it."
+
+metadata:
+  tags:
+    - dev-loop
+    - queue
+    - merge-queue
+    - steward
+    - deferred
+  estimated_effort: "Large (Path A: 1-2 days; Path B: 2-3 days)"
+  created_date: "2026-04-30"
+
+impact:
+  business_value: |
+    IF measurement justifies it, eliminates remaining merge contention
+    and provides hard guarantees about develop never being broken by
+    semantic conflicts. IF measurement does NOT justify it, the design
+    captured here is throwaway — but the gate prevents wasted work.
+  technical_debt: |
+    If built, adds significant infrastructure (Path A: GitHub config;
+    Path B: workflow + bot + state machine). All gated on data, so
+    debt only accrues when it's worth carrying.
+
+success_metrics:
+  - "Queue successfully serializes integration to develop with zero false-positive merges"
+  - "P95 queue dwell time stays under 30 minutes for trusted-lane PRs"
+  - "Zero successful exploits via PR-controlled steward code (untrusted lane proves out)"
+
+open_questions:
+  - "Should queue:abandoned auto-close after 14 days, or just label and let humans decide? (Plan: auto-close with polite comment; reduces backlog. Revisit if it closes valuable work.)"
+  - "Should the steward (Path B) run on schedule (every 5 min) or event-driven (label change)? (Plan: event-driven via label; schedule is a fallback for missed events.)"
+  - "If org transfer happens, do we still need Path B as a fallback? (Plan: no — native MQ replaces steward entirely. But keep the design document as historical reference.)"
