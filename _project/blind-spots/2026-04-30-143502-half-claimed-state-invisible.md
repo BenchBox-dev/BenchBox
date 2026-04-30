@@ -32,11 +32,14 @@ that were "claimed but broken" even before the rollback gap.
 ## Suggested next steps
 
 - [x] Add a `venv` health column (`ok` / `stale` / `missing`) to
-      `make worktree-pool-status` (this PR).
+      `make worktree-pool-status`.
 - [x] Add a trap-on-failure rollback to `worktree-claim-locked` so
-      partial failures return the slot to detached origin/develop
-      (this PR).
-- [ ] Optional: consider a `claim_started_at` marker file that
-      `worktree-claim` writes before mutation and removes on success;
-      pool-status would surface lingering markers as `claim-aborted`
-      state for slots that died without trap firing (e.g. SIGKILL).
+      partial failures return the slot to detached origin/develop.
+      Trap now also fires on SIGINT and SIGTERM, not just ERR.
+- [x] `worktree-claim-attempt` writes a `.benchbox/claim_in_progress`
+      marker before mutation and removes it on success or via the
+      trap. If the process is SIGKILL'd between write and removal,
+      the marker survives and `worktree-pool-status` reports the slot
+      as `aborted` so the operator knows it needs `pool-reset`. The
+      marker also makes claim-attempt skip the slot (won't re-claim
+      a half-mutated worktree).

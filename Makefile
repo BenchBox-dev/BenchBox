@@ -4,6 +4,10 @@
 PR_FANOUT_JOBS ?= 4
 POOL_SIZE ?= 10
 WORKTREE_POOL_PARENT ?= ..
+# Minimum free disk space (in 1K-blocks) required on the pool parent
+# directory before `make worktree-claim` will allocate a slot. Default
+# 5 GB. Override to 0 to bypass the check (e.g. during low-space CI).
+POOL_MIN_FREE_KB ?= 5000000
 
 # Shell command snippet that resolves the main clone's directory name
 # (e.g. "BenchBox"). Pool worktree paths derive from it as
@@ -12,7 +16,7 @@ WORKTREE_POOL_PARENT ?= ..
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -737,7 +741,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -881,46 +885,79 @@ worktree-claim:
 	@test -n "$(BRANCH)" || { echo "Usage: make worktree-claim BRANCH=<branch-name>"; exit 1; }
 	@case "$(BRANCH)" in chore/?*|fix/?*|feat/?*|docs/?*) ;; *) echo "BRANCH must match ^(chore|fix|feat|docs)/.+"; exit 1 ;; esac
 	@git check-ref-format --branch "$(BRANCH)" >/dev/null || { echo "Invalid git branch name: $(BRANCH)"; exit 1; }
+	@if [ "$(POOL_MIN_FREE_KB)" -gt 0 ]; then \
+		FREE_KB=$$(df -k "$(WORKTREE_POOL_PARENT)" 2>/dev/null | awk 'NR==2 {print $$4}'); \
+		if [ -n "$$FREE_KB" ] && [ "$$FREE_KB" -lt "$(POOL_MIN_FREE_KB)" ]; then \
+			echo "Refusing to claim: $$FREE_KB KB free on $(WORKTREE_POOL_PARENT) < $(POOL_MIN_FREE_KB) KB required." >&2; \
+			echo "Hint: run \`make worktree-pool-disk-clean\` to drop pytest/coverage caches," >&2; \
+			echo "      or override with \`POOL_MIN_FREE_KB=0 make worktree-claim BRANCH=...\`." >&2; \
+			exit 1; \
+		fi; \
+	fi
 	@git fetch origin develop --quiet
 	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
 	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"
 
+# Orchestrator: try once, then auto-sweep stale slots, then try again.
+# The auto-sweep means routine pool exhaustion (forgotten releases) is
+# self-healing without operator intervention.
 worktree-claim-locked:
+	@if $(MAKE) -s worktree-claim-attempt BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; then \
+		exit 0; \
+	fi
+	@echo "No free pool worktree on first pass — auto-sweeping stale slots..." >&2
+	@$(MAKE) -s worktree-pool-sweep-stale-locked POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)" >&2 || true
+	@if $(MAKE) -s worktree-claim-attempt BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; then \
+		exit 0; \
+	fi
+	@echo "Still no free pool worktree available after auto-sweep." >&2
+	@echo "Hint: dirty or claim-aborted slots are not auto-recovered (they may have valuable state)." >&2
+	@echo "      Run \`make worktree-pool-status\` to inspect, then \`make worktree-pool-reset POOL=NN\`" >&2
+	@echo "      as a last-resort manual escape hatch after reviewing what will be discarded." >&2
+	@exit 1
+
+# Single-pass claim attempt. Iterates the pool once; on the first
+# detached, clean, non-claim-aborted slot, mutates it to the requested
+# branch under a trap that rolls back on any failure (including SIGINT).
+# A `.benchbox/claim_in_progress` marker is written before mutation and
+# removed on success or rollback; if the process is SIGKILL'd between
+# write and removal, the marker survives and `worktree-pool-status`
+# reports the slot as `aborted` so the operator knows it needs reset.
+worktree-claim-attempt:
 	@set -e; \
 	POOL_REPO=$$($(POOL_REPO_CMD)); \
 	i=1; \
 	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
 		pool=$$(printf 'pool-%02d' "$$i"); \
 		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		if git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-			branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
-			status=$$(git -C "$$wt" status --porcelain); \
-			if [ -z "$$branch" ] && [ -z "$$status" ]; then \
-				rollback() { \
-					git -C "$$wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
-					git -C "$$wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
-					echo "claim of $$pool failed; slot returned to detached origin/develop" >&2; \
-					exit 1; \
-				}; \
-				trap rollback ERR; \
-				git -C "$$wt" reset --hard origin/develop >/dev/null; \
-				git -C "$$wt" checkout -b "$(BRANCH)" >/dev/null; \
-				if [ ! -f "$$wt/.venv/pyvenv.cfg" ] \
-					|| [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
-					( cd "$$wt" && uv sync --group dev >/dev/null ); \
-				fi; \
-				trap - ERR; \
-				printf 'WORKTREE_PATH=%s\n' "$$(cd "$$wt" && pwd -P)"; \
-				exit 0; \
-			fi; \
-		fi; \
 		i=$$((i + 1)); \
+		git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue; \
+		[ -f "$$wt/.benchbox/claim_in_progress" ] && continue; \
+		branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
+		status=$$(git -C "$$wt" status --porcelain); \
+		[ -z "$$branch" ] && [ -z "$$status" ] || continue; \
+		marker="$$wt/.benchbox/claim_in_progress"; \
+		mkdir -p "$$wt/.benchbox"; \
+		printf 'pid=%s started=%s branch=%s\n' "$$$$" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(BRANCH)" > "$$marker"; \
+		rollback() { \
+			rm -f "$$marker"; \
+			git -C "$$wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
+			git -C "$$wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
+			echo "claim of $$pool failed; slot returned to detached origin/develop" >&2; \
+			exit 1; \
+		}; \
+		trap rollback ERR INT TERM; \
+		git -C "$$wt" reset --hard origin/develop >/dev/null; \
+		git -C "$$wt" checkout -b "$(BRANCH)" >/dev/null; \
+		if [ ! -f "$$wt/.venv/pyvenv.cfg" ] \
+			|| [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
+			( cd "$$wt" && uv sync --group dev >/dev/null ); \
+		fi; \
+		rm -f "$$marker"; \
+		trap - ERR INT TERM; \
+		printf 'WORKTREE_PATH=%s\n' "$$(cd "$$wt" && pwd -P)"; \
+		exit 0; \
 	done; \
-	echo "No free pool worktree available." >&2; \
-	echo "Hint: stale slots (PR MERGED but branch not released) are common after agent crashes." >&2; \
-	echo "      Run \`make worktree-pool-status\` to find them, then \`make worktree-pool-sweep-stale\`" >&2; \
-	echo "      to auto-release any whose PRs are merged. Use \`make worktree-pool-reset POOL=NN\`" >&2; \
-	echo "      as a last-resort manual escape hatch." >&2; \
 	exit 1
 
 worktree-release:
@@ -958,6 +995,9 @@ worktree-release-locked:
 ##   dirty    — uncommitted changes (filtered against .benchbox/ scratch
 ##              dir which is the only expected non-ignored untracked path;
 ##              .venv/ is .gitignored, so it does not appear in --untracked-files=normal)
+##   aborted  — `.benchbox/claim_in_progress` marker survived from a
+##              previous claim that was SIGKILL'd or otherwise died
+##              before its trap could clean up. Run pool-reset to recover.
 ##   unknown  — gh pr view/list lookup failed (auth / network / rate limit)
 ##              — distinguished from claimed-no-PR-yet
 ##   missing  — pool slot directory absent
@@ -986,6 +1026,8 @@ worktree-pool-status:
 		if git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
 			current=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
 			dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+			aborted=0; \
+			[ -f "$$wt/.benchbox/claim_in_progress" ] && aborted=1; \
 			if [ ! -f "$$wt/.venv/pyvenv.cfg" ]; then \
 				venv="missing"; \
 			elif [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
@@ -995,7 +1037,11 @@ worktree-pool-status:
 			fi; \
 			size=$$(du -sh "$$wt" 2>/dev/null | awk '{print $$1}'); \
 			[ -n "$$size" ] || size="-"; \
-			if [ -z "$$current" ]; then \
+			if [ "$$aborted" = "1" ]; then \
+				state="aborted"; \
+				[ -n "$$current" ] && branch="$$current" || branch="(detached)"; \
+				age=$$(git -C "$$wt" log -1 --format=%ar 2>/dev/null || echo "-"); \
+			elif [ -z "$$current" ]; then \
 				branch="(detached)"; \
 				if [ -z "$$dirty" ]; then state="free"; else state="dirty"; fi; \
 			else \
@@ -1017,7 +1063,11 @@ worktree-pool-status:
 		fi; \
 		printf '%-8s | %-58s | %-28s | %-8s | %-13s | %-7s | %s\n' "$$pool" "$$wt" "$$branch" "$$state" "$$age" "$$venv" "$$size"; \
 		i=$$((i + 1)); \
-	done
+	done; \
+	if [ "$$pr_lookup_failed" = "1" ]; then \
+		printf '\nNote: state=unknown — \`gh pr list\` returned no data.\n'; \
+		printf '  Check \`gh auth status\` and \`gh api rate_limit\` to recover.\n'; \
+	fi
 
 worktree-pool-reset:
 	@test -n "$(POOL)" || { echo "Usage: make worktree-pool-reset POOL=NN"; exit 1; }
@@ -1105,7 +1155,38 @@ worktree-pool-sweep-stale-locked:
 	done; \
 	echo "Swept $$swept pool slot(s)."
 
-# Create a worktree off origin/develop. Usage: make worktree-add BRANCH=fix/foo
+## worktree-pool-disk-clean: drop pytest, mypy, ruff, coverage caches
+## from every pool slot without touching `.venv/` or git state. Useful
+## when the pre-claim free-space check refuses or `worktree-pool-status`
+## shows slots ballooning past their typical ~2 GB footprint.
+##
+## Lock-free by design: it only removes ignored cache directories, so
+## it cannot corrupt git state or interfere with concurrent claim/release.
+worktree-pool-disk-clean:
+	@set -e; \
+	POOL_REPO=$$($(POOL_REPO_CMD)); \
+	freed_total=0; \
+	cleaned=0; \
+	i=1; \
+	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
+		pool=$$(printf 'pool-%02d' "$$i"); \
+		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
+		i=$$((i + 1)); \
+		[ -d "$$wt" ] || continue; \
+		before=$$(du -sk "$$wt" 2>/dev/null | awk '{print $$1}'); \
+		find "$$wt" -type d \( -name '__pycache__' -o -name '.pytest_cache' -o -name '.ruff_cache' -o -name '.mypy_cache' \) -prune -exec rm -rf {} + 2>/dev/null || true; \
+		find "$$wt" -maxdepth 4 -type f -name '.coverage*' -exec rm -f {} + 2>/dev/null || true; \
+		[ -d "$$wt/.benchbox/cache" ] && rm -rf "$$wt/.benchbox/cache" || true; \
+		after=$$(du -sk "$$wt" 2>/dev/null | awk '{print $$1}'); \
+		delta=$$((before - after)); \
+		if [ "$$delta" -gt 0 ]; then \
+			echo "$$pool: freed $${delta}K (was $${before}K, now $${after}K)"; \
+			freed_total=$$((freed_total + delta)); \
+			cleaned=$$((cleaned + 1)); \
+		fi; \
+	done; \
+	echo "Cleaned $$cleaned slot(s); freed $${freed_total}K total."
+
 # Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
 # After: cd into the path, work, run `make pr-open` from inside.
 worktree-add:
@@ -1272,6 +1353,7 @@ help:
 	@echo "  make worktree-release             Inside a pool worktree: return to detached origin/develop after PR merges"
 	@echo "  make worktree-pool-status         Show pool slot state, venv health, and disk usage"
 	@echo "  make worktree-pool-sweep-stale    Auto-release pool slots whose PRs have merged"
+	@echo "  make worktree-pool-disk-clean     Drop pytest/mypy/ruff/coverage caches from pool slots (preserves .venv)"
 	@echo "  make worktree-pool-reset POOL=NN  Manual escape hatch for stuck pool slots"
 	@echo ""
 	@echo "Legacy / non-pool worktree paths (deprecated, kept for one release):"
