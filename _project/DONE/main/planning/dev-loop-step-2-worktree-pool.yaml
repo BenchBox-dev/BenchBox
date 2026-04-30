@@ -2,7 +2,8 @@ id: dev-loop-step-2-worktree-pool
 title: "Dev-loop simplification — Step 2: fixed pool of 10 retained worktrees with claim/release"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-30"
 category: Core Functionality
 
 description: |
@@ -31,8 +32,9 @@ description: |
     - Each is detached at `origin/develop` and clean
     - Each has `.venv/` populated
     - `make worktree-pool-status` shows all 10 free
-    - Each free worktree is detached at `origin/develop`, NOT on the
-      local `develop` branch
+    - Each free worktree is detached and clean, NOT on the local
+      `develop` branch; claim refreshes free slots to current
+      `origin/develop`
 
   Tracked as a follow-up checklist item in the PR description, not as a
   work unit, because the work unit DAG is for code changes that can be
@@ -61,11 +63,13 @@ work:
     summary: "Add make worktree-claim BRANCH=<name> — atomic claim under portable lock"
     status: done
     notes: |
-      Selects the first **Free** pool worktree (detached HEAD exactly at
-      `origin/develop`, working tree clean, no local feature branch
-      checked out). Pool worktrees must not check out the local `develop`
-      branch because the main clone keeps `develop` checked out and Git
-      does not allow the same branch in multiple worktrees.
+      Selects the first **Free** pool worktree (detached HEAD, working
+      tree clean, no local feature branch checked out). Claim fetches
+      and resets the selected worktree to current `origin/develop`
+      before creating the branch. Pool worktrees must not check out the
+      local `develop` branch because the main clone keeps `develop`
+      checked out and Git does not allow the same branch in multiple
+      worktrees.
       Steps:
         1. Acquire a portable file lock on `<main-clone>/.git/pool.lock`
            (timeout 30s). Use `lockf` on macOS, `flock` on Linux if
@@ -105,8 +109,9 @@ work:
     notes: |
       Prints table with columns: pool-NN | path | branch | state |
       claim_age. State is one of:
-        - free: detached HEAD at origin/develop, working tree clean, no
-                untracked files outside expected (`.benchbox/`, `.venv/`, etc.)
+        - free: detached HEAD, working tree clean, no untracked files
+                outside expected (`.benchbox/`, `.venv/`, etc.); claim
+                refreshes to current origin/develop before checkout
         - claimed: HEAD on a non-develop branch
         - stale: claimed branch has been merged upstream (gh pr view
                  returns MERGED) but worktree still on the branch
