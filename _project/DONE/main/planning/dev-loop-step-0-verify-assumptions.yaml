@@ -2,7 +2,8 @@ id: dev-loop-step-0-verify-assumptions
 title: "Dev-loop simplification — Step 0: verify assumptions before changing anything"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-30"
 category: Core Functionality
 
 description: |
@@ -24,7 +25,7 @@ description: |
 work:
   - id: w1
     summary: "Check classic branch protection on develop for `strict: true`"
-    status: pending
+    status: done
     notes: |
       Run: `gh api repos/joeharris76/BenchBox/branches/develop/protection
       --jq '.required_status_checks'` and record the value of `strict`.
@@ -33,7 +34,7 @@ work:
 
   - id: w2
     summary: "Check GitHub rulesets targeting develop for required-checks and strict-base"
-    status: pending
+    status: done
     notes: |
       Required checks may be encoded in a ruleset, not in classic
       branch protection. Run: `gh api repos/joeharris76/BenchBox/rulesets`
@@ -45,7 +46,7 @@ work:
 
   - id: w3
     summary: "Audit current PR-tier CI cost on develop"
-    status: pending
+    status: done
     notes: |
       Read `.github/workflows/test.yml` `on:` block; identify which jobs
       run on `pull_request` to develop. Cross-reference with recent run
@@ -56,7 +57,7 @@ work:
 
   - id: w4
     summary: "Audit develop-post-merge.yml health"
-    status: pending
+    status: done
     notes: |
       Run: `gh run list --workflow develop-post-merge.yml --branch develop
       --limit 30 --json conclusion`. Record current red/green ratio. If
@@ -65,7 +66,7 @@ work:
 
   - id: w5
     summary: "Estimate actual pr-refresh / staleness pain rate"
-    status: pending
+    status: done
     notes: |
       Use a concrete proxy rather than free-text grep. For the last 50
       merged PRs targeting develop, compute the gap between the last
@@ -91,7 +92,7 @@ work:
 
   - id: w6
     summary: "Confirm native GitHub Merge Queue availability"
-    status: pending
+    status: done
     notes: |
       Run: `gh api repos/joeharris76/BenchBox --jq '{visibility,
       owner_type: .owner.type, owner_login: .owner.login,
@@ -109,7 +110,7 @@ work:
 
   - id: w7
     summary: "Write decision record at _project/decisions/dev-loop-verification-2026-04-30.md"
-    status: pending
+    status: done
     needs: [w1, w2, w3, w4, w5, w6]
     notes: |
       Single markdown file with: timestamp, raw outputs of w1-w6,

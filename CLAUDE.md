@@ -70,8 +70,9 @@ during the single-repo migration).
     preflight, push, open PR, enable auto-merge). Prefer `/pr` over the
     user-global `/commit-push-pr` plugin in this repo — `/pr` targets
     `develop`, runs preflight, and enables auto-merge.
-  - Pre-push hook (`pr-preflight-fast-tests` in `.pre-commit-config.yaml`)
-    runs the fast lane on every push. Activate once with `pre-commit install`.
+  - Expensive pre-push hooks are opt-in. Set `BENCHBOX_PREPUSH=1` for pushes
+    where you want `.pre-commit-config.yaml` to run the timing fast lane and
+    pytest fast lane. Otherwise, `make pr-preflight` is the explicit local gate.
   - **Backstop**: `.github/workflows/auto-merge-on-open.yml` enables
     squash auto-merge on any non-draft PR opened against develop, so PRs
     opened outside `make pr-open` still auto-land.
@@ -89,23 +90,16 @@ during the single-repo migration).
     off `origin/develop` with branch `fix/foo` checked out. `cd` into it,
     run `uv sync --group dev`, work, `make pr-open` from inside.
   - `make pr-fanout` walks every worktree (skipping the main clone) and
-    runs `make pr-open` sequentially. Use this when you've worked across
-    several branches and want to ensure each has a PR with auto-merge on.
-    Sequential by design — the pre-push fast-test hook serializes via a
-    flock, so parallelizing invites lock-contention failures.
-  - `make pr-refresh` is the stale-PR escape hatch when GitHub shows PRs
-    as CLEAN but they are behind `develop` and strict required checks need
-    current-base CI. Run it from the stale PR worktree: it merges
-    `origin/develop` into the current branch, pushes, and re-enables
-    auto-merge. Drain stale PRs one at a time, oldest first — refresh one,
-    wait for it to land, then refresh the next — otherwise the first merge
-    can stale the rest again. If a merge conflicts, resolve it in that
-    worktree and rerun `make pr-open`.
-  - **One PR per file area at a time.** Don't open three PRs touching the
-    same file in 25 minutes; sequence them so the second sees the first
-    landed. The cost of a 10-minute wait beats a multi-PR semantic
-    conflict resolution. The pairwise warning above will flag obvious
-    overlap; convention covers the rest.
+    runs `make pr-open` with bounded parallelism (`PR_FANOUT_JOBS ?= 4`).
+    Use this when you've worked across several branches and want to ensure
+    each has a PR with auto-merge on.
+  - `make pr-refresh` remains a manual escape hatch when a branch genuinely
+    needs `origin/develop` merged before `make pr-open`. If a merge conflicts,
+    resolve it in that worktree and rerun `make pr-open`.
+  - The operating model is retained worktree pool + auto-merge, with
+    `.github/workflows/develop-post-merge.yml` and the Step 4 auto-revert
+    follow-up as the develop-tip safety net. Step 2 expands the worktree pool
+    commands; Step 4 expands the post-merge safety net.
   - **Drafts are intentional.** Open as draft when you don't want
     auto-merge yet (spike, RFC, parked work). Mark ready when you do —
     the auto-merge-on-open workflow respects this.
