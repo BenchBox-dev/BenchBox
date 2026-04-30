@@ -498,7 +498,7 @@ uv run -- python -m pytest tests/unit/core/read_primitives/test_read_primitives_
 ```
 
 A passing unit test means the catalog and the test expectations are internally
-consistent and every active high-risk variant has a declared comparable shape.
+consistent and every active variant has a declared comparable shape.
 It does **not** mean the SQL executes correctly on the platform.
 
 **Runtime parity test**

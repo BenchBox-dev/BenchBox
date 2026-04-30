@@ -42,7 +42,17 @@ _DUCKDB_CONTRACT_SHAPE_QUERIES = (
     "window_rank",
 )
 
+_EXTREME_BY_VARIANT_QUERIES = (
+    "max_by_simple",
+    "min_by_simple",
+    "max_by_complex",
+    "min_by_complex",
+    "max_by_with_ties",
+    "min_by_with_ties",
+)
+
 _DATAFUSION_VARIANT_QUERIES = (
+    *_EXTREME_BY_VARIANT_QUERIES,
     "map_construction",
     "map_access",
     "map_keys_values",
@@ -227,6 +237,21 @@ def _canonical_rows(rows: list[tuple[Any, ...]], contract: ResultContract) -> li
     return sorted(canonical, key=lambda row: tuple(row[index] for index in identity_indexes))
 
 
+def _canonical_rows_in_order(rows: list[tuple[Any, ...]], contract: ResultContract) -> list[tuple[Any, ...]]:
+    column_contracts = list(contract.columns)
+    return [
+        tuple(
+            _canonical_value(
+                cell,
+                order_sensitive=column_contracts[index].order_sensitive,
+                type_class=column_contracts[index].type_class,
+            )
+            for index, cell in enumerate(row)
+        )
+        for row in rows
+    ]
+
+
 def _assert_shape_contract(rows: list[tuple[Any, ...]], contract: ResultContract) -> None:
     assert rows, "Runtime parity queries should return at least one row at SF=0.01"
     for row in rows:
@@ -272,6 +297,40 @@ def test_datafusion_variants_match_duckdb_reference(
     contract = read_primitives_contracts[query_id]
 
     assert _canonical_rows(comparison_rows, contract) == _canonical_rows(reference_rows, contract)
+
+
+@pytest.mark.parametrize("query_id", _EXTREME_BY_VARIANT_QUERIES)
+def test_datafusion_extreme_by_variants_preserve_duckdb_reference_order(
+    query_id,
+    read_primitives_duckdb_conn,
+    datafusion_ctx,
+    read_primitives_queries_by_dialect,
+    read_primitives_contracts,
+):
+    """MAX_BY/MIN_BY fallbacks must not rely on accidental row ordering."""
+    reference_rows = _duckdb_rows(read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"][query_id])
+    comparison_rows = _datafusion_rows(datafusion_ctx, read_primitives_queries_by_dialect["datafusion"][query_id])
+    contract = read_primitives_contracts[query_id]
+
+    assert _canonical_rows_in_order(comparison_rows, contract) == _canonical_rows_in_order(reference_rows, contract)
+
+
+@pytest.mark.parametrize("query_id", _EXTREME_BY_VARIANT_QUERIES)
+def test_redshift_extreme_by_variants_preserve_duckdb_reference_order(
+    query_id,
+    read_primitives_duckdb_conn,
+    read_primitives_queries_by_dialect,
+    read_primitives_contracts,
+):
+    """Redshift MAX_BY/MIN_BY fallbacks are local-SQL-compatible and must stay ordered."""
+    benchmark = ReadPrimitivesBenchmark()
+    reference_rows = _duckdb_rows(read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"][query_id])
+    comparison_rows = _duckdb_rows(
+        read_primitives_duckdb_conn, benchmark.query_manager.get_query(query_id, dialect="redshift")
+    )
+    contract = read_primitives_contracts[query_id]
+
+    assert _canonical_rows_in_order(comparison_rows, contract) == _canonical_rows_in_order(reference_rows, contract)
 
 
 @pytest.mark.parametrize("query_id", _CLICKHOUSE_VARIANT_QUERIES)
