@@ -82,6 +82,8 @@ work:
         4. Confirm `gh pr merge --auto --squash` remains the submission
            mechanism for develop PRs.
         5. Update CLAUDE.md/AGENTS.md to describe the queue-managed flow.
+        6. Update CLAUDE.md pre-approved command buckets for any new
+           queue-facing commands or labels.
 
       Path B locked spec:
         1. Implement BenchBox Merge Steward as a single-concurrency
@@ -111,9 +113,19 @@ work:
           refuse dirty worktree, capture immutable head SHA, skip drafts,
           and bypass auto-queue for workflow/steward changes.
         - Keep `make pr-open` as a deprecated alias for one release.
+        - Update CLAUDE.md and AGENTS.md with the submitted/queued flow,
+          including when agents use `make pr-submit` vs deprecated
+          `make pr-open`, whether they should wait, and how queue
+          ejections are repaired.
+        - Update CLAUDE.md Pre-approved Commands so `make pr-submit`
+          and any safe queue-status commands are explicitly classified;
+          queue admin/reset commands must not be hidden in broad wildcards.
         - Define trusted vs untrusted lanes. Untrusted PRs require manual
           `queue:approved`; `pull_request_target` is forbidden in steward
           workflows.
+        - Update CONTRIBUTING.md with the external contributor path:
+          untrusted PRs require manual `queue:approved`; PR-controlled
+          workflow/steward changes bypass auto-queue.
         - Define bounce ownership and retry budget: original author owns
           `queue:conflict` / `queue:failed`; 3 ejections max, then
           `queue:abandoned`.
@@ -147,8 +159,8 @@ verification:
     command: "f=$(ls _project/TODO/main/planning/dev-loop-step-6[ab]-*.yaml); ! grep -qE 'ONLY if|mark this .* skipped|needs: \\[w2, w3\\]' \"$f\" && echo ok"
     expected_output: "ok"
   - description: "Common queue policy is present in generated TODO"
-    command: "f=$(ls _project/TODO/main/planning/dev-loop-step-6[ab]-*.yaml); grep -cE 'queue-tier|pr-submit|queue:approved|queue:abandoned|pull_request_target|develop-post-merge' \"$f\""
-    expected_output: ">= 6"
+    command: "f=$(ls _project/TODO/main/planning/dev-loop-step-6[ab]-*.yaml); grep -cE 'queue-tier|pr-submit|queue:approved|queue:abandoned|pull_request_target|develop-post-merge|CLAUDE.md|AGENTS.md|CONTRIBUTING.md|Pre-approved' \"$f\""
+    expected_output: ">= 10"
 
 must_preserve:
   - "Step 3's lightweight PR-tier CI — the queue does not promote develop to release-grade gating"
