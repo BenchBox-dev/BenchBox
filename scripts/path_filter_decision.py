@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Iterable, cast
 
-DEFAULT_RULES = Path(".github/workflows/_paths.yml")
+DEFAULT_RULES = Path(".github/path-filters.yml")
 LIST_NAMES = {
     "changed": "changed_paths",
     "content": "content_guard_paths",

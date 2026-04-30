@@ -77,7 +77,7 @@ during the single-repo migration).
   routine dev work as a branch-protection deployment.
 - **CI split**: routine `develop` PRs run the required lightweight gate
   through `.github/workflows/pr.yml`. The shared path ruleset is
-  `.github/workflows/_paths.yml`: content-only PRs run content validation
+  `.github/path-filters.yml`: content-only PRs run content validation
   and skip Python fast tests; code, infra, workflow, tooling, and unknown
   paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate.
   Broad non-required validation (OS/Python compatibility, security,
@@ -87,7 +87,7 @@ during the single-repo migration).
   `main` PRs and tag releases keep release-grade validation.
 - **One-shot PR flow** (the canonical path — use this, not bare git):
   - From a feature branch: `make pr-preflight && make pr-open`.
-    `make pr-preflight` uses the same `_paths.yml` classifier as CI:
+    `make pr-preflight` uses the same `path-filters.yml` classifier as CI:
     content-only branches run the cheap content guard and skip only the
     local Python fast-test lane, while code/infra/unknown branches run
     the full local lint + fast-test gate. `make pr-open` opens the PR vs

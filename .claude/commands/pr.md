@@ -14,7 +14,7 @@ description: BenchBox PR workflow - path-aware preflight, push, open PR vs devel
 
 This is the BenchBox-specific PR workflow. `develop` is PR-gated through
 `ci-required-result`; linear history and squash-only merging are enforced. The
-umbrella uses `.github/workflows/_paths.yml`: content-only PRs run content
+umbrella uses `.github/path-filters.yml`: content-only PRs run content
 validation and skip Python fast tests, while code/infra/unknown-path PRs run the
 post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. The goal is to land a green
 PR with one command and walk away - auto-merge handles the rest.
