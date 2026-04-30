@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: develop-post-merge-${{ github.ref }}
-  cancel-in-progress: true
+  group: develop-post-merge-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   lint:
