@@ -985,6 +985,7 @@ worktree-pool-reset:
 # After: cd into the path, work, run `make pr-open` from inside.
 worktree-add:
 	@test -n "$(BRANCH)" || { echo "Usage: make worktree-add BRANCH=<branch-name>"; exit 1; }
+	@echo "DEPRECATED: use \`make worktree-claim BRANCH=...\` instead. The pool model retains worktrees rather than creating new ones. \`worktree-add\` will be removed in the next release." >&2
 	@WTNAME=$$(echo "$(BRANCH)" | tr '/' '-'); \
 	WTPATH="../BenchBox.$$WTNAME"; \
 	test ! -e "$$WTPATH" || { echo "Path exists: $$WTPATH"; exit 1; }; \
@@ -1141,7 +1142,7 @@ help:
 	@echo "  make worktree-claim BRANCH=name  Claim a retained pool worktree for a branch"
 	@echo "  make worktree-release  Release a merged pool branch back to detached origin/develop"
 	@echo "  make worktree-pool-reset POOL=NN  Reset a retained pool worktree manually"
-	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"
+	@echo "  make worktree-add BRANCH=name  Deprecated legacy worktree creator"
 	@echo "  make worktree-list   List active worktrees"
 	@echo "  make worktree-prune  Remove worktrees whose branches are gone on origin (post-merge cleanup)"
 	@echo ""
