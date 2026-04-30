@@ -40,7 +40,7 @@ work:
 
   - id: w2
     summary: "Make pr-fanout bounded-parallel with PR_FANOUT_JOBS=4 default"
-    status: pending
+    status: done
     notes: |
       Change `pr-fanout` target in `Makefile` from sequential to parallel.
       Add `PR_FANOUT_JOBS ?= 4` near the top. Use `xargs -P "$(PR_FANOUT_JOBS)"`

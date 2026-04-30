@@ -1,6 +1,8 @@
 # BenchBox Makefile
 # This makefile provides commands for building, testing and development
 
+PR_FANOUT_JOBS ?= 4
+
 .PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
@@ -764,18 +766,24 @@ pr-open:
 	gh pr merge --auto --squash "$$URL"
 
 # Walk every worktree (except the main clone) and run `make pr-open` in each.
-# Sequential by design: the pre-push fast-test hook serializes via a flock,
-# so parallelizing here invites lock-contention failures. Use pr-refresh when
-# branches need to be updated onto origin/develop before auto-merge can fire.
+# Use PR_FANOUT_JOBS to bound parallelism.
 pr-fanout:
 	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
+	TMP=$$(mktemp); \
+	LOGDIR=$$(mktemp -d); \
+	trap 'rm -f "$$TMP"; rm -rf "$$LOGDIR"' EXIT; \
 	git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r wt; do \
 		[ "$$(realpath "$$wt")" = "$$MAIN_CLONE" ] && { echo "(skip $$wt: main clone)"; continue; }; \
 		BR=$$(git -C "$$wt" branch --show-current 2>/dev/null); \
 		case "$$BR" in develop|main|"") echo "(skip $$wt: branch=$$BR)"; continue ;; esac; \
-		echo "==> $$wt [$$BR]"; \
-		( cd "$$wt" && $(MAKE) -s pr-open ) || echo "(failed: $$wt)"; \
-	done
+		IDX=$$(($${IDX:-0} + 1)); \
+		printf '%06d|%s\0' "$$IDX" "$$wt" >> "$$TMP"; \
+	done; \
+	if [ ! -s "$$TMP" ]; then exit 0; fi; \
+	xargs -0 -n 1 -P "$(PR_FANOUT_JOBS)" sh -c 'logdir="$$1"; record="$$2"; idx="$${record%%|*}"; wt="$${record#*|}"; br=$$(git -C "$$wt" branch --show-current 2>/dev/null); { echo "==> $$wt [$$br]"; ( cd "$$wt" && $(MAKE) -s pr-open ) || echo "(failed: $$wt)"; } > "$$logdir/$$idx.log" 2>&1' sh "$$LOGDIR" < "$$TMP"; \
+	STATUS=$$?; \
+	for log in "$$LOGDIR"/*.log; do [ -e "$$log" ] && cat "$$log"; done; \
+	exit $$STATUS
 
 # Refresh the current PR branch onto origin/develop, then run pr-open.
 # This is the stale-PR escape hatch when required checks must be current with
@@ -967,7 +975,7 @@ help:
 	@echo "PR Workflow & Worktrees:"
 	@echo "  make pr-preflight    Run lint + fast tests locally; mirrors CI gate"
 	@echo "  make pr-open         Push branch + open PR vs develop + enable auto-merge (idempotent; safe to rerun)"
-	@echo "  make pr-fanout       Run pr-open in every worktree (sequential; ensures auto-merge is on across branches)"
+	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
 	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
 	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"
