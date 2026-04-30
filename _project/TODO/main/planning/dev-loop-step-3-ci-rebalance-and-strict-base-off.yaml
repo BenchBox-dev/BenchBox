@@ -173,7 +173,7 @@ work:
 
   - id: w5
     summary: "Update agent docs for the replanned CI contract"
-    status: pending
+    status: done
     needs: [w2, w3, w4]
     notes: |
       Update `CLAUDE.md` and `AGENTS.md` only where the workflow contract is
@@ -187,6 +187,16 @@ work:
         - `main` PRs and tag releases retain release-grade validation.
         - `make pr-refresh` remains an escape hatch for genuine branch drift;
           do not deprecate it solely because strict-base was already off.
+
+      Implementation record (2026-04-30):
+        - Updated `CLAUDE.md` and `AGENTS.md` to state that develop required
+          checks are intentionally minimal and strict-base is already off.
+        - Documented the split between routine develop PR gates and broad
+          nightly/workflow_dispatch validation.
+        - Preserved `make pr-refresh` as an escape hatch rather than a
+          deprecated path.
+        - Documented that main PRs and tag releases keep release-grade
+          validation.
 
   - id: w6
     summary: "Verify locally, review the change, and open the PR"
