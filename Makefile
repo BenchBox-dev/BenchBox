@@ -5,7 +5,14 @@ PR_FANOUT_JOBS ?= 4
 POOL_SIZE ?= 10
 WORKTREE_POOL_PARENT ?= ..
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-pool-reset worktree-add worktree-list worktree-prune todo-reindex
+# Shell command snippet that resolves the main clone's directory name
+# (e.g. "BenchBox"). Pool worktree paths derive from it as
+# $(WORKTREE_POOL_PARENT)/$(POOL_REPO_CMD).pool-NN. Inlined as a Make
+# variable so the four pool-management targets share a single source of
+# truth instead of repeating the four-deep nested expansion.
+POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
+
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -730,7 +737,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-pool-reset worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -828,7 +835,7 @@ pr-status:
 worktree-pool-init:
 	@git fetch origin develop --quiet
 	@set -e; \
-	POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	POOL_REPO=$$($(POOL_REPO_CMD)); \
 	i=1; \
 	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
 		pool=$$(printf 'pool-%02d' "$$i"); \
@@ -846,7 +853,7 @@ worktree-pool-init:
 		fi; \
 		i=$$((i + 1)); \
 	done
-	@POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	@POOL_REPO=$$($(POOL_REPO_CMD)); \
 	printf '%-8s | %-60s | %s\n' "pool" "path" "branch"; \
 	i=1; \
 	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
@@ -863,10 +870,17 @@ worktree-pool-init:
 	done
 
 # Claim the first free pool worktree for a feature branch.
+#
+# Concurrency note: the file lock serializes only `worktree-claim` calls
+# against each other. It does NOT prevent `worktree-claim` from racing
+# with `worktree-release` or `worktree-pool-reset` on the same slot —
+# those are operator-driven and assumed to run on a single workstation
+# where humans/agents serialize their own actions.
 worktree-claim:
 	@test -n "$(BRANCH)" || { echo "Usage: make worktree-claim BRANCH=<branch-name>"; exit 1; }
 	@case "$(BRANCH)" in chore/?*|fix/?*|feat/?*|docs/?*) ;; *) echo "BRANCH must match ^(chore|fix|feat|docs)/.+"; exit 1 ;; esac
 	@git check-ref-format --branch "$(BRANCH)" >/dev/null || { echo "Invalid git branch name: $(BRANCH)"; exit 1; }
+	@git fetch origin develop --quiet
 	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
 	touch "$$LOCK"; \
 	if command -v lockf >/dev/null 2>&1; then \
@@ -874,13 +888,12 @@ worktree-claim:
 	elif command -v flock >/dev/null 2>&1; then \
 		flock -w 30 "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; \
 	else \
-		uv run -- python -c 'import fcntl, signal, subprocess, sys; signal.signal(signal.SIGALRM, lambda *_: sys.exit("Timed out waiting for pool lock")); signal.alarm(30); lock = open(sys.argv[1], "a", encoding="utf-8"); fcntl.flock(lock, fcntl.LOCK_EX); signal.alarm(0); raise SystemExit(subprocess.call(sys.argv[2:]))' "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; \
+		uv run -- python scripts/_pool_lock.py "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; \
 	fi
 
 worktree-claim-locked:
-	@git fetch origin develop --quiet
 	@set -e; \
-	POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	POOL_REPO=$$($(POOL_REPO_CMD)); \
 	i=1; \
 	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
 		pool=$$(printf 'pool-%02d' "$$i"); \
@@ -889,17 +902,31 @@ worktree-claim-locked:
 			branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
 			status=$$(git -C "$$wt" status --porcelain); \
 			if [ -z "$$branch" ] && [ -z "$$status" ]; then \
-				git -C "$$wt" fetch origin develop --quiet; \
+				rollback() { \
+					git -C "$$wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
+					git -C "$$wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
+					echo "claim of $$pool failed; slot returned to detached origin/develop" >&2; \
+					exit 1; \
+				}; \
+				trap rollback ERR; \
 				git -C "$$wt" reset --hard origin/develop >/dev/null; \
 				git -C "$$wt" checkout -b "$(BRANCH)" >/dev/null; \
-				( cd "$$wt" && uv sync --group dev >/dev/null ); \
+				if [ ! -f "$$wt/.venv/pyvenv.cfg" ] \
+					|| [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
+					( cd "$$wt" && uv sync --group dev >/dev/null ); \
+				fi; \
+				trap - ERR; \
 				printf 'WORKTREE_PATH=%s\n' "$$(cd "$$wt" && pwd -P)"; \
 				exit 0; \
 			fi; \
 		fi; \
 		i=$$((i + 1)); \
 	done; \
-	echo "No free pool worktree available. Run: make worktree-pool-status" >&2; \
+	echo "No free pool worktree available." >&2; \
+	echo "Hint: stale slots (PR MERGED but branch not released) are common after agent crashes." >&2; \
+	echo "      Run \`make worktree-pool-status\` to find them, then \`make worktree-pool-sweep-stale\`" >&2; \
+	echo "      to auto-release any whose PRs are merged. Use \`make worktree-pool-reset POOL=NN\`" >&2; \
+	echo "      as a last-resort manual escape hatch." >&2; \
 	exit 1
 
 worktree-release:
@@ -920,17 +947,55 @@ worktree-release:
 	git remote prune origin; \
 	echo "Released $$branch; worktree is detached at origin/develop."
 
+## worktree-pool-status: report pool slot state + venv health + disk usage.
+##
+## Columns:
+##   pool, path, branch, state, claim_age, venv, size
+##
+## State semantics:
+##   free     — detached HEAD, working tree clean
+##   claimed  — on a feature branch, no PR or PR is open
+##   stale    — on a feature branch, PR is MERGED (release/sweep candidate)
+##   dirty    — uncommitted changes (filtered against .benchbox/ scratch
+##              dir which is the only expected non-ignored untracked path;
+##              .venv/ is .gitignored, so it does not appear in --untracked-files=normal)
+##   unknown  — gh pr view/list lookup failed (auth / network / rate limit)
+##              — distinguished from claimed-no-PR-yet
+##   missing  — pool slot directory absent
+##
+## Venv health:
+##   ok           — .venv/pyvenv.cfg exists and is at least as new as uv.lock + pyproject.toml
+##   stale        — .venv exists but uv.lock or pyproject.toml is newer (next claim will re-sync)
+##   missing      — .venv absent (claim will recreate)
+##
+## PR-state lookup is batched: a single `gh pr list --state all` runs up
+## front and an associative awk lookup per slot replaces N per-slot
+## `gh pr view` calls.
 worktree-pool-status:
-	@POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
-	printf '%-8s | %-60s | %-28s | %-7s | %s\n' "pool" "path" "branch" "state" "claim_age"; \
+	@POOL_REPO=$$($(POOL_REPO_CMD)); \
+	pr_table=$$(gh pr list --state all --base develop --limit 200 \
+		--json headRefName,state \
+		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\n"}}{{end}}' 2>/dev/null); \
+	pr_lookup_failed=0; \
+	if [ -z "$$pr_table" ]; then pr_lookup_failed=1; fi; \
+	printf '%-8s | %-58s | %-28s | %-8s | %-13s | %-7s | %s\n' "pool" "path" "branch" "state" "claim_age" "venv" "size"; \
 	i=1; \
 	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
 		pool=$$(printf 'pool-%02d' "$$i"); \
 		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		branch="-"; state="missing"; age="-"; \
+		branch="-"; state="missing"; age="-"; venv="-"; size="-"; \
 		if git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
 			current=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
 			dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+			if [ ! -f "$$wt/.venv/pyvenv.cfg" ]; then \
+				venv="missing"; \
+			elif [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
+				venv="stale"; \
+			else \
+				venv="ok"; \
+			fi; \
+			size=$$(du -sh "$$wt" 2>/dev/null | awk '{print $$1}'); \
+			[ -n "$$size" ] || size="-"; \
 			if [ -z "$$current" ]; then \
 				branch="(detached)"; \
 				if [ -z "$$dirty" ]; then state="free"; else state="dirty"; fi; \
@@ -940,12 +1005,18 @@ worktree-pool-status:
 				if [ -n "$$dirty" ]; then \
 					state="dirty"; \
 				else \
-					pr_state=$$(gh pr view "$$current" --json state --jq .state 2>/dev/null || true); \
-					if [ "$$pr_state" = "MERGED" ]; then state="stale"; else state="claimed"; fi; \
+					pr_state=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$current" '$$1 == b {print $$2; exit}'); \
+					if [ "$$pr_lookup_failed" = "1" ]; then \
+						state="unknown"; \
+					elif [ "$$pr_state" = "MERGED" ]; then \
+						state="stale"; \
+					else \
+						state="claimed"; \
+					fi; \
 				fi; \
 			fi; \
 		fi; \
-		printf '%-8s | %-60s | %-28s | %-7s | %s\n' "$$pool" "$$wt" "$$branch" "$$state" "$$age"; \
+		printf '%-8s | %-58s | %-28s | %-8s | %-13s | %-7s | %s\n' "$$pool" "$$wt" "$$branch" "$$state" "$$age" "$$venv" "$$size"; \
 		i=$$((i + 1)); \
 	done
 
@@ -953,7 +1024,7 @@ worktree-pool-reset:
 	@test -n "$(POOL)" || { echo "Usage: make worktree-pool-reset POOL=NN"; exit 1; }
 	@case "$(POOL)" in [0-9][0-9]) ;; *) echo "POOL must be two digits, e.g. POOL=03"; exit 1 ;; esac
 	@set -e; \
-	POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	POOL_REPO=$$($(POOL_REPO_CMD)); \
 	wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.pool-$(POOL)"; \
 	git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "No pool worktree found: $$wt"; exit 1; }; \
 	branch=$$(git -C "$$wt" branch --show-current 2>/dev/null || true); \
@@ -979,6 +1050,50 @@ worktree-pool-reset:
 		case "$$branch" in develop|main) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
 	fi; \
 	echo "Reset pool-$(POOL): $$wt"
+
+## worktree-pool-sweep-stale: auto-release pool slots whose branch's PR
+## is MERGED on origin and whose working tree is clean. Idempotent;
+## refuses to touch slots that are dirty, claimed-no-PR, claimed-with-open-PR,
+## or where the gh API lookup failed (state=unknown). Run after a busy day
+## to recover slots that died between work and `make worktree-release`.
+worktree-pool-sweep-stale:
+	@set -e; \
+	POOL_REPO=$$($(POOL_REPO_CMD)); \
+	pr_table=$$(gh pr list --state all --base develop --limit 200 \
+		--json headRefName,state \
+		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\n"}}{{end}}' 2>/dev/null); \
+	if [ -z "$$pr_table" ]; then \
+		echo "gh pr list returned no data; refusing to sweep without PR-state visibility" >&2; \
+		exit 1; \
+	fi; \
+	swept=0; \
+	i=1; \
+	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
+		pool=$$(printf 'pool-%02d' "$$i"); \
+		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
+		i=$$((i + 1)); \
+		git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue; \
+		current=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
+		[ -n "$$current" ] || continue; \
+		dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+		if [ -n "$$dirty" ]; then \
+			echo "skip $$pool: dirty (branch=$$current)"; \
+			continue; \
+		fi; \
+		pr_state=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$current" '$$1 == b {print $$2; exit}'); \
+		if [ "$$pr_state" != "MERGED" ]; then \
+			echo "skip $$pool: PR not merged (state=$${pr_state:-none})"; \
+			continue; \
+		fi; \
+		echo "sweep $$pool: releasing $$current (PR MERGED)"; \
+		git -C "$$wt" fetch origin develop --quiet; \
+		git -C "$$wt" checkout --detach origin/develop >/dev/null; \
+		git -C "$$wt" reset --hard origin/develop >/dev/null; \
+		git -C "$$wt" branch -D "$$current" >/dev/null 2>&1 || true; \
+		git -C "$$wt" remote prune origin >/dev/null 2>&1 || true; \
+		swept=$$((swept + 1)); \
+	done; \
+	echo "Swept $$swept pool slot(s)."
 
 # Create a worktree off origin/develop. Usage: make worktree-add BRANCH=fix/foo
 # Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
@@ -1141,14 +1256,18 @@ help:
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
 	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
-	@echo "  make worktree-pool-init  Create retained pool worktrees (POOL_SIZE=$(POOL_SIZE))"
-	@echo "  make worktree-pool-status  Show retained pool worktree state"
-	@echo "  make worktree-claim BRANCH=name  Claim a retained pool worktree for a branch"
-	@echo "  make worktree-release  Release a merged pool branch back to detached origin/develop"
-	@echo "  make worktree-pool-reset POOL=NN  Reset a retained pool worktree manually"
-	@echo "  make worktree-add BRANCH=name  Deprecated legacy worktree creator"
-	@echo "  make worktree-list   List active worktrees"
-	@echo "  make worktree-prune  Remove legacy non-pool worktrees whose branches are gone on origin"
+	@echo "Worktree-pool lifecycle (preferred for new write sessions):"
+	@echo "  make worktree-pool-init           Bootstrap retained pool worktrees (POOL_SIZE=$(POOL_SIZE))"
+	@echo "  make worktree-claim BRANCH=name   Claim a free pool slot for a feature branch"
+	@echo "  make worktree-release             Inside a pool worktree: return to detached origin/develop after PR merges"
+	@echo "  make worktree-pool-status         Show pool slot state, venv health, and disk usage"
+	@echo "  make worktree-pool-sweep-stale    Auto-release pool slots whose PRs have merged"
+	@echo "  make worktree-pool-reset POOL=NN  Manual escape hatch for stuck pool slots"
+	@echo ""
+	@echo "Legacy / non-pool worktree paths (deprecated, kept for one release):"
+	@echo "  make worktree-add BRANCH=name  Deprecated legacy worktree creator (prefer worktree-claim)"
+	@echo "  make worktree-list             List active worktrees"
+	@echo "  make worktree-prune            Remove legacy non-pool worktrees whose branches are gone on origin"
 	@echo ""
 	@echo "Blind-Spot Findings (see _project/blind-spots/README.md):"
 	@echo "  make blind-spots-list   List open findings (one row each)"

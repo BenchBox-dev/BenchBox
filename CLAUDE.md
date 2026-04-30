@@ -32,12 +32,22 @@ before the first edit.
 BenchBox uses a retained pool of 10 worktrees. `make worktree-claim`
 atomically picks a free `BenchBox.pool-NN`, resets it to current
 `origin/develop`, checks out the requested branch, and prints
-`WORKTREE_PATH=...`. After the PR merges, run `make worktree-release`
-inside that pool worktree to return it to detached `origin/develop`.
-If a prior session died, run `make worktree-pool-status`; reset a stale
-or dirty slot only with `make worktree-pool-reset POOL=NN` after
-reviewing what will be discarded. `make worktree-add` remains as a
-deprecated one-release compatibility path for legacy non-pool worktrees.
+`WORKTREE_PATH=...`. `uv sync --group dev` runs only when `uv.lock` or
+`pyproject.toml` is newer than the existing `.venv`, so repeat claims
+after a clean release skip the sync. If anything fails after the
+branch is created, the slot is rolled back to detached
+`origin/develop` automatically. After the PR merges, run
+`make worktree-release` inside that pool worktree to return it to
+detached `origin/develop`.
+
+`make worktree-pool-status` reports each slot's state (free / claimed /
+stale / dirty / unknown / missing), venv health (ok / stale / missing),
+and disk usage. After a busy session, `make worktree-pool-sweep-stale`
+auto-releases slots whose PRs are MERGED on origin and whose trees are
+clean — idempotent. Reach for `make worktree-pool-reset POOL=NN` only
+as a last-resort manual escape hatch after reviewing what will be
+discarded. `make worktree-add` remains as a deprecated one-release
+compatibility path for legacy non-pool worktrees.
 
 **If you find the main clone on a non-`develop` branch**, surface it
 to the user and ask before writing anything to it — that may be the
@@ -210,7 +220,7 @@ benchbox run --help | --help-topic all | --help-topic examples | --help-topic be
 ## Pre-approved Commands
 - **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `uv run -- python -m pytest *`
 - **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-status`, `make worktree-pool-status`, `make worktree-list`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
-- **PR/Worktree (write — feature/pool worktrees only)**: `make pr-open`, `make pr-fanout`, `make pr-refresh`, `make worktree-claim BRANCH=*`, `make worktree-release`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `git push origin chore/*`, `git push origin fix/*`, `git push origin feat/*`, `git push origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
+- **PR/Worktree (write — feature/pool worktrees only)**: `make pr-open`, `make pr-fanout`, `make pr-refresh`, `make worktree-claim BRANCH=*`, `make worktree-release`, `make worktree-pool-sweep-stale`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `git push origin chore/*`, `git push origin fix/*`, `git push origin feat/*`, `git push origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
   - **Manual/admin escape hatches, not broad auto-allow**: `make worktree-pool-init`, `make worktree-pool-reset POOL=NN`, `make worktree-prune`
   - **Never auto-allowed**: `git push * develop`, `git push * main`, `git push --force*`, `gh pr create --base main*`. These remain prompt-on-use.
 - **Files**: `ls*`, `find*`, `cat*`, `head*`, `tail*`, `wc*`, `file*`, `stat*`, `du*`, `tree*`, `which*`
