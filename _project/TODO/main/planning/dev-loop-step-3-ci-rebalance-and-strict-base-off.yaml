@@ -142,7 +142,7 @@ work:
 
   - id: w4
     summary: "Preserve main PR and tag-release validation semantics"
-    status: pending
+    status: done
     needs: [w2, w3]
     notes: |
       Audit `.github/workflows/test.yml`, `.github/workflows/nightly.yml`, and
@@ -156,6 +156,20 @@ work:
       A comment in the workflow is acceptable when it prevents future drift,
       but avoid comment-only churn unless it clarifies a real branch-specific
       invariant.
+
+      Implementation record (2026-04-30):
+        - Audited `.github/workflows/test.yml`: `pull_request` to `main` and
+          `push` to `main` still run the required Ubuntu 3.12 fast-test job,
+          the additional compatibility matrix, package install, security,
+          smoke/table-format, and parity lanes. The new gates exclude only
+          `pull_request` events whose base branch is `develop`.
+        - Audited `.github/workflows/validate-main-pr.yml`: main PRs remain
+          restricted to release branches through `validate-base`.
+        - Audited `.github/workflows/release.yml`: `push` tags matching `v*`
+          still run dependency bounds, reproducible build, package checks,
+          publish, GitHub release creation, and post-publish installation
+          across Ubuntu/macOS/Windows and Python 3.10/3.12/3.13 coverage.
+        - No release workflow edits were needed.
 
   - id: w5
     summary: "Update agent docs for the replanned CI contract"
