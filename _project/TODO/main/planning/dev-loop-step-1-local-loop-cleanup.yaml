@@ -86,7 +86,7 @@ work:
 
   - id: w5
     summary: "Capture consolidated L2 blind-spot findings to _project/blind-spots/"
-    status: pending
+    status: done
     notes: |
       Six findings from the four-round merge-loop audit (2026-04-30 session):
         1. Original plan bundled "stop babysitting PRs" with "promote
