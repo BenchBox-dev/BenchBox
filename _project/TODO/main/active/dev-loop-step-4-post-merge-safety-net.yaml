@@ -45,7 +45,7 @@ work:
 
   - id: w2
     summary: "Add auto-revert PR generation on red"
-    status: pending
+    status: done
     notes: |
       New job `auto-revert-on-failure` triggered by
       `workflow_run.conclusion == 'failure'` (or as a continuation
@@ -63,6 +63,26 @@ work:
            label `incident:develop-red-revert-conflict`, no PR
       Use `peter-evans/create-pull-request@v6` action or a small
       gh-cli script.
+
+      Implementation record (2026-04-30):
+        - Added `auto-revert-on-failure` to
+          `.github/workflows/develop-post-merge.yml` with
+          `needs: [lint, fast-test]` and an `always()` guard that runs only
+          when one of those post-merge checks fails.
+        - Added job-level permissions `contents: write`,
+          `pull-requests: write`, and `issues: write`, which are the minimum
+          scopes needed to push a revert branch and open either a PR or issue.
+        - Used an inline `gh` script so the same job can identify the
+          associated squash-merge PR, create idempotent incident labels, open
+          an `auto-revert/<short-sha>` PR when `git revert --no-edit` succeeds,
+          and request review from the originating PR author when possible.
+        - Added conflict fallback: if the revert does not apply cleanly, the
+          job aborts the revert and opens an
+          `incident:develop-red-revert-conflict` issue with the failing SHA,
+          run URL, originating PR URL, and attempted branch name.
+        - W2 review issue addressed during implementation: the job uses
+          `needs.*.result` rather than job-level `failure()` alone, so skipped
+          or successful post-merge jobs do not accidentally trigger a revert.
     needs: [w1]
 
   - id: w3

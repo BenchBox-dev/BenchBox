@@ -54,3 +54,140 @@ jobs:
 
       - name: Run CI fast-test mirror
         run: make ci-test
+
+  auto-revert-on-failure:
+    name: auto-revert-on-failure
+    runs-on: ubuntu-latest
+    needs: [lint, fast-test]
+    if: ${{ always() && (needs.lint.result == 'failure' || needs.fast-test.result == 'failure') }}
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FAILING_SHA: ${{ github.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Open revert PR or conflict issue
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          short_sha="${FAILING_SHA:0:12}"
+          revert_branch="auto-revert/${short_sha}"
+
+          gh label create incident:develop-red \
+            --description "Develop post-merge failure with an automatic revert PR" \
+            --color B60205 >/dev/null 2>&1 || true
+          gh label create incident:develop-red-revert-conflict \
+            --description "Develop post-merge failure where automatic revert conflicted" \
+            --color D93F0B >/dev/null 2>&1 || true
+
+          existing_pr_url="$(gh pr list \
+            --state open \
+            --base develop \
+            --head "${revert_branch}" \
+            --json url \
+            --jq '.[0].url // ""')"
+          if [ -n "${existing_pr_url}" ]; then
+            echo "Revert PR already exists: ${existing_pr_url}"
+            exit 0
+          fi
+
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          pr_json="$(gh api graphql \
+            -f owner="${GITHUB_REPOSITORY_OWNER}" \
+            -f repo="${repo_name}" \
+            -f oid="${FAILING_SHA}" \
+            -f query='
+              query($owner: String!, $repo: String!, $oid: GitObjectID!) {
+                repository(owner: $owner, name: $repo) {
+                  object(oid: $oid) {
+                    ... on Commit {
+                      associatedPullRequests(first: 1) {
+                        nodes {
+                          number
+                          title
+                          url
+                          author {
+                            login
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ' \
+            --jq '.data.repository.object.associatedPullRequests.nodes[0] // {}')"
+
+          pr_number="$(jq -r '.number // empty' <<<"${pr_json}")"
+          pr_title="$(jq -r '.title // empty' <<<"${pr_json}")"
+          pr_url="$(jq -r '.url // empty' <<<"${pr_json}")"
+          pr_author="$(jq -r '.author.login // empty' <<<"${pr_json}")"
+
+          if [ -z "${pr_number}" ]; then
+            pr_label="commit ${short_sha}"
+            pr_title="commit ${short_sha}"
+            pr_url="${RUN_URL}"
+          else
+            pr_label="#${pr_number}"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --no-tags origin develop
+          git checkout -B "${revert_branch}" origin/develop
+
+          if git revert --no-edit "${FAILING_SHA}"; then
+            git push --force-with-lease origin "${revert_branch}"
+
+            body_file="$(mktemp)"
+            cat > "${body_file}" <<EOF
+          Develop went red after ${pr_label} landed.
+
+          Failing SHA: \`${FAILING_SHA}\`
+          Failing run: ${RUN_URL}
+          Originating PR: ${pr_url}
+
+          This PR reverts only the offending squash commit. Reviewers should decide whether to merge this revert or fix forward.
+          EOF
+
+            revert_pr_url="$(gh pr create \
+              --base develop \
+              --head "${revert_branch}" \
+              --title "Revert ${pr_title} (${pr_label}) - develop went red post-merge" \
+              --body-file "${body_file}" \
+              --label incident:develop-red)"
+
+            if [ -n "${pr_author}" ]; then
+              gh pr edit "${revert_pr_url}" --add-reviewer "${pr_author}" || true
+            fi
+
+            echo "Opened revert PR: ${revert_pr_url}"
+          else
+            git revert --abort || true
+
+            body_file="$(mktemp)"
+            cat > "${body_file}" <<EOF
+          Develop went red after ${pr_label} landed, but the automatic revert conflicted.
+
+          Failing SHA: \`${FAILING_SHA}\`
+          Failing run: ${RUN_URL}
+          Originating PR: ${pr_url}
+          Attempted revert branch: \`${revert_branch}\`
+
+          A human needs to decide whether to revert a larger stack or fix forward.
+          EOF
+
+            issue_url="$(gh issue create \
+              --title "Auto-revert conflict for develop red at ${short_sha}" \
+              --body-file "${body_file}" \
+              --label incident:develop-red-revert-conflict)"
+            echo "Opened conflict issue: ${issue_url}"
+          fi
