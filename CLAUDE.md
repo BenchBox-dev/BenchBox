@@ -2,7 +2,37 @@
 
 → **See AGENTS.md for full guidance.** Claude Code-specific shortcuts only.
 
-**Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`). Never `git add -A`. TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
+**Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`/`ty`). Never `git add -A`. Dev PRs target `develop`, never `main` (`main` is release-only and `develop` is PR-gated — no direct push to either). **All agent edits and commits happen in a worktree off `develop`. If a session begins in the main clone (`/Users/joe/Developer/BenchBox`), creating a worktree is the FIRST action (see "Session start" below). Never `git checkout`/`switch`/`branch -m` in the main clone without explicit user approval — that clone stays on `develop`.** TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
+
+## Session start
+
+**First action of any new session that might write to the repo**: confirm
+you are in a worktree, not the main clone.
+
+```bash
+git rev-parse --show-toplevel
+# If the output is /Users/joe/Developer/BenchBox you are in the main
+# clone. Stop. Create a worktree BEFORE any edit, commit, or branch
+# switch:
+make worktree-add BRANCH=<type>/<short-slug>   # type: chore|fix|feat|docs
+cd ../BenchBox.<type>-<short-slug>/
+uv sync --group dev
+```
+
+Pick the branch name from the user's stated task (e.g.
+`fix/explorer-cold-load`, `chore/claude-md-rules`,
+`feat/query-row-limit`). If the task is unclear, ask the user before
+creating the worktree.
+
+**Read-only carveout.** Pure Q&A / exploration sessions — no edits,
+no commits, no state-mutating commands — may stay in the main clone.
+The instant the session turns into a write task, create a worktree
+before the first edit.
+
+**If you find the main clone on a non-`develop` branch**, surface it
+to the user and ask before writing anything to it — that may be the
+user's in-progress work; do not reflexively `git checkout develop` to
+"clean up", that can discard uncommitted state.
 
 ## Git workflow
 
@@ -10,6 +40,14 @@ Single repo, single remote (`origin` → `joeharris76/BenchBox`). Working
 clone: `/Users/joe/Developer/BenchBox` (the canonical path; the old
 private clone was retired to `BenchBox.retired-20260427/` alongside it
 during the single-repo migration).
+
+> **Remote sanity check.** If `git remote -v` shows anything other than
+> a single `origin → joeharris76/BenchBox`, stop and ask — that's a
+> leftover from the pre-migration two-remote setup (`private` /
+> `public`) and pushing without confirming could leak intent across
+> repos. There is **no** `private` or `public` remote anymore; all
+> work goes to `origin` and PRs target `develop` (or `main` for
+> releases).
 
 - **Branches**: `develop` is the long-lived dev branch; `main` is
   release-only.
@@ -40,9 +78,13 @@ during the single-repo migration).
   - **Post-merge safety net**: `.github/workflows/develop-post-merge.yml`
     runs the lightweight lint + fast-test mirror on the actual `develop`
     tip after a PR lands.
-- **Concurrent sessions / multiple worktrees**:
-  - `~/Developer/BenchBox/` stays on `develop`, always. Don't swap
-    branches in the main clone.
+- **Worktrees** for parallel branches (this is how agents work in
+  this repo — see "Session start" above; not an optional optimisation):
+  - `~/Developer/BenchBox/` stays on `develop`, always. **Agents must
+    not run `git checkout`, `git switch`, `git branch -m`, or any
+    other command that changes the current branch in the main clone
+    without explicit user approval.** All feature work happens in a
+    worktree (`make worktree-add BRANCH=...`).
   - `make worktree-add BRANCH=fix/foo` creates `../BenchBox.fix-foo/`
     off `origin/develop` with branch `fix/foo` checked out. `cd` into it,
     run `uv sync --group dev`, work, `make pr-open` from inside.
@@ -156,7 +198,9 @@ benchbox run --help | --help-topic all | --help-topic examples | --help-topic be
 
 ## Pre-approved Commands
 - **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `uv run -- python -m pytest *`
-- **PR/Worktree**: `make pr-preflight`, `make pr-status`, `make pr-fanout`, `make worktree-list`, `make worktree-prune`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
+- **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-status`, `make worktree-list`, `make worktree-prune`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
+- **PR/Worktree (write — feature branches only)**: `make pr-open`, `make pr-fanout`, `make pr-refresh`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `git push origin chore/*`, `git push origin fix/*`, `git push origin feat/*`, `git push origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
+  - **Never auto-allowed**: `git push * develop`, `git push * main`, `git push --force*`, `gh pr create --base main*`. These remain prompt-on-use.
 - **Files**: `ls*`, `find*`, `cat*`, `head*`, `tail*`, `wc*`, `file*`, `stat*`, `du*`, `tree*`, `which*`
 - **Git**: `git status`, `git diff*`, `git log*`, `git show*`, `git branch*`, `git remote*`, `git config --list`, `git worktree list*`
 - **Python**: `uv tree`, `uv pip list`, `uv pip show*`, `uv export`, `uv run -- python -c*`, `uv run -- python -m*`
