@@ -76,7 +76,7 @@ Single repo (`origin` → `joeharris76/BenchBox`); two long-lived branches: `dev
 - Keep `~/Developer/BenchBox/` on `develop` permanently.
 - New write sessions use the retained pool: `make worktree-claim BRANCH=fix/foo` atomically claims a free `BenchBox.pool-NN`, resets it to current `origin/develop`, checks out `fix/foo`, runs `uv sync --group dev`, and prints `WORKTREE_PATH=...`.
 - `cd` into that path, work, run `make pr-open`, and after the PR merges run `make worktree-release` inside the pool worktree to return it to detached `origin/develop`.
-- `make worktree-pool-status` shows free, claimed, stale, and dirty slots; stale recovery is inspect status first, then `make worktree-pool-reset POOL=NN` only when you intentionally want to discard or detach that slot.
+- `make worktree-pool-status` shows each slot's state (free / claimed / stale / dirty / unknown / missing), venv health (ok / stale / missing), and disk usage. After a busy session, `make worktree-pool-sweep-stale` auto-releases slots whose PRs have merged and whose trees are clean (idempotent). Reach for `make worktree-pool-reset POOL=NN` only as a last-resort manual escape hatch when you intentionally want to discard or detach that slot.
 - `make worktree-add BRANCH=fix/foo` remains as a deprecated one-release compatibility path for legacy non-pool worktrees.
 - `make pr-fanout` walks every worktree (skipping the main clone) and runs `make pr-open` with bounded parallelism (`PR_FANOUT_JOBS ?= 4`) so retained worktrees can be published without local hook serialization.
 - The operating model is pool worktrees + auto-merge, with `.github/workflows/develop-post-merge.yml` and the Step 4 auto-revert follow-up as the develop-tip safety net.
