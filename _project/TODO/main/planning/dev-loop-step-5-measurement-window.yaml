@@ -25,6 +25,7 @@ deps:
     - dev-loop-step-1-local-loop-cleanup
     - dev-loop-step-2-worktree-pool
     - dev-loop-step-3-ci-rebalance-and-strict-base-off
+    - dev-loop-step-3a-path-based-ci-skip
     - dev-loop-step-4-post-merge-safety-net
 
 work:
