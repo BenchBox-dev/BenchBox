@@ -2,8 +2,10 @@
 # This makefile provides commands for building, testing and development
 
 PR_FANOUT_JOBS ?= 4
+POOL_SIZE ?= 10
+WORKTREE_POOL_PARENT ?= ..
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -728,7 +730,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -821,6 +823,43 @@ pr-conflict-scan:
 pr-status:
 	@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
+
+# Initialize retained pool worktrees. Existing pool-NN paths are left untouched.
+worktree-pool-init:
+	@git fetch origin develop --quiet
+	@POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	i=1; \
+	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
+		pool=$$(printf 'pool-%02d' "$$i"); \
+		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
+		if [ -e "$$wt" ]; then \
+			git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { \
+				echo "Path exists but is not a git worktree: $$wt" >&2; \
+				exit 1; \
+			}; \
+			echo "$$pool exists: $$wt"; \
+		else \
+			echo "$$pool create: $$wt"; \
+			git worktree add --detach "$$wt" origin/develop; \
+			( cd "$$wt" && uv sync --group dev && uv run -- pre-commit install ); \
+		fi; \
+		i=$$((i + 1)); \
+	done
+	@POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	printf '%-8s | %-60s | %s\n' "pool" "path" "branch"; \
+	i=1; \
+	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
+		pool=$$(printf 'pool-%02d' "$$i"); \
+		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
+		if [ -d "$$wt/.git" ] || git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+			branch=$$(git -C "$$wt" branch --show-current 2>/dev/null); \
+			[ -n "$$branch" ] || branch="(detached)"; \
+		else \
+			branch="(missing)"; \
+		fi; \
+		printf '%-8s | %-60s | %s\n' "$$pool" "$$wt" "$$branch"; \
+		i=$$((i + 1)); \
+	done
 
 # Create a worktree off origin/develop. Usage: make worktree-add BRANCH=fix/foo
 # Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
@@ -978,6 +1017,7 @@ help:
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
 	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
+	@echo "  make worktree-pool-init  Create retained pool worktrees (POOL_SIZE=$(POOL_SIZE))"
 	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"
 	@echo "  make worktree-list   List active worktrees"
 	@echo "  make worktree-prune  Remove worktrees whose branches are gone on origin (post-merge cleanup)"

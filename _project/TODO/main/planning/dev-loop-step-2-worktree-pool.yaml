@@ -2,7 +2,7 @@ id: dev-loop-step-2-worktree-pool
 title: "Dev-loop simplification — Step 2: fixed pool of 10 retained worktrees with claim/release"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 
 description: |
@@ -45,7 +45,7 @@ deps:
 work:
   - id: w1
     summary: "Add make worktree-pool-init target — creates pool-01..POOL_SIZE from develop"
-    status: pending
+    status: done
     notes: |
       One-time bootstrap. Add `POOL_SIZE ?= 10` and
       `WORKTREE_POOL_PARENT ?= ..` so verification can create disposable
