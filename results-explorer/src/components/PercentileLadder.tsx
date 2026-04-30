@@ -18,6 +18,10 @@ import { paletteColor } from "@/lib/chartTheme";
 const LEGEND_SWATCH_COLOR = "#6b7280"; // Tailwind gray-500
 
 export interface PercentileStatsRow {
+  /** Stable per-result identifier, used as the row's React key so that two
+   *  rows for the same platform with different tuning_modes (variants) do
+   *  not collide on `key={platform}`. */
+  result_id: string;
   platform: string;
   percentile_stats: PercentileStats;
   colorIdx?: number;
@@ -104,7 +108,7 @@ export function PercentileLadder({ rows }: Props) {
           ];
 
           return (
-            <g key={row.platform}>
+            <g key={row.result_id} data-result-id={row.result_id}>
               {/* Platform label */}
               <text
                 x={LABEL_W - 6}
