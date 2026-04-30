@@ -2,7 +2,7 @@ id: dev-loop-step-5-measurement-window
 title: "Dev-loop simplification — Step 5: 30-day measurement window with queue decision thresholds"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Blocked
 category: Core Functionality
 
 description: |
@@ -31,7 +31,7 @@ deps:
 work:
   - id: w1
     summary: "Wait for 30 calendar days post-Step-4-merge before starting w2"
-    status: pending
+    status: in_progress
     notes: |
       The measurement window is 30 days of normal usage AFTER Step 4
       lands. Prior data is contaminated by the old workflow. Mark this
@@ -40,6 +40,14 @@ work:
       To start the timer: when Step 4 PR merges, comment on this TODO
       with the merge date and update `metadata.due_date` to merge_date
       + 30 days.
+
+      Implementation record (2026-04-30):
+        - Step 4 PR #81 merged to `develop` at `2026-04-30T21:33:45Z`.
+        - Set `metadata.due_date` to `2026-05-30` for the 30 calendar
+          day measurement window.
+        - Set this TODO status to `Blocked` and left W1 `in_progress`
+          until the due date. No code or workflow changes are allowed
+          during the measurement window.
 
   - id: w2
     summary: "Aggregate dev-loop metrics for the 30-day window"
@@ -192,9 +200,9 @@ metadata:
     - decision-gate
   estimated_effort: "Small (2-3h after the 30-day wait)"
   created_date: "2026-04-30"
-  # due_date: TBD — set to (Step 4 merge_date + 30 days) when Step 4 lands.
-  # Leaving unset because Step 4's merge date is unknown at TODO creation;
-  # a fake-precise placeholder would mislead future readers.
+  due_date: "2026-05-30"
+  step4_merged_at: "2026-04-30T21:33:45Z"
+  last_updated: "2026-04-30T21:33:45Z"
 
 impact:
   business_value: |
