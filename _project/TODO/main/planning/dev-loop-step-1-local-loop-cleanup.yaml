@@ -25,7 +25,7 @@ deps:
 work:
   - id: w1
     summary: "Gate all expensive pre-push hooks behind BENCHBOX_PREPUSH=1"
-    status: pending
+    status: done
     notes: |
       Audit `.pre-commit-config.yaml` for every hook with `stages:
       [pre-push]`. Currently includes at minimum:

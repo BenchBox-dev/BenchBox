@@ -4,6 +4,7 @@
 # Run manually: pre-commit run --all-files
 
 default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
 
 repos:
   - repo: local
@@ -13,6 +14,7 @@ repos:
         entry: uv run -- python scripts/generate_corpus_inventory.py --check
         language: system
         pass_filenames: false
+        stages: [pre-commit]
         files: ^results-data/bundles/
 
       # Fast (<1s) allowlist-only scan. Runs on every commit.
@@ -25,11 +27,12 @@ repos:
         entry: uv run -- python _project/scripts/timing_policy_check.py --strict --skip-fast-lane
         language: system
         pass_filenames: false
+        stages: [pre-commit]
         files: \.(py|json)$
 
       - id: timing-policy-fast-lane
         name: timing policy (fast-lane collect)
-        entry: uv run -- python _project/scripts/timing_policy_check.py --strict --only-fast-lane
+        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec uv run -- python _project/scripts/timing_policy_check.py --strict --only-fast-lane; fi'
         language: system
         pass_filenames: false
         stages: [pre-push]
@@ -41,7 +44,7 @@ repos:
       # plus the fast test lane.
       - id: pr-preflight-fast-tests
         name: pr-preflight (fast tests, mirrors CI)
-        entry: uv run -- python -m pytest -m fast -q
+        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec uv run -- python -m pytest -m fast -q; fi'
         language: system
         pass_filenames: false
         stages: [pre-push]
@@ -53,6 +56,7 @@ repos:
         name: blind-spot frontmatter validation
         entry: uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py
         language: system
+        stages: [pre-commit]
         files: ^_project/blind-spots/.*\.md$
         exclude: ^_project/blind-spots/README\.md$
 
@@ -75,8 +79,10 @@ repos:
       # Run the linter
       - id: ruff
         args: [--fix]
+        stages: [pre-commit]
       # Run the formatter
       - id: ruff-format
+        stages: [pre-commit]
 
   # Spell checking
   - repo: https://github.com/codespell-project/codespell
@@ -87,6 +93,7 @@ repos:
           - --ignore-words=.codespell-ignore.txt
           - --skip=*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,*.csv
           - --quiet-level=2
+        stages: [pre-commit]
         exclude: ^_sources/  # vendored upstream sources; preserve byte-for-byte
 
   # YAML validation
@@ -95,14 +102,20 @@ repos:
     hooks:
       - id: check-yaml
         args: [--unsafe]  # Allow custom YAML tags
+        stages: [pre-commit]
       - id: end-of-file-fixer
+        stages: [pre-commit]
         exclude: ^(_sources/|_binaries/.*EULA\.txt)  # vendored upstream sources; preserve byte-for-byte
       - id: trailing-whitespace
+        stages: [pre-commit]
         exclude: ^(_sources/|_binaries/.*EULA\.txt)  # vendored upstream sources; preserve byte-for-byte
       - id: check-added-large-files
         args: [--maxkb=1000]
+        stages: [pre-commit]
       - id: check-merge-conflict
+        stages: [pre-commit]
       - id: detect-private-key
+        stages: [pre-commit]
 
   # Markdown linting
   - repo: https://github.com/igorshubovych/markdownlint-cli
@@ -110,3 +123,4 @@ repos:
     hooks:
       - id: markdownlint
         args: [--fix, --disable, MD013, MD033, MD041]  # Disable line-length, HTML, first-line-heading rules
+        stages: [pre-commit]
