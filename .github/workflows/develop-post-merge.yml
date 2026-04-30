@@ -145,13 +145,44 @@ jobs:
             pr_label="#${pr_number}"
           fi
 
+          open_manual_action_issue() {
+            local title="$1"
+            local reason="$2"
+
+            body_file="$(mktemp)"
+            cat > "${body_file}" <<EOF
+          Develop went red after ${pr_label} landed, but the automatic revert could not open a revert PR.
+
+          Reason: ${reason}
+
+          Failing SHA: \`${FAILING_SHA}\`
+          Failing run: ${RUN_URL}
+          Originating PR: ${pr_url}
+          Attempted revert branch: \`${revert_branch}\`
+
+          A human needs to decide whether to revert a larger stack or fix forward.
+          EOF
+
+            issue_url="$(gh issue create \
+              --title "${title}" \
+              --body-file "${body_file}" \
+              --label incident:develop-red-revert-conflict)"
+            echo "conflict-issue-url=${issue_url}" >> "${GITHUB_OUTPUT}"
+            echo "Opened conflict issue: ${issue_url}"
+          }
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch --no-tags origin develop
           git checkout -B "${revert_branch}" origin/develop
 
           if git revert --no-edit "${FAILING_SHA}"; then
-            git push --force-with-lease origin "${revert_branch}"
+            if ! git push --force-with-lease origin "${revert_branch}"; then
+              open_manual_action_issue \
+                "Auto-revert could not push branch for develop red at ${short_sha}" \
+                "The revert commit was created locally, but pushing \`${revert_branch}\` failed. This can happen if the offending commit changes workflow files and \`GITHUB_TOKEN\` lacks the \`workflows\` permission."
+              exit 0
+            fi
 
             body_file="$(mktemp)"
             cat > "${body_file}" <<EOF
@@ -164,12 +195,17 @@ jobs:
           This PR reverts only the offending squash commit. Reviewers should decide whether to merge this revert or fix forward.
           EOF
 
-            revert_pr_url="$(gh pr create \
+            if ! revert_pr_url="$(gh pr create \
               --base develop \
               --head "${revert_branch}" \
               --title "Revert ${pr_title} (${pr_label}) - develop went red post-merge" \
               --body-file "${body_file}" \
-              --label incident:develop-red)"
+              --label incident:develop-red)"; then
+              open_manual_action_issue \
+                "Auto-revert branch created but PR creation failed for ${short_sha}" \
+                "The revert branch \`${revert_branch}\` was pushed, but \`gh pr create\` failed."
+              exit 0
+            fi
 
             if [ -n "${pr_author}" ]; then
               gh pr edit "${revert_pr_url}" --add-reviewer "${pr_author}" || true
@@ -183,25 +219,9 @@ jobs:
             echo "Opened revert PR: ${revert_pr_url}"
           else
             git revert --abort || true
-
-            body_file="$(mktemp)"
-            cat > "${body_file}" <<EOF
-          Develop went red after ${pr_label} landed, but the automatic revert conflicted.
-
-          Failing SHA: \`${FAILING_SHA}\`
-          Failing run: ${RUN_URL}
-          Originating PR: ${pr_url}
-          Attempted revert branch: \`${revert_branch}\`
-
-          A human needs to decide whether to revert a larger stack or fix forward.
-          EOF
-
-            issue_url="$(gh issue create \
-              --title "Auto-revert conflict for develop red at ${short_sha}" \
-              --body-file "${body_file}" \
-              --label incident:develop-red-revert-conflict)"
-            echo "conflict-issue-url=${issue_url}" >> "${GITHUB_OUTPUT}"
-            echo "Opened conflict issue: ${issue_url}"
+            open_manual_action_issue \
+              "Auto-revert conflict for develop red at ${short_sha}" \
+              "The automatic \`git revert ${FAILING_SHA}\` conflicted."
           fi
 
   metrics:
