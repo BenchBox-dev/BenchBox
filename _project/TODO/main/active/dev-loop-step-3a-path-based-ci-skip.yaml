@@ -2,7 +2,7 @@ id: dev-loop-step-3a-path-based-ci-skip
 title: "Dev-loop simplification — Step 3a: path-based CI skip for content-only PRs"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 
 description: |
@@ -46,7 +46,7 @@ deps:
 work:
   - id: w1
     summary: "Define a fail-closed path-filter ruleset"
-    status: pending
+    status: done
     notes: |
       Decide what is explicitly safe to treat as content-only. The rule is
       fail-closed: a PR can skip code CI only when EVERY changed path is in
@@ -85,6 +85,22 @@ work:
       Document the ruleset in `.github/workflows/_paths.yml` (a reusable
       filter file referenced by the umbrella and local helper) so it has
       a single source of truth.
+
+      Implementation record (2026-04-30):
+        - Added `.github/workflows/_paths.yml` with a `safe-content` allowlist
+          covering TODO/DONE records, blind spots, decisions, handoffs, notes,
+          research/planning records, blog drafts, docs, root markdown, and
+          agent docs.
+        - Added `content-guard` patterns matching the safe content surface so
+          content-only PRs still run targeted validation before the umbrella
+          can report green.
+        - Added explicit `code-ci` examples for code, tests, tooling, workflow,
+          Makefile, config, lockfile, git behavior, and agent-command paths.
+        - Kept unknown paths implicit and fail-closed so a new top-level path
+          runs full PR-tier CI instead of silently skipping code checks.
+        - W1 review issue fixed: removed a broad `**` code-ci pattern because
+          it would make path-filter tooling report code CI for every content
+          change and defeat the skip.
 
   - id: w2
     summary: "Add ci-required umbrella, content guard, and gated code jobs"

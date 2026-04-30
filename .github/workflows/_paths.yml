@@ -1,0 +1,64 @@
+# Shared path rules for the develop PR CI classifier.
+#
+# The classifier fails closed: every changed path must match `safe-content`
+# before Python code CI can be skipped. Any non-matching path, including a new
+# top-level area, is treated as `code-ci`.
+safe-content:
+  - "_project/TODO/**"
+  - "_project/DONE/**"
+  - "_project/blind-spots/**"
+  - "_project/decisions/**"
+  - "_project/handoffs/**"
+  - "_project/notes/**"
+  - "_project/research/**"
+  - "_project/planning/**"
+  - "_blog/**"
+  - "docs/**"
+  - "*.md"
+  - "CLAUDE.md"
+  - "AGENTS.md"
+
+# Documentation-only changes are validated by the content guard. Repository
+# behavior, build, workflow, tooling, and unknown paths deliberately do not live
+# here; the helper reports them as `code-ci`.
+content-guard:
+  - "_project/TODO/**"
+  - "_project/DONE/**"
+  - "_project/blind-spots/**"
+  - "_project/decisions/**"
+  - "_project/handoffs/**"
+  - "_project/notes/**"
+  - "_project/research/**"
+  - "_project/planning/**"
+  - "_blog/**"
+  - "docs/**"
+  - "*.md"
+  - "CLAUDE.md"
+  - "AGENTS.md"
+
+# Explicitly documented examples of paths that require the full PR tier.
+# Unknown paths are also `code-ci` by default; they are intentionally implicit
+# so this file remains usable by path-filter tooling without `code-ci` matching
+# every safe content-only change.
+code-ci:
+  - "benchbox/**"
+  - "tests/**"
+  - "scripts/**"
+  - "examples/**"
+  - "landing/**"
+  - "results-data/**"
+  - "results-explorer/**"
+  - "docker/**"
+  - "_binaries/**"
+  - "_sources/**"
+  - "_project/scripts/**"
+  - "_project/config/**"
+  - "_project/compat/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "Makefile"
+  - ".github/workflows/**"
+  - ".pre-commit-config.yaml"
+  - ".claude/commands/**"
+  - ".gitignore"
+  - ".gitattributes"
