@@ -2,7 +2,8 @@ id: dev-loop-step-3-ci-rebalance-and-strict-base-off
 title: "Dev-loop simplification — Step 3: reduce non-required develop PR CI cost"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-30"
 category: Core Functionality
 
 description: |
@@ -200,7 +201,7 @@ work:
 
   - id: w6
     summary: "Verify locally, review the change, and open the PR"
-    status: pending
+    status: done
     needs: [w1, w2, w3, w4, w5]
     notes: |
       Run focused workflow/TODO validation first, then the repo preflight
@@ -214,6 +215,18 @@ work:
       The PR description must state that no branch-protection or ruleset PATCH
       is part of Step 3 because Step 0 already proved the desired required
       contexts and strict-base setting are live on `develop`.
+
+      Implementation record (2026-04-30):
+        - Rebased the implementation branch onto `origin/develop` after the
+          Step 3 replan PR merged.
+        - Validated edited YAML files with `pre-commit` `check-yaml`.
+        - Ran `todo_cli.py check-graph`; graph validation passed.
+        - Reconfirmed the live `develop-squash-only` ruleset still requires
+          only `lint` and `test (ubuntu-latest, 3.12)` with strict-base off.
+        - Reconfirmed classic branch protection remains absent.
+        - Ran `make pr-preflight`; CI lint checks passed and fast tests
+          reported `21268 passed, 6 skipped`.
+        - Final branch review found no blocking issues.
 
 verification:
   - description: "Develop ruleset still has strict-base off with only the two lightweight required contexts"
