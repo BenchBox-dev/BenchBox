@@ -2,7 +2,7 @@ id: dev-loop-step-3-ci-rebalance-and-strict-base-off
 title: "Dev-loop simplification — Step 3: reduce non-required develop PR CI cost"
 worktree: main
 priority: High
-status: Not Started
+status: In Progress
 category: Core Functionality
 
 description: |
@@ -36,7 +36,7 @@ deps:
 work:
   - id: w1
     summary: "Reconfirm protection/ruleset state and classify PR-tier jobs by requirement status"
-    status: pending
+    status: done
     notes: |
       Start from `_project/decisions/dev-loop-verification-2026-04-30.md`,
       then re-read live GitHub state before editing workflows. Record:
@@ -51,6 +51,25 @@ work:
       This is a gate for the rest of Step 3. If required contexts changed
       after Step 0, stop and re-evaluate rather than editing CI around stale
       assumptions.
+
+      Implementation record (2026-04-30):
+        - `gh api repos/joeharris76/BenchBox/branches/develop/protection`
+          returned HTTP 404, so classic branch protection remains absent.
+        - `gh api repos/joeharris76/BenchBox/rulesets/15611785` returned
+          required status checks `lint` and `test (ubuntu-latest, 3.12)`;
+          `strict_required_status_checks_policy` is `false`.
+        - Required PR contexts: `lint` from `.github/workflows/lint.yml` and
+          `test (ubuntu-latest, 3.12)` from the `Tests` matrix.
+        - Non-required routine PR contexts in `.github/workflows/test.yml`:
+          `test (ubuntu-latest, 3.10)`, `test (ubuntu-latest, 3.13)`,
+          `test (macos-latest, 3.12)`, `test (windows-latest, 3.12)`,
+          `test (windows-latest, 3.10)`, `check-test-patterns`, `security`,
+          `integration-smoke` on Ubuntu and Windows, `integration-table-formats`,
+          `test-package` on Ubuntu and Windows, `parity`, and `pyspark-tests`.
+        - Label-gated/push-main context: `integration` runs on `push` or PRs
+          carrying `run-integration`; it is skipped for ordinary develop PRs.
+        - Manual/nightly broad validation does not exist yet; Step 3 must add
+          it before removing non-required routine PR lanes.
 
   - id: w2
     summary: "Design the develop PR trigger policy for non-required test.yml jobs"
