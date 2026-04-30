@@ -20,12 +20,13 @@ during the single-repo migration).
     the PR vs `develop` and enables `gh pr merge --auto --squash` so it
     lands the moment CI is green. Walk away — don't poll.
   - `make pr-open` is **idempotent** — safe to rerun. If a PR already
-    exists for the branch it reuses it; auto-merge is (re)enabled either
-    way. Use this to flip auto-merge on for a PR opened via the GitHub
-    UI or `gh pr create` directly.
+    exists for the current branch it reuses that open PR; auto-merge is
+    (re)enabled either way. Use this to flip auto-merge on for a PR
+    opened via the GitHub UI or `gh pr create` directly.
   - Before pushing, `pr-open` runs `git merge-tree` against every other
     open PR head and warns on textual conflicts (~1s, no CI). Warn-only
-    — does not block. Catches the modify-vs-delete class deterministically.
+    — does not block. Catches content conflicts and modify-vs-delete
+    conflicts deterministically.
   - In Claude Code, the project-local `/pr` slash command
     (`.claude/commands/pr.md`) wraps this end-to-end (commit if needed,
     preflight, push, open PR, enable auto-merge). Prefer `/pr` over the
@@ -36,6 +37,9 @@ during the single-repo migration).
   - **Backstop**: `.github/workflows/auto-merge-on-open.yml` enables
     squash auto-merge on any non-draft PR opened against develop, so PRs
     opened outside `make pr-open` still auto-land.
+  - **Post-merge safety net**: `.github/workflows/develop-post-merge.yml`
+    runs the lightweight lint + fast-test mirror on the actual `develop`
+    tip after a PR lands.
 - **Concurrent sessions / multiple worktrees**:
   - `~/Developer/BenchBox/` stays on `develop`, always. Don't swap
     branches in the main clone.
@@ -47,6 +51,14 @@ during the single-repo migration).
     several branches and want to ensure each has a PR with auto-merge on.
     Sequential by design — the pre-push fast-test hook serializes via a
     flock, so parallelizing invites lock-contention failures.
+  - `make pr-refresh` is the stale-PR escape hatch when GitHub shows PRs
+    as CLEAN but they are behind `develop` and strict required checks need
+    current-base CI. Run it from the stale PR worktree: it merges
+    `origin/develop` into the current branch, pushes, and re-enables
+    auto-merge. Drain stale PRs one at a time, oldest first — refresh one,
+    wait for it to land, then refresh the next — otherwise the first merge
+    can stale the rest again. If a merge conflicts, resolve it in that
+    worktree and rerun `make pr-open`.
   - **One PR per file area at a time.** Don't open three PRs touching the
     same file in 25 minutes; sequence them so the second sees the first
     landed. The cost of a 10-minute wait beats a multi-PR semantic
@@ -60,9 +72,12 @@ during the single-repo migration).
     branch deleted on origin → next prune sweeps the worktree. Run
     this at end-of-session.
   - **`.gitignore` ∩ tracked-files** is CI-blocked
-    (`.github/workflows/gitignore-lint.yml`). If you add a path to
-    `.gitignore`, you must `git rm -r --cached <paths>` in the same PR,
-    or open branches will all conflict on merge.
+    (`.github/workflows/gitignore-lint.yml`). New ignore rules that match
+    tracked files on the PR head must untrack them in the same PR. Rules
+    matching files tracked on the base branch require an explicit
+    `# benchbox-ignore-lint: allow-next-line tracked` waiver immediately
+    before the pattern; use it only for isolated untracking PRs because
+    it can force open branches to refresh.
 - **Releases** (2-command flow): on `develop`, `make release-cut
   VERSION=X.Y.Z` cuts the `vX.Y.Z` branch, bumps version, drafts the
   changelog (opens `$EDITOR`), curates dev-only paths, opens the PR vs

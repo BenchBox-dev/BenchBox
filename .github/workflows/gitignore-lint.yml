@@ -1,15 +1,9 @@
 name: gitignore lint
 
-# Block PRs that add a .gitignore pattern matching files HEAD still tracks.
-# This is the failure mode that produced the PR #53 → #45/#52/#54/#58 fan-out
-# (8 conflicts each across 4 open PRs): paths were added to .gitignore but
-# the same PR didn't `git rm -r --cached` them, leaving every other open
-# branch with tracked-and-modified copies that conflicted on merge.
-#
-# The fix the author needs is always one of:
-#   (a) include `git rm -r --cached <paths>` in the same PR, or
-#   (b) drop the .gitignore addition.
-# This check tells them which.
+# Guardrail for the PR #53 failure mode: a PR added ignore rules for paths that
+# were tracked on the base branch, then every still-open branch with modified
+# tracked copies hit modify-vs-delete conflicts. Intentional untracking is still
+# allowed, but it must be explicit so it gets sequenced carefully.
 
 on:
   pull_request:
@@ -27,47 +21,121 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect newly-ignored paths still tracked in HEAD
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Detect newly-ignored tracked paths
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
+          uv run --no-project --no-cache -- python - <<'PY'
+          from __future__ import annotations
 
-          # Diff the .gitignore in this PR against base. Take added lines only
-          # (lines starting with '+' but not the '+++' file header). Strip
-          # comments and blanks. Negation patterns ('!foo') are ignores being
-          # turned off — they cannot create the modify-vs-delete trap, so skip.
-          added=$(git diff "$BASE_SHA"..HEAD -- .gitignore \
-            | awk '/^\+[^+]/ {sub(/^\+/, ""); print}' \
-            | sed 's/[[:space:]]*#.*$//' \
-            | grep -v '^[[:space:]]*$' \
-            | grep -v '^!' \
-            || true)
+          import os
+          import re
+          import subprocess
+          import sys
+          from collections import defaultdict
+          from pathlib import Path
 
-          if [ -z "$added" ]; then
-            echo "No new ignore patterns in this PR."
-            exit 0
-          fi
 
-          echo "Newly-added ignore patterns:"
-          echo "$added" | sed 's/^/  /'
-          echo
+          def run(args: list[str], *, input_bytes: bytes | None = None) -> subprocess.CompletedProcess[bytes]:
+              return subprocess.run(args, input=input_bytes, capture_output=True, check=False)
 
-          fail=0
-          while IFS= read -r pat; do
-            [ -z "$pat" ] && continue
-            # `git ls-files -- <pattern>` honours pathspec semantics; matches
-            # tracked files at HEAD. We deliberately do not use --ignored here
-            # because the .gitignore in HEAD already includes this PR's edits
-            # if the workflow runs on the merge ref (default for pull_request).
-            matches=$(git ls-files -- "$pat" 2>/dev/null || true)
-            if [ -n "$matches" ]; then
-              echo "::error file=.gitignore::Pattern '$pat' is in this PR's .gitignore but HEAD still tracks matching files. Either (a) add 'git rm -r --cached $pat' in this PR, or (b) drop the .gitignore line. Tracked matches:"
-              echo "$matches" | sed 's/^/  /'
-              fail=1
-            fi
-          done <<EOF
-          $added
-          EOF
 
-          exit $fail
+          def added_gitignore_lines(base_sha: str) -> set[int]:
+              diff = subprocess.check_output(
+                  ["git", "diff", "--unified=0", "--no-color", f"{base_sha}..HEAD", "--", ".gitignore"],
+                  text=True,
+              )
+              added: set[int] = set()
+              new_line: int | None = None
+              for line in diff.splitlines():
+                  if line.startswith("@@"):
+                      match = re.search(r"\+(\d+)(?:,\d+)?", line)
+                      new_line = int(match.group(1)) if match else None
+                      continue
+                  if new_line is None:
+                      continue
+                  if line.startswith("+") and not line.startswith("+++"):
+                      added.add(new_line)
+                      new_line += 1
+                  elif line.startswith("-") and not line.startswith("---"):
+                      continue
+                  elif not line.startswith("\\"):
+                      new_line += 1
+              return added
+
+
+          def ignored_tracked_paths(paths: bytes, added_lines: set[int]) -> dict[int, dict[str, set[str]]]:
+              proc = run(["git", "check-ignore", "-z", "-v", "--no-index", "--stdin"], input_bytes=paths)
+              if proc.returncode not in (0, 1):
+                  sys.stderr.buffer.write(proc.stderr)
+                  sys.exit(proc.returncode)
+
+              fields = proc.stdout.split(b"\0")
+              hits: dict[int, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+              for idx in range(0, len(fields) - 1, 4):
+                  source, line_no, pattern, path = fields[idx : idx + 4]
+                  if source.decode("utf-8", "replace") != ".gitignore":
+                      continue
+                  line = int(line_no)
+                  if line not in added_lines:
+                      continue
+                  hits[line][pattern.decode("utf-8", "replace")].add(path.decode("utf-8", "replace"))
+              return hits
+
+
+          base_sha = os.environ["BASE_SHA"]
+          added_lines = added_gitignore_lines(base_sha)
+          if not added_lines:
+              print("No new .gitignore lines in this PR.")
+              sys.exit(0)
+
+          lines = Path(".gitignore").read_text(encoding="utf-8-sig").splitlines()
+          waiver_lines = {
+              line_no + 1
+              for line_no, text in enumerate(lines, start=1)
+              if "benchbox-ignore-lint: allow-next-line tracked" in text
+          }
+
+          base_paths = subprocess.check_output(["git", "ls-tree", "-r", "--name-only", "-z", base_sha])
+          head_paths = subprocess.check_output(["git", "ls-files", "-z"])
+          base_hits = ignored_tracked_paths(base_paths, added_lines)
+          head_hits = ignored_tracked_paths(head_paths, added_lines)
+
+          failed = False
+          for line, pattern_hits in sorted(head_hits.items()):
+              failed = True
+              patterns = ", ".join(repr(pattern) for pattern in pattern_hits)
+              print(
+                  f"::error file=.gitignore,line={line}::New ignore pattern(s) {patterns} "
+                  "still match files tracked in this PR. Drop the ignore rule or untrack the files "
+                  "with 'git rm -r --cached <path>' in the same PR."
+              )
+              for paths in pattern_hits.values():
+                  for path in sorted(paths)[:20]:
+                      print(f"  {path}")
+
+          for line, pattern_hits in sorted(base_hits.items()):
+              if line in head_hits or line in waiver_lines:
+                  continue
+              failed = True
+              patterns = ", ".join(repr(pattern) for pattern in pattern_hits)
+              print(
+                  f"::error file=.gitignore,line={line}::New ignore pattern(s) {patterns} "
+                  "match files tracked on the base branch. This can create modify-vs-delete "
+                  "conflicts for open PRs. If this is intentional untracking, keep the PR isolated, "
+                  "remove the tracked files from the index, and add this comment immediately before "
+                  "the pattern: '# benchbox-ignore-lint: allow-next-line tracked'."
+              )
+              for paths in pattern_hits.values():
+                  for path in sorted(paths)[:20]:
+                      print(f"  {path}")
+
+          if failed:
+              sys.exit(1)
+
+          print("New .gitignore rules do not newly ignore tracked files.")
+          PY
