@@ -59,7 +59,7 @@ work:
 
   - id: w2
     summary: "Add make worktree-claim BRANCH=<name> — atomic claim under portable lock"
-    status: pending
+    status: done
     notes: |
       Selects the first **Free** pool worktree (detached HEAD exactly at
       `origin/develop`, working tree clean, no local feature branch
