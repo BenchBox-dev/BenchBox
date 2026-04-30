@@ -1,78 +1,27 @@
-name: Tests
+name: Nightly Validation
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-      - develop
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
 
 concurrency:
-  group: test-${{ github.ref }}
-  cancel-in-progress: true
+  group: nightly-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   test:
-    name: test (ubuntu-latest, 3.12)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Create virtual environment
-        run: uv venv
-
-      - name: Install dependencies
-        run: |
-          uv sync --group dev
-
-      - name: Run linting
-        run: |
-          uv run ruff check .
-          uv run ruff format --check .
-          uv run -- python scripts/check_windows_antipatterns.py
-
-      - name: Run type checking
-        run: |
-          uv run ty check
-
-      - name: Run fast tests
-        run: |
-          # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
-          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  compat-test:
-    name: compat-test (${{ matrix.os }}, ${{ matrix.python-version }})
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        # Additional compatibility coverage for main/push surfaces.
-        # Develop PRs keep only the required Ubuntu 3.12 test job; broad
-        # validation is covered by nightly/manual workflows.
+        # Full compatibility matrix kept out of routine develop PRs.
+        os: [ubuntu-latest]
+        python-version: ['3.10', '3.12', '3.13']
         include:
-          - os: ubuntu-latest
-            python-version: '3.10'
-          - os: ubuntu-latest
-            python-version: '3.13'
           - os: macos-latest
             python-version: '3.12'
           - os: windows-latest
@@ -114,12 +63,15 @@ jobs:
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
           uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
 
-  # Check for unsafe patch() string paths in test files.
-  # Catches the pattern patch("benchbox.cli.commands.<module>.<attr>") where
-  # <module> is re-exported by __init__.py under the same name, shadowing the
-  # submodule and causing Python 3.10 failures or order-dependent 3.12 passes.
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   check-test-patterns:
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -130,18 +82,15 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run patch safety check
-        # Bare python is intentional: this job skips uv setup for speed since
-        # check_patch_safety.py is stdlib-only (no third-party imports).
-        run: python scripts/check_patch_safety.py
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
 
-  # Security audit
+      - name: Run patch safety check
+        run: uv run -- python scripts/check_patch_safety.py
+
   security:
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ubuntu-latest
     env:
-      # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
-      # Keep empty unless triage is documented in the TODO item.
       PIP_AUDIT_IGNORE_VULNS: ""
     steps:
       - name: Checkout code
@@ -168,10 +117,7 @@ jobs:
             uvx pip-audit
           fi
 
-  # Quick integration smoke tests - non-required on main/push; develop broad
-  # validation runs through nightly/manual workflows.
   integration-smoke:
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -199,14 +145,9 @@ jobs:
 
       - name: Run integration smoke tests
         run: |
-          # Run platform smoke tests and fast integration tests (~46 tests)
-          # These don't require external credentials and catch common issues
           uv run -- python -m pytest tests/integration -m "platform_smoke or (integration and fast)" --tb=short
 
-  # Table-format dependency lane for main/push validation.
-  # Nightly/manual workflows cover this lane for develop after Step 3.
   integration-table-formats:
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -229,11 +170,9 @@ jobs:
         run: |
           uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py -m "requires_table_formats" --tb=short
 
-  # Full integration test suite - runs on push to main or with label
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-integration'))
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -254,9 +193,7 @@ jobs:
         run: |
           uv run -- python -m pytest tests/integration -m "integration and not slow and not stress" --tb=short --maxfail=5 --timeout=300
 
-  # Package build and install test
   test-package:
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -285,8 +222,6 @@ jobs:
       - name: Test package installation
         shell: bash
         run: |
-          # Use bash on all platforms so glob expansion works cross-platform.
-          # GitHub Actions Windows runners have Git Bash available.
           uv venv test-venv
           uv pip install --python test-venv dist/*.whl
           uv run --python test-venv python -c "import benchbox; print('Package installation successful')"
@@ -295,16 +230,11 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: test-build-dist-${{ matrix.os }}
+          name: nightly-test-build-dist-${{ matrix.os }}
           path: dist/
-          retention-days: 7  # Shorter retention for test artifacts
+          retention-days: 7
 
-  # CLI↔explorer visualization parity check.
-  # Verifies that the checked-in JSON fixtures in tests/parity/fixtures/
-  # match the current Python implementations, AND that the Vitest suite passes.
-  # Skipped on Release v* PRs (curation + version bumps don't change fixtures).
   parity:
-    if: ${{ (github.event_name != 'pull_request' || github.base_ref != 'develop') && (github.event_name != 'pull_request' || !startsWith(github.event.pull_request.title, 'Release v')) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -337,10 +267,7 @@ jobs:
         run: npm test -- --reporter=verbose
         working-directory: results-explorer
 
-  # PySpark tests - requires Java, runs separately
-  # Non-blocking: PySpark setup can be fragile
   pyspark-tests:
-    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:

@@ -2,7 +2,8 @@ id: dev-loop-step-3-ci-rebalance-and-strict-base-off
 title: "Dev-loop simplification — Step 3: reduce non-required develop PR CI cost"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-30"
 category: Core Functionality
 
 description: |
@@ -36,7 +37,7 @@ deps:
 work:
   - id: w1
     summary: "Reconfirm protection/ruleset state and classify PR-tier jobs by requirement status"
-    status: pending
+    status: done
     notes: |
       Start from `_project/decisions/dev-loop-verification-2026-04-30.md`,
       then re-read live GitHub state before editing workflows. Record:
@@ -52,9 +53,28 @@ work:
       after Step 0, stop and re-evaluate rather than editing CI around stale
       assumptions.
 
+      Implementation record (2026-04-30):
+        - `gh api repos/joeharris76/BenchBox/branches/develop/protection`
+          returned HTTP 404, so classic branch protection remains absent.
+        - `gh api repos/joeharris76/BenchBox/rulesets/15611785` returned
+          required status checks `lint` and `test (ubuntu-latest, 3.12)`;
+          `strict_required_status_checks_policy` is `false`.
+        - Required PR contexts: `lint` from `.github/workflows/lint.yml` and
+          `test (ubuntu-latest, 3.12)` from the `Tests` matrix.
+        - Non-required routine PR contexts in `.github/workflows/test.yml`:
+          `test (ubuntu-latest, 3.10)`, `test (ubuntu-latest, 3.13)`,
+          `test (macos-latest, 3.12)`, `test (windows-latest, 3.12)`,
+          `test (windows-latest, 3.10)`, `check-test-patterns`, `security`,
+          `integration-smoke` on Ubuntu and Windows, `integration-table-formats`,
+          `test-package` on Ubuntu and Windows, `parity`, and `pyspark-tests`.
+        - Label-gated/push-main context: `integration` runs on `push` or PRs
+          carrying `run-integration`; it is skipped for ordinary develop PRs.
+        - Manual/nightly broad validation does not exist yet; Step 3 must add
+          it before removing non-required routine PR lanes.
+
   - id: w2
     summary: "Design the develop PR trigger policy for non-required test.yml jobs"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Choose the smallest maintainable workflow shape that keeps the two
@@ -72,9 +92,24 @@ work:
       conditions everywhere. If a split would break required check names,
       use targeted conditions instead and document why.
 
+      Implementation record (2026-04-30):
+        - Kept `.github/workflows/lint.yml` unchanged so the required `lint`
+          context stays stable.
+        - Replaced the broad `test` matrix with one explicit required job named
+          `test (ubuntu-latest, 3.12)`, preserving the required context while
+          avoiding matrix evaluation for routine develop PRs.
+        - Added `compat-test` for non-required OS/Python combinations on
+          main/push surfaces.
+        - Added develop-PR gates to non-required `test.yml` jobs:
+          `compat-test`, `check-test-patterns`, `security`,
+          `integration-smoke`, `integration-table-formats`, `test-package`,
+          `parity`, and `pyspark-tests`.
+        - Left `integration` label-gated as-is so `run-integration` can still
+          opt a PR into the heavier integration lane intentionally.
+
   - id: w3
     summary: "Move broad validation to nightly/workflow_dispatch without losing coverage"
-    status: pending
+    status: done
     needs: [w2]
     notes: |
       Add or update `.github/workflows/nightly.yml` so the jobs removed from
@@ -94,9 +129,21 @@ work:
       for this PR, defer it explicitly and ensure nightly failures are still
       visible through GitHub notifications.
 
+      Implementation record (2026-04-30):
+        - Added `.github/workflows/nightly.yml` with `workflow_dispatch` and a
+          daily 06:00 UTC schedule.
+        - Nightly coverage includes the full OS/Python fast-test matrix,
+          patch-safety check, security audit, integration smoke,
+          table-format integration, full local integration, package install,
+          parity, and non-blocking PySpark lanes.
+        - Reused the existing `uv` setup and test commands from `test.yml`.
+        - Deferred automatic issue creation to keep this PR scoped; failures
+          remain visible through GitHub Actions notifications and manual
+          workflow dispatch is available for reruns.
+
   - id: w4
     summary: "Preserve main PR and tag-release validation semantics"
-    status: pending
+    status: done
     needs: [w2, w3]
     notes: |
       Audit `.github/workflows/test.yml`, `.github/workflows/nightly.yml`, and
@@ -111,9 +158,23 @@ work:
       but avoid comment-only churn unless it clarifies a real branch-specific
       invariant.
 
+      Implementation record (2026-04-30):
+        - Audited `.github/workflows/test.yml`: `pull_request` to `main` and
+          `push` to `main` still run the required Ubuntu 3.12 fast-test job,
+          the additional compatibility matrix, package install, security,
+          smoke/table-format, and parity lanes. The new gates exclude only
+          `pull_request` events whose base branch is `develop`.
+        - Audited `.github/workflows/validate-main-pr.yml`: main PRs remain
+          restricted to release branches through `validate-base`.
+        - Audited `.github/workflows/release.yml`: `push` tags matching `v*`
+          still run dependency bounds, reproducible build, package checks,
+          publish, GitHub release creation, and post-publish installation
+          across Ubuntu/macOS/Windows and Python 3.10/3.12/3.13 coverage.
+        - No release workflow edits were needed.
+
   - id: w5
     summary: "Update agent docs for the replanned CI contract"
-    status: pending
+    status: done
     needs: [w2, w3, w4]
     notes: |
       Update `CLAUDE.md` and `AGENTS.md` only where the workflow contract is
@@ -128,9 +189,19 @@ work:
         - `make pr-refresh` remains an escape hatch for genuine branch drift;
           do not deprecate it solely because strict-base was already off.
 
+      Implementation record (2026-04-30):
+        - Updated `CLAUDE.md` and `AGENTS.md` to state that develop required
+          checks are intentionally minimal and strict-base is already off.
+        - Documented the split between routine develop PR gates and broad
+          nightly/workflow_dispatch validation.
+        - Preserved `make pr-refresh` as an escape hatch rather than a
+          deprecated path.
+        - Documented that main PRs and tag releases keep release-grade
+          validation.
+
   - id: w6
     summary: "Verify locally, review the change, and open the PR"
-    status: pending
+    status: done
     needs: [w1, w2, w3, w4, w5]
     notes: |
       Run focused workflow/TODO validation first, then the repo preflight
@@ -144,6 +215,18 @@ work:
       The PR description must state that no branch-protection or ruleset PATCH
       is part of Step 3 because Step 0 already proved the desired required
       contexts and strict-base setting are live on `develop`.
+
+      Implementation record (2026-04-30):
+        - Rebased the implementation branch onto `origin/develop` after the
+          Step 3 replan PR merged.
+        - Validated edited YAML files with `pre-commit` `check-yaml`.
+        - Ran `todo_cli.py check-graph`; graph validation passed.
+        - Reconfirmed the live `develop-squash-only` ruleset still requires
+          only `lint` and `test (ubuntu-latest, 3.12)` with strict-base off.
+        - Reconfirmed classic branch protection remains absent.
+        - Ran `make pr-preflight`; CI lint checks passed and fast tests
+          reported `21268 passed, 6 skipped`.
+        - Final branch review found no blocking issues.
 
 verification:
   - description: "Develop ruleset still has strict-base off with only the two lightweight required contexts"

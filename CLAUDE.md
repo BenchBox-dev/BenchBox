@@ -72,7 +72,16 @@ during the single-repo migration).
 - **Branches**: `develop` is the long-lived dev branch; `main` is
   release-only.
 - **Dev PRs**: feature branch off `develop` → PR → squash-merge to
-  `develop`. Required CI: `lint` + `test (ubuntu-latest, 3.12)`.
+  `develop`. Required CI is intentionally minimal: `lint` +
+  `test (ubuntu-latest, 3.12)`. The active `develop` ruleset already has
+  strict-base off; do not treat routine dev work as a branch-protection
+  deployment.
+- **CI split**: routine `develop` PRs run the required lightweight gate.
+  Broad non-required validation (OS/Python compatibility, security,
+  integration smoke/table-format, package install, parity, and PySpark)
+  runs through `.github/workflows/nightly.yml` on schedule or
+  `workflow_dispatch`, and remains available on `main`/release paths.
+  `main` PRs and tag releases keep release-grade validation.
 - **One-shot PR flow** (the canonical path — use this, not bare git):
   - From a feature branch: `make pr-preflight && make pr-open`. Opens
     the PR vs `develop` and enables `gh pr merge --auto --squash` so it
