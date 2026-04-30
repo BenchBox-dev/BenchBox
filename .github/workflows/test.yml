@@ -15,17 +15,64 @@ concurrency:
 
 jobs:
   test:
+    name: test (ubuntu-latest, 3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run linting
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run -- python scripts/check_windows_antipatterns.py
+
+      - name: Run type checking
+        run: |
+          uv run ty check
+
+      - name: Run fast tests
+        run: |
+          # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
+          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  compat-test:
+    name: compat-test (${{ matrix.os }}, ${{ matrix.python-version }})
+    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        # Simplified matrix: 5 configurations
-        # - Ubuntu: test across Python versions (min, middle, latest stable)
-        # - macOS/Windows: single version for compatibility testing
-        # Note: Python 3.9 dropped (EOL Oct 2025), 3.14 deferred (lxml wheel missing)
-        os: [ubuntu-latest]
-        python-version: ['3.10', '3.12', '3.13']
+        # Additional compatibility coverage for main/push surfaces.
+        # Develop PRs keep only the required Ubuntu 3.12 test job; broad
+        # validation is covered by nightly/manual workflows.
         include:
+          - os: ubuntu-latest
+            python-version: '3.10'
+          - os: ubuntu-latest
+            python-version: '3.13'
           - os: macos-latest
             python-version: '3.12'
           - os: windows-latest
@@ -67,19 +114,12 @@ jobs:
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
           uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
 
-      - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
-          token: ${{ secrets.CODECOV_TOKEN }}
-
   # Check for unsafe patch() string paths in test files.
   # Catches the pattern patch("benchbox.cli.commands.<module>.<attr>") where
   # <module> is re-exported by __init__.py under the same name, shadowing the
   # submodule and causing Python 3.10 failures or order-dependent 3.12 passes.
   check-test-patterns:
+    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -97,6 +137,7 @@ jobs:
 
   # Security audit
   security:
+    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ubuntu-latest
     env:
       # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
@@ -127,8 +168,10 @@ jobs:
             uvx pip-audit
           fi
 
-  # Quick integration smoke tests - runs on ALL PRs
+  # Quick integration smoke tests - non-required on main/push; develop broad
+  # validation runs through nightly/manual workflows.
   integration-smoke:
+    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -160,9 +203,10 @@ jobs:
           # These don't require external credentials and catch common issues
           uv run -- python -m pytest tests/integration -m "platform_smoke or (integration and fast)" --tb=short
 
-  # Required lane for optional table-format dependencies.
-  # Without this, delta/iceberg integration assertions can be silently skipped.
+  # Table-format dependency lane for main/push validation.
+  # Nightly/manual workflows cover this lane for develop after Step 3.
   integration-table-formats:
+    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -212,6 +256,7 @@ jobs:
 
   # Package build and install test
   test-package:
+    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -259,7 +304,7 @@ jobs:
   # match the current Python implementations, AND that the Vitest suite passes.
   # Skipped on Release v* PRs (curation + version bumps don't change fixtures).
   parity:
-    if: ${{ !startsWith(github.event.pull_request.title, 'Release v') }}
+    if: ${{ (github.event_name != 'pull_request' || github.base_ref != 'develop') && (github.event_name != 'pull_request' || !startsWith(github.event.pull_request.title, 'Release v')) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -295,6 +340,7 @@ jobs:
   # PySpark tests - requires Java, runs separately
   # Non-blocking: PySpark setup can be fragile
   pyspark-tests:
+    if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:

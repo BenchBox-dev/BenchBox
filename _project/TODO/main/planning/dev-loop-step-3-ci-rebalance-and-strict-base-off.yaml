@@ -73,7 +73,7 @@ work:
 
   - id: w2
     summary: "Design the develop PR trigger policy for non-required test.yml jobs"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Choose the smallest maintainable workflow shape that keeps the two
@@ -90,6 +90,21 @@ work:
       `nightly.yml` for broad validation) over repeating fragile job-level
       conditions everywhere. If a split would break required check names,
       use targeted conditions instead and document why.
+
+      Implementation record (2026-04-30):
+        - Kept `.github/workflows/lint.yml` unchanged so the required `lint`
+          context stays stable.
+        - Replaced the broad `test` matrix with one explicit required job named
+          `test (ubuntu-latest, 3.12)`, preserving the required context while
+          avoiding matrix evaluation for routine develop PRs.
+        - Added `compat-test` for non-required OS/Python combinations on
+          main/push surfaces.
+        - Added develop-PR gates to non-required `test.yml` jobs:
+          `compat-test`, `check-test-patterns`, `security`,
+          `integration-smoke`, `integration-table-formats`, `test-package`,
+          `parity`, and `pyspark-tests`.
+        - Left `integration` label-gated as-is so `run-integration` can still
+          opt a PR into the heavier integration lane intentionally.
 
   - id: w3
     summary: "Move broad validation to nightly/workflow_dispatch without losing coverage"
