@@ -1,0 +1,348 @@
+id: dev-loop-step-3a-path-based-ci-skip
+title: "Dev-loop simplification — Step 3a: path-based CI skip for non-code PRs"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Companion to Step 3. After Step 3 narrows develop PR-tier CI to
+  lint + Ubuntu 3.12 fast tests, this step closes the remaining waste:
+  PRs that touch zero code (TODOs, blind-spots, decisions, blog drafts,
+  agent-doc edits) still run the surviving 2-3 jobs unnecessarily.
+
+  Evidence: PR #66 and PR #67 — both pure `_project/TODO/**` changes —
+  triggered ~16 jobs each (full matrix + integration + parity + PySpark)
+  pre-Step-3, and would still trigger ~3 jobs post-Step-3. Both rounds
+  of waste are unnecessary; nothing in those PRs could possibly affect
+  the test suite.
+
+  Approach: introduce a single always-running `ci-required` umbrella job
+  that detects whether the PR's diff contains code via
+  `dorny/paths-filter` (or an equivalent step), then dispatches to the
+  Step-3 PR-tier jobs only when code paths changed. For non-code PRs,
+  the umbrella reports green in <60 seconds and the PR is mergeable.
+
+  Branch protection contract: the umbrella becomes the single required
+  status check. Subordinate jobs (`lint`, `test`) gain `if:` conditions
+  on the filter outputs but no longer need to be required, because their
+  pass/fail is rolled up into the umbrella. This preserves the merge gate
+  while eliminating the doc-only waste.
+
+  Single PR via `make pr-open`. Independently shippable AFTER Step 3
+  lands (the required-checks list this depends on is established there).
+
+deps:
+  needs:
+    - dev-loop-step-3-ci-rebalance-and-strict-base-off
+
+work:
+  - id: w1
+    summary: "Define the path-filter ruleset (code vs non-code)"
+    status: pending
+    notes: |
+      Decide what counts as a "code path" that requires the full PR-tier
+      CI to run. Initial split, to be locked in this work unit:
+
+      Code paths (run full PR-tier):
+        - `benchbox/**`
+        - `tests/**`
+        - `scripts/**`
+        - `_binaries/**` (TPC binaries — affect data generation)
+        - `pyproject.toml`, `uv.lock`
+        - `Makefile`
+        - `.github/workflows/**`
+        - `.pre-commit-config.yaml`
+        - `_project/scripts/**` (TODO scripts; if these break, validation breaks)
+
+      Non-code paths (skip PR-tier; umbrella greens immediately):
+        - `_project/TODO/**`, `_project/DONE/**`
+        - `_project/blind-spots/**`
+        - `_project/decisions/**`
+        - `_project/handoffs/**`
+        - `_blog/**`
+        - `docs/**`
+        - `*.md` at repo root (README.md, CONTRIBUTING.md, etc.)
+        - `CLAUDE.md`, `AGENTS.md`
+        - `.gitignore`, `.gitattributes` (small risk; mark as code if it
+          ever causes a surprise)
+
+      Edge case: a single PR that touches BOTH categories runs full
+      PR-tier (failsafe). The filter is "any code path changed → full
+      run", not "majority of paths".
+
+      Document the ruleset in `.github/workflows/_paths.yml` (a reusable
+      filter file referenced by the umbrella) so it has a single source
+      of truth.
+
+  - id: w2
+    summary: "Add ci-required umbrella job to the PR-tier workflow"
+    status: pending
+    needs: [w1]
+    notes: |
+      Edit the workflow that runs on `pull_request` to develop (Step 3
+      may have split test.yml; if so, edit the new pr-tier workflow;
+      otherwise edit test.yml). Add a job named `ci-required` that:
+        1. Always runs (no `if:` condition).
+        2. Uses `dorny/paths-filter@v3` (pinned by SHA) to compute
+           `code-changed: true|false` from the ruleset in `_paths.yml`.
+        3. If `code-changed == false`: outputs `decision: skip` and
+           reports success. End of job.
+        4. If `code-changed == true`: outputs `decision: full`. The
+           subordinate jobs (`lint`, `test`) gate their `if:` on this
+           output and run normally.
+        5. The umbrella's final step `needs:` the subordinate jobs (when
+           they were dispatched) and reports their aggregate status.
+           If `decision: skip`, the umbrella succeeds without waiting.
+
+      Concrete shape (sketch):
+
+        jobs:
+          ci-required:
+            runs-on: ubuntu-latest
+            outputs:
+              code-changed: ${{ steps.filter.outputs.code }}
+            steps:
+              - uses: actions/checkout@v4
+              - uses: dorny/paths-filter@v3
+                id: filter
+                with:
+                  filters: .github/workflows/_paths.yml
+
+          lint:
+            needs: ci-required
+            if: needs.ci-required.outputs.code-changed == 'true'
+            ...
+
+          test:
+            needs: ci-required
+            if: needs.ci-required.outputs.code-changed == 'true'
+            ...
+
+          ci-required-result:
+            needs: [ci-required, lint, test]
+            if: always()
+            runs-on: ubuntu-latest
+            steps:
+              - run: |
+                  if [ "${{ needs.ci-required.outputs.code-changed }}" = "false" ]; then
+                    echo "Doc-only PR — skipped code CI. Marking required check green."
+                    exit 0
+                  fi
+                  if [ "${{ needs.lint.result }}" = "success" ] && \
+                     [ "${{ needs.test.result }}" = "success" ]; then
+                    exit 0
+                  fi
+                  echo "lint=${{ needs.lint.result }} test=${{ needs.test.result }}"
+                  exit 1
+
+      The required check on develop branch protection becomes
+      `ci-required-result`, NOT `lint` or `test` directly.
+
+  - id: w3
+    summary: "Update branch-protection required-checks list to use the umbrella"
+    status: pending
+    needs: [w2]
+    notes: |
+      Apply via `gh api -X PATCH repos/joeharris76/BenchBox/branches/
+      develop/protection` (or the Step-0-found ruleset). Required
+      checks before this step (post-Step-3): `lint`, `test (ubuntu-latest, 3.12)`.
+      Required checks after this step: `ci-required-result`.
+
+      The lint and test jobs continue to run (when dispatched) and
+      report their own status, but they are no longer required gates;
+      the umbrella's aggregation is the gate.
+
+      Sequencing: WORKFLOW CHANGES (w2) MUST LAND ON DEVELOP BEFORE
+      THIS BRANCH PROTECTION EDIT. Otherwise develop becomes unmergeable
+      because the new required check name doesn't exist yet. Document
+      the order in PR description (same pattern as Step 3 w5).
+
+      Record the before/after JSON in PR description for audit.
+
+  - id: w4
+    summary: "Add a tiny test that proves the skip path works"
+    status: pending
+    needs: [w2]
+    notes: |
+      In a fork or via `act` locally, simulate two PR diffs:
+        1. Touch only `_project/TODO/foo.yaml` — confirm `ci-required`
+           reports green in under 60 seconds, lint/test do not run.
+        2. Touch `benchbox/cli/run.py` — confirm full PR-tier runs as
+           today and umbrella aggregates correctly.
+      Document the test in `_project/decisions/dev-loop-path-filter-
+      smoke-test-<date>.md` with workflow run URLs and timings.
+
+  - id: w5
+    summary: "Apply equivalent local skip in pr-preflight for symmetry"
+    status: pending
+    needs: [w1]
+    notes: |
+      Step 1 made pre-push hooks opt-in via BENCHBOX_PREPUSH=1. When
+      humans/agents DO opt in (e.g. running `make pr-preflight`), the
+      fast-test lane still runs even on doc-only changes — same waste,
+      just locally instead of in CI.
+
+      Add a check at the top of `pr-preflight` (and the
+      pr-preflight-fast-tests pre-commit hook) that runs the same path
+      filter against `git diff --name-only origin/develop...HEAD`. If
+      no code paths matched, print "No code changes detected; skipping
+      fast tests." and exit 0.
+
+      Reuse the path-filter ruleset from `.github/workflows/_paths.yml`
+      via a small Python or shell helper at `scripts/_paths_filter.sh`
+      so the rule lives in exactly one place.
+
+  - id: w6
+    summary: "Document the umbrella in CLAUDE.md / AGENTS.md"
+    status: pending
+    needs: [w2]
+    notes: |
+      Add a short paragraph in both files under the CI-related guidance
+      from Step 3:
+        - "PRs that touch only docs/TODOs/blind-spots/decisions/blog
+          report green via the `ci-required` umbrella in <60s; full
+          PR-tier CI runs only when code paths (benchbox/, tests/, etc.)
+          change. The path ruleset is at .github/workflows/_paths.yml."
+      Note that this also applies locally to `make pr-preflight` so
+      agents don't see fast-tests on TODO-only commits anymore.
+
+  - id: w7
+    summary: "Open the PR after Step 3 has landed and required checks updated"
+    status: pending
+    needs: [w1, w2, w3, w4, w5, w6]
+    notes: |
+      `make lint format typecheck`; `BENCHBOX_PREPUSH=1 make pr-preflight`;
+      `make pr-open`. Apply branch-protection change (w3) AFTER the PR
+      merges (workflow changes need to be live first; same sequencing
+      as Step 3 w5).
+
+      In PR description: include before/after required-checks JSON,
+      smoke-test fork run URLs, and confirmation that PR #66/#67-style
+      doc-only PRs would now skip code CI entirely.
+
+verification:
+  - description: "Path filter ruleset exists in workflows directory"
+    command: "test -f .github/workflows/_paths.yml && grep -cE '^(code|non_code|docs|todos):' .github/workflows/_paths.yml"
+    expected_output: ">= 1"
+  - description: "ci-required umbrella job is present in PR-tier workflow"
+    command: "grep -cE 'ci-required:|ci-required-result:' .github/workflows/test.yml .github/workflows/pr.yml 2>/dev/null | awk -F: '{s+=$2}END{print s}'"
+    expected_output: ">= 2"
+  - description: "Subordinate jobs gate on the filter output"
+    command: "grep -cE \"if:.*needs\\.ci-required\\.outputs\\.code-changed\" .github/workflows/test.yml .github/workflows/pr.yml 2>/dev/null | awk -F: '{s+=$2}END{print s}'"
+    expected_output: ">= 2"
+  - description: "Branch-protection required check is the umbrella, not the subordinate jobs"
+    command: "gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '.required_status_checks.contexts' 2>/dev/null || gh api repos/joeharris76/BenchBox/rulesets --jq '[.[] | select((.conditions.ref_name.include // []) | any(. == \"refs/heads/develop\" or . == \"~DEFAULT_BRANCH\")) | .rules[]? | select(.type == \"required_status_checks\") | .parameters.required_status_checks[]?.context]'"
+    expected_output: "list contains 'ci-required-result' and does NOT contain bare 'lint' or 'test (ubuntu-latest, 3.12)'"
+  - description: "Smoke-test decision record proves doc-only PR greens in <60s"
+    command: "grep -cE 'doc.only|TODO.only|under 60 seconds|skip path' _project/decisions/dev-loop-path-filter-smoke-test-*.md"
+    expected_output: ">= 2"
+  - description: "Local pr-preflight skips fast tests for doc-only diffs"
+    command: "make pr-preflight 2>&1 | grep -cE 'No code changes detected|skipping fast tests' || echo 'requires a doc-only diff to demonstrate'"
+    expected_output: ">= 1 when run on a doc-only branch; absent on a code-changed branch"
+  - description: "CLAUDE.md and AGENTS.md document the umbrella behavior"
+    command: "grep -cE 'ci-required|_paths\\.yml|umbrella|doc-only PR' CLAUDE.md AGENTS.md"
+    expected_output: ">= 2"
+
+must_preserve:
+  - "Existing PR-tier job definitions from Step 3 — Step 3a wraps them, does not replace them"
+  - "Branch-protection contract — required check always reports a status; the umbrella is the new required check, not a removal of all required checks"
+  - "Code-touching PRs continue to run full PR-tier CI as today (post-Step-3 narrowed) — the skip applies only when no code paths matched"
+  - "Step 4's develop-post-merge.yml safety net is unchanged — post-merge auto-revert still runs on every landed SHA, doc-only or not"
+  - "Single source of truth for the path ruleset — `_paths.yml` is referenced by both CI and local pr-preflight; do not duplicate the rules"
+
+approach: |
+  Two-file change at minimum: `.github/workflows/_paths.yml` (ruleset)
+  plus the PR-tier workflow that adds `ci-required` and
+  `ci-required-result`. Plus a small `scripts/_paths_filter.sh` for the
+  local equivalent (w5).
+
+  Use `dorny/paths-filter@v3` rather than rolling a custom diff parser:
+  it handles edge cases (renames, submodules, merge-commit diffs)
+  correctly. Pin to a SHA for supply-chain safety, not to `@v3`.
+
+  For the umbrella aggregation step, the explicit pass/fail script
+  (rather than relying on `needs:` propagation alone) is intentional:
+  it makes the "doc-only is success" semantic visible in the workflow
+  log, and it correctly handles the case where `needs.lint.result` is
+  the literal string `"skipped"` (which evaluates truthy in some
+  comparison contexts).
+
+  Sequence the rollout: workflow changes first (w2 → develop), THEN
+  branch-protection change (w3). Reverse order leaves develop
+  unmergeable for whatever interval. Step 3 w5 used the same sequencing
+  for the same reason.
+
+anti_patterns:
+  - "DO NOT use top-level `paths:` / `paths-ignore:` filters on the workflow `on:` block — because GitHub treats workflows-not-run as 'pending' for required-checks, leaving the PR unmergeable — use job-level `if:` with an umbrella instead"
+  - "DO NOT skip lint on doc-only PRs — because markdown/YAML lint catches errors that ARE relevant to those PRs (e.g., the pre-commit hooks that ran on PR #66/#67 caught real issues) — keep lint inside the umbrella's full path or move it to its own always-run job"
+  - "DO NOT duplicate the path ruleset between CI and local pr-preflight — because they will drift and the local skip will lie to agents — share via `.github/workflows/_paths.yml` or a single shell helper"
+  - "DO NOT pin `dorny/paths-filter@v3` by tag — because tags are mutable and a compromised release could exfil secrets — pin by SHA"
+  - "DO NOT mark Makefile changes as non-code — because Makefile edits change developer-facing surface and have caused real regressions — keep Makefile in the code path list"
+  - "DO NOT skip the smoke-test (w4) — because a buggy umbrella that always greens would make develop unprotected and you would not notice until something breaks — fork-test before enabling on develop"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/_paths.yml (new path-filter ruleset)"
+    - ".github/workflows/test.yml or .github/workflows/pr.yml (whichever Step 3 ended up with as PR-tier)"
+    - "scripts/_paths_filter.sh (new local helper)"
+    - "Makefile (pr-preflight target — add path-filter shortcut)"
+    - ".pre-commit-config.yaml (pr-preflight-fast-tests hook — add path-filter shortcut)"
+    - "CLAUDE.md (umbrella + local skip paragraph)"
+    - "AGENTS.md (umbrella + local skip paragraph)"
+    - "_project/decisions/dev-loop-path-filter-smoke-test-*.md (smoke-test evidence)"
+  do_not_modify:
+    - ".github/workflows/develop-post-merge.yml (Step 4 owns this; post-merge runs on every SHA, doc-only or not)"
+    - ".github/workflows/release.yml (release CI is unchanged)"
+    - ".github/workflows/nightly.yml (Step 3 owns this; nightly always runs the full matrix)"
+    - "Makefile worktree-add, worktree-claim, worktree-pool-*, worktree-release targets (Step 2 owns these)"
+    - "Makefile pr-fanout target (Step 1 owns this)"
+    - "tests/ (no test changes; only CI orchestration and a tiny local helper)"
+    - "GitHub branch protection / rulesets — Step 3a w3 IS the rule edit, but the edit is to the required-checks list only; do not change strict-base, dismiss-stale-reviews, enforce-admins, etc."
+
+deferred:
+  - summary: "Path-based skip on Step 4 develop-post-merge.yml"
+    reason: "Post-merge runs are the safety net; skipping them based on paths could mask a code regression that only manifests when a doc-only commit lands on top of an existing code change. Keep post-merge always-runs."
+  - summary: "Path-based skip on nightly.yml"
+    reason: "Nightly is scheduled, not PR-triggered. The 'doc-only' question doesn't apply — nightly runs the full matrix regardless of recent commits."
+  - summary: "Cache the path-filter ruleset across steps for performance"
+    reason: "Premature optimization. dorny/paths-filter completes in seconds; caching adds complexity for negligible gain."
+  - summary: "Per-path matrix dispatch (e.g., only run ubuntu tests for backend changes, only docs lint for docs changes)"
+    reason: "Bigger redesign than the umbrella. Revisit only if Step 5 metrics show it's worth the complexity."
+
+metadata:
+  tags:
+    - dev-loop
+    - ci
+    - path-filter
+    - cost-reduction
+  estimated_effort: "Small (1-2h after Step 3 lands)"
+  created_date: "2026-04-30"
+
+impact:
+  user_impact: |
+    Doc-only / TODO-only / blog-only PRs report green in under 60 seconds
+    instead of triggering the post-Step-3 PR-tier (lint + Ubuntu 3.12
+    fast tests). Local `make pr-preflight` mirrors the skip, so agents
+    no longer hit the test-lock collision pattern that bit the Step 1/2
+    drafts (PRs #66/#67 saw exactly this).
+  business_value: |
+    Concrete runner-minute savings. Conservative estimate: half of recent
+    PRs touched only `_project/**`, `docs/**`, or markdown — that's a
+    50% reduction in PR-tier runner minutes on top of Step 3's matrix
+    cut. Compounds over the measurement window in Step 5.
+  technical_debt: |
+    One additional workflow file (`_paths.yml`) and one additional job
+    (`ci-required` umbrella). Standard pattern in many large repos
+    (rust-lang/rust, kubernetes/kubernetes use variations). Net debt:
+    low.
+
+success_metrics:
+  - "P95 CI time on doc-only PRs drops from ~5 min (post-Step-3) to under 60 seconds"
+  - "Branch protection contract preserved: every PR has a single required check that always reports green or red"
+  - "Zero false-positive merges where the umbrella greened despite a real code-path change being missed by the filter"
+
+open_questions:
+  - "Should `docs/**` count as code or non-code? (Plan: non-code; docs have their own validation in docs.yml. Revisit if a docs-rendered-from-code change ever ships and breaks something.)"
+  - "Should `.github/workflows/**` ever be considered non-code? (Plan: no — workflow changes can break CI silently and need full-run validation themselves.)"
+  - "Should the umbrella also write a metric (doc-only PR count, time saved) for Step 5? (Plan: yes if cheap; reuse the Step 4 metrics emission pattern. If it adds workflow complexity, defer.)"
