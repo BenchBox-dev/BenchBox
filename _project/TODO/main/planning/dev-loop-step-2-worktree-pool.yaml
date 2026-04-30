@@ -83,7 +83,7 @@ work:
 
   - id: w3
     summary: "Add make worktree-release — verify merged, return to develop"
-    status: pending
+    status: done
     notes: |
       Run from inside a pool worktree (refuses if cwd is not a pool-NN
       path). Steps:

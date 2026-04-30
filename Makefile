@@ -5,7 +5,7 @@ PR_FANOUT_JOBS ?= 4
 POOL_SIZE ?= 10
 WORKTREE_POOL_PARENT ?= ..
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-claim worktree-claim-locked worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-claim worktree-claim-locked worktree-release worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -730,7 +730,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-claim worktree-claim-locked worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-claim worktree-claim-locked worktree-release worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -904,6 +904,24 @@ worktree-claim-locked:
 	echo "No free pool worktree available. Run: make worktree-pool-status" >&2; \
 	exit 1
 
+worktree-release:
+	@set -e; \
+	top=$$(git rev-parse --show-toplevel); \
+	case "$$top" in *.pool-[0-9][0-9]) ;; *) echo "Refusing: worktree-release must run inside a pool-NN worktree."; exit 1 ;; esac; \
+	branch=$$(git branch --show-current); \
+	test -n "$$branch" || { echo "Refusing: this pool worktree is already detached/free."; exit 1; }; \
+	case "$$branch" in develop|main) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
+	if [ "$(FORCE)" != "1" ]; then \
+		state=$$(gh pr view "$$branch" --json state --jq .state 2>/dev/null || true); \
+		[ "$$state" = "MERGED" ] || { echo "Refusing: PR for $$branch is not MERGED; open or close PR first, or rerun with FORCE=1."; exit 1; }; \
+	fi; \
+	git checkout --detach origin/develop; \
+	git fetch origin develop --quiet; \
+	git reset --hard origin/develop; \
+	git branch -D "$$branch"; \
+	git remote prune origin; \
+	echo "Released $$branch; worktree is detached at origin/develop."
+
 # Create a worktree off origin/develop. Usage: make worktree-add BRANCH=fix/foo
 # Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
 # After: cd into the path, work, run `make pr-open` from inside.
@@ -1062,6 +1080,7 @@ help:
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
 	@echo "  make worktree-pool-init  Create retained pool worktrees (POOL_SIZE=$(POOL_SIZE))"
 	@echo "  make worktree-claim BRANCH=name  Claim a retained pool worktree for a branch"
+	@echo "  make worktree-release  Release a merged pool branch back to detached origin/develop"
 	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"
 	@echo "  make worktree-list   List active worktrees"
 	@echo "  make worktree-prune  Remove worktrees whose branches are gone on origin (post-merge cleanup)"
