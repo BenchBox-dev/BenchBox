@@ -16,6 +16,7 @@ import re
 import shutil
 from collections import defaultdict
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -361,6 +362,16 @@ def _build_meta_leaderboard(
     }
 
 
+@dataclass(frozen=True)
+class BuildStats:
+    """Counts emitted by a successful pipeline run, for caller display."""
+
+    processed: int
+    skipped: int
+    cohorts: int
+    output_dir: Path
+
+
 class ExplorerPipeline:
     """Orchestrates the full static build pipeline for the results explorer."""
 
@@ -379,7 +390,7 @@ class ExplorerPipeline:
         trust_label: str = "maintainer-run",
         visibility: str = "public-curated",
         bundle_url_prefix: str = "/results/data/bundles",
-    ) -> None:
+    ) -> BuildStats:
         """Execute the full pipeline.
 
         Steps:
@@ -552,5 +563,12 @@ class ExplorerPipeline:
         )
         logger.info("Wrote full DuckDB browser store to %s", duckdb_path)
 
+        return BuildStats(
+            processed=len(manifest_entries),
+            skipped=skipped_bundles,
+            cohorts=len(summaries),
+            output_dir=output_dir,
+        )
 
-__all__ = ["ExplorerPipeline"]
+
+__all__ = ["BuildStats", "ExplorerPipeline"]
