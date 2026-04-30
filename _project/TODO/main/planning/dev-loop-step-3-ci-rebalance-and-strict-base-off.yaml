@@ -91,7 +91,10 @@ work:
           critical toggle that eliminates stale-PR refresh)
         - Keep `enforce_admins: true` if currently set
       Record the before/after JSON in the PR description for audit.
-      This is a manual deployment step; not in the PR diff.
+      This is a manual deployment step; not in the PR diff. If Step 0
+      found required checks in GitHub rulesets rather than classic branch
+      protection, patch the ruleset instead and record the ruleset name,
+      rule id, required checks, and strict-base flag before/after.
     needs: [w2]
 
   - id: w6
@@ -120,7 +123,7 @@ work:
 
 verification:
   - description: "PR-tier CI on develop runs only lint and Ubuntu 3.12 fast tests"
-    command: "gh run list --workflow test.yml --branch develop --event pull_request --limit 1 --json jobs --jq '.[].jobs | length'"
+    command: "run_id=$(gh run list --workflow test.yml --event pull_request --limit 1 --json databaseId --jq '.[0].databaseId'); gh run view \"$run_id\" --json jobs --jq '.jobs | length'"
     expected_output: "<= 3 jobs (lint, type, fast-test)"
   - description: "Full matrix runs on nightly schedule"
     command: "gh workflow list --json name,state | jq '.[] | select(.name | test(\"nightly|Nightly\"))'"
@@ -129,11 +132,14 @@ verification:
     command: "grep -cE 'matrix:|os: \\[ubuntu-latest, macos-latest, windows-latest\\]' .github/workflows/release.yml .github/workflows/test.yml"
     expected_output: ">= 1"
   - description: "Strict-base is off on develop branch protection"
-    command: "gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '.required_status_checks.strict'"
-    expected_output: "false"
-  - description: "Required checks list contains only lightweight jobs"
-    command: "gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '.required_status_checks.contexts | length'"
-    expected_output: "<= 3"
+    command: "gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '.required_status_checks.strict' 2>/dev/null || echo classic-protection-not-configured"
+    expected_output: "false OR classic-protection-not-configured; ruleset strict check below must also pass"
+  - description: "Rulesets targeting develop do not require strict-base"
+    command: "gh api repos/joeharris76/BenchBox/rulesets --jq '[.[] | select((.conditions.ref_name.include // []) | any(. == \"refs/heads/develop\" or . == \"~DEFAULT_BRANCH\")) | .rules[]? | select(.type == \"required_status_checks\") | (.parameters.strict_required_status_checks_policy // false)] | all(. == false)'"
+    expected_output: "true"
+  - description: "Required checks list contains only lightweight jobs across protection surfaces"
+    command: "classic=$(gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '(.required_status_checks.contexts // []) | length' 2>/dev/null || echo 0); rulesets=$(gh api repos/joeharris76/BenchBox/rulesets --jq '[.[] | select((.conditions.ref_name.include // []) | any(. == \"refs/heads/develop\" or . == \"~DEFAULT_BRANCH\")) | .rules[]? | select(.type == \"required_status_checks\") | .parameters.required_status_checks[]?.context] | length'); test $((classic + rulesets)) -le 3 && echo ok"
+    expected_output: "ok"
   - description: "make pr-refresh prints deprecation notice"
     command: "make -n pr-refresh 2>&1 | grep -c 'DEPRECATED' || make pr-refresh 2>&1 | head -3 | grep -c 'DEPRECATED'"
     expected_output: ">= 1"
@@ -172,14 +178,16 @@ scope_limit:
     - ".github/workflows/test.yml"
     - ".github/workflows/nightly.yml (new)"
     - ".github/workflows/release.yml (audit + comment-only)"
-    - "Makefile (pr-refresh deprecation notice)"
+    - "Makefile (pr-refresh deprecation notice only)"
     - "CLAUDE.md (pr-refresh paragraph)"
     - "AGENTS.md (pr-refresh paragraph)"
   do_not_modify:
-    - ".github/workflows/develop-post-merge.yml (Step 4)"
-    - "Makefile worktree-* targets (Step 2)"
-    - ".pre-commit-config.yaml (Step 1)"
-    - "Test code (no test changes; only CI orchestration)"
+    - ".github/workflows/develop-post-merge.yml (Step 4 owns this)"
+    - ".github/workflows/lint.yml (only edit if a required PR-tier check moves; otherwise leave alone)"
+    - "Makefile worktree-add, worktree-claim, worktree-pool-*, worktree-release targets (Step 2 owns these)"
+    - "Makefile pr-fanout, pr-open targets (Step 1 owns these)"
+    - ".pre-commit-config.yaml (Step 1 owns pre-push gating)"
+    - "tests/ (no test changes; only CI orchestration)"
 
 deferred:
   - summary: "Native GitHub Merge Queue migration"

@@ -57,9 +57,10 @@ work:
       Read `tests/conftest.py` and locate the lock acquisition logic
       (currently `~/.benchbox/test.lock`). Do NOT change the default —
       a global lock is what prevents 10 concurrent xdist runs from
-      melting the workstation. Add an env var override:
-        `lock_dir = os.environ.get("BENCHBOX_TEST_LOCK_DIR",
-                                   os.path.expanduser("~/.benchbox"))`
+      saturating the workstation. Add an env-var-aware helper, e.g.
+      `_get_test_lock_path()`, that returns:
+        `Path(os.environ.get("BENCHBOX_TEST_LOCK_DIR",
+                             Path.home() / ".benchbox")) / "test.lock"`
       Update `Makefile` `test-unlock` target to honor the same env var.
       Update `tests/README.md:257` area to document the override and
       explain WHY the default stays global.
@@ -109,10 +110,10 @@ work:
 
 verification:
   - description: "All pre-push hooks no-op when BENCHBOX_PREPUSH is unset"
-    command: "BENCHBOX_PREPUSH= pre-commit run --hook-stage pre-push --all-files 2>&1 | grep -cE '(Skipped|Passed)'"
+    command: "BENCHBOX_PREPUSH= uv run -- pre-commit run --hook-stage pre-push --all-files 2>&1 | grep -cE '(Skipped|Passed)'"
     expected_output: "matches the count of pre-push hooks in .pre-commit-config.yaml"
   - description: "Pre-push hooks execute when BENCHBOX_PREPUSH=1"
-    command: "BENCHBOX_PREPUSH=1 pre-commit run pr-preflight-fast-tests --hook-stage pre-push --all-files 2>&1 | tail -3"
+    command: "BENCHBOX_PREPUSH=1 uv run -- pre-commit run pr-preflight-fast-tests --hook-stage pre-push --all-files 2>&1 | tail -3"
     expected_output: "hook runs (success or expected failure on uncommitted state); does not skip"
   - description: "pr-fanout default parallelism is 4"
     command: "grep -E '^PR_FANOUT_JOBS \\?= ' Makefile"
@@ -121,8 +122,8 @@ verification:
     command: "BENCHBOX_TEST_LOCK_DIR=/tmp/bb-lock-test uv run -- python -m pytest -m fast -q tests/unit/ -x 2>&1 | tail -5 && ls /tmp/bb-lock-test/test.lock"
     expected_output: "lock file present at /tmp/bb-lock-test/test.lock; tests run normally"
   - description: "Default test lock still uses ~/.benchbox/"
-    command: "uv run -- python -c \"import os; from tests.conftest import _LOCK_PATH if False else None; print(os.path.expanduser('~/.benchbox/test.lock'))\""
-    expected_output: "/Users/joe/.benchbox/test.lock or equivalent home-dir path"
+    command: "uv run -- python -c \"from pathlib import Path; from tests.conftest import _get_test_lock_path; print(_get_test_lock_path() == Path.home() / '.benchbox' / 'test.lock')\""
+    expected_output: "True"
   - description: "Stale guidance removed from agent-facing docs"
     command: "grep -cE '(Drain one at a time|One PR per file area|Sequential by design)' CLAUDE.md AGENTS.md"
     expected_output: "0"
@@ -154,7 +155,6 @@ approach: |
 
 anti_patterns:
   - "DO NOT localize the test lock to per-worktree by default — because 10 concurrent xdist runs (auto-workers) would exhaust CPU and produce timing-flake — keep global default and offer override only"
-  - "DO NOT bundle worktree-pool work into this PR — because that's Step 2 with its own scope and verification — ship the local-loop changes alone"
   - "DO NOT remove pr-refresh target in this PR — because branch protection still requires up-to-date until Step 3 lands — that target stays useful until then"
   - "DO NOT skip the blind-spot capture (w5) — because the protocol explicitly requires file-first capture and this is the natural home — they are 6 small files"
 
@@ -168,9 +168,11 @@ scope_limit:
     - "AGENTS.md (manual-coordination paragraphs)"
     - "_project/blind-spots/2026-04-30-*.md (6 new files)"
   do_not_modify:
-    - ".github/workflows/ (that's Step 3 and Step 4)"
-    - "Makefile worktree-* targets (that's Step 2)"
-    - "Branch protection or rulesets (that's Step 3)"
+    - ".github/workflows/test.yml (Step 3 owns this)"
+    - ".github/workflows/develop-post-merge.yml (Step 4 owns this)"
+    - "Makefile worktree-add, worktree-prune, worktree-pool-* targets (Step 2 owns these)"
+    - "Makefile pr-refresh target (Step 3 deprecates this; here it stays)"
+    - "GitHub branch protection / rulesets (Step 3 manual deployment)"
 
 metadata:
   tags:

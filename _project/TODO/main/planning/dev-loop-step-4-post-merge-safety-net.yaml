@@ -63,18 +63,31 @@ work:
     summary: "Emit per-PR dev-loop metrics as workflow artifact"
     status: pending
     notes: |
-      Add a `metrics` job that runs on every successful merge to develop.
-      Computes and writes JSON artifact:
+      Add a `metrics` job that runs with `if: always()` for every push to
+      develop, so both green and red post-merge runs emit a machine-readable
+      record. Computes and writes JSON artifact:
         {
           "merged_at": "<ISO-8601>",
           "pr_number": N,
           "pr_open_to_merged_seconds": N,
           "post_merge_red": false,
-          "conflict_on_merge": <bool from PR labels>,
+          "develop_red_detected_at": null,
+          "auto_revert_pr_opened_at": null,
+          "time_to_revert_pr_seconds": null,
+          "next_green_develop_run_at": null,
+          "time_to_recover_red_seconds": null,
+          "conflict_on_merge": <bool from PR labels/comments>,
+          "orphaned_failed_pr": false,
           "ci_runner_minutes": N
         }
-      Artifact retention: 90 days (covers the Step 5 measurement window).
-      One file per merge. Step 5 aggregates these.
+      On failure, the auto-revert job should update or emit the same shape
+      with `post_merge_red: true`, `develop_red_detected_at`, and
+      `auto_revert_pr_opened_at`. `next_green_develop_run_at` and
+      `time_to_recover_red_seconds` may be null at artifact creation time;
+      `make dev-loop-metrics` must fill them by scanning later successful
+      develop-post-merge runs. Artifact retention: 90 days (covers the
+      Step 5 measurement window). One file per merge. Step 5 aggregates
+      these records plus the explicit PR audit sources named there.
 
   - id: w4
     summary: "Document the new failure flow in CLAUDE.md and AGENTS.md"
@@ -117,7 +130,10 @@ work:
       push to a fork's develop, confirm the workflow opens a revert PR
       with correct title/body/labels. If revert conflicts, confirm the
       fallback issue is opened correctly.
-      Document the test in PR description.
+      Document the test in PR description AND write
+      `_project/decisions/dev-loop-auto-revert-fork-test-<date>.md` with
+      fork repo, failing SHA, workflow run URL, revert PR URL or conflict
+      issue URL, and screenshots/CLI excerpts sufficient for review.
 
 verification:
   - description: "develop-post-merge.yml uses cancel-in-progress: false"
@@ -136,8 +152,8 @@ verification:
     command: "grep -cE 'incident:develop-red|auto-revert' CLAUDE.md AGENTS.md"
     expected_output: ">= 2"
   - description: "PR description includes fork-test evidence"
-    command: "echo 'manual check at review time'"
-    expected_output: "PR description references the fork-validation test"
+    command: "grep -cE 'Fork validation|failing SHA|revert PR|conflict issue|workflow run' _project/decisions/dev-loop-auto-revert-fork-test-*.md"
+    expected_output: ">= 4"
 
 must_preserve:
   - "Existing develop-post-merge.yml job definitions and their pass/fail signal — Step 4 ADDS auto-revert, does not replace existing checks"
@@ -181,11 +197,14 @@ scope_limit:
     - "Makefile (dev-loop-metrics target only)"
     - "CLAUDE.md (failure flow section)"
     - "AGENTS.md (failure flow section)"
+    - "_project/decisions/dev-loop-auto-revert-fork-test-*.md (new fork validation evidence)"
   do_not_modify:
-    - ".github/workflows/test.yml (Step 3 territory)"
-    - ".github/workflows/release.yml"
-    - "Branch protection rules (Step 3)"
-    - "Makefile worktree-* or pr-* targets (Steps 1-2)"
+    - ".github/workflows/test.yml (Step 3 owns this)"
+    - ".github/workflows/nightly.yml (Step 3 owns this)"
+    - ".github/workflows/release.yml (release CI is unchanged)"
+    - "Makefile worktree-add, worktree-claim, worktree-pool-*, worktree-release targets (Step 2 owns these)"
+    - "Makefile pr-open, pr-fanout, pr-refresh targets (Steps 1 and 3 own these)"
+    - "GitHub branch protection / rulesets (Step 3 owns these)"
 
 deferred:
   - summary: "Slack/Discord notifications on develop-red"

@@ -6,18 +6,37 @@ status: Not Started
 category: Core Functionality
 
 description: |
-  Replace the create-and-destroy worktree model with a fixed pool of 10
-  worktrees retained indefinitely. New agent sessions claim an available
-  worktree, update it from current `develop`, work there until merge,
-  then release it back to the pool.
+  Replace the create-and-destroy worktree model with a retained pool of
+  worktrees. Default pool size is 10 (`POOL_SIZE ?= 10`), but the targets
+  must keep the size configurable so the workstation can be tuned without
+  editing Makefile logic. New agent sessions claim an available worktree,
+  update it from current `develop`, work there until merge, then release
+  it back to the pool.
 
-  This formalizes how concurrent agents share the workstation. The pool
-  size of 10 is a hard cap that bounds the parallelism (which is also
-  why Step 1 keeps the test lock global — even with the pool bounded,
-  10 concurrent xdist runs would saturate the machine).
+  This formalizes how concurrent agents share the workstation. The default
+  size of 10 bounds routine parallelism (which is also why Step 1 keeps
+  the test lock global — even with the pool bounded, 10 concurrent xdist
+  runs would saturate the machine).
 
-  Single PR via `make pr-open`. After merge, run `make worktree-pool-init`
-  on the workstation as a one-time bootstrap.
+  Single PR via `make pr-open`.
+
+  ## Post-merge runbook (not part of the PR diff)
+
+  After this PR merges to develop, perform on Joe's workstation:
+
+    make worktree-pool-init
+
+  Then verify:
+    - 10 worktrees present at `BenchBox.pool-01..10`
+    - Each is detached at `origin/develop` and clean
+    - Each has `.venv/` populated
+    - `make worktree-pool-status` shows all 10 free
+    - Each free worktree is detached at `origin/develop`, NOT on the
+      local `develop` branch
+
+  Tracked as a follow-up checklist item in the PR description, not as a
+  work unit, because the work unit DAG is for code changes that can be
+  marked done by `todo-cli done <slug> <work-id>` against a commit.
 
 deps:
   needs:
@@ -25,25 +44,34 @@ deps:
 
 work:
   - id: w1
-    summary: "Add make worktree-pool-init target — creates pool-01..10 from develop"
+    summary: "Add make worktree-pool-init target — creates pool-01..POOL_SIZE from develop"
     status: pending
     notes: |
-      One-time bootstrap. Creates `BenchBox.pool-01` through
-      `BenchBox.pool-10` as siblings of the main clone, each on
-      `develop`, each with `uv sync --group dev` run, each with
-      `pre-commit install`. Idempotent: if a pool-NN worktree already
-      exists, leave it alone (do not touch its branch state).
+      One-time bootstrap. Add `POOL_SIZE ?= 10` and
+      `WORKTREE_POOL_PARENT ?= ..` so verification can create disposable
+      pools outside the normal sibling paths. With defaults, creates
+      `BenchBox.pool-01` through `BenchBox.pool-10` as siblings of the
+      main clone, each in detached HEAD at `origin/develop`, each with
+      `uv sync --group dev` run, each with `pre-commit install`.
+      Idempotent: if a pool-NN worktree already exists, leave it alone
+      (do not touch its branch state).
       Print summary table at end: pool-NN | path | branch.
 
   - id: w2
-    summary: "Add make worktree-claim BRANCH=<name> — atomic claim under flock"
+    summary: "Add make worktree-claim BRANCH=<name> — atomic claim under portable lock"
     status: pending
     notes: |
-      Selects the first **Free** pool worktree (HEAD on `develop`,
-      working tree clean, no local feature branch beyond `develop`).
+      Selects the first **Free** pool worktree (detached HEAD exactly at
+      `origin/develop`, working tree clean, no local feature branch
+      checked out). Pool worktrees must not check out the local `develop`
+      branch because the main clone keeps `develop` checked out and Git
+      does not allow the same branch in multiple worktrees.
       Steps:
-        1. Acquire flock on `<main-clone>/.git/pool.lock` (timeout 30s)
-        2. Iterate pool-01..10; first match is "Free"
+        1. Acquire a portable file lock on `<main-clone>/.git/pool.lock`
+           (timeout 30s). Use `lockf` on macOS, `flock` on Linux if
+           available, or a tiny Python helper using `fcntl.flock` so the
+           target works on Joe's macOS workstation and CI.
+        2. Iterate pool-01..POOL_SIZE; first match is "Free"
         3. In that worktree: `git fetch origin`, `git reset --hard
            origin/develop`, `git checkout -b $BRANCH`, `uv sync --group dev`
         4. Release flock
@@ -63,7 +91,7 @@ work:
         2. Verify PR for this branch is in MERGED state via
            `gh pr view --json state` (refuse if not, with explicit
            "open or close PR first" message; FORCE=1 escapes)
-        3. `git checkout develop`
+        3. `git checkout --detach origin/develop`
         4. `git fetch origin`
         5. `git reset --hard origin/develop`
         6. `git branch -D <feature-branch>` (the one just released)
@@ -77,8 +105,8 @@ work:
     notes: |
       Prints table with columns: pool-NN | path | branch | state |
       claim_age. State is one of:
-        - free: HEAD on develop, working tree clean, no untracked files
-                outside expected (`.benchbox/`, `.venv/`, etc.)
+        - free: detached HEAD at origin/develop, working tree clean, no
+                untracked files outside expected (`.benchbox/`, `.venv/`, etc.)
         - claimed: HEAD on a non-develop branch
         - stale: claimed branch has been merged upstream (gh pr view
                  returns MERGED) but worktree still on the branch
@@ -139,33 +167,21 @@ work:
       worktrees only; pool worktrees are released via `worktree-release`.
     needs: [w1]
 
-  - id: w9
-    summary: "Run worktree-pool-init on Joe's workstation post-merge"
-    status: pending
-    needs: [w1, w2, w3, w4, w5, w6, w7, w8]
-    notes: |
-      One-time runbook step after the PR lands. Verify:
-        - 10 worktrees present at BenchBox.pool-01..10
-        - Each on develop, clean
-        - Each has .venv/ populated
-        - `make worktree-pool-status` shows all 10 free
-      Track in PR description as a follow-up checklist item.
-
 verification:
   - description: "make worktree-pool-init creates 10 worktrees idempotently"
-    command: "make worktree-pool-init && ls -d ../BenchBox.pool-* | wc -l && make worktree-pool-init"
-    expected_output: "10 (first run) and second run completes without error"
+    command: "tmp=$(mktemp -d); WORKTREE_POOL_PARENT=$tmp POOL_SIZE=2 make worktree-pool-init && find \"$tmp\" -maxdepth 1 -type d -name 'BenchBox.pool-*' | wc -l && WORKTREE_POOL_PARENT=$tmp POOL_SIZE=2 make worktree-pool-init; for wt in \"$tmp\"/BenchBox.pool-*; do git worktree remove --force \"$wt\" >/dev/null 2>&1 || true; done; rm -rf \"$tmp\""
+    expected_output: "2 (first run) and second run completes without error; disposable worktrees are removed"
   - description: "worktree-claim refuses invalid branch names"
     command: "make worktree-claim BRANCH=bad-name 2>&1 | grep -c 'must match'"
     expected_output: ">= 1"
   - description: "worktree-claim selects an available pool worktree"
-    command: "make worktree-claim BRANCH=chore/test-pool-claim 2>&1 | grep -E 'WORKTREE_PATH=.*pool-[0-9]+'"
+    command: "tmp=$(mktemp -d); WORKTREE_POOL_PARENT=$tmp POOL_SIZE=1 make worktree-pool-init >/dev/null && WORKTREE_POOL_PARENT=$tmp POOL_SIZE=1 make worktree-claim BRANCH=chore/test-pool-claim 2>&1 | tee /tmp/bb-pool-claim.out | grep -E 'WORKTREE_PATH=.*pool-[0-9]+'; wt=$(sed -n 's/^WORKTREE_PATH=//p' /tmp/bb-pool-claim.out); git worktree remove --force \"$wt\" >/dev/null 2>&1 || true; git branch -D chore/test-pool-claim >/dev/null 2>&1 || true; rm -rf \"$tmp\" /tmp/bb-pool-claim.out"
     expected_output: "WORKTREE_PATH=<absolute path containing pool-NN>"
   - description: "worktree-pool-status reports all pool worktrees"
     command: "make worktree-pool-status 2>&1 | grep -cE '^pool-[0-9]+'"
     expected_output: "10"
   - description: "Concurrent claims do not race"
-    command: "for i in 1 2 3; do (make worktree-claim BRANCH=chore/race-test-$i &); done; wait; make worktree-pool-status | grep -cE 'chore/race-test-' && make worktree-pool-status | sort -u"
+    command: "tmp=$(mktemp -d); WORKTREE_POOL_PARENT=$tmp POOL_SIZE=3 make worktree-pool-init >/dev/null; for i in 1 2 3; do (WORKTREE_POOL_PARENT=$tmp POOL_SIZE=3 make worktree-claim BRANCH=chore/race-test-$i >\"$tmp/out-$i\" 2>&1 &); done; wait; cat \"$tmp\"/out-* | grep -E '^WORKTREE_PATH=' | sort -u | wc -l; for wt in \"$tmp\"/BenchBox.pool-*; do git worktree remove --force \"$wt\" >/dev/null 2>&1 || true; done; for i in 1 2 3; do git branch -D chore/race-test-$i >/dev/null 2>&1 || true; done; rm -rf \"$tmp\""
     expected_output: "3 distinct claims, each on a different pool-NN worktree"
   - description: "worktree-prune skips pool worktrees"
     command: "make worktree-prune 2>&1 | grep -c 'Skipping pool worktree'"
@@ -186,13 +202,17 @@ approach: |
   (w4) and reset (w5) are operational tooling, then docs (w6) and
   deprecation (w7-w8) update the rest of the surface.
 
-  Use `flock` (via `flock(1)` on Linux/macOS) for atomic claim. Lock
-  file at `<main-clone>/.git/pool.lock`. Single shared lock across all
-  pool worktrees — claim is fast (seconds) so contention is fine.
+  Use a portable lock wrapper for atomic claim. `flock(1)` is not present
+  on the macOS workstation, so the Makefile cannot assume it. Prefer
+  `lockf` on macOS, `flock` on Linux when available, or a small Python
+  helper that calls `fcntl.flock`. Lock file stays at
+  `<main-clone>/.git/pool.lock`. Single shared lock across all pool
+  worktrees — claim is fast (seconds) so contention is fine.
 
   For state detection in worktree-pool-status:
-    - free: `git rev-parse --abbrev-ref HEAD` == "develop" AND
-            `git status --porcelain` is empty AND no extra branches
+    - free: `git symbolic-ref -q --short HEAD` is empty AND
+            `git rev-parse HEAD` == `git rev-parse origin/develop` AND
+            `git status --porcelain` is empty
     - claimed: not on develop, working tree may or may not be clean
     - stale: claimed AND `gh pr view --json state` returns MERGED
     - dirty: claimed AND `git status --porcelain` non-empty
@@ -202,10 +222,11 @@ approach: |
 
 anti_patterns:
   - "DO NOT auto-reap stale claims — because an agent crash mid-session may leave valuable uncommitted work — surface as 'stale' in status, require explicit `worktree-pool-reset` to free"
-  - "DO NOT skip flock on claim selection — because two concurrent agents racing to claim would both pick pool-01 and one would clobber the other's branch — atomic selection is required"
+  - "DO NOT skip portable locking on claim selection — because two concurrent agents racing to claim would both pick pool-01 and one would clobber the other's branch — atomic selection is required"
   - "DO NOT delete pool-NN worktrees in worktree-prune — because the pool is the contract — prune is for legacy non-pool worktrees only"
   - "DO NOT remove make worktree-add in this PR — because in-flight work in non-pool worktrees needs continuity — deprecate-with-notice now, remove next release"
   - "DO NOT hardcode pool size to 10 — because the workstation may want a different cap — read POOL_SIZE ?= 10 from the environment"
+  - "DO NOT check out the local develop branch in pool worktrees — because the main clone owns develop and Git forbids the same branch in multiple worktrees — use detached origin/develop as the Free state"
 
 scope_limit:
   only_modify:
@@ -214,10 +235,12 @@ scope_limit:
     - "AGENTS.md (Session start / Worktree section)"
     - ".gitignore (add .git/pool.lock if needed)"
   do_not_modify:
-    - ".github/workflows/ (Step 3 and Step 4 territory)"
-    - "tests/ (test lock is Step 1)"
-    - ".pre-commit-config.yaml (Step 1)"
-    - "Branch protection or rulesets (Step 3)"
+    - ".github/workflows/test.yml (Step 3 owns this)"
+    - ".github/workflows/develop-post-merge.yml (Step 4 owns this)"
+    - "tests/conftest.py (Step 1 owns the test-lock helper)"
+    - ".pre-commit-config.yaml (Step 1 owns pre-push gating)"
+    - "Makefile pr-* targets (Steps 1 and 3 own these)"
+    - "GitHub branch protection / rulesets (Step 3 manual deployment)"
 
 deferred:
   - summary: "Auto-update of pool worktrees while idle (background pull of develop)"

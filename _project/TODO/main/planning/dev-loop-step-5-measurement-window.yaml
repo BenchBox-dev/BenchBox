@@ -48,6 +48,21 @@ work:
       Run `make dev-loop-metrics WINDOW=30d` (added in Step 4 w5).
       Capture output. If artifacts coverage is below 80% of merges
       (i.e., emission failures), extend the window 7 days and retry.
+      Also capture the raw JSON summary if the target supports it
+      (`make dev-loop-metrics WINDOW=30d FORMAT=json`), because w3 needs
+      exact counts for threshold evaluation.
+
+      Metrics must combine:
+        - Step 4 metrics artifacts (PR open->merged, post-merge red,
+          time-to-revert-PR, time-to-recover, runner minutes)
+        - PR audit for the same window:
+          `gh pr list --state all --base develop --search "updated:>=<start>"`
+          and labels/comments containing `queue:conflict`,
+          `conflict`, `pr-refresh`, `auto-revert`, or
+          `incident:develop-red`
+        - Post-merge workflow runs:
+          `gh run list --workflow develop-post-merge.yml --created
+          <start>..<end> --json conclusion,createdAt,updatedAt,url`
       Save raw aggregation to `_project/decisions/
       dev-loop-measurement-<window-end>.md`.
 
@@ -67,6 +82,17 @@ work:
       For each metric: PASS (below trigger) / FAIL (at or above).
       "Sustained" means >= 70% of days in the window above threshold;
       not just one outlier week.
+
+      Data-source rules:
+        - Use Step 4 artifacts for PR open->merged, post-merge red,
+          time-to-revert-PR, time-to-recover, and runner minutes.
+        - Use the PR audit from w2 for cross-PR conflict repairs/week.
+        - Count orphaned failed PRs from PRs labeled/commented as failed,
+          conflicted, auto-reverted, or develop-red with no new commit,
+          review response, or replacement PR within 24h.
+        - If a metric cannot be computed because Step 4 did not emit the
+          required fields, mark REASSESS and create a follow-up to fix
+          metrics emission; do not silently drop the metric.
 
   - id: w4
     summary: "Write decision record with go/no-go for Step 6"
@@ -139,13 +165,15 @@ anti_patterns:
 scope_limit:
   only_modify:
     - "_project/decisions/dev-loop-measurement-*.md (new)"
-    - "_project/TODO/main/planning/dev-loop-step-6-queue-decision-gate.yaml (status field only)"
+    - "_project/TODO/main/planning/dev-loop-step-6-queue-decision-gate.yaml (status/deps only, or move to DONE if DO NOT BUILD)"
     - "CLAUDE.md (one paragraph)"
     - "AGENTS.md (one paragraph)"
   do_not_modify:
-    - "Any code or workflow file"
-    - "Branch protection or rulesets"
-    - "Step 1-4 implementation artifacts"
+    - ".github/workflows/test.yml, develop-post-merge.yml, nightly.yml, release.yml (no code changes during the measurement window)"
+    - "Makefile (no target changes during the window)"
+    - "tests/conftest.py (Step 1 helper stays as-is)"
+    - "GitHub branch protection / rulesets (no further changes during the window)"
+    - "_project/TODO/main/planning/dev-loop-step-{0,1,2,3,4}-*.yaml (Steps 1-4 implementations are frozen during measurement)"
 
 deferred:
   - summary: "Building infrastructure based on measurement findings"
@@ -160,7 +188,9 @@ metadata:
     - decision-gate
   estimated_effort: "Small (2-3h after the 30-day wait)"
   created_date: "2026-04-30"
-  due_date: "2026-06-15"
+  # due_date: TBD — set to (Step 4 merge_date + 30 days) when Step 4 lands.
+  # Leaving unset because Step 4's merge date is unknown at TODO creation;
+  # a fake-precise placeholder would mislead future readers.
 
 impact:
   business_value: |
