@@ -67,24 +67,45 @@ work:
     summary: "Estimate actual pr-refresh / staleness pain rate"
     status: pending
     notes: |
-      Inspect last 50 merged PRs for refresh-loop indicators:
-        - `gh pr list --state merged --base develop --limit 50 --json title,labels,comments,mergedAt`
-        - grep recent shell history / commit messages for `pr-refresh`
-        - look for "rebase" or "merge develop" comments on PRs
-      Record an estimated rate (PRs that hit refresh / total). If it's
-      under 5%, the queue is overkill even if Step 4 metrics later say
-      otherwise — Step 6 should reflect that.
+      Use a concrete proxy rather than free-text grep. For the last 50
+      merged PRs targeting develop, compute the gap between the last
+      successful CI run start and the PR merge time. A gap > 30 minutes
+      with intervening pushes is a strong signal of a strict-base re-CI
+      cycle (the PR was green, develop advanced, CI re-ran):
+        - `gh pr list --state merged --base develop --limit 50 \
+            --json number,mergedAt,headRefOid,labels,statusCheckRollup`
+        - For each PR, compute `merged_at - last_successful_check_started_at`
+          across `statusCheckRollup` entries
+        - Count PRs where that gap > 30 min AND statusCheckRollup has
+          >= 2 distinct startedAt timestamps for the same check name
+          (proxy for re-CI after a base push)
+      Secondary signal (lower confidence): `gh pr list --json comments`
+      and grep PR comments for explicit `pr-refresh`, `make pr-refresh`,
+      or `merged develop into branch`. Use only as corroboration.
+
+      Record:
+        - Strict-base re-CI rate (primary proxy, %)
+        - Explicit pr-refresh mentions (secondary, count)
+      If the primary proxy is < 5%, the queue is overkill even if Step 4
+      metrics later say otherwise — Step 6 should reflect that.
 
   - id: w6
     summary: "Confirm native GitHub Merge Queue availability"
     status: pending
     notes: |
-      Run: `gh api repos/joeharris76/BenchBox --jq '{visibility, owner_type:
-      .owner.type, allow_merge_commit, merge_queue: .has_issues}'`.
-      Native MQ requires public org-owned, or private org-owned on
-      Enterprise Cloud. User-owned repos do not qualify. Record the
-      finding so Step 6 picks the right path (native vs steward) without
-      re-investigation.
+      Run: `gh api repos/joeharris76/BenchBox --jq '{visibility,
+      owner_type: .owner.type, owner_login: .owner.login,
+      full_name, default_branch, private}'`. Also inspect the branch
+      protection / ruleset surfaces from w1/w2 for any native merge-queue
+      rule. Do NOT infer merge-queue availability from unrelated repo
+      fields such as `.has_issues`; that field only says whether Issues
+      are enabled.
+
+      Native MQ generally requires org-owned repos (with plan-dependent
+      availability for private repos). User-owned repos should be treated
+      as "native MQ unavailable" unless GitHub's protection/ruleset API
+      shows merge-queue rules can be applied. Record the evidence so Step 6
+      picks the right path (native vs steward) without re-investigation.
 
   - id: w7
     summary: "Write decision record at _project/decisions/dev-loop-verification-2026-04-30.md"
@@ -124,11 +145,12 @@ scope_limit:
   only_modify:
     - "_project/decisions/dev-loop-verification-2026-04-30.md (new file, the decision record)"
   do_not_modify:
-    - ".github/workflows/"
-    - "Makefile"
-    - "CLAUDE.md"
-    - "AGENTS.md"
-    - "Any branch protection or ruleset settings"
+    - ".github/workflows/test.yml (Step 3 owns this)"
+    - ".github/workflows/develop-post-merge.yml (Step 4 owns this)"
+    - ".github/workflows/release.yml (audited but not edited)"
+    - "Makefile (no edits — read-only investigation)"
+    - "CLAUDE.md, AGENTS.md (no edits — Steps 1-4 update these)"
+    - "GitHub branch protection / rulesets (Step 0 reads via gh api; never PATCH)"
 
 deferred:
   - summary: "Acting on the findings (Steps 1-4 implementation)"
