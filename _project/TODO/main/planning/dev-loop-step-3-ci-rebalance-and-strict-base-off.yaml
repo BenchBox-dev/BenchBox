@@ -108,7 +108,7 @@ work:
 
   - id: w3
     summary: "Move broad validation to nightly/workflow_dispatch without losing coverage"
-    status: pending
+    status: done
     needs: [w2]
     notes: |
       Add or update `.github/workflows/nightly.yml` so the jobs removed from
@@ -127,6 +127,18 @@ work:
       with the run URL and failing job names. If that automation is too large
       for this PR, defer it explicitly and ensure nightly failures are still
       visible through GitHub notifications.
+
+      Implementation record (2026-04-30):
+        - Added `.github/workflows/nightly.yml` with `workflow_dispatch` and a
+          daily 06:00 UTC schedule.
+        - Nightly coverage includes the full OS/Python fast-test matrix,
+          patch-safety check, security audit, integration smoke,
+          table-format integration, full local integration, package install,
+          parity, and non-blocking PySpark lanes.
+        - Reused the existing `uv` setup and test commands from `test.yml`.
+        - Deferred automatic issue creation to keep this PR scoped; failures
+          remain visible through GitHub Actions notifications and manual
+          workflow dispatch is available for reruns.
 
   - id: w4
     summary: "Preserve main PR and tag-release validation semantics"
