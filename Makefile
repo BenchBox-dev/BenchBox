@@ -5,7 +5,7 @@ PR_FANOUT_JOBS ?= 4
 POOL_SIZE ?= 10
 WORKTREE_POOL_PARENT ?= ..
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-pool-reset worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -730,7 +730,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-pool-reset worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -949,6 +949,37 @@ worktree-pool-status:
 		i=$$((i + 1)); \
 	done
 
+worktree-pool-reset:
+	@test -n "$(POOL)" || { echo "Usage: make worktree-pool-reset POOL=NN"; exit 1; }
+	@case "$(POOL)" in [0-9][0-9]) ;; *) echo "POOL must be two digits, e.g. POOL=03"; exit 1 ;; esac
+	@set -e; \
+	POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.pool-$(POOL)"; \
+	git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "No pool worktree found: $$wt"; exit 1; }; \
+	branch=$$(git -C "$$wt" branch --show-current 2>/dev/null || true); \
+	dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+	if [ -n "$$dirty" ] && [ "$(FORCE)" != "1" ]; then \
+		echo "Refusing to reset dirty pool worktree $$wt. Review changes or rerun with FORCE=1."; \
+		echo "$$dirty"; \
+		exit 1; \
+	fi; \
+	if [ "$(FORCE)" = "1" ]; then \
+		echo "About to reset $$wt to origin/develop."; \
+		if [ -n "$$branch" ]; then echo "Current branch: $$branch"; else echo "Current branch: (detached)"; fi; \
+		if [ -n "$$dirty" ]; then echo "Uncommitted changes to discard:"; echo "$$dirty"; fi; \
+		printf 'Type RESET to continue: '; \
+		read answer; \
+		[ "$$answer" = "RESET" ] || { echo "Aborted."; exit 1; }; \
+	fi; \
+	git -C "$$wt" fetch origin develop --quiet; \
+	git -C "$$wt" checkout --detach origin/develop; \
+	git -C "$$wt" reset --hard origin/develop; \
+	if [ "$(FORCE)" = "1" ]; then git -C "$$wt" clean -fd -e .benchbox >/dev/null; fi; \
+	if [ "$(FORCE)" = "1" ] && [ -n "$$branch" ]; then \
+		case "$$branch" in develop|main) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
+	fi; \
+	echo "Reset pool-$(POOL): $$wt"
+
 # Create a worktree off origin/develop. Usage: make worktree-add BRANCH=fix/foo
 # Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
 # After: cd into the path, work, run `make pr-open` from inside.
@@ -1109,6 +1140,7 @@ help:
 	@echo "  make worktree-pool-status  Show retained pool worktree state"
 	@echo "  make worktree-claim BRANCH=name  Claim a retained pool worktree for a branch"
 	@echo "  make worktree-release  Release a merged pool branch back to detached origin/develop"
+	@echo "  make worktree-pool-reset POOL=NN  Reset a retained pool worktree manually"
 	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"
 	@echo "  make worktree-list   List active worktrees"
 	@echo "  make worktree-prune  Remove worktrees whose branches are gone on origin (post-merge cleanup)"

@@ -117,7 +117,7 @@ work:
 
   - id: w5
     summary: "Add make worktree-pool-reset POOL=NN — manual escape hatch"
-    status: pending
+    status: done
     notes: |
       Forcibly returns pool-NN to Free state. Refuses if working tree
       has uncommitted changes UNLESS `FORCE=1` is set. Even with FORCE,
