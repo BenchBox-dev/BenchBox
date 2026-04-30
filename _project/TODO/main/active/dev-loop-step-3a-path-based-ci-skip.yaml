@@ -235,7 +235,7 @@ work:
 
   - id: w3
     summary: "Add the equivalent local skip in pr-preflight"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Step 1 made pre-push hooks opt-in via BENCHBOX_PREPUSH=1. When
@@ -253,6 +253,27 @@ work:
       Reuse the path-filter ruleset from `.github/workflows/_paths.yml`
       via a small helper (`scripts/path_filter_decision.sh` or Python if
       YAML parsing is needed) so the rule lives in exactly one place.
+
+      Implementation record (2026-04-30):
+        - Updated `make pr-preflight` so lint/type checks still run first,
+          then the Python fast-test lane delegates to `make
+          pr-preflight-fast-tests`.
+        - Added `pr-preflight-fast-tests`, which classifies
+          `origin/develop...HEAD` with `scripts/path_filter_decision.py`.
+          Code/infra/unknown-path diffs still run `uv run -- python -m pytest
+          -m fast -q`; content-only diffs run the cheap content guard and
+          print `No code changes detected; skipping fast tests.`
+        - Added `pr-content-guard` so local preflight mirrors CI content
+          validation for YAML, markdown, TODO/DONE graph, and docs reference
+          checks.
+        - Updated the opt-in `pr-preflight-fast-tests` pre-push hook to call
+          the same Make target when `BENCHBOX_PREPUSH=1`, avoiding a separate
+          hook-only path decision.
+        - Extended `scripts/path_filter_decision.py` with `--json-in` and
+          `--check` so Makefile logic can consume the same classifier output
+          without duplicating JSON parsing in shell.
+        - W3 review found no actionable issues after checking quoting,
+          content-only guard behavior, and code-path fallback behavior.
 
   - id: w4
     summary: "Add a tiny test that proves the skip path works"

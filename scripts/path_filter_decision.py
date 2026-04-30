@@ -195,25 +195,34 @@ def main() -> int:
     parser.add_argument("--rules", type=Path, default=DEFAULT_RULES)
     parser.add_argument("--base-ref", help="Git ref to diff against, for example origin/develop")
     parser.add_argument("--changed-file", type=Path, help="Read changed paths from a newline-delimited file")
+    parser.add_argument("--json-in", type=Path, help="Read an existing decision JSON instead of classifying paths")
     parser.add_argument("--json-out", type=Path, help="Write the full decision as JSON")
     parser.add_argument("--github-output", type=Path, help="Append GitHub Actions outputs")
     parser.add_argument("--summary", type=Path, help="Append a GitHub step summary")
     parser.add_argument("--lists-dir", type=Path, help="Write changed/content/code helper lists")
+    parser.add_argument(
+        "--check",
+        choices=["needs-code-ci", "safe-content-only", "content-guard-needed"],
+        help="Exit 0 when the named decision is true, otherwise exit 1",
+    )
     args = parser.parse_args()
 
-    rules = load_rules(args.rules)
-    if args.changed_file:
-        changed_paths = [
-            normalize_path(line)
-            for line in args.changed_file.read_text(encoding="utf-8").splitlines()
-            if normalize_path(line)
-        ]
-    elif args.base_ref:
-        changed_paths = git_changed_paths(args.base_ref)
+    if args.json_in:
+        decision = json.loads(args.json_in.read_text(encoding="utf-8"))
     else:
-        changed_paths = stdin_changed_paths()
+        rules = load_rules(args.rules)
+        if args.changed_file:
+            changed_paths = [
+                normalize_path(line)
+                for line in args.changed_file.read_text(encoding="utf-8").splitlines()
+                if normalize_path(line)
+            ]
+        elif args.base_ref:
+            changed_paths = git_changed_paths(args.base_ref)
+        else:
+            changed_paths = stdin_changed_paths()
+        decision = classify_paths(ordered_unique(changed_paths), rules)
 
-    decision = classify_paths(ordered_unique(changed_paths), rules)
     if args.json_out:
         args.json_out.write_text(json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if args.github_output:
@@ -224,6 +233,9 @@ def main() -> int:
         write_lists(args.lists_dir, decision)
 
     print(json.dumps(decision, indent=2, sort_keys=True))
+    if args.check:
+        decision_key = args.check.replace("-", "_")
+        return 0 if decision[decision_key] else 1
     return 0
 
 

@@ -16,7 +16,7 @@ POOL_MIN_FREE_KB ?= 5000000
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -741,15 +741,54 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
 # preflight surface stays in sync with lint.yml automatically.
 pr-preflight:
 	@$(MAKE) ci-lint
-	@echo "==> fast tests"
-	@uv run -- python -m pytest -m fast -q
+	@$(MAKE) pr-preflight-fast-tests
+
+pr-preflight-fast-tests:
+	@DECISION=$$(mktemp); \
+	LISTS=$$(mktemp -d); \
+	trap 'rm -f "$$DECISION"; rm -rf "$$LISTS"' EXIT; \
+	git fetch origin develop --quiet; \
+	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
+	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
+		echo "==> fast tests"; \
+		uv run -- python -m pytest -m fast -q; \
+	else \
+		$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
+		echo "No code changes detected; skipping fast tests."; \
+	fi
+
+pr-content-guard:
+	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
+	if [ -s "$(PATH_LISTS)/yaml.txt" ]; then \
+		uv run -- pre-commit run check-yaml --files $$(cat "$(PATH_LISTS)/yaml.txt"); \
+	else \
+		echo "No YAML content paths changed."; \
+	fi; \
+	if [ -s "$(PATH_LISTS)/markdown.txt" ]; then \
+		uv run -- pre-commit run markdownlint --files $$(cat "$(PATH_LISTS)/markdown.txt"); \
+	else \
+		echo "No markdown content paths changed."; \
+	fi; \
+	if [ -s "$(PATH_LISTS)/todo.txt" ]; then \
+		while IFS= read -r todo_path; do \
+			uv run --project _project/scripts -- python _project/scripts/validate_todo.py "$$todo_path"; \
+		done < "$(PATH_LISTS)/todo.txt"; \
+		uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph; \
+	else \
+		echo "No TODO/DONE YAML paths changed."; \
+	fi; \
+	if [ -s "$(PATH_LISTS)/docs.txt" ]; then \
+		$(MAKE) docs-validate; \
+	else \
+		echo "No docs paths changed."; \
+	fi
 
 # Push current branch and open a PR against develop with auto-merge enabled.
 # Squash-merge happens automatically once `lint` + `test (ubuntu-latest, 3.12)`
