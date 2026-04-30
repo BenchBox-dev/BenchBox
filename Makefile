@@ -5,7 +5,7 @@ PR_FANOUT_JOBS ?= 4
 POOL_SIZE ?= 10
 WORKTREE_POOL_PARENT ?= ..
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-claim worktree-claim-locked worktree-release worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -730,7 +730,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-claim worktree-claim-locked worktree-release worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -887,10 +887,8 @@ worktree-claim-locked:
 		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
 		if git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
 			branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
-			head=$$(git -C "$$wt" rev-parse HEAD 2>/dev/null || true); \
-			develop=$$(git -C "$$wt" rev-parse origin/develop 2>/dev/null || true); \
 			status=$$(git -C "$$wt" status --porcelain); \
-			if [ -z "$$branch" ] && [ "$$head" = "$$develop" ] && [ -z "$$status" ]; then \
+			if [ -z "$$branch" ] && [ -z "$$status" ]; then \
 				git -C "$$wt" fetch origin develop --quiet; \
 				git -C "$$wt" reset --hard origin/develop >/dev/null; \
 				git -C "$$wt" checkout -b "$(BRANCH)" >/dev/null; \
@@ -921,6 +919,35 @@ worktree-release:
 	git branch -D "$$branch"; \
 	git remote prune origin; \
 	echo "Released $$branch; worktree is detached at origin/develop."
+
+worktree-pool-status:
+	@POOL_REPO=$$(basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"); \
+	printf '%-8s | %-60s | %-28s | %-7s | %s\n' "pool" "path" "branch" "state" "claim_age"; \
+	i=1; \
+	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
+		pool=$$(printf 'pool-%02d' "$$i"); \
+		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
+		branch="-"; state="missing"; age="-"; \
+		if git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+			current=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
+			dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+			if [ -z "$$current" ]; then \
+				branch="(detached)"; \
+				if [ -z "$$dirty" ]; then state="free"; else state="dirty"; fi; \
+			else \
+				branch="$$current"; \
+				age=$$(git -C "$$wt" log -1 --format=%ar 2>/dev/null || echo "-"); \
+				if [ -n "$$dirty" ]; then \
+					state="dirty"; \
+				else \
+					pr_state=$$(gh pr view "$$current" --json state --jq .state 2>/dev/null || true); \
+					if [ "$$pr_state" = "MERGED" ]; then state="stale"; else state="claimed"; fi; \
+				fi; \
+			fi; \
+		fi; \
+		printf '%-8s | %-60s | %-28s | %-7s | %s\n' "$$pool" "$$wt" "$$branch" "$$state" "$$age"; \
+		i=$$((i + 1)); \
+	done
 
 # Create a worktree off origin/develop. Usage: make worktree-add BRANCH=fix/foo
 # Path convention: ../BenchBox.<branch-with-slashes-as-dashes>/
@@ -1079,6 +1106,7 @@ help:
 	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
 	@echo "  make worktree-pool-init  Create retained pool worktrees (POOL_SIZE=$(POOL_SIZE))"
+	@echo "  make worktree-pool-status  Show retained pool worktree state"
 	@echo "  make worktree-claim BRANCH=name  Claim a retained pool worktree for a branch"
 	@echo "  make worktree-release  Release a merged pool branch back to detached origin/develop"
 	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"

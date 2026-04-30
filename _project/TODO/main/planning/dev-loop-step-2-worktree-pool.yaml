@@ -101,7 +101,7 @@ work:
 
   - id: w4
     summary: "Add make worktree-pool-status — tabular state listing"
-    status: pending
+    status: done
     notes: |
       Prints table with columns: pool-NN | path | branch | state |
       claim_age. State is one of:
