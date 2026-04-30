@@ -45,6 +45,9 @@ mutmut:
 codespell:
   reason: "Spell checker CLI; invoked as `codespell`. Not imported."
 
+pre-commit:
+  reason: "Git hook and content-guard CLI; invoked as `uv run -- pre-commit`. Not imported."
+
 # --------------------------------------------------------------------------
 # Sphinx and documentation build plugins - activated via docs/conf.py
 # extensions list or as theme packages.

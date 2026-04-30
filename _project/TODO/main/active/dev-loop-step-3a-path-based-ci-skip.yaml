@@ -385,6 +385,12 @@ work:
           Moved the shared ruleset to `.github/path-filters.yml` and updated
           the classifier/docs to avoid an invalid workflow named after the
           rules file.
+        - Hosted PR run #25187095898 exposed a third W6 issue: the project
+          environment did not include the `pre-commit` executable, so
+          `uv run -- pre-commit` resolved only on machines with a global
+          install. Added `pre-commit` to the dev dependency group and refreshed
+          `uv.lock` so CI and local content guard runs use the locked CLI;
+          also documented/allowlisted it as a CLI-only dev dependency.
         - W6 follow-up for PR creation: after this commit, run `make pr-open`
           and set the PR body to state that the required-check ruleset edit is
           W7 and happens only after this workflow PR lands.
