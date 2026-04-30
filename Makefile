@@ -737,7 +737,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -871,25 +871,19 @@ worktree-pool-init:
 
 # Claim the first free pool worktree for a feature branch.
 #
-# Concurrency note: the file lock serializes only `worktree-claim` calls
-# against each other. It does NOT prevent `worktree-claim` from racing
-# with `worktree-release` or `worktree-pool-reset` on the same slot —
-# those are operator-driven and assumed to run on a single workstation
-# where humans/agents serialize their own actions.
+# Concurrency: every pool-mutating target (claim, release, pool-reset,
+# pool-sweep-stale) acquires the same `.git/pool.lock` via
+# scripts/_with_pool_lock.sh. They serialize against each other so
+# concurrent operations cannot leave a slot in a torn state. The lock
+# does NOT cover read-only inspection (worktree-pool-status), which is
+# safe to run anytime.
 worktree-claim:
 	@test -n "$(BRANCH)" || { echo "Usage: make worktree-claim BRANCH=<branch-name>"; exit 1; }
 	@case "$(BRANCH)" in chore/?*|fix/?*|feat/?*|docs/?*) ;; *) echo "BRANCH must match ^(chore|fix|feat|docs)/.+"; exit 1 ;; esac
 	@git check-ref-format --branch "$(BRANCH)" >/dev/null || { echo "Invalid git branch name: $(BRANCH)"; exit 1; }
 	@git fetch origin develop --quiet
 	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
-	touch "$$LOCK"; \
-	if command -v lockf >/dev/null 2>&1; then \
-		lockf -t 30 "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; \
-	elif command -v flock >/dev/null 2>&1; then \
-		flock -w 30 "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; \
-	else \
-		uv run -- python scripts/_pool_lock.py "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; \
-	fi
+	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"
 
 worktree-claim-locked:
 	@set -e; \
@@ -930,9 +924,14 @@ worktree-claim-locked:
 	exit 1
 
 worktree-release:
+	@top=$$(git rev-parse --show-toplevel); \
+	case "$$top" in *.pool-[0-9][0-9]) ;; *) echo "Refusing: worktree-release must run inside a pool-NN worktree."; exit 1 ;; esac; \
+	LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
+	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-release-locked FORCE="$(FORCE)"
+
+worktree-release-locked:
 	@set -e; \
 	top=$$(git rev-parse --show-toplevel); \
-	case "$$top" in *.pool-[0-9][0-9]) ;; *) echo "Refusing: worktree-release must run inside a pool-NN worktree."; exit 1 ;; esac; \
 	branch=$$(git branch --show-current); \
 	test -n "$$branch" || { echo "Refusing: this pool worktree is already detached/free."; exit 1; }; \
 	case "$$branch" in develop|main) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
@@ -1023,6 +1022,10 @@ worktree-pool-status:
 worktree-pool-reset:
 	@test -n "$(POOL)" || { echo "Usage: make worktree-pool-reset POOL=NN"; exit 1; }
 	@case "$(POOL)" in [0-9][0-9]) ;; *) echo "POOL must be two digits, e.g. POOL=03"; exit 1 ;; esac
+	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
+	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-pool-reset-locked POOL="$(POOL)" FORCE="$(FORCE)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"
+
+worktree-pool-reset-locked:
 	@set -e; \
 	POOL_REPO=$$($(POOL_REPO_CMD)); \
 	wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.pool-$(POOL)"; \
@@ -1056,7 +1059,14 @@ worktree-pool-reset:
 ## refuses to touch slots that are dirty, claimed-no-PR, claimed-with-open-PR,
 ## or where the gh API lookup failed (state=unknown). Run after a busy day
 ## to recover slots that died between work and `make worktree-release`.
+##
+## Acquires the pool lock for the duration of the sweep so concurrent
+## claims/releases cannot race with the per-slot reset operations.
 worktree-pool-sweep-stale:
+	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
+	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-pool-sweep-stale-locked POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"
+
+worktree-pool-sweep-stale-locked:
 	@set -e; \
 	POOL_REPO=$$($(POOL_REPO_CMD)); \
 	pr_table=$$(gh pr list --state all --base develop --limit 200 \

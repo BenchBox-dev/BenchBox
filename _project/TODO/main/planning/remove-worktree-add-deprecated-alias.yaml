@@ -1,0 +1,147 @@
+id: remove-worktree-add-deprecated-alias
+title: "Remove deprecated `make worktree-add` and consolidate to pool-only paths"
+worktree: main
+priority: Low
+status: Not Started
+category: Core Functionality
+
+description: |
+  After Step 2 (PR #73) introduced the retained worktree pool, four
+  worktree creation paths now coexist (raw `git worktree add`,
+  `make worktree-add` [deprecated], `make worktree-claim` [preferred],
+  `make worktree-pool-init` [bootstrap]). Captured as L2 blind-spot
+  finding `2026-04-30-143501-four-worktree-creation-paths`.
+
+  PR #73 added a stderr deprecation notice to `make worktree-add`
+  promising removal "in the next release". This TODO tracks that
+  removal so the deprecation marker doesn't rot indefinitely.
+
+  Remove the alias one release after the pool model lands. Concretely:
+  open this PR after the next release is cut from develop and any
+  downstream tooling has had a release cycle to migrate to
+  `worktree-claim`.
+
+  Related blind-spot finding:
+    `_project/blind-spots/2026-04-30-143501-four-worktree-creation-paths.md`
+
+work:
+  - id: w1
+    summary: "Confirm one release has cut since PR #73 and any callers have migrated"
+    status: pending
+    notes: |
+      Check that `git tag --list 'v*'` has at least one tag created
+      after PR #73 merged. Search the codebase and `_project/scripts/`
+      for any remaining references to `worktree-add` (excluding the
+      deprecation paragraphs in CLAUDE.md and AGENTS.md, which this
+      TODO will remove). Confirm the help table and pre-approved
+      command bucket no longer have downstream consumers expecting
+      `worktree-add`.
+
+  - id: w2
+    summary: "Remove `worktree-add` Make target and its .PHONY entry"
+    status: pending
+    needs: [w1]
+    notes: |
+      Edit Makefile:
+        - Delete the `worktree-add:` recipe (lines around the deprecation echo).
+        - Remove `worktree-add` from the .PHONY declarations.
+        - Remove the `make worktree-add BRANCH=name` row from the help text.
+      Confirm `make help` no longer mentions worktree-add and the
+      deprecated section header can also be removed.
+
+  - id: w3
+    summary: "Strip remaining `worktree-add` paragraphs from CLAUDE.md and AGENTS.md"
+    status: pending
+    needs: [w2]
+    notes: |
+      Both files currently say `make worktree-add BRANCH=fix/foo`
+      remains as a deprecated one-release compatibility path for legacy
+      non-pool worktrees. Remove those sentences entirely; the pool
+      path is now the only path.
+
+  - id: w4
+    summary: "Mark blind-spot 2026-04-30-143501 as actioned + reference this TODO"
+    status: pending
+    needs: [w3]
+    notes: |
+      Update the frontmatter:
+        status: actioned (was: actioned with future work pending)
+        todo_id: remove-worktree-add-deprecated-alias
+      Tick the "After one release..." checkbox in the body's
+      "Suggested next steps".
+
+  - id: w5
+    summary: "Run pr-preflight and open the PR"
+    status: pending
+    needs: [w2, w3, w4]
+    notes: |
+      Standard cycle: `make lint format typecheck`,
+      `BENCHBOX_PREPUSH=1 make pr-preflight`, then `make pr-open`.
+      Auto-merge will land it once the PR-tier checks pass.
+
+verification:
+  - description: "Makefile no longer references worktree-add"
+    command: "grep -cE '^worktree-add:|^\\.PHONY.*worktree-add' Makefile"
+    expected_output: "0"
+  - description: "CLAUDE.md no longer mentions worktree-add"
+    command: "grep -cE 'worktree-add|worktree add' CLAUDE.md"
+    expected_output: "0"
+  - description: "AGENTS.md no longer mentions worktree-add"
+    command: "grep -cE 'worktree-add|worktree add' AGENTS.md"
+    expected_output: "0"
+  - description: "Blind-spot file 143501 marked actioned with todo_id"
+    command: "grep -cE 'todo_id: remove-worktree-add-deprecated-alias' _project/blind-spots/2026-04-30-143501-four-worktree-creation-paths.md"
+    expected_output: "1"
+
+must_preserve:
+  - "`make worktree-claim`, `make worktree-release`, `make worktree-pool-status`, `make worktree-pool-init`, `make worktree-pool-reset`, `make worktree-pool-sweep-stale` — the pool-managed surface remains the canonical path"
+  - "Existing pool worktrees on the workstation — removing `worktree-add` does not affect any worktree already on disk"
+
+approach: |
+  Wait for confirmation that one release has cut from develop AND that
+  no in-flight branches are still using legacy non-pool worktrees
+  before deleting the alias. The deprecation notice gives users one
+  release to migrate; this TODO is the deletion that follows.
+
+anti_patterns:
+  - "DO NOT remove `worktree-add` before one release ships — because in-flight non-pool worktrees may still be in use — wait for the deprecation window"
+  - "DO NOT also touch `worktree-prune` — because it still serves legacy worktrees that exist outside the pool — leave it for a separate cleanup if the legacy paths ever go to zero"
+
+scope_limit:
+  only_modify:
+    - "Makefile (worktree-add target + .PHONY + help only)"
+    - "CLAUDE.md (worktree-add paragraph)"
+    - "AGENTS.md (worktree-add paragraph)"
+    - "_project/blind-spots/2026-04-30-143501-four-worktree-creation-paths.md (status update)"
+  do_not_modify:
+    - "Any other Makefile target"
+    - "scripts/_with_pool_lock.sh, scripts/_pool_lock.py"
+    - ".github/workflows/"
+    - "Pool worktree directories on the workstation"
+
+deferred:
+  - summary: "Removing `make worktree-prune` and `make worktree-list`"
+    reason: "Both still serve legitimate cases (non-pool worktrees, status inspection). Revisit only if all non-pool worktree usage goes to zero, which is unlikely while the legacy paths remain part of the toolkit."
+
+metadata:
+  tags:
+    - dev-loop
+    - worktree
+    - deprecation
+    - cleanup
+  estimated_effort: "Small (30 min)"
+  created_date: "2026-04-30"
+
+impact:
+  user_impact: |
+    Reduces the worktree-creation surface from four paths to three
+    (raw git, claim, pool-init), with claim being the only routine
+    path. Less to learn for new agents and contributors.
+  technical_debt: |
+    Eliminates a deprecated alias before it accumulates dead-letter
+    rot. Standard one-release deprecation cycle.
+
+success_metrics:
+  - "Single Makefile target manages routine worktree creation (`worktree-claim`)"
+  - "No active references to `worktree-add` outside git history"
+  - "Blind-spot finding 2026-04-30-143501 is marked actioned with todo_id pointer"
