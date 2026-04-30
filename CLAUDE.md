@@ -115,7 +115,28 @@ during the single-repo migration).
     opened outside `make pr-open` still auto-land.
   - **Post-merge safety net**: `.github/workflows/develop-post-merge.yml`
     runs the lightweight lint + fast-test mirror on the actual `develop`
-    tip after a PR lands.
+    tip after a PR lands. If `develop` goes red, the workflow opens a
+    revert PR labeled `incident:develop-red`, or an issue labeled
+    `incident:develop-red-revert-conflict` if the revert conflicts.
+    Agents do not need to monitor CI proactively after auto-merge; the
+    revert PR or conflict issue is the alert. The workflow also uploads
+    a `metrics` JSON artifact; `make dev-loop-metrics` downloads recent
+    artifacts and reports PR-to-merge P50/P95, post-merge red rate,
+    conflict rate, and total runner minutes.
+  - **If develop goes red**:
+    - The post-merge workflow detects the failed `develop` tip within the
+      normal GitHub Actions scheduling window and attempts `git revert` of
+      the offending squash SHA.
+    - If the revert applies, it opens an `auto-revert/<sha>` PR against
+      `develop`, labels it `incident:develop-red`, links the failed run and
+      originating PR, and requests review from the original PR author when
+      GitHub permits it.
+    - If the revert conflicts, it opens an issue labeled
+      `incident:develop-red-revert-conflict` with the failing SHA, run URL,
+      originating PR, and attempted branch name.
+    - To repair, claim a fresh pool worktree with
+      `make worktree-claim BRANCH=fix/<original-issue>`, fix the root cause,
+      run the normal preflight, and resubmit with `make pr-open`.
 - **Worktrees** for parallel branches (this is how agents work in
   this repo — see "Session start" above; not an optional optimisation):
   - `~/Developer/BenchBox/` stays on `develop`, always. **Agents must
@@ -142,9 +163,8 @@ during the single-repo migration).
     needs `origin/develop` merged before `make pr-open`. If a merge conflicts,
     resolve it in that worktree and rerun `make pr-open`.
   - The operating model is retained worktree pool + auto-merge, with
-    `.github/workflows/develop-post-merge.yml` and the Step 4 auto-revert
-    follow-up as the develop-tip safety net. Step 2 expands the worktree pool
-    commands; Step 4 expands the post-merge safety net.
+    `.github/workflows/develop-post-merge.yml` as the develop-tip safety net.
+    Step 2 owns the worktree pool commands.
   - **Drafts are intentional.** Open as draft when you don't want
     auto-merge yet (spike, RFC, parked work). Mark ready when you do —
     the auto-merge-on-open workflow respects this.
@@ -236,7 +256,7 @@ benchbox run --help | --help-topic all | --help-topic examples | --help-topic be
 
 ## Pre-approved Commands
 - **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `uv run -- python -m pytest *`
-- **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-preflight-fast-tests`, `make pr-content-guard *`, `make pr-status`, `make worktree-pool-status`, `make worktree-list`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
+- **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-preflight-fast-tests`, `make pr-content-guard *`, `make pr-status`, `make dev-loop-metrics`, `make worktree-pool-status`, `make worktree-list`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
 - **PR/Worktree (write — feature/pool worktrees only)**: `make pr-open`, `make pr-fanout`, `make pr-refresh`, `make worktree-claim BRANCH=*`, `make worktree-release`, `make worktree-pool-sweep-stale`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `git push origin chore/*`, `git push origin fix/*`, `git push origin feat/*`, `git push origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
   - **Manual/admin escape hatches, not broad auto-allow**: `make worktree-pool-init`, `make worktree-pool-reset POOL=NN`, `make worktree-prune`
   - **Never auto-allowed**: `git push * develop`, `git push * main`, `git push --force*`, `gh pr create --base main*`. These remain prompt-on-use.
