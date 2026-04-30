@@ -1,6 +1,6 @@
 ---
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(make:*), Bash(uv:*)
-description: BenchBox PR workflow — preflight, push, open PR vs develop, enable auto-merge
+description: BenchBox PR workflow - path-aware preflight, push, open PR vs develop, enable auto-merge
 ---
 
 ## Context
@@ -12,10 +12,12 @@ description: BenchBox PR workflow — preflight, push, open PR vs develop, enabl
 
 ## Your task
 
-This is the BenchBox-specific PR workflow. `develop` is PR-gated (CI must pass:
-`lint` + `test (ubuntu-latest, 3.12)`; linear history; squash-only). The goal
-is to land a green PR with one command and walk away — auto-merge handles the
-rest.
+This is the BenchBox-specific PR workflow. `develop` is PR-gated through
+`ci-required-result`; linear history and squash-only merging are enforced. The
+umbrella uses `.github/workflows/_paths.yml`: content-only PRs run content
+validation and skip Python fast tests, while code/infra/unknown-path PRs run the
+post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. The goal is to land a green
+PR with one command and walk away - auto-merge handles the rest.
 
 Execute the following in order, stopping on the first failure:
 
@@ -37,7 +39,7 @@ Execute the following in order, stopping on the first failure:
    `gh pr create --fill`, and enables `gh pr merge --auto --squash`.
 
 5. **Print the PR URL** and a one-line summary of what auto-merge will do
-   ("will squash-merge once `lint` + `test (ubuntu-latest, 3.12)` go green").
+   ("will squash-merge once `ci-required-result` goes green").
    Do NOT poll for CI completion — auto-merge handles it.
 
 You have the capability to call multiple tools in a single response. Call them

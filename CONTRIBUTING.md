@@ -35,7 +35,7 @@ This document provides guidelines and instructions for contributing.
 
    This installs two hooks (configured in `.pre-commit-config.yaml`):
    - **pre-commit**: ruff format/check, codespell, YAML / markdown lint, timing-policy check.
-   - **pre-push**: `pr-preflight-fast-tests` — re-runs the fast test lane so PR pushes don't discover failures via the CI roundtrip.
+   - **pre-push**: `pr-preflight-fast-tests` — when `BENCHBOX_PREPUSH=1`, runs the path-aware fast-test lane so code PR pushes don't discover failures via the CI roundtrip.
 
    If `pre-commit install` errors with `Cowardly refusing to install hooks with core.hooksPath set` and points at the default `.git/hooks` location, run `git config --unset-all core.hooksPath` and try again — that's a redundant override left over from earlier tooling.
 
@@ -43,7 +43,7 @@ This document provides guidelines and instructions for contributing.
 
 `develop` is the long-lived development branch; **all changes land via PR**. `main` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
 
-Required CI checks on `develop`: `lint` + `test (ubuntu-latest, 3.12)`. Reviews are not required for solo-dev work; auto-merge handles landing.
+Required CI on `develop` reports through `ci-required-result`. The umbrella uses `.github/workflows/_paths.yml` to classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; auto-merge handles landing.
 
 ## Development Workflow
 
@@ -82,7 +82,7 @@ The canonical loop is **branch → edit → preflight → `make pr-open`**. Auto
 4. **Run the local preflight, then open the PR with auto-merge in one shot:**
 
    ```bash
-   make pr-preflight      # ruff check + ruff format --check + fast tests (mirrors CI)
+   make pr-preflight      # local lint + path-aware content guard / fast tests
    make pr-open           # push + gh pr create --base develop + gh pr merge --auto --squash
    ```
 
@@ -106,7 +106,7 @@ There are two layers, and you only need the first:
 make pr-preflight
 ```
 
-This runs `ruff check` + `ruff format --check` + the fast test lane. It's identical in spirit to the required checks (`lint` + `test (ubuntu-latest, 3.12)`), so a green preflight almost always means a green CI. The pre-push git hook runs the test portion automatically, so `make pr-open` (and any plain `git push`) is gated even if you forget.
+This runs the local lint/type gate, then uses `.github/workflows/_paths.yml` to decide the fast-test lane. Content-only branches run the cheap content guard and skip Python fast tests; code, infra, workflow, tooling, and unknown paths run the fast tests. This mirrors the `ci-required-result` umbrella, so a green preflight almost always means a green CI. The opt-in pre-push git hook runs the same path-aware test portion when `BENCHBOX_PREPUSH=1`.
 
 **Optional thoroughness check** — only useful when you've changed cross-cutting things (CI workflows, packaging, docs build, integration paths):
 

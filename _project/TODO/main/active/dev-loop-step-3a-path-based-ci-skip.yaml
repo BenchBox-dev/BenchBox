@@ -312,7 +312,7 @@ work:
 
   - id: w5
     summary: "Document the umbrella in agent and contributor docs"
-    status: pending
+    status: done
     needs: [w2, w3]
     notes: |
       Update every place that currently hard-codes the old
@@ -330,6 +330,19 @@ work:
           Ubuntu 3.12 fast-test gate.
         - The shared path ruleset is `.github/workflows/_paths.yml`.
         - Local `make pr-preflight` uses the same classifier.
+
+      Implementation record (2026-04-30):
+        - Updated `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, and
+          `.claude/commands/pr.md` to describe `ci-required-result` as the
+          develop PR umbrella.
+        - Documented `.github/workflows/_paths.yml` as the shared path ruleset.
+        - Documented that content-only PRs run content validation and skip
+          Python fast tests, while code/infra/workflow/tooling/unknown paths run
+          the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate.
+        - Documented that local `make pr-preflight` uses the same classifier
+          and skips only the Python fast-test lane on content-only branches.
+        - W5 review found no stale docs that still describe the develop
+          required gate as bare `lint` + `test (ubuntu-latest, 3.12)`.
 
   - id: w6
     summary: "Open and merge the workflow PR before touching branch protection"
