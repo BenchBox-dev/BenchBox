@@ -168,7 +168,7 @@ work:
 
   - id: w5
     summary: "Add make dev-loop-metrics target for ad-hoc inspection"
-    status: pending
+    status: done
     notes: |
       `make dev-loop-metrics` downloads the last N (default 30) days
       of metrics artifacts and prints a summary:
@@ -184,6 +184,24 @@ work:
       safety-net / dev-loop workflow text. In CLAUDE.md, add it to the
       pre-approved read-only PR/Worktree or metrics bucket; the command
       reads workflow artifacts through `gh` and does not mutate repo state.
+
+      Implementation record (2026-04-30):
+        - Added `make dev-loop-metrics` with `DEV_LOOP_METRICS_DAYS` (default
+          30) and `DEV_LOOP_METRICS_LIMIT` (default 100). The target lists
+          recent `develop-post-merge.yml` push runs on `develop`, downloads
+          available `metrics` artifacts, and aggregates their JSON files.
+        - The summary prints metrics artifact count, P50/P95 PR-to-merged
+          seconds, post-merge red rate, conflict rate, and total runner
+          minutes. If no artifacts exist yet, it still prints a non-empty
+          `n/a` summary instead of failing.
+        - Documented the target in `CLAUDE.md` and `AGENTS.md` near the
+          post-merge safety-net flow.
+        - Added `make dev-loop-metrics` to the CLAUDE.md pre-approved
+          read-only PR/Worktree command bucket because it only reads workflow
+          artifacts through `gh`.
+        - W5 review issues addressed during implementation: the target handles
+          an empty metrics-artifact window without failing, and P50/P95 use
+          nearest-rank percentiles instead of lower-rank indexing.
     needs: [w3]
 
   - id: w6

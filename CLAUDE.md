@@ -119,7 +119,10 @@ during the single-repo migration).
     revert PR labeled `incident:develop-red`, or an issue labeled
     `incident:develop-red-revert-conflict` if the revert conflicts.
     Agents do not need to monitor CI proactively after auto-merge; the
-    revert PR or conflict issue is the alert.
+    revert PR or conflict issue is the alert. The workflow also uploads
+    a `metrics` JSON artifact; `make dev-loop-metrics` downloads recent
+    artifacts and reports PR-to-merge P50/P95, post-merge red rate,
+    conflict rate, and total runner minutes.
   - **If develop goes red**:
     - The post-merge workflow detects the failed `develop` tip within the
       normal GitHub Actions scheduling window and attempts `git revert` of
@@ -253,7 +256,7 @@ benchbox run --help | --help-topic all | --help-topic examples | --help-topic be
 
 ## Pre-approved Commands
 - **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `uv run -- python -m pytest *`
-- **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-preflight-fast-tests`, `make pr-content-guard *`, `make pr-status`, `make worktree-pool-status`, `make worktree-list`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
+- **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-preflight-fast-tests`, `make pr-content-guard *`, `make pr-status`, `make dev-loop-metrics`, `make worktree-pool-status`, `make worktree-list`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
 - **PR/Worktree (write — feature/pool worktrees only)**: `make pr-open`, `make pr-fanout`, `make pr-refresh`, `make worktree-claim BRANCH=*`, `make worktree-release`, `make worktree-pool-sweep-stale`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `git push origin chore/*`, `git push origin fix/*`, `git push origin feat/*`, `git push origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
   - **Manual/admin escape hatches, not broad auto-allow**: `make worktree-pool-init`, `make worktree-pool-reset POOL=NN`, `make worktree-prune`
   - **Never auto-allowed**: `git push * develop`, `git push * main`, `git push --force*`, `gh pr create --base main*`. These remain prompt-on-use.

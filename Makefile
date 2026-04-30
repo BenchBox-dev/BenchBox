@@ -4,6 +4,8 @@
 PR_FANOUT_JOBS ?= 4
 POOL_SIZE ?= 10
 WORKTREE_POOL_PARENT ?= ..
+DEV_LOOP_METRICS_DAYS ?= 30
+DEV_LOOP_METRICS_LIMIT ?= 100
 # Minimum free disk space (in 1K-blocks) required on the pool parent
 # directory before `make worktree-claim` will allocate a slot. Default
 # 5 GB. Override to 0 to bypass the check (e.g. during low-space CI).
@@ -16,7 +18,7 @@ POOL_MIN_FREE_KB ?= 5000000
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status dev-loop-metrics worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -741,7 +743,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status dev-loop-metrics worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -873,6 +875,49 @@ pr-conflict-scan:
 pr-status:
 	@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
+
+dev-loop-metrics:
+	@set -e; \
+	TMP=$$(mktemp -d); \
+	trap 'rm -rf "$$TMP"' EXIT; \
+	SINCE=$$(uv run -- python -c 'from datetime import datetime, timedelta, timezone; print((datetime.now(timezone.utc) - timedelta(days=int("$(DEV_LOOP_METRICS_DAYS)"))).date().isoformat())'); \
+	echo "Fetching develop-post-merge metrics since $$SINCE (limit $(DEV_LOOP_METRICS_LIMIT))..."; \
+	RUN_IDS=$$(gh run list --workflow develop-post-merge.yml --branch develop --event push --created ">=$$SINCE" --limit "$(DEV_LOOP_METRICS_LIMIT)" --json databaseId --jq '.[].databaseId' 2>/dev/null || true); \
+	for id in $$RUN_IDS; do \
+		gh run download "$$id" -n metrics -D "$$TMP/$$id" >/dev/null 2>&1 || true; \
+	done; \
+	FILES=$$(find "$$TMP" -type f -name '*.json' | sort); \
+	if [ -z "$$FILES" ]; then \
+		echo "Metrics artifacts: 0"; \
+		echo "PR-to-merged P50: n/a"; \
+		echo "PR-to-merged P95: n/a"; \
+		echo "Post-merge red rate: n/a (0/0)"; \
+		echo "Conflict rate: n/a (0/0)"; \
+		echo "Runner minutes total: 0"; \
+		exit 0; \
+	fi; \
+	jq -r -s ' \
+		def nums($$k): [.[].[$$k] | select(type == "number")]; \
+		def ceil_num: if . == floor then . else floor + 1 end; \
+		def pct($$a; $$p): \
+			if ($$a | length) == 0 then null \
+			else ($$a | sort) as $$s | (((($$s | length) * $$p / 100) | ceil_num) - 1) as $$idx | $$s[$$idx] end; \
+		def fmt: if . == null then "n/a" else tostring end; \
+		def rate($$n; $$d): if $$d == 0 then "n/a" else (((100 * $$n / $$d) | tostring) + "%") end; \
+		. as $$rows | \
+		($$rows | length) as $$total | \
+		(nums("pr_open_to_merged_seconds")) as $$merge_seconds | \
+		([$$rows[] | select(.post_merge_red == true)] | length) as $$red | \
+		([$$rows[] | select(.conflict_on_merge == true)] | length) as $$conflicts | \
+		((nums("ci_runner_minutes") | add) // 0) as $$runner | \
+		[ \
+			"Metrics artifacts: \($$total)", \
+			"PR-to-merged P50: \(pct($$merge_seconds; 50) | fmt) seconds", \
+			"PR-to-merged P95: \(pct($$merge_seconds; 95) | fmt) seconds", \
+			"Post-merge red rate: \(rate($$red; $$total)) (\($$red)/\($$total))", \
+			"Conflict rate: \(rate($$conflicts; $$total)) (\($$conflicts)/\($$total))", \
+			"Runner minutes total: \($$runner)" \
+		] | .[]' $$FILES
 
 # Initialize retained pool worktrees. Existing pool-NN paths are left untouched.
 worktree-pool-init:
@@ -1399,6 +1444,7 @@ help:
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
 	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
+	@echo "  make dev-loop-metrics  Summarize recent develop post-merge metrics (DEV_LOOP_METRICS_DAYS=$(DEV_LOOP_METRICS_DAYS))"
 	@echo "Worktree-pool lifecycle (preferred for new write sessions):"
 	@echo "  make worktree-pool-init           Bootstrap retained pool worktrees (POOL_SIZE=$(POOL_SIZE))"
 	@echo "  make worktree-claim BRANCH=name   Claim a free pool slot for a feature branch"
