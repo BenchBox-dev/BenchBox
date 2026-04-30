@@ -202,11 +202,14 @@ work:
         - W5 review issues addressed during implementation: the target handles
           an empty metrics-artifact window without failing, and P50/P95 use
           nearest-rank percentiles instead of lower-rank indexing.
+        - Final Step 4 verification issue addressed: the summary prints
+          `runner minutes total` with lowercase `runner` so the TODO
+          verification command passes as written.
     needs: [w3]
 
   - id: w6
     summary: "Run smoke test against a known-bad SHA in a fork"
-    status: pending
+    status: done
     needs: [w1, w2, w3, w4, w5]
     notes: |
       Before merging this PR, validate the auto-revert path end-to-end
@@ -218,6 +221,35 @@ work:
       `_project/decisions/dev-loop-auto-revert-fork-test-<date>.md` with
       fork repo, failing SHA, workflow run URL, revert PR URL or conflict
       issue URL, and screenshots/CLI excerpts sufficient for review.
+
+      Implementation record (2026-04-30):
+        - A true same-account fork was impossible: GitHub rejected
+          `joeharris76/BenchBox` -> `joeharris76/BenchBox-dev-loop-smoke-*`
+          because one user account cannot own both a parent and a fork. No
+          organization target was available, so W6 used public disposable
+          mirror `joeharris76/benchbox-dev-loop-smoke-20260430`.
+        - Configured the mirror and canonical repository workflow setting with
+          `default_workflow_permissions=read` and
+          `can_approve_pull_request_reviews=true`, which is required for
+          `GITHUB_TOKEN` to create pull requests when the job requests
+          `pull-requests: write`.
+        - First smoke SHA `35dd478645e5ed34b5b21d33e625bab8e88ddef5`
+          exposed a workflow-file edge case: GitHub rejected the revert branch
+          push because the reverted commit changed `.github/workflows/*` and
+          `GITHUB_TOKEN` lacks `workflows` permission.
+        - W6 review issue addressed in `.github/workflows/develop-post-merge.yml`:
+          push failures and `gh pr create` failures now open a manual-action
+          issue labeled `incident:develop-red-revert-conflict` instead of
+          failing without an incident artifact.
+        - Final smoke SHA `cff5c591941c989cd0c3003d552142d93489e238`
+          validated the normal path: run
+          `https://github.com/joeharris76/benchbox-dev-loop-smoke-20260430/actions/runs/25189439117`
+          opened revert PR
+          `https://github.com/joeharris76/benchbox-dev-loop-smoke-20260430/pull/1`
+          from `auto-revert/cff5c591941c` to `develop` with label
+          `incident:develop-red`.
+        - Evidence written to
+          `_project/decisions/dev-loop-auto-revert-fork-test-2026-04-30.md`.
 
 verification:
   - description: "develop-post-merge.yml uses cancel-in-progress: false"

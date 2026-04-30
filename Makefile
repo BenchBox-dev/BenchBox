@@ -893,7 +893,7 @@ dev-loop-metrics:
 		echo "PR-to-merged P95: n/a"; \
 		echo "Post-merge red rate: n/a (0/0)"; \
 		echo "Conflict rate: n/a (0/0)"; \
-		echo "Runner minutes total: 0"; \
+		echo "runner minutes total: 0"; \
 		exit 0; \
 	fi; \
 	jq -r -s ' \
@@ -916,7 +916,7 @@ dev-loop-metrics:
 			"PR-to-merged P95: \(pct($$merge_seconds; 95) | fmt) seconds", \
 			"Post-merge red rate: \(rate($$red; $$total)) (\($$red)/\($$total))", \
 			"Conflict rate: \(rate($$conflicts; $$total)) (\($$conflicts)/\($$total))", \
-			"Runner minutes total: \($$runner)" \
+			"runner minutes total: \($$runner)" \
 		] | .[]' $$FILES
 
 # Initialize retained pool worktrees. Existing pool-NN paths are left untouched.
