@@ -1007,12 +1007,16 @@ todo-reindex:
 	@uv run _project/scripts/generate_indexes.py
 
 # Remove worktrees whose branches are gone on origin (already merged).
-# Pairs with auto-merge: PR merges → branch deleted → worktree pruned.
+# Legacy cleanup only. Pool worktrees are retained and released instead.
 worktree-prune:
 	@git fetch --prune --quiet
-	@git worktree list --porcelain | awk '/^worktree /{wt=$$2} /^branch /{br=$$2; print wt"|"br}' | \
+	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
+	git worktree list --porcelain | awk 'function emit(){if (wt != "") print wt "|" br} /^worktree /{emit(); wt=$$2; br=""} /^branch /{br=$$2} END{emit()}' | \
 		while IFS='|' read -r wt br; do \
-			[ "$$wt" = "$$(git rev-parse --show-toplevel)" ] && continue; \
+			[ "$$wt" = "$$MAIN_CLONE" ] && continue; \
+			base=$$(basename "$$wt"); \
+			case "$$base" in *.pool-[0-9][0-9]) pool=$${base##*.}; echo "Skipping pool worktree $$pool (retained)"; continue ;; esac; \
+			[ -n "$$br" ] || continue; \
 			short=$${br#refs/heads/}; \
 			if ! git ls-remote --exit-code --heads origin "$$short" >/dev/null 2>&1; then \
 				echo "Removing worktree (branch gone on origin): $$wt [$$short]"; \
@@ -1144,7 +1148,7 @@ help:
 	@echo "  make worktree-pool-reset POOL=NN  Reset a retained pool worktree manually"
 	@echo "  make worktree-add BRANCH=name  Deprecated legacy worktree creator"
 	@echo "  make worktree-list   List active worktrees"
-	@echo "  make worktree-prune  Remove worktrees whose branches are gone on origin (post-merge cleanup)"
+	@echo "  make worktree-prune  Remove legacy non-pool worktrees whose branches are gone on origin"
 	@echo ""
 	@echo "Blind-Spot Findings (see _project/blind-spots/README.md):"
 	@echo "  make blind-spots-list   List open findings (one row each)"

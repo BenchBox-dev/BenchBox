@@ -165,7 +165,7 @@ work:
 
   - id: w8
     summary: "Update worktree-prune to skip pool-NN worktrees"
-    status: pending
+    status: done
     notes: |
       Pool worktrees are retained indefinitely; `worktree-prune` should
       no longer be a routine end-of-session command. Modify the target
