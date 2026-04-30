@@ -67,7 +67,7 @@ work:
 
   - id: w4
     summary: "Strip manual-coordination guidance from CLAUDE.md and AGENTS.md"
-    status: pending
+    status: done
     notes: |
       Remove from both files:
         - "Drain one at a time, oldest first" (and surrounding pr-refresh prose)
