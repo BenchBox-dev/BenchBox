@@ -60,6 +60,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, fast-test]
     if: ${{ always() && (needs.lint.result == 'failure' || needs.fast-test.result == 'failure') }}
+    outputs:
+      auto-revert-pr-opened-at: ${{ steps.open-revert.outputs.auto-revert-pr-opened-at }}
+      auto-revert-pr-url: ${{ steps.open-revert.outputs.auto-revert-pr-url }}
+      conflict-issue-url: ${{ steps.open-revert.outputs.conflict-issue-url }}
     permissions:
       contents: write
       issues: write
@@ -74,6 +78,7 @@ jobs:
           fetch-depth: 0
 
       - name: Open revert PR or conflict issue
+        id: open-revert
         shell: bash
         run: |
           set -euo pipefail
@@ -96,6 +101,7 @@ jobs:
             --jq '.[0].url // ""')"
           if [ -n "${existing_pr_url}" ]; then
             echo "Revert PR already exists: ${existing_pr_url}"
+            echo "auto-revert-pr-url=${existing_pr_url}" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
 
@@ -169,6 +175,11 @@ jobs:
               gh pr edit "${revert_pr_url}" --add-reviewer "${pr_author}" || true
             fi
 
+            opened_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            {
+              echo "auto-revert-pr-url=${revert_pr_url}"
+              echo "auto-revert-pr-opened-at=${opened_at}"
+            } >> "${GITHUB_OUTPUT}"
             echo "Opened revert PR: ${revert_pr_url}"
           else
             git revert --abort || true
@@ -189,5 +200,121 @@ jobs:
               --title "Auto-revert conflict for develop red at ${short_sha}" \
               --body-file "${body_file}" \
               --label incident:develop-red-revert-conflict)"
+            echo "conflict-issue-url=${issue_url}" >> "${GITHUB_OUTPUT}"
             echo "Opened conflict issue: ${issue_url}"
           fi
+
+  metrics:
+    name: metrics
+    runs-on: ubuntu-latest
+    needs: [lint, fast-test, auto-revert-on-failure]
+    if: ${{ always() }}
+    permissions:
+      actions: read
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MERGED_SHA: ${{ github.sha }}
+      RUN_ID: ${{ github.run_id }}
+      LINT_RESULT: ${{ needs.lint.result }}
+      FAST_TEST_RESULT: ${{ needs.fast-test.result }}
+      AUTO_REVERT_PR_OPENED_AT: ${{ needs.auto-revert-on-failure.outputs.auto-revert-pr-opened-at }}
+      AUTO_REVERT_PR_URL: ${{ needs.auto-revert-on-failure.outputs.auto-revert-pr-url }}
+      CONFLICT_ISSUE_URL: ${{ needs.auto-revert-on-failure.outputs.conflict-issue-url }}
+    steps:
+      - name: Write dev-loop metrics JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          post_merge_red=false
+          if [ "${LINT_RESULT}" = "failure" ] || [ "${FAST_TEST_RESULT}" = "failure" ]; then
+            post_merge_red=true
+          fi
+
+          pr_json="$(gh api graphql \
+            -f owner="${GITHUB_REPOSITORY_OWNER}" \
+            -f repo="${repo_name}" \
+            -f oid="${MERGED_SHA}" \
+            -f query='
+              query($owner: String!, $repo: String!, $oid: GitObjectID!) {
+                repository(owner: $owner, name: $repo) {
+                  object(oid: $oid) {
+                    ... on Commit {
+                      associatedPullRequests(first: 1) {
+                        nodes {
+                          number
+                          createdAt
+                          mergedAt
+                          labels(first: 20) {
+                            nodes {
+                              name
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ' \
+            --jq '.data.repository.object.associatedPullRequests.nodes[0] // {}')"
+
+          jobs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs?per_page=100")"
+
+          mkdir -p dev-loop-metrics
+          jq -n \
+            --argjson pr "${pr_json}" \
+            --argjson jobs "${jobs_json}" \
+            --arg post_merge_red "${post_merge_red}" \
+            --arg auto_revert_pr_opened_at "${AUTO_REVERT_PR_OPENED_AT}" \
+            --arg auto_revert_pr_url "${AUTO_REVERT_PR_URL}" \
+            --arg conflict_issue_url "${CONFLICT_ISSUE_URL}" \
+            'def null_if_empty: if . == "" then null else . end;
+             def ts: fromdateiso8601;
+             ($pr.createdAt // null) as $created_at |
+             ($pr.mergedAt // null) as $merged_at |
+             (if $post_merge_red == "true" then
+                ([($jobs.jobs // [])[] |
+                  select((.name == "lint" or .name == "fast-test") and .conclusion == "failure") |
+                  .completed_at] | max // null)
+              else null end) as $red_at |
+             {
+               merged_at: $merged_at,
+               pr_number: ($pr.number // null),
+               pr_open_to_merged_seconds: (
+                 if $created_at != null and $merged_at != null then
+                   (($merged_at | ts) - ($created_at | ts) | floor)
+                 else null end
+               ),
+               post_merge_red: ($post_merge_red == "true"),
+               develop_red_detected_at: $red_at,
+               auto_revert_pr_opened_at: ($auto_revert_pr_opened_at | null_if_empty),
+               time_to_revert_pr_seconds: (
+                 if ($red_at != null and $auto_revert_pr_opened_at != "") then
+                   (($auto_revert_pr_opened_at | ts) - ($red_at | ts) | floor)
+                 else null end
+               ),
+               next_green_develop_run_at: null,
+               time_to_recover_red_seconds: null,
+               conflict_on_merge: ([($pr.labels.nodes // [])[].name] | any(test("conflict"; "i"))),
+               orphaned_failed_pr: (($post_merge_red == "true") and (($pr.number // null) == null)),
+               ci_runner_minutes: (
+                 (([($jobs.jobs // [])[] |
+                   select(.started_at != null and .completed_at != null) |
+                   ((.completed_at | ts) - (.started_at | ts))]
+                 | add) // 0) / 60
+               ),
+               auto_revert_pr_url: ($auto_revert_pr_url | null_if_empty),
+               conflict_issue_url: ($conflict_issue_url | null_if_empty)
+             }' > "dev-loop-metrics/${MERGED_SHA}.json"
+
+          cat "dev-loop-metrics/${MERGED_SHA}.json"
+
+      - name: Upload metrics artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics
+          path: dev-loop-metrics/*.json
+          retention-days: 90

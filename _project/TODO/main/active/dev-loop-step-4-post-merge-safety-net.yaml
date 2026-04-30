@@ -87,7 +87,7 @@ work:
 
   - id: w3
     summary: "Emit per-PR dev-loop metrics as workflow artifact"
-    status: pending
+    status: done
     notes: |
       Add a `metrics` job that runs with `if: always()` for every push to
       develop, so both green and red post-merge runs emit a machine-readable
@@ -114,6 +114,28 @@ work:
       develop-post-merge runs. Artifact retention: 90 days (covers the
       Step 5 measurement window). One file per merge. Step 5 aggregates
       these records plus the explicit PR audit sources named there.
+
+      Implementation record (2026-04-30):
+        - Added a `metrics` job to `.github/workflows/develop-post-merge.yml`
+          with `if: always()` and `needs: [lint, fast-test,
+          auto-revert-on-failure]`, so every develop push emits metrics after
+          the selected post-merge checks and any auto-revert attempt finish.
+        - The metrics job uses read-only `actions`/`contents` permissions,
+          queries the associated squash-merge PR through GraphQL, and writes
+          `dev-loop-metrics/<sha>.json`.
+        - The JSON includes the Step 4 shape: merge timestamp, PR number,
+          PR-open-to-merge seconds, post-merge red status, red detection time,
+          auto-revert PR timestamp when one was opened, recovery placeholders,
+          conflict/orphan flags, and summed completed-job runner minutes.
+        - Added a 90-day artifact upload named `metrics` for Step 5's
+          measurement window.
+        - W3 review issue addressed during implementation: the metrics job
+          has only read permissions, and the GitHub jobs query requests one
+          bounded page (`per_page=100`) so the captured payload is valid JSON.
+        - W3 review timing issue fixed: `develop_red_detected_at` is derived
+          from the failed `lint`/`fast-test` job completion timestamp instead
+          of the later metrics-job start time, so `time_to_revert_pr_seconds`
+          cannot go negative when auto-revert finishes before metrics runs.
 
   - id: w4
     summary: "Document the new failure flow in CLAUDE.md and AGENTS.md"
