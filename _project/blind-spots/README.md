@@ -40,12 +40,15 @@ not the write step.
 YYYY-MM-DD-HHMMSS-<short-slug>.md
 ```
 
-- The timestamp prefix gives total ordering and uniqueness — two parallel
-  reviews on two branches can never produce the same filename. **This is
-  what makes the directory merge-collision-safe.**
-- The slug is grep bait, kept short (3–6 words).
+- The timestamp prefix gives total ordering and practical uniqueness. If the
+  exact target path already exists (same second + same slug), append a short
+  numeric suffix such as `-2` before `.md`. **This is what makes the directory
+  merge-collision-safe.**
+- The slug is grep bait, kept short (3–6 words), lowercase kebab-case with no
+  empty segments or trailing hyphen.
 
-Use the local clock; precision to the second is plenty.
+Use the local clock; precision to the second is plenty when paired with the
+exists-before-write suffix rule.
 
 ---
 
@@ -75,9 +78,9 @@ todo_id: null                                     # populated when promoted via 
 | `status` | yes | One of: `open`, `actioned`, `dismissed`, `merged-to-todo` |
 | `finding_kind` | yes | One of: `framework-gap`, `bug-class`, `missed-axis`, `scope-creep`, `assumption`, `other` |
 | `review_context` | yes | Free-form: which review / branch / PR / agent surfaced this |
-| `related_paths` | optional | Repo-relative paths the finding touches |
-| `suggested_sweep` | optional | One-line hint for the sweep step |
-| `todo_id` | optional | Slug of the promoted TODO, populated by `sweep_blind_spots.py triage promote` |
+| `related_paths` | optional | Repo-relative paths the finding touches; list of strings or `null` |
+| `suggested_sweep` | optional | One-line hint for the sweep step; string or `null` |
+| `todo_id` | optional | Non-empty slug of the promoted TODO, populated by `sweep_blind_spots.py triage promote`; `null` while open |
 
 Anything else is rejected by `validate_blind_spot.py`. Keep frontmatter
 minimal — long context belongs in the body.
@@ -86,7 +89,8 @@ minimal — long context belongs in the body.
 
 ## Body shape
 
-Keep it short. These are seeds, not specs.
+Keep it short. These are seeds, not specs. `validate_blind_spot.py` enforces
+the top-level title plus the three required `##` sections below.
 
 ```markdown
 # <Title — one line, no jargon>
@@ -136,8 +140,8 @@ uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.p
 uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py triage <id> --action promote  --todo-id <todo-slug>
 ```
 
-Triage outcomes (each stamps frontmatter and appends a one-line entry under
-`## Triage log` in the body):
+Triage outcomes (each updates only `status` / `todo_id` in frontmatter and
+appends a one-line entry under `## Triage log` in the body):
 
 - **`dismiss`** — sets `status: dismissed`. Use when the finding doesn't
   warrant action.
@@ -160,14 +164,16 @@ There are exactly two ways markdown-in-git directories generate merge
 conflicts, and both are designed out:
 
 1. **Two branches editing the same file at the same offset** — avoided by
-   one-file-per-finding with timestamped names. Two parallel reviews produce
-   two filenames, not two diffs of one file.
+   one-file-per-finding with timestamped names plus the exists-before-write
+   suffix rule. Two parallel reviews produce two filenames, not two diffs of
+   one file.
 2. **Two branches editing a shared index** — avoided by *not checking in any
    hand-maintained index*. The sweep produces transient reports, and TODO
    promotion goes through the existing `todo_cli.py` infrastructure (which
    already handles its own indexes via `generate_indexes.py`).
 
 The only file that gets edited in place after creation is the finding's own
-frontmatter `status:` line during triage. Triage happens serially on a single
-branch, so two people aren't dismissing the same finding from two PRs. If
-they ever did, the conflict is a 3-line YAML diff, trivial to resolve.
+frontmatter `status:` / `todo_id:` line during triage plus its own
+`## Triage log` section. Triage happens serially on a single branch, so two
+people aren't dismissing the same finding from two PRs. If they ever did, the
+conflict is a small finding-local diff, not a shared-index conflict.

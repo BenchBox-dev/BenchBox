@@ -5,9 +5,9 @@ Migrate monolithic PROJECT_TODO.yaml and PROJECT_DONE.yaml to distributed struct
 Creates directory structure: _project/{TODO|DONE}/{worktree}/{lifecycle-phase}/{item-slug}.yaml
 
 Usage:
-    uv run scripts/migrate_todos.py                    # Full migration with prompts
-    uv run scripts/migrate_todos.py --dry-run          # Preview without writing
-    uv run scripts/migrate_todos.py --force            # Skip confirmation prompts
+    uv run _project/scripts/migrate_todos.py                    # Full migration with prompts
+    uv run _project/scripts/migrate_todos.py --dry-run          # Preview without writing
+    uv run _project/scripts/migrate_todos.py --force            # Skip confirmation prompts
 """
 
 import argparse
@@ -98,7 +98,7 @@ class TodoMigrator:
             return []
 
         try:
-            with open(file_path) as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
 
             if data is None:
@@ -133,7 +133,7 @@ class TodoMigrator:
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write YAML file with nice formatting
-        with open(target_path, "w") as f:
+        with open(target_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(
                 item,
                 f,
@@ -272,7 +272,7 @@ This directory contains {root_dir} items organized in a distributed structure.
 
 ```
 {root_dir}/
-├── _indexes/                    # Auto-generated index files
+├── _indexes/                    # Auto-generated index files (gitignored, rebuilt on demand)
 │   ├── master.yaml             # Complete listing with metadata
 │   ├── by-category.yaml        # Grouped by category
 │   ├── by-priority.yaml        # Grouped by priority
@@ -287,7 +287,9 @@ This directory contains {root_dir} items organized in a distributed structure.
 
 ## Navigation
 
-Use the index files in `_indexes/` for quick lookups:
+Use the index files in `_indexes/` for quick local lookups. Fresh clones and
+GitHub blob/raw views do not contain these generated files until they are
+rebuilt locally.
 
 - `master.yaml` - All items with full metadata
 - `by-category.yaml` - Items grouped by category (Core Functionality, Platform Expansion, etc.)
@@ -300,26 +302,26 @@ Use the TODO CLI for querying and management:
 
 ```bash
 # List items
-uv run scripts/todo_cli.py list --priority=high
-uv run scripts/todo_cli.py list --status="in-progress"
-uv run scripts/todo_cli.py list --worktree=platform-expansion
+uv run _project/scripts/todo_cli.py list --priority=high
+uv run _project/scripts/todo_cli.py list --status="in-progress"
+uv run _project/scripts/todo_cli.py list --worktree=platform-expansion
 
 # Show specific item
-uv run scripts/todo_cli.py show {root_dir}/{"{worktree}"}/{"{phase}"}/{"{item}.yaml"}
+uv run _project/scripts/todo_cli.py show {root_dir}/{"{worktree}"}/{"{phase}"}/{"{item}.yaml"}
 
 # Validate items
-uv run scripts/todo_cli.py validate {root_dir}/
+uv run _project/scripts/todo_cli.py validate {root_dir}/
 
 # Regenerate indexes
-uv run scripts/todo_cli.py reindex
+make todo-reindex
 ```
 
 ## Adding New Items
 
 1. Use the template: `_project/TODO_ENTRY_TEMPLATE.yaml`
 2. Create file in appropriate location: `{root_dir}/{"{worktree}"}/{"{phase}"}/{"{slug}.yaml"}`
-3. Validate: `uv run scripts/validate_todo.py <file>`
-4. Regenerate indexes: `uv run scripts/generate_indexes.py`
+3. Validate: `uv run _project/scripts/validate_todo.py <file>`
+4. Regenerate indexes: `make todo-reindex` (or let `todo_cli.py` regen on next read — indexes are gitignored)
 
 ## Claude Skills
 
@@ -340,7 +342,7 @@ Original files are preserved in `_project/_archive/`.
 
         if not self.dry_run:
             readme_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(readme_path, "w") as f:
+            with open(readme_path, "w", encoding="utf-8") as f:
                 f.write(content)
             print(f"✓ Created {readme_path.relative_to(self.project_root)}")
         else:
@@ -421,8 +423,8 @@ def main():
     else:
         print("✅ Migration complete!")
         print("\nNext steps:")
-        print("  1. Generate indexes: uv run scripts/generate_indexes.py")
-        print("  2. Validate output: uv run scripts/validate_todo.py --all")
+        print("  1. Generate indexes: make todo-reindex")
+        print("  2. Validate output: uv run _project/scripts/validate_todo.py --all")
         print("  3. Verify manually: spot-check a few migrated files")
         print("  4. Archive originals: mv _project/PROJECT_*.yaml _project/_archive/\n")
 

@@ -94,7 +94,7 @@ def _package_via_submit(bundle_path: Path, output_dir: Path) -> Path:
         catch_exceptions=False,
     )
     assert result.exit_code == 0, f"benchbox submit failed: {result.output}"
-    manifest = output_dir / "submission-manifest.json"
+    manifest = output_dir / f"{bundle_path.stem}.manifest.json"
     assert manifest.is_file(), f"manifest missing from {output_dir}"
     # repo_root is referenced by _run_validator below; keep it accessible.
     _ = repo_root
@@ -115,7 +115,7 @@ def test_round_trip_validates_clean_submission(tmp_path: Path, populated_corpus:
     # 3. Copy bundle + manifest into the populated corpus.
     submitted_bundle = out_dir / "bundle" / bundle.name
     target_bundle = populated_corpus / bundle.name
-    target_manifest = populated_corpus / "submission-manifest.json"
+    target_manifest = populated_corpus / manifest_src.name
     shutil.copy2(submitted_bundle, target_bundle)
     shutil.copy2(manifest_src, target_manifest)
 
@@ -139,7 +139,7 @@ def test_round_trip_rejects_tampered_bundle(tmp_path: Path, populated_corpus: Pa
 
     submitted_bundle = out_dir / "bundle" / bundle.name
     target_bundle = populated_corpus / bundle.name
-    target_manifest = populated_corpus / "submission-manifest.json"
+    target_manifest = populated_corpus / manifest_src.name
     shutil.copy2(submitted_bundle, target_bundle)
     shutil.copy2(manifest_src, target_manifest)
 

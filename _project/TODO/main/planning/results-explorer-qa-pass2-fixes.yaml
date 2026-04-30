@@ -1,0 +1,567 @@
+id: results-explorer-qa-pass2-fixes
+title: "Investigate and remediate Results Explorer QA pass-2 findings"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Second end-to-end QA pass of the Results Explorer (run on Chromium 147,
+  with a Firefox 148 spot-check on the cold-load finding) against the
+  dev server at http://localhost:5173/results/, scored against the
+  pass-2 test plan at
+  `_project/audits/results-explorer-qa-pass2-test-plan.md`.
+
+  Tester totals: P=30, F=16, Q=10. Full report:
+  `_project/audits/results-explorer-qa-pass2-findings.md`.
+
+  This item supersedes the still-open work in
+  `results-explorer-qa-pass1-fixes`. Status update against the pass-1
+  bugs (verified during pass-2):
+
+    B1 (PlatformIndex headers don't sort)             still open + scope expanded
+    B2 (empty duckdb/polars platform pages)           CLOSED — pages now render rows
+    B3 (`/does-not-exist/` ≠ NotFound)                partly fixed — multi-segment paths now hit NotFound; single-segment slugs still fall through to BenchmarkIndex
+    B4 (TimeSeries duplicate-key warning)             still open — same warning text
+    Q1 (`?metric=` toggle)                            resolved as an answer: there is no in-page toggle and the URL param is dead code (read into state, then overwritten by `getPrimaryMetricForBenchmark()` on load)
+
+  Pass-2 also surfaced six genuinely new product issues:
+
+    N1  S1.6 / S10.1   Cold-load Home renders the empty corpus (`0 / 0 / 0` cards + "No leaderboard cells match") before DuckDB-WASM has attached. Warm reloads are fine. Highest user-facing impact in this pass.
+    N2  S3.3 / S3.8    BenchmarkIndex silently coerces `?phase=` to an available phase while leaving the URL untouched — URL and rendered cohort can disagree without any visible cue.
+    N3  S9             BenchmarkIndex preserves invalid `?sf=abc` and renders a blank page instead of falling back to a known scale factor.
+    N4  S6.5           Compare with `?ids=<single>` renders a single-platform "comparison" instead of redirecting to ResultDetail or showing a "need 2+" message.
+    N5  S1.4           `document.title` never changes per route — every page is "BenchBox Results Explorer".
+    N6  S7.5           Query workbench has no UI to switch between `DEFAULT_ROW_LIMIT` and `UNLIMITED_ROW_LIMIT`; the constants exist, the toggle does not.
+
+  Plus one plan errata (not a code change):
+
+    E1  S2.2  The pass-2 plan asserted Speedup ratios should be ≥1; the explorer's design is "best=1.00×, slower entries <1". Plan needs a one-line fix.
+
+  Confirmed-but-not-actionable findings (corpus too thin to exercise the
+  control: S3.4 trust+tuning chips, S5.5 tuning sidecar, S6.2 four-platform
+  same-cohort compare) are not work units here — they're tracked as a
+  separate `seed-richer-qa-fixture-corpus` candidate (not yet filed).
+
+  Sequencing rationale: w1 and w2 are research/decision units that gate
+  w12 and w6 respectively; w3..w11 are mechanical and parallel-safe;
+  w13..w14 finalise docs and e2e; w15 is the final acceptance gate.
+
+work:
+  - id: w1
+    summary: "Investigate N1 — root-cause cold-load empty corpus on Home"
+    status: pending
+    notes: |
+      Reproduce on a hard refresh of `/results/` (DevTools "Disable cache"
+      checked, "Preserve log" on). Capture the timing of:
+        - Initial render (which strings appear first — "Loading..." or "0 Results"?)
+        - DuckDB-WASM .duckdb fetch start/end
+        - getMetaLeaderboardData() resolve
+        - listResults() resolve
+
+      Hypothesis ladder, narrowest first:
+        H1  Race in `Home.tsx`: the loading guard is `if (!results)`,
+            but `setResults([])` may run before the meta-leaderboard
+            `getMetaLeaderboardData()` resolves, briefly painting an
+            empty corpus before the leaderboard fills in.
+        H2  `listResults()` returns `[]` (not throw) when the DuckDB
+            view isn't attached yet; the `null`-vs-`[]` distinction is
+            being lost before the spinner can render.
+        H3  StatCard counts (`results.length`, `benchmarks.length`,
+            `platformIds.length`) are computed unconditionally from
+            `results ?? []`, so an in-flight empty array paints the
+            zero state for one frame.
+
+      Output of this unit: a one-paragraph diagnosis on this work
+      unit's notes naming the winning hypothesis with file:line evidence,
+      and a short list of code surfaces that need to change in w6.
+
+  - id: w2
+    summary: "Decide Q1 follow-up — delete dead `?metric=` code or wire the toggle"
+    status: pending
+    notes: |
+      Pass-1's Q1 is resolved: there is no toggle UI and the
+      `?metric=` URL param is read into local state, then immediately
+      overwritten by `getPrimaryMetricForBenchmark(detail.benchmark)`
+      in both `ResultDetail.tsx:64-66` and `Compare.tsx`.
+
+      Choose one:
+        (a) DELETE — remove the `useState` + URL param read + setter on
+            both pages. Drop "primary metric URL param" from any docs.
+            Smallest patch; preserves the "metric is benchmark-derived"
+            invariant that the data layer already enforces.
+        (b) IMPLEMENT — keep the URL contract, also add an in-page
+            toggle (segmented control: "Power score" / "Geomean ms").
+            Toggle writes `?metric=…` and the load effect respects the
+            URL value over the benchmark default. Bigger surface, but
+            unblocks per-result re-framing for power-score benchmarks.
+
+      Recommendation default: (a). Reason: there is no evidence in git
+      history of a removed toggle, and the data layer already picks
+      the correct default per benchmark. Re-confirm by running:
+          git log -p -- results-explorer/src/pages/ResultDetail.tsx | grep -i metric
+          git log -p -- results-explorer/src/pages/Compare.tsx | grep -i metric
+
+      Output: a one-line decision in this work unit's notes; that
+      decision drives w12.
+
+  - id: w3
+    summary: "Fix B1 + S3.6 — click-to-sort headers on PlatformIndex AND BenchmarkIndex"
+    status: pending
+    notes: |
+      Pattern source: `results-explorer/src/pages/ResultDetail.tsx`
+      already has the canonical implementation (`<th><button onClick=
+      toggleSort(key)>{label}{sortArrow(key)}</button></th>` with
+      `useState<SortState<Key>>` and a `useMemo`-built sorted array).
+      Copy that pattern verbatim onto:
+
+        - `results-explorer/src/pages/PlatformIndex.tsx` — columns
+          Benchmark, Scale, Date, Power Score, Geomean. Keep the
+          existing default (`geomean_ms` ascending, nulls last) as the
+          initial `SortState`, so observable behaviour does not change.
+        - `results-explorer/src/pages/BenchmarkIndex.tsx` — sortable
+          columns in the matrix and list views. Identify which `<th>`s
+          should sort by reading the existing render output; do NOT
+          add a sort button to columns whose values aren't ordered
+          (e.g. trust badge column).
+
+      Add `aria-sort="ascending|descending|none"` on each sortable
+      `<th>` so screen readers can follow the state.
+
+      Re-test with: open `/results/p/duckdb/` and `/results/tpch/`,
+      cycle each header asc → desc → asc, confirm the arrow indicator
+      flips and `aria-sort` updates.
+
+  - id: w4
+    summary: "Fix B4 — stable Preact key on TimeSeries multi-result-per-date"
+    status: pending
+    notes: |
+      In `results-explorer/src/components/TimeSeries.tsx` the row key
+      is the `run_date` string. Multiple results sharing one date
+      (common for batch/bulk runs) collide. Switch the key to the
+      stable `result_id` (or a composite `${result_id}-${run_date}` if
+      result_id alone isn't visible at that scope). Confirm with a
+      browser console clean of "Each child in a list should have a
+      unique 'key' prop" warnings on `/results/p/datafusion/` and
+      `/results/p/duckdb/`.
+
+  - id: w5
+    summary: "Fix B3 (narrow) — route single-segment unknown benchmark slugs to NotFound"
+    status: pending
+    notes: |
+      Multi-segment paths like `/results/totally/made/up/path/` now hit
+      NotFound — that part of B3 is fixed. The remaining surface is
+      `/results/<unknown-slug>/`, which still routes to BenchmarkIndex
+      and renders an empty page titled "DOES-NOT-EXIST Results".
+
+      Two acceptable approaches; pick one based on what fits the
+      existing data flow:
+        (a) Inside `BenchmarkIndex.tsx`, after the `listResults()` load
+            settles, if no rows match the URL `benchmark` prop AND the
+            cohort_metadata table has no entry for that benchmark,
+            render `<NotFound />` instead of the empty page.
+        (b) Maintain a known-benchmarks set (built once from
+            cohort_metadata distinct values, cached at the query layer)
+            and have BenchmarkIndex consult it on mount.
+
+      Either way, distinguish "valid benchmark, empty for current
+      filters" (current empty state, keep) from "unknown benchmark
+      slug" (NotFound). Add an e2e test under
+      `results-explorer/e2e/unknown-benchmark.spec.ts` that hits
+      `/results/does-not-exist/` and asserts the NotFound copy renders.
+
+  - id: w6
+    summary: "Fix N1 — eliminate the cold-load empty-corpus flash"
+    needs: [w1]
+    status: pending
+    notes: |
+      Implementation depends on w1's diagnosis. Most likely surface:
+        - If H1/H2/H3: gate the StatCard + MetaLeaderboard render on
+          BOTH `results !== null` AND `metaLeaderboard !== null`
+          (today only the first is gated). Show the existing
+          `LoadingSpinner` until both resolve.
+        - Make the data layer distinguish "WASM not yet attached"
+          (return a sentinel, retry once) from "attached, returned
+          zero rows" (legitimate empty state). Most natural place:
+          `results-explorer/src/lib/duckdbQueries.ts:listResults()`.
+
+      Acceptance: hard-refresh `/results/` with cache disabled in both
+      Chromium and Firefox; the page must NEVER paint `0 / 0 / 0` plus
+      the empty-leaderboard string. Either a spinner or the populated
+      view is acceptable.
+
+  - id: w7
+    summary: "Fix N2 — BenchmarkIndex phase URL/cohort mismatch"
+    status: pending
+    notes: |
+      Today `BenchmarkIndex.tsx:99` computes `effectivePhase = phases.includes(phaseFilter) ? phaseFilter : (phases[0] ?? phaseFilter)`
+      but the URL keeps the user-supplied (invalid) `?phase=` value.
+      User sees `?phase=standard` while looking at the `power` cohort.
+
+      Fix: when the fallback fires, write the corrected value back to
+      the URL via `setPhaseFilter(effectivePhase)`. Make this
+      transparent — no flash, no extra navigation entry. (Use
+      `useUrlState`'s replace mode if available; if not, switch to
+      `history.replaceState`.)
+
+      Add a regression test: navigate to
+      `/results/tpch/?sf=0.01&phase=standard` and assert the URL
+      bar settles at the available phase for that SF after one tick.
+
+  - id: w8
+    summary: "Fix N3 — BenchmarkIndex `?sf=abc` validation"
+    status: pending
+    notes: |
+      Currently `BenchmarkIndex.tsx:42-44` reads `sf` as a string with
+      no validator, then keys data fetches off `effectiveSf =
+      scaleFilter ?? scaleFactors[0] ?? "0.01"`. If the URL is
+      `?sf=abc`, the scale filter is `"abc"` and the cohort lookup
+      finds nothing, blanking the page.
+
+      Fix: on URL hydration, validate the sf value against
+      `scaleFactors` (loaded from the manifest). If invalid, fall
+      through to the default (`scaleFactors[0]`) AND coerce the URL
+      back to that default with a single replaceState (matching w7's
+      pattern — extract a small helper if w7 ships first).
+
+      Add a test that loads `/results/tpch/?sf=abc` and asserts the
+      page renders the SF=0.01 cohort with the URL coerced.
+
+  - id: w9
+    summary: "Fix N4 — Compare single-id guard"
+    status: pending
+    notes: |
+      `Compare.tsx` accepts `?ids=<single>` and renders a one-row
+      "comparison". The pass-2 plan §S6.5 expectation is either:
+        (a) redirect to `/results/r/<id>` (lossless — single-id is
+            really just a detail view); or
+        (b) render a clear "Need 2 or more results to compare" empty
+            state with a link back to the source page.
+
+      Pick (a) for UX; (b) is acceptable if the URL came from a stale
+      saved link. The empty `?ids=` and unknown `?ids=zzz` paths are
+      already handled correctly (per pass-2 P + clean error message);
+      do not regress those.
+
+      Add a test that hits `/results/compare?ids=tpch-duckdb-sf0.01-20260403-7fe93365`
+      and asserts either the redirect (a) or the empty-state copy (b).
+
+  - id: w10
+    summary: "Fix N5 — per-route document.title updates"
+    status: pending
+    notes: |
+      `index.html` declares a single static `<title>BenchBox Results
+      Explorer</title>`. Add a tiny `useDocumentTitle(title)` hook
+      under `results-explorer/src/lib/` (or inline in `Layout.tsx`)
+      and call it from each page with a route-specific title:
+
+        Home:           "Results · BenchBox"
+        BenchmarkIndex: "<Benchmark> · BenchBox Results"
+        PlatformIndex:  "<Platform> · BenchBox Results"
+        ResultDetail:   "<benchmark> · <platform> · SF<sf> · BenchBox Results"
+        Compare:        "Compare (<n>) · BenchBox Results"
+        Query:          "Query · BenchBox Results"
+        NotFound:       "Not found · BenchBox Results"
+
+      Reset to the default in the hook's cleanup so navigating away
+      doesn't leak a stale title into a subsequent route.
+
+  - id: w11
+    summary: "Fix N6 — surface row-limit toggle in Query workbench"
+    status: pending
+    notes: |
+      `results-explorer/src/lib/queryFilters.ts` already exports
+      `DEFAULT_ROW_LIMIT` and `UNLIMITED_ROW_LIMIT`. The Query page
+      uses the default for the table but never lets the user switch.
+      Add a control next to the result table — segmented control or
+      checkbox — and store the choice in URL state via `useUrlState`
+      (suggested key: `limit=default|all`). Default state stays
+      `default`.
+
+      Make the visual signal of the active state obvious; if "all"
+      is selected, also display the actual returned row count in the
+      table footer so the user knows what they got.
+
+  - id: w12
+    summary: "Resolve `?metric=` per w2 — delete dead code OR implement toggle"
+    needs: [w2]
+    status: pending
+    notes: |
+      Branch on w2's recorded decision:
+        (a) DELETE: remove the `primaryMetric` `useState`, the URL
+            param read, and any setter that no longer has a caller, on
+            both `ResultDetail.tsx` and `Compare.tsx`. Verify nothing
+            in `ChartPanel` consumes the URL param directly.
+        (b) IMPLEMENT: add a segmented control rendered next to the
+            headline metric on both pages; clicking writes `?metric=…`
+            via `useUrlState`. Override
+            `getPrimaryMetricForBenchmark()`'s default with the URL
+            value when present, but keep the benchmark default when
+            the URL is absent.
+
+      Either way, update the QA test plan §5.2 / §6.4 expectation in
+      lockstep so a future re-test does not re-flag this finding.
+
+  - id: w13
+    summary: "Apply test-plan errata (E1 / S2.2 Speedup) and promote QA plan to docs/operations/results-explorer-qa.md"
+    status: pending
+    notes: |
+      Two-part doc work:
+
+      Part 1 — fix the Speedup expectation in the pass-2 plan
+      (`_project/audits/results-explorer-qa-pass2-test-plan.md`,
+      §S2.2): the explorer's contract is "best-in-cohort = 1.00×,
+      slower entries < 1". Replace the sentence "speedup = ratios ≥1"
+      with the actual contract.
+
+      Part 2 — promote the (corrected) plan to
+      `docs/operations/results-explorer-qa.md` so it is tracked as
+      shipping documentation rather than a one-off audit artifact.
+      Continues pass-1 work unit w7. Include:
+        - the corrected speedup expectation
+        - the resolved Q1 status (URL-only contract, see w12)
+        - a "Prereqs (operator)" block referencing
+          `cd results-explorer && npm run dev`
+        - an "Expected hidden controls" note covering trust + tuning
+          chips when the corpus has only one tier (avoids spurious
+          finding next pass)
+
+  - id: w14
+    summary: "Add Playwright e2e specs for the new guards"
+    needs: [w3, w5, w7, w8, w9]
+    status: pending
+    notes: |
+      Add or extend specs under `results-explorer/e2e/`. Suggested
+      filenames (one assertion concern each):
+
+        - `unknown-benchmark.spec.ts`         hits /results/does-not-exist/, expects NotFound copy (B3 narrow)
+        - `index-sort-headers.spec.ts`        clicks each sortable th on PlatformIndex + BenchmarkIndex, asserts row order flips (B1 + S3.6)
+        - `compare-single-id.spec.ts`         hits /results/compare?ids=<one>, asserts redirect or empty state (S6.5)
+        - `bench-index-url-validation.spec.ts` hits /results/tpch/?phase=standard and ?sf=abc, asserts URL settles to a valid value (S3.3, S9)
+
+      Wire them into `npm run test:e2e:chromium`. Aim for fast
+      tests (no DuckDB-WASM warmup required where avoidable —
+      these are URL/route assertions, not data assertions).
+
+  - id: w15
+    summary: "Re-run QA pass against the fixed build (pass-3) and confirm closure"
+    needs: [w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14]
+    status: pending
+    notes: |
+      Run the corrected pass-2 plan once more in Chromium 147 and
+      Firefox 148 against http://localhost:5173/results/. Capture a
+      fresh findings file at
+      `_project/audits/results-explorer-qa-pass3-findings.md` using
+      the same YAML block template.
+
+      Acceptance:
+        - All B1, B3 (narrow), B4 entries P
+        - All N1..N6 entries P
+        - S2.2 expectation matches actual UI (no Q raised)
+        - Console clean of the TimeSeries duplicate-key warning
+        - Cold-load Home in both browsers never paints `0 / 0 / 0`
+          before content settles
+
+      If anything still fails, surface as a fresh F finding with a
+      severity tag — do not re-open this TODO; file pass-3 fixes if
+      needed.
+
+deferred:
+  - summary: "Seed a richer QA fixture corpus (multi-tier trust, tuned/notuned pairs, ≥4 platforms in one cohort)"
+    reason: |
+      Pass-2 left S3.4 (trust + tuning chips), S5.5 (tuning sidecar
+      lazy-load), and S6.2 (4-platform same-cohort compare) as
+      corpus-coverage gaps rather than app issues. Worth filing
+      separately so the QA pass actually exercises these controls
+      in pass-3+. Out of scope for this remediation TODO.
+
+  - summary: "Investigate Chrome-headless 30-45s cold-load latency"
+    reason: |
+      Already tracked under `enable-duckdb-wasm-http-range-reads-for-registered-urls`.
+      Pass-2's N1 cold-load empty-state finding is a different surface
+      (UI loading-state gating) and IS in scope as w1+w6.
+
+  - summary: "Suppress / upgrade Firefox WebAssembly exception-handling deprecation warning"
+    reason: |
+      Upstream DuckDB-WASM. No local action available until the runtime
+      drops the deprecated `try` form. (Carried over from pass-1.)
+
+  - summary: "URL-sync BenchmarkIndex view mode (matrix/ranks/list) and Query column visibility"
+    reason: |
+      Pass-2 §S3.1 and §S7.3 confirmed these are session-only by design.
+      Treating "shareable URL state" as a follow-up improvement, not a
+      regression. File as a separate enhancement TODO if/when needed.
+
+files_affected:
+  modified:
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/Home.tsx"
+    - "results-explorer/src/pages/NotFound.tsx"
+    - "results-explorer/src/components/TimeSeries.tsx"
+    - "results-explorer/src/components/Layout.tsx"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/queryFilters.ts"
+    - "results-explorer/src/lib/useUrlState.ts"
+    - "_project/audits/results-explorer-qa-pass2-test-plan.md"
+  added:
+    - "results-explorer/src/lib/useDocumentTitle.ts"
+    - "results-explorer/e2e/unknown-benchmark.spec.ts"
+    - "results-explorer/e2e/index-sort-headers.spec.ts"
+    - "results-explorer/e2e/compare-single-id.spec.ts"
+    - "results-explorer/e2e/bench-index-url-validation.spec.ts"
+    - "docs/operations/results-explorer-qa.md"
+    - "_project/audits/results-explorer-qa-pass3-findings.md"
+
+must_preserve:
+  - "B2 fix: /results/p/duckdb/ (4 rows) and /results/p/polars/ (2 rows) keep rendering — do not regress while restructuring PlatformIndex for click-sort"
+  - "ResultDetail's existing in-page sort UI (button-in-th + sortArrow) keeps working unchanged after w3 is reused as the pattern source"
+  - "PlatformIndex default sort (geomean_ms ascending, nulls last) remains the initial state when no header has been clicked"
+  - "DuckDB-WASM single-attach behaviour: results.duckdb is fetched once per page-session, not per navigation (S10.3 currently P — must stay P)"
+  - "NotFound page continues to render for genuinely unknown top-level routes (preact-router default) — w5 must narrow, not widen, the guard"
+  - "Compare's existing `?ids=<unknown>` clean error path keeps showing 'No detail found for…' rather than crashing"
+  - "Empty `?ids=` and `?bm=` URL params keep being treated as 'no filter' (S2.3 + S6.5 P paths)"
+  - "Existing default sort on Query workbench (`run_date desc`) remains the initial state after w11 adds the row-limit toggle"
+
+approach: |
+  Investigate before patching. w1 and w2 are research/decision units
+  that produce explicit outputs (root cause; delete-vs-implement
+  decision). Run them first. Once they settle:
+
+    Phase A (parallel-safe mechanical fixes):  w3, w4, w5, w7, w8, w9, w10, w11
+    Phase B (depends on Phase A):              w12 (needs w2), w6 (needs w1)
+    Phase C (depends on Phases A+B):           w13 docs, w14 e2e
+    Phase D (acceptance gate):                 w15 re-run QA
+
+  Reuse existing patterns:
+    - Sort handlers: copy ResultDetail's `<th><button onClick=
+      toggleSort()>` pattern verbatim (w3).
+    - Stable Preact keys: every result row already has a `result_id` —
+      use it directly (w4).
+    - URL-state validation: `useUrlState` + `replaceState` on hydrate
+      is the right shape for w7 + w8; consider extracting a small
+      helper if both ship.
+    - Document title: a tiny `useEffect`-based `useDocumentTitle`
+      hook under `src/lib/` is sufficient — no need for a head-manager
+      dependency (w10).
+    - Loading-state gating: `Home.tsx`'s existing
+      `if (!results) return <LoadingSpinner ... />` is the obvious
+      surface for w6; just AND it with `metaLeaderboard !== null` if
+      H1/H3 wins.
+
+  Do NOT batch fixes into one mega-commit. Each work unit is its own
+  commit per the skill's commit framework. Run lint + relevant tests
+  per slice. Vertical slices: implement → test → verify → commit.
+
+  For the failing cold-load (N1), do NOT skip the diagnosis step —
+  jumping to a "just add a spinner" fix risks masking a deeper
+  data-layer race that will resurface as soon as the corpus grows.
+
+anti_patterns:
+  - "DO NOT add the `?metric=` toggle UI before w2 records a decision — because there is no evidence it ever existed and the data layer already enforces a benchmark-derived default — gather git evidence first."
+  - "DO NOT delete the existing default-sort logic on PlatformIndex or the existing `run_date desc` default on Query while extending them — because those are observable initial states — extend, do not replace."
+  - "DO NOT widen w5's NotFound guard to top-level routes — because preact-router's `default` already handles those — guard only the `:benchmark/` slug match."
+  - "DO NOT silently rewrite garbage URL state to defaults without a single visible replaceState — because users hand-edit URLs and a hidden coercion would feel broken — make the URL settle to a valid value within one tick."
+  - "DO NOT special-case the cold-load fix to a single platform — because the bug is global empty-state-vs-loading-state confusion — find the gating bug and fix it for all platforms at once."
+  - "DO NOT add a head-manager package (react-helmet-equivalent) for the document.title fix — because a 12-line `useDocumentTitle` hook does the entire job — keep the dependency surface flat."
+  - "DO NOT batch unrelated fixes into one commit — because per-slice commits give the QA re-run (w15) a clean bisect target — one work unit, one commit."
+
+verification:
+  - description: "Vitest unit tests pass after all fixes"
+    command: "cd results-explorer && npm run test"
+    expected_output: "Test Files  ... passed ... 0 failed"
+  - description: "TypeScript clean across the explorer"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "exit code 0; no `error TS` lines emitted"
+  - description: "Playwright e2e Chromium suite passes (includes new specs from w14)"
+    command: "cd results-explorer && npm run test:e2e:chromium"
+    expected_output: "passed (... ms); 0 failed"
+  - description: "Manual smoke: cold-load Home does not paint the 0/0/0 empty state"
+    command: "open -a 'Google Chrome' --args --incognito http://localhost:5173/results/  # then watch DevTools Network + Elements"
+    expected_output: "Either the LoadingSpinner or the populated MetaLeaderboard renders; the StatCard counts never read 0/0/0; no 'No leaderboard cells match' string flashes"
+  - description: "Manual smoke: PlatformIndex headers sort"
+    command: "open http://localhost:5173/results/p/duckdb/  # click each sortable th"
+    expected_output: "Each click flips row order; arrow indicator updates; aria-sort reflects current state"
+  - description: "Manual smoke: BenchmarkIndex headers sort"
+    command: "open http://localhost:5173/results/tpch/  # click each sortable th in matrix and list views"
+    expected_output: "Same behaviour as PlatformIndex; default geomean order preserved on initial render"
+  - description: "Manual smoke: TimeSeries console clean"
+    command: "open http://localhost:5173/results/p/datafusion/  # then check DevTools Console"
+    expected_output: "No 'Each child in a list should have a unique \"key\" prop' warnings; no red error entries"
+  - description: "Manual smoke: /results/does-not-exist/ → NotFound"
+    command: "open http://localhost:5173/results/does-not-exist/"
+    expected_output: "Page renders the NotFound component, not 'DOES-NOT-EXIST Results'"
+  - description: "Manual smoke: BenchmarkIndex URL validation"
+    command: "open 'http://localhost:5173/results/tpch/?phase=standard' && open 'http://localhost:5173/results/tpch/?sf=abc'"
+    expected_output: "URL bar settles within one tick — phase= reflects an available phase, sf= reflects an available scale factor; rendered cohort matches"
+  - description: "Manual smoke: Compare single-id guard"
+    command: "open 'http://localhost:5173/results/compare?ids=tpch-duckdb-sf0.01-20260403-7fe93365'"
+    expected_output: "Either redirects to /results/r/tpch-duckdb-sf0.01-20260403-7fe93365 OR shows a clear 'Need 2 or more results to compare' message — never a one-row 'comparison'"
+  - description: "Manual smoke: document.title updates per route"
+    command: "Visit /, /tpch/, /p/duckdb/, /r/<id>, /compare, /query, /not-a-real-path  # watch the browser tab title"
+    expected_output: "Each route shows a distinct title per w10's mapping; navigating away resets the default"
+  - description: "Manual smoke: Query workbench row-limit toggle"
+    command: "open http://localhost:5173/results/query  # toggle between Default and All"
+    expected_output: "Toggle updates URL state; row count in the table footer reflects the actual returned rows; default initial state remains 'Default'"
+  - description: "Pass-3 QA findings file shows zero F entries"
+    command: "grep -c 'status: F' _project/audits/results-explorer-qa-pass3-findings.md"
+    expected_output: "0"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/"
+    - "results-explorer/e2e/"
+    - "_project/audits/results-explorer-qa-pass2-test-plan.md"
+    - "_project/audits/results-explorer-qa-pass3-findings.md"
+    - "docs/operations/results-explorer-qa.md"
+  do_not_modify:
+    - "benchbox/core/explorer_pipeline/"
+    - "benchbox/cli/commands/explorer.py"
+    - "results-explorer/src/db.ts"
+    - "results-explorer/public/data/"
+    - "results-explorer/scripts/"
+
+deps:
+  needs: []
+
+metadata:
+  tags:
+    - "results-explorer"
+    - "qa-followup"
+    - "bug"
+    - "ui"
+    - "preact"
+    - "duckdb-wasm"
+    - "url-state"
+    - "accessibility"
+  estimated_effort: "Medium-Large (2-3 days end-to-end including the pass-3 re-test)"
+  created_date: "2026-04-29"
+  source: "QA tester report (pass-2) on branch chore/todo-review-nits-dry-run-2026-04-29, captured at _project/audits/results-explorer-qa-pass2-findings.md"
+
+impact:
+  user_impact: |
+    The cold-load empty-state flash (N1) is the most visible bug — a
+    first-time visitor with a cleared cache sees an explorer that
+    appears to have no data. Sortable index headers (B1 + S3.6) and
+    URL-state validation (N2 + N3) are workflow papercuts that
+    accumulate friction for any analyst trying to share a state-laden
+    URL. Single-id Compare (N4) and missing document titles (N5)
+    confuse browser-history navigation. Row-limit UI (N6) blocks
+    larger ad-hoc queries. Together this pass closes the practical
+    gaps before the explorer can be advertised externally.
+  technical_debt: |
+    Resolves the dead `?metric=` URL-param state on ResultDetail and
+    Compare (Q1) so future readers don't re-discover it. Establishes a
+    reusable `useDocumentTitle` hook + URL-validation pattern that the
+    next page added to the explorer can adopt without bespoke code.
+
+success_metrics:
+  - "All pass-1 still-open bugs (B1 expanded, B3 narrowed, B4) resolved with passing verification commands"
+  - "All pass-2 new findings (N1..N6) resolved with passing verification commands"
+  - "Q1 cleanup landed per w2's recorded decision; QA test plan §5.2 + §6.4 reflect it"
+  - "QA test plan §S2.2 Speedup expectation corrected and the plan promoted to docs/operations/results-explorer-qa.md"
+  - "Pass-3 QA re-run returns zero F entries across all S* sections"
+  - "Playwright e2e Chromium suite covers the new guards (B3 narrow, sort headers, single-id compare, sf=garbage)"

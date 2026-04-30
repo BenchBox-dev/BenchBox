@@ -60,6 +60,9 @@ When you produce a **Blind-Spot Audit (L2)** during any review (ultrareview,
 Do not skip the file write because the finding "feels minor" — sweep-time
 triage is where dismissals belong, not write-time. Findings printed only in
 chat get lost; file-first capture is what makes the L2 audit habit pay off.
+If a review response contains an L2 audit without a `Recorded:` pointer for
+each finding, treat the response as protocol drift and record the missing
+finding before continuing.
 
 Sweep / triage findings with `make blind-spots-{list,report,sweep}`. Promotion
 to a TODO is a sweep-step decision, not a write-step decision. See

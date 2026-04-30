@@ -45,8 +45,8 @@ _HIGH_RISK_CATEGORIES = {
 _HIGH_RISK_QUERY_IDS = {
     "any_value_simple",
     "any_value_with_filter",
-    # Guard for future approximate-median variants: no active variant exists
-    # today, but any reintroduced variant must declare its comparability contract.
+    # Historical guard: intrinsic_appx_median has no active variant today,
+    # but any reintroduced variant is also covered by the all-variants rule.
     "intrinsic_appx_median",
 }
 
@@ -131,7 +131,7 @@ def _contract_metadata_issues(
                     query_id=query_id,
                     dialect=None,
                     kind="missing_result_contract",
-                    detail="High-risk variant-bearing query must declare result_contract",
+                    detail="Variant-bearing query must declare result_contract",
                 )
             ]
         return []
@@ -209,7 +209,7 @@ def _resolve_star_wrapper_projections(select: exp.Select) -> list[exp.Expression
 
 
 def _requires_result_contract(entry: PrimitiveQuery) -> bool:
-    return entry.category in _HIGH_RISK_CATEGORIES or entry.id in _HIGH_RISK_QUERY_IDS
+    return bool(entry.variants) or entry.category in _HIGH_RISK_CATEGORIES or entry.id in _HIGH_RISK_QUERY_IDS
 
 
 __all__ = [

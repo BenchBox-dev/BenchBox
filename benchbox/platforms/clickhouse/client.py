@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import io
 import logging
 import re
+
+import pandas as pd
+import pyarrow as pa
 
 logger = logging.getLogger(__name__)
 
@@ -101,21 +105,45 @@ class ClickHouseLocalClient:
             if query.strip().upper().startswith("INSERT") and params:
                 return self._execute_insert(query, params)
 
-            # `format="DataFrame"` returns a pandas DataFrame directly from chDB,
-            # avoiding the per-row Python CSV parsing that previously dominated
-            # wall-clock time for queries returning many rows (10–100× speedup
-            # on multi-million-row results).
+            # `format="ArrowStream"` returns Arrow IPC bytes that we decode via
+            # pyarrow into a pandas DataFrame. Two reasons not to use chDB's
+            # built-in `format="DataFrame"`:
+            #   1. it SIGABRTs (uncatchable) when the result contains a Tuple-
+            #      typed column (e.g. read_primitives.array_of_struct returns
+            #      Array(Tuple(...))), killing the whole benchmark process;
+            #   2. it's a thin wrapper around the same Arrow path anyway, so
+            #      decoding via pyarrow ourselves keeps the perf benefit that
+            #      replaced per-row CSV parsing while sidestepping the bug.
             # Session API: query(sql, format)  /  Connection API: query(sql, format=format)
-            df = (
-                self._conn.query(query, "DataFrame")
+            result = (
+                self._conn.query(query, "ArrowStream")
                 if self._is_persistent
-                else self._conn.query(query, format="DataFrame")
+                else self._conn.query(query, format="ArrowStream")
             )
-            return _ResultProxy(df)
+            return _ResultProxy(self._arrow_to_dataframe(result))
 
         except Exception as e:
             # Re-raise with more context
             raise RuntimeError(f"ClickHouse local query failed: {e}") from e
+
+    @staticmethod
+    def _arrow_to_dataframe(result):
+        """Decode chDB ArrowStream result bytes into a pandas DataFrame.
+
+        Empty results (e.g. INSERT, DDL, or `WHERE 0=1`) return zero bytes from
+        chDB; treat that as an empty DataFrame instead of erroring on the IPC
+        stream reader.
+
+        TODO(chdb-tuple-dataframe): once chDB's `format="DataFrame"` stops
+        SIGABRTing on Tuple-typed columns, the explicit ArrowStream + pyarrow
+        decode here can be reverted to a direct DataFrame fetch. File / track
+        this in the chdb upstream issue tracker.
+        """
+        data = result.bytes()
+        if not data:
+            return pd.DataFrame()
+        reader = pa.ipc.open_stream(io.BytesIO(data))
+        return reader.read_all().to_pandas()
 
     def close(self):
         """Close the local connection and ensure data is persisted."""

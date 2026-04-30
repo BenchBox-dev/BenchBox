@@ -38,6 +38,7 @@ jobs:
             | grep -v '\.plans\.json$' \
             | grep -v '\.tuning\.json$' \
             | grep -v 'corpus-inventory\.json$' \
+            | grep -v '\.manifest\.json$' \
             | grep -v 'submission-manifest\.json$' \
             || true)
           if [ -z "$CHANGED" ]; then

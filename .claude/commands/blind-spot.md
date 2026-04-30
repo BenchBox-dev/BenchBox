@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(date:*), Bash(uv:*), Bash(make:*), Write, Edit, Read
+allowed-tools: Bash(date:*), Bash(git:*), Bash(ls:*), Bash(grep:*), Bash(wc:*), Bash(tr:*), Bash(test:*), Bash(uv:*), Bash(make:*), Write, Edit, Read
 description: Record a blind-spot audit finding to _project/blind-spots/ (file-first capture)
 ---
 
@@ -21,7 +21,8 @@ The user wants to record a blind-spot audit finding. Follow the protocol in
 
 2. **Compose the filename.** Use the timestamp from the Context block above:
    `_project/blind-spots/YYYY-MM-DD-HHMMSS-<slug>.md`. Filename stem must equal
-   the `id` field in the frontmatter.
+   the `id` field in the frontmatter. If that exact path already exists, append
+   a short numeric suffix before `.md` (`...-<slug>-2.md`, then `-3`, etc.).
 
 3. **Write the file** using this exact frontmatter schema. Required fields are
    `id`, `date`, `status` (always `open` at write time), `finding_kind`, and

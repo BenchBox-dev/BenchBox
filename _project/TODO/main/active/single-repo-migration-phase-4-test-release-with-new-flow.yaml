@@ -167,7 +167,7 @@ work:
     # Verify:
     git log --graph --oneline | head -20   # should show two roots merging
     git log --oneline -- _project/TODO/ | head -5   # original SHAs preserved
-    git blame _project/TODO/_indexes/by-priority.yaml | head   # original authors/dates
+    git blame _project/TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml | head
 
     git push origin migration/project-history-merge
     gh pr create --title "Migration: merge _project/** history (preserve TODO/DONE archaeology)" \

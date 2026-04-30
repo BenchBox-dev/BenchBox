@@ -416,6 +416,25 @@ class TestClickHouseAdapter:
             expected_with_engine = "CREATE TABLE test (id INT) ENGINE = ReplacingMergeTree() ORDER BY tuple()"
             assert optimized_with_engine == expected_with_engine
 
+            # DuckDB-style fixed-size float arrays must be rewritten to
+            # Array(Float32/Float64) — ClickHouse rejects `FLOAT[N]` syntax.
+            duckdb_array = "CREATE TABLE vectors (id BIGINT, embedding FLOAT[128])"
+            assert "Array(Float32)" in adapter._optimize_table_definition(duckdb_array)
+            assert "FLOAT[" not in adapter._optimize_table_definition(duckdb_array)
+
+            duckdb_double_array = "CREATE TABLE vectors (id BIGINT, embedding DOUBLE[256])"
+            assert "Array(Float64)" in adapter._optimize_table_definition(duckdb_double_array)
+
+            # \b word boundary must protect identifiers that merely contain the
+            # FLOAT/DOUBLE substring; the rewrite is for type tokens only. The
+            # mixed case asserts both: the real FLOAT[N] type token IS rewritten
+            # while the column name `my_float_col` survives untouched.
+            mixed = "CREATE TABLE t (vec FLOAT[10], my_float_col INT)"
+            mixed_out = adapter._optimize_table_definition(mixed)
+            assert "vec Array(Float32)" in mixed_out
+            assert "my_float_col INT" in mixed_out
+            assert "FLOAT[" not in mixed_out
+
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_get_platform_metadata(self, mock_client_class):
         """Test platform metadata collection."""

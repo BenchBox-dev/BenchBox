@@ -9,9 +9,9 @@ Creates structured indexes for quick navigation and querying:
 - _indexes/by-status.yaml - Grouped by status
 
 Usage:
-    uv run scripts/generate_indexes.py                    # Generate indexes for TODO and DONE
-    uv run scripts/generate_indexes.py --todo-only         # Only TODO indexes
-    uv run scripts/generate_indexes.py --done-only         # Only DONE indexes
+    uv run _project/scripts/generate_indexes.py                    # Generate indexes for TODO and DONE
+    uv run _project/scripts/generate_indexes.py --todo-only         # Only TODO indexes
+    uv run _project/scripts/generate_indexes.py --done-only         # Only DONE indexes
 """
 
 import argparse
@@ -19,6 +19,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import yaml
 
@@ -30,6 +31,7 @@ class IndexGenerator:
         """Initialize index generator for a TODO or DONE directory."""
         self.root_path = root_path
         self.items = []
+        self.errors: list[str] = []
 
     def scan_items(self):
         """Scan directory tree and collect all TODO items."""
@@ -45,7 +47,7 @@ class IndexGenerator:
 
         for file_path in yaml_files:
             try:
-                with open(file_path) as f:
+                with open(file_path, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
 
                 if data is None:
@@ -84,13 +86,9 @@ class IndexGenerator:
                 work = data.get("work")
                 if work and isinstance(work, list):
                     item["work_total"] = len(work)
-                    item["work_done"] = sum(
-                        1 for u in work if isinstance(u, dict) and u.get("status") == "done"
-                    )
+                    item["work_done"] = sum(1 for u in work if isinstance(u, dict) and u.get("status") == "done")
                     # Ready = pending with all needs satisfied
-                    done_ids = {
-                        u.get("id") for u in work if isinstance(u, dict) and u.get("status") == "done"
-                    }
+                    done_ids = {u.get("id") for u in work if isinstance(u, dict) and u.get("status") == "done"}
                     ready_count = 0
                     for u in work:
                         if not isinstance(u, dict):
@@ -116,7 +114,9 @@ class IndexGenerator:
                 self.items.append(item)
 
             except Exception as e:
-                print(f"Warning: Failed to process {file_path}: {e}", file=sys.stderr)
+                message = f"Warning: Failed to process {file_path}: {e}"
+                self.errors.append(message)
+                print(message, file=sys.stderr)
                 continue
 
     def generate_master_index(self) -> dict:
@@ -228,7 +228,27 @@ class IndexGenerator:
 
         return result
 
-    def write_indexes(self):
+    def _write_yaml_atomic(self, index_path: Path, data: dict) -> None:
+        """Write one YAML index by replacing a complete temp file atomically."""
+        tmp_path: Path | None = None
+        try:
+            with NamedTemporaryFile(
+                "w",
+                dir=index_path.parent,
+                prefix=f".{index_path.name}.",
+                suffix=".tmp",
+                encoding="utf-8",
+                delete=False,
+            ) as f:
+                tmp_path = Path(f.name)
+                yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True, width=120)
+            tmp_path.replace(index_path)
+        except Exception:
+            if tmp_path and tmp_path.exists():
+                tmp_path.unlink()
+            raise
+
+    def write_indexes(self) -> bool:
         """Generate and write all index files."""
         # Create _indexes directory
         indexes_dir = self.root_path / "_indexes"
@@ -238,6 +258,12 @@ class IndexGenerator:
         print(f"Scanning {self.root_path}...")
         self.scan_items()
         print(f"Found {len(self.items)} items")
+        if self.errors:
+            print(
+                f"❌ Skipped {len(self.errors)} file(s); not writing indexes for {self.root_path.name}/",
+                file=sys.stderr,
+            )
+            return False
 
         # Generate indexes
         indexes = {
@@ -250,11 +276,11 @@ class IndexGenerator:
         # Write index files
         for filename, data in indexes.items():
             index_path = indexes_dir / filename
-            with open(index_path, "w") as f:
-                yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True, width=120)
+            self._write_yaml_atomic(index_path, data)
             print(f"  ✓ Generated {index_path}")
 
         print(f"✅ Index generation complete for {self.root_path.name}/\n")
+        return len(self.errors) == 0
 
 
 def main():
@@ -279,17 +305,19 @@ def main():
     print("TODO/DONE Index Generator")
     print(f"{'=' * 80}\n")
 
+    had_errors = False
+
     # Generate indexes based on arguments
     if args.done_only:
         if done_dir.exists():
             generator = IndexGenerator(done_dir)
-            generator.write_indexes()
+            had_errors = not generator.write_indexes()
         else:
             print(f"⚠️  DONE directory not found: {done_dir}")
     elif args.todo_only:
         if todo_dir.exists():
             generator = IndexGenerator(todo_dir)
-            generator.write_indexes()
+            had_errors = not generator.write_indexes()
         else:
             print(f"⚠️  TODO directory not found: {todo_dir}")
     else:
@@ -297,9 +325,13 @@ def main():
         for directory in [todo_dir, done_dir]:
             if directory.exists():
                 generator = IndexGenerator(directory)
-                generator.write_indexes()
+                had_errors = not generator.write_indexes() or had_errors
             else:
                 print(f"⚠️  Directory not found: {directory}\n")
+
+    if had_errors:
+        print("❌ Index generation completed with skipped files; fix warnings above.", file=sys.stderr)
+        sys.exit(1)
 
     print("✅ All indexes generated successfully!")
 
