@@ -139,7 +139,7 @@ work:
 
   - id: w4
     summary: "Document the new failure flow in CLAUDE.md and AGENTS.md"
-    status: pending
+    status: done
     notes: |
       Add a section "If develop goes red":
         - The post-merge workflow detects the failure within ~5 min
@@ -150,6 +150,20 @@ work:
         - To repair: `make worktree-claim BRANCH=fix/<original-issue>`,
           fix, resubmit
       Replace any older "monitor your PR until green" guidance.
+
+      Implementation record (2026-04-30):
+        - Updated `CLAUDE.md` with an "If develop goes red" flow: the
+          post-merge workflow opens an `incident:develop-red` revert PR, or an
+          `incident:develop-red-revert-conflict` issue when the revert
+          conflicts.
+        - Updated `AGENTS.md` with the same operating guidance and removed
+          the placeholder language that Step 4 would expand the safety net
+          later.
+        - Documented that agents do not need to monitor CI proactively after
+          auto-merge; the generated revert PR or conflict issue is the alert.
+        - Documented the repair path:
+          `make worktree-claim BRANCH=fix/<original-issue>`, fix, preflight,
+          and resubmit with `make pr-open`.
     needs: [w2]
 
   - id: w5
