@@ -2,8 +2,9 @@ id: dev-loop-step-4-post-merge-safety-net
 title: "Dev-loop simplification — Step 4: develop-post-merge auto-revert + dev-loop metrics"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Core Functionality
+completed_date: "2026-04-30"
 
 description: |
   Strengthens `develop-post-merge.yml` so that relaxing strict-base in
