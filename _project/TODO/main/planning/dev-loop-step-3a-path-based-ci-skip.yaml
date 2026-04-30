@@ -6,8 +6,9 @@ status: Not Started
 category: Core Functionality
 
 description: |
-  Companion to Step 3. After Step 3 narrows develop PR-tier CI to
-  lint + Ubuntu 3.12 fast tests, this step closes the remaining waste:
+  Companion to Step 3. After Step 3 removes broad non-required lanes
+  from routine develop PR CI while preserving the existing lint +
+  Ubuntu 3.12 fast-test required contexts, this step closes the remaining waste:
   PRs that touch zero code (TODOs, blind-spots, decisions, blog drafts,
   agent-doc edits) still run the surviving 2-3 jobs unnecessarily.
 
@@ -33,7 +34,9 @@ description: |
   non-required reporting only.
 
   Single PR via `make pr-open`. Independently shippable AFTER Step 3
-  lands (the required-checks list this depends on is established there).
+  lands so the PR-tier workflow shape is stable. The starting required-checks
+  list is already established by the live `develop` ruleset; Step 3a is the
+  later step that changes it to the umbrella result check.
 
 deps:
   needs:
@@ -351,9 +354,9 @@ approach: |
   comparison contexts).
 
   Sequence the rollout: workflow changes first (w6 merged to develop),
-  THEN branch-protection change (w7). Reverse order leaves develop
-  unmergeable for whatever interval. Step 3 w5 used the same sequencing
-  for the same reason.
+  THEN branch-protection/ruleset change (w7). Reverse order leaves develop
+  unmergeable for whatever interval because the required umbrella check name
+  will not exist on the base branch yet.
 
 anti_patterns:
   - "DO NOT use top-level `paths:` / `paths-ignore:` filters on the workflow `on:` block — because GitHub treats workflows-not-run as 'pending' for required-checks, leaving the PR unmergeable — use job-level `if:` with an umbrella instead"
