@@ -1,0 +1,200 @@
+id: dev-loop-step-1-local-loop-cleanup
+title: "Dev-loop simplification — Step 1: opt-in pre-push, bounded fanout, conservative test lock"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  First implementation step of the dev-loop simplification plan. Removes
+  local-loop friction so agents can push and run `pr-fanout` without
+  hook serialization, while preserving the global test lock that protects
+  the workstation from concurrent xdist storms.
+
+  This step also captures the consolidated L2 blind-spot findings from
+  the four-round merge-loop audit to `_project/blind-spots/`, satisfying
+  the protocol-debt accumulated during the planning rounds.
+
+  Single PR via `make pr-open`. Independently shippable; no dependency
+  on Steps 2-4 landing first.
+
+deps:
+  needs:
+    - dev-loop-step-0-verify-assumptions
+
+work:
+  - id: w1
+    summary: "Gate all expensive pre-push hooks behind BENCHBOX_PREPUSH=1"
+    status: pending
+    notes: |
+      Audit `.pre-commit-config.yaml` for every hook with `stages:
+      [pre-push]`. Currently includes at minimum:
+        - `pr-preflight-fast-tests`
+        - `timing-policy-fast-lane`
+      Wrap each entry's command in a guard:
+        `if [ "$BENCHBOX_PREPUSH" = "1" ]; then <existing-cmd>; else exit 0; fi`
+      Or use the `args` / `entry` pattern that pre-commit supports.
+      Default behavior: hooks no-op unless env var is set. `make
+      pr-preflight` remains the explicit human-facing invocation
+      (does not depend on the env var).
+
+  - id: w2
+    summary: "Make pr-fanout bounded-parallel with PR_FANOUT_JOBS=4 default"
+    status: pending
+    notes: |
+      Change `pr-fanout` target in `Makefile` from sequential to parallel.
+      Add `PR_FANOUT_JOBS ?= 4` near the top. Use `xargs -P "$(PR_FANOUT_JOBS)"`
+      or GNU `parallel -j "$(PR_FANOUT_JOBS)"` to fan out
+      `make pr-open` calls across worktrees. Drop the
+      "Sequential by design" comment block. Document the env var in
+      the help target.
+    needs: [w1]
+
+  - id: w3
+    summary: "Keep global test lock; add BENCHBOX_TEST_LOCK_DIR override"
+    status: pending
+    notes: |
+      Read `tests/conftest.py` and locate the lock acquisition logic
+      (currently `~/.benchbox/test.lock`). Do NOT change the default —
+      a global lock is what prevents 10 concurrent xdist runs from
+      melting the workstation. Add an env var override:
+        `lock_dir = os.environ.get("BENCHBOX_TEST_LOCK_DIR",
+                                   os.path.expanduser("~/.benchbox"))`
+      Update `Makefile` `test-unlock` target to honor the same env var.
+      Update `tests/README.md:257` area to document the override and
+      explain WHY the default stays global.
+
+  - id: w4
+    summary: "Strip manual-coordination guidance from CLAUDE.md and AGENTS.md"
+    status: pending
+    notes: |
+      Remove from both files:
+        - "Drain one at a time, oldest first" (and surrounding pr-refresh prose)
+        - "One PR per file area at a time"
+        - "Sequential by design" notes around pr-fanout
+      Replace with a one-paragraph summary of the new model: pool
+      worktrees + auto-merge + post-merge auto-revert as safety net.
+      Note that this paragraph will be expanded by Steps 2 and 4 once
+      those land; here, just remove the now-incorrect guidance.
+
+  - id: w5
+    summary: "Capture consolidated L2 blind-spot findings to _project/blind-spots/"
+    status: pending
+    notes: |
+      Six findings from the four-round merge-loop audit (2026-04-30 session):
+        1. Original plan bundled "stop babysitting PRs" with "promote
+           develop to release-grade gating" — separable decisions
+        2. PR CI on develop is already heavy today; reducing it is the
+           highest-leverage standalone move
+        3. Test-lock localization is not a pure win at scale; the global
+           lock has a real CPU-protection job (10 worktrees × xdist auto)
+        4. A queue creates a single point of failure with no analog in
+           current setup
+        5. Dwell time silently changes the agent contract (5 min today
+           vs hours under a queue)
+        6. develop-post-merge.yml is the actual safety net; queue plan
+           kept it as belt-and-suspenders without resolving the tension
+      One file per finding under `_project/blind-spots/2026-04-30-HHMMSS-<slug>.md`
+      using the frontmatter schema from `_project/blind-spots/README.md`.
+
+  - id: w6
+    summary: "Run validation locally and open the PR"
+    status: pending
+    needs: [w1, w2, w3, w4, w5]
+    notes: |
+      Run `make lint format typecheck`, then
+      `BENCHBOX_PREPUSH=1 make pr-preflight` to confirm the opt-in path
+      still works. Then `make pr-open`. Do NOT enable the new env var
+      globally; the point is that absence-of-var is the new default.
+
+verification:
+  - description: "All pre-push hooks no-op when BENCHBOX_PREPUSH is unset"
+    command: "BENCHBOX_PREPUSH= pre-commit run --hook-stage pre-push --all-files 2>&1 | grep -cE '(Skipped|Passed)'"
+    expected_output: "matches the count of pre-push hooks in .pre-commit-config.yaml"
+  - description: "Pre-push hooks execute when BENCHBOX_PREPUSH=1"
+    command: "BENCHBOX_PREPUSH=1 pre-commit run pr-preflight-fast-tests --hook-stage pre-push --all-files 2>&1 | tail -3"
+    expected_output: "hook runs (success or expected failure on uncommitted state); does not skip"
+  - description: "pr-fanout default parallelism is 4"
+    command: "grep -E '^PR_FANOUT_JOBS \\?= ' Makefile"
+    expected_output: "PR_FANOUT_JOBS ?= 4"
+  - description: "Test lock honors BENCHBOX_TEST_LOCK_DIR override"
+    command: "BENCHBOX_TEST_LOCK_DIR=/tmp/bb-lock-test uv run -- python -m pytest -m fast -q tests/unit/ -x 2>&1 | tail -5 && ls /tmp/bb-lock-test/test.lock"
+    expected_output: "lock file present at /tmp/bb-lock-test/test.lock; tests run normally"
+  - description: "Default test lock still uses ~/.benchbox/"
+    command: "uv run -- python -c \"import os; from tests.conftest import _LOCK_PATH if False else None; print(os.path.expanduser('~/.benchbox/test.lock'))\""
+    expected_output: "/Users/joe/.benchbox/test.lock or equivalent home-dir path"
+  - description: "Stale guidance removed from agent-facing docs"
+    command: "grep -cE '(Drain one at a time|One PR per file area|Sequential by design)' CLAUDE.md AGENTS.md"
+    expected_output: "0"
+  - description: "Six blind-spot findings recorded"
+    command: "ls _project/blind-spots/2026-04-30-*.md | wc -l"
+    expected_output: "6"
+
+must_preserve:
+  - "Existing test runtime when BENCHBOX_PREPUSH is set — no functional change to the hook itself"
+  - "Global test lock as the DEFAULT — agents that don't set the env var continue to be CPU-protected"
+  - "make pr-preflight as a working manual command (it is the human-facing escape hatch)"
+  - "Existing pr-fanout output structure (one section per worktree) — only parallelism changes, not the report shape"
+
+approach: |
+  Order the work units to minimize risk: hooks first (w1) is the
+  load-bearing change; fanout (w2) depends on hooks being opt-in;
+  lock (w3) is independent but read tests/README.md:257 first to
+  understand the existing rationale; docs (w4) reflect the new
+  reality; blind-spots (w5) are the protocol-debt cleanup; PR (w6)
+  ships everything as one cohesive unit.
+
+  For w1, prefer wrapping hook commands in `bash -c` with the env-var
+  guard — it's smaller than rewriting hook definitions and easier to
+  revert if something breaks.
+
+  For w2, the `xargs -P` approach is simpler than GNU parallel
+  (parallel may not be installed). Keep the per-worktree output
+  prefixed with the worktree name so logs remain readable.
+
+anti_patterns:
+  - "DO NOT localize the test lock to per-worktree by default — because 10 concurrent xdist runs (auto-workers) would exhaust CPU and produce timing-flake — keep global default and offer override only"
+  - "DO NOT bundle worktree-pool work into this PR — because that's Step 2 with its own scope and verification — ship the local-loop changes alone"
+  - "DO NOT remove pr-refresh target in this PR — because branch protection still requires up-to-date until Step 3 lands — that target stays useful until then"
+  - "DO NOT skip the blind-spot capture (w5) — because the protocol explicitly requires file-first capture and this is the natural home — they are 6 small files"
+
+scope_limit:
+  only_modify:
+    - ".pre-commit-config.yaml"
+    - "Makefile (pr-fanout target only)"
+    - "tests/conftest.py (lock-path logic only)"
+    - "tests/README.md (around line 257)"
+    - "CLAUDE.md (manual-coordination paragraphs)"
+    - "AGENTS.md (manual-coordination paragraphs)"
+    - "_project/blind-spots/2026-04-30-*.md (6 new files)"
+  do_not_modify:
+    - ".github/workflows/ (that's Step 3 and Step 4)"
+    - "Makefile worktree-* targets (that's Step 2)"
+    - "Branch protection or rulesets (that's Step 3)"
+
+metadata:
+  tags:
+    - dev-loop
+    - pre-commit
+    - test-infrastructure
+    - blind-spots
+  estimated_effort: "Small (1h)"
+  created_date: "2026-04-30"
+
+impact:
+  user_impact: |
+    Agents push faster and pr-fanout no longer serializes. Workstation
+    stays CPU-protected because the global test lock remains. Six
+    audit findings from this planning round get archived where future
+    sessions can find them.
+  technical_debt: |
+    Reduces protocol drift (blind-spot capture). Removes incorrect
+    documentation that would mislead future agents.
+
+success_metrics:
+  - "PR lands as single squash-merge to develop"
+  - "Subsequent agent sessions push without local hook delay"
+  - "Six blind-spot findings reachable via `make blind-spots-list`"
+
+open_questions:
+  - "Should `make pr-preflight` print a hint when BENCHBOX_PREPUSH is unset, or stay silent? (Suggest: silent — agents shouldn't be nagged about a feature they're not using.)"

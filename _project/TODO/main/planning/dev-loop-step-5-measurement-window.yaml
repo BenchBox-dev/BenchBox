@@ -1,0 +1,183 @@
+id: dev-loop-step-5-measurement-window
+title: "Dev-loop simplification — Step 5: 30-day measurement window with queue decision thresholds"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Decision-gate item that decides whether Step 6 (queue) is needed.
+  Runs after Steps 1-4 have been merged for ~30 days. Aggregates the
+  metrics emitted by Step 4 against pre-defined thresholds and produces
+  a written go/no-go recommendation.
+
+  No code changes during the window itself; the deliverable is a
+  decision record. If all thresholds are below trigger, Step 6 is
+  cancelled and the simplification effort is closed. If one or more
+  trigger, Step 6 is unblocked.
+
+  This TODO is intentionally LOW-effort but HIGH-leverage — it prevents
+  building queue infrastructure for a problem that doesn't exist at
+  scale.
+
+deps:
+  needs:
+    - dev-loop-step-1-local-loop-cleanup
+    - dev-loop-step-2-worktree-pool
+    - dev-loop-step-3-ci-rebalance-and-strict-base-off
+    - dev-loop-step-4-post-merge-safety-net
+
+work:
+  - id: w1
+    summary: "Wait for 30 calendar days post-Step-4-merge before starting w2"
+    status: pending
+    notes: |
+      The measurement window is 30 days of normal usage AFTER Step 4
+      lands. Prior data is contaminated by the old workflow. Mark this
+      TODO Blocked until that date.
+
+      To start the timer: when Step 4 PR merges, comment on this TODO
+      with the merge date and update `metadata.due_date` to merge_date
+      + 30 days.
+
+  - id: w2
+    summary: "Aggregate dev-loop metrics for the 30-day window"
+    status: pending
+    needs: [w1]
+    notes: |
+      Run `make dev-loop-metrics WINDOW=30d` (added in Step 4 w5).
+      Capture output. If artifacts coverage is below 80% of merges
+      (i.e., emission failures), extend the window 7 days and retry.
+      Save raw aggregation to `_project/decisions/
+      dev-loop-measurement-<window-end>.md`.
+
+  - id: w3
+    summary: "Evaluate against queue-trigger thresholds"
+    status: pending
+    needs: [w2]
+    notes: |
+      Apply the trigger matrix from the plan:
+        | Metric                                | Trigger threshold |
+        | P95 PR open → merged                  | sustained > 1h    |
+        | Post-merge red rate on develop        | sustained > 5%    |
+        | Time-to-recover red develop (P95)     | > 30 min          |
+        | Cross-PR conflict repairs / week      | > 2/week          |
+        | Orphaned failed PRs (no resub <24h)   | any pattern       |
+        | Runner minutes total                  | budget signal     |
+      For each metric: PASS (below trigger) / FAIL (at or above).
+      "Sustained" means >= 70% of days in the window above threshold;
+      not just one outlier week.
+
+  - id: w4
+    summary: "Write decision record with go/no-go for Step 6"
+    status: pending
+    needs: [w3]
+    notes: |
+      Single markdown file appended to the measurement record from w2.
+      Sections:
+        - Window: <start> to <end>
+        - Per-metric PASS/FAIL with raw numbers
+        - Recommendation: BUILD QUEUE | DO NOT BUILD QUEUE | REASSESS
+        - If BUILD: which queue path (native vs steward), rationale
+          tied to Step 0 w6 finding
+        - If DO NOT BUILD: cancel Step 6 TODO, close the simplification
+          effort
+        - If REASSESS: extend window 30 days, identify which
+          measurements were ambiguous, and what would resolve them
+      Commit the record. Update Step 6 TODO status (unblock or close).
+
+  - id: w5
+    summary: "Update CLAUDE.md / AGENTS.md with measurement findings"
+    status: pending
+    needs: [w4]
+    notes: |
+      Add a one-paragraph "Dev-loop status (as of <date>)" note in
+      both files that documents:
+        - Whether the queue is being built or not
+        - Current P95 PR-to-merged time
+        - Current post-merge red rate
+      Future agents read this to understand the state of the merge
+      machinery without re-running the analysis.
+
+verification:
+  - description: "Measurement record exists with all six metrics evaluated"
+    command: "ls _project/decisions/dev-loop-measurement-*.md && grep -cE '^### (P95|Post-merge|Time-to-recover|Cross-PR|Orphaned|Runner)' _project/decisions/dev-loop-measurement-*.md"
+    expected_output: ">= 6"
+  - description: "Recommendation section is present and unambiguous"
+    command: "grep -cE '^Recommendation: (BUILD QUEUE|DO NOT BUILD QUEUE|REASSESS)' _project/decisions/dev-loop-measurement-*.md"
+    expected_output: "1"
+  - description: "Step 6 TODO status updated to reflect decision"
+    command: "grep -E '^status:' _project/TODO/main/planning/dev-loop-step-6-queue-decision-gate.yaml"
+    expected_output: "Either 'Not Started' (if BUILD), 'Blocked' (if REASSESS), or moved to DONE (if DO NOT BUILD)"
+
+must_preserve:
+  - "Steps 1-4 implementation untouched during measurement — no code changes during the window"
+  - "Existing dev-loop metrics emission — if Step 4 metrics break mid-window, fix forward; do not roll back"
+  - "Threshold definitions from this TODO — if measurement is ambiguous, use REASSESS rather than redefining thresholds post-hoc"
+
+approach: |
+  This is a deliberately low-effort TODO. The work is "wait, then look
+  at numbers and write down the answer." The goal is a forcing
+  function: without this gate, Step 6 might get built reflexively
+  ("we said we would") rather than because it's needed.
+
+  Be honest about what the metrics show. If the numbers are clearly
+  below threshold (e.g., P95 PR-to-merged is 8 minutes), DO NOT BUILD
+  is the correct call. If they're clearly above, BUILD. If they're
+  ambiguous, REASSESS — don't force a binary decision on noisy data.
+
+  For "sustained" interpretation: use 70% of days above threshold as
+  the rule. One bad week shouldn't trigger a queue; sustained pain
+  should. Adjust if 70% turns out wrong empirically.
+
+anti_patterns:
+  - "DO NOT shorten the measurement window because it feels long — because 30 days captures within-month variability (releases, vacations, etc.) that shorter windows miss — wait the full window"
+  - "DO NOT redefine thresholds during evaluation — because that's confirmation bias dressed as analysis — if thresholds were wrong, that's a separate REASSESS conclusion, not a silent edit"
+  - "DO NOT skip writing the decision record — because future re-evaluation needs to know what was decided and why — a verbal 'we measured and it was fine' loses information"
+  - "DO NOT begin Step 6 planning during the measurement window — because that primes the conclusion — wait for the data"
+
+scope_limit:
+  only_modify:
+    - "_project/decisions/dev-loop-measurement-*.md (new)"
+    - "_project/TODO/main/planning/dev-loop-step-6-queue-decision-gate.yaml (status field only)"
+    - "CLAUDE.md (one paragraph)"
+    - "AGENTS.md (one paragraph)"
+  do_not_modify:
+    - "Any code or workflow file"
+    - "Branch protection or rulesets"
+    - "Step 1-4 implementation artifacts"
+
+deferred:
+  - summary: "Building infrastructure based on measurement findings"
+    reason: "That's Step 6, gated on this step's recommendation. Keeping the decision/build separation prevents 'might as well build it while I'm here.'"
+  - summary: "Long-term metrics retention beyond 90-day artifact window"
+    reason: "If measurement reveals we want continuous tracking, that's a follow-up. For Step 5, the 90-day artifact retention from Step 4 is sufficient."
+
+metadata:
+  tags:
+    - dev-loop
+    - measurement
+    - decision-gate
+  estimated_effort: "Small (2-3h after the 30-day wait)"
+  created_date: "2026-04-30"
+  due_date: "2026-06-15"
+
+impact:
+  business_value: |
+    Prevents building queue infrastructure for a non-problem.
+    Conservative estimate: queue infra is 2-3 days of work + ongoing
+    maintenance. If Steps 1-4 already solved the dev loop, a clean
+    DO NOT BUILD recommendation captures that win and closes the
+    effort.
+  technical_debt: |
+    Produces a durable decision record that future planning rounds
+    can reference. Same pattern as ADRs.
+
+success_metrics:
+  - "Decision record committed within 1 week of window end"
+  - "Recommendation is unambiguous (BUILD / DO NOT BUILD / REASSESS — not 'maybe')"
+  - "If REASSESS, the next-action triggers are explicit (extend X days, measure Y additionally)"
+
+open_questions:
+  - "If measurement reveals new thresholds are more meaningful than the originals, do we adopt them (REASSESS path) or stick with the locked thresholds for this evaluation? (Plan: stick. Adopt new thresholds only in a follow-up.)"
+  - "Who reviews the decision record before it's binding? (Plan: Joe reviews; this is a one-person org.)"

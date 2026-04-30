@@ -1,0 +1,222 @@
+id: dev-loop-step-3-ci-rebalance-and-strict-base-off
+title: "Dev-loop simplification — Step 3: light PR-tier CI on develop, heavy matrix to nightly, strict-base off"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  The load-bearing change in the dev-loop simplification plan. Three
+  coupled adjustments that together eliminate stale-PR refresh churn
+  on `develop` while preserving release-grade validation on `main`:
+
+    1. Cut PR-tier CI on develop to lint + Ubuntu 3.12 fast tests
+    2. Move full OS/Python matrix + integration + parity to nightly
+    3. Disable "Require branches up to date before merging" on develop
+
+  Critically: full matrix + package + release validation REMAINS
+  required for `main` PRs and tag releases. Release confidence is
+  unchanged; only the routine `develop` PR experience is altered.
+
+  Single PR via `make pr-open`. The branch-protection toggle (3.4) is
+  applied via the GitHub UI or `gh api` separately and recorded in
+  the PR description as a manual deployment step.
+
+deps:
+  needs:
+    - dev-loop-step-0-verify-assumptions
+
+work:
+  - id: w1
+    summary: "Identify current required-checks for develop and the PR-tier job set in test.yml"
+    status: pending
+    notes: |
+      Re-read the Step 0 decision record (`_project/decisions/
+      dev-loop-verification-2026-04-30.md`) for w1/w2/w3 outputs.
+      Confirm exactly which jobs are listed as required vs which run
+      but don't block. The Step 3.1 surgery touches the required set;
+      non-required jobs can stay or move to nightly per cost analysis.
+
+  - id: w2
+    summary: "Cut develop PR-tier CI to lint + Ubuntu 3.12 fast tests"
+    status: pending
+    notes: |
+      Edit `.github/workflows/test.yml`. For the `pull_request` trigger
+      targeting develop:
+        - Keep: lint, type-check, Ubuntu-latest Python 3.12 fast test
+        - Move to nightly (or workflow_dispatch only): macOS, Windows,
+          Python 3.10/3.11/3.13, integration smoke, table-format,
+          package, parity, PySpark
+      Use a job-level `if: github.event_name != 'pull_request' ||
+      github.base_ref != 'develop'` for moved jobs, OR split into
+      two workflows (`pr.yml` minimal, `nightly.yml` full).
+      Branch-protection required-checks list updated in w5 below.
+    needs: [w1]
+
+  - id: w3
+    summary: "Add nightly.yml workflow (or schedule trigger on test.yml) running the full matrix"
+    status: pending
+    notes: |
+      Schedule `cron: '0 6 * * *'` (6am UTC, off-peak). On failure,
+      emit a workflow_run event that auto-opens an issue with label
+      `incident:nightly-red` containing the failing job name and run
+      URL. Use `workflow_dispatch` for manual re-runs. Reuse the same
+      job definitions moved out of PR-tier in w2.
+    needs: [w2]
+
+  - id: w4
+    summary: "Preserve full matrix + package validation on main PRs and tag releases"
+    status: pending
+    notes: |
+      Audit `.github/workflows/release.yml` and `test.yml` to ensure
+      that `pull_request` to `main` AND `push: tags: ['v*']` still
+      trigger:
+        - Full OS/Python matrix
+        - Package install validation
+        - Release-flow checks
+      Add a comment block in `release.yml` stating "DO NOT lighten
+      this — main is release-only; full validation is required here."
+      No functional change if these are already correct; the audit
+      step is the deliverable.
+
+  - id: w5
+    summary: "Update branch-protection required-checks list for develop"
+    status: pending
+    notes: |
+      Apply via `gh api -X PATCH repos/joeharris76/BenchBox/branches/
+      develop/protection` (or the equivalent ruleset PATCH) to:
+        - Reduce `required_status_checks.contexts` to just the lint
+          and Ubuntu 3.12 fast-test job names
+        - Set `required_status_checks.strict: false` (this is the
+          critical toggle that eliminates stale-PR refresh)
+        - Keep `enforce_admins: true` if currently set
+      Record the before/after JSON in the PR description for audit.
+      This is a manual deployment step; not in the PR diff.
+    needs: [w2]
+
+  - id: w6
+    summary: "Deprecate make pr-refresh and update CLAUDE.md/AGENTS.md"
+    status: pending
+    notes: |
+      With strict-base off, pr-refresh is no longer routine. Modify
+      target to print stderr: "DEPRECATED: strict-base is now off on
+      develop; pr-refresh is rarely needed. Use only as escape hatch
+      when explicitly required." Then proceed with current behavior.
+      Remove pr-refresh from the routine workflow paragraphs in
+      CLAUDE.md ("PR/Worktree (write — feature branches only)" still
+      lists it as escape hatch but not as routine).
+    needs: [w5]
+
+  - id: w7
+    summary: "Run lint + fast-test locally and open the PR"
+    status: pending
+    needs: [w1, w2, w3, w4, w5, w6]
+    notes: |
+      `make lint format typecheck`, `BENCHBOX_PREPUSH=1 make
+      pr-preflight`, then `make pr-open`. Manually apply the
+      branch-protection change (w5) AFTER the PR merges so the
+      workflow file changes are live before required-checks are
+      adjusted. Document the sequence in PR description.
+
+verification:
+  - description: "PR-tier CI on develop runs only lint and Ubuntu 3.12 fast tests"
+    command: "gh run list --workflow test.yml --branch develop --event pull_request --limit 1 --json jobs --jq '.[].jobs | length'"
+    expected_output: "<= 3 jobs (lint, type, fast-test)"
+  - description: "Full matrix runs on nightly schedule"
+    command: "gh workflow list --json name,state | jq '.[] | select(.name | test(\"nightly|Nightly\"))'"
+    expected_output: "nightly workflow exists and is active"
+  - description: "Main PRs and tag releases still run full matrix"
+    command: "grep -cE 'matrix:|os: \\[ubuntu-latest, macos-latest, windows-latest\\]' .github/workflows/release.yml .github/workflows/test.yml"
+    expected_output: ">= 1"
+  - description: "Strict-base is off on develop branch protection"
+    command: "gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '.required_status_checks.strict'"
+    expected_output: "false"
+  - description: "Required checks list contains only lightweight jobs"
+    command: "gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '.required_status_checks.contexts | length'"
+    expected_output: "<= 3"
+  - description: "make pr-refresh prints deprecation notice"
+    command: "make -n pr-refresh 2>&1 | grep -c 'DEPRECATED' || make pr-refresh 2>&1 | head -3 | grep -c 'DEPRECATED'"
+    expected_output: ">= 1"
+
+must_preserve:
+  - "Full matrix + package + release validation remains REQUIRED for main PRs and tag releases — Step 3 only changes develop, not main"
+  - "Existing required job names that downstream tooling references — confirm test runner integrations (status badges, code coverage) still find their checks"
+  - "develop-post-merge.yml unchanged in this step — Step 4 strengthens it; here we only rebalance PR-tier"
+  - "Existing pull_request job functionality when run via workflow_dispatch — moved-to-nightly jobs must still run successfully when manually invoked"
+
+approach: |
+  Sequence matters: ship the workflow changes first (w2, w3, w4) so
+  the lighter jobs exist and are reporting status BEFORE updating
+  required-checks (w5). If you flip required-checks first, develop
+  will be unmergeable until the workflow changes propagate.
+
+  Two-workflow split (test.yml for PR-tier, nightly.yml for matrix)
+  is cleaner than `if:` job conditions. Conditions create maintenance
+  surface — every new job needs the same condition copied. Splitting
+  files makes intent obvious.
+
+  For w5, read the existing branch-protection JSON first, redact and
+  archive it in the PR description, then PATCH only the changed fields.
+  Don't replace the whole protection blob — easy to lose unrelated
+  settings (e.g., enforce_admins, dismiss_stale_reviews).
+
+anti_patterns:
+  - "DO NOT also lighten main PR / tag-release CI — because main is release-only and full validation is required there — only develop's PR-tier changes"
+  - "DO NOT flip branch protection BEFORE the workflow changes land — because required checks reference job names that may not exist yet — sequence: workflows first, protection second"
+  - "DO NOT remove make pr-refresh in this PR — because rare-but-real conflict cases still need it — deprecate-with-notice now, remove next release after Step 5 measurement confirms it's unused"
+  - "DO NOT skip nightly issue automation (w3) — because moved-to-nightly jobs are now invisible without a clear failure signal — auto-issue is the replacement for PR-blocking"
+  - "DO NOT delete the develop-post-merge.yml workflow — because it becomes the safety net under relaxed strict-base — Step 4 strengthens it"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/test.yml"
+    - ".github/workflows/nightly.yml (new)"
+    - ".github/workflows/release.yml (audit + comment-only)"
+    - "Makefile (pr-refresh deprecation notice)"
+    - "CLAUDE.md (pr-refresh paragraph)"
+    - "AGENTS.md (pr-refresh paragraph)"
+  do_not_modify:
+    - ".github/workflows/develop-post-merge.yml (Step 4)"
+    - "Makefile worktree-* targets (Step 2)"
+    - ".pre-commit-config.yaml (Step 1)"
+    - "Test code (no test changes; only CI orchestration)"
+
+deferred:
+  - summary: "Native GitHub Merge Queue migration"
+    reason: "Step 6 territory, deferred until Step 5 measurement justifies it. Current repo is user-owned which likely precludes native MQ anyway."
+  - summary: "Self-hosted runner adoption"
+    reason: "Cost reduction is real but adds operational burden. Defer until runner-minutes metric in Step 5 shows it's worth it."
+
+metadata:
+  tags:
+    - dev-loop
+    - ci
+    - branch-protection
+    - workflows
+  estimated_effort: "Medium (1-2h including manual branch-protection edit)"
+  created_date: "2026-04-30"
+
+impact:
+  user_impact: |
+    PR-to-merged time on develop drops from minutes-to-hours (with
+    refresh churn) to single-digit minutes. Heavy regressions still
+    caught — just nightly instead of per-PR. Release confidence on
+    main unchanged.
+  business_value: |
+    Reduces runner minutes by N× (where N depends on the matrix size
+    cut). Frees agent time previously spent on pr-refresh. Lets the
+    pool of 10 worktrees actually deliver throughput instead of
+    serializing on stale-base CI re-runs.
+  technical_debt: |
+    Some technical debt added: heavy matrix bugs may be discovered
+    one day later (nightly) instead of on the PR. Step 4's auto-revert
+    is the mitigation for the rare case where this matters on develop.
+
+success_metrics:
+  - "P50 develop PR CI duration drops from current baseline (recorded in Step 0 w3) to under 5 minutes"
+  - "Zero pr-refresh invocations needed during routine workflow over the next 2 weeks post-merge"
+  - "Nightly workflow runs successfully each morning; failures auto-open issues with full context"
+
+open_questions:
+  - "Should the nightly workflow also run weekly/on-demand security scans, or keep those separate? (Plan: keep separate; security cadence is its own decision.)"
+  - "If a moved-to-nightly job depends on a develop-only secret, do we keep the secret available to nightly? (Yes — secrets are per-environment, not per-trigger.)"
