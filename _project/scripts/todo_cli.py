@@ -3,21 +3,22 @@
 TODO CLI - Command-line tool for querying and managing BenchBox TODO items.
 
 Usage:
-    uv run scripts/todo_cli.py list [--priority=...] [--status=...] [--category=...] [--worktree=...]
-    uv run scripts/todo_cli.py show <path>
-    uv run scripts/todo_cli.py validate [<path>]
-    uv run scripts/todo_cli.py reindex
-    uv run scripts/todo_cli.py stats
-    uv run scripts/todo_cli.py ready
-    uv run scripts/todo_cli.py next <slug>
-    uv run scripts/todo_cli.py done <slug> <work-id>
-    uv run scripts/todo_cli.py check-graph
-    uv run scripts/todo_cli.py cleanup [--dry-run]
+    uv run _project/scripts/todo_cli.py list [--priority=...] [--status=...] [--category=...] [--worktree=...]
+    uv run _project/scripts/todo_cli.py show <path>
+    uv run _project/scripts/todo_cli.py validate [<path>]
+    uv run _project/scripts/todo_cli.py reindex
+    uv run _project/scripts/todo_cli.py stats
+    uv run _project/scripts/todo_cli.py ready
+    uv run _project/scripts/todo_cli.py next <slug>
+    uv run _project/scripts/todo_cli.py done <slug> <work-id>
+    uv run _project/scripts/todo_cli.py check-graph
+    uv run _project/scripts/todo_cli.py cleanup [--dry-run]
 """
 
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -45,7 +46,9 @@ class TodoCLI:
         index_path = self.project_root / "_project" / tree / "_indexes" / "master.yaml"
 
         if not index_path.exists():
-            self._regenerate_indexes_silent()
+            regen_result = self._regenerate_indexes_silent()
+            if regen_result and regen_result.returncode != 0:
+                self._print_regen_failure(regen_result)
 
         if not index_path.exists():
             print(f"⚠️  Index not found and could not be generated: {index_path}", file=sys.stderr)
@@ -55,18 +58,26 @@ class TodoCLI:
         with open(index_path, encoding="utf-8") as f:
             return yaml.safe_load(f)
 
-    def _regenerate_indexes_silent(self) -> None:
-        """Run generate_indexes.py; swallow output. Used for first-use bootstrap."""
-        import subprocess
-
+    def _regenerate_indexes_silent(self) -> subprocess.CompletedProcess[str] | None:
+        """Run generate_indexes.py for first-use bootstrap; caller reports failures."""
         index_script = self.project_root / "_project" / "scripts" / "generate_indexes.py"
         if not index_script.exists():
-            return
-        subprocess.run(
+            return None
+        return subprocess.run(
             [sys.executable, str(index_script)],
             capture_output=True,
             check=False,
+            text=True,
         )
+
+    def _print_regen_failure(self, result: subprocess.CompletedProcess[str]) -> None:
+        """Print captured index-regeneration diagnostics without hiding the root cause."""
+        print("⚠️  Index generation failed during first-use bootstrap:", file=sys.stderr)
+        detail = (result.stderr or result.stdout or "").strip()
+        if detail:
+            for line in detail.splitlines():
+                print(f"   {line}", file=sys.stderr)
+        print("   Run 'uv run _project/scripts/generate_indexes.py' manually after fixing the error.", file=sys.stderr)
 
     def list_items(
         self,
@@ -858,7 +869,7 @@ class TodoCLI:
 
         Handles:
         - TODO/DONE item files (validated)
-        - Index files (regenerated and committed)
+        - Index files (regenerated locally; gitignored and not committed)
         - Supporting scripts in _project/scripts/
         """
         import subprocess
@@ -1001,7 +1012,7 @@ class TodoCLI:
         items_added = 0
         items_modified = 0
         items_deleted = 0
-        indexes_changed = 0
+        tracked_indexes_changed = 0
         scripts_changed = 0
 
         for line in final_lines:
@@ -1012,7 +1023,7 @@ class TodoCLI:
                 file_path = file_path.split(" -> ")[1]
 
             if "_indexes" in file_path:
-                indexes_changed += 1
+                tracked_indexes_changed += 1
             elif "_project/scripts/" in file_path:
                 scripts_changed += 1
             elif status == "D":
@@ -1023,7 +1034,8 @@ class TodoCLI:
                 items_modified += 1
 
         print(f"   Items: +{items_added} ~{items_modified} -{items_deleted}")
-        print(f"   Indexes: {indexes_changed} file(s)")
+        if tracked_indexes_changed:
+            print(f"   Tracked indexes: {tracked_indexes_changed} file(s) (unexpected; indexes should be gitignored)")
         if scripts_changed:
             print(f"   Scripts: {scripts_changed} file(s)")
         print()
@@ -1072,8 +1084,8 @@ class TodoCLI:
             changes.append(f"update {items_modified} item(s)")
         if items_deleted:
             changes.append(f"remove {items_deleted} item(s)")
-        if indexes_changed and not changes:
-            changes.append("update indexes")
+        if tracked_indexes_changed and not changes:
+            changes.append("update tracked indexes")
         if scripts_changed and not changes:
             changes.append("update scripts")
 

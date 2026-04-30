@@ -17,6 +17,7 @@ INVENTORY_PATH = Path("results-data/corpus-inventory.json")
 SKIP_NAMES = {"corpus-inventory.json", "submission-manifest.json"}
 COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
 SUBMISSION_MANIFEST = "submission-manifest.json"
+SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 COMMUNITY_TRUST_LABEL = "community-submission"
 DEFAULT_TRUST_LABEL = "maintainer-run"
 
@@ -26,7 +27,9 @@ def discover_bundles(bundles_dir: Path) -> list[Path]:
     return [
         path
         for path in sorted(bundles_dir.rglob("*.json"))
-        if path.name not in SKIP_NAMES and not any(path.name.endswith(s) for s in COMPANION_SUFFIXES)
+        if path.name not in SKIP_NAMES
+        and not any(path.name.endswith(s) for s in COMPANION_SUFFIXES)
+        and not path.name.endswith(SUBMISSION_MANIFEST_SUFFIX)
     ]
 
 
@@ -36,8 +39,15 @@ def _bundle_hash(bundle_path: Path) -> str:
 
 
 def _bundle_trust_label(bundle_path: Path) -> str:
-    """Resolve trust label using the established sidecar-presence contract."""
-    if (bundle_path.parent / SUBMISSION_MANIFEST).is_file():
+    """Resolve trust label using the established sidecar-presence contract.
+
+    Prefers the per-bundle name (`<stem>.manifest.json`); falls back to the
+    legacy singleton (`submission-manifest.json`) so already-merged
+    submissions keep their community label.
+    """
+    per_bundle = bundle_path.parent / f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX}"
+    legacy = bundle_path.parent / SUBMISSION_MANIFEST
+    if per_bundle.is_file() or legacy.is_file():
         return COMMUNITY_TRUST_LABEL
     return DEFAULT_TRUST_LABEL
 

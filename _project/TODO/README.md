@@ -21,7 +21,8 @@ TODO/
 
 ## Navigation
 
-Use the index files in `_indexes/` for quick lookups:
+Use the index files in `_indexes/` for quick local lookups. Fresh clones and GitHub blob/raw views do not
+contain these generated files until they are rebuilt locally:
 
 - `master.yaml` - All items with full metadata
 - `by-category.yaml` - Items grouped by category (Core Functionality, Platform Expansion, etc.)
@@ -34,25 +35,25 @@ Use the TODO CLI for querying and management:
 
 ```bash
 # List items
-uv run scripts/todo_cli.py list --priority=high
-uv run scripts/todo_cli.py list --status="in-progress"
-uv run scripts/todo_cli.py list --worktree=platform-expansion
+uv run _project/scripts/todo_cli.py list --priority=high
+uv run _project/scripts/todo_cli.py list --status="in-progress"
+uv run _project/scripts/todo_cli.py list --worktree=platform-expansion
 
 # Show specific item
-uv run scripts/todo_cli.py show TODO/{worktree}/{phase}/{item}.yaml
+uv run _project/scripts/todo_cli.py show TODO/{worktree}/{phase}/{item}.yaml
 
 # Validate items
-uv run scripts/todo_cli.py validate TODO/
+uv run _project/scripts/todo_cli.py validate TODO/
 
 # Regenerate indexes
-uv run scripts/todo_cli.py reindex
+make todo-reindex
 ```
 
 ## Adding New Items
 
 1. Use the template: `_project/TODO_ENTRY_TEMPLATE.yaml`
 2. Create file in appropriate location: `TODO/{worktree}/{phase}/{slug}.yaml`
-3. Validate: `uv run scripts/validate_todo.py <file>`
+3. Validate: `uv run _project/scripts/validate_todo.py <file>`
 4. Regenerate indexes: `make todo-reindex` (or let `todo_cli.py` regen on next read — indexes are gitignored)
 
 ## Claude Skills

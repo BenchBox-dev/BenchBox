@@ -27,10 +27,17 @@ class ClickHouseWorkloadMixin:
         self._log_constraint_configuration(enable_primary_keys, enable_foreign_keys)
 
         try:
-            # Get schema SQL directly from benchmark to avoid sqlglot translation issues
+            # Get schema SQL directly from benchmark to avoid sqlglot translation issues.
+            # We ask for the DuckDB dialect because most BenchBox schemas emit identical
+            # DDL for "duckdb" and "clickhouse", and the few that differ (e.g.
+            # transaction_primitives / write_primitives drop inline PRIMARY KEY when
+            # dialect="clickhouse") would lose the PK info that
+            # `_extract_primary_key_columns` later uses to derive ORDER BY. Known
+            # DuckDB-only DDL syntax (Nullable() NOT NULL, FLOAT[N] vector columns)
+            # is rewritten in `_optimize_table_definition` below.
             effective_config = self.get_effective_tuning_configuration()
             schema_sql = benchmark.get_create_tables_sql(
-                dialect="duckdb",  # Use duckdb as it's compatible with ClickHouse for schema
+                dialect="duckdb",
                 tuning_config=effective_config,
             )
 
@@ -69,6 +76,14 @@ class ClickHouseWorkloadMixin:
             statement,
             flags=re.IGNORECASE,
         )
+
+        # Schema generators emit DuckDB-style fixed-size float arrays
+        # (FLOAT[N], DOUBLE[N]) for embedding columns. ClickHouse rejects the
+        # `[N]` syntax (SYNTAX_ERROR Code 62) and uses Array(Float32/Float64)
+        # without a compile-time dimension. Rewrite in-place so the
+        # vector_search benchmark's CREATE TABLE parses on ClickHouse.
+        statement = re.sub(r"\bFLOAT\s*\[\s*\d+\s*\]", "Array(Float32)", statement, flags=re.IGNORECASE)
+        statement = re.sub(r"\bDOUBLE\s*\[\s*\d+\s*\]", "Array(Float64)", statement, flags=re.IGNORECASE)
 
         # Include ClickHouse MergeTree engine and ORDER BY clause if not present
         statement_upper = statement.upper()

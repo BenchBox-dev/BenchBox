@@ -3,10 +3,10 @@
 Validate TODO/DONE YAML files against the TODO_SCHEMA.yaml schema.
 
 Usage:
-    uv run scripts/validate_todo.py <path>           # Validate single file or directory
-    uv run scripts/validate_todo.py --all            # Validate all TODO and DONE items
-    uv run scripts/validate_todo.py --strict         # Enable strict validation (no extra fields)
-    uv run scripts/validate_todo.py --warn-deprecated # Warn about legacy tasks/dependencies fields
+    uv run _project/scripts/validate_todo.py <path>            # Validate single file or directory
+    uv run _project/scripts/validate_todo.py --all             # Validate all TODO and DONE items
+    uv run _project/scripts/validate_todo.py --strict          # Enable strict validation (no extra fields)
+    uv run _project/scripts/validate_todo.py --warn-deprecated # Warn about legacy tasks/dependencies fields
 """
 
 import argparse

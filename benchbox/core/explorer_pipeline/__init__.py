@@ -12,10 +12,11 @@ from benchbox.core.explorer_pipeline.models import (
     ManifestEntry,
     QueryTiming,
 )
-from benchbox.core.explorer_pipeline.pipeline import ExplorerPipeline
+from benchbox.core.explorer_pipeline.pipeline import BuildStats, ExplorerPipeline
 from benchbox.core.explorer_pipeline.transformer import BundleTransformer
 
 __all__ = [
+    "BuildStats",
     "BundleTransformer",
     "DetailResult",
     "DuckDBSnapshotBuilder",

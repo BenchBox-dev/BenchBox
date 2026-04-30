@@ -16,6 +16,7 @@ import re
 import shutil
 from collections import defaultdict
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -37,7 +38,25 @@ from benchbox.core.explorer_pipeline.transformer import (
 logger = logging.getLogger(__name__)
 
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
+SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 COMMUNITY_TRUST_LABEL = "community-submission"
+
+
+def _find_submission_manifest(bundle_path: Path) -> Path | None:
+    """Locate the submission manifest sidecar for a bundle.
+
+    Prefers the per-bundle name (`<bundle_stem>.manifest.json`); falls
+    back to the legacy singleton (`submission-manifest.json`) for
+    bundles submitted before the per-bundle convention landed.
+    """
+    per_bundle = bundle_path.parent / f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX}"
+    if per_bundle.is_file():
+        return per_bundle
+    legacy = bundle_path.parent / SUBMISSION_MANIFEST_FILENAME
+    if legacy.is_file():
+        return legacy
+    return None
+
 
 # Type alias for the summary accumulator: (benchmark, scale_factor, phase) → rows
 _SummaryKey = tuple[str, float, str]
@@ -343,6 +362,16 @@ def _build_meta_leaderboard(
     }
 
 
+@dataclass(frozen=True)
+class BuildStats:
+    """Counts emitted by a successful pipeline run, for caller display."""
+
+    processed: int
+    skipped: int
+    cohorts: int
+    output_dir: Path
+
+
 class ExplorerPipeline:
     """Orchestrates the full static build pipeline for the results explorer."""
 
@@ -361,7 +390,7 @@ class ExplorerPipeline:
         trust_label: str = "maintainer-run",
         visibility: str = "public-curated",
         bundle_url_prefix: str = "/results/data/bundles",
-    ) -> None:
+    ) -> BuildStats:
         """Execute the full pipeline.
 
         Steps:
@@ -391,7 +420,7 @@ class ExplorerPipeline:
                 path
                 for path in bundles_dir.rglob("*.json")
                 if path.is_file()
-                and not path.name.endswith((".plans.json", ".tuning.json"))
+                and not path.name.endswith((".plans.json", ".tuning.json", SUBMISSION_MANIFEST_SUFFIX))
                 and path.name != SUBMISSION_MANIFEST_FILENAME
             )
             logger.info("Found %d bundle(s) in %s", len(bundle_files), bundles_dir)
@@ -437,11 +466,10 @@ class ExplorerPipeline:
                 prefix = bundle_url_prefix.rstrip("/")
                 bundle_download_url = f"{prefix}/{result_id}.json"
 
-                # Per-bundle trust label: if a submission-manifest.json sidecar
+                # Per-bundle trust label: if a submission manifest sidecar
                 # exists alongside this bundle, it was community-submitted.
                 effective_trust = trust_label
-                manifest_sidecar = bundle_path.parent / SUBMISSION_MANIFEST_FILENAME
-                if manifest_sidecar.is_file():
+                if _find_submission_manifest(bundle_path) is not None:
                     effective_trust = COMMUNITY_TRUST_LABEL
                     logger.debug(
                         "Found submission manifest for %s - using trust_label=%r",
@@ -535,5 +563,12 @@ class ExplorerPipeline:
         )
         logger.info("Wrote full DuckDB browser store to %s", duckdb_path)
 
+        return BuildStats(
+            processed=len(manifest_entries),
+            skipped=skipped_bundles,
+            cohorts=len(summaries),
+            output_dir=output_dir,
+        )
 
-__all__ = ["ExplorerPipeline"]
+
+__all__ = ["BuildStats", "ExplorerPipeline"]

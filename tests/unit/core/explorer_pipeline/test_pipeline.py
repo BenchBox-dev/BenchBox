@@ -269,6 +269,37 @@ class TestExplorerPipelineRun:
 
         assert _duckdb_results(output)[0]["trust_label"] == "maintainer-run"
 
+    def test_per_bundle_manifest_sidecar_overrides_trust_label(self, tmp_path: Path) -> None:
+        """The new `<stem>.manifest.json` naming triggers the community trust label."""
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        bundle_path = bundles_dir / "community_result.json"
+        bundle_path.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        # Per-bundle manifest naming: <stem>.manifest.json next to the bundle.
+        (bundles_dir / "community_result.manifest.json").write_text(
+            json.dumps({"bundle_hash": "abc123", "bundle_file": "community_result.json"}),
+            encoding="utf-8",
+        )
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output, trust_label="maintainer-run")
+
+        assert _duckdb_results(output)[0]["trust_label"] == COMMUNITY_TRUST_LABEL
+
+    def test_per_bundle_manifest_excluded_from_bundle_discovery(self, tmp_path: Path) -> None:
+        """`<stem>.manifest.json` files are not picked up as bundles."""
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        (bundles_dir / "real_bundle.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        (bundles_dir / "real_bundle.manifest.json").write_text("{}", encoding="utf-8")
+        (bundles_dir / "other.manifest.json").write_text("{}", encoding="utf-8")
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        # Only the real bundle, not either manifest sidecar.
+        assert len(_duckdb_results(output)) == 1
+
     def test_submission_manifest_excluded_from_bundle_discovery(self, tmp_path: Path) -> None:
         """submission-manifest.json should not be treated as a bundle file."""
         bundles_dir = tmp_path / "data" / "bundles"

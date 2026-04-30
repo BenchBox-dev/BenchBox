@@ -726,7 +726,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-open pr-status worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-open pr-fanout pr-refresh pr-conflict-scan pr-status worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -739,15 +739,75 @@ pr-preflight:
 # Push current branch and open a PR against develop with auto-merge enabled.
 # Squash-merge happens automatically once `lint` + `test (ubuntu-latest, 3.12)`
 # go green. Refuses to run from develop/main.
+#
+# Idempotent: safe to rerun. If a PR is already open for the branch, reuses it
+# and just (re)enables auto-merge — useful after a partial run, or to flip
+# auto-merge on for a PR opened via `gh pr create` directly.
+#
+# Pre-push warning: runs `git merge-tree` against every other open PR head
+# (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
+# before landing. Warn-only — does not block the push.
 pr-open:
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
 		develop|main) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
 	esac; \
+	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" && \
-	URL=$$(gh pr create --base develop --fill --head "$$CURRENT") && \
+	URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
+	if [ -z "$$URL" ]; then \
+		URL=$$(gh pr create --base develop --fill --head "$$CURRENT"); \
+	else \
+		echo "Reusing existing PR: $$URL"; \
+	fi && \
 	echo "$$URL" && \
 	gh pr merge --auto --squash "$$URL"
+
+# Walk every worktree (except the main clone) and run `make pr-open` in each.
+# Sequential by design: the pre-push fast-test hook serializes via a flock,
+# so parallelizing here invites lock-contention failures. Use pr-refresh when
+# branches need to be updated onto origin/develop before auto-merge can fire.
+pr-fanout:
+	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
+	git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r wt; do \
+		[ "$$(realpath "$$wt")" = "$$MAIN_CLONE" ] && { echo "(skip $$wt: main clone)"; continue; }; \
+		BR=$$(git -C "$$wt" branch --show-current 2>/dev/null); \
+		case "$$BR" in develop|main|"") echo "(skip $$wt: branch=$$BR)"; continue ;; esac; \
+		echo "==> $$wt [$$BR]"; \
+		( cd "$$wt" && $(MAKE) -s pr-open ) || echo "(failed: $$wt)"; \
+	done
+
+# Refresh the current PR branch onto origin/develop, then run pr-open.
+# This is the stale-PR escape hatch when required checks must be current with
+# develop: GitHub can show a PR as CLEAN even though auto-merge is waiting for
+# a branch update. Run this one stale PR at a time; updating several branches
+# at once can let the first merge stale the others again under strict checks.
+pr-refresh:
+	@CURRENT=$$(git branch --show-current); \
+	case "$$CURRENT" in \
+		develop|main|"") echo "Refusing to refresh $$CURRENT — switch to a feature branch worktree."; exit 1 ;; \
+	esac; \
+	git fetch origin develop --quiet && \
+	git merge --no-edit origin/develop && \
+	$(MAKE) -s pr-open
+
+# Pure-git pairwise textual-conflict probe. Caller passes BRANCH=<current>;
+# we compare HEAD against every other open PR head via `git merge-tree` and
+# print warnings. Warn-only; does not exit non-zero. Used internally by pr-open.
+pr-conflict-scan:
+	@CURRENT="$(BRANCH)"; \
+	[ -n "$$CURRENT" ] || CURRENT=$$(git branch --show-current); \
+	gh pr list --base develop --state open --json number,headRefName \
+		--jq '.[] | "\(.number) \(.headRefName)"' 2>/dev/null | \
+	while read num branch; do \
+		[ "$$branch" = "$$CURRENT" ] && continue; \
+		git fetch origin "$$branch" --quiet 2>/dev/null || continue; \
+		base=$$(git merge-base HEAD "origin/$$branch" 2>/dev/null) || continue; \
+		out=$$(git merge-tree "$$base" HEAD "origin/$$branch" 2>/dev/null); \
+		if echo "$$out" | grep -qE '^(<<<<<<<|changed in both|added in both|removed in local|removed in remote|CONFLICT )'; then \
+			echo "  ⚠ textual conflict with PR #$$num ($$branch) — coordinate before landing"; \
+		fi; \
+	done; true
 
 # Show open PRs against develop and their CI + auto-merge state.
 pr-status:
@@ -906,7 +966,9 @@ help:
 	@echo ""
 	@echo "PR Workflow & Worktrees:"
 	@echo "  make pr-preflight    Run lint + fast tests locally; mirrors CI gate"
-	@echo "  make pr-open         Push branch + open PR vs develop + enable auto-merge (squash)"
+	@echo "  make pr-open         Push branch + open PR vs develop + enable auto-merge (idempotent; safe to rerun)"
+	@echo "  make pr-fanout       Run pr-open in every worktree (sequential; ensures auto-merge is on across branches)"
+	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
 	@echo "  make worktree-add BRANCH=name  Create a worktree off origin/develop at ../BenchBox.<name>"
 	@echo "  make worktree-list   List active worktrees"

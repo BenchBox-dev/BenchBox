@@ -27,7 +27,32 @@ let dbInstance: duckdb.AsyncDuckDB | null = null;
 let initPromise: Promise<duckdb.AsyncDuckDB> | null = null;
 let initFailures = 0;
 const INIT_FAILURE_LIMIT = 3;
+const SNAPSHOT_READY_ATTEMPTS = 5;
+const SNAPSHOT_READY_DELAY_MS = 100;
 let initError: Error | null = null;
+
+type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
+
+const SNAPSHOT_READY_SCAN_SQL = `
+  SELECT *
+  FROM bench.platform_index_rows
+  ORDER BY run_date DESC
+`;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+}
+
+async function waitForSnapshotRows(conn: DuckDBConnection): Promise<void> {
+  for (let attempt = 1; attempt <= SNAPSHOT_READY_ATTEMPTS; attempt += 1) {
+    const result = await conn.query(SNAPSHOT_READY_SCAN_SQL);
+    const rowCount = result.toArray().length;
+    if (rowCount > 0 || attempt === SNAPSHOT_READY_ATTEMPTS) {
+      return;
+    }
+    await sleep(SNAPSHOT_READY_DELAY_MS * attempt);
+  }
+}
 
 // Reset the retry counter when the browser reports a network recovery so a
 // transient same-origin asset or snapshot outage doesn't permanently disable
@@ -79,6 +104,10 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
     const conn = await db.connect();
     try {
       await conn.query("ATTACH 'results.duckdb' AS bench (READ_ONLY)");
+      // COUNT(*) can be satisfied from metadata for this projection view.
+      // Run the same projection PlatformIndex uses so a cold HTTP-backed
+      // snapshot is query-ready before the cached DB instance is exposed.
+      await waitForSnapshotRows(conn);
     } finally {
       await conn.close();
     }
