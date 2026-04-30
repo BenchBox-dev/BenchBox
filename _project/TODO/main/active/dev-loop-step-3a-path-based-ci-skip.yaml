@@ -376,6 +376,10 @@ work:
           `needs_code_ci=true`, develop PR checks moved out of `lint.yml` and
           `test.yml`, and `.github/workflows/pr.yml` supplies `lint`,
           `test (ubuntu-latest, 3.12)`, and `ci-required-result`.
+        - Hosted PR run #25186848736 exposed one W6 issue:
+          `content-guard` ran `pre-commit` without first syncing dev
+          dependencies. Fixed by adding `uv sync --group dev` to the
+          `content-guard` job before YAML/markdown validation.
         - W6 follow-up for PR creation: after this commit, run `make pr-open`
           and set the PR body to state that the required-check ruleset edit is
           W7 and happens only after this workflow PR lands.
