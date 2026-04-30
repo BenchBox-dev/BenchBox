@@ -32,11 +32,17 @@ narrow scope might leak.
 
 ## Suggested next steps
 
-- [x] Document the concurrency assumption in a comment at the
-      `worktree-claim` lock acquisition site (this PR).
-- [x] Update the operator-facing docs to call out that pool ops
-      assume single-workstation serial use.
-- [ ] If automation is ever added that races claim/release/reset
-      (e.g. cron-driven sweep-stale running while a user claims a
-      slot), extend the lock to cover all three operations or
-      introduce per-slot read-write locks.
+- [x] Extract the lock-acquisition logic into a reusable helper
+      (`scripts/_with_pool_lock.sh`) and acquire the same
+      `.git/pool.lock` from every pool-mutating target:
+      `worktree-claim`, `worktree-release`, `worktree-pool-reset`,
+      and `worktree-pool-sweep-stale`. They now serialize against
+      each other rather than only `worktree-claim` against itself.
+      Read-only `worktree-pool-status` is intentionally lock-free.
+- [x] Update the operator-facing comment at the lock acquisition
+      site to describe the new (broader) coverage and what is
+      explicitly NOT covered (status reads).
+- [ ] Optional: if per-slot independence ever matters (e.g. operator
+      wants to claim a free slot while sweep-stale resets a
+      different slot), introduce per-slot read-write locks. Not
+      worth the complexity for current single-workstation usage.

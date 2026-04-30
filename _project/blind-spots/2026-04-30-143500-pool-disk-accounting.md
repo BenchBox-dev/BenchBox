@@ -32,10 +32,12 @@ size, the operator only learns about it when something breaks.
 
 ## Suggested next steps
 
-- [x] Add `size` column to `make worktree-pool-status` (this PR).
-- [ ] Optional: pre-claim free-space check that refuses with a clear
-      "host has < 2 GB free; clean caches before claiming" message
-      rather than letting `uv sync` fail mid-claim.
-- [ ] Optional: a `make worktree-pool-disk-clean` that removes
-      pytest/coverage caches in pool-NN slots without touching `.venv`
-      or git state.
+- [x] Add `size` column to `make worktree-pool-status`.
+- [x] Pre-claim free-space check that refuses with a clear
+      "$FREE_KB free on $WORKTREE_POOL_PARENT < $POOL_MIN_FREE_KB required"
+      message rather than letting `uv sync` fail mid-claim. Override
+      with `POOL_MIN_FREE_KB=0`. Default 5 GB threshold.
+- [x] `make worktree-pool-disk-clean` removes pytest, mypy, ruff,
+      coverage caches and `.benchbox/cache` from each pool slot
+      without touching `.venv/` or git state. Lock-free; reports
+      bytes freed per slot.

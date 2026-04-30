@@ -31,9 +31,12 @@ by distinguishing the lookup-failed case explicitly.
 ## Suggested next steps
 
 - [x] Replace per-slot `gh pr view` with a single up-front `gh pr list`,
-      then awk-lookup per slot (this PR — also closes Consider #4).
+      then awk-lookup per slot (also closes Consider #4).
 - [x] If the up-front `gh pr list` returns no data (empty stdout),
       report state=`unknown` for all otherwise-claimed slots rather
       than silently rendering as `claimed`.
-- [ ] Optional: surface the `unknown` count in the pool-status footer
-      with a hint to check `gh auth status` and `gh api rate_limit`.
+- [x] When any slot is `unknown`, `worktree-pool-status` prints a
+      footer hint: "state=unknown — `gh pr list` returned no data.
+      Check `gh auth status` and `gh api rate_limit` to recover."
+      The hint surfaces the recovery commands so the operator
+      doesn't need to remember them.

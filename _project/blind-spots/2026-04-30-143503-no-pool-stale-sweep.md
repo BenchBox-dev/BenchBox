@@ -29,10 +29,17 @@ common cleanup case automatically.
 
 ## Suggested next steps
 
-- [x] Add `make worktree-pool-sweep-stale` (this PR) that finds slots
-      with MERGED PRs + clean trees and auto-releases them. Idempotent.
+- [x] Add `make worktree-pool-sweep-stale` that finds slots with
+      MERGED PRs + clean trees and auto-releases them. Idempotent.
 - [x] Update the pool-exhausted error message to point at sweep-stale
       and pool-reset as the recovery hierarchy.
-- [ ] Optional: schedule sweep-stale via a developer's local cron or a
-      pre-claim hook so it runs automatically before claim ever sees
-      pool exhaustion.
+- [x] Pre-claim auto-sweep: `worktree-claim-locked` is now an
+      orchestrator that runs `claim-attempt` → if no slot found,
+      runs `pool-sweep-stale-locked` inline (same lock) → re-runs
+      `claim-attempt`. Routine pool exhaustion (forgotten releases)
+      is self-healing without operator intervention. Final-failure
+      hint focuses on what the auto-sweep cannot recover (dirty,
+      claim-aborted slots).
+- [ ] Optional: cron-driven sweep would catch the case where sweep
+      should run between sessions (not just at next claim). Defer
+      until measurement shows the at-claim sweep isn't enough.
