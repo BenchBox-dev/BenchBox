@@ -2,7 +2,8 @@ id: dev-loop-step-1-local-loop-cleanup
 title: "Dev-loop simplification — Step 1: opt-in pre-push, bounded fanout, conservative test lock"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-04-30"
 category: Core Functionality
 
 description: |
@@ -106,7 +107,7 @@ work:
 
   - id: w6
     summary: "Run validation locally and open the PR"
-    status: pending
+    status: done
     needs: [w1, w2, w3, w4, w5]
     notes: |
       Run `make lint format typecheck`, then

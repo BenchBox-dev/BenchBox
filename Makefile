@@ -527,11 +527,10 @@ ci-local:
 
 # Type checking
 typecheck:
-	ty check
-
-# Type checking with uv (for development)
-typecheck-uv:
 	uv run ty check
+
+# Backward-compatible alias for older local notes/scripts.
+typecheck-uv: typecheck
 
 # Import validation
 validate-imports:
