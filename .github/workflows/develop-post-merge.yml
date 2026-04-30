@@ -1,0 +1,56 @@
+name: Develop post-merge
+
+# Safety net for strict-checks-off and stale-PR flows alike: once a PR lands,
+# run the same lightweight local gates against the actual develop tip. This is
+# intentionally narrower than test.yml's full PR matrix so it does not turn
+# every squash merge into the heavyweight optional suite.
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: develop-post-merge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run CI lint mirror
+        run: make ci-lint
+
+  fast-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run CI fast-test mirror
+        run: make ci-test

@@ -1,0 +1,34 @@
+name: Auto-enable auto-merge
+
+# Backstop for the local `make pr-open` flow: if a PR is opened against
+# develop via the GitHub UI, `gh pr create` directly, or any path that
+# skips `gh pr merge --auto --squash`, this workflow turns auto-merge on.
+#
+# Drafts are explicitly skipped — opening a draft is the user's signal
+# that the PR is not yet ready to land. Auto-merge gets enabled when the
+# draft is marked ready (the `ready_for_review` event).
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    branches: [develop]
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  enable:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable squash auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Idempotent: gh pr merge --auto is a no-op if auto-merge is already on
+          # for the same method. We keep the call simple and rely on that.
+          gh pr merge --auto --squash --repo "$REPO" "$PR_NUMBER"
