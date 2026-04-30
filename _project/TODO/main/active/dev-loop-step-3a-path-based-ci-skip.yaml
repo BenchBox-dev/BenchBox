@@ -277,7 +277,7 @@ work:
 
   - id: w4
     summary: "Add a tiny test that proves the skip path works"
-    status: pending
+    status: done
     needs: [w2]
     notes: |
       In a fork or via `act` locally, simulate two PR diffs:
@@ -294,6 +294,21 @@ work:
            included in the blocking aggregation.
       Document the test in `_project/decisions/dev-loop-path-filter-
       smoke-test-<date>.md` with workflow run URLs and timings.
+
+      Implementation record (2026-04-30):
+        - Checked for `act`; it is not installed in this environment, so a
+          local classifier/content-guard smoke run was used before the workflow
+          PR exists on GitHub.
+        - Added `_project/decisions/dev-loop-path-filter-smoke-test-2026-04-30.md`
+          with the five required cases: TODO-only, `docs/**`, code,
+          unknown top-level path, and `.gitignore`.
+        - Confirmed TODO-only and docs paths classify as safe content-only,
+          run content validation, and skip Python fast tests.
+        - Confirmed code, unknown, and `.gitignore` paths classify as
+          `needs_code_ci=true`, routing through `code-lint` and `code-test`.
+        - W4 review caveat recorded: GitHub workflow run URLs are not available
+          until the workflow PR is opened; W6 must use the branch PR run as the
+          first hosted workflow evidence.
 
   - id: w5
     summary: "Document the umbrella in agent and contributor docs"
