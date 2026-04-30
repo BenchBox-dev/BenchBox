@@ -25,8 +25,9 @@ description: |
   Designed-together follow-up: Step 3a (`dev-loop-step-3a-path-based-ci-skip`)
   closes the remaining waste where doc-only / TODO-only PRs still trigger
   the post-Step-3 PR-tier jobs unnecessarily. Step 3 narrows the matrix;
-  Step 3a adds a `ci-required` umbrella that skips PR-tier entirely for
-  non-code paths. Read both before implementing either.
+  Step 3a adds a required-check umbrella that skips Python fast tests for
+  safe content-only paths while preserving targeted content validation.
+  Read both before implementing either.
 
 deps:
   needs:
