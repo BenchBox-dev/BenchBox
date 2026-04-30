@@ -7,9 +7,9 @@ category: Core Functionality
 
 description: |
   Decision-gate item that decides whether Step 6 (queue) is needed.
-  Runs after Steps 1-4 have been merged for ~30 days. Aggregates the
-  metrics emitted by Step 4 against pre-defined thresholds and produces
-  a written go/no-go recommendation.
+  Runs after Steps 1-4 plus Step 3a have been merged for ~30 days.
+  Aggregates the metrics emitted by Step 4 against pre-defined thresholds
+  and produces a written go/no-go recommendation.
 
   No code changes during the window itself; the deliverable is a
   decision record. If all thresholds are below trigger, Step 6 is
@@ -173,11 +173,11 @@ scope_limit:
     - "CLAUDE.md (one paragraph)"
     - "AGENTS.md (one paragraph)"
   do_not_modify:
-    - ".github/workflows/test.yml, develop-post-merge.yml, nightly.yml, release.yml (no code changes during the measurement window)"
+    - ".github/workflows/test.yml, pr.yml, develop-post-merge.yml, nightly.yml, release.yml (no code changes during the measurement window)"
     - "Makefile (no target changes during the window)"
     - "tests/conftest.py (Step 1 helper stays as-is)"
     - "GitHub branch protection / rulesets (no further changes during the window)"
-    - "_project/TODO/main/planning/dev-loop-step-{0,1,2,3,4}-*.yaml (Steps 1-4 implementations are frozen during measurement)"
+    - "_project/TODO/main/planning/dev-loop-step-{0,1,2,3,3a,4}-*.yaml (Steps 1-4 plus Step 3a implementations are frozen during measurement)"
 
 deferred:
   - summary: "Building infrastructure based on measurement findings"
