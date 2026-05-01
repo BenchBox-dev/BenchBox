@@ -76,8 +76,12 @@ def matches_any(path: str, patterns: Iterable[str]) -> bool:
 
 
 def git_changed_paths(base_ref: str) -> list[str]:
+    # Include deletions (D) so a PR that only deletes a code file is
+    # still classified as a code change. Without D, removing a Python
+    # module while adding a markdown file would land in safe-content
+    # and skip lint/test even though it removes executable code.
     result = subprocess.run(
-        ["git", "diff", "--name-only", "--diff-filter=ACMRT", f"{base_ref}...HEAD"],
+        ["git", "diff", "--name-only", "--diff-filter=ACDMRT", f"{base_ref}...HEAD"],
         check=True,
         text=True,
         stdout=subprocess.PIPE,
@@ -109,7 +113,14 @@ def classify_paths(changed_paths: list[str], rules: dict[str, list[str]]) -> dic
     safe_paths = [path for path in changed_paths if matches_any(path, safe_patterns)]
     content_paths = [path for path in changed_paths if matches_any(path, content_patterns)]
     explicit_code_paths = [path for path in changed_paths if matches_any(path, code_patterns)]
+    # A path is `code` if it is not on the safe-content allowlist OR if it is
+    # explicitly on the code-ci allowlist (the latter wins over safe-content
+    # so a file like `docs/conf.py` runs full CI even when `docs/**.md`
+    # is also matched in the same diff).
     code_paths = [path for path in changed_paths if path not in safe_paths or path in explicit_code_paths]
+    # `unknown_paths` are code-classified paths with no explicit code-ci
+    # match — typically a brand-new top-level area. They still route through
+    # code-ci because the classifier fails closed.
     unknown_paths = [path for path in code_paths if not matches_any(path, code_patterns)]
 
     safe_content_only = bool(changed_paths) and not code_paths
