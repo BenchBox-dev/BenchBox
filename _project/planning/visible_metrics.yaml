@@ -170,9 +170,118 @@ metrics:
 
   - table: results
     column: cost_usd
-    kind: raw_copy
-    source_field: "cost.total_usd"
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._cost_usd_alias"
+    tolerance: 1.0e-9
     display_surfaces: [benchmark_index, query]
+    notes: "Deprecated compute-only alias derived from normalized cost; null outside normalized compute-only cost."
+
+  - table: results
+    column: normalized_cost_usd
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 1.0e-9
+    display_surfaces: [benchmark_index, result_detail, query]
+    notes: "BenchBox-normalized USD cost; null when cost_status is unavailable."
+
+  - table: results
+    column: cost_model_version
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
+
+  - table: results
+    column: cost_model_source
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [result_detail, query]
+
+  - table: results
+    column: cost_scope
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
+
+  - table: results
+    column: cost_status
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
+    notes: "Explicit status: normalized, not_applicable_local, or unavailable."
+
+  - table: results
+    column: billing_unit
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [result_detail, query]
+
+  - table: results
+    column: pricing_region
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [result_detail, query]
+
+  - table: results
+    column: cloud_provider
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
+
+  - table: results
+    column: cloud_region
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
+
+  - table: results
+    column: instance_type
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
+
+  - table: results
+    column: warehouse_size
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
+
+  - table: results
+    column: node_count
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
+
+  - table: results
+    column: cluster_size
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
+
+  - table: results
+    column: storage_format
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
+
+  - table: results
+    column: storage_tier
+    kind: derived
+    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    tolerance: 0
+    display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: compliance_class

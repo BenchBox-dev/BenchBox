@@ -74,13 +74,19 @@ work:
 - id: w4
   summary: "Wire normalized cost through DuckDB builder and visible metrics registry"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Touch `benchbox/core/explorer_pipeline/duckdb_builder.py` and
     `_project/planning/visible_metrics.yaml`. Add parity tests so every
     visible cost/deployment field is either a raw bundle copy or a
     documented derived value with a canonical Python reference. Update
     `test_visible_metrics_registry.py` accordingly.
+    Owned files for this work unit:
+      - benchbox/core/explorer_pipeline/duckdb_builder.py
+      - _project/planning/visible_metrics.yaml
+      - tests/unit/core/explorer_pipeline/test_duckdb_builder.py
+      - tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py
+      - tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py
 
 - id: w5
   summary: "Integrate normalized cost with existing benchbox.core.cost calculators"
@@ -210,6 +216,11 @@ scope_limit:
   - "benchbox/core/cost/models.py"
   - "benchbox/core/explorer_pipeline/models.py"
   - "benchbox/core/explorer_pipeline/transformer.py"
+  - "benchbox/core/explorer_pipeline/duckdb_builder.py"
+  - "_project/planning/visible_metrics.yaml"
+  - "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
+  - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+  - "tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py"
   - "tests/unit/core/explorer_pipeline/test_transformer.py"
   - "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
 
