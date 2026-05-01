@@ -417,8 +417,28 @@ work:
 
   - id: w8
     summary: "Fix N3 — BenchmarkIndex `?sf=abc` validation"
-    status: pending
+    status: done
     notes: |
+      Implemented in `BenchmarkIndex.tsx`:
+        - Raw `sf` URL state is now validated against the manifest's
+          available scale factors before it participates in
+          `effectiveSf`.
+        - Invalid non-empty `sf` values fall through to the first
+          published scale factor and are written back through
+          `setSfRaw`, preserving the existing replaceState URL writer.
+
+      Tests:
+        - Added `?sf=abc` coverage asserting the URL settles to the
+          rendered scale (`0.1` in the unit fixture) and the DuckDB
+          benchmark ranking query targets that same numeric scale.
+
+      Verification:
+        - `cd results-explorer && npm run test -- src/pages/__tests__/BenchmarkIndex.test.tsx`
+          passed: 14 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - `git diff --check` passed.
+        - `/code review W8`: no required issues.
+
       Currently `BenchmarkIndex.tsx:42-44` reads `sf` as a string with
       no validator, then keys data fetches off `effectiveSf =
       scaleFilter ?? scaleFactors[0] ?? "0.01"`. If the URL is

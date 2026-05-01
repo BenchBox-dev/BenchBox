@@ -414,4 +414,20 @@ describe("BenchmarkIndex", () => {
     );
     expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "power"]);
   });
+
+  it("coerces an invalid scale-factor URL value to the rendered scale", async () => {
+    window.history.replaceState(null, "", "/results/tpch/?sf=abc");
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("sf")).toBe("0.1"),
+    );
+
+    const rankingCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+      String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
+    );
+    expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "power"]);
+  });
 });

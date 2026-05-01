@@ -43,7 +43,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
   // Filter state - URL-synced so views are shareable.
   const [_sfRaw, setSfRaw] = useUrlState<string>("sf", "", stringSerde);
-  const scaleFilter: string | null = _sfRaw === "" ? null : _sfRaw;
   const setScaleFilter = (v: string | null) => setSfRaw(v ?? "");
   const [phaseFilter, setPhaseFilter] = useUrlState<string>("phase", "power", stringSerde);
   const [tuningFilter, setTuningFilter] = useUrlState<string>("tuning", "all", stringSerde);
@@ -82,8 +81,16 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     ...new Set(benchmarkResults.map((r) => String(r.scale_factor))),
   ].sort((a, b) => Number(a) - Number(b));
 
+  const scaleFilter: string | null =
+    _sfRaw !== "" && scaleFactors.includes(_sfRaw) ? _sfRaw : null;
+
   // Set defaults once manifest loads.
   const effectiveSf = scaleFilter ?? scaleFactors[0] ?? "0.01";
+
+  useEffect(() => {
+    if (!results || scaleFactors.length === 0 || _sfRaw === "" || _sfRaw === effectiveSf) return;
+    setSfRaw(effectiveSf);
+  }, [_sfRaw, effectiveSf, results, scaleFactors.length, setSfRaw]);
 
   // Phases available for the *current* scale factor only - prevents requesting
   // a phase+SF combination that has no artifact (e.g. "power" for SF 0.01
