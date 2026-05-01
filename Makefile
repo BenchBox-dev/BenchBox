@@ -1018,9 +1018,14 @@ worktree-claim-attempt:
 			git -C "$$wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
 			git -C "$$wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
 			echo "claim of $$pool failed; slot returned to detached origin/develop" >&2; \
+			marker=""; \
 		fi; \
 	}; \
-	trap cleanup EXIT INT TERM; \
+	on_int() { cleanup; exit 130; }; \
+	on_term() { cleanup; exit 143; }; \
+	trap cleanup EXIT; \
+	trap on_int INT; \
+	trap on_term TERM; \
 	POOL_REPO=$$($(POOL_REPO_CMD)); \
 	i=1; \
 	while [ "$$i" -le "$(POOL_SIZE)" ]; do \

@@ -124,7 +124,7 @@ work:
 
   - id: w5
     summary: "Make INT/TERM claim-trap handling exit nonzero after cleanup"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #78, P1, `Makefile`
