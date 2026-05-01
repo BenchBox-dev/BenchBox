@@ -71,6 +71,8 @@ describe("RunReceipt", () => {
     expect(within(receipt).getByText("power")).toBeTruthy();
     expect(within(receipt).getByText("DuckDB")).toBeTruthy();
     expect(within(receipt).getByText("macOS")).toBeTruthy();
+    expect(within(receipt).getByText("Trust")).toBeTruthy();
+    expect(within(receipt).getByText("maintainer-run")).toBeTruthy();
     expect(within(receipt).getByText("exact")).toBeTruthy();
     expect(within(receipt).getByText("Eligible")).toBeTruthy();
     expect(within(receipt).getByText("abc12345")).toBeTruthy();
@@ -82,10 +84,12 @@ describe("RunReceipt", () => {
     render(<RunReceipt detail={makeDetail()} />);
 
     const receipt = screen.getByRole("region", { name: "Run receipt" });
-    expect(within(receipt).getByText("Query count")).toBeTruthy();
-    expect(within(receipt).getByText("Measurement samples")).toBeTruthy();
-    expect(within(receipt).getByText("2")).toBeTruthy();
-    expect(within(receipt).getByText("5")).toBeTruthy();
+    const workload = within(receipt).getByRole("heading", { name: "Workload" }).closest("section");
+    expect(workload).not.toBeNull();
+    expect(workload).toHaveTextContent("Query count");
+    expect(workload).toHaveTextContent("2");
+    expect(workload).toHaveTextContent("Measurement samples");
+    expect(workload).toHaveTextContent("5");
   });
 
   it("renders bundle and reproduce artifacts without requiring public plans", () => {

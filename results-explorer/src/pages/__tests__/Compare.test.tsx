@@ -297,4 +297,38 @@ describe("Compare", () => {
     expect(receipt.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(receipt.compareDocumentPosition(queryBreakdownHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it("shows compare receipt warnings for tuning and environment differences", async () => {
+    const duckdb = makeResult({
+      result_id: "r1",
+      platform: "DuckDB",
+      platform_id: "duckdb",
+      driver_version: "1.0",
+      environment: { os: "Linux", arch: "x64", cpu_count: 8 },
+      tuning_mode: "default",
+    });
+    const sqlite = makeResult({
+      result_id: "r2",
+      platform: "SQLite",
+      platform_id: "sqlite",
+      driver_version: "2.0",
+      environment: { os: "macOS", arch: "arm64", cpu_count: 10 },
+      tuning_mode: "manual",
+    });
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1" ? Promise.resolve(duckdb) : Promise.resolve(sqlite)
+    );
+
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+    });
+
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    expect(receipt).toHaveTextContent("Tuning");
+    expect(receipt).toHaveTextContent("DuckDB: default; SQLite: manual");
+    expect(receipt).toHaveTextContent("Environment");
+    expect(receipt).toHaveTextContent("DuckDB: Linux, x64, 8 CPU");
+    expect(receipt).toHaveTextContent("SQLite: macOS, arm64, 10 CPU");
+  });
 });

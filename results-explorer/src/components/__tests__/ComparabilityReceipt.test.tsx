@@ -95,4 +95,26 @@ describe("ComparabilityReceipt", () => {
     expect(fields.find((field) => field.label === "Phase")?.status).toBe("diff");
     expect(fields.find((field) => field.label === "Query scope")?.status).toBe("diff");
   });
+
+  it("flags benchmark and scale differences as explicit warning fields", () => {
+    const fields = buildComparabilityFields([
+      makeDetail(),
+      makeDetail({
+        result_id: "r2",
+        benchmark: "clickbench",
+        scale_factor: 1,
+        platform: "SQLite",
+        platform_id: "sqlite",
+      }),
+    ]);
+
+    expect(fields.find((field) => field.label === "Benchmark")).toMatchObject({
+      status: "diff",
+      detail: "DuckDB: TPC-H; SQLite: ClickBench",
+    });
+    expect(fields.find((field) => field.label === "Scale factor")).toMatchObject({
+      status: "diff",
+      detail: "DuckDB: SF 0.1; SQLite: SF 1",
+    });
+  });
 });

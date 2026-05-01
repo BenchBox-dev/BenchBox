@@ -98,7 +98,7 @@ work:
   - id: w6
     summary: "Add tests for receipt labels, count semantics, and compare warnings"
     needs: [w1, w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Tests should assert that query count and sample count are separate, bundle
       links render, validation/trust fields render, and compare warnings appear
