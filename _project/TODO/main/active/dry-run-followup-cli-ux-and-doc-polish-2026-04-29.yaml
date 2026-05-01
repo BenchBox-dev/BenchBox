@@ -2,7 +2,7 @@ id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
 title: "CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run"
 worktree: main
 priority: Medium
-status: Not Started
+status: In Progress
 category: Core Functionality
 
 description: |
@@ -56,8 +56,25 @@ work:
 
   - id: w2
     summary: "Make `benchbox submit` print the exact next commands"
-    status: pending
+    status: done
     notes: |
+      Existing implementation already satisfies this work item:
+        - `_print_submission_summary()` prints the concrete `cp`
+          command for the bundle and manifest, the inventory command,
+          the validation command, the PR title, and the
+          `published-results` target branch.
+        - `tests/unit/cli/commands/test_submit.py` includes the pinned
+          W2 regression
+          `test_submit_prints_next_steps_with_pr_target_branch`.
+
+      `/code review W2`: no required issues. The code path is covered
+      by the focused submit unit suite, and no production-code patch was
+      needed for this slice.
+
+      Verification:
+        - `uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q`
+          passed: 28 passed.
+
       Codex's recommendation #2: after writing the bundle, print the
       exact next commands the contributor should run, with paths
       filled in:
