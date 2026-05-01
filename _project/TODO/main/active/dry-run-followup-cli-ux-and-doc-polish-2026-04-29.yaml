@@ -90,8 +90,26 @@ work:
 
   - id: w3
     summary: "Downgrade `benchbox run` recoverable Missing-tables from red ❌ to amber recovery message"
-    status: pending
+    status: done
     notes: |
+      Existing production output already renders missing-table details
+      as yellow/recoverable while preserving red output for hard
+      failures such as inaccessible tables.
+
+      Change:
+        - Added
+          `test_missing_tables_validation_message_is_recoverable_amber`
+          in `tests/unit/cli/test_cli_output.py` to pin the amber
+          missing-table branch and the red inaccessible-table branch.
+
+      `/code review W3`: no required issues. The test is scoped to the
+      exact formatter behavior and does not weaken hard-failure red
+      output.
+
+      Verification:
+        - `uv run -- python -m pytest tests/unit/cli/test_cli_output.py::TestConsoleResultFormatter::test_missing_tables_validation_message_is_recoverable_amber -q`
+          passed: 1 passed.
+
       Codex hit `❌ Missing tables...` printed in red, then the runner
       automatically deleted+rebuilt the DuckDB file and the run
       succeeded. The user-visible result was success, but the red ❌

@@ -213,6 +213,27 @@ class TestConsoleResultFormatter:
         assert any("manifest row counts incomplete" in line for line in rendered)
 
     @patch("benchbox.cli.output.console")
+    def test_missing_tables_validation_message_is_recoverable_amber(self, mock_console):
+        """Recoverable missing-table rebuilds should not render as red failures."""
+        result = self.create_cli_result()
+        result.validation_status = "FAILED"
+        validation_details = {
+            "missing_tables": ["customer", "orders"],
+            "inaccessible_tables": ["lineitem"],
+        }
+
+        ConsoleResultFormatter._display_validation_status(result, validation_details)
+
+        rendered = [" ".join(str(arg) for arg in call.args) for call in mock_console.print.call_args_list]
+        missing_line = next(line for line in rendered if "Missing tables:" in line)
+        inaccessible_line = next(line for line in rendered if "Inaccessible tables:" in line)
+
+        assert "[yellow]• Missing tables:[/yellow]" in missing_line
+        assert "recoverable" in missing_line
+        assert "[red]• Missing tables:[/red]" not in missing_line
+        assert "[red]• Inaccessible tables:[/red]" in inaccessible_line
+
+    @patch("benchbox.cli.output.console")
     def test_display_platform_result_basic(self, mock_console):
         """Test basic platform result display."""
         result = self.create_platform_result()
