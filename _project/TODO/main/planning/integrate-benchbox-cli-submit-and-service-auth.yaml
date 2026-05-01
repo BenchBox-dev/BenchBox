@@ -154,11 +154,21 @@ work:
   - id: w7
     summary: "Write unit and integration tests for the full hosted submission flow"
     needs: [w5, w6]
-    status: pending
+    status: done
     notes: |
       Unit tests: CLI flag parsing, dry-run output, auth token storage/retrieval.
       Integration tests: full submit flow with a mock service (httpretty or
       respx). Cover retry, idempotency, and 401 re-auth paths.
+
+      Landed 2026-05-01:
+        - Added `tests/integration/test_hosted_submission.py` with a local
+          `ThreadingHTTPServer` mock service.
+        - Covers real CLI result loading, multipart upload, status polling,
+          history sidecar creation, transient 5xx retry with stable
+          idempotency key, 401 keyring refresh, and idempotent re-submit.
+        - `/code review W7` found and fixed a coverage weakness: the
+          integration tests now exercise the real schema-v2 result loader
+          instead of monkeypatching `load_result_file`.
 
   - id: w8
     summary: "Update CLI reference docs and add hosted-submission walkthrough"
