@@ -70,11 +70,13 @@ work:
 - id: w5
   summary: "Add Result Detail regression test for separate query and sample counts"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Extend ResultDetail.test.tsx or MethodologyDisclosure.test.tsx to assert
     "queries" and "measurement samples" render as distinct counts when sample
     count exceeds logical query count. Commit with the w2 fix.
+    Owned files for this work unit:
+      - results-explorer/src/components/__tests__/MethodologyDisclosure.test.tsx
 
 - id: w6
   summary: "Add Platform trend regression test against mixed cohorts"
