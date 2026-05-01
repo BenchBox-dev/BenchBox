@@ -151,11 +151,15 @@ work:
 - id: w8
   summary: "Add submission validation that rejects user-supplied public leaderboard cost totals"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Public submissions should provide resource/deployment metadata; BenchBox
     computes normalized cost. Add validator tests using fixtures that attempt
     to submit `cost.total_usd` directly without normalized-cost provenance.
+    Owned files for this work unit:
+      - scripts/validate_submission.py
+      - tests/fixtures/published_results_validator.py
+      - tests/unit/scripts/test_validate_submission.py
 
 - id: w9
   summary: "Backfill or explicitly mark existing public fixtures by cost status"
@@ -242,40 +246,43 @@ verification:
 
 scope_limit:
   only_modify:
-    - "benchbox/core/cost/models.py"
-    - "benchbox/core/explorer_pipeline/models.py"
-    - "benchbox/core/explorer_pipeline/transformer.py"
-    - "benchbox/core/explorer_pipeline/duckdb_builder.py"
-    - "benchbox/core/cost/calculator.py"
-    - "benchbox/core/cost/integration.py"
-    - "benchbox/core/results/schema.py"
-    - "_project/planning/visible_metrics.yaml"
-    - "tests/unit/core/cost/test_calculator.py"
-    - "tests/unit/core/cost/test_integration.py"
-    - "tests/unit/core/results/test_query_plan_serialization.py"
-    - "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
-    - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
-    - "tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py"
-    - "tests/unit/core/explorer_pipeline/test_transformer.py"
-    - "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
-    - "results-explorer/src/types.ts"
-    - "results-explorer/src/lib/duckdbQueries.ts"
-    - "results-explorer/src/lib/queryFilters.ts"
-    - "results-explorer/src/lib/starterQueries.ts"
-    - "results-explorer/src/lib/chartRegistry.ts"
-    - "results-explorer/src/components/CostScatter.tsx"
-    - "results-explorer/src/components/SparklineTable.tsx"
-    - "results-explorer/src/pages/Home.tsx"
-    - "results-explorer/src/pages/Query.tsx"
-    - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
-    - "results-explorer/src/__tests__/duckdbMetricParity.test.ts"
-    - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
-    - "results-explorer/src/components/__tests__/charts.smoke.test.tsx"
-    - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
-    - "results-explorer/src/pages/__tests__/Home.test.tsx"
-    - "results-explorer/src/lib/__tests__/queryFilters.test.ts"
-    - "results-explorer/src/lib/__tests__/starterQueries.test.ts"
-    - "results-explorer/src/pages/__tests__/Query.test.tsx"
+  - "benchbox/core/cost/models.py"
+  - "benchbox/core/explorer_pipeline/models.py"
+  - "benchbox/core/explorer_pipeline/transformer.py"
+  - "benchbox/core/explorer_pipeline/duckdb_builder.py"
+  - "benchbox/core/cost/calculator.py"
+  - "benchbox/core/cost/integration.py"
+  - "benchbox/core/results/schema.py"
+  - "_project/planning/visible_metrics.yaml"
+  - "tests/unit/core/cost/test_calculator.py"
+  - "tests/unit/core/cost/test_integration.py"
+  - "tests/unit/core/results/test_query_plan_serialization.py"
+  - "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
+  - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+  - "tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py"
+  - "tests/unit/core/explorer_pipeline/test_transformer.py"
+  - "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
+  - "scripts/validate_submission.py"
+  - "tests/fixtures/published_results_validator.py"
+  - "tests/unit/scripts/test_validate_submission.py"
+  - "results-explorer/src/types.ts"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/queryFilters.ts"
+  - "results-explorer/src/lib/starterQueries.ts"
+  - "results-explorer/src/lib/chartRegistry.ts"
+  - "results-explorer/src/components/CostScatter.tsx"
+  - "results-explorer/src/components/SparklineTable.tsx"
+  - "results-explorer/src/pages/Home.tsx"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+  - "results-explorer/src/__tests__/duckdbMetricParity.test.ts"
+  - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+  - "results-explorer/src/components/__tests__/charts.smoke.test.tsx"
+  - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+  - "results-explorer/src/pages/__tests__/Home.test.tsx"
+  - "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+  - "results-explorer/src/lib/__tests__/starterQueries.test.ts"
+  - "results-explorer/src/pages/__tests__/Query.test.tsx"
 
 open_questions:
 - "Should normalized storage cost be included in the first release or deferred behind compute-only cost with explicit scope?"
