@@ -34,7 +34,7 @@ work:
 
 - id: w2
   summary: "Correct Result Detail methodology copy to distinguish logical queries from samples"
-  status: pending
+  status: done
   notes: |
     In results-explorer/src/pages/ResultDetail.tsx and/or
     MethodologyDisclosure, source logical query scope from `detail.query_count`
@@ -65,7 +65,7 @@ work:
 - id: w5
   summary: "Add Result Detail regression test for separate query and sample counts"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Extend ResultDetail.test.tsx or MethodologyDisclosure.test.tsx to assert
     "queries" and "measurement samples" render as distinct counts when sample
