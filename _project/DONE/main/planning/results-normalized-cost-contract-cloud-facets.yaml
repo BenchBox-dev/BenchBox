@@ -2,8 +2,9 @@ id: results-normalized-cost-contract-cloud-facets
 title: "Results pipeline: normalized cost contract and cloud deployment facets"
 worktree: main
 priority: High
-status: "In Progress"
+status: "Completed"
 category: "Result Integrity"
+completed_date: "2026-05-01"
 
 description: |
   Make cost usable for ranking, filtering, and trust. Product direction is that
