@@ -134,8 +134,26 @@ work:
 
   - id: w4
     summary: "Drop 'Interactive Benchmark Runner' header in non-interactive `benchbox run`"
-    status: pending
+    status: done
     notes: |
+      Existing production code already gates the header on
+      `sys.stdin.isatty()` and the absence of explicit platform +
+      benchmark args.
+
+      Change:
+        - Added focused tests in
+          `tests/unit/cli/test_run_command_interactive_paths.py` for
+          suppressing the header with explicit run args and preserving
+          it for a prompted TTY run.
+
+      `/code review W4`: no required issues. The regression tests
+      cover the requested suppression without removing the true
+      interactive banner.
+
+      Verification:
+        - `uv run -- python -m pytest tests/unit/cli/test_run_command_interactive_paths.py::test_interactive_header_suppressed_for_explicit_run_args tests/unit/cli/test_run_command_interactive_paths.py::test_interactive_header_shown_for_prompted_tty_run -q`
+          passed: 2 passed.
+
       Codex called this out: showing 'Interactive Benchmark Runner'
       when running with explicit flags (no interactive prompt) is
       misleading. Suppress the header when stdin is not a TTY OR
