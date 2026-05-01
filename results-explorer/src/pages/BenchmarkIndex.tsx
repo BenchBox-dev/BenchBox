@@ -101,6 +101,11 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   // the first available phase so we never request a non-existent artifact.
   const effectivePhase = phases.includes(phaseFilter) ? phaseFilter : (phases[0] ?? phaseFilter);
 
+  useEffect(() => {
+    if (!results || phases.length === 0 || phaseFilter === effectivePhase) return;
+    setPhaseFilter(effectivePhase);
+  }, [effectivePhase, phaseFilter, phases.length, results, setPhaseFilter]);
+
   // Load the BenchmarkSummary from DuckDB whenever (sf, phase) changes.
   useEffect(() => {
     // Guard: don't request until phases have resolved for the current SF.

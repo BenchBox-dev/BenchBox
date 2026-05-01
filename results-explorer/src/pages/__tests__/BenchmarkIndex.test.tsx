@@ -234,6 +234,7 @@ function defaultImpl(rows: typeof RESULT_ROWS, rankings: typeof RANKING_ROWS, ce
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/results/tpch/");
   vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS));
 });
 
@@ -384,6 +385,9 @@ describe("BenchmarkIndex", () => {
 
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("phase")).toBe("standard"),
+    );
 
     // Verify the last benchmark_rankings call targets "standard" (any earlier
     // call may still use the default phase filter before results resolve).
@@ -391,5 +395,23 @@ describe("BenchmarkIndex", () => {
       String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
     );
     expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "standard"]);
+  });
+
+  it("coerces an unavailable phase URL value to the rendered cohort phase", async () => {
+    window.history.replaceState(null, "", "/results/tpch/?sf=0.1&phase=standard");
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    // "power" is the useUrlState default, so correcting to it strips the
+    // phase key rather than leaving a redundant `?phase=power` param.
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("phase")).toBeNull(),
+    );
+
+    const rankingCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+      String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
+    );
+    expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "power"]);
   });
 });

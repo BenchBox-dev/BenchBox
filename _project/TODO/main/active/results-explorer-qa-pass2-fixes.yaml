@@ -375,8 +375,32 @@ work:
 
   - id: w7
     summary: "Fix N2 — BenchmarkIndex phase URL/cohort mismatch"
-    status: pending
+    status: done
     notes: |
+      Implemented in `BenchmarkIndex.tsx`:
+        - After manifest rows resolve, BenchmarkIndex now reconciles an
+          unavailable URL `phase` value to `effectivePhase` through the
+          existing `useUrlState` setter.
+        - The setter uses `history.replaceState`, so the URL settles
+          without adding navigation history. When the corrected phase is
+          the default `power`, the redundant key is stripped rather than
+          left as `?phase=power`.
+
+      Tests:
+        - Extended the existing standard-only phase guard to assert the
+          URL is corrected to `?phase=standard` when that is the only
+          available phase.
+        - Added coverage for `?phase=standard` against a power-only
+          cohort: the rendered DuckDB query targets `power` and the URL
+          removes the invalid `phase` key.
+
+      Verification:
+        - `cd results-explorer && npm run test -- src/pages/__tests__/BenchmarkIndex.test.tsx`
+          passed: 13 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - `git diff --check` passed.
+        - `/code review W7`: no required issues.
+
       Today `BenchmarkIndex.tsx:99` computes `effectivePhase = phases.includes(phaseFilter) ? phaseFilter : (phases[0] ?? phaseFilter)`
       but the URL keeps the user-supplied (invalid) `?phase=` value.
       User sees `?phase=standard` while looking at the `power` cohort.
