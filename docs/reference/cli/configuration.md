@@ -262,8 +262,8 @@ Result output and export settings.
 | `formats` | list | `[json, console]` | Output format list |
 | `directory` | string | `./benchmark_runs/results` | Results directory |
 | `timestamp_format` | string | `%Y%m%d_%H%M%S` | Timestamp format for result filenames |
-| `submit_to_service` | boolean | `false` | Automatically submit results to the hosted service |
-| `service_url` | string | `https://api.benchbox.dev/v1` | Results service URL |
+| `submit_to_service` | boolean | `false` | Legacy placeholder; use `benchbox submit --service` for hosted upload |
+| `service_url` | string | `https://api.benchbox.dev/v1` | Default hosted results service URL placeholder |
 | `compression.enabled` | boolean | `true` | Enable result file compression |
 | `compression.type` | string | `zstd` | Compression algorithm (`zstd`, `gzip`) |
 | `compression.level` | integer | `null` | Compression level; `null` uses the algorithm default |

@@ -2,7 +2,7 @@ id: integrate-benchbox-cli-submit-and-service-auth
 title: "Integrate BenchBox CLI submission flow and service authentication"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
 category: Core Functionality
 deps:
   needs:
@@ -81,50 +81,115 @@ work:
   - id: w4
     summary: "Implement authentication: token fetch, local keychain storage, and refresh flow"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       On first submit, prompt for token. Store securely (keyring or encrypted
       file). On subsequent runs, load token from storage. Handle 401 by prompting
       for re-auth rather than hard-failing. Do not store plaintext tokens in
       config files.
 
+      Landed 2026-05-01:
+        - Added `benchbox auth login/status/refresh/logout`.
+        - Added `benchbox.cli.submit_auth` with env-token precedence,
+          OS-keyring storage, hidden prompt fetch, keyring overwrite refresh,
+          and token-redacted auth status.
+        - Wired non-dry-run `benchbox submit --service` to resolve auth before
+          the still-placeholder upload path. `--service --dry-run` remains
+          credential-free.
+        - `/code review W4` found and fixed two auth-flow issues: refresh now
+          refuses to hide a replacement keyring token behind an active env
+          override, and logout reports "not found" accurately before deleting.
+
   - id: w5
     summary: "Implement upload, status polling, retries, and idempotent re-submit"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       POST the canonical schema-v2 bundle. Poll for async processing status
       (accepted → validated → published). Retry on transient errors (5xx,
       network). Re-submit with same bundle must be idempotent - service returns
       the existing hosted URL rather than creating a duplicate.
 
+      Landed 2026-05-01 against the documented Phase 3 contract in
+      `docs/reference/hosted-results-contract.md`:
+        - Added stdlib multipart POST transport for `/v1/submissions`.
+        - Sends bearer auth, visibility, companion files, manifest, and a
+          stable UUIDv5 idempotency key derived from service URL + bundle hash
+          unless the caller supplies `--idempotency-key`.
+        - Retries transient upload/status failures (5xx and network errors)
+          with exponential backoff.
+        - Polls `/v1/submissions/{submission_id}/status` until published or
+          rejected when `--wait` is enabled; `--no-wait` exits after accepted
+          upload with the submission id.
+        - Retries once with refreshed auth on 401.
+        - `/code review W5` found and fixed two issues: 401/last-5xx error
+          classification no longer depends on JSON error bodies, and
+          `--no-wait` now reports accepted rather than complete.
+      This is unit/contract tested only; w7 still owns the full mock-service
+      integration suite.
+
   - id: w6
     summary: "Connect hosted result URL and submission history into `benchbox results --submitted`"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
       After a successful submission, persist the hosted URL in local history.
       `benchbox results --submitted` lists past submissions with their hosted
       URLs. Builds on the existing results history surfaces without modifying
       the exporter.
 
+      Landed 2026-05-01:
+        - Added hosted-submission history sidecars next to the submitted result
+          file, preserving the canonical bundle bytes.
+        - Records status, submission id, public result id, public URL,
+          idempotency key, service URL, and manifest-derived benchmark
+          metadata without storing tokens.
+        - Added `benchbox results --submitted`.
+        - Skipped `.submission.json` sidecars from normal exported-result
+          discovery.
+        - `/code review W6` found and fixed a history overwrite bug: sidecar
+          names now include a sanitized idempotency key so idempotent retries
+          update one record while distinct service/key submissions are retained.
+
   - id: w7
     summary: "Write unit and integration tests for the full hosted submission flow"
     needs: [w5, w6]
-    status: pending
+    status: done
     notes: |
       Unit tests: CLI flag parsing, dry-run output, auth token storage/retrieval.
       Integration tests: full submit flow with a mock service (httpretty or
       respx). Cover retry, idempotency, and 401 re-auth paths.
 
+      Landed 2026-05-01:
+        - Added `tests/integration/test_hosted_submission.py` with a local
+          `ThreadingHTTPServer` mock service.
+        - Covers real CLI result loading, multipart upload, status polling,
+          history sidecar creation, transient 5xx retry with stable
+          idempotency key, 401 keyring refresh, and idempotent re-submit.
+        - `/code review W7` found and fixed a coverage weakness: the
+          integration tests now exercise the real schema-v2 result loader
+          instead of monkeypatching `load_result_file`.
+
   - id: w8
     summary: "Update CLI reference docs and add hosted-submission walkthrough"
     needs: [w6, w7]
-    status: pending
+    status: done
     notes: |
       Update docs/CLI_REFERENCE.md and docs/reference/cli/ with submit command
       docs. Add a how-to page covering the end-to-end workflow:
       run → export → submit → track hosted URL.
+
+      Landed 2026-05-01:
+        - Updated `docs/CLI_REFERENCE.md`, `docs/reference/cli/submit.md`,
+          `docs/reference/cli/results.md`, and the CLI index for hosted submit,
+          auth, `--service`, and `results --submitted`.
+        - Added `docs/reference/cli/auth.md`.
+        - Added `docs/guides/hosted-submission.md` and linked it from the
+          guides index.
+        - Corrected hosted contract snippets for current manifest filenames,
+          `--service`, keyring/env auth, and primary-file `bundle_hash` plus
+          `companion_hashes`.
+        - `/code review W8` found and fixed stale schema/hash docs.
 
 metadata:
   tags:
@@ -135,6 +200,7 @@ metadata:
     - api
   estimated_effort: "Large"
   created_date: "2026-03-29"
+  completed_date: "2026-05-01"
 
 impact:
   business_value: |

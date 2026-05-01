@@ -404,10 +404,13 @@ The submission manifest schema:
 
 ```json
 {
-  "bundle_hash": "<sha256 composite over all files in bundle directory>",
   "submission_tool_version": "<'benchbox/' + semver string>",
   "submitted_at": "<ISO 8601 UTC timestamp>",
   "bundle_file": "<filename of primary result JSON>",
+  "bundle_hash": "<sha256 of primary result JSON>",
+  "companion_hashes": {
+    "<companion filename>": "<sha256 of companion file>"
+  },
   "benchmark": "<benchmark name from result>",
   "platform": "<platform name from result>",
   "scale_factor": "<scale factor from result>",
@@ -424,13 +427,11 @@ The submission manifest schema:
 
 #### `bundle_hash` computation
 
-The CLI computes `bundle_hash` as a composite SHA-256 over all files in the
-assembled bundle directory. Files are enumerated in sorted order by filename;
-for each file the filename bytes and file content bytes are fed into the hash.
-The manifest itself is excluded (hash is computed before manifest creation).
-This ensures companion files (query plans, tuning configs) are covered by
-the integrity check. The hash must be recomputed at submission time (not
-cached from a prior run) to detect any post-run modifications.
+The CLI computes `bundle_hash` as the SHA-256 of the primary result JSON bytes.
+Companion files are covered separately through `companion_hashes`, a mapping of
+companion filename to SHA-256. The manifest itself is excluded because it is
+created after these hashes are computed. Hashes must be recomputed at submission
+time, not cached from a prior run, to detect post-run modifications.
 
 #### Dry-run behavior
 
@@ -457,19 +458,20 @@ submission/
     <result_filename>.json
     <result_filename>.plans.json   (if present)
     <result_filename>.tuning.json  (if present)
-  submission-manifest.json
+  <result_filename>.manifest.json
   CONTRIBUTING.md
 ```
 
-The contributor opens a PR against `results-data/` by copying the `bundle/`
-directory into `results-data/<benchmark>/<platform>/sf<scale>/` and placing
-`submission-manifest.json` alongside it. See `CONTRIBUTING.md` in the output
-directory for step-by-step instructions.
+The contributor opens a PR against `published-results` by copying the contents
+of `bundle/` into `results-data/bundles/` and placing
+`<result_filename>.manifest.json` alongside the bundle files. See
+`CONTRIBUTING.md` in the output directory for step-by-step instructions.
 
 #### Phase 3 API mode
 
-When `submit_to_service` is configured in `~/.benchbox/config.toml`, the CLI
-POSTs the submission bundle directly to the hosted API:
+When `--service [URL]` is passed, the CLI POSTs the submission bundle directly
+to the hosted API. Authentication comes from `benchbox auth login` keyring
+storage or `BENCHBOX_SUBMIT_TOKEN`; dry runs do not require credentials.
 
 ```
 POST /v1/submissions

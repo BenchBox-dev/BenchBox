@@ -84,7 +84,7 @@ benchbox export --last --format json --format csv --format html --output-dir ./a
 ### Notes
 
 - The `export` command loads existing result files from `benchmark_runs/results/`
-- Schema version 1.0 is required (all recent benchmarks use this version)
+- Schema versions 2.0 and 2.1 are supported by current result tooling
 - Export preserves all metrics and metadata from original results
 - Large result files (TPC-DS at scale 100+) may take a few seconds to process
 - The --force flag skips confirmation prompts when overwriting existing files
@@ -100,6 +100,8 @@ Display exported benchmark results and execution history.
 ### Options
 
 - `--limit INTEGER`: Number of results to show (default: 10)
+- `--submitted`: Show hosted submission history sidecars instead of exported
+  benchmark result files
 
 ### Usage Examples
 
@@ -109,6 +111,9 @@ benchbox results
 
 # Show more results
 benchbox results --limit 25
+
+# Show hosted submissions and public URLs
+benchbox results --submitted
 ```
 
 ---

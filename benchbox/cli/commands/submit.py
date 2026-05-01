@@ -13,17 +13,29 @@ import click
 
 import benchbox
 from benchbox.cli.shared import console
+from benchbox.cli.submit_auth import (
+    DEFAULT_SERVICE_URL as _DEFAULT_SERVICE_URL,
+    SubmissionAuthError,
+    refresh_submission_token,
+    resolve_submission_token,
+)
+from benchbox.cli.submit_service import (
+    HostedSubmitError,
+    HostedSubmitResult,
+    HostedSubmitUnauthorized,
+    submit_hosted_bundle,
+)
 from benchbox.core.results.loader import (
     ResultLoadError,
     UnsupportedSchemaError,
     find_latest_result,
     load_result_file,
 )
+from benchbox.core.results.submission_history import record_hosted_submission
 
 # Submission manifest phase - indicates the result schema generation (v2.0 = phase 2).
 _SUBMISSION_PHASE = 2
 
-_DEFAULT_SERVICE_URL = "https://api.benchbox.dev/v1"
 _VISIBILITY_CHOICES = ("public", "unlisted", "private")
 
 # Static checklist (Option B from
@@ -112,24 +124,50 @@ def _compute_file_hash(file_path: Path) -> str:
     return h.hexdigest()
 
 
+def _build_submission_manifest(
+    *,
+    source_path: Path,
+    companions: list[Path],
+    result,
+    submitted_by: str | None,
+    submission_path: str,
+) -> dict:
+    """Build the shared submission manifest envelope for PR and hosted modes."""
+
+    return {
+        "submission_tool_version": f"benchbox/{benchbox.__version__}",
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+        "bundle_file": source_path.name,
+        "bundle_hash": _compute_file_hash(source_path),
+        "companion_hashes": {comp.name: _compute_file_hash(comp) for comp in companions},
+        "benchmark": result.benchmark_name,
+        "platform": result.platform,
+        "scale_factor": result.scale_factor,
+        "phase": _SUBMISSION_PHASE,
+        "submission_path": submission_path,
+        "submitted_by": _resolve_submitted_by(submitted_by),
+    }
+
+
 def _dispatch_service_mode(
     ctx: click.Context,
     *,
     source_path: Path,
     companions: list[Path],
+    result,
     service_url: str,
     visibility: str,
     idempotency_key: str | None,
     wait: bool,
     dry_run: bool,
+    submitted_by: str | None,
 ) -> None:
     """Phase 3 hosted-API submission path.
 
-    Currently a skeleton: --dry-run is fully supported (validates the
-    bundle, prints what would be uploaded, no credentials needed). The
-    real upload + auth + status-polling flow is the work in
-    `integrate-benchbox-cli-submit-and-service-auth` w4-w8 and lands
-    once the hosted ingest API is available.
+    --dry-run is fully supported: it validates the bundle, prints what
+    would be uploaded, and needs no credentials. The real path resolves
+    auth, uploads the canonical bundle, and optionally polls for hosted
+    publication status.
 
     Hash contract for the dry-run: the values printed are SHA-256 of the
     on-disk source files as-is. The Phase 2 PR-package path
@@ -162,16 +200,98 @@ def _dispatch_service_mode(
         console.print("\n[yellow]Dry-run complete - no bytes sent.[/yellow]")
         return
 
-    # Real upload path is not yet implemented. Surface that explicitly
-    # rather than silently no-op or partially-execute.
-    console.print(
-        "\n[red]Hosted submission upload is not yet implemented.[/red]\n"
-        "  --service --dry-run works today; the live upload + auth flow lands\n"
-        "  in `integrate-benchbox-cli-submit-and-service-auth` w4-w8, gated\n"
-        "  on the Phase 3 promotion metrics in\n"
-        "  _project/analysis/phase-3-promotion-metrics.md."
+    try:
+        token = resolve_submission_token(service_url)
+    except SubmissionAuthError as exc:
+        console.print(f"\n[red]Authentication required:[/red] {exc}")
+        ctx.exit(1)
+        return
+
+    manifest = _build_submission_manifest(
+        source_path=source_path,
+        companions=companions,
+        result=result,
+        submitted_by=submitted_by,
+        submission_path="hosted-service",
     )
-    ctx.exit(1)
+
+    console.print("\n[bold]Uploading submission bundle:[/bold]")
+    console.print(f"  Service URL:      {service_url}")
+    console.print(f"  Bundle file:      {source_path.name} ({bundle_size:,} bytes)")
+    console.print(f"  Bundle hash:      {bundle_hash}")
+    console.print(f"  Visibility:       {visibility}")
+
+    try:
+        upload_result = submit_hosted_bundle(
+            service_url=service_url,
+            token=token.token,
+            source_path=source_path,
+            companions=companions,
+            manifest=manifest,
+            bundle_hash=bundle_hash,
+            visibility=visibility,
+            idempotency_key=idempotency_key,
+            wait=wait,
+        )
+    except HostedSubmitUnauthorized:
+        try:
+            refreshed_token = refresh_submission_token(service_url)
+            upload_result = submit_hosted_bundle(
+                service_url=service_url,
+                token=refreshed_token.token,
+                source_path=source_path,
+                companions=companions,
+                manifest=manifest,
+                bundle_hash=bundle_hash,
+                visibility=visibility,
+                idempotency_key=idempotency_key,
+                wait=wait,
+            )
+        except (HostedSubmitError, SubmissionAuthError) as exc:
+            console.print(f"\n[red]Hosted submission failed:[/red] {exc}")
+            ctx.exit(1)
+            return
+    except HostedSubmitError as exc:
+        console.print(f"\n[red]Hosted submission failed:[/red] {exc}")
+        ctx.exit(1)
+        return
+
+    try:
+        history_path = record_hosted_submission(
+            result_file=source_path,
+            service_url=service_url,
+            manifest=manifest,
+            status=upload_result.status,
+            idempotency_key=upload_result.idempotency_key,
+            submission_id=upload_result.submission_id,
+            public_result_id=upload_result.public_result_id,
+            public_url=upload_result.public_url,
+        )
+    except OSError as exc:
+        console.print(f"[yellow]warning:[/yellow] could not save hosted submission history: {exc}")
+        history_path = None
+
+    _print_service_result(upload_result, wait=wait)
+    if history_path is not None:
+        console.print(f"  History:          {history_path}")
+
+
+def _print_service_result(result: HostedSubmitResult, *, wait: bool) -> None:
+    is_terminal = result.status in {"already_published", "published"} or result.public_url is not None
+    if is_terminal:
+        console.print("\n[bold green]Hosted submission complete.[/bold green]")
+    else:
+        console.print("\n[bold green]Hosted submission accepted.[/bold green]")
+    console.print(f"  Status:           {result.status}")
+    if result.submission_id:
+        console.print(f"  Submission ID:    {result.submission_id}")
+    console.print(f"  Idempotency key:  {result.idempotency_key}")
+    if result.status_history:
+        console.print(f"  Status history:   {' -> '.join(result.status_history)}")
+    if result.public_url:
+        console.print(f"  Public URL:       {result.public_url}")
+    elif not wait and result.submission_id:
+        console.print("  Next step:        rerun with --wait to poll for the public URL")
 
 
 def _print_submission_summary(
@@ -430,11 +550,13 @@ def submit(
             ctx,
             source_path=source_path,
             companions=companions,
+            result=result,
             service_url=service_url,
             visibility=visibility,
             idempotency_key=idempotency_key,
             wait=wait,
             dry_run=dry_run,
+            submitted_by=submitted_by,
         )
         return
 
@@ -467,28 +589,16 @@ def submit(
     for comp in companions:
         shutil.copy2(comp, bundle_dir / comp.name)
 
-    # Per-file hashes — bundle_hash covers the primary bundle JSON only,
-    # companion_hashes maps each companion's filename to its SHA-256.
-    # Per-file is the contract used by scripts/validate_submission.py;
-    # using a directory-level hash here would not survive the user
-    # copying the files into results-data/bundles/ where 13+ other
-    # bundles already live.
-    bundle_hash = _compute_file_hash(bundle_dir / source_path.name)
-    companion_hashes = {comp.name: _compute_file_hash(bundle_dir / comp.name) for comp in companions}
-
-    manifest = {
-        "submission_tool_version": f"benchbox/{benchbox.__version__}",
-        "submitted_at": datetime.now(timezone.utc).isoformat(),
-        "bundle_file": source_path.name,
-        "bundle_hash": bundle_hash,
-        "companion_hashes": companion_hashes,
-        "benchmark": result.benchmark_name,
-        "platform": result.platform,
-        "scale_factor": result.scale_factor,
-        "phase": _SUBMISSION_PHASE,
-        "submission_path": "PR-based",
-        "submitted_by": _resolve_submitted_by(submitted_by),
-    }
+    # Per-file hashes are the contract used by scripts/validate_submission.py;
+    # using a directory-level hash would not survive copying into
+    # results-data/bundles/ where other bundles already live.
+    manifest = _build_submission_manifest(
+        source_path=source_path,
+        companions=companions,
+        result=result,
+        submitted_by=submitted_by,
+        submission_path="PR-based",
+    )
 
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     contributing_path.write_text(_CONTRIBUTING_TEXT, encoding="utf-8")

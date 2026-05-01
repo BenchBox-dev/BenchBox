@@ -106,7 +106,7 @@ class ResultExporter:
     def _write_file(self, file_path: Path, content: str, mode: str = "w") -> None:
         """Write content to file, handling both local and cloud paths."""
         if self.is_cloud_output and hasattr(file_path, "write_text"):
-            file_path.write_text(content)
+            file_path.write_text(content, encoding="utf-8")
         elif self.is_cloud_output and hasattr(file_path, "write_bytes"):
             file_path.write_bytes(content.encode("utf-8"))
         else:
@@ -527,7 +527,11 @@ class ResultExporter:
 
         for json_file in self.output_dir.glob("*.json"):
             # Skip companion files
-            if json_file.name.endswith(".plans.json") or json_file.name.endswith(".tuning.json"):
+            if (
+                json_file.name.endswith(".plans.json")
+                or json_file.name.endswith(".tuning.json")
+                or json_file.name.endswith(".submission.json")
+            ):
                 continue
 
             try:

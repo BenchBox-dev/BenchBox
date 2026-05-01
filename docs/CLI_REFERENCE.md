@@ -57,7 +57,14 @@ expected runtime characteristics.
 ### `benchbox results`
 
 Displays benchmark execution history and summary metrics from stored
-artifacts under `benchmark_runs/`.
+artifacts under `benchmark_runs/`. Use `benchbox results --submitted`
+to list hosted submission history and public result URLs.
+
+### `benchbox auth`
+
+Manages hosted submission credentials for `benchbox submit --service`.
+Tokens are stored in the OS keyring and can be overridden for automation
+with `BENCHBOX_SUBMIT_TOKEN`.
 
 ### `benchbox export`
 
@@ -128,6 +135,39 @@ benchbox publish show abc123def456
 
 # Remove a publication record (does not delete artifact files)
 benchbox publish remove abc123def456
+```
+
+### `benchbox submit`
+
+Packages or uploads schema-v2 result bundles for the BenchBox results
+platform.
+
+Common flags:
+
+- `--last` - use the most recent result file
+- `--output <dir>` - create a PR-ready local submission package
+- `--service [url]` - upload to the hosted ingest API
+- `--visibility <public|unlisted|private>` - hosted visibility
+- `--idempotency-key <key>` - override the stable hosted retry key
+- `--wait / --no-wait` - poll or return after hosted acceptance
+- `--dry-run` - preview without writing files or sending bytes
+- `--submitted-by <name>` - override PR manifest submitter name
+
+Examples:
+
+```bash
+# Package the latest result for PR contribution
+benchbox submit --last --output ./submission
+
+# Preview a hosted upload without credentials or network
+benchbox submit --last --service --dry-run
+
+# Log in and upload to the hosted service
+benchbox auth login
+benchbox submit --last --service
+
+# Track hosted submissions
+benchbox results --submitted
 ```
 
 ### `benchbox check-deps`

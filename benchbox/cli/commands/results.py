@@ -7,9 +7,11 @@ from typing import Any
 import click
 from pydantic import ValidationError
 from rich.panel import Panel
+from rich.table import Table
 
 from benchbox.cli.output import ResultExporter
 from benchbox.cli.shared import console
+from benchbox.core.results.submission_history import list_hosted_submissions
 from benchbox.core.schemas import ExecutionContext
 
 
@@ -83,8 +85,9 @@ def _reconstruct_cli_command(
 
 @click.group("results", invoke_without_command=True)
 @click.option("--limit", type=int, default=10, help="Number of results to show")
+@click.option("--submitted", is_flag=True, help="Show hosted submission history")
 @click.pass_context
-def results(ctx, limit):
+def results(ctx, limit, submitted):
     """Show exported benchmark results and execution history.
 
     Displays a summary of recent benchmark executions including performance
@@ -98,7 +101,42 @@ def results(ctx, limit):
     # If no subcommand is invoked, show results summary
     if ctx.invoked_subcommand is None:
         exporter = ResultExporter()
-        exporter.show_results_summary()
+        if submitted:
+            _show_submitted_results(exporter, limit=limit)
+        else:
+            exporter.show_results_summary()
+
+
+def _show_submitted_results(exporter: ResultExporter, *, limit: int) -> None:
+    records = list_hosted_submissions(Path(exporter.output_dir), limit=limit)
+    if not records:
+        console.print("[yellow]No hosted submissions found[/yellow]")
+        return
+
+    console.print(f"\n[bold]Hosted Submissions ({len(records)} shown)[/bold]")
+    console.print(f"Output directory: [cyan]{exporter.output_dir}[/cyan]")
+
+    table = Table()
+    table.add_column("Submitted", style="dim")
+    table.add_column("Benchmark", style="green")
+    table.add_column("Platform", style="blue")
+    table.add_column("Scale", style="cyan")
+    table.add_column("Status", style="yellow")
+    table.add_column("URL / Submission", style="magenta")
+
+    for record in records:
+        submitted = str(record.get("submitted_at", ""))[:19].replace("T", " ")
+        url_or_submission = record.get("public_url") or record.get("submission_id") or ""
+        table.add_row(
+            submitted,
+            str(record.get("benchmark") or ""),
+            str(record.get("platform") or ""),
+            str(record.get("scale_factor") or ""),
+            str(record.get("status") or ""),
+            str(url_or_submission),
+        )
+
+    console.print(table)
 
 
 @results.command("show-cli")
@@ -116,7 +154,7 @@ def show_cli(result_file: str, full: bool) -> None:
     """
     try:
         result_path = Path(result_file)
-        with result_path.open("r") as f:
+        with result_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
 
         platform, benchmark_name, scale_factor, execution_context = _extract_result_fields(data)
