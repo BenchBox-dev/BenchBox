@@ -607,8 +607,37 @@ work:
   - id: w12
     summary: "Resolve `?metric=` per w2 — delete dead code OR implement toggle"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
+      Implemented the W2 DELETE decision:
+        - Removed standalone mutable `primaryMetric` state/setters from
+          ResultDetail and Compare.
+        - ResultDetail now stores `{ detail, primaryMetric }` together
+          after both the detail payload and canonical benchmark metric
+          have loaded.
+        - Compare now stores `{ results, primaryMetric }` together
+          after all details pass validation and the canonical benchmark
+          metric has loaded.
+        - `?metric=` remains unsupported; the canonical metric comes
+          from `getPrimaryMetricForBenchmark`.
+
+      Docs/tests:
+        - Updated pass-2 QA plan §S5.2 and §S6.4 to state that
+          `?metric=` is not a supported URL contract and no in-page
+          toggle is expected.
+        - Added ResultDetail and Compare tests proving `?metric=` does
+          not override the canonical benchmark-derived metric.
+
+      Verification:
+        - `cd results-explorer && npm run test -- src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx`
+          passed: 16 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - `cd results-explorer && npm run build` passed.
+        - `git diff --check` passed.
+        - `/code review W12` finding: explicitly reset the Compare
+          canonical-metric mock in `beforeEach`; addressed. No
+          remaining required issues.
+
       Branch on w2's recorded decision:
         (a) DELETE: remove the `primaryMetric` `useState`, the URL
             param read, and any setter that no longer has a caller, on

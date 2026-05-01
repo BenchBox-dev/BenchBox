@@ -34,7 +34,7 @@ vi.mock("@/lib/duckdbQueries", async () => {
   };
 });
 
-import { getDetailResult, resolveShortId } from "@/lib/duckdbQueries";
+import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId } from "@/lib/duckdbQueries";
 import { Compare } from "@/pages/Compare";
 
 // ---------------------------------------------------------------------------
@@ -96,14 +96,16 @@ const SQLITE = makeResult({
   ],
 });
 
-function setupUrl(ids: string[]) {
-  window.history.replaceState(null, "", `/results/compare?ids=${ids.join(",")}`);
+function setupUrl(ids: string[], extraParams: Record<string, string> = {}) {
+  const params = new URLSearchParams({ ids: ids.join(","), ...extraParams });
+  window.history.replaceState(null, "", `/results/compare?${params.toString()}`);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   setupUrl(["r1", "r2"]);
   vi.mocked(resolveShortId).mockImplementation((id) => Promise.resolve(id));
+  vi.mocked(getPrimaryMetricForBenchmark).mockResolvedValue("power_score");
   vi.mocked(getDetailResult).mockImplementation((id) =>
     id === "r1" ? Promise.resolve(DUCKDB) : Promise.resolve(SQLITE)
   );
@@ -189,6 +191,19 @@ describe("Compare", () => {
       expect(spans.length).toBeGreaterThan(0);
     });
     // Primary label should be "Power score" (not "Geomean query time")
+    const labels = screen.getAllByText(/Power score/i);
+    expect(labels.length).toBeGreaterThan(0);
+  });
+
+  it("ignores metric URL params and uses the canonical benchmark metric", async () => {
+    setupUrl(["r1", "r2"], { metric: "display_geomean_ms" });
+
+    render(<Compare />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+    });
+    expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch");
     const labels = screen.getAllByText(/Power score/i);
     expect(labels.length).toBeGreaterThan(0);
   });

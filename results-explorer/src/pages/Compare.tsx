@@ -16,13 +16,22 @@ import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
+type PrimaryMetric = "power_score" | "display_geomean_ms";
+interface CompareState {
+  results: DetailResult[];
+  primaryMetric: PrimaryMetric;
+}
+
+const EMPTY_RESULTS: DetailResult[] = [];
+
 export function Compare(_: RoutableProps) {
-  const [results, setResults] = useState<DetailResult[]>([]);
-  const [primaryMetric, setPrimaryMetric] = useState<"power_score" | "display_geomean_ms">("display_geomean_ms");
+  const [compareState, setCompareState] = useState<CompareState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const results = compareState?.results ?? EMPTY_RESULTS;
+  const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
   useDocumentTitle(
     results.length > 0 ? `Compare (${results.length}) · BenchBox Results` : "Compare · BenchBox Results",
   );
@@ -113,8 +122,7 @@ export function Compare(_: RoutableProps) {
 
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
-        setPrimaryMetric(metric);
-        setResults(details);
+        setCompareState({ results: details, primaryMetric: metric });
         setLoading(false);
       })
       .catch((err: unknown) => {

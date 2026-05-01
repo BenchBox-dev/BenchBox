@@ -19,12 +19,14 @@ interface ResultDetailProps extends RoutableProps {
 
 type MedianSortKey = "query_id" | "display_ms" | "sample_count";
 type RawSortKey = "query_id" | "duration_ms" | "status";
+type PrimaryMetric = "power_score" | "display_geomean_ms";
+interface DetailState {
+  detail: DetailResult;
+  primaryMetric: PrimaryMetric;
+}
 
 export function ResultDetail({ resultId = "" }: ResultDetailProps) {
-  const [detail, setDetail] = useState<DetailResult | null>(null);
-  const [primaryMetric, setPrimaryMetric] = useState<
-    "power_score" | "display_geomean_ms"
-  >("display_geomean_ms");
+  const [detailState, setDetailState] = useState<DetailState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState<MedianSortKey>>({
     key: "query_id",
@@ -40,6 +42,8 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   const [tuningLoading, setTuningLoading] = useState(false);
   const [tuningError, setTuningError] = useState<string | null>(null);
   const tuningAbortRef = useRef<AbortController | null>(null);
+  const detail = detailState?.detail ?? null;
+  const primaryMetric = detailState?.primaryMetric ?? "display_geomean_ms";
   const documentTitle = detail
     ? `${humanizeBenchmark(detail.benchmark)} · ${detail.platform} · SF${detail.scale_factor} · BenchBox Results`
     : "Result · BenchBox Results";
@@ -51,7 +55,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
       return;
     }
     // Clear stale state so a previous error or detail does not flash during navigation.
-    setDetail(null);
+    setDetailState(null);
     setError(null);
     setTuningExpanded(false);
     setTuningData(null);
@@ -68,8 +72,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
         }
         const metric = await getPrimaryMetricForBenchmark(data.benchmark);
         if (cancelled) return;
-        setPrimaryMetric(metric);
-        setDetail(data);
+        setDetailState({ detail: data, primaryMetric: metric });
       })
       .catch((err: unknown) => { if (!cancelled) setError(errMsg(err)); });
     return () => {
