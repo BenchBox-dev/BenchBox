@@ -95,7 +95,7 @@ work:
 - id: w6
   summary: "Define skeleton tokens and Home/Layout loading states"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     This item OWNS the skeleton design system: token names, animation,
     sizing scale, and the Home + Layout consumers. The downstream

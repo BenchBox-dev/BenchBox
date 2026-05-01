@@ -9,7 +9,7 @@ import type {
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getMetaLeaderboardData, listResults } from "@/lib/duckdbQueries";
 import { BENCHMARK_LABELS, humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
@@ -190,7 +190,7 @@ export function Home(_: RoutableProps) {
     );
   }
   if (!results || !metaLeaderboardLoaded || hasInconsistentEmptySnapshot) {
-    return <LoadingSpinner message="Loading results..." />;
+    return <HomeLoadingSkeleton />;
   }
 
   const mode: MetaLeaderboardMode =
@@ -400,6 +400,91 @@ export function Home(_: RoutableProps) {
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function HomeLoadingSkeleton() {
+  return (
+    <div>
+      <section class="border-b border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] text-[var(--bb-fg-primary)]">
+        <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+          <div class="max-w-4xl">
+            <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
+            <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
+              Reproducible OLAP benchmark rankings by workload, scale, deployment, and normalized cost.
+            </p>
+          </div>
+
+          <section
+            aria-label="Leaderboard cohort selector"
+            class="mt-5 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+          >
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <SkeletonSelect label="Benchmark" />
+              <SkeletonSelect label="Scale factor" />
+              <SkeletonSelect label="Phase" />
+              <CoverageSummary />
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section
+          aria-label="Cross-benchmark leaderboard loading"
+          aria-busy="true"
+          class="mb-12"
+        >
+          <p role="status" aria-live="polite" class="mb-4 text-sm font-medium text-gray-500">
+            Initializing static DuckDB snapshot...
+          </p>
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div class="space-y-2">
+              <SkeletonBlock className="h-5 w-64" />
+              <SkeletonBlock className="h-3 w-80" />
+            </div>
+            <div class="flex gap-2">
+              <SkeletonBlock className="h-8 w-16" />
+              <SkeletonBlock className="h-8 w-16" />
+              <SkeletonBlock className="h-8 w-20" />
+            </div>
+          </div>
+          <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table aria-hidden="true" class="min-w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  {Array.from({ length: 6 }).map((_, column) => (
+                    <th key={column} class="px-4 py-3">
+                      <SkeletonBlock className="h-3 w-24" />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                {Array.from({ length: 5 }).map((_, row) => (
+                  <tr key={row} class="bb-skeleton-row">
+                    {Array.from({ length: 6 }).map((__, column) => (
+                      <td key={column} class="px-4 py-3">
+                        <SkeletonBlock className={column === 0 ? "h-4 w-28" : "h-4 w-20"} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function SkeletonSelect({ label }: { label: string }) {
+  return (
+    <div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <SkeletonBlock className="h-9 w-full bb-skeleton-dark" />
     </div>
   );
 }

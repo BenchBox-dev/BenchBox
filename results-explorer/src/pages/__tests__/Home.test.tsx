@@ -208,7 +208,7 @@ describe("Home", () => {
 
     await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
     expect(document.title).toBe("Results · BenchBox");
-    expect(screen.queryByText("Loading results...")).toBeNull();
+    expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
     expect(screen.queryByText("Cross-Benchmark Leaderboard")).toBeNull();
   });
 
@@ -236,7 +236,12 @@ describe("Home", () => {
     render(<Home />);
 
     await waitFor(() => expect(resultCalls).toBe(1));
-    await waitFor(() => expect(screen.getByText("Loading results...")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy());
+    expect(screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
     expect(screen.queryByText("Recent Results")).toBeNull();
     expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
 
@@ -244,14 +249,14 @@ describe("Home", () => {
     cohortRows.resolve(COHORT_ROWS);
 
     await waitFor(() => expect(resultCalls).toBe(2));
-    expect(screen.getByText("Loading results...")).toBeTruthy();
+    expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy();
     expect(screen.queryByText("Recent Results")).toBeNull();
     expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
 
     retryRows.resolve(RESULT_ROWS);
 
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
-    expect(screen.queryByText("Loading results...")).toBeNull();
+    expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
     expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
   });
 
@@ -278,7 +283,7 @@ describe("Home", () => {
     await waitFor(() => expect(resultCalls).toBe(2));
     expect(screen.getByText("Results snapshot incomplete")).toBeTruthy();
     expect(screen.getByText(/Reload the page to retry the DuckDB snapshot load/)).toBeTruthy();
-    expect(screen.queryByText("Loading results...")).toBeNull();
+    expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
     expect(screen.queryByText("Recent Results")).toBeNull();
   });
 
