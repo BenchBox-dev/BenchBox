@@ -40,6 +40,21 @@ function makePlatformRow(overrides: Partial<PlatformRow> = {}): PlatformRow {
     display_geomean_ms: overrides.display_geomean_ms ?? 10,
     sample_geomean_ms: overrides.sample_geomean_ms ?? 10,
     cost_usd: overrides.cost_usd ?? 1.25,
+    normalized_cost_usd: overrides.normalized_cost_usd ?? 1.25,
+    cost_model_version: overrides.cost_model_version ?? "2026.05.0",
+    cost_model_source: overrides.cost_model_source ?? "benchbox.core.cost.pricing",
+    cost_scope: overrides.cost_scope ?? "compute_only",
+    cost_status: overrides.cost_status ?? "normalized",
+    billing_unit: overrides.billing_unit ?? "credit",
+    pricing_region: overrides.pricing_region ?? "us-east-1",
+    cloud_provider: overrides.cloud_provider ?? "aws",
+    cloud_region: overrides.cloud_region ?? "us-east-1",
+    instance_type: overrides.instance_type ?? null,
+    warehouse_size: overrides.warehouse_size ?? "MEDIUM",
+    node_count: overrides.node_count ?? null,
+    cluster_size: overrides.cluster_size ?? null,
+    storage_format: overrides.storage_format ?? null,
+    storage_tier: overrides.storage_tier ?? null,
     compliance_class: overrides.compliance_class ?? null,
     percentile_stats: overrides.percentile_stats ?? PERCENTILES,
     phase_durations: overrides.phase_durations ?? { load: 1.2, power: 3.4 },
@@ -125,6 +140,21 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     test_type: overrides.test_type ?? "power",
     validation_status: overrides.validation_status ?? "exact",
     cost_usd: overrides.cost_usd ?? 1.25,
+    normalized_cost_usd: overrides.normalized_cost_usd ?? 1.25,
+    cost_model_version: overrides.cost_model_version ?? "2026.05.0",
+    cost_model_source: overrides.cost_model_source ?? "benchbox.core.cost.pricing",
+    cost_scope: overrides.cost_scope ?? "compute_only",
+    cost_status: overrides.cost_status ?? "normalized",
+    billing_unit: overrides.billing_unit ?? "credit",
+    pricing_region: overrides.pricing_region ?? "us-east-1",
+    cloud_provider: overrides.cloud_provider ?? "aws",
+    cloud_region: overrides.cloud_region ?? "us-east-1",
+    instance_type: overrides.instance_type ?? null,
+    warehouse_size: overrides.warehouse_size ?? "MEDIUM",
+    node_count: overrides.node_count ?? null,
+    cluster_size: overrides.cluster_size ?? null,
+    storage_format: overrides.storage_format ?? null,
+    storage_tier: overrides.storage_tier ?? null,
     compliance_class: overrides.compliance_class ?? null,
   };
 }
@@ -148,6 +178,33 @@ describe("ChartPanel", () => {
     expect(screen.getByRole("button", { name: "Performance Trend" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cost vs Performance Scatter" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Comparison Bar" })).toBeNull();
+  });
+
+  it("keeps the cost chart reachable so normalized-cost empty states are visible", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            platforms: [
+              makePlatformRow({
+                cost_status: "unavailable",
+                normalized_cost_usd: null,
+                cloud_provider: null,
+                cloud_region: null,
+                pricing_region: null,
+                warehouse_size: null,
+              }),
+            ],
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cost vs Performance Scatter" }));
+
+    expect(screen.getByText(/No normalized cost data/)).toBeTruthy();
+    expect(screen.getByText(/No row has cost_status=normalized/)).toBeTruthy();
   });
 
   it("renders compare-only tabs and hides historical-only charts", () => {

@@ -128,12 +128,25 @@ work:
 - id: w7
   summary: "Update cost visualizations to use normalized cost and disclose model version"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Update `CostScatter`, benchmark pages, compare pages, and home leaderboard
     metrics so any cost chart labels axes as normalized USD with scope and
     model version. When no normalized cost exists, empty-state copy should
     say which metadata is missing, not just "No cost data available."
+    Owned files for this work unit:
+      - results-explorer/src/types.ts
+      - results-explorer/src/lib/duckdbQueries.ts
+      - results-explorer/src/lib/chartRegistry.ts
+      - results-explorer/src/components/CostScatter.tsx
+      - results-explorer/src/components/SparklineTable.tsx
+      - results-explorer/src/pages/Home.tsx
+      - results-explorer/src/lib/__tests__/duckdbQueries.test.ts
+      - results-explorer/src/__tests__/duckdbMetricParity.test.ts
+      - results-explorer/src/components/__tests__/ChartPanel.test.tsx
+      - results-explorer/src/components/__tests__/charts.smoke.test.tsx
+      - results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx
+      - results-explorer/src/pages/__tests__/Home.test.tsx
 
 - id: w8
   summary: "Add submission validation that rejects user-supplied public leaderboard cost totals"
@@ -249,7 +262,17 @@ scope_limit:
     - "results-explorer/src/lib/duckdbQueries.ts"
     - "results-explorer/src/lib/queryFilters.ts"
     - "results-explorer/src/lib/starterQueries.ts"
+    - "results-explorer/src/lib/chartRegistry.ts"
+    - "results-explorer/src/components/CostScatter.tsx"
+    - "results-explorer/src/components/SparklineTable.tsx"
+    - "results-explorer/src/pages/Home.tsx"
     - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+    - "results-explorer/src/__tests__/duckdbMetricParity.test.ts"
+    - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+    - "results-explorer/src/components/__tests__/charts.smoke.test.tsx"
+    - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+    - "results-explorer/src/pages/__tests__/Home.test.tsx"
     - "results-explorer/src/lib/__tests__/queryFilters.test.ts"
     - "results-explorer/src/lib/__tests__/starterQueries.test.ts"
     - "results-explorer/src/pages/__tests__/Query.test.tsx"

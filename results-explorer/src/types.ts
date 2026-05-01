@@ -95,7 +95,7 @@ export interface PercentileStats {
   p99: number;
 }
 
-export interface PlatformRow {
+export interface PlatformRow extends CostDeploymentFields {
   result_id: string;
   /** 8+ hex-char sha256 prefix for compact Compare URLs; "" when the
    *  pipeline has no short-ID map for this row. */

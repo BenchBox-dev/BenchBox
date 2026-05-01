@@ -224,7 +224,7 @@ function defaultImpl(rows: typeof RESULT_ROWS, rankings: typeof RANKING_ROWS, ce
   return async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
     if (s.startsWith("SELECT * FROM bench.results")) return rows;
-    if (s.startsWith("SELECT * FROM bench.benchmark_rankings")) return rankings;
+    if (s.includes("FROM bench.benchmark_rankings")) return rankings;
     if (s.startsWith("SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms")) {
       return cells;
     }
