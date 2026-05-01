@@ -2,7 +2,8 @@ id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
 title: "CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
+completed_date: "2026-05-01"
 category: Core Functionality
 
 description: |
