@@ -65,6 +65,7 @@ export function Query(_: RoutableProps) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
   const rowLimit = rowLimitMode === "all" ? UNLIMITED_ROW_LIMIT : DEFAULT_ROW_LIMIT;
+  const rowQueryColumns = useMemo(() => withRowIdentityColumn(visibleColumns, schema), [schema, visibleColumns]);
 
   const filters: QueryFilterState = useMemo(
     () => ({
@@ -121,7 +122,7 @@ export function Query(_: RoutableProps) {
       has_cost: buildFacetCountQuery("cost_usd", filters, { exclude: "hasCost", derived: "has_cost" }),
       date_window: buildFacetCountQuery("run_date", filters, { exclude: "dateWindow", derived: "date_window" }),
     };
-    const selectQuery = buildSelectQuery(filters, visibleColumns, sort, rowLimit);
+    const selectQuery = buildSelectQuery(filters, rowQueryColumns, sort, rowLimit);
 
     Promise.all([
       queryRows<ResultRow>(selectQuery.sql, selectQuery.params),
@@ -143,7 +144,7 @@ export function Query(_: RoutableProps) {
         setError(err instanceof Error ? err.message : "DuckDB query failed");
         setLoading(false);
       });
-  }, [filters, rowLimit, schema, sort, visibleColumns]);
+  }, [filters, rowLimit, rowQueryColumns, schema, sort, visibleColumns]);
 
   const sqlColumns = useMemo(() => [...new Set(sqlRows.flatMap((row) => Object.keys(row)))], [sqlRows]);
 
@@ -182,7 +183,7 @@ export function Query(_: RoutableProps) {
     setDownloadError(null);
     try {
       const exportName = `benchbox-query-export-${Date.now()}.json`;
-      const blob = new Blob([JSON.stringify(rows, null, 2)], {
+      const blob = new Blob([JSON.stringify(projectVisibleColumns(rows, visibleColumns), null, 2)], {
         type: "application/json;charset=utf-8",
       });
       const url = URL.createObjectURL(blob);
@@ -405,20 +406,27 @@ export function Query(_: RoutableProps) {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white">
-                  {rows.map((row) => (
-                    <tr key={String(row.result_id)} class="hover:bg-gray-50">
-                      {visibleColumns.map((column) => (
-                        <td key={column} class="table-td">
-                          {formatCell(row[column])}
+                  {rows.map((row, index) => {
+                    const resultId = resultIdFromRow(row);
+                    return (
+                      <tr key={resultId ?? index} class="hover:bg-gray-50">
+                        {visibleColumns.map((column) => (
+                          <td key={column} class="table-td">
+                            {formatCell(row[column])}
+                          </td>
+                        ))}
+                        <td class="table-td text-right">
+                          {resultId ? (
+                            <a href={`/results/r/${resultId}`} class="text-xs font-medium no-underline">
+                              View →
+                            </a>
+                          ) : (
+                            <span class="text-xs text-gray-400">-</span>
+                          )}
                         </td>
-                      ))}
-                      <td class="table-td text-right">
-                        <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
-                          View →
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 {rowLimitMode === "all" && (
                   <tfoot class="border-t border-gray-200 bg-gray-50">
@@ -554,6 +562,20 @@ function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === "") return "-";
   if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(2);
   return String(value);
+}
+
+function withRowIdentityColumn(columns: string[], schema: SchemaColumn[]): string[] {
+  if (!schema.some((column) => column.name === "result_id") || columns.includes("result_id")) return columns;
+  return ["result_id", ...columns];
+}
+
+function resultIdFromRow(row: ResultRow): string | null {
+  const value = row.result_id;
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function projectVisibleColumns(rows: ResultRow[], visibleColumns: string[]): ResultRow[] {
+  return rows.map((row) => Object.fromEntries(visibleColumns.map((column) => [column, row[column]])));
 }
 
 function StarterQueries({ onSelect }: { onSelect: (sql: string) => void }) {

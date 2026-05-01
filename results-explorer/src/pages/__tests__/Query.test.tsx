@@ -53,6 +53,14 @@ function normalizeSql(sql: string): string {
   return sql.replace(/\s+/g, " ").trim();
 }
 
+function tableSelectCalls() {
+  return vi
+    .mocked(queryRows)
+    .mock.calls.filter(([sql]) =>
+      normalizeSql(String(sql)).startsWith("SELECT result_id, benchmark, platform, scale_factor"),
+    );
+}
+
 beforeEach(() => {
   window.history.replaceState(null, "", "/results/query");
   vi.stubGlobal(
@@ -126,7 +134,7 @@ beforeEach(() => {
     if (normalized.startsWith("CREATE TABLE")) {
       throw new Error("read-only connection");
     }
-    if (normalized.startsWith("SELECT benchmark, platform, scale_factor")) {
+    if (normalized.startsWith("SELECT result_id, benchmark, platform, scale_factor")) {
       return BASE_ROWS;
     }
     if (normalized.startsWith("SELECT * FROM bench.results")) {
@@ -148,6 +156,16 @@ describe("Query", () => {
     expect(within(resultsTable).getByText("maintainer-run")).toBeTruthy();
   });
 
+  it("keeps row view links working when result_id is hidden from default columns", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+    const resultsTable = screen.getAllByRole("table")[0]!;
+
+    expect(within(resultsTable).queryByText("result_id")).toBeNull();
+    expect(within(resultsTable).getAllByRole("link", { name: /View/ })[0]).toHaveAttribute("href", "/results/r/r1");
+    expect(tableSelectCalls().at(-1)?.[0]).toContain("SELECT result_id, benchmark, platform");
+  });
+
   it("updates the select SQL when facet filters change and sort toggles", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
@@ -155,18 +173,12 @@ describe("Query", () => {
 
     fireEvent.click(screen.getByLabelText(/DuckDB/i));
     await waitFor(() => {
-      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
-        String(sql).includes("SELECT benchmark, platform, scale_factor"),
-      );
-      expect(selectCalls.at(-1)?.[0]).toContain("platform IN (?)");
+      expect(tableSelectCalls().at(-1)?.[0]).toContain("platform IN (?)");
     });
 
     fireEvent.click(within(resultsTable).getAllByText(/^benchmark(?:\s[↑↓])?$/)[0]!);
     await waitFor(() => {
-      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
-        String(sql).includes("SELECT benchmark, platform, scale_factor"),
-      );
-      expect(selectCalls.at(-1)?.[0]).toContain("ORDER BY benchmark ASC");
+      expect(tableSelectCalls().at(-1)?.[0]).toContain("ORDER BY benchmark ASC");
     });
   });
 
@@ -174,10 +186,7 @@ describe("Query", () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    const selectCallsBefore = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
-      String(sql).includes("SELECT benchmark, platform, scale_factor"),
-    );
-    expect(selectCallsBefore.at(-1)?.[0]).toContain(`LIMIT ${DEFAULT_ROW_LIMIT}`);
+    expect(tableSelectCalls().at(-1)?.[0]).toContain(`LIMIT ${DEFAULT_ROW_LIMIT}`);
 
     fireEvent.click(screen.getByRole("button", { name: /^All$/ }));
 
@@ -185,10 +194,7 @@ describe("Query", () => {
       expect(new URL(window.location.href).searchParams.get("limit")).toBe("all"),
     );
     await waitFor(() => {
-      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
-        String(sql).includes("SELECT benchmark, platform, scale_factor"),
-      );
-      expect(selectCalls.at(-1)?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
+      expect(tableSelectCalls().at(-1)?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
     });
     expect(screen.getByText("Showing all returned rows: 2")).toBeTruthy();
 
@@ -270,6 +276,7 @@ describe("Query", () => {
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed.length).toBeGreaterThan(0);
     expect(parsed[0]).toHaveProperty("benchmark");
+    expect(parsed[0]).not.toHaveProperty("result_id");
   });
 
   it("runs read-only SQL and surfaces DDL errors", async () => {
