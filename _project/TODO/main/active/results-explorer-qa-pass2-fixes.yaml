@@ -506,8 +506,40 @@ work:
 
   - id: w10
     summary: "Fix N5 — per-route document.title updates"
-    status: pending
+    status: done
     notes: |
+      Implemented:
+        - Added `useDocumentTitle` under `results-explorer/src/lib/`.
+          It sets the route title and resets to the static index title
+          (`BenchBox Results Explorer`) on cleanup.
+        - Wired route titles:
+          Home: `Results · BenchBox`
+          BenchmarkIndex: `<Benchmark> · BenchBox Results`
+          PlatformIndex: `<Platform> · BenchBox Results`
+          ResultDetail: `<benchmark> · <platform> · SF<sf> · BenchBox Results`
+          Compare: `Compare (<n>) · BenchBox Results`
+          Query: `Query · BenchBox Results`
+          NotFound: `Not found · BenchBox Results`
+
+      Tests:
+        - Added hook cleanup coverage.
+        - Added page-level assertions for the static and async dynamic
+          titles.
+        - Added an unknown BenchmarkIndex slug regression so the nested
+          NotFound title wins over the parent benchmark title.
+
+      Verification:
+        - `cd results-explorer && npm run test -- src/lib/__tests__/useDocumentTitle.test.tsx src/pages/__tests__/Home.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/NotFound.test.tsx`
+          passed: 47 tests.
+        - After review cleanup, `cd results-explorer && npm run test -- src/lib/__tests__/useDocumentTitle.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Compare.test.tsx`
+          passed: 32 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - `cd results-explorer && npm run build` passed.
+        - `git diff --check` passed.
+        - `/code review W10` finding: nested NotFound from BenchmarkIndex
+          could fight the parent title; fixed and covered. No remaining
+          required issues.
+
       `index.html` declares a single static `<title>BenchBox Results
       Explorer</title>`. Add a tiny `useDocumentTitle(title)` hook
       under `results-explorer/src/lib/` (or inline in `Layout.tsx`)

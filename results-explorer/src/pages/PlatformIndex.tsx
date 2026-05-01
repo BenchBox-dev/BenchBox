@@ -11,6 +11,7 @@ import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { ChartPanel } from "@/components/ChartPanel";
 import type { SortState } from "@/types";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 interface PlatformIndexProps extends RoutableProps {
   platform?: string;
@@ -29,6 +30,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     key: "geomean_ms",
     direction: "asc",
   });
+  const platformDisplayName =
+    rows?.find((r) => r.platform_id === platform || r.platform === platform)?.platform ?? platform;
+  useDocumentTitle(`${platformDisplayName} · BenchBox Results`);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,8 +59,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   // Fall back to matching by display name for backward compatibility with any
   // old links constructed from the display name.
   const allPlatformResults = rows.filter((r) => r.platform_id === platform || r.platform === platform);
-  // Use the display name from the first result for titles/breadcrumbs.
-  const platformDisplayName = allPlatformResults[0]?.platform ?? platform;
 
   // Unique non-null tuning modes - only show filter when multiple modes present.
   const tuningModes = [

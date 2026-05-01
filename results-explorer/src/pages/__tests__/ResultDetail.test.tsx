@@ -86,6 +86,7 @@ describe("ResultDetail - median-first contract", () => {
 
     // Header should show display_timings count
     expect(screen.getByText("Query Timings (2)")).toBeTruthy();
+    await waitFor(() => expect(document.title).toBe("TPC-H · DuckDB · SF0.1 · BenchBox Results"));
 
     // The main table has "Median (ms)" column header (not "Duration (ms)")
     expect(screen.getAllByText(/Median \(ms\)/i).length).toBeGreaterThan(0);

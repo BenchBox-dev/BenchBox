@@ -15,6 +15,7 @@ import {
 } from "@/lib/queryFilters";
 import { getTableSchema, type SchemaColumn } from "@/lib/duckdbSchema";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 const EMPTY_STRING_ARRAY: string[] = [];
 
@@ -37,6 +38,7 @@ const DEFAULT_COLUMNS = [
 ];
 
 export function Query(_: RoutableProps) {
+  useDocumentTitle("Query · BenchBox Results");
   const [benchmarks, setBenchmarks] = useUrlState<string[]>("benchmark", EMPTY_STRING_ARRAY, arraySerde);
   const [platforms, setPlatforms] = useUrlState<string[]>("platform", EMPTY_STRING_ARRAY, arraySerde);
   const [scaleFactors, setScaleFactors] = useUrlState<string[]>("sf", EMPTY_STRING_ARRAY, arraySerde);

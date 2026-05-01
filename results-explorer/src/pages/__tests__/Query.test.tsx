@@ -139,6 +139,7 @@ describe("Query", () => {
   it("loads facet counts and table rows from DuckDB", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+    expect(document.title).toBe("Query · BenchBox Results");
     const resultsTable = screen.getAllByRole("table")[0]!;
 
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);

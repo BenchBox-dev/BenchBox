@@ -252,6 +252,13 @@ describe("BenchmarkIndex", () => {
   it("renders the page title", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByText("TPC-H Results")).toBeTruthy());
+    expect(document.title).toBe("TPC-H · BenchBox Results");
+  });
+
+  it("sets the not-found title for unknown benchmark slugs", async () => {
+    render(<BenchmarkIndex benchmark="does-not-exist" />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "404" })).toBeTruthy());
+    await waitFor(() => expect(document.title).toBe("Not found · BenchBox Results"));
   });
 
   it("shows QueryHeatmap (query column headers) by default", async () => {

@@ -14,10 +14,12 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
 import { arraySerde, stringSerde, useUrlState } from "@/lib/useUrlState";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 const EMPTY_STRING_ARRAY: string[] = [];
 
 export function Home(_: RoutableProps) {
+  useDocumentTitle("Results · BenchBox");
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [metaLeaderboard, setMetaLeaderboard] = useState<MetaLeaderboardData | null>(null);
   const [metaLeaderboardLoaded, setMetaLeaderboardLoaded] = useState(false);

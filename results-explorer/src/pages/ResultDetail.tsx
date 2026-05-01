@@ -11,6 +11,7 @@ import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
 import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
 import { ChartPanel } from "@/components/ChartPanel";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 interface ResultDetailProps extends RoutableProps {
   resultId?: string;
@@ -39,6 +40,10 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   const [tuningLoading, setTuningLoading] = useState(false);
   const [tuningError, setTuningError] = useState<string | null>(null);
   const tuningAbortRef = useRef<AbortController | null>(null);
+  const documentTitle = detail
+    ? `${humanizeBenchmark(detail.benchmark)} · ${detail.platform} · SF${detail.scale_factor} · BenchBox Results`
+    : "Result · BenchBox Results";
+  useDocumentTitle(documentTitle);
 
   useEffect(() => {
     if (!resultId) {

@@ -14,6 +14,7 @@ import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { perQuerySpeedup, vsSlowestRatio } from "@/lib/chartMath";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export function Compare(_: RoutableProps) {
   const [results, setResults] = useState<DetailResult[]>([]);
@@ -22,6 +23,9 @@ export function Compare(_: RoutableProps) {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useDocumentTitle(
+    results.length > 0 ? `Compare (${results.length}) · BenchBox Results` : "Compare · BenchBox Results",
+  );
   useEffect(() => {
     let cancelled = false;
 

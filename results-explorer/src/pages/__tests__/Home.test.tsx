@@ -207,6 +207,7 @@ describe("Home", () => {
     render(<Home />);
 
     await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
+    expect(document.title).toBe("Results · BenchBox");
     expect(screen.queryByText("Loading results...")).toBeNull();
     expect(screen.queryByText("Cross-Benchmark Leaderboard")).toBeNull();
   });

@@ -158,6 +158,7 @@ describe("Compare", () => {
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
+    await waitFor(() => expect(document.title).toBe("Compare (2) · BenchBox Results"));
     // The summary card dt label
     expect(screen.getAllByText(/vs worst/i).length).toBeGreaterThan(0);
     // The computed ratio: 10.00x

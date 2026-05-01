@@ -15,6 +15,7 @@ import { QueryHeatmap } from "@/components/QueryHeatmap";
 import { RankTable } from "@/components/RankTable";
 import { ChartPanel } from "@/components/ChartPanel";
 import { NotFound } from "@/pages/NotFound";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
@@ -35,6 +36,7 @@ function trustAbbrev(label: string): string {
 }
 
 export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
+  const title = humanizeBenchmark(benchmark);
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [summary, setSummary] = useState<BenchmarkSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -76,6 +78,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
   // Derive available scale factors and phases from the loaded rows.
   const benchmarkResults = results?.filter((r) => r.benchmark === benchmark) ?? [];
+  const benchmarkNotFound = results !== null && benchmarkResults.length === 0 && !isKnownBenchmark(benchmark);
+  useDocumentTitle(benchmarkNotFound ? "Not found · BenchBox Results" : `${title} · BenchBox Results`);
 
   const scaleFactors = [
     ...new Set(benchmarkResults.map((r) => String(r.scale_factor))),
@@ -169,7 +173,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   // [] when this guard fires. A future refactor that decouples them
   // would need to add an explicit early-return there.
   if (benchmarkResults.length === 0) {
-    if (!isKnownBenchmark(benchmark)) {
+    if (benchmarkNotFound) {
       return (
         <NotFound
           message={`Benchmark "${benchmark}" is not part of the published corpus.`}
@@ -192,8 +196,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       </div>
     );
   }
-
-  const title = humanizeBenchmark(benchmark);
 
   // Collect unique trust labels and tuning modes from the loaded summary.
   const tuningModes = summary
