@@ -325,8 +325,8 @@ jobs:
              ($pr.mergedAt // null) as $merged_at |
              (if $post_merge_red == "true" then
                 ([($jobs.jobs // [])[] |
-                  select((.name == "lint" or .name == "fast-test") and .conclusion == "failure") |
-                  .completed_at] | max // null)
+                  select((.name == "lint" or .name == "fast-test") and .conclusion == "failure" and .completed_at != null) |
+                  .completed_at] | min // null)
               else null end) as $red_at |
              {
                merged_at: $merged_at,

@@ -30,21 +30,25 @@ deps:
 
 work:
   - id: w1
-    summary: "Wait for 30 calendar days post-Step-4-merge before starting w2"
+    summary: "Wait for 30 calendar days after Step 3a and Step 4 have both merged before starting w2"
     status: in_progress
     notes: |
-      The measurement window is 30 days of normal usage AFTER Step 4
-      lands. Prior data is contaminated by the old workflow. Mark this
-      TODO Blocked until that date.
+      The measurement window is 30 days of normal usage AFTER both
+      Step 3a and Step 4 have landed. Prior data is contaminated by the
+      old workflow. Mark this TODO Blocked until that date.
 
-      To start the timer: when Step 4 PR merges, comment on this TODO
-      with the merge date and update `metadata.due_date` to merge_date
-      + 30 days.
+      To start the timer: when both Step 3a and Step 4 PRs have merged,
+      set the window start timestamp to the later of `step3a_merged_at`
+      and `step4_merged_at`, comment on this TODO with the merge dates,
+      and update `metadata.due_date` to start_date + 30 calendar days.
 
       Implementation record (2026-04-30):
+        - Step 3a PR #80 merged to `develop` at `2026-04-30T20:36:27Z`.
         - Step 4 PR #81 merged to `develop` at `2026-04-30T21:33:45Z`.
-        - Set `metadata.due_date` to `2026-05-30` for the 30 calendar
-          day measurement window.
+        - Step 4 is the later prerequisite, so the measurement window
+          starts at `2026-04-30T21:33:45Z`.
+        - Set `metadata.due_date` to `2026-05-30`; the existing date
+          remains correct because Step 4 merged after Step 3a.
         - Set this TODO status to `Blocked` and left W1 `in_progress`
           until the due date. No code or workflow changes are allowed
           during the measurement window.
@@ -230,8 +234,9 @@ metadata:
   estimated_effort: "Small (2-3h after the 30-day wait)"
   created_date: "2026-04-30"
   due_date: "2026-05-30"
+  step3a_merged_at: "2026-04-30T20:36:27Z"
   step4_merged_at: "2026-04-30T21:33:45Z"
-  last_updated: "2026-04-30"
+  last_updated: "2026-05-01T15:29:14Z"
 
 impact:
   business_value: |

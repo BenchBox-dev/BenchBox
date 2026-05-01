@@ -2,7 +2,8 @@ id: codex-pr-review-followups-week-2026-05-01
 title: "Address unresolved Codex PR review follow-ups from the week ending 2026-05-01"
 worktree: main
 priority: High
-status: Identified
+status: Completed
+completed_date: "2026-05-01"
 category: Testing and Quality Assurance
 
 description: |
@@ -34,7 +35,7 @@ description: |
 work:
   - id: w1
     summary: "Make blind-spot frontmatter stamping replace complete YAML nodes"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #59, P2, `_project/scripts/sweep_blind_spots.py`
@@ -57,7 +58,7 @@ work:
 
   - id: w2
     summary: "Expand BENCHBOX_TEST_LOCK_DIR consistently in `make test-unlock`"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #71, P2, `Makefile`
@@ -79,7 +80,7 @@ work:
 
   - id: w3
     summary: "Refuse `worktree-release` on dirty pool worktrees unless forced"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #73, P1, `Makefile`
@@ -102,7 +103,7 @@ work:
 
   - id: w4
     summary: "Ignore expected `.benchbox` scratch files when claiming free pool slots"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #73, P2, `Makefile`
@@ -124,7 +125,7 @@ work:
 
   - id: w5
     summary: "Make INT/TERM claim-trap handling exit nonzero after cleanup"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #78, P1, `Makefile`
@@ -145,7 +146,7 @@ work:
 
   - id: w6
     summary: "Correct Step 5 measurement-window start description in TODO"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #70, P2, `_project/TODO/main/planning/dev-loop-step-5-measurement-window.yaml`
@@ -168,7 +169,7 @@ work:
 
   - id: w7
     summary: "Convert Step 5 `last_updated` to ISO date-time as schema expects"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #83, P2, `_project/TODO/main/planning/dev-loop-step-5-measurement-window.yaml`
@@ -187,7 +188,7 @@ work:
 
   - id: w8
     summary: "Record first failed post-merge job completion as red-detection time"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #81, P2, `.github/workflows/develop-post-merge.yml`
@@ -206,7 +207,7 @@ work:
 
   - id: w9
     summary: "Handle persistent results-explorer snapshot mismatch without an infinite spinner"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #86, P1, `results-explorer/src/pages/Home.tsx`
@@ -238,7 +239,7 @@ work:
 
   - id: w10
     summary: "Allow `benchbox auth login` to prompt even when an env token is set"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #93, P2, `benchbox/cli/commands/auth.py`
@@ -263,7 +264,7 @@ work:
 
   - id: w11
     summary: "Remove hard-coded repository ruleset ID from Step 3a verification"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #80, P2, `_project/DONE/main/active/dev-loop-step-3a-path-based-ci-skip.yaml`
@@ -288,7 +289,7 @@ work:
 
   - id: w12
     summary: "Make Step 3 job-count verification select develop-targeted PR runs"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #67, P2, `_project/TODO/main/planning/dev-loop-step-3-ci-rebalance-and-strict-base-off.yaml`
@@ -314,7 +315,7 @@ work:
 
   - id: w13
     summary: "Scope Step 0 secondary-probe `gh pr list --json comments` query"
-    status: pending
+    status: done
     notes: |
       Source review comment (newly tracked — was acknowledged in inventory
       but not assigned to a work unit in the prior revision):
@@ -343,7 +344,7 @@ work:
   - id: w14
     summary: "Re-audit stale Codex threads after fixes and record which ones are closed"
     needs: [w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13]
-    status: pending
+    status: done
     notes: |
       Re-run the PR thread scan for `chatgpt-codex-connector` on the same
       merge window and record which comments are now fixed, stale, or still
@@ -465,7 +466,7 @@ anti_patterns:
 
 verification:
   - description: "This TODO item validates cleanly"
-    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/codex-pr-review-followups-week-2026-05-01.yaml"
+    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/active/codex-pr-review-followups-week-2026-05-01.yaml"
     expected_output: "Validation passes with no schema or DAG errors"
   - description: "TODO dependency graph remains valid"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"

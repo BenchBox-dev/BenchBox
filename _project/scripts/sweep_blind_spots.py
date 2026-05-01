@@ -222,9 +222,18 @@ def render_scalar_field(field: str, value: str) -> str:
 
 def replace_frontmatter_field(raw: str, field: str, value: str) -> str:
     line = render_scalar_field(field, value)
-    pattern = re.compile(rf"(?m)^{re.escape(field)}:.*$")
-    if pattern.search(raw):
-        return pattern.sub(line, raw, count=1)
+    field_re = re.compile(rf"^{re.escape(field)}\s*:")
+    lines = raw.splitlines()
+    for start, existing in enumerate(lines):
+        if not field_re.match(existing):
+            continue
+        end = start + 1
+        while end < len(lines):
+            next_line = lines[end]
+            if next_line and not next_line[0].isspace():
+                break
+            end += 1
+        return "\n".join([*lines[:start], line, *lines[end:]])
     return raw.rstrip() + f"\n{line}"
 
 

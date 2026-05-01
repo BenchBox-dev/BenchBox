@@ -255,6 +255,33 @@ describe("Home", () => {
     expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
   });
 
+  it("renders a recoverable error when the empty result snapshot persists after retry", async () => {
+    let resultCalls = 0;
+
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.startsWith("SELECT * FROM bench.results")) {
+        resultCalls += 1;
+        return [];
+      }
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.startsWith("SELECT * FROM bench.cohort_metadata")) {
+        return COHORT_ROWS;
+      }
+      return [];
+    });
+
+    render(<Home />);
+
+    await waitFor(() => expect(resultCalls).toBe(2));
+    expect(screen.getByText("Results snapshot incomplete")).toBeTruthy();
+    expect(screen.getByText(/Reload the page to retry the DuckDB snapshot load/)).toBeTruthy();
+    expect(screen.queryByText("Loading results...")).toBeNull();
+    expect(screen.queryByText("Recent Results")).toBeNull();
+  });
+
   it("treats a benchmark chip click as isolate-not-exclude from the default all state", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());

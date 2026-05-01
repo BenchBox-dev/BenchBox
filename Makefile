@@ -17,6 +17,7 @@ POOL_MIN_FREE_KB ?= 5000000
 # variable so the four pool-management targets share a single source of
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
+BENCHBOX_TEST_LOCK_PATH = $(shell uv run -- python -c 'import os; from pathlib import Path; lock_dir = os.environ.get("BENCHBOX_TEST_LOCK_DIR"); base_dir = Path(lock_dir).expanduser() if lock_dir else Path.home() / ".benchbox"; print(base_dir / "test.lock")')
 
 .PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status dev-loop-metrics worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
 
@@ -56,9 +57,9 @@ test-fast:
 	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short
 
 test-unlock:
-	@LOCK_DIR="$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}"; \
-	echo "Removing stale BenchBox test lock at $$LOCK_DIR/test.lock..."; \
-	rm -f "$$LOCK_DIR/test.lock"
+	@LOCK_PATH="$(BENCHBOX_TEST_LOCK_PATH)"; \
+	echo "Removing stale BenchBox test lock at $$LOCK_PATH..."; \
+	rm -f "$$LOCK_PATH"
 	@echo "Lock cleared."
 
 test-medium:
@@ -1017,9 +1018,14 @@ worktree-claim-attempt:
 			git -C "$$wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
 			git -C "$$wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
 			echo "claim of $$pool failed; slot returned to detached origin/develop" >&2; \
+			marker=""; \
 		fi; \
 	}; \
-	trap cleanup EXIT INT TERM; \
+	on_int() { cleanup; exit 130; }; \
+	on_term() { cleanup; exit 143; }; \
+	trap cleanup EXIT; \
+	trap on_int INT; \
+	trap on_term TERM; \
 	POOL_REPO=$$($(POOL_REPO_CMD)); \
 	i=1; \
 	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
@@ -1029,7 +1035,7 @@ worktree-claim-attempt:
 		git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue; \
 		[ -f "$$wt/.benchbox/claim_in_progress" ] && continue; \
 		branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
-		status=$$(git -C "$$wt" status --porcelain); \
+		status=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
 		[ -z "$$branch" ] && [ -z "$$status" ] || continue; \
 		marker="$$wt/.benchbox/claim_in_progress"; \
 		mkdir -p "$$wt/.benchbox"; \
@@ -1060,6 +1066,12 @@ worktree-release-locked:
 	branch=$$(git branch --show-current); \
 	test -n "$$branch" || { echo "Refusing: this pool worktree is already detached/free."; exit 1; }; \
 	case "$$branch" in develop|main) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
+	dirty=$$(git status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+	if [ -n "$$dirty" ] && [ "$(FORCE)" != "1" ]; then \
+		echo "Refusing to release dirty pool worktree $$top. Review changes or rerun with FORCE=1."; \
+		echo "$$dirty"; \
+		exit 1; \
+	fi; \
 	if [ "$(FORCE)" != "1" ]; then \
 		state=$$(gh pr view "$$branch" --json state --jq .state 2>/dev/null || true); \
 		[ "$$state" = "MERGED" ] || { echo "Refusing: PR for $$branch is not MERGED; open or close PR first, or rerun with FORCE=1."; exit 1; }; \

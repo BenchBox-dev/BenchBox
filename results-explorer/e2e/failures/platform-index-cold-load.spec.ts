@@ -14,7 +14,7 @@ const EXPECTED_ROWS_BY_PLATFORM: Record<string, number> = {
 };
 
 async function expectExactPlatformRows(page: Page, expected: number) {
-  await expect.poll(() => page.locator("table tbody tr").count(), { timeout: 20_000 }).toBe(expected);
+  await expect(page.locator("table tbody tr")).toHaveCount(expected, { timeout: 20_000 });
   await expect(page.getByText(/No results found for platform/i)).not.toBeVisible();
 }
 
