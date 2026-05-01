@@ -91,13 +91,20 @@ work:
 - id: w5
   summary: "Integrate normalized cost with existing benchbox.core.cost calculators"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Reuse `benchbox/core/cost/models.py`, `calculator.py`, and `pricing.py`.
     Cost should be computed from measured usage/resource configuration plus
     BenchBox pricing tables, not from arbitrary submitter-supplied totals.
     Add validation errors or warnings when a cloud run lacks the provider,
     region, warehouse/instance, or billing-unit metadata required to normalize.
+    Owned files for this work unit:
+      - benchbox/core/cost/calculator.py
+      - benchbox/core/cost/integration.py
+      - benchbox/core/results/schema.py
+      - tests/unit/core/cost/test_calculator.py
+      - tests/unit/core/cost/test_integration.py
+      - tests/unit/core/results/test_query_plan_serialization.py
 
 - id: w6
   summary: "Add cloud/deployment facets to explorer filters and Query Workbench"
@@ -213,16 +220,22 @@ verification:
 
 scope_limit:
   only_modify:
-  - "benchbox/core/cost/models.py"
-  - "benchbox/core/explorer_pipeline/models.py"
-  - "benchbox/core/explorer_pipeline/transformer.py"
-  - "benchbox/core/explorer_pipeline/duckdb_builder.py"
-  - "_project/planning/visible_metrics.yaml"
-  - "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
-  - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
-  - "tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py"
-  - "tests/unit/core/explorer_pipeline/test_transformer.py"
-  - "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
+    - "benchbox/core/cost/models.py"
+    - "benchbox/core/explorer_pipeline/models.py"
+    - "benchbox/core/explorer_pipeline/transformer.py"
+    - "benchbox/core/explorer_pipeline/duckdb_builder.py"
+    - "benchbox/core/cost/calculator.py"
+    - "benchbox/core/cost/integration.py"
+    - "benchbox/core/results/schema.py"
+    - "_project/planning/visible_metrics.yaml"
+    - "tests/unit/core/cost/test_calculator.py"
+    - "tests/unit/core/cost/test_integration.py"
+    - "tests/unit/core/results/test_query_plan_serialization.py"
+    - "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
+    - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+    - "tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py"
+    - "tests/unit/core/explorer_pipeline/test_transformer.py"
+    - "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
 
 open_questions:
 - "Should normalized storage cost be included in the first release or deferred behind compute-only cost with explicit scope?"
