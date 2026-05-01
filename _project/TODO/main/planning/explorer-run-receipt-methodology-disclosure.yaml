@@ -20,7 +20,7 @@ description: |
 work:
   - id: w1
     summary: "Design and implement compact RunReceipt component for result detail"
-    status: pending
+    status: done
     notes: |
       Add `results-explorer/src/components/RunReceipt.tsx`. It should render a
       dense two-column receipt with sections:
