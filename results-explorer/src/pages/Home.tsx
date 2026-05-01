@@ -24,6 +24,7 @@ export function Home(_: RoutableProps) {
   const [metaLeaderboard, setMetaLeaderboard] = useState<MetaLeaderboardData | null>(null);
   const [metaLeaderboardLoaded, setMetaLeaderboardLoaded] = useState(false);
   const retriedEmptyResults = useRef(false);
+  const [emptyResultsRetryFinished, setEmptyResultsRetryFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [benchmarkFilters, setBenchmarkFilters] = useUrlState<string[]>("bm", EMPTY_STRING_ARRAY, arraySerde);
   const [scaleFilters, setScaleFilters] = useUrlState<string[]>("sf", EMPTY_STRING_ARRAY, arraySerde);
@@ -67,6 +68,7 @@ export function Home(_: RoutableProps) {
   // makes future investigation possible by surfacing the exact mismatch
   // in browser DevTools without needing to re-run the audit setup.
   const hasInconsistentEmptySnapshot = results !== null && results.length === 0 && metaLeaderboard !== null;
+  const hasPersistentInconsistentEmptySnapshot = hasInconsistentEmptySnapshot && emptyResultsRetryFinished;
 
   useEffect(() => {
     if (!hasInconsistentEmptySnapshot || retriedEmptyResults.current) return;
@@ -80,10 +82,16 @@ export function Home(_: RoutableProps) {
     }
     listResults()
       .then((rows) => {
-        if (!cancelled) setResults(rows);
+        if (!cancelled) {
+          setResults(rows);
+          setEmptyResultsRetryFinished(true);
+        }
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(errMsg(err));
+        if (!cancelled) {
+          setEmptyResultsRetryFinished(true);
+          setError(errMsg(err));
+        }
       });
     return () => {
       cancelled = true;
@@ -172,6 +180,14 @@ export function Home(_: RoutableProps) {
   ]);
 
   if (error) return <ErrorMessage message={error} />;
+  if (hasPersistentInconsistentEmptySnapshot) {
+    return (
+      <ErrorMessage
+        title="Results snapshot incomplete"
+        message="The results table loaded empty while leaderboard metadata is present. Reload the page to retry the DuckDB snapshot load."
+      />
+    );
+  }
   if (!results || !metaLeaderboardLoaded || hasInconsistentEmptySnapshot) {
     return <LoadingSpinner message="Loading results..." />;
   }

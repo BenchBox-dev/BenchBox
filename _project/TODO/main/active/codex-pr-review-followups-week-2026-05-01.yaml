@@ -206,7 +206,7 @@ work:
 
   - id: w9
     summary: "Handle persistent results-explorer snapshot mismatch without an infinite spinner"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #86, P1, `results-explorer/src/pages/Home.tsx`
