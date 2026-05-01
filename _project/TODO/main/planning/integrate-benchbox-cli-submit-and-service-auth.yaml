@@ -81,12 +81,24 @@ work:
   - id: w4
     summary: "Implement authentication: token fetch, local keychain storage, and refresh flow"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       On first submit, prompt for token. Store securely (keyring or encrypted
       file). On subsequent runs, load token from storage. Handle 401 by prompting
       for re-auth rather than hard-failing. Do not store plaintext tokens in
       config files.
+
+      Landed 2026-05-01:
+        - Added `benchbox auth login/status/refresh/logout`.
+        - Added `benchbox.cli.submit_auth` with env-token precedence,
+          OS-keyring storage, hidden prompt fetch, keyring overwrite refresh,
+          and token-redacted auth status.
+        - Wired non-dry-run `benchbox submit --service` to resolve auth before
+          the still-placeholder upload path. `--service --dry-run` remains
+          credential-free.
+        - `/code review W4` found and fixed two auth-flow issues: refresh now
+          refuses to hide a replacement keyring token behind an active env
+          override, and logout reports "not found" accurately before deleting.
 
   - id: w5
     summary: "Implement upload, status polling, retries, and idempotent re-submit"

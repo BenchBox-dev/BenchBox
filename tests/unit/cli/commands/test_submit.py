@@ -331,6 +331,11 @@ def test_submit_service_dry_run_no_creds_required(monkeypatch: pytest.MonkeyPatc
     src = tmp_path / "tpch_duckdb.json"
     src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    monkeypatch.setattr(
+        sub,
+        "resolve_submission_token",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("dry-run must not resolve auth")),
+    )
 
     result = CliRunner().invoke(sub.submit, [str(src), "--service", "--dry-run"])
     assert result.exit_code == 0, result.output
@@ -398,14 +403,40 @@ def test_submit_service_idempotency_key_passthrough(monkeypatch: pytest.MonkeyPa
 
 
 def test_submit_service_real_upload_returns_not_implemented(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """--service without --dry-run must fail loudly until w5 implementation lands."""
+    """--service without --dry-run resolves auth, then fails loudly until w5 lands."""
     src = tmp_path / "tpch_duckdb.json"
     src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    auth_calls: list[str] = []
+
+    def fake_resolve(service_url: str):
+        auth_calls.append(service_url)
+        return SimpleNamespace(token="secret-token", source="keyring")
+
+    monkeypatch.setattr(sub, "resolve_submission_token", fake_resolve)
 
     result = CliRunner().invoke(sub.submit, [str(src), "--service"])
     assert result.exit_code == 1
     assert "not yet implemented" in result.output.lower()
+    assert "secret-token" not in result.output
+    assert auth_calls == [sub._DEFAULT_SERVICE_URL]
+
+
+def test_submit_service_real_upload_requires_auth(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """--service without --dry-run stops before upload when auth is missing."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    def fake_resolve(_service_url: str):
+        raise sub.SubmissionAuthError("No hosted-submit token found.")
+
+    monkeypatch.setattr(sub, "resolve_submission_token", fake_resolve)
+
+    result = CliRunner().invoke(sub.submit, [str(src), "--service"])
+    assert result.exit_code == 1
+    assert "Authentication required" in result.output
+    assert "not yet implemented" not in result.output.lower()
 
 
 def test_submit_default_pr_path_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

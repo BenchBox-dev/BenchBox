@@ -33,6 +33,7 @@ dependencies = [
     # click: capped <9 - historically click majors rename decorators/context APIs.
     "click>=8.0.0,<9.0.0",
     "rich>=13.0.0",
+    "keyring>=25.0.0",
     "psutil>=5.9.0",
     # pydantic: v1→v2 migration broke the entire validation surface; capped <3 until pydantic v3 lands
     # and is audited.

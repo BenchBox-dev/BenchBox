@@ -13,6 +13,11 @@ import click
 
 import benchbox
 from benchbox.cli.shared import console
+from benchbox.cli.submit_auth import (
+    DEFAULT_SERVICE_URL as _DEFAULT_SERVICE_URL,
+    SubmissionAuthError,
+    resolve_submission_token,
+)
 from benchbox.core.results.loader import (
     ResultLoadError,
     UnsupportedSchemaError,
@@ -23,7 +28,6 @@ from benchbox.core.results.loader import (
 # Submission manifest phase - indicates the result schema generation (v2.0 = phase 2).
 _SUBMISSION_PHASE = 2
 
-_DEFAULT_SERVICE_URL = "https://api.benchbox.dev/v1"
 _VISIBILITY_CHOICES = ("public", "unlisted", "private")
 
 # Static checklist (Option B from
@@ -127,9 +131,8 @@ def _dispatch_service_mode(
 
     Currently a skeleton: --dry-run is fully supported (validates the
     bundle, prints what would be uploaded, no credentials needed). The
-    real upload + auth + status-polling flow is the work in
-    `integrate-benchbox-cli-submit-and-service-auth` w4-w8 and lands
-    once the hosted ingest API is available.
+    real upload path now resolves hosted-submit auth, then stops before
+    network work until upload + status-polling lands in w5-w8.
 
     Hash contract for the dry-run: the values printed are SHA-256 of the
     on-disk source files as-is. The Phase 2 PR-package path
@@ -162,12 +165,19 @@ def _dispatch_service_mode(
         console.print("\n[yellow]Dry-run complete - no bytes sent.[/yellow]")
         return
 
+    try:
+        resolve_submission_token(service_url)
+    except SubmissionAuthError as exc:
+        console.print(f"\n[red]Authentication required:[/red] {exc}")
+        ctx.exit(1)
+        return
+
     # Real upload path is not yet implemented. Surface that explicitly
     # rather than silently no-op or partially-execute.
     console.print(
         "\n[red]Hosted submission upload is not yet implemented.[/red]\n"
-        "  --service --dry-run works today; the live upload + auth flow lands\n"
-        "  in `integrate-benchbox-cli-submit-and-service-auth` w4-w8, gated\n"
+        "  Authentication is configured; live upload + status polling lands\n"
+        "  in `integrate-benchbox-cli-submit-and-service-auth` w5-w8, gated\n"
         "  on the Phase 3 promotion metrics in\n"
         "  _project/analysis/phase-3-promotion-metrics.md."
     )
