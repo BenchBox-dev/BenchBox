@@ -263,7 +263,7 @@ work:
 
   - id: w11
     summary: "Remove hard-coded repository ruleset ID from Step 3a verification"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #80, P2, `_project/DONE/main/active/dev-loop-step-3a-path-based-ci-skip.yaml`

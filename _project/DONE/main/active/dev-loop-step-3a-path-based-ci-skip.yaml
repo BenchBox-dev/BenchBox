@@ -445,7 +445,14 @@ verification:
     command: "grep -cE 'needs: \\[.*code-lint|code-lint:|ci-required-result:' .github/workflows/test.yml .github/workflows/pr.yml 2>/dev/null | awk -F: '{s+=$2}END{print s}'"
     expected_output: ">= 2"
   - description: "Branch-protection required check is the umbrella, not the subordinate jobs"
-    command: "gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '[.rules[] | select(.type == \"required_status_checks\") | .parameters.required_status_checks[]?.context]'"
+    command: |
+      repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+      found=0
+      for ruleset_id in $(gh api "repos/${repo}/rulesets" --jq '.[] | select(.target == "branch" and ((.conditions.ref_name.include // []) | any(. == "refs/heads/develop"))) | .id'); do
+        found=1
+        gh api "repos/${repo}/rulesets/${ruleset_id}" --jq '[.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[]?.context]'
+      done
+      test "$found" = "1"
     expected_output: "list contains 'ci-required-result' and does NOT contain bare 'lint' or 'test (ubuntu-latest, 3.12)'"
   - description: "Smoke-test decision record proves content-only skip, code fallback, unknown fallback, and gitignore handling"
     command: "grep -cE 'TODO.only|docs/|under 60 seconds|unknown.*full|gitignore|code-lint|code-test|content guard' _project/decisions/dev-loop-path-filter-smoke-test-*.md"
