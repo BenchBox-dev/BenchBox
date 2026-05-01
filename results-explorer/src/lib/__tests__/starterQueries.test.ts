@@ -10,6 +10,7 @@ describe("starterQueries", () => {
   it("covers every required analyst category", () => {
     const required: StarterQueryCategory[] = [
       "results",
+      "cost_and_deployment",
       "per_query_timings",
       "cohort_comparisons",
       "trust_and_tuning",
@@ -50,5 +51,14 @@ describe("starterQueries", () => {
     for (const category of Object.keys(STARTER_QUERY_CATEGORIES) as StarterQueryCategory[]) {
       expect(STARTER_QUERY_CATEGORIES[category]).toBeTruthy();
     }
+  });
+
+  it("includes starter templates for normalized cost deployment analysis", () => {
+    const costQueries = starterQueriesByCategory().cost_and_deployment;
+
+    expect(costQueries.length).toBeGreaterThan(0);
+    expect(costQueries.some((query) => query.sql.includes("normalized_cost_usd"))).toBe(true);
+    expect(costQueries.some((query) => query.sql.includes("cost_status"))).toBe(true);
+    expect(costQueries.some((query) => query.sql.includes("cloud_provider"))).toBe(true);
   });
 });

@@ -5,6 +5,13 @@ export interface QueryFilterState {
   tuningModes: string[];
   trustTiers: string[];
   validationStatuses: string[];
+  costStatuses: string[];
+  costModelVersions: string[];
+  cloudProviders: string[];
+  cloudRegions: string[];
+  instanceTypes: string[];
+  warehouseSizes: string[];
+  storageFormats: string[];
   hasCost: "all" | "yes" | "no";
   dateWindow: "all" | "30d" | "90d" | "365d";
 }
@@ -39,6 +46,21 @@ const ALLOWED_COLUMNS = new Set([
   "test_type",
   "validation_status",
   "cost_usd",
+  "normalized_cost_usd",
+  "cost_model_version",
+  "cost_model_source",
+  "cost_scope",
+  "cost_status",
+  "billing_unit",
+  "pricing_region",
+  "cloud_provider",
+  "cloud_region",
+  "instance_type",
+  "warehouse_size",
+  "node_count",
+  "cluster_size",
+  "storage_format",
+  "storage_tier",
 ]);
 
 function expandListFilter(
@@ -72,6 +94,13 @@ export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
   expandListFilter("tuning_mode", filters.tuningModes, clauses, params);
   expandListFilter("trust_label", filters.trustTiers, clauses, params);
   expandListFilter("validation_status", filters.validationStatuses, clauses, params);
+  expandListFilter("cost_status", filters.costStatuses, clauses, params);
+  expandListFilter("cost_model_version", filters.costModelVersions, clauses, params);
+  expandListFilter("cloud_provider", filters.cloudProviders, clauses, params);
+  expandListFilter("cloud_region", filters.cloudRegions, clauses, params);
+  expandListFilter("instance_type", filters.instanceTypes, clauses, params);
+  expandListFilter("warehouse_size", filters.warehouseSizes, clauses, params);
+  expandListFilter("storage_format", filters.storageFormats, clauses, params);
 
   if (filters.hasCost === "yes") clauses.push("cost_usd IS NOT NULL");
   if (filters.hasCost === "no") clauses.push("cost_usd IS NULL");
@@ -123,6 +152,14 @@ export function buildFacetCountQuery(
     trustTiers: options.exclude === "trustTiers" ? [] : filters.trustTiers,
     validationStatuses:
       options.exclude === "validationStatuses" ? [] : filters.validationStatuses,
+    costStatuses: options.exclude === "costStatuses" ? [] : filters.costStatuses,
+    costModelVersions:
+      options.exclude === "costModelVersions" ? [] : filters.costModelVersions,
+    cloudProviders: options.exclude === "cloudProviders" ? [] : filters.cloudProviders,
+    cloudRegions: options.exclude === "cloudRegions" ? [] : filters.cloudRegions,
+    instanceTypes: options.exclude === "instanceTypes" ? [] : filters.instanceTypes,
+    warehouseSizes: options.exclude === "warehouseSizes" ? [] : filters.warehouseSizes,
+    storageFormats: options.exclude === "storageFormats" ? [] : filters.storageFormats,
     hasCost: options.exclude === "hasCost" ? "all" : filters.hasCost,
     dateWindow: options.exclude === "dateWindow" ? "all" : filters.dateWindow,
   };

@@ -11,6 +11,7 @@
 import { queryRows } from "@/db";
 import type {
   BenchmarkSummary,
+  CostDeploymentFields,
   DetailResult,
   Environment,
   MetaCohort,
@@ -27,7 +28,7 @@ import type {
 // Row shapes - one-to-one with the DDL in browser-duckdb-schema.sql
 // ---------------------------------------------------------------------------
 
-export interface ResultRow {
+export interface ResultRow extends CostDeploymentFields {
   result_id: string;
   benchmark: string;
   scale_factor: number;
@@ -123,7 +124,7 @@ export interface BenchmarkRankingRow {
   speedup_vs_slowest_in_cohort: number | null;
 }
 
-export interface PlatformIndexRowRow {
+export interface PlatformIndexRowRow extends CostDeploymentFields {
   result_id: string;
   benchmark: string;
   scale_factor: number;
@@ -272,6 +273,21 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     test_type: wide.test_type,
     validation_status: wide.validation_status,
     cost_usd: wide.cost_usd,
+    normalized_cost_usd: wide.normalized_cost_usd,
+    cost_model_version: wide.cost_model_version,
+    cost_model_source: wide.cost_model_source,
+    cost_scope: wide.cost_scope,
+    cost_status: wide.cost_status,
+    billing_unit: wide.billing_unit,
+    pricing_region: wide.pricing_region,
+    cloud_provider: wide.cloud_provider,
+    cloud_region: wide.cloud_region,
+    instance_type: wide.instance_type,
+    warehouse_size: wide.warehouse_size,
+    node_count: wide.node_count,
+    cluster_size: wide.cluster_size,
+    storage_format: wide.storage_format,
+    storage_tier: wide.storage_tier,
     compliance_class: wide.compliance_class,
   };
 }
