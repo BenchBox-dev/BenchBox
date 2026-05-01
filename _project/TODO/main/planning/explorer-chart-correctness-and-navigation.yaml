@@ -1,0 +1,162 @@
+id: explorer-chart-correctness-and-navigation
+title: "Explorer: chart correctness, log-scale latency encoding, and chart navigation"
+worktree: main
+priority: High
+status: "Not Started"
+category: "Data Visualization"
+
+deps:
+  needs:
+    - explorer-critical-results-ux-defects
+
+description: |
+  Fix visualization choices that currently reduce trust or legibility in the
+  Results Explorer. Database benchmark latency often spans orders of magnitude,
+  so linear bar charts can compress meaningful differences and cause labels to
+  overlap. Chart navigation also exposes too many tiny chart chips without an
+  analytical hierarchy. The goal is to make charts answer clear questions:
+  overview, per-query behavior, distribution, cost, trend, and rank.
+
+work:
+  - id: w1
+    summary: "Audit chart registry and group charts by analytical question"
+    status: pending
+    notes: |
+      In `results-explorer/src/lib/chartRegistry.ts` and ChartPanel, replace the
+      flat 10+ chip list with grouped tabs or segmented controls:
+        - Overview
+        - Per-query
+        - Distribution
+        - Cost
+        - Trend
+        - Rank
+      Each group should show at most the relevant chart controls for the current
+      page/data shape.
+
+  - id: w2
+    summary: "Use log-scale or ratio-based encoding for latency bars where values span orders of magnitude"
+    needs: [w1]
+    status: pending
+    notes: |
+      Update PowerBar/ChartPanel latency views so linear bars do not compress
+      faster engines against a slow outlier. Use log scale for latency magnitude
+      or speedup-vs-best where comparison is the point. Axis labels must disclose
+      log scale when used.
+
+  - id: w3
+    summary: "Fix label overlap in SSB/star_schema performance bar charts"
+    needs: [w2]
+    status: pending
+    notes: |
+      The audited SSB Performance Bar showed labels crowding near the origin.
+      Implement collision-aware label placement: outside labels when space is
+      insufficient, minimum label gutter, and tooltip fallback for narrow bars.
+
+  - id: w4
+    summary: "Split platform trend charts by cohort or metric"
+    needs: [w1]
+    status: pending
+    notes: |
+      Carry forward the critical defect fix: trend charts must not mix
+      benchmark/scale/phase cohorts. Render cohort-specific small multiples or
+      require a selected cohort before showing the time series.
+
+  - id: w5
+    summary: "Add natural query sorting and explicit query labels in heatmaps and tables"
+    status: pending
+    notes: |
+      Query IDs should sort Q1, Q2, ..., Q10 rather than lexicographic 1, 10,
+      11, ..., 2. Labels should preserve benchmark-specific prefixes where
+      present (`Q1`, `q01`, `query_001`) rather than bare ambiguous numerals.
+
+  - id: w6
+    summary: "Add high-contrast and reduced-color paths for heatmaps"
+    needs: [w5]
+    status: pending
+    notes: |
+      MetaLeaderboard and QueryHeatmap should have text/value labels sufficient
+      for interpretation without relying only on color. Add or preserve
+      color-blind-safe sequential palettes and reduced-color rendering where
+      supported by CSS/media queries.
+
+  - id: w7
+    summary: "Add chart math and rendering tests for scale, sorting, and labels"
+    needs: [w2, w3, w4, w5, w6]
+    status: pending
+    notes: |
+      Extend chartMath and component tests for log-scale mapping, label
+      collision behavior, cohort-split trend data, natural query sort, and
+      heatmap accessible names/values.
+
+metadata:
+  tags:
+    - explorer
+    - charts
+    - visualization
+    - accessibility
+  estimated_effort: "Large (3-5 days)"
+  created_date: "2026-05-01"
+
+impact:
+  business_value: |
+    Makes leaderboard charts credible to technical users and reduces avoidable
+    objections about misleading scale or mixed metrics.
+  user_impact: |
+    Users can see meaningful latency differences, identify per-query outliers,
+    and navigate charts by question instead of scanning a long chip list.
+  technical_debt: |
+    Centralizes chart categorization and scale decisions in the chart registry
+    and math helpers.
+
+files_affected:
+  modified:
+    - "results-explorer/src/lib/chartRegistry.ts"
+    - "results-explorer/src/lib/chartMath.ts"
+    - "results-explorer/src/components/ChartPanel.tsx"
+    - "results-explorer/src/components/PowerBar.tsx"
+    - "results-explorer/src/components/TimeSeries.tsx"
+    - "results-explorer/src/components/QueryHeatmap.tsx"
+    - "results-explorer/src/components/MetaLeaderboard.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/__tests__/chartRegistry.meta.test.ts"
+    - "results-explorer/src/__tests__/chartTheme.test.ts"
+    - "results-explorer/src/__tests__/parity/chartMath.parity.test.ts"
+    - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+    - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+
+must_preserve:
+  - "Chart registry remains the single source for chart availability and chart metadata."
+  - "Benchmark ranking order continues to come from pipeline-emitted primary_metric/primary_order, not frontend guesses."
+  - "Charts remain readable when only one platform/result is present."
+  - "Heatmaps remain keyboard navigable and retain existing role/grid accessibility behavior."
+
+approach: |
+  Start by making chart intent explicit in registry metadata, then update
+  ChartPanel navigation. Treat log scale and speedup as distinct encodings:
+  log scale for magnitude across orders of magnitude, speedup when the user is
+  asking relative winner/loser questions. Test chart math separately from Preact
+  rendering so scale regressions are easy to catch.
+
+anti_patterns:
+  - "DO NOT use linear latency bars when one slow outlier collapses the rest of the field - because users cannot compare fast platforms - use log scale or speedup encoding with clear labels."
+  - "DO NOT mix cohorts in trend charts - because benchmark/scale geomeans are not one metric - split by cohort."
+  - "DO NOT rely on color alone in heatmaps - because color perception and print/screenshot contexts vary - keep visible values and accessible names."
+  - "DO NOT present every chart as an equal chip - because users need analytical hierarchy - group charts by question."
+
+verification:
+  - description: "Frontend typecheck and chart tests pass."
+    command: "cd results-explorer && npm run typecheck && npm test"
+    expected_output: "All chart registry, chart math, heatmap, and ChartPanel tests pass."
+  - description: "Production build succeeds."
+    command: "cd results-explorer && npm run build"
+    expected_output: "Vite build completes without chart-related warnings or errors."
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/lib/chartRegistry.ts"
+    - "results-explorer/src/lib/chartMath.ts"
+    - "results-explorer/src/components/"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/__tests__/"
