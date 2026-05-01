@@ -1,0 +1,154 @@
+id: explorer-critical-results-ux-defects
+title: "Explorer: fix critical result-browser defects found in design audit"
+worktree: main
+priority: Critical
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  Fix the correctness defects found while auditing the BenchBox Results Explorer
+  before layering on larger visual and IA changes. These issues directly break
+  navigation or misrepresent benchmark data:
+
+  - Query Workbench default `View ->` links can navigate to `/results/r/undefined`
+    because the default visible column set omits `result_id` while the row action
+    reads `row.result_id`.
+  - Result detail methodology can label sample count as query scope, e.g. showing
+    "Query scope: 88 queries" on a page whose timing section has 22 logical
+    queries and 88 individual samples.
+  - Platform page "Performance Trend" can mix unrelated benchmark/scale cohorts
+    such as SSB SF0.01, SSB SF0.1, TPC-H SF0.01, and TPC-H SF0.1 into one
+    geomean trend line, which implies a single longitudinal metric where none
+    exists.
+
+work:
+  - id: w1
+    summary: "Make Query Workbench row actions independent of visible result_id column"
+    status: pending
+    notes: |
+      In results-explorer/src/pages/Query.tsx, ensure `result_id` is always
+      available for row actions even when not visible. Preferred fix: keep
+      `result_id` in the SELECT projection as a hidden key and render only the
+      user-selected columns. Add a regression test where DEFAULT_COLUMNS omits
+      `result_id` but the "View" link still points to `/results/r/{id}`.
+
+  - id: w2
+    summary: "Correct Result Detail methodology copy to distinguish logical queries from samples"
+    status: pending
+    notes: |
+      In results-explorer/src/pages/ResultDetail.tsx and/or
+      MethodologyDisclosure, source logical query scope from `detail.query_count`
+      or `detail.display_timings.length`, and sample count from
+      `detail.queries.length`. The UI should say, for example, "22 queries,
+      88 measurement samples" rather than "88 queries" when samples are the
+      larger number.
+
+  - id: w3
+    summary: "Stop Platform page trend chart from combining different cohorts into one time series"
+    status: pending
+    notes: |
+      In results-explorer/src/pages/PlatformIndex.tsx and
+      results-explorer/src/components/TimeSeries.tsx call sites, group trend
+      data by `(benchmark, scale_factor, phase, primary_metric)` before drawing.
+      Either render cohort-specific small multiples or require an explicit cohort
+      selector. Do not plot mixed cohorts on one y-axis.
+
+  - id: w4
+    summary: "Add Query Workbench regression test for default row link without visible result_id"
+    needs: [w1]
+    status: pending
+    notes: |
+      Extend Query.test.tsx with a case where DEFAULT_COLUMNS omits `result_id`
+      but the rendered "View" link still resolves to `/results/r/{id}`. Commit
+      with the w1 fix so navigation is locked in by the same change.
+
+  - id: w5
+    summary: "Add Result Detail regression test for separate query and sample counts"
+    needs: [w2]
+    status: pending
+    notes: |
+      Extend ResultDetail.test.tsx or MethodologyDisclosure.test.tsx to assert
+      "queries" and "measurement samples" render as distinct counts when sample
+      count exceeds logical query count. Commit with the w2 fix.
+
+  - id: w6
+    summary: "Add Platform trend regression test against mixed cohorts"
+    needs: [w3]
+    status: pending
+    notes: |
+      Extend PlatformIndex.test.tsx with rows from at least two distinct
+      `(benchmark, scale_factor)` cohorts and assert the trend renderer either
+      splits cohorts into small multiples or refuses to render a single merged
+      line. Commit with the w3 fix.
+
+metadata:
+  tags:
+    - explorer
+    - audit-followup
+    - correctness
+    - navigation
+  estimated_effort: "Medium (1 day)"
+  created_date: "2026-05-01"
+
+impact:
+  business_value: |
+    Removes trust-damaging defects before the explorer is promoted as a public
+    leaderboard surface.
+  user_impact: |
+    Users can navigate from the workbench reliably and are not shown misleading
+    methodology or trend data.
+  technical_debt: |
+    Adds regression coverage around defects that are likely to recur as result
+    tables and chart inputs become more configurable.
+
+files_affected:
+  modified:
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/components/MethodologyDisclosure.tsx"
+    - "results-explorer/src/components/TimeSeries.tsx"
+    - "results-explorer/src/pages/__tests__/Query.test.tsx"
+    - "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+    - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+    - "results-explorer/src/components/__tests__/MethodologyDisclosure.test.tsx"
+
+must_preserve:
+  - "Query Workbench column picker continues to control visible table columns."
+  - "Query Workbench CSV/JSON export continues to emit exactly the columns the user has selected (no extra hidden `result_id`); the projection-only fix keeps `result_id` available to row actions without leaking into export output."
+  - "Existing Result Detail route `/results/r/{result_id}` remains unchanged."
+  - "Platform trend charts remain available, but only for comparable cohorts."
+
+approach: |
+  Fix each defect in the smallest owning component first, then add tests around
+  the observable behavior. For Query Workbench, avoid making `result_id` visible
+  by default just to fix navigation; separate row identity from displayed
+  columns. For Result Detail, audit all methodology labels that mention query
+  scope so the copy cannot reuse sample-count terminology. For Platform trend,
+  use the existing ranking/cohort fields already emitted by
+  `bench.benchmark_rankings` rather than inventing a frontend-only cohort key.
+
+anti_patterns:
+  - "DO NOT hide the Query Workbench View link when result_id is not visible - because navigation is a core row action - carry row identity separately from displayed columns."
+  - "DO NOT label measurement samples as queries - because that overstates benchmark breadth - show logical queries and samples as separate counts."
+  - "DO NOT normalize mixed benchmark/scale rows into a single trend line - because geomean values are cohort-relative - split by cohort or force a cohort selector."
+
+verification:
+  - description: "Frontend typecheck and unit tests pass."
+    command: "cd results-explorer && npm run typecheck && npm test"
+    expected_output: "TypeScript and Vitest pass, including new regressions for workbench links, methodology counts, and platform trend grouping."
+  - description: "Production explorer bundle still builds."
+    command: "cd results-explorer && npm run build"
+    expected_output: "Vite production build completes without errors."
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/components/MethodologyDisclosure.tsx"
+    - "results-explorer/src/components/TimeSeries.tsx"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/queryFilters.ts"
+    - "results-explorer/src/pages/__tests__/"
+    - "results-explorer/src/components/__tests__/"

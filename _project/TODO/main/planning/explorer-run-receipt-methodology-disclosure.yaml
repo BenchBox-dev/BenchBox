@@ -1,0 +1,155 @@
+id: explorer-run-receipt-methodology-disclosure
+title: "Explorer: prominent run receipt and methodology disclosure"
+worktree: main
+priority: High
+status: "Not Started"
+category: "Result Integrity"
+
+description: |
+  Add a trust-forward "Run Receipt" pattern to result detail, compare, and
+  leaderboard surfaces. The hostile-reader test for database benchmarks is
+  straightforward: a vendor will attack hardware, version pinning, validation,
+  tuning, cost normalization, and query scope before accepting the ranking.
+  Today much of that context is either low in the page, collapsed, inconsistently
+  labeled, or absent from compare/leaderboard contexts.
+
+  The design goal is not more prose. It is an auditable receipt: command,
+  benchmark/scale/phase, platform and driver version, environment, validation,
+  tuning, cost model, artifact IDs, bundle link, and eventually plan artifacts.
+
+work:
+  - id: w1
+    summary: "Design and implement compact RunReceipt component for result detail"
+    status: pending
+    notes: |
+      Add `results-explorer/src/components/RunReceipt.tsx`. It should render a
+      dense two-column receipt with sections:
+        - Workload: benchmark, scale factor, phase/test type, query count,
+          sample count.
+        - Platform: platform, platform version, driver version, execution mode,
+          tuning mode/hash.
+        - Environment: OS, arch, CPU count, memory, Python.
+        - Integrity: trust label, visibility, validation status, compliance
+          class, ranking eligibility.
+        - Artifacts: result ID, short ID if available, bundle download, plans
+          availability, reproduce command if available.
+        - Cost: normalized cost status/model/scope once available.
+
+  - id: w2
+    summary: "Promote methodology from lower-page disclosure to above-the-fold trust panel"
+    needs: [w1]
+    status: pending
+    notes: |
+      On ResultDetail, place RunReceipt adjacent to or immediately below the
+      primary metric summary. MethodologyDisclosure can remain for deeper text,
+      but the receipt must be visible before charts/timing tables on desktop and
+      reachable before raw samples on mobile.
+
+  - id: w3
+    summary: "Add compare-page comparability receipt for selected result set"
+    needs: [w1]
+    status: pending
+    notes: |
+      THIS ITEM OWNS the ComparabilityReceipt component. The downstream
+      `explorer-compare-decision-summary` item consumes it (its w4 cohort
+      guardrails render through this component) but does not redefine its
+      API. In Compare.tsx, render a compact comparability strip showing which
+      fields are identical across selected runs and which differ: benchmark,
+      scale factor, phase, date window, platform versions, driver versions,
+      tuning, validation, cost model, environment. Differences are explicit
+      warnings, not buried in row metadata.
+
+  - id: w4
+    summary: "Surface methodology links from leaderboard rows and benchmark matrices"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add small trust/receipt affordances to row headers or result links in
+      MetaLeaderboard, BenchmarkIndex, and PlatformIndex: trust badge,
+      validation status, and quick link to the result detail receipt. Keep it
+      compact enough for dense tables.
+
+  - id: w5
+    summary: "Prepare execution-plan affordance without requiring public plans in this phase"
+    needs: [w1]
+    status: pending
+    notes: |
+      If `has_plans` is true, show "Plans available" linking to the future plan
+      viewer/download route if present. If false, show "Plans not published" in
+      the receipt. Do not implement a full plan viewer in this TODO.
+
+  - id: w6
+    summary: "Add tests for receipt labels, count semantics, and compare warnings"
+    needs: [w1, w2, w3, w4]
+    status: pending
+    notes: |
+      Tests should assert that query count and sample count are separate, bundle
+      links render, validation/trust fields render, and compare warnings appear
+      when selected runs differ in benchmark/scale/tuning/environment.
+
+metadata:
+  tags:
+    - explorer
+    - methodology
+    - trust
+    - reproducibility
+  estimated_effort: "Medium-Large (2-4 days)"
+  created_date: "2026-05-01"
+
+impact:
+  business_value: |
+    Makes public rankings harder to dismiss and gives vendors/contributors a
+    clear path to reproduce or challenge a result constructively.
+  user_impact: |
+    Users can decide whether a benchmark result is relevant and trustworthy
+    without hunting through raw JSON or collapsed methodology text.
+  technical_debt: |
+    Centralizes methodology rendering in reusable components instead of spreading
+    trust copy across pages.
+
+files_affected:
+  modified:
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/components/MethodologyDisclosure.tsx"
+    - "results-explorer/src/components/TrustBadge.tsx"
+    - "results-explorer/src/types.ts"
+  added:
+    - "results-explorer/src/components/RunReceipt.tsx"
+    - "results-explorer/src/components/ComparabilityReceipt.tsx"
+    - "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
+    - "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+
+must_preserve:
+  - "Existing MethodologyDisclosure tests continue to pass or are migrated to the new receipt/disclosure split."
+  - "Bundle download URLs and result detail URLs remain stable."
+  - "TrustBadge semantics remain consistent across home, benchmark, platform, compare, and detail pages."
+  - "Execution plans remain a follow-on; this item only exposes availability/status."
+
+approach: |
+  Build the receipt as a reusable display component fed by existing DetailResult
+  fields. Add compare-specific aggregation separately so one result receipt does
+  not grow conditional compare logic. Keep the visual treatment compact:
+  12-13px labels, 13-14px values, strong section labels, no paragraph-heavy
+  methodology in the primary surface.
+
+anti_patterns:
+  - "DO NOT bury hardware/version/tuning/cost context below charts - because these are the first things a skeptical database engineer will attack - show a receipt near the primary metrics."
+  - "DO NOT add long methodology prose to leaderboard rows - because it destroys density - use badges and links there, full receipt on detail."
+  - "DO NOT imply plans are public when `has_plans` is false - because execution plans are a follow-on phase - show explicit unavailable status."
+
+verification:
+  - description: "Frontend typecheck and component/page tests pass."
+    command: "cd results-explorer && npm run typecheck && npm test"
+    expected_output: "All tests pass, including RunReceipt and ComparabilityReceipt coverage."
+  - description: "Manual detail and compare smoke."
+    command: "cd results-explorer && npm run dev"
+    expected_output: "`/results/r/{id}` shows Run Receipt above timing tables; `/results/compare?ids=...` shows comparability warnings before detailed charts."
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/pages/"
+    - "results-explorer/src/components/"
+    - "results-explorer/src/types.ts"
