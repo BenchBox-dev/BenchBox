@@ -1,6 +1,7 @@
+import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
-import type { BenchmarkSummary } from "@/types";
+import type { BenchmarkSummary, SortDirection, SortState } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getBenchmarkSummaryFromDuckDB, listResults } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
@@ -20,6 +21,7 @@ interface BenchmarkIndexProps extends RoutableProps {
 }
 
 type ViewMode = "matrix" | "ranks" | "list";
+type BenchmarkListSortKey = "platform" | "scale_factor" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
 
 const TRUST_LABEL_ABBREV: Record<string, string> = {
   "maintainer-run": "Maintainer",
@@ -481,6 +483,10 @@ function ListTable({
   tuningFilter: string;
   trustFilter: Set<string> | null;
 }) {
+  const [sort, setSort] = useState<SortState<BenchmarkListSortKey>>({
+    key: "display_geomean_ms",
+    direction: "asc",
+  });
   const benchmarkResults = results.filter((r) => r.benchmark === benchmark);
 
   const byScale = benchmarkResults.filter((r) => String(r.scale_factor) === scaleFactor);
@@ -491,12 +497,34 @@ function ListTable({
   const trustFiltered =
     trustFilter === null ? tuningFiltered : tuningFiltered.filter((r) => trustFilter.has(r.trust_label));
 
-  const filtered = [...trustFiltered].sort((a, b) => {
-    if (a.geomean_ms === null && b.geomean_ms === null) return 0;
-    if (a.geomean_ms === null) return 1;
-    if (b.geomean_ms === null) return -1;
-    return a.geomean_ms - b.geomean_ms;
-  });
+  const filtered = [...trustFiltered].sort((a, b) => compareListRows(a, b, sort));
+
+  function toggleSort(key: BenchmarkListSortKey) {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: "asc" },
+    );
+  }
+
+  function ariaSort(key: BenchmarkListSortKey): "ascending" | "descending" | "none" {
+    if (sort.key !== key) return "none";
+    return sort.direction === "asc" ? "ascending" : "descending";
+  }
+
+  function sortArrow(key: BenchmarkListSortKey) {
+    if (sort.key !== key) return " ↕";
+    return sort.direction === "asc" ? " ↑" : " ↓";
+  }
+
+  function sortAnnouncement(key: BenchmarkListSortKey) {
+    if (sort.key !== key) return null;
+    return (
+      <span class="sr-only">
+        {sort.direction === "asc" ? "sorted ascending" : "sorted descending"}
+      </span>
+    );
+  }
 
   if (filtered.length === 0) {
     return (
@@ -511,17 +539,61 @@ function ListTable({
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="table-th">Platform</th>
-            <th class="table-th">Scale</th>
-            <th class="table-th">Date</th>
-            <th class="table-th">Power Score</th>
+            <ListSortHeader
+              label="Platform"
+              sortKey="platform"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <ListSortHeader
+              label="Scale"
+              sortKey="scale_factor"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <ListSortHeader
+              label="Date"
+              sortKey="run_date"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <ListSortHeader
+              label="Power Score"
+              sortKey="power_score"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
             <th
-              class="table-th"
+              class="p-0"
+              scope="col"
+              aria-sort={ariaSort("display_geomean_ms")}
               title="Geometric mean of per-query median execution times (measurement runs only). Lower is faster."
             >
-              Geomean (ms)
+              <button
+                type="button"
+                class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
+                onClick={() => toggleSort("display_geomean_ms")}
+              >
+                Geomean (ms){sortArrow("display_geomean_ms")}
+                {sortAnnouncement("display_geomean_ms")}
+              </button>
             </th>
-            <th class="table-th">Queries</th>
+            <ListSortHeader
+              label="Queries"
+              sortKey="query_count"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
             <th class="table-th">Source</th>
             <th class="table-th" />
           </tr>
@@ -538,7 +610,7 @@ function ListTable({
 
 function BenchmarkRow({ entry }: { entry: ResultRow }) {
   return (
-    <tr class="hover:bg-gray-50">
+    <tr class="hover:bg-gray-50" data-testid={entry.result_id}>
       <td class="table-td">
         <a href={`/results/p/${entry.platform_id}/`} class="font-medium no-underline">
           {entry.platform}
@@ -568,4 +640,61 @@ function BenchmarkRow({ entry }: { entry: ResultRow }) {
       </td>
     </tr>
   );
+}
+
+function ListSortHeader({
+  label,
+  sortKey,
+  ariaSort,
+  sortArrow,
+  sortAnnouncement,
+  onSort,
+}: {
+  label: string;
+  sortKey: BenchmarkListSortKey;
+  ariaSort: (key: BenchmarkListSortKey) => "ascending" | "descending" | "none";
+  sortArrow: (key: BenchmarkListSortKey) => string;
+  sortAnnouncement: (key: BenchmarkListSortKey) => ComponentChildren;
+  onSort: (key: BenchmarkListSortKey) => void;
+}) {
+  return (
+    <th class="p-0" scope="col" aria-sort={ariaSort(sortKey)}>
+      <button
+        type="button"
+        class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
+        onClick={() => onSort(sortKey)}
+      >
+        {label}{sortArrow(sortKey)}
+        {sortAnnouncement(sortKey)}
+      </button>
+    </th>
+  );
+}
+
+function compareListRows(a: ResultRow, b: ResultRow, sort: SortState<BenchmarkListSortKey>): number {
+  if (sort.key === "platform") {
+    return sort.direction === "asc"
+      ? a.platform.localeCompare(b.platform)
+      : b.platform.localeCompare(a.platform);
+  }
+  if (sort.key === "run_date") {
+    if (a.run_date === b.run_date) return 0;
+    const order = a.run_date < b.run_date ? -1 : 1;
+    return sort.direction === "asc" ? order : -order;
+  }
+  if (sort.key === "display_geomean_ms") {
+    return compareNullableNumber(
+      a.display_geomean_ms ?? a.geomean_ms,
+      b.display_geomean_ms ?? b.geomean_ms,
+      sort.direction,
+    );
+  }
+  return compareNullableNumber(a[sort.key], b[sort.key], sort.direction);
+}
+
+function compareNullableNumber(a: number | null, b: number | null, direction: SortDirection): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return direction === "asc" ? a - b : b - a;
 }

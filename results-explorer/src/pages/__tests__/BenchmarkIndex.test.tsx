@@ -237,6 +237,12 @@ beforeEach(() => {
   vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS));
 });
 
+function getRenderedResultOrder(container: ParentNode): string[] {
+  return Array.from(container.querySelectorAll("tbody tr[data-testid]")).map(
+    (row) => row.getAttribute("data-testid") ?? "",
+  );
+}
+
 // ---------------------------------------------------------------------------
 // (a) Matrix view is the default
 // ---------------------------------------------------------------------------
@@ -250,9 +256,20 @@ describe("BenchmarkIndex", () => {
   it("shows QueryHeatmap (query column headers) by default", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => {
-      expect(screen.getByText("Q1")).toBeTruthy();
-      expect(screen.getByText("Q2")).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^Q2/ })).toBeTruthy();
     });
+  });
+
+  it("matrix view sorts rows from query headers", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
+
+    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    fireEvent.click(screen.getByRole("button", { name: /^Q1/ }));
+    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    fireEvent.click(screen.getByRole("button", { name: /^Q1/ }));
+    expect(getRenderedResultOrder(container)).toEqual(["r2", "r1"]);
   });
 
   it("shows platform names from the summary", async () => {
@@ -276,9 +293,20 @@ describe("BenchmarkIndex", () => {
     fireEvent.click(listBtn);
 
     // List view shows a table with Geomean column but no query columns
-    await waitFor(() => expect(screen.getByText("Geomean (ms)")).toBeTruthy());
-    expect(screen.queryByText("Q1")).toBeNull();
-    expect(screen.queryByText("Q2")).toBeNull();
+    await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Q2/ })).toBeNull();
+  });
+
+  it("list view sorts rows from table headers", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+    fireEvent.click(screen.getByText("List"));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
+    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    fireEvent.click(screen.getByRole("button", { name: /Geomean/ }));
+    expect(getRenderedResultOrder(container)).toEqual(["r2", "r1"]);
   });
 
   // -----------------------------------------------------------------------

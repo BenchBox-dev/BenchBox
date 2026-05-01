@@ -192,8 +192,35 @@ work:
 
   - id: w3
     summary: "Fix B1 + S3.6 — click-to-sort headers on PlatformIndex AND BenchmarkIndex"
-    status: pending
+    status: done
     notes: |
+      Landed for the remaining BenchmarkIndex surface. PlatformIndex
+      already had sortable headers + aria-sort coverage from the
+      pass-1 follow-up on this branch, so this work unit left it
+      unchanged.
+
+      Changes:
+        - `QueryHeatmap` matrix rows now sort from the Platform,
+          primary metric, Geomean, and per-query headers. Trust stays
+          static because it is a badge/category column rather than an
+          ordered metric. Source/selection columns are not made
+          sortable.
+        - BenchmarkIndex list view now has sortable Platform, Scale,
+          Date, Power Score, Geomean, and Queries headers. Source and
+          action columns remain static.
+        - Sortable headers expose `aria-sort` and screen-reader
+          direction announcements. Missing numeric values stay last
+          in both directions, matching the PlatformIndex convention.
+        - Added regression coverage for matrix query-header sorting,
+          list-view geomean sorting, and QueryHeatmap query-header
+          sorting.
+
+      Verification:
+        - `cd results-explorer && npm run test -- src/components/__tests__/QueryHeatmap.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx`
+          passed: 31 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - `git diff --check` passed.
+
       Pattern source: `results-explorer/src/pages/ResultDetail.tsx`
       already has the canonical implementation (`<th><button onClick=
       toggleSort(key)>{label}{sortArrow(key)}</button></th>` with

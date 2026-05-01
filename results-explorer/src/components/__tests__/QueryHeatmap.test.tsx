@@ -95,8 +95,22 @@ describe("QueryHeatmap rendering", () => {
 
   it("renders query column headers", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
-    expect(screen.getByText("Q1")).toBeTruthy();
-    expect(screen.getByText("Q2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Q2/ })).toBeTruthy();
+  });
+
+  it("clicking a query header sorts rows by that query", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+    const rowOrder = () =>
+      Array.from(container.querySelectorAll("tbody tr[data-testid]")).map(
+        (row) => row.getAttribute("data-testid") ?? "",
+      );
+
+    expect(rowOrder()).toEqual(["r1", "r2"]);
+    fireEvent.click(screen.getByRole("button", { name: /^Q1/ }));
+    expect(rowOrder()).toEqual(["r1", "r2"]);
+    fireEvent.click(screen.getByRole("button", { name: /^Q1/ }));
+    expect(rowOrder()).toEqual(["r2", "r1"]);
   });
 
   it("heatmap cells have --cell-hue style set for multi-platform summaries", () => {
