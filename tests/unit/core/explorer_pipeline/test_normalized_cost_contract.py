@@ -4,6 +4,8 @@ import pytest
 
 from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
 
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
 
 def test_normalized_cost_contract_covers_all_statuses() -> None:
     deployment = DeploymentMetadata(
