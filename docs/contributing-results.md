@@ -21,6 +21,14 @@ uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01
 
 The result JSON is written to `benchmark_runs/results/`.
 
+Optional companion files may be written next to the result JSON. Add
+`--capture-plans` on supported platforms to create `<result>.plans.json`.
+Use `--tuning tuned`, `--tuning auto`, or `--tuning ./path/to/tuning.yaml`
+only for intentionally tuned submissions; tuned runs create
+`<result>.tuning.json` when tuning clauses are applied. `benchbox submit`
+packages either companion automatically when it sits next to the result JSON,
+so missing companion files do not make a default submission incomplete.
+
 ### 2. Package the submission
 
 Use `uv run -- benchbox submit` to create a submission package:
@@ -41,8 +49,8 @@ This creates a `submission/` directory containing:
 | File | Description |
 |------|-------------|
 | `bundle/<result>.json` | The canonical schema-v2 result bundle |
-| `bundle/<result>.plans.json` | Query execution plans (if captured) |
-| `bundle/<result>.tuning.json` | Tuning configuration (if used) |
+| `bundle/<result>.plans.json` | Optional query execution plans from `--capture-plans` |
+| `bundle/<result>.tuning.json` | Optional tuning details from an intentionally tuned run |
 | `<result>.manifest.json` | Metadata: hash, benchmark, platform, contributor |
 | `CONTRIBUTING.md` | PR instructions (for reference) |
 
