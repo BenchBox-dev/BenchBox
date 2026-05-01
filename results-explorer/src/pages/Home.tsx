@@ -331,6 +331,8 @@ export function Home(_: RoutableProps) {
           </section>
         )}
 
+        {filteredMetaLeaderboard && <FlywheelStrip />}
+
         <div class="mb-12 grid grid-cols-2 gap-4 text-center lg:grid-cols-4">
           <StatCard
             value={SUPPORTED_BENCHMARK_COUNT}
@@ -353,24 +355,6 @@ export function Home(_: RoutableProps) {
             detail="bundles reviewed before publication"
           />
         </div>
-
-        <section class="mb-12 rounded-xl border border-brand-200 bg-brand-50 p-6 shadow-sm">
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 class="text-xl font-semibold text-gray-900">
-                Run BenchBox on your platform and submit your results
-              </h2>
-              <p class="mt-2 max-w-2xl text-sm text-gray-600">
-                The Phase 2 workflow is simple: run a benchmark, package it with{" "}
-                <code class="rounded bg-white px-1 py-0.5 text-xs">benchbox submit</code>, then
-                open a PR against the public corpus.
-              </p>
-            </div>
-            <a href="/docs/contributing-results.html" class="btn-primary text-sm text-center">
-              Submit a Result
-            </a>
-          </div>
-        </section>
 
         <section class="mb-12">
           <h2 class="mb-4 text-xl font-semibold text-gray-900">Recent Results</h2>
@@ -545,6 +529,37 @@ function CoverageSummary() {
         </span>
       </div>
     </div>
+  );
+}
+
+const FLYWHEEL_STEPS = [
+  { label: "Run a benchmark", href: "/docs/usage/installation.html" },
+  { label: "Compare your result", href: "/results/compare" },
+  { label: "Submit a bundle", href: "/docs/contributing-results.html" },
+];
+
+function FlywheelStrip() {
+  return (
+    <section class="mb-12 border-y border-gray-200 py-3">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-sm font-semibold text-gray-700">Run -&gt; Compare -&gt; Submit</p>
+        <nav aria-label="Result contribution workflow" class="flex flex-wrap gap-2">
+          {FLYWHEEL_STEPS.map((step, index) => (
+            <a
+              key={step.href}
+              href={step.href}
+              aria-label={step.label}
+              class="inline-flex h-9 items-center gap-2 rounded-md border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 no-underline hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+            >
+              <span class="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-500">
+                {index + 1}
+              </span>
+              {step.label}
+            </a>
+          ))}
+        </nav>
+      </div>
+    </section>
   );
 }
 

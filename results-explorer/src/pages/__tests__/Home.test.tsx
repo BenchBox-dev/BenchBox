@@ -311,6 +311,27 @@ describe("Home", () => {
     expect(screen.queryByText(/^Benchmarks$/)).toBeNull();
   });
 
+  it("renders a compact run-compare-submit workflow near the leaderboard", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    expect(screen.getByText("Run -> Compare -> Submit")).toBeTruthy();
+    const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
+    expect(within(workflow).getByRole("link", { name: "Run a benchmark" })).toHaveAttribute(
+      "href",
+      "/docs/usage/installation.html",
+    );
+    expect(within(workflow).getByRole("link", { name: "Compare your result" })).toHaveAttribute(
+      "href",
+      "/results/compare",
+    );
+    expect(within(workflow).getByRole("link", { name: "Submit a bundle" })).toHaveAttribute(
+      "href",
+      "/docs/contributing-results.html",
+    );
+    expect(screen.queryByText("Run BenchBox on your platform and submit your results")).toBeNull();
+  });
+
   it("treats a benchmark selector change as isolate-not-exclude from the default all state", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());

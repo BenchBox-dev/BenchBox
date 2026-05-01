@@ -85,7 +85,7 @@ work:
 - id: w5
   summary: "Add Run -> Compare -> Submit flywheel affordance without reducing data density"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Add a compact three-step strip or inline CTA cluster near the leaderboard:
     "Run a benchmark", "Compare your result", "Submit a bundle". Each should
