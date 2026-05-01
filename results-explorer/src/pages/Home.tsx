@@ -334,6 +334,7 @@ export function Home(_: RoutableProps) {
             onModeChange={(value) => setModeRaw(value)}
             cohortHref={buildCohortHref}
             platformHref={buildPlatformHref}
+            resultMetadataById={resultById}
           />
         </>
       )}

@@ -10,6 +10,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
 import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
+import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -192,6 +193,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   ].filter((row): row is { label: string; value: string } => row !== null);
 
   const showTuningSection = detail.tuning_mode !== null || detail.has_tuning;
+  const plansUrl = planDownloadUrl(detail);
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -203,7 +205,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
         ]}
       />
 
-      <div class="mt-6 mb-8">
+      <section aria-label="Result summary" class="mt-6 mb-8">
         <div class="flex flex-wrap items-center gap-3 mb-3">
           <h1 class="text-3xl font-bold text-gray-900">
             {benchmarkLabel} - {detail.platform}
@@ -243,6 +245,10 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             </span>
           )}
         </div>
+      </section>
+
+      <div class="mb-8">
+        <RunReceipt detail={detail} />
       </div>
 
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -313,7 +319,13 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
               </a>
             </div>
             {detail.has_plans && (
-              <p class="mt-3 text-xs text-gray-500">Execution plans available.</p>
+              plansUrl ? (
+                <a href={plansUrl} class="mt-3 inline-block text-xs font-medium no-underline" download>
+                  Download plans
+                </a>
+              ) : (
+                <p class="mt-3 text-xs text-gray-500">Execution plans available.</p>
+              )
             )}
           </section>
         </div>
