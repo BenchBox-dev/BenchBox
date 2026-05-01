@@ -2,7 +2,8 @@ id: codex-pr-review-followups-week-2026-05-01
 title: "Address unresolved Codex PR review follow-ups from the week ending 2026-05-01"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-05-01"
 category: Testing and Quality Assurance
 
 description: |
@@ -343,7 +344,7 @@ work:
   - id: w14
     summary: "Re-audit stale Codex threads after fixes and record which ones are closed"
     needs: [w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13]
-    status: pending
+    status: done
     notes: |
       Re-run the PR thread scan for `chatgpt-codex-connector` on the same
       merge window and record which comments are now fixed, stale, or still
