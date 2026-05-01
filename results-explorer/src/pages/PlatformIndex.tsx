@@ -9,7 +9,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
-import { ChartPanel } from "@/components/ChartPanel";
+import { TimeSeries } from "@/components/TimeSeries";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -18,6 +18,16 @@ interface PlatformIndexProps extends RoutableProps {
 }
 
 type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score" | "geomean_ms";
+type PrimaryMetric = "power_score" | "display_geomean_ms";
+
+interface TrendCohort {
+  key: string;
+  benchmark: string;
+  scaleFactor: number;
+  phase: string;
+  primaryMetric: PrimaryMetric;
+  entries: PlatformIndexRowRow[];
+}
 
 export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const [rows, setRows] = useState<PlatformIndexRowRow[] | null>(null);
@@ -36,10 +46,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
   useEffect(() => {
     let cancelled = false;
-    // Fetch the whole view so we can also accept legacy display-name URLs.
-    // Cost: the view projects bare columns over `results`, which is tens of KB
-    // in the committed corpus. The previous implementation paid the same cost
-    // via manifest.json, so this is not a regression.
+    // Fetch the whole platform index so we can also accept legacy display-name
+    // URLs and split trend charts by ranking cohort metadata.
     getPlatformIndexRows()
       .then((r) => {
         if (!cancelled) setRows(r);
@@ -88,6 +96,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     if (bv === null) return -1;
     return dir * (av - bv);
   });
+  const trendCohorts = buildTrendCohorts(platformResultsRaw);
 
   function toggleSort(key: PlatformSortKey) {
     setSort((prev) =>
@@ -255,18 +264,84 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       {selected.size === 1 && <p class="mt-3 text-sm text-gray-500">Select at least one more result to compare.</p>}
 
       {platformResultsRaw.length >= 2 && (
-        <div class="mt-8">
-          <ChartPanel
-            context={{
-              kind: "summary",
-              summary: null,
-              historical: platformResultsRaw,
-            }}
-          />
-        </div>
+        <section class="mt-8 space-y-4" aria-label="Performance trends">
+          <div>
+            <h2 class="text-base font-semibold text-gray-900">Performance Trends</h2>
+            {trendCohorts.length > 1 && (
+              <p class="mt-1 text-sm text-gray-500">
+                Split by benchmark, scale, phase, and ranking metric so each trend compares one cohort.
+              </p>
+            )}
+          </div>
+          {trendCohorts.length === 0 ? (
+            <div class="card">
+              <p class="text-sm text-gray-400 italic">
+                Not enough comparable historical data for a trend chart (need ≥2 runs in the same cohort).
+              </p>
+            </div>
+          ) : (
+            trendCohorts.map((cohort) => (
+              <section key={cohort.key} class="card" aria-label={`${trendCohortLabel(cohort)} trend`}>
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h3 class="text-sm font-semibold text-gray-900">{trendCohortLabel(cohort)}</h3>
+                  <span class="text-xs text-gray-500">{cohort.entries.length} runs</span>
+                </div>
+                <TimeSeries entries={cohort.entries} primaryMetric={cohort.primaryMetric} />
+              </section>
+            ))
+          )}
+        </section>
       )}
     </div>
   );
+}
+
+function buildTrendCohorts(rows: PlatformIndexRowRow[]): TrendCohort[] {
+  const cohorts = new Map<string, TrendCohort>();
+  for (const row of rows) {
+    const phase = row.phase ?? row.test_type ?? "power";
+    const primaryMetric = normalizePrimaryMetric(row.primary_metric);
+    const key = [row.benchmark, String(row.scale_factor), phase, primaryMetric].join("|");
+    let cohort = cohorts.get(key);
+    if (!cohort) {
+      cohort = {
+        key,
+        benchmark: row.benchmark,
+        scaleFactor: row.scale_factor,
+        phase,
+        primaryMetric,
+        entries: [],
+      };
+      cohorts.set(key, cohort);
+    }
+    cohort.entries.push(row);
+  }
+
+  return [...cohorts.values()]
+    .map((cohort) => ({
+      ...cohort,
+      entries: [...cohort.entries].sort((a, b) => a.run_date.localeCompare(b.run_date)),
+    }))
+    .filter((cohort) => cohort.entries.length >= 2)
+    .sort(compareTrendCohorts);
+}
+
+function compareTrendCohorts(a: TrendCohort, b: TrendCohort): number {
+  return (
+    a.benchmark.localeCompare(b.benchmark) ||
+    a.scaleFactor - b.scaleFactor ||
+    a.phase.localeCompare(b.phase) ||
+    a.primaryMetric.localeCompare(b.primaryMetric)
+  );
+}
+
+function normalizePrimaryMetric(value: string | null | undefined): PrimaryMetric {
+  return value === "power_score" ? "power_score" : "display_geomean_ms";
+}
+
+function trendCohortLabel(cohort: TrendCohort): string {
+  const metricLabel = cohort.primaryMetric === "power_score" ? "Power score" : "Geomean";
+  return `${humanizeBenchmark(cohort.benchmark)} · SF ${cohort.scaleFactor} · ${cohort.phase} · ${metricLabel}`;
 }
 
 interface PlatformRowProps {

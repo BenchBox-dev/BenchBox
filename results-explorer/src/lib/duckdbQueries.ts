@@ -140,6 +140,9 @@ export interface PlatformIndexRowRow {
   query_count: number;
   trust_label: string;
   validation_status?: string | null;
+  test_type?: string | null;
+  phase?: string | null;
+  primary_metric?: string | null;
   tuning_mode: string | null;
   execution_mode: string | null;
   compliance_class: string | null;
@@ -425,14 +428,20 @@ export async function getBenchmarkSummaryFromDuckDB(
 
 export async function getPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow[]> {
   const selectPlatformRows =
-    "SELECT result_id, benchmark, scale_factor, platform, platform_id, driver_version, run_date," +
-    " power_score, total_duration_s, geomean_ms, display_geomean_ms, query_count, trust_label," +
-    " validation_status, tuning_mode, execution_mode, compliance_class, cost_usd FROM bench.results";
+    "SELECT r.result_id, r.benchmark, r.scale_factor, r.platform, r.platform_id, r.driver_version, r.run_date," +
+    " r.power_score, r.total_duration_s, r.geomean_ms, r.display_geomean_ms, r.query_count, r.trust_label," +
+    " r.validation_status, r.test_type, COALESCE(br.phase, r.test_type, 'power') AS phase, br.primary_metric," +
+    " r.tuning_mode, r.execution_mode, r.compliance_class, r.cost_usd" +
+    " FROM bench.results r LEFT JOIN bench.benchmark_rankings br" +
+    " ON br.result_id = r.result_id" +
+    " AND br.benchmark = r.benchmark" +
+    " AND br.scale_factor = r.scale_factor" +
+    " AND br.phase = COALESCE(r.test_type, 'power')";
   if (platformId === undefined) {
-    return queryRows<PlatformIndexRowRow>(`${selectPlatformRows} ORDER BY run_date DESC`);
+    return queryRows<PlatformIndexRowRow>(`${selectPlatformRows} ORDER BY r.run_date DESC`);
   }
   return queryRows<PlatformIndexRowRow>(
-    `${selectPlatformRows} WHERE platform_id = ? ORDER BY run_date DESC`,
+    `${selectPlatformRows} WHERE r.platform_id = ? ORDER BY r.run_date DESC`,
     [platformId],
   );
 }

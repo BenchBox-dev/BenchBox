@@ -50,13 +50,16 @@ work:
 
 - id: w3
   summary: "Stop Platform page trend chart from combining different cohorts into one time series"
-  status: pending
+  status: done
   notes: |
     In results-explorer/src/pages/PlatformIndex.tsx and
     results-explorer/src/components/TimeSeries.tsx call sites, group trend
     data by `(benchmark, scale_factor, phase, primary_metric)` before drawing.
     Either render cohort-specific small multiples or require an explicit cohort
     selector. Do not plot mixed cohorts on one y-axis.
+    Owned files for this work unit:
+      - results-explorer/src/lib/duckdbQueries.ts
+      - results-explorer/src/pages/PlatformIndex.tsx
 
 - id: w4
   summary: "Add Query Workbench regression test for default row link without visible result_id"
