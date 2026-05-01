@@ -49,14 +49,18 @@ work:
   - id: w2
     summary: "Apply the chosen change to docs/contributing-results.md"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      If documenting opt-in: add a one-line sub-bullet under Step 1
-      naming the `benchbox run` flags that produce these files
-      (likely `--capture-plans` / `--tuning <path>` — verify against
-      the actual CLI). If dropping: remove the two rows and add a
-      brief note in `docs/operations/` for maintainers who need
-      these artifacts.
+      Documented the accepted opt-in path in `docs/contributing-results.md`:
+      use `--capture-plans` on supported platforms for `<result>.plans.json`,
+      and use `--tuning tuned`, `--tuning auto`, or a YAML path for
+      intentionally tuned submissions that may emit `<result>.tuning.json`.
+      The Step 2 bundle table now labels both rows as optional and no longer
+      uses undefined `(if captured)` / `(if used)` qualifiers.
+
+      `/code review W2`: no required issues. The text preserves the
+      community-submittable sidecar contract from W1 while making absence of
+      sidecars explicitly non-blocking for default submissions.
 
 verification:
   - description: "Bundle table no longer contains undefined `(if captured)` / `(if used)` qualifiers"
