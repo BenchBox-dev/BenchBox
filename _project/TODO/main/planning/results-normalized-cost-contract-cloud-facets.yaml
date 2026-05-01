@@ -20,7 +20,7 @@ description: |
 work:
   - id: w1
     summary: "Define normalized cost data classes and Python contract test fixture"
-    status: pending
+    status: done
     notes: |
       In `benchbox/core/cost/models.py`, add a `NormalizedCost` data class with
       the canonical fields:
@@ -37,6 +37,9 @@ work:
       `tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py`
       with fixtures covering all three cost statuses. No transformer/DuckDB
       wiring in this unit.
+      Owned files for this work unit:
+        - benchbox/core/cost/models.py
+        - tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py
 
   - id: w2
     summary: "Document cost_usd compatibility decision (alias vs hard migrate)"
@@ -194,12 +197,8 @@ verification:
 
 scope_limit:
   only_modify:
-    - "benchbox/core/cost/"
-    - "benchbox/core/explorer_pipeline/"
-    - "tests/unit/core/cost/"
-    - "tests/unit/core/explorer_pipeline/"
-    - "results-explorer/src/"
-    - "_project/planning/visible_metrics.yaml"
+    - "benchbox/core/cost/models.py"
+    - "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
 
 open_questions:
   - "Should normalized storage cost be included in the first release or deferred behind compute-only cost with explicit scope?"
