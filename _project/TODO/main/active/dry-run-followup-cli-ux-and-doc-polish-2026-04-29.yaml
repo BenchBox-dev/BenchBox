@@ -231,8 +231,21 @@ work:
 
   - id: w7
     summary: "Clarify the `stream_id != 0 validation disabled` TPC-H warning"
-    status: pending
+    status: done
     notes: |
+      Existing warning text already includes the requested clarification:
+      stream 0 is validated against the answer set, and streams > 0 are
+      run for timing only per TPC-H spec.
+
+      `/code review W7`: no required issues. The behavior remains
+      unchanged: auto-selected validation is disabled for nonzero
+      streams, while explicit validation modes are not silently altered
+      by this wording-only path.
+
+      Verification:
+        - `grep -cE 'timing only|per TPC-H spec' benchbox/core/tpch/power_test.py`
+          returned 2.
+
       Codex's run hit a warning that validation was disabled for
       stream_id != 0 and was unsure whether the result was actually
       fully validated.
