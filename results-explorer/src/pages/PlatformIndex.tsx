@@ -9,7 +9,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
-import { ChartPanel } from "@/components/ChartPanel";
+import { TimeSeries } from "@/components/TimeSeries";
 import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -18,6 +18,14 @@ interface PlatformIndexProps extends RoutableProps {
 }
 
 type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score" | "geomean_ms";
+type TrendMetric = "power_score" | "display_geomean_ms";
+
+interface TrendCohort {
+  key: string;
+  label: string;
+  primaryMetric: TrendMetric;
+  entries: PlatformIndexRowRow[];
+}
 
 export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const [rows, setRows] = useState<PlatformIndexRowRow[] | null>(null);
@@ -36,10 +44,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
   useEffect(() => {
     let cancelled = false;
-    // Fetch the whole view so we can also accept legacy display-name URLs.
-    // Cost: the view projects bare columns over `results`, which is tens of KB
-    // in the committed corpus. The previous implementation paid the same cost
-    // via manifest.json, so this is not a regression.
+    // Fetch all platform index rows so we can also accept legacy display-name URLs.
+    // Cost stays small in the committed corpus; the query projects only the table
+    // columns plus cohort metadata needed to avoid mixed-cohort trend charts.
     getPlatformIndexRows()
       .then((r) => {
         if (!cancelled) setRows(r);
@@ -67,6 +74,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
   const platformResultsRaw =
     tuningFilter === "all" ? allPlatformResults : allPlatformResults.filter((r) => r.tuning_mode === tuningFilter);
+  const trendCohorts = buildTrendCohorts(platformResultsRaw);
 
   const platformResults = [...platformResultsRaw].sort((a, b) => {
     const dir = sort.direction === "asc" ? 1 : -1;
@@ -255,18 +263,64 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       {selected.size === 1 && <p class="mt-3 text-sm text-gray-500">Select at least one more result to compare.</p>}
 
       {platformResultsRaw.length >= 2 && (
-        <div class="mt-8">
-          <ChartPanel
-            context={{
-              kind: "summary",
-              summary: null,
-              historical: platformResultsRaw,
-            }}
-          />
-        </div>
+        <section class="card mt-8" aria-label="Performance trends by comparable cohort">
+          <h2 class="mb-2 text-base font-semibold text-gray-900">Performance Trends by Cohort</h2>
+          {trendCohorts.length === 0 ? (
+            <p class="text-sm text-gray-400 italic">
+              Trends require at least two runs within the same benchmark, scale, phase, and primary metric.
+            </p>
+          ) : (
+            <div class="space-y-6">
+              {trendCohorts.map((cohort) => (
+                <section key={cohort.key} data-testid={`trend-cohort-${cohort.key}`} class="space-y-2">
+                  <h3 class="text-sm font-medium text-gray-700">{cohort.label}</h3>
+                  <TimeSeries entries={cohort.entries} primaryMetric={cohort.primaryMetric} />
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
       )}
     </div>
   );
+}
+
+function buildTrendCohorts(rows: PlatformIndexRowRow[]): TrendCohort[] {
+  const groups = new Map<string, TrendCohort>();
+  for (const row of rows) {
+    const primaryMetric = normalizeTrendMetric(row.primary_metric);
+    const key = `${row.benchmark}-sf${row.scale_factor}-${row.phase}-${primaryMetric}`;
+    let cohort = groups.get(key);
+    if (!cohort) {
+      cohort = {
+        key,
+        label: `${humanizeBenchmark(row.benchmark)} · SF ${row.scale_factor} · ${row.phase}`,
+        primaryMetric,
+        entries: [],
+      };
+      groups.set(key, cohort);
+    }
+    cohort.entries.push(row);
+  }
+
+  return [...groups.values()]
+    .map((cohort) => ({
+      ...cohort,
+      entries: [...cohort.entries].sort((a, b) => a.run_date.localeCompare(b.run_date)),
+    }))
+    .filter(
+      (cohort) =>
+        cohort.entries.filter((entry) => trendValue(entry, cohort.primaryMetric) !== null).length >= 2,
+    )
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function normalizeTrendMetric(metric: string): TrendMetric {
+  return metric === "power_score" ? "power_score" : "display_geomean_ms";
+}
+
+function trendValue(row: PlatformIndexRowRow, metric: TrendMetric): number | null {
+  return metric === "power_score" ? row.power_score : row.display_geomean_ms;
 }
 
 interface PlatformRowProps {

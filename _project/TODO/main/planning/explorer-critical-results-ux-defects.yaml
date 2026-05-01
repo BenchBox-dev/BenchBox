@@ -45,7 +45,7 @@ work:
 
 - id: w3
   summary: "Stop Platform page trend chart from combining different cohorts into one time series"
-  status: pending
+  status: done
   notes: |
     In results-explorer/src/pages/PlatformIndex.tsx and
     results-explorer/src/components/TimeSeries.tsx call sites, group trend
@@ -74,7 +74,7 @@ work:
 - id: w6
   summary: "Add Platform trend regression test against mixed cohorts"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Extend PlatformIndex.test.tsx with rows from at least two distinct
     `(benchmark, scale_factor)` cohorts and assert the trend renderer either
