@@ -79,6 +79,10 @@ export function Query(_: RoutableProps) {
     }),
     [benchmarks, dateWindow, hasCost, platforms, scaleFactors, trustTiers, tuningModes, validationStatuses],
   );
+  const queryColumns = useMemo(
+    () => (visibleColumns.includes("result_id") ? visibleColumns : ["result_id", ...visibleColumns]),
+    [visibleColumns],
+  );
 
   useEffect(() => {
     if (rowLimitRaw === "default" || rowLimitRaw === "all") return;
@@ -121,7 +125,7 @@ export function Query(_: RoutableProps) {
       has_cost: buildFacetCountQuery("cost_usd", filters, { exclude: "hasCost", derived: "has_cost" }),
       date_window: buildFacetCountQuery("run_date", filters, { exclude: "dateWindow", derived: "date_window" }),
     };
-    const selectQuery = buildSelectQuery(filters, visibleColumns, sort, rowLimit);
+    const selectQuery = buildSelectQuery(filters, queryColumns, sort, rowLimit);
 
     Promise.all([
       queryRows<ResultRow>(selectQuery.sql, selectQuery.params),
@@ -143,7 +147,7 @@ export function Query(_: RoutableProps) {
         setError(err instanceof Error ? err.message : "DuckDB query failed");
         setLoading(false);
       });
-  }, [filters, rowLimit, schema, sort, visibleColumns]);
+  }, [filters, queryColumns, rowLimit, schema, sort, visibleColumns]);
 
   const sqlColumns = useMemo(() => [...new Set(sqlRows.flatMap((row) => Object.keys(row)))], [sqlRows]);
 
@@ -182,7 +186,7 @@ export function Query(_: RoutableProps) {
     setDownloadError(null);
     try {
       const exportName = `benchbox-query-export-${Date.now()}.json`;
-      const blob = new Blob([JSON.stringify(rows, null, 2)], {
+      const blob = new Blob([JSON.stringify(rows.map((row) => projectVisibleRow(row, visibleColumns)), null, 2)], {
         type: "application/json;charset=utf-8",
       });
       const url = URL.createObjectURL(blob);
@@ -554,6 +558,10 @@ function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === "") return "-";
   if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(2);
   return String(value);
+}
+
+function projectVisibleRow(row: ResultRow, visibleColumns: string[]): ResultRow {
+  return Object.fromEntries(visibleColumns.map((column) => [column, row[column]]));
 }
 
 function StarterQueries({ onSelect }: { onSelect: (sql: string) => void }) {
