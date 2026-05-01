@@ -38,8 +38,27 @@ description: |
 work:
   - id: w1
     summary: "Decide path: cherry-pick develop's validator to published-results, or land a release first"
-    status: pending
+    status: done
     notes: |
+      DECISION: choose path A -- update the `published-results`
+      validator directly.
+
+      Rationale:
+        - This is a production submission-flow blocker independent of
+          the Python package release cadence: GitHub Actions executes
+          `scripts/validate_submission.py` from the PR checkout of the
+          `published-results` branch.
+        - `develop` already has the correct per-file writer and
+          validator contract. Waiting for the release-flow dry run would
+          delay contributor submissions without improving the contract.
+        - The branch-specific validator fix can be verified immediately
+          by running the `published-results` validator against the
+          Codex dry-run bundle cited in the retrospective.
+
+      `/code review W1`: no required issues. The rejected path B remains
+      the longer-term release hygiene path, but it is not the fastest
+      unblock for external contributors.
+
       Two paths:
       A. Cherry-pick the post-PR-#33 `scripts/validate_submission.py`
          (and any related changes) onto `published-results`. Quickest
