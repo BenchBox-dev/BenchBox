@@ -38,12 +38,13 @@ test.describe("ResultDetail", () => {
     await expect(header).toContainText("↓");
   });
 
-  test("'Compare this result' deep-links into /results/compare?ids=<id>", async ({ page }) => {
+  test("'Compare this result' single-id link resolves back to the result detail page", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
     await waitForDataLoaded(page, /Query Timings/);
 
     await page.getByRole("link", { name: /Compare this result/i }).click();
-    await expect(page).toHaveURL(new RegExp(`/results/compare\\?ids=${TPCH_DUCKDB_ID}`));
+    await expect(page).toHaveURL(new RegExp(`/results/r/${TPCH_DUCKDB_ID}$`));
+    await waitForDataLoaded(page, /Query Timings/);
   });
 
   test("a missing result_id surfaces a user-visible error rather than a blank screen", async ({ page }) => {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { route } from "preact-router";
 import type { RoutableProps } from "preact-router";
 import type { DetailResult } from "@/types";
 import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId, toShortIds } from "@/lib/duckdbQueries";
@@ -35,6 +36,33 @@ export function Compare(_: RoutableProps) {
     if (ids.length === 0) {
       setError("No result IDs provided. Add ?ids=id1,id2 to the URL.");
       setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (ids.length === 1) {
+      resolveShortId(ids[0]!)
+        .then(async (resolvedId) => {
+          if (cancelled) return;
+          const detail = await getDetailResult(resolvedId);
+          if (cancelled) return;
+          if (detail === null) {
+            setError(
+              `No result found for: ${resolvedId}. ` +
+                "These results may have been removed from the published dataset.",
+            );
+            setLoading(false);
+            return;
+          }
+          route(`/results/r/${encodeURIComponent(resolvedId)}`, true);
+        })
+        .catch((err: unknown) => {
+          if (!cancelled) {
+            setError(errMsg(err));
+            setLoading(false);
+          }
+        });
       return () => {
         cancelled = true;
       };

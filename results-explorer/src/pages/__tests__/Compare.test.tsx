@@ -12,11 +12,16 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { route } from "preact-router";
 import type { DetailResult } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Mock manifest module
 // ---------------------------------------------------------------------------
+
+vi.mock("preact-router", () => ({
+  route: vi.fn(),
+}));
 
 vi.mock("@/lib/duckdbQueries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/duckdbQueries")>("@/lib/duckdbQueries");
@@ -29,7 +34,7 @@ vi.mock("@/lib/duckdbQueries", async () => {
   };
 });
 
-import { getDetailResult } from "@/lib/duckdbQueries";
+import { getDetailResult, resolveShortId } from "@/lib/duckdbQueries";
 import { Compare } from "@/pages/Compare";
 
 // ---------------------------------------------------------------------------
@@ -92,15 +97,13 @@ const SQLITE = makeResult({
 });
 
 function setupUrl(ids: string[]) {
-  // jsdom doesn't support full navigation; set search directly.
-  Object.defineProperty(window, "location", {
-    writable: true,
-    value: { ...window.location, search: `?ids=${ids.join(",")}` },
-  });
+  window.history.replaceState(null, "", `/results/compare?ids=${ids.join(",")}`);
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   setupUrl(["r1", "r2"]);
+  vi.mocked(resolveShortId).mockImplementation((id) => Promise.resolve(id));
   vi.mocked(getDetailResult).mockImplementation((id) =>
     id === "r1" ? Promise.resolve(DUCKDB) : Promise.resolve(SQLITE)
   );
@@ -111,6 +114,44 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("Compare", () => {
+  it("redirects a single compare ID to its result detail page", async () => {
+    setupUrl(["a556e716"]);
+    vi.mocked(resolveShortId).mockResolvedValue("tpch-duckdb-sf0.01-20260403-7fe93365");
+
+    render(<Compare />);
+
+    await waitFor(() =>
+      expect(route).toHaveBeenCalledWith(
+        "/results/r/tpch-duckdb-sf0.01-20260403-7fe93365",
+        true,
+      ),
+    );
+    expect(getDetailResult).toHaveBeenCalledWith("tpch-duckdb-sf0.01-20260403-7fe93365");
+  });
+
+  it("keeps a single unknown compare ID on the Compare error path", async () => {
+    setupUrl(["does-not-exist"]);
+    vi.mocked(getDetailResult).mockResolvedValue(null);
+
+    render(<Compare />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/No result found for: does-not-exist/)).toBeTruthy(),
+    );
+    expect(route).not.toHaveBeenCalled();
+  });
+
+  it("keeps the empty ids error on the Compare page", async () => {
+    setupUrl([]);
+
+    render(<Compare />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/No result IDs provided/)).toBeTruthy(),
+    );
+    expect(route).not.toHaveBeenCalled();
+  });
+
   it("shows 'vs worst' speedup of 10.00x in the DuckDB summary card (power_score primary)", async () => {
     // DUCKDB power_score=3000, SQLITE power_score=300 → DuckDB vs worst = 3000/300 = 10.00x
     render(<Compare />);

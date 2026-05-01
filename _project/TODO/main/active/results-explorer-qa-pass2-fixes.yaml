@@ -456,8 +456,39 @@ work:
 
   - id: w9
     summary: "Fix N4 — Compare single-id guard"
-    status: pending
+    status: done
     notes: |
+      Implemented in `Compare.tsx`:
+        - A single `ids` value resolves through `resolveShortId`, checks
+          that `getDetailResult` can load the result, then routes with
+          replace semantics to `/results/r/<full-result-id>`.
+        - Empty `?ids=` still renders the existing "No result IDs
+          provided" Compare error.
+        - Missing single IDs stay on the Compare error path with the
+          existing removal-hint copy instead of redirecting to
+          ResultDetail.
+
+      Tests:
+        - Added unit coverage for valid single-ID redirect, empty IDs,
+          and missing single-ID Compare errors.
+        - Added Playwright coverage for direct single-ID Compare URLs.
+        - Updated the ResultDetail route spec to reflect the new guard:
+          the existing "Compare this result" single-ID link resolves
+          back to the detail route instead of landing on a one-row
+          comparison.
+
+      Verification:
+        - `cd results-explorer && npm run test -- src/pages/__tests__/Compare.test.tsx`
+          passed: 10 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - `cd results-explorer && npm run build` passed.
+        - `cd results-explorer && npm run test:e2e -- --project=chromium routes/compare.spec.ts routes/result-detail.spec.ts`
+          passed: 10 tests.
+        - `git diff --check` passed.
+        - `/code review W9` finding: preserve missing single-ID Compare
+          error path; addressed before commit. No remaining required
+          issues.
+
       `Compare.tsx` accepts `?ids=<single>` and renders a one-row
       "comparison". The pass-2 plan §S6.5 expectation is either:
         (a) redirect to `/results/r/<id>` (lossless — single-id is
