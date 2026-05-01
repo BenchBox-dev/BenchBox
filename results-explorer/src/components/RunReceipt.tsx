@@ -73,7 +73,10 @@ export function RunReceipt({
         { label: "Short ID", value: valueOrMissing(shortId) },
         { label: "Bundle", value: renderBundleLink(detail.bundle_download_url) },
         { label: "Plans", value: detail.has_plans ? "Plans available" : "Plans not published" },
-        { label: "Reproduce", value: reproduceCommand ? <code class="font-mono text-xs">{reproduceCommand}</code> : "Not recorded" },
+        {
+          label: "Reproduce",
+          value: reproduceCommand ? <code class="font-mono text-xs">{reproduceCommand}</code> : "Not recorded",
+        },
       ],
     },
     {
@@ -87,7 +90,7 @@ export function RunReceipt({
   ];
 
   return (
-    <section aria-label="Run receipt" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section id="run-receipt" aria-label="Run receipt" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="text-base font-semibold text-gray-900">Run Receipt</h2>

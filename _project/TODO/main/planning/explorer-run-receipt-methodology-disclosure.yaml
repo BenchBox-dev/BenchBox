@@ -62,12 +62,29 @@ work:
   - id: w4
     summary: "Surface methodology links from leaderboard rows and benchmark matrices"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add small trust/receipt affordances to row headers or result links in
       MetaLeaderboard, BenchmarkIndex, and PlatformIndex: trust badge,
       validation status, and quick link to the result detail receipt. Keep it
       compact enough for dense tables.
+      Owned files for this work unit:
+        - results-explorer/src/components/MetaLeaderboard.tsx
+        - results-explorer/src/components/QueryHeatmap.tsx
+        - results-explorer/src/components/RunReceipt.tsx
+        - results-explorer/src/components/TrustBadge.tsx
+        - results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx
+        - results-explorer/src/components/__tests__/QueryHeatmap.test.tsx
+        - results-explorer/src/components/__tests__/TrustBadge.test.tsx
+        - results-explorer/src/lib/duckdbQueries.ts
+        - results-explorer/src/lib/__tests__/duckdbQueries.test.ts
+        - results-explorer/src/pages/BenchmarkIndex.tsx
+        - results-explorer/src/pages/Home.tsx
+        - results-explorer/src/pages/PlatformIndex.tsx
+        - results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx
+        - results-explorer/src/pages/__tests__/Home.test.tsx
+        - results-explorer/src/pages/__tests__/PlatformIndex.test.tsx
+        - results-explorer/src/types.ts
 
   - id: w5
     summary: "Prepare execution-plan affordance without requiring public plans in this phase"
@@ -110,6 +127,7 @@ impact:
 files_affected:
   modified:
     - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/Home.tsx"
     - "results-explorer/src/pages/Compare.tsx"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/pages/PlatformIndex.tsx"
@@ -155,6 +173,7 @@ scope_limit:
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/pages/PlatformIndex.tsx"
     - "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+    - "results-explorer/src/pages/__tests__/Home.test.tsx"
     - "results-explorer/src/pages/__tests__/Compare.test.tsx"
     - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
     - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
@@ -162,8 +181,14 @@ scope_limit:
     - "results-explorer/src/components/TrustBadge.tsx"
     - "results-explorer/src/components/RunReceipt.tsx"
     - "results-explorer/src/components/ComparabilityReceipt.tsx"
+    - "results-explorer/src/components/MetaLeaderboard.tsx"
+    - "results-explorer/src/components/QueryHeatmap.tsx"
     - "results-explorer/src/components/__tests__/MethodologyDisclosure.test.tsx"
     - "results-explorer/src/components/__tests__/TrustBadge.test.tsx"
     - "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
     - "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+    - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
     - "results-explorer/src/types.ts"

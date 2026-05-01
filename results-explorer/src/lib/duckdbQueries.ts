@@ -101,6 +101,8 @@ export interface BenchmarkRankingRow {
   platform: string;
   short_id: string;
   trust_label: string;
+  platform_version?: string | null;
+  validation_status?: string | null;
   tuning_mode: string | null;
   tuning_hash: string | null;
   execution_mode: string | null;
@@ -137,6 +139,7 @@ export interface PlatformIndexRowRow {
   display_geomean_ms: number | null;
   query_count: number;
   trust_label: string;
+  validation_status?: string | null;
   tuning_mode: string | null;
   execution_mode: string | null;
   compliance_class: string | null;
@@ -385,11 +388,12 @@ export async function getBenchmarkSummaryFromDuckDB(
       short_id: row.short_id,
       platform_id: row.platform_id,
       platform: row.platform,
-      platform_version: null,
+      platform_version: row.platform_version ?? null,
       tuning_mode: row.tuning_mode,
       tuning_hash: row.tuning_hash,
       execution_mode: row.execution_mode,
       trust_label: row.trust_label,
+      validation_status: row.validation_status ?? null,
       run_date: row.run_date,
       is_ranking_eligible: row.is_ranking_eligible,
       power_score: row.power_score,
@@ -420,11 +424,15 @@ export async function getBenchmarkSummaryFromDuckDB(
 }
 
 export async function getPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow[]> {
+  const selectPlatformRows =
+    "SELECT result_id, benchmark, scale_factor, platform, platform_id, driver_version, run_date," +
+    " power_score, total_duration_s, geomean_ms, display_geomean_ms, query_count, trust_label," +
+    " validation_status, tuning_mode, execution_mode, compliance_class, cost_usd FROM bench.results";
   if (platformId === undefined) {
-    return queryRows<PlatformIndexRowRow>("SELECT * FROM bench.platform_index_rows ORDER BY run_date DESC");
+    return queryRows<PlatformIndexRowRow>(`${selectPlatformRows} ORDER BY run_date DESC`);
   }
   return queryRows<PlatformIndexRowRow>(
-    "SELECT * FROM bench.platform_index_rows WHERE platform_id = ? ORDER BY run_date DESC",
+    `${selectPlatformRows} WHERE platform_id = ? ORDER BY run_date DESC`,
     [platformId],
   );
 }
