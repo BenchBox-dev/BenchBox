@@ -2,7 +2,8 @@ id: dry-run-followup-cli-ux-and-doc-polish-2026-04-29
 title: "CLI UX polish + doc consistency fixes from 2026-04-29 Codex dry-run"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-05-01"
 category: Core Functionality
 
 description: |
@@ -23,8 +24,28 @@ description: |
 work:
   - id: w1
     summary: "Audit doc invocation consistency: pick canonical form between `benchbox`, `uv run benchbox`, `uv run -- benchbox`"
-    status: pending
+    status: done
     notes: |
+      DECISION: `uv run -- benchbox` is the canonical form for
+      contributor-facing submission docs. Bare `benchbox` remains
+      acceptable in broad reference examples that explicitly assume an
+      installed CLI.
+
+      Changes:
+        - Normalized the active submission workflow in
+          `docs/contributing-results.md` to `uv run -- benchbox`.
+        - Updated the public-results contribution paragraph in
+          `README.md` to use `uv run -- benchbox submit`.
+
+      `/code review W1`: no required issues. Scope stayed focused on
+      contributor-facing submission paths rather than rewriting every
+      broad README/reference example.
+
+      Verification:
+        - `grep -rEc '^[^#]*\buv run benchbox\b(?! --)' docs/contributing-results.md docs/usage/ README.md 2>/dev/null | awk -F: '{s+=$2}END{print s}'`
+          reports no matches.
+        - `git diff --check` passed.
+
       Codex re-read steps to figure out which form to use. Pick one
       canonical form for contributor-facing docs and normalize.
       Recommend `uv run -- benchbox` (matches the repo's uv-first
@@ -36,8 +57,25 @@ work:
 
   - id: w2
     summary: "Make `benchbox submit` print the exact next commands"
-    status: pending
+    status: done
     notes: |
+      Existing implementation already satisfies this work item:
+        - `_print_submission_summary()` prints the concrete `cp`
+          command for the bundle and manifest, the inventory command,
+          the validation command, the PR title, and the
+          `published-results` target branch.
+        - `tests/unit/cli/commands/test_submit.py` includes the pinned
+          W2 regression
+          `test_submit_prints_next_steps_with_pr_target_branch`.
+
+      `/code review W2`: no required issues. The code path is covered
+      by the focused submit unit suite, and no production-code patch was
+      needed for this slice.
+
+      Verification:
+        - `uv run -- python -m pytest tests/unit/cli/commands/test_submit.py -q`
+          passed: 28 passed.
+
       Codex's recommendation #2: after writing the bundle, print the
       exact next commands the contributor should run, with paths
       filled in:
@@ -53,8 +91,26 @@ work:
 
   - id: w3
     summary: "Downgrade `benchbox run` recoverable Missing-tables from red ❌ to amber recovery message"
-    status: pending
+    status: done
     notes: |
+      Existing production output already renders missing-table details
+      as yellow/recoverable while preserving red output for hard
+      failures such as inaccessible tables.
+
+      Change:
+        - Added
+          `test_missing_tables_validation_message_is_recoverable_amber`
+          in `tests/unit/cli/test_cli_output.py` to pin the amber
+          missing-table branch and the red inaccessible-table branch.
+
+      `/code review W3`: no required issues. The test is scoped to the
+      exact formatter behavior and does not weaken hard-failure red
+      output.
+
+      Verification:
+        - `uv run -- python -m pytest tests/unit/cli/test_cli_output.py::TestConsoleResultFormatter::test_missing_tables_validation_message_is_recoverable_amber -q`
+          passed: 1 passed.
+
       Codex hit `❌ Missing tables...` printed in red, then the runner
       automatically deleted+rebuilt the DuckDB file and the run
       succeeded. The user-visible result was success, but the red ❌
@@ -79,8 +135,26 @@ work:
 
   - id: w4
     summary: "Drop 'Interactive Benchmark Runner' header in non-interactive `benchbox run`"
-    status: pending
+    status: done
     notes: |
+      Existing production code already gates the header on
+      `sys.stdin.isatty()` and the absence of explicit platform +
+      benchmark args.
+
+      Change:
+        - Added focused tests in
+          `tests/unit/cli/test_run_command_interactive_paths.py` for
+          suppressing the header with explicit run args and preserving
+          it for a prompted TTY run.
+
+      `/code review W4`: no required issues. The regression tests
+      cover the requested suppression without removing the true
+      interactive banner.
+
+      Verification:
+        - `uv run -- python -m pytest tests/unit/cli/test_run_command_interactive_paths.py::test_interactive_header_suppressed_for_explicit_run_args tests/unit/cli/test_run_command_interactive_paths.py::test_interactive_header_shown_for_prompted_tty_run -q`
+          passed: 2 passed.
+
       Codex called this out: showing 'Interactive Benchmark Runner'
       when running with explicit flags (no interactive prompt) is
       misleading. Suppress the header when stdin is not a TTY OR
@@ -94,8 +168,22 @@ work:
 
   - id: w5
     summary: "Sync `benchbox profile` docs ('Platform Availability' → actual 'Available Databases')"
-    status: pending
+    status: done
     notes: |
+      Existing docs already use the CLI-matching `Available Databases`
+      heading in `docs/platforms/dataframe.md`, and the other audited
+      docs also align with the CLI output.
+
+      Evidence:
+        - `docs/platforms/dataframe.md:358` is `## Available Databases`.
+        - `benchbox/cli/system.py` and `benchbox/cli/database.py` print
+          or title the surface as `Available Databases`.
+        - `rg -n "Platform Availability|Available Databases|Checking Platform Availability|benchbox profile" ...`
+          found no remaining `Platform Availability` doc mismatch.
+
+      `/code review W5`: no required issues. No docs patch was needed
+      beyond recording the resolved state.
+
       The doc references a 'Platform Availability' surface; the actual
       CLI prints 'Available Databases'. Either add the doc-claimed
       table to the CLI, or update docs to match what the CLI prints.
@@ -116,8 +204,26 @@ work:
 
   - id: w6
     summary: "Align `benchbox submit --dry-run` output format with real submit output"
-    status: pending
+    status: done
     notes: |
+      Existing implementation already routes dry-run and real submit
+      output through the shared `_print_submission_summary()` helper.
+      Dry-run only changes the header and the trailing
+      `(dry run; no files written)` footer; the file list and next-step
+      command shape are shared.
+
+      Existing pinned test:
+        - `test_submit_dry_run_matches_real_run_shape` in
+          `tests/unit/cli/commands/test_submit.py`.
+
+      `/code review W6`: no required issues. The shared helper avoids
+      drift between dry-run and real submit output, and the dry-run path
+      still asserts no files are written.
+
+      Verification:
+        - `uv run -- python -m pytest tests/unit/cli/commands/test_submit.py::test_submit_dry_run_matches_real_run_shape -q`
+          passed: 1 passed.
+
       Codex noted the dry-run path output format and real output
       format differ slightly. Make `--dry-run` print the same
       file/manifest/contributing list shape as the real run, just
@@ -126,8 +232,21 @@ work:
 
   - id: w7
     summary: "Clarify the `stream_id != 0 validation disabled` TPC-H warning"
-    status: pending
+    status: done
     notes: |
+      Existing warning text already includes the requested clarification:
+      stream 0 is validated against the answer set, and streams > 0 are
+      run for timing only per TPC-H spec.
+
+      `/code review W7`: no required issues. The behavior remains
+      unchanged: auto-selected validation is disabled for nonzero
+      streams, while explicit validation modes are not silently altered
+      by this wording-only path.
+
+      Verification:
+        - `grep -cE 'timing only|per TPC-H spec' benchbox/core/tpch/power_test.py`
+          returned 2.
+
       Codex's run hit a warning that validation was disabled for
       stream_id != 0 and was unsure whether the result was actually
       fully validated.

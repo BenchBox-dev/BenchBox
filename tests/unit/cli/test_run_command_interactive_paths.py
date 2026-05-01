@@ -65,6 +65,43 @@ def _tuned_unified_config() -> UnifiedTuningConfiguration:
     return config
 
 
+def _banner_state(*, platform: str | None, benchmark: str | None) -> SimpleNamespace:
+    return SimpleNamespace(
+        iterations=None,
+        phases_to_run=["power"],
+        logger=None,
+        platform=platform,
+        benchmark=benchmark,
+        quiet=False,
+    )
+
+
+def test_interactive_header_suppressed_for_explicit_run_args():
+    state = _banner_state(platform="duckdb", benchmark="tpch")
+    interactive_sys = SimpleNamespace(stdin=SimpleNamespace(isatty=lambda: True))
+
+    with (
+        patch.object(_run_module, "sys", interactive_sys),
+        patch.object(_run_module, "console") as mock_console,
+    ):
+        _run_module._derive_exec_type_and_banner(state)
+
+    mock_console.print.assert_not_called()
+
+
+def test_interactive_header_shown_for_prompted_tty_run():
+    state = _banner_state(platform=None, benchmark=None)
+    interactive_sys = SimpleNamespace(stdin=SimpleNamespace(isatty=lambda: True))
+
+    with (
+        patch.object(_run_module, "sys", interactive_sys),
+        patch.object(_run_module, "console") as mock_console,
+    ):
+        _run_module._derive_exec_type_and_banner(state)
+
+    mock_console.print.assert_called_once()
+
+
 def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_path: Path):
     runner = CliRunner()
 

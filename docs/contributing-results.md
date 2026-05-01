@@ -16,24 +16,24 @@ Run a complete benchmark suite (not a cherry-picked subset of queries):
 Install the platform extra first (e.g. `pip install "benchbox[duckdb]"`).
 
 ```bash
-benchbox run --platform duckdb --benchmark tpch --scale 0.01
+uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01
 ```
 
 The result JSON is written to `benchmark_runs/results/`.
 
 ### 2. Package the submission
 
-Use `benchbox submit` to create a submission package:
+Use `uv run -- benchbox submit` to create a submission package:
 
 ```bash
 # Package the most recent result
-benchbox submit --last --output ./submission
+uv run -- benchbox submit --last --output ./submission
 
 # Or specify a result file directly
-benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
+uv run -- benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
 
 # Preview what would be packaged (no files written)
-benchbox submit --last --dry-run
+uv run -- benchbox submit --last --dry-run
 ```
 
 This creates a `submission/` directory containing:
