@@ -56,7 +56,7 @@ https://docs.benchbox.dev/contributing-results
 
 1. Fork https://github.com/joeharris76/BenchBox (or use your existing fork).
 2. Copy the contents of `bundle/` into `results-data/bundles/` in your fork.
-3. Copy `submission-manifest.json` alongside the bundle files.
+3. Copy the generated `<result>.manifest.json` alongside the bundle files.
 4. Regenerate the corpus inventory before you commit:
 
        uv run -- python scripts/generate_corpus_inventory.py --write

@@ -73,12 +73,23 @@ class TestGenerateInventory:
 
         assert inventory["bundles"][0]["trust_label"] == "community-submission"
 
+    def test_per_bundle_sidecar_sets_community_trust_label(self, tmp_path: Path) -> None:
+        bundle_dir = tmp_path / "tpch" / "duckdb" / "sf0.01"
+        bundle_dir.mkdir(parents=True)
+        _write_bundle(bundle_dir / "result.json")
+        (bundle_dir / "result.manifest.json").write_text("{}", encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["bundles"][0]["trust_label"] == "community-submission"
+
     def test_excludes_companions_and_sorts_deterministically(self, tmp_path: Path) -> None:
         bundle_dir = tmp_path / "bundles"
         bundle_dir.mkdir()
         _write_bundle(bundle_dir / "b.json", benchmark_id="tpch", platform="DuckDB")
         _write_bundle(bundle_dir / "a.json", benchmark_id="tpch", platform="DataFusion")
         (bundle_dir / "a.plans.json").write_text("{}", encoding="utf-8")
+        (bundle_dir / "a.manifest.json").write_text("{}", encoding="utf-8")
         (bundle_dir / "submission-manifest.json").write_text("{}", encoding="utf-8")
 
         inventory = script.generate_inventory(bundle_dir)

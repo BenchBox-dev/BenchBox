@@ -121,7 +121,7 @@ touched.
   any directory. We do not need a new seam; we need a thin fixture
   generator that:
   1. Copies canonical schema-v2 bundles (and companion `.plans.json`
-     / `.tuning.json` / `submission-manifest.json` sidecars) from a small
+     / `.tuning.json` / `<result>.manifest.json` sidecars) from a small
      committed source set under `results-explorer/test-fixtures/source/`
      into an ephemeral staging dir.
   2. Applies controlled metadata mutations in memory per variant

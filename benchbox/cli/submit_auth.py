@@ -155,14 +155,16 @@ def resolve_submission_token(
 
     if not prompt:
         raise SubmissionAuthError(
-            "No hosted-submit token found. Run `benchbox auth login` or set BENCHBOX_SUBMIT_TOKEN."
+            "No hosted-submit token found. Run `benchbox auth login`, set BENCHBOX_SUBMIT_TOKEN, "
+            "or set BENCHBOX_SERVICE_TOKEN as a fallback."
         )
 
     try:
         token = click.prompt("BenchBox service token", hide_input=True, confirmation_prompt=False).strip()
     except (click.Abort, EOFError) as exc:
         raise SubmissionAuthError(
-            "No hosted-submit token found. Run `benchbox auth login` or set BENCHBOX_SUBMIT_TOKEN."
+            "No hosted-submit token found. Run `benchbox auth login`, set BENCHBOX_SUBMIT_TOKEN, "
+            "or set BENCHBOX_SERVICE_TOKEN as a fallback."
         ) from exc
 
     auth_store.save_token(service_url, token)

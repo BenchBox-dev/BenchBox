@@ -11,10 +11,10 @@ Exit codes:
 
 Usage:
     # Validate all bundles
-    python scripts/validate_submission.py results-data/bundles/
+    uv run -- python scripts/validate_submission.py results-data/bundles/
 
     # Validate specific files (e.g. only changed files from a PR)
-    python scripts/validate_submission.py path/to/bundle1.json path/to/bundle2.json
+    uv run -- python scripts/validate_submission.py path/to/bundle1.json path/to/bundle2.json
 """
 
 from __future__ import annotations
@@ -40,6 +40,8 @@ ACCEPTED_VERSION_PREFIX = "2."
 
 # Companion file suffixes - skipped during bundle discovery.
 COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
+SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
+SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 
 # Known benchmarks and platforms - warn (not fail) on unknown values.
 KNOWN_BENCHMARKS = {
@@ -49,9 +51,24 @@ KNOWN_BENCHMARKS = {
     "star_schema",
     "clickbench",
     "nyctaxi",
+    "flightdata",
     "tsbs-devops",
+    "tsbs_devops",
     "h2odb",
+    "amplab",
+    "coffeeshop",
+    "joinorder",
+    "tpch_skew",
+    "tpchavoc",
     "datavault",
+    "tpcdi",
+    "tpcds_obt",
+    "read_primitives",
+    "write_primitives",
+    "metadata_primitives",
+    "transaction_primitives",
+    "ai_primitives",
+    "vector_search",
 }
 KNOWN_PLATFORMS = {
     # Core
@@ -408,16 +425,23 @@ def discover_bundles(path: Path) -> list[Path]:
             continue
         if f.name == "corpus-inventory.json":
             continue
-        if f.name == "submission-manifest.json" or f.name.endswith(".manifest.json"):
+        if _is_submission_manifest_path(f):
             continue
         bundles.append(f)
     return bundles
+
+
+def _is_submission_manifest_path(path: Path) -> bool:
+    return path.name == SUBMISSION_MANIFEST_FILENAME or path.name.endswith(SUBMISSION_MANIFEST_SUFFIX)
 
 
 def validate_bundles(paths: list[Path]) -> list[ValidationResult]:
     """Validate a list of bundle files. Returns one ValidationResult per file."""
     results = []
     for bundle_path in paths:
+        if _is_submission_manifest_path(bundle_path):
+            continue
+
         vr = ValidationResult(str(bundle_path))
 
         if not bundle_path.exists():
@@ -441,8 +465,8 @@ def validate_bundles(paths: list[Path]) -> list[ValidationResult]:
 
         # Check for submission manifest alongside the bundle.
         # Prefer per-bundle name (<stem>.manifest.json), fall back to legacy.
-        per_bundle_manifest = bundle_path.parent / f"{bundle_path.stem}.manifest.json"
-        legacy_manifest = bundle_path.parent / "submission-manifest.json"
+        per_bundle_manifest = bundle_path.parent / f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX}"
+        legacy_manifest = bundle_path.parent / SUBMISSION_MANIFEST_FILENAME
         manifest_path = (
             per_bundle_manifest
             if per_bundle_manifest.exists()

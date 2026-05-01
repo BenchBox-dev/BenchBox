@@ -11,12 +11,13 @@ Package or upload a benchmark result bundle for the BenchBox results platform.
 - `--output` packages a local PR-ready bundle for the `published-results`
   contribution flow. This mode does not use the network or credentials.
 - `--service` uploads the same canonical bundle to a hosted ingest API. This
-  mode requires `benchbox auth login` or `BENCHBOX_SUBMIT_TOKEN`.
+  mode requires keyring auth, `BENCHBOX_SUBMIT_TOKEN`, or the lower-precedence
+  `BENCHBOX_SERVICE_TOKEN` fallback.
 
 ## Basic Syntax
 
 ```bash
-benchbox submit [RESULT_FILE] [OPTIONS]
+uv run -- benchbox submit [RESULT_FILE] [OPTIONS]
 ```
 
 ## Options
@@ -83,13 +84,13 @@ There is no second hosted-only wire format.
 Authenticate once:
 
 ```bash
-benchbox auth login
+uv run -- benchbox auth login
 ```
 
 Then submit a result:
 
 ```bash
-benchbox submit --last --service
+uv run -- benchbox submit --last --service
 ```
 
 Hosted mode sends a multipart request containing:
@@ -116,7 +117,7 @@ benchmark_runs/results/<result>.<idempotency-key>.submission.json
 List them with:
 
 ```bash
-benchbox results --submitted
+uv run -- benchbox results --submitted
 ```
 
 ## `submit` vs `publish`
@@ -134,31 +135,31 @@ These commands serve different purposes:
 
 ```bash
 # Package a specific result file
-benchbox submit results/tpch_sf1_duckdb.json
+uv run -- benchbox submit results/tpch_sf1_duckdb.json
 
 # Package the most recent result
-benchbox submit --last
+uv run -- benchbox submit --last
 
 # Package the most recent TPC-H result
-benchbox submit --last --benchmark tpch
+uv run -- benchbox submit --last --benchmark tpch
 
 # Preview what would be packaged (no files written)
-benchbox submit --last --dry-run
+uv run -- benchbox submit --last --dry-run
 
 # Use a custom output directory
-benchbox submit --last --output ./my-submission
+uv run -- benchbox submit --last --output ./my-submission
 
 # Log in for hosted submission
-benchbox auth login
+uv run -- benchbox auth login
 
 # Upload to hosted API and wait for publication
-benchbox submit --last --service
+uv run -- benchbox submit --last --service
 
 # Upload to staging without waiting for publication
-benchbox submit --last --service https://staging.benchbox.dev/v1 --no-wait
+uv run -- benchbox submit --last --service https://staging.benchbox.dev/v1 --no-wait
 
 # Show hosted submission history
-benchbox results --submitted
+uv run -- benchbox results --submitted
 ```
 
 ## Related

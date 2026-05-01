@@ -233,3 +233,45 @@ def test_submit_hosted_bundle_last_5xx_does_not_require_json_body(tmp_path: Path
             sleep=lambda _seconds: None,
             upload_attempts=1,
         )
+
+
+def test_submit_hosted_bundle_rate_limit_with_non_json_body_reports_retry_after(tmp_path: Path) -> None:
+    source, companions = _bundle(tmp_path)
+    opener = FakeOpener(FakeResponse(429, headers={"Retry-After": "30"}, raw_body=b"<html>slow down</html>"))
+
+    with pytest.raises(HostedSubmitError, match="rate limited.*30"):
+        submit_hosted_bundle(
+            service_url="https://api.benchbox.dev/v1",
+            token="secret-token",
+            source_path=source,
+            companions=companions,
+            manifest=_manifest(),
+            bundle_hash="a" * 64,
+            visibility="private",
+            idempotency_key=None,
+            wait=True,
+            opener=opener,
+            sleep=lambda _seconds: None,
+            upload_attempts=1,
+        )
+
+
+def test_submit_hosted_bundle_validation_error_with_non_json_body_reports_422(tmp_path: Path) -> None:
+    source, companions = _bundle(tmp_path)
+    opener = FakeOpener(FakeResponse(422, raw_body=b"<html>bad bundle</html>"))
+
+    with pytest.raises(HostedSubmitError, match="validation failed"):
+        submit_hosted_bundle(
+            service_url="https://api.benchbox.dev/v1",
+            token="secret-token",
+            source_path=source,
+            companions=companions,
+            manifest=_manifest(),
+            bundle_hash="a" * 64,
+            visibility="private",
+            idempotency_key=None,
+            wait=True,
+            opener=opener,
+            sleep=lambda _seconds: None,
+            upload_attempts=1,
+        )

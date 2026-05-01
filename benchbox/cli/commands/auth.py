@@ -31,7 +31,10 @@ def auth() -> None:
 @click.option(
     "--token",
     default=None,
-    help="Token to store. If omitted, BenchBox prompts without echoing input.",
+    help=(
+        "Token to store. Prefer the prompt or BENCHBOX_SUBMIT_TOKEN; "
+        "command-line values may be stored in shell history or process listings."
+    ),
 )
 @click.pass_context
 def login(ctx: click.Context, service_url: str, token: str | None) -> None:
@@ -77,6 +80,7 @@ def status(ctx: click.Context, service_url: str) -> None:
     else:
         console.print("[yellow]Not authenticated[/yellow]")
         console.print("Run `benchbox auth login` or set BENCHBOX_SUBMIT_TOKEN.")
+        console.print("[dim]BENCHBOX_SERVICE_TOKEN is also accepted as a fallback.[/dim]")
 
 
 @auth.command("refresh")
