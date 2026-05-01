@@ -2,13 +2,15 @@ id: dry-run-followup-bundle-table-conditionals
 title: "Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table"
 worktree: main
 priority: Low
-status: In Progress
+status: Completed
 category: Documentation
+completed_date: "2026-05-01"
 
 description: |
-  **Status note:** marked `Identified` rather than `Not Started`
-  because `w1` requires a maintainer decision before any code or doc
-  edit can begin. Move to `Not Started` once the decision is recorded.
+  **Completion note:** plans/tuning sidecars are community-submittable
+  companion files when they sit next to the primary result JSON. The
+  contributor-facing doc now explains the opt-in flags and labels both rows
+  as optional.
 
   `docs/contributing-results.md` Step 2 lists `<result>.plans.json` and
   `<result>.tuning.json` as bundle outputs gated on `(if captured)` /
