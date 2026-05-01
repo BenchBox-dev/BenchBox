@@ -2,7 +2,7 @@ id: enable-duckdb-wasm-http-range-reads-for-registered-urls
 title: "Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL"
 worktree: main
 priority: Medium
-status: Identified
+status: Blocked
 category: Performance
 
 description: |
@@ -103,6 +103,18 @@ work:
     needs: [w1]
     status: pending
     notes: |
+      Update 2026-05-01: still blocked on upstream. Current npm metadata
+      shows no stable `@duckdb/duckdb-wasm` release beyond `1.32.0`; the
+      package dist-tags point at dev builds (`latest=1.33.1-dev45.0`,
+      `next=1.33.1-dev53.0`). Upstream issue duckdb/duckdb-wasm#1984 is
+      still open, with no maintainer resolution or release note indicating
+      a supported range-only path for HTTP-registered URLs.
+
+      `/code review W2`: no required code changes are available under the
+      TODO guardrails. Upgrading to a dev pre-release or carrying a private
+      patched runtime would violate the `approach` constraint unless the
+      maintainer explicitly accepts that tradeoff.
+
       Of the three candidate paths:
 
       1. **Library upgrade** — no stable 1.33.x release is available
