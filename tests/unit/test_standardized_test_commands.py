@@ -131,6 +131,23 @@ class TestMakefileCommands:
         for target in expected_targets:
             assert target in makefile_content, f"Makefile should contain target: {target}"
 
+    def test_makefile_test_unlock_expands_user_lock_dir(self):
+        env = {**subprocess.os.environ, "BENCHBOX_TEST_LOCK_DIR": "~/tmp/benchbox-lock-probe"}
+
+        result = subprocess.run(
+            ["make", "-n", "--no-print-directory", "test-unlock"],
+            cwd=Path.cwd(),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+        )
+
+        expected_path = str(Path.home() / "tmp" / "benchbox-lock-probe" / "test.lock")
+        assert result.returncode == 0, result.stderr
+        assert expected_path in result.stdout
+        assert "~/tmp/benchbox-lock-probe/test.lock" not in result.stdout
+
     def test_makefile_test_all_splits_parallel_and_serial_lanes_explicitly(self):
         makefile_content = (Path.cwd() / "Makefile").read_text()
 

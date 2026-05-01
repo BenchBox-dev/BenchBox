@@ -57,7 +57,7 @@ work:
 
   - id: w2
     summary: "Expand BENCHBOX_TEST_LOCK_DIR consistently in `make test-unlock`"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #71, P2, `Makefile`

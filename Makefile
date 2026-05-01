@@ -17,6 +17,7 @@ POOL_MIN_FREE_KB ?= 5000000
 # variable so the four pool-management targets share a single source of
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
+BENCHBOX_TEST_LOCK_PATH = $(shell uv run -- python -c 'import os; from pathlib import Path; lock_dir = os.environ.get("BENCHBOX_TEST_LOCK_DIR"); base_dir = Path(lock_dir).expanduser() if lock_dir else Path.home() / ".benchbox"; print(base_dir / "test.lock")')
 
 .PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status dev-loop-metrics worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
 
@@ -56,9 +57,9 @@ test-fast:
 	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short
 
 test-unlock:
-	@LOCK_DIR="$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}"; \
-	echo "Removing stale BenchBox test lock at $$LOCK_DIR/test.lock..."; \
-	rm -f "$$LOCK_DIR/test.lock"
+	@LOCK_PATH="$(BENCHBOX_TEST_LOCK_PATH)"; \
+	echo "Removing stale BenchBox test lock at $$LOCK_PATH..."; \
+	rm -f "$$LOCK_PATH"
 	@echo "Lock cleared."
 
 test-medium:
