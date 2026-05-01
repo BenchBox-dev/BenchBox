@@ -2,7 +2,8 @@ id: dry-run-followup-validator-hash-contract-mismatch
 title: "Sync published-results validator with develop's per-file hash contract (release-blocker)"
 worktree: main
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-04-30"
 category: Core Functionality
 
 description: |
@@ -74,8 +75,29 @@ work:
   - id: w2
     summary: "Apply chosen path; verify with a round-trip test"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
+      Applied path A in branch
+      `fix/published-results-validator-manifest` and opened PR #87
+      against `published-results`:
+      https://github.com/joeharris76/BenchBox/pull/87
+
+      Scope of the branch-specific patch:
+        - `scripts/validate_submission.py` now skips `*.manifest.json`
+          during bundle discovery.
+        - The validator prefers `<bundle-stem>.manifest.json`, while
+          preserving the legacy `submission-manifest.json` fallback.
+
+      Verification run against the Codex dry-run bundle cited in the
+      retrospective:
+        - legacy `submission-manifest.json` layout: 0 errors,
+          0 warnings.
+        - per-bundle `<stem>.manifest.json` layout: 0 errors,
+          0 warnings.
+
+      `/code review W2`: no required issues. The patch is branch-local,
+      preserves legacy manifests, and does not touch the writer.
+
       After sync, re-run the validator on `published-results` against
       a freshly-submitted bundle:
         cd <published-results checkout>
@@ -88,8 +110,27 @@ work:
   - id: w3
     summary: "Add a CI cross-branch contract test to prevent recurrence"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
+      Already landed before this TODO cleanup:
+        - `tests/integration/test_cross_branch_validator_contract.py`
+        - `tests/fixtures/published_results_validator.py`
+
+      Evidence:
+        - `git log -- tests/integration/test_cross_branch_validator_contract.py tests/fixtures/published_results_validator.py`
+          shows the contract test and vendored validator landed in
+          prior dry-run follow-up commits (#49, #51, #45).
+        - `cmp -s scripts/validate_submission.py tests/fixtures/published_results_validator.py`
+          returns 0, so the vendored validator matches the develop
+          validator byte-for-byte.
+        - The test covers writer output, companion hashes, symlink
+          rejection, missing-manifest-field UX, and validator drift.
+
+      `/code review W3`: no required issues. The original TODO
+      suggested fetching `origin/published-results` live; the landed
+      test intentionally vendors the validator to keep the fast lane
+      deterministic and avoid network/branch-state flake.
+
       Add `tests/integration/test_cross_branch_validator_contract.py`
       that validates the writer's emitted hashes match what the
       validator on `published-results` computes. Implementation shape:
