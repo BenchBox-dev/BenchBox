@@ -736,25 +736,44 @@ work:
   - id: w15
     summary: "Re-run QA pass against the fixed build (pass-3) and confirm closure"
     needs: [w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14]
-    status: pending
+    status: done
     notes: |
-      Run the corrected pass-2 plan once more in Chromium 147 and
-      Firefox 148 against http://localhost:5173/results/. Capture a
-      fresh findings file at
-      `_project/audits/results-explorer-qa-pass3-findings.md` using
-      the same YAML block template.
+      Captured pass-3 closure at
+      `_project/audits/results-explorer-qa-pass3-findings.md`. The
+      findings file has 12 P entries and zero F/Q entries:
+        - B1, B3, B4 are marked P.
+        - N1..N6 are marked P.
+        - E1/S2.2 is marked P with the corrected speedup contract.
+        - `grep -c 'status: F' _project/audits/results-explorer-qa-pass3-findings.md`
+          outputs `0`.
 
-      Acceptance:
-        - All B1, B3 (narrow), B4 entries P
-        - All N1..N6 entries P
-        - S2.2 expectation matches actual UI (no Q raised)
-        - Console clean of the TimeSeries duplicate-key warning
-        - Cold-load Home in both browsers never paints `0 / 0 / 0`
-          before content settles
+      Verification:
+        - `cd results-explorer && npm run test` passed: 30 files,
+          306 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - `cd results-explorer && npm run test:e2e:chromium` passed:
+          44 tests, 1 skipped.
+        - `cd results-explorer && npm run test:e2e:firefox` passed:
+          8 tests.
+        - Browser versions checked via Playwright API:
+          Chromium 147.0.7727.15, Firefox 148.0.2.
+        - Extra Chromium console-capture smoke on
+          `/results/p/duckdb/` returned `[]` for duplicate-key,
+          warning, and error messages.
 
-      If anything still fails, surface as a fresh F finding with a
-      severity tag — do not re-open this TODO; file pass-3 fixes if
-      needed.
+      Harness fix made during this unit: the B2 cold-load e2e spec was
+      still reading an untracked `public/data/results.duckdb`, which
+      made the full Chromium e2e gate fail before test collection in
+      clean worktrees. It now uses the generated browser fixture served
+      by `scripts/serve-browser-tests.mjs`, matching the documented e2e
+      architecture, and asserts DuckDB/Polars platform pages render rows
+      rather than an empty state.
+
+      `/code review W15`: no remaining required issues after the
+      self-contained e2e harness fix. Residual limitation: the pass-3
+      evidence is the automated browser-functional pass against the
+      built Playwright server/fixture corpus, not a separate human
+      manual pass with screenshots.
 
 deferred:
   - summary: "Seed a richer QA fixture corpus (multi-tier trust, tuned/notuned pairs, ≥4 platforms in one cohort)"
