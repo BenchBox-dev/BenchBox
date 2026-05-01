@@ -79,7 +79,7 @@ work:
 
   - id: w3
     summary: "Refuse `worktree-release` on dirty pool worktrees unless forced"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #73, P1, `Makefile`

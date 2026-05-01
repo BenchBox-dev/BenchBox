@@ -1061,6 +1061,12 @@ worktree-release-locked:
 	branch=$$(git branch --show-current); \
 	test -n "$$branch" || { echo "Refusing: this pool worktree is already detached/free."; exit 1; }; \
 	case "$$branch" in develop|main) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
+	dirty=$$(git status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+	if [ -n "$$dirty" ] && [ "$(FORCE)" != "1" ]; then \
+		echo "Refusing to release dirty pool worktree $$top. Review changes or rerun with FORCE=1."; \
+		echo "$$dirty"; \
+		exit 1; \
+	fi; \
 	if [ "$(FORCE)" != "1" ]; then \
 		state=$$(gh pr view "$$branch" --json state --jq .state 2>/dev/null || true); \
 		[ "$$state" = "MERGED" ] || { echo "Refusing: PR for $$branch is not MERGED; open or close PR first, or rerun with FORCE=1."; exit 1; }; \
