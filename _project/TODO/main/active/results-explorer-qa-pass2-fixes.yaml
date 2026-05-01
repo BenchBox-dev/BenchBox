@@ -703,19 +703,35 @@ work:
   - id: w14
     summary: "Add Playwright e2e specs for the new guards"
     needs: [w3, w5, w7, w8, w9]
-    status: pending
+    status: done
     notes: |
-      Add or extend specs under `results-explorer/e2e/`. Suggested
-      filenames (one assertion concern each):
+      Added focused Playwright coverage for the new guards:
+        - `routes/index-sort-headers.spec.ts` covers PlatformIndex
+          scale sorting plus BenchmarkIndex matrix/list platform
+          sorting. The specs assert `aria-sort`, semantic rendered
+          order, and that row order changes after the header click.
+        - `routes/bench-index-url-validation.spec.ts` covers invalid
+          BenchmarkIndex `phase` and `sf` URL state settling to valid
+          rendered values. The fixture corpus currently exposes
+          `standard` as the valid phase, so the invalid-phase case uses
+          `?phase=power` and expects `?phase=standard`.
+        - Existing `routes/not-found.spec.ts` already covers
+          `/results/does-not-exist/` NotFound behavior.
+        - Existing `routes/compare.spec.ts` already covers
+          `/results/compare?ids=<one>` redirecting to ResultDetail.
 
-        - `unknown-benchmark.spec.ts`         hits /results/does-not-exist/, expects NotFound copy (B3 narrow)
-        - `index-sort-headers.spec.ts`        clicks each sortable th on PlatformIndex + BenchmarkIndex, asserts row order flips (B1 + S3.6)
-        - `compare-single-id.spec.ts`         hits /results/compare?ids=<one>, asserts redirect or empty state (S6.5)
-        - `bench-index-url-validation.spec.ts` hits /results/tpch/?phase=standard and ?sf=abc, asserts URL settles to a valid value (S3.3, S9)
+      `/code review W14` found one required issue: the first draft
+      over-coupled sort assertions to exact generated fixture row
+      counts and hard-coded first-row IDs. Fixed by deriving sorted
+      values from rendered cells and using lower-bound row-count waits.
 
-      Wire them into `npm run test:e2e:chromium`. Aim for fast
-      tests (no DuckDB-WASM warmup required where avoidable —
-      these are URL/route assertions, not data assertions).
+      Verification:
+        - `cd results-explorer && npm run test:e2e:fixtures` passed.
+        - `cd results-explorer && npm run build` passed.
+        - `cd results-explorer && npm run test:e2e -- --project=chromium routes/index-sort-headers.spec.ts routes/bench-index-url-validation.spec.ts routes/not-found.spec.ts routes/compare.spec.ts`
+          passed: 14 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - `git diff --check` passed.
 
   - id: w15
     summary: "Re-run QA pass against the fixed build (pass-3) and confirm closure"
