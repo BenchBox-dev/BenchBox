@@ -18,121 +18,126 @@ description: |
   zero cloud compute cost" from "no normalized cost model available."
 
 work:
-  - id: w1
-    summary: "Define normalized cost data classes and Python contract test fixture"
-    status: done
-    notes: |
-      In `benchbox/core/cost/models.py`, add a `NormalizedCost` data class with
-      the canonical fields:
-        - `normalized_cost_usd: Decimal`
-        - `cost_model_version: str` (e.g. `"2026.05.0"`)
-        - `cost_model_source: str` (e.g. `"benchbox.core.cost.pricing"`)
-        - `cost_scope: Literal["compute_only", "compute_plus_storage"]`
-        - `cost_status: Literal["normalized", "not_applicable_local", "unavailable"]`
-        - `billing_unit: str`
-        - `pricing_region: str`
-      Add a `DeploymentMetadata` block with `cloud_provider`, `cloud_region`,
-      `instance_type`, `warehouse_size`, `node_count`, `cluster_size`,
-      `storage_format`, `storage_tier`. Add
-      `tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py`
-      with fixtures covering all three cost statuses. No transformer/DuckDB
-      wiring in this unit.
-      Owned files for this work unit:
-        - benchbox/core/cost/models.py
-        - tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py
+- id: w1
+  summary: "Define normalized cost data classes and Python contract test fixture"
+  status: done
+  notes: |
+    In `benchbox/core/cost/models.py`, add a `NormalizedCost` data class with
+    the canonical fields:
+      - `normalized_cost_usd: Decimal`
+      - `cost_model_version: str` (e.g. `"2026.05.0"`)
+      - `cost_model_source: str` (e.g. `"benchbox.core.cost.pricing"`)
+      - `cost_scope: Literal["compute_only", "compute_plus_storage"]`
+      - `cost_status: Literal["normalized", "not_applicable_local", "unavailable"]`
+      - `billing_unit: str`
+      - `pricing_region: str`
+    Add a `DeploymentMetadata` block with `cloud_provider`, `cloud_region`,
+    `instance_type`, `warehouse_size`, `node_count`, `cluster_size`,
+    `storage_format`, `storage_tier`. Add
+    `tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py`
+    with fixtures covering all three cost statuses. No transformer/DuckDB
+    wiring in this unit.
+    Owned files for this work unit:
+      - benchbox/core/cost/models.py
+      - tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py
 
-  - id: w2
-    summary: "Document cost_usd compatibility decision (alias vs hard migrate)"
-    needs: [w1]
-    status: done
-    notes: |
-      Locks the open decision in `must_preserve`. RECOMMENDED resolution:
-      retain `cost_usd` as a read-only deprecated alias populated from
-      `normalized_cost_usd` when `cost_status == "normalized"` and `cost_scope
-      == "compute_only"`, and `None` otherwise. Document the decision in the
-      `NormalizedCost` docstring and in
-      `test_normalized_cost_contract.py::test_cost_usd_alias_behavior`. If the
-      user prefers a hard break instead, replace this work unit with a
-      migration of every `cost_usd` consumer in the same PR.
+- id: w2
+  summary: "Document cost_usd compatibility decision (alias vs hard migrate)"
+  needs: [w1]
+  status: done
+  notes: |
+    Locks the open decision in `must_preserve`. RECOMMENDED resolution:
+    retain `cost_usd` as a read-only deprecated alias populated from
+    `normalized_cost_usd` when `cost_status == "normalized"` and `cost_scope
+    == "compute_only"`, and `None` otherwise. Document the decision in the
+    `NormalizedCost` docstring and in
+    `test_normalized_cost_contract.py::test_cost_usd_alias_behavior`. If the
+    user prefers a hard break instead, replace this work unit with a
+    migration of every `cost_usd` consumer in the same PR.
 
-  - id: w3
-    summary: "Wire normalized cost through bundle reader and explorer pipeline transformer"
-    needs: [w1]
-    status: pending
-    notes: |
-      Touch `benchbox/core/explorer_pipeline/models.py` and `transformer.py`.
-      The transformer must emit either a populated `NormalizedCost` block or
-      an explicit `cost_status="unavailable"` row; no implicit nulls or
-      partially-populated cost objects. Extend pipeline tests to cover all
-      three cost statuses.
+- id: w3
+  summary: "Wire normalized cost through bundle reader and explorer pipeline transformer"
+  needs: [w1]
+  status: done
+  notes: |
+    Touch `benchbox/core/explorer_pipeline/models.py` and `transformer.py`.
+    The transformer must emit either a populated `NormalizedCost` block or
+    an explicit `cost_status="unavailable"` row; no implicit nulls or
+    partially-populated cost objects. Extend pipeline tests to cover all
+    three cost statuses.
+    Owned files for this work unit:
+      - benchbox/core/explorer_pipeline/models.py
+      - benchbox/core/explorer_pipeline/transformer.py
+      - tests/unit/core/explorer_pipeline/test_transformer.py
+      - tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py
 
-  - id: w4
-    summary: "Wire normalized cost through DuckDB builder and visible metrics registry"
-    needs: [w3]
-    status: pending
-    notes: |
-      Touch `benchbox/core/explorer_pipeline/duckdb_builder.py` and
-      `_project/planning/visible_metrics.yaml`. Add parity tests so every
-      visible cost/deployment field is either a raw bundle copy or a
-      documented derived value with a canonical Python reference. Update
-      `test_visible_metrics_registry.py` accordingly.
+- id: w4
+  summary: "Wire normalized cost through DuckDB builder and visible metrics registry"
+  needs: [w3]
+  status: pending
+  notes: |
+    Touch `benchbox/core/explorer_pipeline/duckdb_builder.py` and
+    `_project/planning/visible_metrics.yaml`. Add parity tests so every
+    visible cost/deployment field is either a raw bundle copy or a
+    documented derived value with a canonical Python reference. Update
+    `test_visible_metrics_registry.py` accordingly.
 
-  - id: w5
-    summary: "Integrate normalized cost with existing benchbox.core.cost calculators"
-    needs: [w1]
-    status: pending
-    notes: |
-      Reuse `benchbox/core/cost/models.py`, `calculator.py`, and `pricing.py`.
-      Cost should be computed from measured usage/resource configuration plus
-      BenchBox pricing tables, not from arbitrary submitter-supplied totals.
-      Add validation errors or warnings when a cloud run lacks the provider,
-      region, warehouse/instance, or billing-unit metadata required to normalize.
+- id: w5
+  summary: "Integrate normalized cost with existing benchbox.core.cost calculators"
+  needs: [w1]
+  status: pending
+  notes: |
+    Reuse `benchbox/core/cost/models.py`, `calculator.py`, and `pricing.py`.
+    Cost should be computed from measured usage/resource configuration plus
+    BenchBox pricing tables, not from arbitrary submitter-supplied totals.
+    Add validation errors or warnings when a cloud run lacks the provider,
+    region, warehouse/instance, or billing-unit metadata required to normalize.
 
-  - id: w6
-    summary: "Add cloud/deployment facets to explorer filters and Query Workbench"
-    needs: [w4]
-    status: pending
-    notes: |
-      Add filters for cloud provider, region, instance/warehouse shape, storage
-      format, cost status, and cost model version. Query Workbench should expose
-      these columns in schema/column picker and starter queries. Cost filters
-      should distinguish `normalized`, `not_applicable_local`, and `unavailable`.
+- id: w6
+  summary: "Add cloud/deployment facets to explorer filters and Query Workbench"
+  needs: [w4]
+  status: pending
+  notes: |
+    Add filters for cloud provider, region, instance/warehouse shape, storage
+    format, cost status, and cost model version. Query Workbench should expose
+    these columns in schema/column picker and starter queries. Cost filters
+    should distinguish `normalized`, `not_applicable_local`, and `unavailable`.
 
-  - id: w7
-    summary: "Update cost visualizations to use normalized cost and disclose model version"
-    needs: [w4]
-    status: pending
-    notes: |
-      Update `CostScatter`, benchmark pages, compare pages, and home leaderboard
-      metrics so any cost chart labels axes as normalized USD with scope and
-      model version. When no normalized cost exists, empty-state copy should
-      say which metadata is missing, not just "No cost data available."
+- id: w7
+  summary: "Update cost visualizations to use normalized cost and disclose model version"
+  needs: [w4]
+  status: pending
+  notes: |
+    Update `CostScatter`, benchmark pages, compare pages, and home leaderboard
+    metrics so any cost chart labels axes as normalized USD with scope and
+    model version. When no normalized cost exists, empty-state copy should
+    say which metadata is missing, not just "No cost data available."
 
-  - id: w8
-    summary: "Add submission validation that rejects user-supplied public leaderboard cost totals"
-    needs: [w5]
-    status: pending
-    notes: |
-      Public submissions should provide resource/deployment metadata; BenchBox
-      computes normalized cost. Add validator tests using fixtures that attempt
-      to submit `cost.total_usd` directly without normalized-cost provenance.
+- id: w8
+  summary: "Add submission validation that rejects user-supplied public leaderboard cost totals"
+  needs: [w5]
+  status: pending
+  notes: |
+    Public submissions should provide resource/deployment metadata; BenchBox
+    computes normalized cost. Add validator tests using fixtures that attempt
+    to submit `cost.total_usd` directly without normalized-cost provenance.
 
-  - id: w9
-    summary: "Backfill or explicitly mark existing public fixtures by cost status"
-    needs: [w4, w7]
-    status: pending
-    notes: |
-      Existing rows should not silently appear as comparable normalized cost if
-      the metadata is missing. Backfill local rows as `not_applicable_local`
-      where valid, and cloud rows as `unavailable` until enough metadata exists.
+- id: w9
+  summary: "Backfill or explicitly mark existing public fixtures by cost status"
+  needs: [w4, w7]
+  status: pending
+  notes: |
+    Existing rows should not silently appear as comparable normalized cost if
+    the metadata is missing. Backfill local rows as `not_applicable_local`
+    where valid, and cloud rows as `unavailable` until enough metadata exists.
 
 metadata:
   tags:
-    - cost
-    - explorer
-    - cloud
-    - result-schema
-    - trust
+  - cost
+  - explorer
+  - cloud
+  - result-schema
+  - trust
   estimated_effort: "Large (5-8 days)"
   created_date: "2026-05-01"
 
@@ -149,27 +154,28 @@ impact:
 
 files_affected:
   modified:
-    - "benchbox/core/cost/models.py"
-    - "benchbox/core/cost/calculator.py"
-    - "benchbox/core/cost/pricing.py"
-    - "benchbox/core/explorer_pipeline/models.py"
-    - "benchbox/core/explorer_pipeline/transformer.py"
-    - "benchbox/core/explorer_pipeline/duckdb_builder.py"
-    - "_project/planning/visible_metrics.yaml"
-    - "results-explorer/src/types.ts"
-    - "results-explorer/src/lib/duckdbQueries.ts"
-    - "results-explorer/src/lib/queryFilters.ts"
-    - "results-explorer/src/components/CostScatter.tsx"
-    - "results-explorer/src/pages/Query.tsx"
+  - "benchbox/core/cost/models.py"
+  - "benchbox/core/cost/calculator.py"
+  - "benchbox/core/cost/pricing.py"
+  - "benchbox/core/explorer_pipeline/models.py"
+  - "benchbox/core/explorer_pipeline/transformer.py"
+  - "benchbox/core/explorer_pipeline/duckdb_builder.py"
+  - "_project/planning/visible_metrics.yaml"
+  - "results-explorer/src/types.ts"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/queryFilters.ts"
+  - "results-explorer/src/components/CostScatter.tsx"
+  - "results-explorer/src/pages/Query.tsx"
   added:
-    - "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
-    - "results-explorer/src/components/CostModelBadge.tsx"
+  - "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
+  - "results-explorer/src/components/CostModelBadge.tsx"
 
 must_preserve:
-  - "Existing result bundles without normalized cost continue to load with explicit unavailable status."
-  - "Local/self-hosted platforms are not shown as cloud-cost comparable unless the cost scope explains what is included."
-  - "Visible metrics parity remains Python-canonical; TypeScript must not become the cost reference implementation."
-  - "Existing `cost_usd` consumers keep working through the read-only alias defined in w2 (alias is `None` outside `compute_only` normalized cost). Decision is locked in w2 before downstream wiring begins."
+- "Existing result bundles without normalized cost continue to load with explicit unavailable status."
+- "Local/self-hosted platforms are not shown as cloud-cost comparable unless the cost scope explains what is included."
+- "Visible metrics parity remains Python-canonical; TypeScript must not become the cost reference implementation."
+- "Existing `cost_usd` consumers keep working through the read-only alias defined in w2 (alias is `None` outside `compute_only`
+  normalized cost). Decision is locked in w2 before downstream wiring begins."
 
 approach: |
   Start with the data contract, because UI cost work is not trustworthy until
@@ -179,27 +185,34 @@ approach: |
   null-only UI absence.
 
 anti_patterns:
-  - "DO NOT accept submitter-supplied total cost as leaderboard cost - because vendors can manipulate it - compute normalized cost from resource metadata and BenchBox pricing tables."
-  - "DO NOT collapse zero local compute cost and missing cloud cost into the same value - because users will misread price/performance - use explicit cost_status."
-  - "DO NOT hardcode regional prices in the frontend - because pricing provenance belongs in `benchbox.core.cost` - surface only emitted model fields."
-  - "DO NOT change cost rankings without visible methodology copy - because cost is high-stakes for vendor comparison - show model version and scope near every cost metric."
+- "DO NOT accept submitter-supplied total cost as leaderboard cost - because vendors can manipulate it - compute normalized
+  cost from resource metadata and BenchBox pricing tables."
+- "DO NOT collapse zero local compute cost and missing cloud cost into the same value - because users will misread price/performance
+  - use explicit cost_status."
+- "DO NOT hardcode regional prices in the frontend - because pricing provenance belongs in `benchbox.core.cost` - surface
+  only emitted model fields."
+- "DO NOT change cost rankings without visible methodology copy - because cost is high-stakes for vendor comparison - show
+  model version and scope near every cost metric."
 
 verification:
-  - description: "Python cost and explorer pipeline tests pass."
-    command: "uv run -- python -m pytest tests/unit/core/cost tests/unit/core/explorer_pipeline -q"
-    expected_output: "All cost and explorer pipeline tests pass, including normalized cost contract coverage."
-  - description: "Frontend typecheck and tests pass with normalized cost fields."
-    command: "cd results-explorer && npm run typecheck && npm test"
-    expected_output: "TypeScript and Vitest pass with new cost facets and cost-status states."
-  - description: "Visible metric registry remains valid."
-    command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py -q"
-    expected_output: "Visible metrics registry test passes for all added cost/deployment fields."
+- description: "Python cost and explorer pipeline tests pass."
+  command: "uv run -- python -m pytest tests/unit/core/cost tests/unit/core/explorer_pipeline -q"
+  expected_output: "All cost and explorer pipeline tests pass, including normalized cost contract coverage."
+- description: "Frontend typecheck and tests pass with normalized cost fields."
+  command: "cd results-explorer && npm run typecheck && npm test"
+  expected_output: "TypeScript and Vitest pass with new cost facets and cost-status states."
+- description: "Visible metric registry remains valid."
+  command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py -q"
+  expected_output: "Visible metrics registry test passes for all added cost/deployment fields."
 
 scope_limit:
   only_modify:
-    - "benchbox/core/cost/models.py"
-    - "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
+  - "benchbox/core/cost/models.py"
+  - "benchbox/core/explorer_pipeline/models.py"
+  - "benchbox/core/explorer_pipeline/transformer.py"
+  - "tests/unit/core/explorer_pipeline/test_transformer.py"
+  - "tests/unit/core/explorer_pipeline/test_normalized_cost_contract.py"
 
 open_questions:
-  - "Should normalized storage cost be included in the first release or deferred behind compute-only cost with explicit scope?"
-  - "What canonical pricing region should be used for cross-cloud default comparisons when a user has not selected a region?"
+- "Should normalized storage cost be included in the first release or deferred behind compute-only cost with explicit scope?"
+- "What canonical pricing region should be used for cross-cloud default comparisons when a user has not selected a region?"
