@@ -205,7 +205,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
         ]}
       />
 
-      <div class="mt-6 mb-8">
+      <section aria-label="Result summary" class="mt-6 mb-8">
         <div class="flex flex-wrap items-center gap-3 mb-3">
           <h1 class="text-3xl font-bold text-gray-900">
             {benchmarkLabel} - {detail.platform}
@@ -245,7 +245,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             </span>
           )}
         </div>
-      </div>
+      </section>
 
       <div class="mb-8">
         <RunReceipt detail={detail} />
