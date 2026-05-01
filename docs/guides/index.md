@@ -70,6 +70,8 @@ Ensuring benchmark result accuracy:
 
 Integrating BenchBox into your workflow:
 
+- [Hosted Result Submission](hosted-submission.md) - Submit a local result to
+  the hosted results platform
 - [MCP Integration](mcp-integration.md) - Use BenchBox with Claude Code and AI assistants
 - [CI/CD Integration](../advanced/ci-cd-integration.md) - Automated benchmark pipelines
 - [Custom Benchmarks](../advanced/custom-benchmarks.md) - Creating your own benchmarks
@@ -91,6 +93,7 @@ dataframe-migration
 row-count-validation
 cloud-storage
 compression
+hosted-submission
 mcp-integration
 ../features/query-plan-analysis
 ../performance/dataframe-benchmarks

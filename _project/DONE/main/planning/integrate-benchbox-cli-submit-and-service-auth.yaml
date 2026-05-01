@@ -2,7 +2,7 @@ id: integrate-benchbox-cli-submit-and-service-auth
 title: "Integrate BenchBox CLI submission flow and service authentication"
 worktree: main
 priority: Medium-High
-status: In Progress
+status: Completed
 category: Core Functionality
 deps:
   needs:
@@ -173,11 +173,23 @@ work:
   - id: w8
     summary: "Update CLI reference docs and add hosted-submission walkthrough"
     needs: [w6, w7]
-    status: pending
+    status: done
     notes: |
       Update docs/CLI_REFERENCE.md and docs/reference/cli/ with submit command
       docs. Add a how-to page covering the end-to-end workflow:
       run → export → submit → track hosted URL.
+
+      Landed 2026-05-01:
+        - Updated `docs/CLI_REFERENCE.md`, `docs/reference/cli/submit.md`,
+          `docs/reference/cli/results.md`, and the CLI index for hosted submit,
+          auth, `--service`, and `results --submitted`.
+        - Added `docs/reference/cli/auth.md`.
+        - Added `docs/guides/hosted-submission.md` and linked it from the
+          guides index.
+        - Corrected hosted contract snippets for current manifest filenames,
+          `--service`, keyring/env auth, and primary-file `bundle_hash` plus
+          `companion_hashes`.
+        - `/code review W8` found and fixed stale schema/hash docs.
 
 metadata:
   tags:
@@ -188,6 +200,7 @@ metadata:
     - api
   estimated_effort: "Large"
   created_date: "2026-03-29"
+  completed_date: "2026-05-01"
 
 impact:
   business_value: |
