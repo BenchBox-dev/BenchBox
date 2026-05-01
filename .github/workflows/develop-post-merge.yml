@@ -149,6 +149,23 @@ jobs:
             local title="$1"
             local reason="$2"
 
+            # Idempotency: if a re-run of this workflow lands on the
+            # fallback path again for the same SHA (workflow re-run, retry
+            # after manual intervention), reuse the existing open issue
+            # instead of opening a duplicate. Match by SHA in the body via
+            # the GitHub search index, scoped to the conflict label.
+            existing_issue_url="$(gh issue list \
+              --state open \
+              --label incident:develop-red-revert-conflict \
+              --search "${FAILING_SHA} in:body" \
+              --json url \
+              --jq '.[0].url // ""')"
+            if [ -n "${existing_issue_url}" ]; then
+              echo "Conflict issue already exists: ${existing_issue_url}"
+              echo "conflict-issue-url=${existing_issue_url}" >> "${GITHUB_OUTPUT}"
+              return 0
+            fi
+
             body_file="$(mktemp)"
             cat > "${body_file}" <<EOF
           Develop went red after ${pr_label} landed, but the automatic revert could not open a revert PR.
@@ -174,10 +191,21 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch --no-tags origin develop
+          # Pull the existing remote revert ref (if any) so the
+          # --force-with-lease check below has a real expected value
+          # instead of relying on an implicit lease against a
+          # remote-tracking ref that may not exist yet.
+          git fetch --no-tags origin "${revert_branch}" || true
           git checkout -B "${revert_branch}" origin/develop
 
           if git revert --no-edit "${FAILING_SHA}"; then
-            if ! git push --force-with-lease origin "${revert_branch}"; then
+            remote_lease="$(git rev-parse --verify --quiet "refs/remotes/origin/${revert_branch}" || true)"
+            if [ -n "${remote_lease}" ]; then
+              push_lease="--force-with-lease=${revert_branch}:${remote_lease}"
+            else
+              push_lease="--force-with-lease=${revert_branch}:"
+            fi
+            if ! git push "${push_lease}" origin "${revert_branch}"; then
               open_manual_action_issue \
                 "Auto-revert could not push branch for develop red at ${short_sha}" \
                 "The revert commit was created locally, but pushing \`${revert_branch}\` failed. This can happen if the offending commit changes workflow files and \`GITHUB_TOKEN\` lacks the \`workflows\` permission."
