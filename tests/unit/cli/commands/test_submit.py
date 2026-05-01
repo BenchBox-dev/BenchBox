@@ -436,6 +436,10 @@ def test_submit_service_real_upload_calls_transport(monkeypatch: pytest.MonkeyPa
     assert auth_calls == [sub._DEFAULT_SERVICE_URL]
     assert upload_calls[0]["token"] == "secret-token"
     assert upload_calls[0]["manifest"]["submission_path"] == "hosted-service"
+    history = json.loads((tmp_path / "tpch_duckdb.generated-key.submission.json").read_text(encoding="utf-8"))
+    assert history["public_url"] == "https://benchbox.dev/results/r/r1"
+    assert history["status"] == "published"
+    assert "secret-token" not in json.dumps(history)
 
 
 def test_submit_service_real_upload_requires_auth(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

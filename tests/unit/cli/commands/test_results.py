@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from importlib import import_module
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -29,6 +31,55 @@ def test_results_group_without_subcommand_shows_summary(cli_runner, monkeypatch)
     result = cli_runner.invoke(results, [])
     assert result.exit_code == 0
     exporter.show_results_summary.assert_called_once_with()
+
+
+def test_results_group_with_submitted_shows_submission_history(cli_runner, monkeypatch, tmp_path):
+    results_module = import_module("benchbox.cli.commands.results")
+    prints = []
+    sidecar = tmp_path / "tpch_duckdb.submission.json"
+    sidecar.write_text(
+        json.dumps(
+            {
+                "submitted_at": "2026-05-01T12:00:00+00:00",
+                "benchmark": "tpch",
+                "platform": "duckdb",
+                "scale_factor": 0.01,
+                "status": "published",
+                "public_url": "https://benchbox.dev/results/r/r1",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(results_module, "ResultExporter", lambda: SimpleNamespace(output_dir=Path(tmp_path)))
+
+    def fake_print(*args, **_kwargs):
+        for arg in args:
+            if hasattr(arg, "columns"):
+                for column in arg.columns:
+                    prints.extend(str(cell) for cell in column._cells)
+            else:
+                prints.append(str(arg))
+
+    monkeypatch.setattr(results_module, "console", SimpleNamespace(print=fake_print))
+
+    result = cli_runner.invoke(results, ["--submitted"])
+
+    assert result.exit_code == 0
+    printed = "\n".join(prints)
+    assert "Hosted Submissions" in printed
+    assert "https://benchbox.dev/results/r/r1" in printed
+
+
+def test_results_group_with_submitted_reports_empty(cli_runner, monkeypatch, tmp_path):
+    results_module = import_module("benchbox.cli.commands.results")
+    prints = []
+    monkeypatch.setattr(results_module, "ResultExporter", lambda: SimpleNamespace(output_dir=Path(tmp_path)))
+    monkeypatch.setattr(results_module, "console", SimpleNamespace(print=lambda *args, **_kwargs: prints.append(args)))
+
+    result = cli_runner.invoke(results, ["--submitted"])
+
+    assert result.exit_code == 0
+    assert any("No hosted submissions found" in str(args) for args in prints)
 
 
 def test_show_cli_reconstructs_legacy_command(cli_runner, tmp_path, monkeypatch):

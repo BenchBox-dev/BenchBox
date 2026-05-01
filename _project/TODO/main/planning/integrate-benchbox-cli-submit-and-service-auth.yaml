@@ -131,12 +131,25 @@ work:
   - id: w6
     summary: "Connect hosted result URL and submission history into `benchbox results --submitted`"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
       After a successful submission, persist the hosted URL in local history.
       `benchbox results --submitted` lists past submissions with their hosted
       URLs. Builds on the existing results history surfaces without modifying
       the exporter.
+
+      Landed 2026-05-01:
+        - Added hosted-submission history sidecars next to the submitted result
+          file, preserving the canonical bundle bytes.
+        - Records status, submission id, public result id, public URL,
+          idempotency key, service URL, and manifest-derived benchmark
+          metadata without storing tokens.
+        - Added `benchbox results --submitted`.
+        - Skipped `.submission.json` sidecars from normal exported-result
+          discovery.
+        - `/code review W6` found and fixed a history overwrite bug: sidecar
+          names now include a sanitized idempotency key so idempotent retries
+          update one record while distinct service/key submissions are retained.
 
   - id: w7
     summary: "Write unit and integration tests for the full hosted submission flow"

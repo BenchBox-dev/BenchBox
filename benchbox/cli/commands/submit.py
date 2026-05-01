@@ -31,6 +31,7 @@ from benchbox.core.results.loader import (
     find_latest_result,
     load_result_file,
 )
+from benchbox.core.results.submission_history import record_hosted_submission
 
 # Submission manifest phase - indicates the result schema generation (v2.0 = phase 2).
 _SUBMISSION_PHASE = 2
@@ -255,7 +256,24 @@ def _dispatch_service_mode(
         ctx.exit(1)
         return
 
+    try:
+        history_path = record_hosted_submission(
+            result_file=source_path,
+            service_url=service_url,
+            manifest=manifest,
+            status=upload_result.status,
+            idempotency_key=upload_result.idempotency_key,
+            submission_id=upload_result.submission_id,
+            public_result_id=upload_result.public_result_id,
+            public_url=upload_result.public_url,
+        )
+    except OSError as exc:
+        console.print(f"[yellow]warning:[/yellow] could not save hosted submission history: {exc}")
+        history_path = None
+
     _print_service_result(upload_result, wait=wait)
+    if history_path is not None:
+        console.print(f"  History:          {history_path}")
 
 
 def _print_service_result(result: HostedSubmitResult, *, wait: bool) -> None:
