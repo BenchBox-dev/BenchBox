@@ -246,8 +246,23 @@ work:
 
   - id: w4
     summary: "Fix B4 — stable Preact key on TimeSeries multi-result-per-date"
-    status: pending
+    status: done
     notes: |
+      Already implemented on this branch by the pass-1 follow-up:
+        - `TimeSeries` threads `result_id` into `SeriesPoint` as
+          `resultId`.
+        - `<circle>` uses `key={p.resultId}` and exposes
+          `data-result-id={p.resultId}`, so two runs sharing
+          `run_date` no longer collide.
+        - The component defensively dedupes duplicate `result_id`
+          entries before grouping/plotting.
+        - `charts.smoke.test.tsx` covers both same-date unique IDs
+          and duplicate-result-id deduplication.
+
+      Verification:
+        - `cd results-explorer && npm run test -- src/components/__tests__/charts.smoke.test.tsx --reporter=verbose`
+          passed: 27 tests.
+
       In `results-explorer/src/components/TimeSeries.tsx` the row key
       is the `run_date` string. Multiple results sharing one date
       (common for batch/bulk runs) collide. Switch the key to the
