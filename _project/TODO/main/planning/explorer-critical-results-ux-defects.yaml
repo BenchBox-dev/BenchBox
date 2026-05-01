@@ -59,7 +59,7 @@ work:
 - id: w4
   summary: "Add Query Workbench regression test for default row link without visible result_id"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Extend Query.test.tsx with a case where DEFAULT_COLUMNS omits `result_id`
     but the rendered "View" link still resolves to `/results/r/{id}`. Commit
