@@ -84,12 +84,14 @@ work:
 - id: w6
   summary: "Add Platform trend regression test against mixed cohorts"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Extend PlatformIndex.test.tsx with rows from at least two distinct
     `(benchmark, scale_factor)` cohorts and assert the trend renderer either
     splits cohorts into small multiples or refuses to render a single merged
     line. Commit with the w3 fix.
+    Owned files for this work unit:
+      - results-explorer/src/pages/__tests__/PlatformIndex.test.tsx
 
 metadata:
   tags:
