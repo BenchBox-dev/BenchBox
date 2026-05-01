@@ -198,7 +198,17 @@ scope_limit:
     - "benchbox/core/explorer_pipeline/"
     - "tests/unit/core/cost/"
     - "tests/unit/core/explorer_pipeline/"
-    - "results-explorer/src/"
+    - "results-explorer/src/types.ts"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/queryFilters.ts"
+    - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+    - "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+    - "results-explorer/src/components/CostScatter.tsx"
+    - "results-explorer/src/components/CostModelBadge.tsx"
+    - "results-explorer/src/components/__tests__/CostScatter.test.tsx"
+    - "results-explorer/src/components/__tests__/CostModelBadge.test.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/__tests__/Query.test.tsx"
     - "_project/planning/visible_metrics.yaml"
 
 open_questions:
