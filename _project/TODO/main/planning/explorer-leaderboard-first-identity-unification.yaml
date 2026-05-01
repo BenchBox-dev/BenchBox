@@ -45,7 +45,7 @@ work:
 - id: w2
   summary: "Replace generic explorer header with shared global BenchBox navigation plus explorer subnav"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     In results-explorer/src/components/Layout.tsx, add a compact global nav
     matching benchbox.dev: BenchBox wordmark/name, Docs, Blog, Results, GitHub,
