@@ -164,11 +164,25 @@ work:
 - id: w9
   summary: "Backfill or explicitly mark existing public fixtures by cost status"
   needs: [w4, w7]
-  status: pending
+  status: done
   notes: |
     Existing rows should not silently appear as comparable normalized cost if
     the metadata is missing. Backfill local rows as `not_applicable_local`
     where valid, and cloud rows as `unavailable` until enough metadata exists.
+    Owned files for this work unit:
+      - results-data/bundles/ssb_sf01_datafusion_sql_20260404_191827_7512d99e.json
+      - results-data/bundles/ssb_sf01_duckdb_sql_20260404_191819_68f79876.json
+      - results-data/bundles/ssb_sf01_sqlite_sql_20260404_191855_123c586c.json
+      - results-data/bundles/star_schema_sf001_datafusion_20260403_093817_adf0920e.json
+      - results-data/bundles/star_schema_sf001_duckdb_20260403_093809_d4ec318a.json
+      - results-data/bundles/star_schema_sf001_sqlite_20260403_093902_c4f99a62.json
+      - results-data/bundles/tpch_sf001_datafusion_20260403_093731_c235e698.json
+      - results-data/bundles/tpch_sf001_duckdb_20260403_093653_9c0925d1.json
+      - results-data/bundles/tpch_sf001_polars_20260403_093741_e744512d.json
+      - results-data/bundles/tpch_sf01_datafusion_sql_20260404_191814_890f931e.json
+      - results-data/bundles/tpch_sf01_duckdb_sql_20260404_191803_a4f37225.json
+      - results-data/bundles/tpch_sf01_polars_df_20260404_191727_mcp_b897c572.json
+      - results-data/corpus-inventory.json
 
 metadata:
   tags:
@@ -265,6 +279,19 @@ scope_limit:
   - "scripts/validate_submission.py"
   - "tests/fixtures/published_results_validator.py"
   - "tests/unit/scripts/test_validate_submission.py"
+  - "results-data/bundles/ssb_sf01_datafusion_sql_20260404_191827_7512d99e.json"
+  - "results-data/bundles/ssb_sf01_duckdb_sql_20260404_191819_68f79876.json"
+  - "results-data/bundles/ssb_sf01_sqlite_sql_20260404_191855_123c586c.json"
+  - "results-data/bundles/star_schema_sf001_datafusion_20260403_093817_adf0920e.json"
+  - "results-data/bundles/star_schema_sf001_duckdb_20260403_093809_d4ec318a.json"
+  - "results-data/bundles/star_schema_sf001_sqlite_20260403_093902_c4f99a62.json"
+  - "results-data/bundles/tpch_sf001_datafusion_20260403_093731_c235e698.json"
+  - "results-data/bundles/tpch_sf001_duckdb_20260403_093653_9c0925d1.json"
+  - "results-data/bundles/tpch_sf001_polars_20260403_093741_e744512d.json"
+  - "results-data/bundles/tpch_sf01_datafusion_sql_20260404_191814_890f931e.json"
+  - "results-data/bundles/tpch_sf01_duckdb_sql_20260404_191803_a4f37225.json"
+  - "results-data/bundles/tpch_sf01_polars_df_20260404_191727_mcp_b897c572.json"
+  - "results-data/corpus-inventory.json"
   - "results-explorer/src/types.ts"
   - "results-explorer/src/lib/duckdbQueries.ts"
   - "results-explorer/src/lib/queryFilters.ts"
