@@ -187,7 +187,7 @@ work:
 
   - id: w8
     summary: "Record first failed post-merge job completion as red-detection time"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #81, P2, `.github/workflows/develop-post-merge.yml`
