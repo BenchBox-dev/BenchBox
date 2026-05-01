@@ -371,31 +371,27 @@ work:
   - id: w8
     summary: "Re-run the QA pass against the fixed build and confirm closure"
     needs: [w3, w4, w5, w6]
-    status: pending
+    status: done
     notes: |
-      BLOCKED on w3 — cannot run the full retest until B2 cold-load
-      mitigation lands. Once w3 verification passes, run the full
-      docs/operations/results-explorer-qa.md plan against the dev server
-      and attach the filled report template here.
+      Closed by the pass-3 QA audit and current automated rerun.
 
-      Partial verification done in lieu of a full retest:
-        - npm run typecheck: clean (0 errors).
-        - npm run test: 288/288 pass (was 279 pre-W4).
-        - npm run build: clean dist/ at 153 kB index.
-        - npx playwright test routes/not-found.spec.ts
-          routes/platform-index.spec.ts: 5/5 pass under chromium.
-            * unknown 3-segment path → 404 (existing).
-            * unknown :benchmark slug → 404 with slug message (w5).
-            * known empty benchmark (clickbench) → empty state (w5 R1).
-            * /results/p/duckdb/ heading + TPC-H fixture (w4 sweep).
-        - manual smoke gates from the parent verification list:
-            * /results/does-not-exist/ shows NotFound (w5).
-            * Console clean of TimeSeries duplicate-key warning (w6).
-            * data-result-id uniqueness on TimeSeries circles (w6 R1).
+      QA report:
+        - `_project/audits/results-explorer-qa-pass3-findings.md`
+          records P=12 F=0 Q=0.
+        - The report explicitly covers pass-1 B1, B3, and B4 plus the
+          cold-load/home readiness follow-ups from the corrected plan.
 
-      Blocker recovery path: complete w3, then run the full
-      docs/operations/results-explorer-qa.md against the dev server
-      and attach the filled report template here.
+      Current branch rerun:
+        - `cd results-explorer && npm run test`: 30 files,
+          306 tests passed.
+        - `cd results-explorer && npm run typecheck`: passed.
+        - `cd results-explorer && npm run test:e2e:chromium`:
+          44 passed, 1 skipped.
+
+      `/code review W8`: no required issues. The only skipped Chromium
+      case is the intentional RG-2 range-read budget gate, tracked by
+      `enable-duckdb-wasm-http-range-reads-for-registered-urls`; it is
+      unrelated to pass-1 bug closure.
 
 deferred:
   - summary: "Investigate Chrome-headless 30-45s cold-load latency"
