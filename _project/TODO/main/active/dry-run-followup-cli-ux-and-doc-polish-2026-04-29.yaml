@@ -167,8 +167,22 @@ work:
 
   - id: w5
     summary: "Sync `benchbox profile` docs ('Platform Availability' → actual 'Available Databases')"
-    status: pending
+    status: done
     notes: |
+      Existing docs already use the CLI-matching `Available Databases`
+      heading in `docs/platforms/dataframe.md`, and the other audited
+      docs also align with the CLI output.
+
+      Evidence:
+        - `docs/platforms/dataframe.md:358` is `## Available Databases`.
+        - `benchbox/cli/system.py` and `benchbox/cli/database.py` print
+          or title the surface as `Available Databases`.
+        - `rg -n "Platform Availability|Available Databases|Checking Platform Availability|benchbox profile" ...`
+          found no remaining `Platform Availability` doc mismatch.
+
+      `/code review W5`: no required issues. No docs patch was needed
+      beyond recording the resolved state.
+
       The doc references a 'Platform Availability' surface; the actual
       CLI prints 'Available Databases'. Either add the doc-claimed
       table to the CLI, or update docs to match what the CLI prints.
