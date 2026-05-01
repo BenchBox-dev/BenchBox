@@ -2,7 +2,8 @@ id: results-explorer-qa-pass2-fixes
 title: "Investigate and remediate Results Explorer QA pass-2 findings"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-04-30"
 category: Testing and Quality Assurance
 
 description: |
