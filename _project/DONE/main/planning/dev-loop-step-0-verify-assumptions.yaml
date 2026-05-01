@@ -80,7 +80,8 @@ work:
         - Count PRs where that gap > 30 min AND statusCheckRollup has
           >= 2 distinct startedAt timestamps for the same check name
           (proxy for re-CI after a base push)
-      Secondary signal (lower confidence): `gh pr list --json comments`
+      Secondary signal (lower confidence): run
+      `gh pr list --state merged --base develop --limit 50 --json number,comments`
       and grep PR comments for explicit `pr-refresh`, `make pr-refresh`,
       or `merged develop into branch`. Use only as corroboration.
 

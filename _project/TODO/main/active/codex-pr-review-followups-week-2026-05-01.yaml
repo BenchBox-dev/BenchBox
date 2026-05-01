@@ -314,7 +314,7 @@ work:
 
   - id: w13
     summary: "Scope Step 0 secondary-probe `gh pr list --json comments` query"
-    status: pending
+    status: done
     notes: |
       Source review comment (newly tracked — was acknowledged in inventory
       but not assigned to a work unit in the prior revision):
