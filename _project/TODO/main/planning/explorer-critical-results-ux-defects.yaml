@@ -37,7 +37,7 @@ work:
 
 - id: w2
   summary: "Correct Result Detail methodology copy to distinguish logical queries from samples"
-  status: pending
+  status: done
   notes: |
     In results-explorer/src/pages/ResultDetail.tsx and/or
     MethodologyDisclosure, source logical query scope from `detail.query_count`
@@ -45,6 +45,8 @@ work:
     `detail.queries.length`. The UI should say, for example, "22 queries,
     88 measurement samples" rather than "88 queries" when samples are the
     larger number.
+    Owned files for this work unit:
+      - results-explorer/src/components/MethodologyDisclosure.tsx
 
 - id: w3
   summary: "Stop Platform page trend chart from combining different cohorts into one time series"
