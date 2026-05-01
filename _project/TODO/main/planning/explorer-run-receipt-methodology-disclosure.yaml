@@ -38,7 +38,7 @@ work:
   - id: w2
     summary: "Promote methodology from lower-page disclosure to above-the-fold trust panel"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       On ResultDetail, place RunReceipt adjacent to or immediately below the
       primary metric summary. MethodologyDisclosure can remain for deeper text,

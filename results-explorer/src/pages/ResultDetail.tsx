@@ -10,6 +10,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
 import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
+import { RunReceipt } from "@/components/RunReceipt";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -243,6 +244,10 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             </span>
           )}
         </div>
+      </div>
+
+      <div class="mb-8">
+        <RunReceipt detail={detail} />
       </div>
 
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
