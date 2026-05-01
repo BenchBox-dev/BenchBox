@@ -20,7 +20,7 @@ export function humanizeBenchmark(benchmark: string): string {
 /** True when the slug names a benchmark family the explorer knows about,
  *  even if no rows have been ingested yet. */
 export function isKnownBenchmark(benchmark: string): boolean {
-  return benchmark in BENCHMARK_LABELS;
+  return Object.prototype.hasOwnProperty.call(BENCHMARK_LABELS, benchmark);
 }
 
 export function fmtScore(score: number | null): string {

@@ -274,8 +274,33 @@ work:
 
   - id: w5
     summary: "Fix B3 (narrow) — route single-segment unknown benchmark slugs to NotFound"
-    status: pending
+    status: done
     notes: |
+      Already implemented on this branch by the pass-1 follow-up:
+        - `BenchmarkIndex` waits until `listResults()` has loaded before
+          classifying no-row benchmark pages.
+        - Unknown single-segment benchmark slugs render `NotFound` with
+          a benchmark-specific message.
+        - Known benchmark families with no ingested rows still render
+          the supported-but-empty corpus state, not a 404.
+        - `routes/not-found.spec.ts` covers the generic fallback route,
+          the unknown `:benchmark` slug route, and a known empty corpus
+          route (`/results/clickbench/`).
+
+      Verification:
+        - `cd results-explorer && npm run test:e2e:fixtures` passed.
+        - `cd results-explorer && npm run build` passed.
+        - `cd results-explorer && npm run test:e2e -- --project=chromium routes/not-found.spec.ts`
+          passed: 3 tests.
+        - W5 review found one inherited-key edge case in
+          `isKnownBenchmark`; fixed with an own-property check and
+          covered by `src/__tests__/utils.test.ts`.
+        - `cd results-explorer && npm run test -- src/__tests__/utils.test.ts src/pages/__tests__/BenchmarkIndex.test.tsx`
+          passed: 13 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - Rebuilt and reran `cd results-explorer && npm run test:e2e -- --project=chromium routes/not-found.spec.ts`;
+          passed: 3 tests.
+
       Multi-segment paths like `/results/totally/made/up/path/` now hit
       NotFound — that part of B3 is fixed. The remaining surface is
       `/results/<unknown-slug>/`, which still routes to BenchmarkIndex
