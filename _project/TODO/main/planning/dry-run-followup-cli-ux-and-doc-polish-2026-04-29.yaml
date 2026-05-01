@@ -23,8 +23,28 @@ description: |
 work:
   - id: w1
     summary: "Audit doc invocation consistency: pick canonical form between `benchbox`, `uv run benchbox`, `uv run -- benchbox`"
-    status: pending
+    status: done
     notes: |
+      DECISION: `uv run -- benchbox` is the canonical form for
+      contributor-facing submission docs. Bare `benchbox` remains
+      acceptable in broad reference examples that explicitly assume an
+      installed CLI.
+
+      Changes:
+        - Normalized the active submission workflow in
+          `docs/contributing-results.md` to `uv run -- benchbox`.
+        - Updated the public-results contribution paragraph in
+          `README.md` to use `uv run -- benchbox submit`.
+
+      `/code review W1`: no required issues. Scope stayed focused on
+      contributor-facing submission paths rather than rewriting every
+      broad README/reference example.
+
+      Verification:
+        - `grep -rEc '^[^#]*\buv run benchbox\b(?! --)' docs/contributing-results.md docs/usage/ README.md 2>/dev/null | awk -F: '{s+=$2}END{print s}'`
+          reports no matches.
+        - `git diff --check` passed.
+
       Codex re-read steps to figure out which form to use. Pick one
       canonical form for contributor-facing docs and normalize.
       Recommend `uv run -- benchbox` (matches the repo's uv-first

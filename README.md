@@ -687,7 +687,7 @@ benchbox export --last --format html
 
 BenchBox also publishes a public results corpus and explorer at `benchbox.dev/results/`.
 If you run BenchBox on a platform you want represented there, package the run with
-`benchbox submit --output ./submission` and open a PR against the `published-results`
+`uv run -- benchbox submit --output ./submission` and open a PR against the `published-results`
 branch of the public repository.
 
 The full contributor workflow, local validation steps, and trust-label rules live in
