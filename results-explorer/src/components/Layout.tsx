@@ -16,7 +16,7 @@ export function Layout({ children }: LayoutProps) {
 
 function Header() {
   const currentPath = typeof window === "undefined" ? "/results/" : window.location.pathname;
-  const inResults = currentPath === "/results" || currentPath.startsWith("/results/");
+  const inResults = currentPath === "/" || currentPath === "/results" || currentPath.startsWith("/results/");
 
   return (
     <header class="border-b border-gray-200 bg-white shadow-sm">

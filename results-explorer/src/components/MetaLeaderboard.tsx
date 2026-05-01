@@ -97,7 +97,7 @@ export function MetaLeaderboard({
   }
 
   return (
-    <section class="mb-12">
+    <section class="mb-12" aria-labelledby="meta-leaderboard-title">
       <div
         role="status"
         aria-live="polite"
@@ -109,7 +109,9 @@ export function MetaLeaderboard({
 
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-xl font-semibold text-gray-900">Cross-Benchmark Leaderboard</h2>
+          <h2 id="meta-leaderboard-title" class="text-xl font-semibold text-gray-900">
+            Cross-Benchmark Leaderboard
+          </h2>
           <p class="mt-1 text-xs text-gray-500">
             Absolute values, ranks, or speedup-vs-cohort-best across the visible cohorts.
           </p>

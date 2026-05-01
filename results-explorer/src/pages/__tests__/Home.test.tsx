@@ -181,6 +181,10 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function expectDocumentOrder(first: Element, second: Element) {
+  expect(Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+}
+
 beforeEach(() => {
   window.history.replaceState(null, "", "/results/");
   vi.mocked(queryRows).mockImplementation(async (sql: string) => {
@@ -308,12 +312,25 @@ describe("Home", () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
-    expect(screen.getByText("supported benchmarks")).toBeTruthy();
-    expect(screen.getByText("2 with public results")).toBeTruthy();
-    expect(screen.getByText("public result bundles")).toBeTruthy();
-    expect(screen.getByText("platforms with public results")).toBeTruthy();
-    expect(screen.getByText("PR-validated corpus")).toBeTruthy();
-    expect(screen.queryByText(/^Benchmarks$/)).toBeNull();
+    const summary = screen.getByRole("region", { name: "Corpus summary" });
+    expect(within(summary).getByText("supported benchmarks")).toBeTruthy();
+    expect(within(summary).getByText("2 with public results")).toBeTruthy();
+    expect(within(summary).getByText("public result bundles")).toBeTruthy();
+    expect(within(summary).getByText("platforms with public results")).toBeTruthy();
+    expect(within(summary).getByText("PR-validated corpus")).toBeTruthy();
+    expect(within(summary).queryByText(/^Benchmarks$/)).toBeNull();
+  });
+
+  it("keeps the leaderboard region before secondary workflow and recent-result sections", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const leaderboard = screen.getByRole("region", { name: "Cross-Benchmark Leaderboard" });
+    const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
+    const recentHeading = screen.getByRole("heading", { name: "Recent Results" });
+
+    expectDocumentOrder(leaderboard, workflow);
+    expectDocumentOrder(leaderboard, recentHeading);
   });
 
   it("renders a compact run-compare-submit workflow near the leaderboard", async () => {

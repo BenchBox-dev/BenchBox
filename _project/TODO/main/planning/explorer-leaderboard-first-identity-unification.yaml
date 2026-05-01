@@ -109,7 +109,7 @@ work:
 - id: w7
   summary: "Add automated DOM-order tests for first-viewport leaderboard hierarchy"
   needs: [w2, w3, w4, w5]
-  status: pending
+  status: done
   notes: |
     Replace any reliance on manual smoke with mechanical assertions in
     `Home.test.tsx` and `Layout.test.tsx`:

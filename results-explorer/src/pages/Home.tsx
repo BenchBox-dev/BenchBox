@@ -333,7 +333,7 @@ export function Home(_: RoutableProps) {
 
         {filteredMetaLeaderboard && <FlywheelStrip />}
 
-        <div class="mb-12 grid grid-cols-2 gap-4 text-center lg:grid-cols-4">
+        <section aria-label="Corpus summary" class="mb-12 grid grid-cols-2 gap-4 text-center lg:grid-cols-4">
           <StatCard
             value={SUPPORTED_BENCHMARK_COUNT}
             label="supported benchmarks"
@@ -354,7 +354,7 @@ export function Home(_: RoutableProps) {
             label="PR-validated corpus"
             detail="bundles reviewed before publication"
           />
-        </div>
+        </section>
 
         <section class="mb-12">
           <h2 class="mb-4 text-xl font-semibold text-gray-900">Recent Results</h2>

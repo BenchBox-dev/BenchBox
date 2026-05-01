@@ -12,8 +12,8 @@ function renderAt(path: string) {
 }
 
 describe("Layout", () => {
-  it("renders the BenchBox global nav with Results active under /results/", () => {
-    renderAt("/results/");
+  it("renders the BenchBox global nav with Results active at the hosted root", () => {
+    renderAt("/");
 
     const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
     expect(within(globalNav).getByRole("link", { name: "Docs" })).toHaveAttribute(
@@ -33,6 +33,13 @@ describe("Layout", () => {
       "href",
       "https://benchbox.dev/docs/usage/installation.html",
     );
+  });
+
+  it("keeps Results active under /results/ routes", () => {
+    renderAt("/results/");
+
+    const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
+    expect(within(globalNav).getByRole("link", { name: "Results" })).toHaveAttribute("aria-current", "page");
   });
 
   it("renders the Results Explorer subnav and marks the current explorer section", () => {
