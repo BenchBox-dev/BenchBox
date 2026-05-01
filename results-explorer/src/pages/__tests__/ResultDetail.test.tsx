@@ -159,4 +159,15 @@ describe("ResultDetail - median-first contract", () => {
     expect(receipt).toHaveTextContent("Measurement samples");
     expect(receipt).toHaveTextContent("Download bundle");
   });
+
+  it("links captured execution plans without requiring a plan viewer route", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ has_plans: true }));
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    const planLinks = screen.getAllByRole("link", { name: "Download plans" }) as HTMLAnchorElement[];
+    expect(planLinks.length).toBeGreaterThanOrEqual(1);
+    expect(planLinks[0]?.getAttribute("href")).toBe("https://example.test/download/r1.plans.json");
+  });
 });

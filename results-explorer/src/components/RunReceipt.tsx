@@ -72,7 +72,7 @@ export function RunReceipt({
         { label: "Result ID", value: <code class="font-mono text-xs">{detail.result_id}</code> },
         { label: "Short ID", value: valueOrMissing(shortId) },
         { label: "Bundle", value: renderBundleLink(detail.bundle_download_url) },
-        { label: "Plans", value: detail.has_plans ? "Plans available" : "Plans not published" },
+        { label: "Plans", value: renderPlansStatus(detail) },
         {
           label: "Reproduce",
           value: reproduceCommand ? <code class="font-mono text-xs">{reproduceCommand}</code> : "Not recorded",
@@ -132,6 +132,23 @@ function renderBundleLink(url: string) {
       Download bundle
     </a>
   );
+}
+
+function renderPlansStatus(detail: DetailResult) {
+  if (!detail.has_plans) return "Plans not published";
+  const plansUrl = planDownloadUrl(detail);
+  if (plansUrl === null) return "Plans available";
+  return (
+    <a href={plansUrl} class="text-xs font-medium no-underline" download>
+      Download plans
+    </a>
+  );
+}
+
+export function planDownloadUrl(detail: DetailResult) {
+  if (!detail.has_plans || !detail.bundle_download_url) return null;
+  if (!detail.bundle_download_url.endsWith(".json")) return null;
+  return detail.bundle_download_url.replace(/\.json$/, ".plans.json");
 }
 
 function valueOrMissing(value: string | number | null | undefined) {

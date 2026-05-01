@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import type { DetailResult } from "@/types";
-import { RunReceipt } from "@/components/RunReceipt";
+import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
 
 function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
   return {
@@ -96,8 +96,19 @@ describe("RunReceipt", () => {
       "href",
       "https://example.test/bundles/abcdef1234567890.json",
     );
-    expect(within(receipt).getByText("Plans available")).toBeTruthy();
+    expect(within(receipt).getByRole("link", { name: "Download plans" })).toHaveAttribute(
+      "href",
+      "https://example.test/bundles/abcdef1234567890.plans.json",
+    );
     expect(within(receipt).getByText("benchbox run --platform duckdb --benchmark tpch --scale 0.1 --phases power"))
       .toBeTruthy();
+  });
+
+  it("derives the plans companion URL only when plan capture is present", () => {
+    expect(planDownloadUrl(makeDetail({ has_plans: true }))).toBe(
+      "https://example.test/bundles/abcdef1234567890.plans.json",
+    );
+    expect(planDownloadUrl(makeDetail({ has_plans: false }))).toBeNull();
+    expect(planDownloadUrl(makeDetail({ has_plans: true, bundle_download_url: "" }))).toBeNull();
   });
 });

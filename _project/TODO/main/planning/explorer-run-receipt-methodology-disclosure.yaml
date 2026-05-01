@@ -89,7 +89,7 @@ work:
   - id: w5
     summary: "Prepare execution-plan affordance without requiring public plans in this phase"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       If `has_plans` is true, show "Plans available" linking to the future plan
       viewer/download route if present. If false, show "Plans not published" in
