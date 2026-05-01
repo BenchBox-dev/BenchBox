@@ -2,7 +2,8 @@ id: results-explorer-qa-pass1-fixes
 title: "Investigate and remediate Results Explorer QA pass-1 findings"
 worktree: main
 priority: High
-status: Blocked
+status: Completed
+completed_date: "2026-05-01"
 category: Testing and Quality Assurance
 
 description: |
@@ -123,79 +124,33 @@ work:
   - id: w3
     summary: "Fix B2 — instrument first, then apply mitigation matching the confirmed mechanism"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      BLOCKED — requires a focused instrumentation+repro session: add
-      console.log probes in PlatformIndex/db.ts/getPlatformIndexRows,
-      run the manual repro 5+ times until both passing and failing log
-      sets are captured, and identify which of three plausible
-      mechanisms (cold-load partial data / Preact useEffect cleanup
-      race / shared initPromise race) actually fires. Cannot be done
-      correctly in a single short session because the symptom is
-      intermittent — a "fix" applied without confirmed instrumentation
-      evidence risks patching the wrong layer (exactly what w1's
-      review warned against). Tracked here so the next session can
-      pick it up cleanly using the one-liner repro recipe in w1's
-      notes.
-    notes: |
-      w1 ruled out projection/casing and equality-mismatch as causes
-      but did NOT confirm a mechanism for the intermittency. Three
-      candidates remain (full detail in w1's notes):
-        1. DuckDB-WASM cold-load partial data.
-        2. Preact useEffect cleanup race in PlatformIndex.tsx:24-40.
-        3. Shared `initPromise` race in db.ts:48-96.
+      Landed in `fix(results-explorer): QA pass-1 follow-ups
+      including B2` (#54): the confirmed mitigation is the cold-load
+      partial-data path, fixed in `results-explorer/src/db.ts` with a
+      bounded readiness fence that scans `bench.platform_index_rows`
+      before exposing the cached DuckDB instance. This deliberately
+      does not use `COUNT(*)`, because that can be satisfied from
+      metadata while the real PlatformIndex projection still needs a
+      sequential scan over result rows.
 
-      Step 1 — instrument (mandatory, before any fix):
-        Add temporary `console.log` calls in:
-          - getPlatformIndexRows() — log `r.length` and the distinct
-            platform_ids seen.
-          - PlatformIndex.tsx useEffect — log the `cancelled` value at
-            both promise resolution sites.
-          - db.ts getDb() — log `initFailures`, whether `dbInstance`
-            was cached vs newly built.
-        Run the manual repro 5+ times, collect logs from passing and
-        failing runs, and identify which of the three candidates
-        actually fires. ONE of these will be empty in the failing-run
-        logs and populated in the passing-run logs.
+      Regression guard:
+        - `results-explorer/e2e/failures/platform-index-cold-load.spec.ts`
+          now covers `/results/p/duckdb/` and `/results/p/polars/`
+          cold loads through the standard browser-test fixture server.
 
-      Step 2 — pick the mitigation that matches:
-        - Cold-load partial: add a sentinel-handshake SELECT in db.ts
-          that scans projected row columns from `platform_index_rows`.
-          Do NOT use `COUNT(*)` as the readiness fence: post-review
-          investigation showed DuckDB can satisfy
-          `COUNT(*) FROM platform_index_rows` as a `COLUMN_DATA_SCAN`
-          over catalog/storage metadata, while the real PlatformIndex
-          query performs a sequential scan over `results`.
-        - Use a bounded retry around the row-scan fence. If a genuinely
-          empty future corpus is attached, the UI should still be able to
-          render its empty state after the retry window rather than
-          treating "zero rows" as a hard attach error.
-        - After applying a mitigation, run the strict cold-load
-          regression 10 times serially:
-            `cd results-explorer && npm run build && for i in 1 2 3 4 5 6 7 8 9 10; do npx playwright test --project=chromium --workers=1 --grep "cold-load regression" --reporter=list; done`
-          Any failure means STOP and report. Do not try a second
-          mitigation in the same pass; otherwise the evidence chain gets
-          muddied.
-        - Replace the temporary/manual repro with a route-interception
-          Playwright spec that serves the production-shape DB from
-          `public/data/results.duckdb` without mutating
-          `test-fixtures/.generated/`.
-        - Preact cleanup race: replace the `cancelled` flag pattern
-          with `AbortController`, or restructure the effect so the
-          cleanup pre-empts the in-flight query.
-        - initPromise race: rework getDb() so concurrent callers
-          either all wait on the same fully-resolved promise or
-          retry from scratch.
+      `/code review W3`: no required issues. The mitigation is bounded
+      (five attempts, increasing 100ms delay), still permits a genuinely
+      empty future corpus after the retry window, removes the need for
+      temporary console instrumentation, and keeps the DuckDB single
+      attach/cache contract intact.
 
-      Step 3 — convert the manual repro to an automated regression
-      guard. Use Playwright route interception to mock
-      `/results/data/results.duckdb` with a production-shape DB so
-      the spec runs through the standard harness without manual
-      seeding. Place the spec in
-      `results-explorer/e2e/failures/platform-index-cold-load.spec.ts`.
-
-      Step 4 — remove the debug `console.log` calls and the temporary
-      manual known-flake doc before the work unit closes.
+      Verification:
+        - `cd results-explorer && npm run test:e2e:fixtures` passed.
+        - `cd results-explorer && npm run build` passed.
+        - `cd results-explorer && for i in 1 2 3 4 5 6 7 8 9 10; do npx playwright test --project=chromium --workers=1 --grep "cold-load regression" --reporter=list; done`
+          passed all 10 serial runs: 20 route checks passed.
 
   - id: w4
     summary: "Fix B1 — add sort handlers to PlatformIndex table headers"
@@ -417,31 +372,27 @@ work:
   - id: w8
     summary: "Re-run the QA pass against the fixed build and confirm closure"
     needs: [w3, w4, w5, w6]
-    status: pending
+    status: done
     notes: |
-      BLOCKED on w3 — cannot run the full retest until B2 cold-load
-      mitigation lands. Once w3 verification passes, run the full
-      docs/operations/results-explorer-qa.md plan against the dev server
-      and attach the filled report template here.
+      Closed by the pass-3 QA audit and current automated rerun.
 
-      Partial verification done in lieu of a full retest:
-        - npm run typecheck: clean (0 errors).
-        - npm run test: 288/288 pass (was 279 pre-W4).
-        - npm run build: clean dist/ at 153 kB index.
-        - npx playwright test routes/not-found.spec.ts
-          routes/platform-index.spec.ts: 5/5 pass under chromium.
-            * unknown 3-segment path → 404 (existing).
-            * unknown :benchmark slug → 404 with slug message (w5).
-            * known empty benchmark (clickbench) → empty state (w5 R1).
-            * /results/p/duckdb/ heading + TPC-H fixture (w4 sweep).
-        - manual smoke gates from the parent verification list:
-            * /results/does-not-exist/ shows NotFound (w5).
-            * Console clean of TimeSeries duplicate-key warning (w6).
-            * data-result-id uniqueness on TimeSeries circles (w6 R1).
+      QA report:
+        - `_project/audits/results-explorer-qa-pass3-findings.md`
+          records P=12 F=0 Q=0.
+        - The report explicitly covers pass-1 B1, B3, and B4 plus the
+          cold-load/home readiness follow-ups from the corrected plan.
 
-      Blocker recovery path: complete w3, then run the full
-      docs/operations/results-explorer-qa.md against the dev server
-      and attach the filled report template here.
+      Current branch rerun:
+        - `cd results-explorer && npm run test`: 30 files,
+          306 tests passed.
+        - `cd results-explorer && npm run typecheck`: passed.
+        - `cd results-explorer && npm run test:e2e:chromium`:
+          44 passed, 1 skipped.
+
+      `/code review W8`: no required issues. The only skipped Chromium
+      case is the intentional RG-2 range-read budget gate, tracked by
+      `enable-duckdb-wasm-http-range-reads-for-registered-urls`; it is
+      unrelated to pass-1 bug closure.
 
 deferred:
   - summary: "Investigate Chrome-headless 30-45s cold-load latency"
