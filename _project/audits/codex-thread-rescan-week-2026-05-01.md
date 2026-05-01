@@ -74,12 +74,17 @@ actionable after w1-w13 and the earlier merges above.
 | `2026-04-30-143505-pool-lock-claim-only` | actioned | Folded into existing broader pool lock coverage; no additional action for this sweep. |
 | `2026-04-30-214358-pool-size-not-codified-as-contract` | open | Out of scope; it is a separate pool invariant hardening idea and remains open as a blind-spot. |
 | `2026-04-30-214359-claim-orchestrator-false-failure` | open | Still actionable but already filed as a blind-spot. This session reproduced the symptom when the first claim printed `WORKTREE_PATH` but `make` exited nonzero; promote separately if it becomes current sprint work. |
+| `2026-05-01-103000-hosted-submit-no-local-validate-preflight` | open | Out of scope; this hosted-submit validation contract question is not one of the PR #19-#94 Codex inline threads. |
+| `2026-05-01-103001-published-results-validator-no-per-bundle-test` | open | Out of scope; this validator contract-test gap is not one of the PR #19-#94 Codex inline threads. |
+| `2026-05-01-103002-explorer-cold-load-test-coverage-weakened` | open | Folded into w9 by restoring strict cold-load row-count assertions with `toHaveCount`; the blind-spot remains open until separately triaged. |
 | `2026-05-01-130000-codex-followups-todo-misses-coverage-downgrades` | open | Folded into this sweep. w9 restored strict cold-load row-count assertions with `toHaveCount` and this audit adds the requested blind-spot cross-check step. |
 
 Notes:
 
-- The blind-spot file names referenced inside
+- The blind-spot files referenced inside
   `2026-05-01-130000-codex-followups-todo-misses-coverage-downgrades`
-  for `103000`, `103001`, and `103002` are not present in this worktree.
+  are present in this worktree. `103002` was folded into w9; `103000`
+  and `103001` remain separate open blind-spots outside this Codex-thread
+  sweep.
 - No new TODO was created from this audit because the only still-actionable
-  non-Codex item is already tracked as an open blind-spot.
+  non-Codex items are already tracked as open blind-spots.

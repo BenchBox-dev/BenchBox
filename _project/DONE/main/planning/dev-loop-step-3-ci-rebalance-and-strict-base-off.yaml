@@ -230,8 +230,15 @@ work:
 
 verification:
   - description: "Develop ruleset still has strict-base off with only the two lightweight required contexts"
-    command: "gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '.rules[] | select(.type == \"required_status_checks\") | .parameters'"
-    expected_output: "strict_required_status_checks_policy is false; required_status_checks are lint and test (ubuntu-latest, 3.12)"
+    command: |
+      repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+      found=0
+      for ruleset_id in $(gh api "repos/${repo}/rulesets" --jq '.[] | select(.target == "branch" and ((.conditions.ref_name.include // []) | any(. == "refs/heads/develop"))) | .id'); do
+        found=1
+        gh api "repos/${repo}/rulesets/${ruleset_id}" --jq '.rules[] | select(.type == "required_status_checks") | .parameters'
+      done
+      test "$found" = "1"
+    expected_output: "strict_required_status_checks_policy is false; required_status_checks are the lightweight develop PR contexts"
   - description: "Classic branch protection is absent or has no conflicting required-check policy"
     command: "gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '.required_status_checks' 2>/dev/null || echo classic-protection-not-configured"
     expected_output: "classic-protection-not-configured OR no broader/strict required checks"
