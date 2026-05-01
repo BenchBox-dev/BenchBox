@@ -64,6 +64,20 @@ def _keyring_error_types() -> tuple[type[BaseException], ...]:
     return (KeyringError,)
 
 
+def _password_delete_not_found_types() -> tuple[type[BaseException], ...]:
+    """Backend-specific exceptions raised when delete targets a missing entry.
+
+    Different keyring backends signal "no such credential" through different
+    exception classes; using the typed subclasses avoids the brittle
+    string-matching that earlier code relied on.
+    """
+    try:
+        from keyring.errors import PasswordDeleteError
+    except ImportError:  # pragma: no cover - dependency is declared
+        return ()
+    return (PasswordDeleteError,)
+
+
 class SubmissionAuthStore:
     """OS keyring-backed token store for hosted result submission."""
 
@@ -99,10 +113,13 @@ class SubmissionAuthStore:
         username = normalize_service_url(service_url)
         try:
             self.keyring_backend.delete_password(self.service_name, username)
+        except _password_delete_not_found_types():
+            # macOS Keychain (PasswordDeleteError), libsecret, and Windows
+            # Credential Manager all surface "already gone" through different
+            # subclasses or messages. Treat any "missing on delete" as a
+            # benign race with the prior get_token() check.
+            return False
         except _keyring_error_types() as exc:
-            message = str(exc).lower()
-            if "not found" in message or "not set" in message:
-                return False
             raise SubmissionAuthError(f"Could not delete hosted-submit credentials from the OS keyring: {exc}") from exc
         return True
 

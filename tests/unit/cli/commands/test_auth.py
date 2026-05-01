@@ -158,3 +158,80 @@ def test_auth_login_token_help_warns_about_command_line_secret_exposure() -> Non
     assert "--token" in result.output
     assert "shell history" in normalized
     assert "process listings" in normalized
+
+
+def test_auth_login_token_stdin_reads_first_line_and_does_not_echo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("BENCHBOX_SUBMIT_TOKEN", raising=False)
+    monkeypatch.delenv("BENCHBOX_SERVICE_TOKEN", raising=False)
+    fake = FakeKeyring()
+    monkeypatch.setattr(submit_auth, "_load_keyring", lambda: fake)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        auth_cmd.auth,
+        ["login", "--token-stdin"],
+        input="stdin-secret\nignored-second-line\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "credentials saved" in result.output.lower()
+    assert "stdin-secret" not in result.output
+    username = submit_auth.normalize_service_url(submit_auth.DEFAULT_SERVICE_URL)
+    assert fake.get_password(submit_auth.KEYRING_SERVICE_NAME, username) == "stdin-secret"
+
+
+def test_auth_login_token_stdin_rejects_empty_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BENCHBOX_SUBMIT_TOKEN", raising=False)
+    monkeypatch.delenv("BENCHBOX_SERVICE_TOKEN", raising=False)
+    monkeypatch.setattr(submit_auth, "_load_keyring", lambda: FakeKeyring())
+
+    result = CliRunner().invoke(auth_cmd.auth, ["login", "--token-stdin"], input="\n")
+
+    assert result.exit_code == 1
+    assert "empty token" in result.output.lower()
+
+
+def test_auth_login_rejects_combined_token_and_token_stdin(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BENCHBOX_SUBMIT_TOKEN", raising=False)
+    monkeypatch.delenv("BENCHBOX_SERVICE_TOKEN", raising=False)
+    monkeypatch.setattr(submit_auth, "_load_keyring", lambda: FakeKeyring())
+
+    result = CliRunner().invoke(
+        auth_cmd.auth,
+        ["login", "--token", "argv-secret", "--token-stdin"],
+        input="stdin-secret\n",
+    )
+
+    assert result.exit_code == 1
+    assert "not both" in result.output.lower()
+
+
+def test_auth_store_delete_handles_missing_via_typed_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """N1 fix: backend `not found` no longer requires substring matching."""
+    from keyring.errors import PasswordDeleteError
+
+    class FakeRacingKeyring:
+        def __init__(self) -> None:
+            self.passwords: dict[tuple[str, str], str] = {
+                (
+                    submit_auth.KEYRING_SERVICE_NAME,
+                    submit_auth.normalize_service_url(submit_auth.DEFAULT_SERVICE_URL),
+                ): "x"
+            }
+
+        def get_password(self, service_name: str, username: str) -> str | None:
+            return self.passwords.get((service_name, username))
+
+        def set_password(self, service_name: str, username: str, password: str) -> None:
+            self.passwords[(service_name, username)] = password
+
+        def delete_password(self, service_name: str, username: str) -> None:
+            # Simulate a race: the credential disappeared between get() and delete().
+            raise PasswordDeleteError("Item not in some-locale-specific-text")
+
+    store = submit_auth.SubmissionAuthStore(keyring_backend=FakeRacingKeyring())
+    assert store.delete_token(submit_auth.DEFAULT_SERVICE_URL) is False

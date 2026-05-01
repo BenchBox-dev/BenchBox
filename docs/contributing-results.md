@@ -24,11 +24,12 @@ The result JSON is written to `benchmark_runs/results/`.
 
 Optional companion files may be written next to the result JSON. Add
 `--capture-plans` on supported platforms to create `<result>.plans.json`.
-Use `--tuning tuned`, `--tuning auto`, or `--tuning ./path/to/tuning.yaml`
-only for intentionally tuned submissions; tuned runs create
-`<result>.tuning.json` when tuning clauses are applied. `benchbox submit`
-packages either companion automatically when it sits next to the result JSON,
-so missing companion files do not make a default submission incomplete.
+The `--tuning` flag accepts `notuning` (default), `tuned`, `auto`, or a
+path to a YAML config; use `tuned`, `auto`, or a YAML path only for
+intentionally tuned submissions, which create `<result>.tuning.json`
+when tuning clauses are applied. `benchbox submit` packages either
+companion automatically when it sits next to the result JSON, so missing
+companion files do not make a default submission incomplete.
 
 ### 2. Package the submission
 

@@ -32,13 +32,36 @@ def auth() -> None:
     "--token",
     default=None,
     help=(
-        "Token to store. Prefer the prompt or BENCHBOX_SUBMIT_TOKEN; "
-        "command-line values may be stored in shell history or process listings."
+        "Token to store. Prefer the prompt, --token-stdin, or "
+        "BENCHBOX_SUBMIT_TOKEN; command-line values may be stored in shell "
+        "history or process listings."
+    ),
+)
+@click.option(
+    "--token-stdin",
+    "token_stdin",
+    is_flag=True,
+    default=False,
+    help=(
+        "Read the token from stdin (first line). Use this in CI or scripted flows to avoid exposing the token on argv."
     ),
 )
 @click.pass_context
-def login(ctx: click.Context, service_url: str, token: str | None) -> None:
+def login(ctx: click.Context, service_url: str, token: str | None, token_stdin: bool) -> None:
     """Store a hosted results service token in the OS keyring."""
+
+    if token is not None and token_stdin:
+        console.print("[red]Pass either --token or --token-stdin, not both.[/red]")
+        ctx.exit(1)
+        return
+
+    if token_stdin:
+        raw = click.get_text_stream("stdin").readline()
+        token = raw.strip()
+        if not token:
+            console.print("[red]--token-stdin received an empty token.[/red]")
+            ctx.exit(1)
+            return
 
     store = SubmissionAuthStore()
     try:
