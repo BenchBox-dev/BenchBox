@@ -145,7 +145,7 @@ work:
 
   - id: w6
     summary: "Correct Step 5 measurement-window start description in TODO"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #70, P2, `_project/TODO/main/planning/dev-loop-step-5-measurement-window.yaml`
