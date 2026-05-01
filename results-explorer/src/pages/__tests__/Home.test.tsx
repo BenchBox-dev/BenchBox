@@ -173,6 +173,14 @@ const COHORT_ROWS = [
   },
 ];
 
+function deferred<T>() {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   window.history.replaceState(null, "", "/results/");
   vi.mocked(queryRows).mockImplementation(async (sql: string) => {
@@ -187,6 +195,65 @@ beforeEach(() => {
 });
 
 describe("Home", () => {
+  it("renders the results shell when no meta leaderboard cohorts are available", async () => {
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.startsWith("SELECT * FROM bench.results")) return RESULT_ROWS;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) return [];
+      if (s.startsWith("SELECT * FROM bench.cohort_metadata")) return [];
+      return [];
+    });
+
+    render(<Home />);
+
+    await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
+    expect(screen.queryByText("Loading results...")).toBeNull();
+    expect(screen.queryByText("Cross-Benchmark Leaderboard")).toBeNull();
+  });
+
+  it("keeps the loading state while an empty result snapshot conflicts with leaderboard metadata", async () => {
+    const metaRows = deferred<typeof META_LEADERBOARD_ROWS>();
+    const cohortRows = deferred<typeof COHORT_ROWS>();
+    const retryRows = deferred<typeof RESULT_ROWS>();
+    let resultCalls = 0;
+
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.startsWith("SELECT * FROM bench.results")) {
+        resultCalls += 1;
+        return resultCalls === 1 ? [] : retryRows.promise;
+      }
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return metaRows.promise;
+      }
+      if (s.startsWith("SELECT * FROM bench.cohort_metadata")) {
+        return cohortRows.promise;
+      }
+      return [];
+    });
+
+    render(<Home />);
+
+    await waitFor(() => expect(resultCalls).toBe(1));
+    await waitFor(() => expect(screen.getByText("Loading results...")).toBeTruthy());
+    expect(screen.queryByText("Recent Results")).toBeNull();
+    expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
+
+    metaRows.resolve(META_LEADERBOARD_ROWS);
+    cohortRows.resolve(COHORT_ROWS);
+
+    await waitFor(() => expect(resultCalls).toBe(2));
+    expect(screen.getByText("Loading results...")).toBeTruthy();
+    expect(screen.queryByText("Recent Results")).toBeNull();
+    expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
+
+    retryRows.resolve(RESULT_ROWS);
+
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+    expect(screen.queryByText("Loading results...")).toBeNull();
+    expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
+  });
+
   it("treats a benchmark chip click as isolate-not-exclude from the default all state", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());

@@ -325,8 +325,39 @@ work:
   - id: w6
     summary: "Fix N1 — eliminate the cold-load empty-corpus flash"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
+      Implemented in `Home.tsx`:
+        - `metaLeaderboardLoaded` now separates "leaderboard still
+          loading" from "leaderboard loaded as null / unavailable".
+        - Home waits for both `listResults()` and
+          `getMetaLeaderboardData()` to settle before rendering the
+          stat cards and leaderboard area.
+        - If `listResults()` yields an empty snapshot while the meta
+          leaderboard contains cohorts, Home treats that as an
+          inconsistent cold-load snapshot, keeps the loading spinner
+          visible, and retries `listResults()` once.
+
+      Tests:
+        - Added a staged-promise regression for the exact bad sequence:
+          first result snapshot `[]`, metadata present, retry resolves
+          to real rows. The page never renders `Recent Results` or
+          "No leaderboard cells match" until the retry data arrives.
+        - Added a preservation test for a legitimate no-meta-leaderboard
+          corpus so `null` metadata does not leave the Home page stuck
+          on the spinner.
+
+      Verification:
+        - `cd results-explorer && npm run test -- src/pages/__tests__/Home.test.tsx`
+          passed: 4 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - `cd results-explorer && npm run build` passed.
+        - `cd results-explorer && npm run test:e2e -- --project=chromium routes/home.spec.ts`
+          passed: 2 tests.
+        - `git diff --check` passed.
+        - `/code review W6` finding: add no-meta-leaderboard coverage;
+          addressed before commit. No remaining required issues.
+
       Implementation depends on w1's diagnosis. Most likely surface:
         - If H1/H2/H3: gate the StatCard + MetaLeaderboard render on
           BOTH `results !== null` AND `metaLeaderboard !== null`
