@@ -136,8 +136,35 @@ work:
 
   - id: w2
     summary: "Decide Q1 follow-up — delete dead `?metric=` code or wire the toggle"
-    status: pending
+    status: done
     notes: |
+      DECISION: DELETE the dead URL-metric contract and keep primary
+      metric benchmark-derived.
+
+      Evidence:
+        - `git log --oneline -G'primaryMetric|metric=' -- ...` shows
+          only the original migration commit (`f9d08d38b`) touching
+          this state on ResultDetail/Compare. There is no history of a
+          removed in-page toggle.
+        - Current ResultDetail has a `primaryMetric` state setter, but
+          the only write after initialization is
+          `getPrimaryMetricForBenchmark(data.benchmark)` in
+          `ResultDetail.tsx:64-66`; it does not read `?metric=`.
+        - Current Compare has the same pattern:
+          `getPrimaryMetricForBenchmark(details[0]!.benchmark)` at
+          `Compare.tsx:83-84`; it also does not read `?metric=`.
+        - `rg 'metric='` finds the claimed URL contract only in the
+          pass-2 audit plan, not in runtime code or e2e coverage.
+
+      w12 should remove the residual standalone mutable
+      `primaryMetric` state/setter from ResultDetail and Compare, then
+      store the resolved metric together with the loaded detail/results
+      payload. The user-visible contract stays: charts and headline
+      values use the benchmark's canonical primary metric from DuckDB
+      (`getPrimaryMetricForBenchmark`). w12 must also update the QA
+      plan sections S5.2 and S6.4 so future tests stop expecting
+      `?metric=` to switch chart semantics.
+
       Pass-1's Q1 is resolved: there is no toggle UI and the
       `?metric=` URL param is read into local state, then immediately
       overwritten by `getPrimaryMetricForBenchmark(detail.benchmark)`
