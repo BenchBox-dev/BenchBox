@@ -327,6 +327,20 @@ describe("Home", () => {
     });
   });
 
+  it("surfaces leaderboard receipt links with trust and validation metadata", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
+    const receiptLink = within(grid).getByRole("link", { name: "10 ms" }) as HTMLAnchorElement;
+
+    expect(receiptLink.getAttribute("href")).toBe("/results/r/r1#run-receipt");
+    expect(within(grid).getAllByText("Maintainer").length).toBeGreaterThan(0);
+    expect(within(grid).getAllByText("Community").length).toBeGreaterThan(0);
+    expect(within(grid).getAllByText("exact").length).toBeGreaterThan(0);
+  });
+
+
   it("filters the matrix by trust tier and preserves tuning in cohort links", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());

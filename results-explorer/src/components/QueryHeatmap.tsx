@@ -20,7 +20,7 @@
 import { useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
-import { TrustBadge } from "@/components/TrustBadge";
+import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { fmtMs, fmtScore, fmtGeomean, complianceLabel } from "@/utils";
 
 // ---------------------------------------------------------------------------
@@ -351,9 +351,18 @@ export function QueryHeatmap({
                     {row.platform_version && (
                       <div class="mt-0.5 text-xs text-gray-400">{row.platform_version}</div>
                     )}
+                    <a
+                      href={`/results/r/${row.result_id}#run-receipt`}
+                      class="mt-1 inline-block text-xs font-medium no-underline"
+                    >
+                      Receipt →
+                    </a>
                   </td>
                   <td role="gridcell" class="table-td sticky left-44 z-10 whitespace-nowrap bg-white">
-                    <TrustBadge trustLabel={row.trust_label} compact />
+                    <div class="flex flex-wrap gap-1">
+                      <TrustBadge trustLabel={row.trust_label} compact />
+                      <ValidationBadge validationStatus={row.validation_status} showMissing />
+                    </div>
                   </td>
                   <td role="gridcell" class="table-td whitespace-nowrap font-mono">
                     {fmtPrimary(getPrimaryValue(row))}

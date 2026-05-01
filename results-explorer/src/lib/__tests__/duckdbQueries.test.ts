@@ -81,7 +81,8 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     mockedQueryRows.mockResolvedValueOnce([]);
     await getPlatformIndexRows();
     const [sql, params] = mockedQueryRows.mock.calls[0]!;
-    expect(sql).toMatch(/FROM bench\.platform_index_rows/);
+    expect(sql).toMatch(/validation_status/);
+    expect(sql).toMatch(/FROM bench\.results/);
     expect(sql).not.toMatch(/WHERE/);
     expect(params).toBeUndefined();
   });

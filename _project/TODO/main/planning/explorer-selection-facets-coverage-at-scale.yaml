@@ -8,6 +8,7 @@ category: "Core Functionality"
 deps:
   needs:
     - explorer-leaderboard-first-identity-unification
+    - results-normalized-cost-contract-cloud-facets
 
 description: |
   Reframe the explorer from "pick a benchmark and browse rows" toward
@@ -218,16 +219,33 @@ verification:
 
 scope_limit:
   only_modify:
-    - "results-explorer/src/lib/"
-    - "results-explorer/src/components/"
+    - "results-explorer/src/lib/useUrlState.ts"
+    - "results-explorer/src/lib/queryFilters.ts"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/facetModel.ts"
+    - "results-explorer/src/lib/__tests__/useUrlState.test.ts"
+    - "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+    - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+    - "results-explorer/src/lib/__tests__/facetModel.test.ts"
+    - "results-explorer/src/components/MetaLeaderboard.tsx"
+    - "results-explorer/src/components/QueryHeatmap.tsx"
+    - "results-explorer/src/components/FacetRail.tsx"
+    - "results-explorer/src/components/CoverageBadge.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+    - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+    - "results-explorer/src/components/__tests__/FacetRail.test.tsx"
+    - "results-explorer/src/components/__tests__/CoverageBadge.test.tsx"
     - "results-explorer/src/pages/Home.tsx"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/pages/PlatformIndex.tsx"
     - "results-explorer/src/pages/Query.tsx"
     - "results-explorer/src/pages/Compare.tsx"
-    - "results-explorer/src/pages/__tests__/"
-    - "results-explorer/src/components/__tests__/"
-    - "results-explorer/src/lib/__tests__/"
+    - "results-explorer/src/pages/__tests__/Home.test.tsx"
+    - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+    - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+    - "results-explorer/src/pages/__tests__/Query.test.tsx"
+    - "results-explorer/src/pages/__tests__/Compare.test.tsx"
     - "benchbox/core/explorer_pipeline/"
     - "tests/unit/core/explorer_pipeline/"
     - "_project/planning/visible_metrics.yaml"

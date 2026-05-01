@@ -2,8 +2,9 @@ id: explorer-run-receipt-methodology-disclosure
 title: "Explorer: prominent run receipt and methodology disclosure"
 worktree: main
 priority: High
-status: "Not Started"
+status: "Completed"
 category: "Result Integrity"
+completed_date: "2026-05-01"
 
 description: |
   Add a trust-forward "Run Receipt" pattern to result detail, compare, and
@@ -20,7 +21,7 @@ description: |
 work:
   - id: w1
     summary: "Design and implement compact RunReceipt component for result detail"
-    status: pending
+    status: done
     notes: |
       Add `results-explorer/src/components/RunReceipt.tsx`. It should render a
       dense two-column receipt with sections:
@@ -38,7 +39,7 @@ work:
   - id: w2
     summary: "Promote methodology from lower-page disclosure to above-the-fold trust panel"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       On ResultDetail, place RunReceipt adjacent to or immediately below the
       primary metric summary. MethodologyDisclosure can remain for deeper text,
@@ -48,7 +49,7 @@ work:
   - id: w3
     summary: "Add compare-page comparability receipt for selected result set"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       THIS ITEM OWNS the ComparabilityReceipt component. The downstream
       `explorer-compare-decision-summary` item consumes it (its w4 cohort
@@ -62,17 +63,34 @@ work:
   - id: w4
     summary: "Surface methodology links from leaderboard rows and benchmark matrices"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add small trust/receipt affordances to row headers or result links in
       MetaLeaderboard, BenchmarkIndex, and PlatformIndex: trust badge,
       validation status, and quick link to the result detail receipt. Keep it
       compact enough for dense tables.
+      Owned files for this work unit:
+        - results-explorer/src/components/MetaLeaderboard.tsx
+        - results-explorer/src/components/QueryHeatmap.tsx
+        - results-explorer/src/components/RunReceipt.tsx
+        - results-explorer/src/components/TrustBadge.tsx
+        - results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx
+        - results-explorer/src/components/__tests__/QueryHeatmap.test.tsx
+        - results-explorer/src/components/__tests__/TrustBadge.test.tsx
+        - results-explorer/src/lib/duckdbQueries.ts
+        - results-explorer/src/lib/__tests__/duckdbQueries.test.ts
+        - results-explorer/src/pages/BenchmarkIndex.tsx
+        - results-explorer/src/pages/Home.tsx
+        - results-explorer/src/pages/PlatformIndex.tsx
+        - results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx
+        - results-explorer/src/pages/__tests__/Home.test.tsx
+        - results-explorer/src/pages/__tests__/PlatformIndex.test.tsx
+        - results-explorer/src/types.ts
 
   - id: w5
     summary: "Prepare execution-plan affordance without requiring public plans in this phase"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       If `has_plans` is true, show "Plans available" linking to the future plan
       viewer/download route if present. If false, show "Plans not published" in
@@ -81,7 +99,7 @@ work:
   - id: w6
     summary: "Add tests for receipt labels, count semantics, and compare warnings"
     needs: [w1, w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Tests should assert that query count and sample count are separate, bundle
       links render, validation/trust fields render, and compare warnings appear
@@ -110,6 +128,7 @@ impact:
 files_affected:
   modified:
     - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/Home.tsx"
     - "results-explorer/src/pages/Compare.tsx"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/pages/PlatformIndex.tsx"
@@ -145,11 +164,32 @@ verification:
     command: "cd results-explorer && npm run typecheck && npm test"
     expected_output: "All tests pass, including RunReceipt and ComparabilityReceipt coverage."
   - description: "Manual detail and compare smoke."
-    command: "cd results-explorer && npm run dev"
-    expected_output: "`/results/r/{id}` shows Run Receipt above timing tables; `/results/compare?ids=...` shows comparability warnings before detailed charts."
+    command: "cd results-explorer && npm run test:e2e:chromium -- --grep \"ResultDetail|Compare\""
+    expected_output: "Chromium browser smoke verifies `/results/r/{id}` and `/results/compare?ids=...` render their primary detail/compare surfaces."
 
 scope_limit:
   only_modify:
-    - "results-explorer/src/pages/"
-    - "results-explorer/src/components/"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+    - "results-explorer/src/pages/__tests__/Home.test.tsx"
+    - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+    - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+    - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+    - "results-explorer/src/components/MethodologyDisclosure.tsx"
+    - "results-explorer/src/components/TrustBadge.tsx"
+    - "results-explorer/src/components/RunReceipt.tsx"
+    - "results-explorer/src/components/ComparabilityReceipt.tsx"
+    - "results-explorer/src/components/MetaLeaderboard.tsx"
+    - "results-explorer/src/components/QueryHeatmap.tsx"
+    - "results-explorer/src/components/__tests__/MethodologyDisclosure.test.tsx"
+    - "results-explorer/src/components/__tests__/TrustBadge.test.tsx"
+    - "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
+    - "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+    - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
     - "results-explorer/src/types.ts"

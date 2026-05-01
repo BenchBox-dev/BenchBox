@@ -50,7 +50,7 @@ const RESULT_ROWS = [
     tuning_mode: null,
     tuning_hash: null,
     test_type: "power",
-    validation_status: null,
+    validation_status: "exact",
     cost_usd: null,
     compliance_class: null,
     is_ranking_eligible: true,
@@ -78,7 +78,7 @@ const RESULT_ROWS = [
     tuning_mode: null,
     tuning_hash: null,
     test_type: "power",
-    validation_status: null,
+    validation_status: "loose",
     cost_usd: null,
     compliance_class: null,
     is_ranking_eligible: false,
@@ -286,6 +286,18 @@ describe("BenchmarkIndex", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
       expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
     });
+  });
+
+  it("matrix rows expose receipt links and validation status from result metadata", async () => {
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => {
+      expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+    });
+
+    const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
+    expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
+    expect(screen.getByText("exact")).toBeTruthy();
+    expect(screen.getByText("loose")).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------

@@ -53,6 +53,11 @@ interface TrustBadgeProps {
   compact?: boolean;
 }
 
+interface ValidationBadgeProps {
+  validationStatus?: string | null;
+  showMissing?: boolean;
+}
+
 export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
   if (!trustLabel) return null;
   const known = TRUST_CONFIG[trustLabel];
@@ -67,6 +72,29 @@ export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
       {text}
     </span>
   );
+}
+
+export function ValidationBadge({ validationStatus, showMissing = false }: ValidationBadgeProps) {
+  if (!validationStatus && !showMissing) return null;
+  const status = validationStatus?.trim() || "not recorded";
+  const lower = status.toLowerCase();
+  const badgeClass = validationBadgeClass(lower);
+  const label = validationStatus ? lower : "validation n/a";
+  return (
+    <span class={`badge ${badgeClass}`} title={`Validation status: ${status}`}>
+      {label}
+    </span>
+  );
+}
+
+function validationBadgeClass(status: string) {
+  if (status.includes("fail")) return "badge-red";
+  if (status.includes("disabled") || status.includes("partial")) return "badge-yellow";
+  if (status === "exact" || status === "full" || status === "passed" || status === "pass") {
+    return "badge-green";
+  }
+  if (status === "loose" || status === "range") return "badge-yellow";
+  return "badge-gray";
 }
 
 export default TrustBadge;

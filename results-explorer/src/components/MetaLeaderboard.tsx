@@ -3,6 +3,7 @@ import { route } from "preact-router";
 import type { MetaCohort, MetaLeaderboard as MetaLeaderboardData, MetaPlatform, MetaRank } from "@/types";
 import { colorForCell } from "@/lib/chartMath";
 import { fmtGeomean, fmtScore, humanizeBenchmark } from "@/utils";
+import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 
 export type MetaLeaderboardMode = "times" | "ranks" | "speedup";
 
@@ -12,6 +13,7 @@ interface MetaLeaderboardProps {
   onModeChange: (mode: MetaLeaderboardMode) => void;
   cohortHref?: (cohort: MetaCohort) => string;
   platformHref?: (platformId: string) => string;
+  resultMetadataById?: ReadonlyMap<string, { trust_label: string; validation_status?: string | null }>;
 }
 
 const MODE_LABELS: Record<MetaLeaderboardMode, string> = {
@@ -26,6 +28,7 @@ export function MetaLeaderboard({
   onModeChange,
   cohortHref = (cohort) => cohort.href,
   platformHref = (platformId) => `/results/p/${platformId}/`,
+  resultMetadataById,
 }: MetaLeaderboardProps) {
   const { cohorts = [], platforms = [] } = data ?? {};
   const gridRef = useRef<HTMLTableElement>(null);
@@ -191,6 +194,9 @@ export function MetaLeaderboard({
                   const hue = shadeMetric !== null ? colorForCell(shadeMetric, minInCol) : null;
                   const active = focusPos.row === rowIdx && focusPos.col === colIdx;
                   const text = describeCell(platform, cohort, rank, mode);
+                  const result = cohort.platforms?.find((row) => row.platform_id === platform.platform_id);
+                  const metadata = result ? resultMetadataById?.get(result.result_id) : undefined;
+                  const receiptHref = result ? `/results/r/${result.result_id}#run-receipt` : null;
                   return (
                     <td
                       key={cohort.key}
@@ -210,7 +216,24 @@ export function MetaLeaderboard({
                       }}
                       onKeyDown={(event) => handleCellKey(event, rowIdx, colIdx)}
                     >
-                      {renderCellValue(rank, cohort, mode)}
+                      {receiptHref ? (
+                        <a
+                          href={receiptHref}
+                          class="font-mono no-underline hover:text-brand-700"
+                          onClick={(event) => event.stopPropagation()}
+                          title="Open result receipt"
+                        >
+                          {renderCellValue(rank, cohort, mode)}
+                        </a>
+                      ) : (
+                        renderCellValue(rank, cohort, mode)
+                      )}
+                      {metadata && (
+                        <div class="mt-1 flex flex-wrap justify-center gap-1">
+                          <TrustBadge trustLabel={metadata.trust_label} compact />
+                          <ValidationBadge validationStatus={metadata.validation_status} showMissing />
+                        </div>
+                      )}
                     </td>
                   );
                 })}

@@ -185,15 +185,21 @@ verification:
     command: "cd results-explorer && npm run typecheck && npm test && npm run build"
     expected_output: "All commands pass with new Home/Layout coverage."
   - description: "Manual browser smoke at desktop and mobile widths."
-    command: "cd results-explorer && npm run dev"
-    expected_output: "`/results/` shows BenchBox Database Leaderboards, global nav, cohort filters, and the leaderboard in the first viewport at desktop; mobile shows headline, compact controls, and leaderboard entry before Recent Results."
+    command: "cd results-explorer && npm run test:e2e:chromium -- --grep \"Home\""
+    expected_output: "Chromium browser smoke verifies `/results/` renders the Home shell and leaderboard; DOM-order unit tests cover first-viewport hierarchy."
 
 scope_limit:
   only_modify:
-    - "results-explorer/src/components/"
+    - "results-explorer/src/components/Layout.tsx"
+    - "results-explorer/src/components/MetaLeaderboard.tsx"
+    - "results-explorer/src/components/LoadingSpinner.tsx"
+    - "results-explorer/src/components/BrandShell.tsx"
+    - "results-explorer/src/components/__tests__/Layout.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+    - "results-explorer/src/components/__tests__/BrandShell.test.tsx"
     - "results-explorer/src/pages/Home.tsx"
     - "results-explorer/src/index.css"
     - "results-explorer/src/pages/__tests__/Home.test.tsx"
-    - "results-explorer/src/components/__tests__/"
   do_not_modify:
     - "landing/"  # tokens are extracted into the explorer; landing itself is not edited
