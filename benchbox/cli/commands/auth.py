@@ -12,6 +12,7 @@ from benchbox.cli.submit_auth import (
     get_submission_auth_status,
     normalize_service_url,
     refresh_submission_token,
+    resolve_submission_token,
 )
 
 
@@ -66,7 +67,7 @@ def login(ctx: click.Context, service_url: str, token: str | None, token_stdin: 
     store = SubmissionAuthStore()
     try:
         if token is None:
-            refresh_submission_token(service_url, store=store)
+            resolve_submission_token(service_url, prompt=True, force_refresh=True, store=store)
         else:
             store.save_token(service_url, token)
     except SubmissionAuthError as exc:

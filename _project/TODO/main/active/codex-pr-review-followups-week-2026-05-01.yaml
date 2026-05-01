@@ -238,7 +238,7 @@ work:
 
   - id: w10
     summary: "Allow `benchbox auth login` to prompt even when an env token is set"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #93, P2, `benchbox/cli/commands/auth.py`

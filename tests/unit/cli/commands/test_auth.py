@@ -141,6 +141,23 @@ def test_auth_command_login_status_logout_do_not_print_token(
     assert "cli-secret" not in logout.output
 
 
+def test_auth_login_prompt_stores_token_when_environment_token_is_active(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BENCHBOX_SUBMIT_TOKEN", "env-token")
+    fake = FakeKeyring()
+    monkeypatch.setattr(submit_auth, "_load_keyring", lambda: fake)
+    runner = CliRunner()
+
+    result = runner.invoke(auth_cmd.auth, ["login"], input="prompt-secret\n")
+
+    assert result.exit_code == 0, result.output
+    assert "credentials saved" in result.output.lower()
+    assert "prompt-secret" not in result.output
+    username = submit_auth.normalize_service_url(submit_auth.DEFAULT_SERVICE_URL)
+    assert fake.get_password(submit_auth.KEYRING_SERVICE_NAME, username) == "prompt-secret"
+
+
 def test_auth_command_registered_on_root_cli() -> None:
     from benchbox.cli.main import cli
 
