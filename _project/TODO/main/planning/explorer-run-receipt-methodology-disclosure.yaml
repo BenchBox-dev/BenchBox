@@ -2,7 +2,7 @@ id: explorer-run-receipt-methodology-disclosure
 title: "Explorer: prominent run receipt and methodology disclosure"
 worktree: main
 priority: High
-status: "Not Started"
+status: "In Progress"
 category: "Result Integrity"
 
 description: |
@@ -48,7 +48,7 @@ work:
   - id: w3
     summary: "Add compare-page comparability receipt for selected result set"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       THIS ITEM OWNS the ComparabilityReceipt component. The downstream
       `explorer-compare-decision-summary` item consumes it (its w4 cohort

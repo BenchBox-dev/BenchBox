@@ -280,4 +280,21 @@ describe("Compare", () => {
     expect(select.value).toBe("0");
     expect(select.options[0]!.text).toBe("DuckDB");
   });
+
+  it("renders the comparability receipt before charts and query breakdown", async () => {
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+    });
+
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    const chartsHeading = screen.getByText("Charts");
+    const queryBreakdownHeading = screen.getByRole("heading", { name: "Query Breakdown" });
+
+    expect(receipt).toHaveTextContent("Benchmark");
+    expect(receipt).toHaveTextContent("Query scope");
+    expect(receipt).toHaveTextContent("Cost metadata not published");
+    expect(receipt.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(receipt.compareDocumentPosition(queryBreakdownHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

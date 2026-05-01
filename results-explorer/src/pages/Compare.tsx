@@ -9,7 +9,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
-import { ComparabilityBanner, buildComparabilityWarnings } from "@/components/ComparabilityBanner";
+import { ComparabilityReceipt } from "@/components/ComparabilityReceipt";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { perQuerySpeedup, vsSlowestRatio } from "@/lib/chartMath";
 import { paletteColor } from "@/lib/chartTheme";
@@ -204,16 +204,6 @@ export function Compare(_: RoutableProps) {
   const slowestPrimary =
     validPrimaries.length > 0 ? (higherIsBetter ? Math.min(...validPrimaries) : Math.max(...validPrimaries)) : null;
 
-  const comparabilityWarnings = buildComparabilityWarnings(
-    results.map((r) => ({
-      platform: r.platform,
-      execution_mode: r.execution_mode,
-      tuning_mode: r.tuning_mode,
-      test_type: r.test_type,
-      query_count: r.queries.length,
-    })),
-  );
-
   const rowData = results.map((r) => ({
     resultId: r.result_id,
     label: r.platform,
@@ -269,7 +259,7 @@ export function Compare(_: RoutableProps) {
         </button>
       </div>
 
-      <ComparabilityBanner warnings={comparabilityWarnings} />
+      <ComparabilityReceipt results={results} />
 
       <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rowData.map((r, i) => {
