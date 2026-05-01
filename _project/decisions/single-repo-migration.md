@@ -213,3 +213,17 @@ These are all build/release/UI artefacts that belong on the released
 tree. They are therefore NOT in the release-cut curation list. This
 amendment is the source of truth for the script; the original A3 row
 remains unchanged.
+
+## Amendment 2026-05-01 — codecov config to main-only allowlist
+
+Adding `codecov.yml` (Codecov coverage thresholds and PR-comment
+suppression) as a new top-level path. CI workflows (`pr.yml`,
+`nightly.yml`, `test.yml`) reference `codecov/codecov-action@v4`, which
+loads this config on every coverage upload. The config is needed on
+both `develop` and the released `main` tree, so it goes in the
+main-only allowlist (not the release-cut curation list).
+
+- **`main` only** (extension to A3): `codecov.yml`.
+
+This amendment extends the 2026-04-27 amendment; both bullets are
+authoritative.
