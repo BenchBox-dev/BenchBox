@@ -96,6 +96,15 @@ uv run ty check
 
 We welcome contributions! Please see the `CONTRIBUTING.md` file in the root of the project for details on our development process, coding standards, and how to submit a pull request.
 
+## Maintainer Dev Loop
+
+Maintainers (and AI agents working in this repo) use a retained pool
+of 10 git worktrees for parallel branch work. New work claims a free
+slot, runs there until merge, then releases it back. See
+[the worktree-pool guide](../operations/dev-loop-worktree-pool.md) for
+common commands, slot states, and recovery scenarios. External
+contributors working from a fork do not need the pool.
+
 ## Release Preparation Workflow
 
 See [the release guide](../operations/release-guide.md) for the full
