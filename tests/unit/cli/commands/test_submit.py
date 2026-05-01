@@ -402,24 +402,40 @@ def test_submit_service_idempotency_key_passthrough(monkeypatch: pytest.MonkeyPa
     assert key in result.output
 
 
-def test_submit_service_real_upload_returns_not_implemented(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """--service without --dry-run resolves auth, then fails loudly until w5 lands."""
+def test_submit_service_real_upload_calls_transport(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """--service without --dry-run resolves auth and calls the hosted transport."""
     src = tmp_path / "tpch_duckdb.json"
     src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
     auth_calls: list[str] = []
+    upload_calls: list[dict] = []
 
     def fake_resolve(service_url: str):
         auth_calls.append(service_url)
         return SimpleNamespace(token="secret-token", source="keyring")
 
+    def fake_upload(**kwargs):
+        upload_calls.append(kwargs)
+        return sub.HostedSubmitResult(
+            status="published",
+            submission_id="sub1",
+            public_result_id="r1",
+            public_url="https://benchbox.dev/results/r/r1",
+            idempotency_key=kwargs["idempotency_key"] or "generated-key",
+            status_history=("pending", "published"),
+        )
+
     monkeypatch.setattr(sub, "resolve_submission_token", fake_resolve)
+    monkeypatch.setattr(sub, "submit_hosted_bundle", fake_upload)
 
     result = CliRunner().invoke(sub.submit, [str(src), "--service"])
-    assert result.exit_code == 1
-    assert "not yet implemented" in result.output.lower()
+    assert result.exit_code == 0
+    assert "Hosted submission complete" in result.output
+    assert "https://benchbox.dev/results/r/r1" in result.output
     assert "secret-token" not in result.output
     assert auth_calls == [sub._DEFAULT_SERVICE_URL]
+    assert upload_calls[0]["token"] == "secret-token"
+    assert upload_calls[0]["manifest"]["submission_path"] == "hosted-service"
 
 
 def test_submit_service_real_upload_requires_auth(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -436,7 +452,63 @@ def test_submit_service_real_upload_requires_auth(monkeypatch: pytest.MonkeyPatc
     result = CliRunner().invoke(sub.submit, [str(src), "--service"])
     assert result.exit_code == 1
     assert "Authentication required" in result.output
-    assert "not yet implemented" not in result.output.lower()
+    assert "Uploading submission bundle" not in result.output
+
+
+def test_submit_service_reauthenticates_once_on_401(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A 401 from the hosted service prompts refresh, then retries once."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    tokens: list[str] = []
+
+    monkeypatch.setattr(sub, "resolve_submission_token", lambda _service_url: SimpleNamespace(token="stale-token"))
+    monkeypatch.setattr(sub, "refresh_submission_token", lambda _service_url: SimpleNamespace(token="fresh-token"))
+
+    def fake_upload(**kwargs):
+        tokens.append(kwargs["token"])
+        if kwargs["token"] == "stale-token":
+            raise sub.HostedSubmitUnauthorized("bad token")
+        return sub.HostedSubmitResult(
+            status="published",
+            submission_id="sub1",
+            public_result_id="r1",
+            public_url="https://benchbox.dev/results/r/r1",
+            idempotency_key="generated-key",
+            status_history=("pending", "published"),
+        )
+
+    monkeypatch.setattr(sub, "submit_hosted_bundle", fake_upload)
+
+    result = CliRunner().invoke(sub.submit, [str(src), "--service"])
+
+    assert result.exit_code == 0
+    assert tokens == ["stale-token", "fresh-token"]
+    assert "fresh-token" not in result.output
+
+
+def test_submit_service_no_wait_reports_accepted_not_complete(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """--no-wait accepted submissions are not reported as completed publications."""
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    monkeypatch.setattr(sub, "resolve_submission_token", lambda _service_url: SimpleNamespace(token="secret-token"))
+    monkeypatch.setattr(
+        sub,
+        "submit_hosted_bundle",
+        lambda **_kwargs: sub.HostedSubmitResult(
+            status="pending",
+            submission_id="sub1",
+            idempotency_key="generated-key",
+            status_history=("pending",),
+        ),
+    )
+
+    result = CliRunner().invoke(sub.submit, [str(src), "--service", "--no-wait"])
+
+    assert result.exit_code == 0
+    assert "Hosted submission accepted" in result.output
+    assert "Hosted submission complete" not in result.output
 
 
 def test_submit_default_pr_path_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

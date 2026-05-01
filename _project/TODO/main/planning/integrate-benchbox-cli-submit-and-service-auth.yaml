@@ -103,12 +103,30 @@ work:
   - id: w5
     summary: "Implement upload, status polling, retries, and idempotent re-submit"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       POST the canonical schema-v2 bundle. Poll for async processing status
       (accepted → validated → published). Retry on transient errors (5xx,
       network). Re-submit with same bundle must be idempotent - service returns
       the existing hosted URL rather than creating a duplicate.
+
+      Landed 2026-05-01 against the documented Phase 3 contract in
+      `docs/reference/hosted-results-contract.md`:
+        - Added stdlib multipart POST transport for `/v1/submissions`.
+        - Sends bearer auth, visibility, companion files, manifest, and a
+          stable UUIDv5 idempotency key derived from service URL + bundle hash
+          unless the caller supplies `--idempotency-key`.
+        - Retries transient upload/status failures (5xx and network errors)
+          with exponential backoff.
+        - Polls `/v1/submissions/{submission_id}/status` until published or
+          rejected when `--wait` is enabled; `--no-wait` exits after accepted
+          upload with the submission id.
+        - Retries once with refreshed auth on 401.
+        - `/code review W5` found and fixed two issues: 401/last-5xx error
+          classification no longer depends on JSON error bodies, and
+          `--no-wait` now reports accepted rather than complete.
+      This is unit/contract tested only; w7 still owns the full mock-service
+      integration suite.
 
   - id: w6
     summary: "Connect hosted result URL and submission history into `benchbox results --submitted`"
