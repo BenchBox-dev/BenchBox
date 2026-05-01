@@ -8,7 +8,7 @@ import type {
 } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getMetaLeaderboardData, listResults } from "@/lib/duckdbQueries";
-import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
+import { BENCHMARK_LABELS, humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
@@ -17,6 +17,7 @@ import { arraySerde, stringSerde, useUrlState } from "@/lib/useUrlState";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 const EMPTY_STRING_ARRAY: string[] = [];
+const SUPPORTED_BENCHMARK_COUNT = new Set(Object.values(BENCHMARK_LABELS)).size;
 
 export function Home(_: RoutableProps) {
   useDocumentTitle("Results · BenchBox");
@@ -330,10 +331,27 @@ export function Home(_: RoutableProps) {
           </section>
         )}
 
-        <div class="mb-12 grid grid-cols-3 gap-6 text-center">
-          <StatCard value={results.length} label="Results" />
-          <StatCard value={benchmarks.length} label="Benchmarks" />
-          <StatCard value={platformIds.length} label="Platforms" />
+        <div class="mb-12 grid grid-cols-2 gap-4 text-center lg:grid-cols-4">
+          <StatCard
+            value={SUPPORTED_BENCHMARK_COUNT}
+            label="supported benchmarks"
+            detail={`${benchmarks.length} with public results`}
+          />
+          <StatCard
+            value={results.length}
+            label="public result bundles"
+            detail="maintainer-curated corpus"
+          />
+          <StatCard
+            value={platformIds.length}
+            label="platforms with public results"
+            detail="published platform IDs"
+          />
+          <StatCard
+            value="PR"
+            label="PR-validated corpus"
+            detail="bundles reviewed before publication"
+          />
         </div>
 
         <section class="mb-12 rounded-xl border border-brand-200 bg-brand-50 p-6 shadow-sm">
@@ -425,11 +443,20 @@ function matchesMultiFilter(value: string, selected: string[]): boolean {
   return selected.length === 0 || selected.includes(value);
 }
 
-function StatCard({ value, label }: { value: number; label: string }) {
+function StatCard({
+  value,
+  label,
+  detail,
+}: {
+  value: number | string;
+  label: string;
+  detail?: string;
+}) {
   return (
     <div class="card">
       <div class="text-3xl font-bold text-brand-600">{value}</div>
       <div class="mt-1 text-sm font-medium text-gray-500">{label}</div>
+      {detail && <div class="mt-2 text-xs text-gray-400">{detail}</div>}
     </div>
   );
 }

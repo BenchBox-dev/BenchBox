@@ -71,7 +71,7 @@ work:
 - id: w4
   summary: "Clarify supported vs published corpus stats in the home proof strip"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Replace ambiguous stat cards with explicit labels such as:
       - "22 supported benchmarks"

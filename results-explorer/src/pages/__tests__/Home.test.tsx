@@ -299,6 +299,18 @@ describe("Home", () => {
     expect(within(selector).getByText("All public coverage")).toBeTruthy();
   });
 
+  it("distinguishes supported benchmark coverage from published public corpus counts", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    expect(screen.getByText("supported benchmarks")).toBeTruthy();
+    expect(screen.getByText("2 with public results")).toBeTruthy();
+    expect(screen.getByText("public result bundles")).toBeTruthy();
+    expect(screen.getByText("platforms with public results")).toBeTruthy();
+    expect(screen.getByText("PR-validated corpus")).toBeTruthy();
+    expect(screen.queryByText(/^Benchmarks$/)).toBeNull();
+  });
+
   it("treats a benchmark selector change as isolate-not-exclude from the default all state", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
