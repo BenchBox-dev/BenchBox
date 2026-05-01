@@ -288,7 +288,7 @@ work:
 
   - id: w12
     summary: "Make Step 3 job-count verification select develop-targeted PR runs"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #67, P2, `_project/TODO/main/planning/dev-loop-step-3-ci-rebalance-and-strict-base-off.yaml`

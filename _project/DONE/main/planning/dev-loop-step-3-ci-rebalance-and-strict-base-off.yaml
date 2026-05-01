@@ -236,7 +236,12 @@ verification:
     command: "gh api repos/joeharris76/BenchBox/branches/develop/protection --jq '.required_status_checks' 2>/dev/null || echo classic-protection-not-configured"
     expected_output: "classic-protection-not-configured OR no broader/strict required checks"
   - description: "Routine develop PR Tests workflow no longer queues broad non-required lanes"
-    command: "branch=$(git branch --show-current); run_id=$(gh run list --workflow test.yml --branch \"$branch\" --event pull_request --limit 1 --json databaseId --jq '.[0].databaseId'); gh run view \"$run_id\" --json jobs --jq '[.jobs[] | select(.conclusion != \"skipped\") | .name] | sort[]'"
+    command: |
+      branch=$(git branch --show-current)
+      pr_base=$(gh pr view "$branch" --json baseRefName --jq .baseRefName)
+      [ "$pr_base" = "develop" ] || { echo "PR for $branch targets $pr_base, not develop"; exit 1; }
+      run_id=$(gh run list --workflow test.yml --branch "$branch" --event pull_request --limit 1 --json databaseId --jq '.[0].databaseId')
+      gh run view "$run_id" --json jobs --jq '[.jobs[] | select(.conclusion != "skipped") | .name] | sort[]'
     expected_output: "Only non-skipped required/lightweight develop PR job names, plus any explicitly documented lightweight umbrella/content jobs"
   - description: "Nightly/manual workflow exists and is active for broad validation"
     command: "gh workflow list --json name,state,path --jq '.[] | select((.name | test(\"nightly|Nightly\")) or (.path | test(\"nightly\")))'"
