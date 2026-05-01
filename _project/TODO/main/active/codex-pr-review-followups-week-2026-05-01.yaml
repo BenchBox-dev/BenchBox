@@ -168,7 +168,7 @@ work:
 
   - id: w7
     summary: "Convert Step 5 `last_updated` to ISO date-time as schema expects"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #83, P2, `_project/TODO/main/planning/dev-loop-step-5-measurement-window.yaml`
