@@ -1030,7 +1030,7 @@ worktree-claim-attempt:
 		git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue; \
 		[ -f "$$wt/.benchbox/claim_in_progress" ] && continue; \
 		branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
-		status=$$(git -C "$$wt" status --porcelain); \
+		status=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
 		[ -z "$$branch" ] && [ -z "$$status" ] || continue; \
 		marker="$$wt/.benchbox/claim_in_progress"; \
 		mkdir -p "$$wt/.benchbox"; \

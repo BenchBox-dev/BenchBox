@@ -102,7 +102,7 @@ work:
 
   - id: w4
     summary: "Ignore expected `.benchbox` scratch files when claiming free pool slots"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #73, P2, `Makefile`
