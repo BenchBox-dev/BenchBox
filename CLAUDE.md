@@ -122,7 +122,10 @@ during the single-repo migration).
     revert PR or conflict issue is the alert. The workflow also uploads
     a `metrics` JSON artifact; `make dev-loop-metrics` downloads recent
     artifacts and reports PR-to-merge P50/P95, post-merge red rate,
-    conflict rate, and total runner minutes.
+    conflict rate, and total runner minutes. The GitHub-side admin
+    state this depends on (ruleset required-checks, default workflow
+    permissions, incident labels) is documented in
+    `docs/operations/repo-admin-settings.md`.
   - **If develop goes red**:
     - The post-merge workflow detects the failed `develop` tip within the
       normal GitHub Actions scheduling window and attempts `git revert` of
