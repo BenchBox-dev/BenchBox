@@ -103,12 +103,12 @@ def submit_hosted_bundle(
     if response.status in _TRANSIENT_STATUS_CODES:
         _raise_for_response(response, {})
 
-    payload = _json_payload(response)
-
     if response.status == 200:
+        payload = _json_payload(response)
         return _result_from_success_payload(payload, idempotency_key=resolved_key)
 
     if response.status in {202, 409}:
+        payload = _json_payload(response)
         submission_id = _require_submission_id(payload)
         status = str(payload.get("status") or "pending")
         history = (status,)
@@ -135,7 +135,7 @@ def submit_hosted_bundle(
             status_history=history,
         )
 
-    _raise_for_response(response, payload)
+    _raise_for_response(response, _json_payload_or_empty(response))
     raise HostedSubmitError(f"Unexpected hosted submission response: HTTP {response.status}")
 
 
@@ -183,10 +183,10 @@ def poll_submission_status(
         if response.status in _TRANSIENT_STATUS_CODES:
             _raise_for_response(response, {})
 
-        payload = _json_payload(response)
-
         if response.status != 200:
-            _raise_for_response(response, payload)
+            _raise_for_response(response, _json_payload_or_empty(response))
+
+        payload = _json_payload(response)
 
         status = str(payload.get("status") or "pending")
         if not history or history[-1] != status:
@@ -345,6 +345,13 @@ def _json_payload(response: _HTTPResponse) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise HostedSubmitError(f"Hosted service returned non-object JSON for HTTP {response.status}.")
     return payload
+
+
+def _json_payload_or_empty(response: _HTTPResponse) -> dict[str, Any]:
+    try:
+        return _json_payload(response)
+    except HostedSubmitError:
+        return {}
 
 
 def _result_from_success_payload(payload: Mapping[str, Any], *, idempotency_key: str) -> HostedSubmitResult:

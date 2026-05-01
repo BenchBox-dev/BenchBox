@@ -173,14 +173,30 @@ def _build_benchmark_summaries(
 
 # Human-readable labels for benchmark families (mirrors frontend BENCHMARK_LABELS).
 _BENCHMARK_LABELS: dict[str, str] = {
-    "tpch": "TPC-H",
-    "tpcds": "TPC-DS",
-    "ssb": "SSB",
-    "star_schema": "SSB",
+    "ai_primitives": "AI Primitives",
+    "amplab": "AMPLab",
     "clickbench": "ClickBench",
+    "coffeeshop": "CoffeeShop",
+    "datavault": "TPC-H Data Vault",
+    "flightdata": "Flight Data",
+    "h2odb": "H2ODB",
+    "joinorder": "JoinOrder",
+    "metadata_primitives": "Metadata",
     "nyctaxi": "NYC Taxi",
-    "h2odb": "H2O DB",
-    "datavault": "DataVault",
+    "read_primitives": "Read Primitives",
+    "star_schema": "SSB",
+    "ssb": "SSB",
+    "tsbs-devops": "TSBS DevOps",
+    "tsbs_devops": "TSBS DevOps",
+    "tpcdi": "TPC-DI",
+    "tpcds": "TPC-DS",
+    "tpcds_obt": "TPC-DS-OBT",
+    "tpch": "TPC-H",
+    "tpch_skew": "TPC-H Skew",
+    "tpchavoc": "TPC-Havoc",
+    "transaction_primitives": "Transactions",
+    "vector_search": "Vector Search",
+    "write_primitives": "Write Primitives",
 }
 
 

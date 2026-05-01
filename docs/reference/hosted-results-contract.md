@@ -471,7 +471,8 @@ of `bundle/` into `results-data/bundles/` and placing
 
 When `--service [URL]` is passed, the CLI POSTs the submission bundle directly
 to the hosted API. Authentication comes from `benchbox auth login` keyring
-storage or `BENCHBOX_SUBMIT_TOKEN`; dry runs do not require credentials.
+storage, `BENCHBOX_SUBMIT_TOKEN`, or the lower-precedence
+`BENCHBOX_SERVICE_TOKEN`; dry runs do not require credentials.
 
 ```
 POST /v1/submissions
@@ -490,7 +491,7 @@ Expected responses:
 | `200 OK` | `bundle_hash` already published; body includes `"status": "already_published"` and `public_result_id` | Print existing result URL, exit 0 |
 | `409 Conflict` | Bundle in `pending` or `validated` state; `submission_id` in body | Print status and poll URL |
 | `422 Unprocessable` | Schema or hash validation failed; `errors` array in body | Print errors, exit non-zero |
-| `429 Too Many Requests` | Rate limited; `retry_after` in headers | Print wait time, exit non-zero |
+| `429 Too Many Requests` | Rate limited; `Retry-After` in headers | Print wait time, exit non-zero |
 
 #### Status polling contract
 

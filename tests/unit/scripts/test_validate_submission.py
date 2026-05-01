@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -146,6 +147,15 @@ class TestValidateBundle:
         _validate_bundle(data, vr)
         assert vr.ok  # warning, not error
         assert any("Unknown benchmark id" in w for w in vr.warnings)
+
+    @pytest.mark.parametrize("benchmark_id", ["flightdata", "tsbs_devops", "tpcdi"])
+    def test_current_benchmark_ids_do_not_warn(self, benchmark_id: str):
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = benchmark_id
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok
+        assert not any("Unknown benchmark id" in w for w in vr.warnings)
 
     def test_unknown_platform_warns(self):
         data = _minimal_bundle()
@@ -380,6 +390,7 @@ class TestDiscoverBundles:
         (tmp_path / "result.json").write_text("{}", encoding="utf-8")
         (tmp_path / "result.plans.json").write_text("{}", encoding="utf-8")
         (tmp_path / "result.tuning.json").write_text("{}", encoding="utf-8")
+        (tmp_path / "result.manifest.json").write_text("{}", encoding="utf-8")
         (tmp_path / "corpus-inventory.json").write_text("{}", encoding="utf-8")
         (tmp_path / "submission-manifest.json").write_text("{}", encoding="utf-8")
 
@@ -419,6 +430,25 @@ class TestValidateBundles:
         results = validate_bundles([f])
         assert not results[0].ok
         assert any("JSON object" in e for e in results[0].errors)
+
+    def test_explicit_manifest_paths_are_ignored(self, tmp_path: Path):
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        manifest = tmp_path / "result.manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "bundle_file": bundle.name,
+                    "bundle_hash": hashlib.sha256(bundle.read_bytes()).hexdigest(),
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        results = validate_bundles([bundle, manifest])
+
+        assert len(results) == 1
+        assert results[0].ok
 
 
 # ---------------------------------------------------------------------------

@@ -51,12 +51,24 @@ def test_auth_store_saves_reads_and_deletes_token() -> None:
 
 def test_resolve_submission_token_prefers_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BENCHBOX_SUBMIT_TOKEN", " env-token ")
+    monkeypatch.setenv("BENCHBOX_SERVICE_TOKEN", " fallback-token ")
     store = submit_auth.SubmissionAuthStore(keyring_backend=FakeKeyring())
 
     token = submit_auth.resolve_submission_token(prompt=False, store=store)
 
     assert token.token == "env-token"
     assert token.source == "environment:BENCHBOX_SUBMIT_TOKEN"
+
+
+def test_resolve_submission_token_accepts_service_token_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BENCHBOX_SUBMIT_TOKEN", raising=False)
+    monkeypatch.setenv("BENCHBOX_SERVICE_TOKEN", " fallback-token ")
+    store = submit_auth.SubmissionAuthStore(keyring_backend=FakeKeyring())
+
+    token = submit_auth.resolve_submission_token(prompt=False, store=store)
+
+    assert token.token == "fallback-token"
+    assert token.source == "environment:BENCHBOX_SERVICE_TOKEN"
 
 
 def test_resolve_submission_token_uses_keyring_without_prompt(
@@ -136,3 +148,13 @@ def test_auth_command_registered_on_root_cli() -> None:
 
     assert result.exit_code == 0
     assert "Manage hosted result-submission credentials" in result.output
+
+
+def test_auth_login_token_help_warns_about_command_line_secret_exposure() -> None:
+    result = CliRunner().invoke(auth_cmd.auth, ["login", "--help"])
+    normalized = " ".join(result.output.split())
+
+    assert result.exit_code == 0
+    assert "--token" in result.output
+    assert "shell history" in normalized
+    assert "process listings" in normalized

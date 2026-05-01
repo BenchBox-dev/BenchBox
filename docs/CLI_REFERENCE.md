@@ -64,7 +64,8 @@ to list hosted submission history and public result URLs.
 
 Manages hosted submission credentials for `benchbox submit --service`.
 Tokens are stored in the OS keyring and can be overridden for automation
-with `BENCHBOX_SUBMIT_TOKEN`.
+with `BENCHBOX_SUBMIT_TOKEN` or the lower-precedence
+`BENCHBOX_SERVICE_TOKEN` fallback.
 
 ### `benchbox export`
 
@@ -157,17 +158,17 @@ Examples:
 
 ```bash
 # Package the latest result for PR contribution
-benchbox submit --last --output ./submission
+uv run -- benchbox submit --last --output ./submission
 
 # Preview a hosted upload without credentials or network
-benchbox submit --last --service --dry-run
+uv run -- benchbox submit --last --service --dry-run
 
 # Log in and upload to the hosted service
-benchbox auth login
-benchbox submit --last --service
+uv run -- benchbox auth login
+uv run -- benchbox submit --last --service
 
 # Track hosted submissions
-benchbox results --submitted
+uv run -- benchbox results --submitted
 ```
 
 ### `benchbox check-deps`

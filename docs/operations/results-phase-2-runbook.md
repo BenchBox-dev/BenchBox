@@ -10,7 +10,7 @@ static explorer rebuild, and no hosted API is involved.
 ## 1. Submission Lifecycle
 
 1. Contributor runs `benchbox run ...` and `benchbox submit --output ./submission`.
-2. Contributor copies the bundle files plus `submission-manifest.json` into `results-data/bundles/`.
+2. Contributor copies the bundle files plus the generated `<result>.manifest.json` into `results-data/bundles/`.
 3. Contributor regenerates `results-data/corpus-inventory.json`.
 4. Contributor opens a PR against `published-results`.
 5. `Validate Submission` checks schema, hash integrity, timing sanity, and inventory drift.
@@ -92,7 +92,7 @@ Use `workflow_dispatch` only after confirming there is no newer push already reb
 - Corpus root: `results-data/`
 - Bundles: `results-data/bundles/`
 - Inventory: `results-data/corpus-inventory.json`
-- Community sidecar: `submission-manifest.json`
+- Community sidecar: `<result>.manifest.json` (legacy `submission-manifest.json` is still accepted)
 - Generated explorer read model: `results-explorer/public/data/`
 
 The explorer pipeline treats sidecar presence as the trust-label contract for community

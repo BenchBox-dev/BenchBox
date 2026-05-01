@@ -9,7 +9,7 @@ BenchBox results platform.
 ## 1. Run A Benchmark
 
 ```bash
-benchbox run --platform duckdb --benchmark tpch --scale 0.01 --non-interactive
+uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 --non-interactive
 ```
 
 BenchBox writes the result JSON under `benchmark_runs/results/`. If query plans
@@ -18,8 +18,8 @@ or tuning were captured, companion files sit beside the primary result.
 ## 2. Check The Result
 
 ```bash
-benchbox results
-benchbox submit --last --service --dry-run
+uv run -- benchbox results
+uv run -- benchbox submit --last --service --dry-run
 ```
 
 The dry run validates the local bundle, computes the hash, lists companion
@@ -29,17 +29,18 @@ does not contact the service.
 ## 3. Authenticate
 
 ```bash
-benchbox auth login
-benchbox auth status
+uv run -- benchbox auth login
+uv run -- benchbox auth status
 ```
 
 `benchbox auth login` stores the hosted token in the operating system keyring.
-For CI, set `BENCHBOX_SUBMIT_TOKEN` instead.
+For CI, set `BENCHBOX_SUBMIT_TOKEN` instead. `BENCHBOX_SERVICE_TOKEN` is still
+accepted as a lower-precedence fallback for older automation.
 
 ## 4. Submit
 
 ```bash
-benchbox submit --last --service
+uv run -- benchbox submit --last --service
 ```
 
 BenchBox uploads the canonical result JSON, the generated manifest, and any
@@ -49,13 +50,13 @@ or rejects the submission.
 Use `--no-wait` when you only need the submission id:
 
 ```bash
-benchbox submit --last --service --no-wait
+uv run -- benchbox submit --last --service --no-wait
 ```
 
 ## 5. Track The Hosted URL
 
 ```bash
-benchbox results --submitted
+uv run -- benchbox results --submitted
 ```
 
 Successful hosted submissions create local sidecars next to the source result:
@@ -73,7 +74,7 @@ Hosted upload is not required for community contribution. To create a local
 package for a pull request:
 
 ```bash
-benchbox submit --last --output ./submission
+uv run -- benchbox submit --last --output ./submission
 ```
 
 Follow the generated `CONTRIBUTING.md` and open the PR against the
