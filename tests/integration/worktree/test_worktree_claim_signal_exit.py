@@ -11,6 +11,7 @@ import pytest
 
 pytestmark = [
     pytest.mark.integration,
+    pytest.mark.fast,
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
