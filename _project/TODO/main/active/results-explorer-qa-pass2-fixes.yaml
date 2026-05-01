@@ -558,8 +558,40 @@ work:
 
   - id: w11
     summary: "Fix N6 — surface row-limit toggle in Query workbench"
-    status: pending
+    status: done
     notes: |
+      Implemented in `Query.tsx`:
+        - Added a URL-backed `limit=default|all` segmented control near
+          the result table actions.
+        - Default mode preserves the existing `DEFAULT_ROW_LIMIT`
+          query behavior and strips the `limit` URL key.
+        - All mode uses `UNLIMITED_ROW_LIMIT` for the rendered table
+          query and shows a table footer with the actual returned row
+          count.
+        - `Build SQL From Filters` now mirrors the selected table row
+          limit. CSV export remains on its existing unlimited filtered
+          export path.
+        - Invalid `?limit=` values settle back to default via
+          replaceState.
+
+      Tests:
+        - Added unit coverage for default/all URL state, SQL LIMIT
+          selection, the all-rows footer, and invalid URL coercion.
+        - Added Playwright coverage for the visible toggle, URL update,
+          all-rows footer, and return to default.
+
+      Verification:
+        - `cd results-explorer && npm run test -- src/pages/__tests__/Query.test.tsx src/lib/__tests__/queryFilters.test.ts`
+          passed: 15 tests.
+        - `cd results-explorer && npm run typecheck` passed.
+        - `cd results-explorer && npm run build` passed.
+        - `cd results-explorer && npm run test:e2e -- --project=chromium routes/query.spec.ts`
+          passed: 9 tests.
+        - `git diff --check` passed.
+        - `/code review W11` findings: add an accessible group label
+          and coerce invalid `?limit=`; both addressed. No remaining
+          required issues.
+
       `results-explorer/src/lib/queryFilters.ts` already exports
       `DEFAULT_ROW_LIMIT` and `UNLIMITED_ROW_LIMIT`. The Query page
       uses the default for the table but never lets the user switch.
