@@ -56,7 +56,7 @@ work:
 - id: w3
   summary: "Rewrite Home first viewport around a live leaderboard, not a brochure hero"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     In results-explorer/src/pages/Home.tsx, first viewport should contain:
       - H1: "BenchBox Database Leaderboards"

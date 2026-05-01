@@ -282,7 +282,24 @@ describe("Home", () => {
     expect(screen.queryByText("Recent Results")).toBeNull();
   });
 
-  it("treats a benchmark chip click as isolate-not-exclude from the default all state", async () => {
+  it("renders the leaderboard-first product identity and dense cohort controls", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    expect(screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" })).toBeTruthy();
+    expect(
+      screen.getByText("Reproducible OLAP benchmark rankings by workload, scale, deployment, and normalized cost."),
+    ).toBeTruthy();
+
+    const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
+    expect(within(selector).getByLabelText("Benchmark")).toBeTruthy();
+    expect(within(selector).getByLabelText("Scale factor")).toBeTruthy();
+    expect(within(selector).getByLabelText("Phase")).toBeTruthy();
+    expect(within(selector).getByText("Deployment / cost")).toBeTruthy();
+    expect(within(selector).getByText("All public coverage")).toBeTruthy();
+  });
+
+  it("treats a benchmark selector change as isolate-not-exclude from the default all state", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
@@ -290,7 +307,7 @@ describe("Home", () => {
     expect(within(grid).getByRole("link", { name: "ClickBench SF0.1" })).toBeTruthy();
     expect(within(grid).getByRole("link", { name: "TPC-H SF1" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "ClickBench" }));
+    fireEvent.change(screen.getByLabelText("Benchmark"), { target: { value: "clickbench" } });
 
     await waitFor(() => {
       expect(within(grid).getByRole("link", { name: "ClickBench SF0.1" })).toBeTruthy();
@@ -306,6 +323,7 @@ describe("Home", () => {
     expect(within(grid).getByText("DuckDB")).toBeTruthy();
     expect(within(grid).getByText("SQLite")).toBeTruthy();
 
+    fireEvent.click(screen.getByText("Advanced filters"));
     fireEvent.click(screen.getByRole("button", { name: "auto" }));
     fireEvent.click(screen.getByRole("button", { name: "community-submission" }));
 

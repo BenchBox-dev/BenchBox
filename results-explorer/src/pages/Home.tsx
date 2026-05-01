@@ -238,96 +238,83 @@ export function Home(_: RoutableProps) {
   }
 
   return (
-    <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div class="mb-12 text-center">
-        <h1 class="mb-4 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
-          BenchBox Results
-        </h1>
-        <p class="mx-auto max-w-2xl text-lg text-gray-600">
-          Browse, compare, and analyze public benchmark results across SQL engines and
-          DataFrame libraries. The current public corpus is maintainer-curated, and new
-          submissions go through PR validation plus maintainer review before they appear here.
-          Every result remains reproducible with{" "}
-          <code class="rounded bg-gray-100 px-1.5 py-0.5 text-sm font-mono">
-            benchbox run
-          </code>
-          .
-        </p>
-      </div>
-
-      <div class="mb-12 grid grid-cols-3 gap-6 text-center">
-        <StatCard value={results.length} label="Results" />
-        <StatCard value={benchmarks.length} label="Benchmarks" />
-        <StatCard value={platformIds.length} label="Platforms" />
-      </div>
-
-      <section class="mb-12 rounded-xl border border-brand-200 bg-brand-50 p-6 shadow-sm">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 class="text-xl font-semibold text-gray-900">
-              Run BenchBox on your platform and submit your results
-            </h2>
-            <p class="mt-2 max-w-2xl text-sm text-gray-600">
-              The Phase 2 workflow is simple: run a benchmark, package it with{" "}
-              <code class="rounded bg-white px-1 py-0.5 text-xs">benchbox submit</code>, then
-              open a PR against the public corpus.
+    <div>
+      <section class="border-b border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] text-[var(--bb-fg-primary)]">
+        <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+          <div class="max-w-4xl">
+            <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
+            <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
+              Reproducible OLAP benchmark rankings by workload, scale, deployment, and normalized cost.
             </p>
           </div>
-          <a href="/docs/contributing-results.html" class="btn-primary text-sm text-center">
-            Submit a Result
-          </a>
+
+          {filteredMetaLeaderboard && (
+            <section
+              aria-label="Leaderboard cohort selector"
+              class="mt-5 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+            >
+              <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <MultiSelectFilter
+                  label="Benchmark"
+                  allLabel="All benchmarks"
+                  options={benchmarkOptions}
+                  current={benchmarkFilters}
+                  onSelect={(value) => setBenchmarkFilters(value === "all" ? [] : [value])}
+                  format={(value) => humanizeBenchmark(value)}
+                />
+                <MultiSelectFilter
+                  label="Scale factor"
+                  allLabel="All scales"
+                  options={scaleOptions}
+                  current={scaleFilters}
+                  onSelect={(value) => setScaleFilters(value === "all" ? [] : [value])}
+                  format={(value) => `SF ${value}`}
+                />
+                <SelectFilter
+                  label="Phase"
+                  options={["all", ...phaseOptions]}
+                  current={phaseFilter}
+                  onSelect={setPhaseFilter}
+                  format={(value) => (value === "all" ? "All phases" : value)}
+                />
+                <CoverageSummary />
+              </div>
+
+              <details class="mt-3 border-t border-[var(--bb-border-default)] pt-3">
+                <summary class="cursor-pointer text-sm font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
+                  Advanced filters
+                </summary>
+                <div class="mt-3 grid gap-3 md:grid-cols-3">
+                  <SingleFilterGroup
+                    label="Tuning"
+                    options={tuningOptions}
+                    current={tuningFilter}
+                    onSelect={setTuningFilter}
+                    format={(value) => (value === "all" ? "All tuning" : value)}
+                  />
+                  <SingleFilterGroup
+                    label="Trust"
+                    options={trustOptions}
+                    current={trustFilter}
+                    onSelect={setTrustFilter}
+                    format={(value) => (value === "all" ? "All trust tiers" : value)}
+                  />
+                  <SingleFilterGroup
+                    label="Date window"
+                    options={["all", "30d", "90d", "365d"]}
+                    current={dateWindow}
+                    onSelect={setDateWindow}
+                    format={(value) => (value === "all" ? "All time" : `Last ${value}`)}
+                  />
+                </div>
+              </details>
+            </section>
+          )}
         </div>
       </section>
 
-      {filteredMetaLeaderboard && (
-        <>
-          <section class="sticky top-0 z-20 mb-6 rounded-xl border border-gray-200 bg-white/95 p-4 shadow-sm backdrop-blur">
-            <div class="grid gap-4 lg:grid-cols-2">
-              <FilterGroup
-                label="Benchmark"
-                options={benchmarkOptions}
-                current={benchmarkFilters}
-                onToggle={(value) => toggleMultiValue(value, benchmarkFilters, setBenchmarkFilters, benchmarkOptions)}
-                format={(value) => humanizeBenchmark(value)}
-              />
-              <FilterGroup
-                label="Scale"
-                options={scaleOptions}
-                current={scaleFilters}
-                onToggle={(value) => toggleMultiValue(value, scaleFilters, setScaleFilters, scaleOptions)}
-                format={(value) => `SF ${value}`}
-              />
-              <SingleFilterGroup
-                label="Phase"
-                options={["all", ...phaseOptions]}
-                current={phaseFilter}
-                onSelect={setPhaseFilter}
-                format={(value) => (value === "all" ? "All phases" : value)}
-              />
-              <SingleFilterGroup
-                label="Tuning"
-                options={tuningOptions}
-                current={tuningFilter}
-                onSelect={setTuningFilter}
-                format={(value) => (value === "all" ? "All tuning" : value)}
-              />
-              <SingleFilterGroup
-                label="Trust"
-                options={trustOptions}
-                current={trustFilter}
-                onSelect={setTrustFilter}
-                format={(value) => (value === "all" ? "All trust tiers" : value)}
-              />
-              <SingleFilterGroup
-                label="Date window"
-                options={["all", "30d", "90d", "365d"]}
-                current={dateWindow}
-                onSelect={setDateWindow}
-                format={(value) => (value === "all" ? "All time" : `Last ${value}`)}
-              />
-            </div>
-          </section>
-
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {filteredMetaLeaderboard && (
           <MetaLeaderboard
             data={filteredMetaLeaderboard}
             mode={mode}
@@ -335,57 +322,81 @@ export function Home(_: RoutableProps) {
             cohortHref={buildCohortHref}
             platformHref={buildPlatformHref}
           />
-        </>
-      )}
+        )}
 
-      {filteredMetaLeaderboard && filteredMetaLeaderboard.cohorts.length === 0 && (
-        <section class="mb-12 rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-400">
-          No leaderboard cells match the current filters.
-        </section>
-      )}
+        {filteredMetaLeaderboard && filteredMetaLeaderboard.cohorts.length === 0 && (
+          <section class="mb-12 rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-400">
+            No leaderboard cells match the current filters.
+          </section>
+        )}
 
-      <section class="mb-12">
-        <h2 class="mb-4 text-xl font-semibold text-gray-900">Recent Results</h2>
-        <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="table-th">Benchmark</th>
-                <th class="table-th">Platform</th>
-                <th class="table-th">Scale</th>
-                <th class="table-th">Date</th>
-                <th class="table-th">Power Score</th>
-                <th
-                  class="table-th"
-                  title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
-                >
-                  Geomean (ms)
-                </th>
-                <th class="table-th" />
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 bg-white">
-              {recent.map((result) => (
-                <RecentRow key={result.result_id} entry={result} />
-              ))}
-            </tbody>
-          </table>
+        <div class="mb-12 grid grid-cols-3 gap-6 text-center">
+          <StatCard value={results.length} label="Results" />
+          <StatCard value={benchmarks.length} label="Benchmarks" />
+          <StatCard value={platformIds.length} label="Platforms" />
         </div>
-      </section>
 
-      <div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
-        <BrowseSection
-          title="Browse by Benchmark"
-          items={benchmarks}
-          hrefFn={(benchmark) => `/results/${benchmark}/`}
-          labelFn={humanizeBenchmark}
-        />
-        <BrowseSection
-          title="Browse by Platform"
-          items={platformIds}
-          hrefFn={(platformId) => `/results/p/${platformId}/`}
-          labelFn={(platformId) => platformIdToName.get(platformId) ?? platformId}
-        />
+        <section class="mb-12 rounded-xl border border-brand-200 bg-brand-50 p-6 shadow-sm">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-xl font-semibold text-gray-900">
+                Run BenchBox on your platform and submit your results
+              </h2>
+              <p class="mt-2 max-w-2xl text-sm text-gray-600">
+                The Phase 2 workflow is simple: run a benchmark, package it with{" "}
+                <code class="rounded bg-white px-1 py-0.5 text-xs">benchbox submit</code>, then
+                open a PR against the public corpus.
+              </p>
+            </div>
+            <a href="/docs/contributing-results.html" class="btn-primary text-sm text-center">
+              Submit a Result
+            </a>
+          </div>
+        </section>
+
+        <section class="mb-12">
+          <h2 class="mb-4 text-xl font-semibold text-gray-900">Recent Results</h2>
+          <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="table-th">Benchmark</th>
+                  <th class="table-th">Platform</th>
+                  <th class="table-th">Scale</th>
+                  <th class="table-th">Date</th>
+                  <th class="table-th">Power Score</th>
+                  <th
+                    class="table-th"
+                    title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
+                  >
+                    Geomean (ms)
+                  </th>
+                  <th class="table-th" />
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 bg-white">
+                {recent.map((result) => (
+                  <RecentRow key={result.result_id} entry={result} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
+          <BrowseSection
+            title="Browse by Benchmark"
+            items={benchmarks}
+            hrefFn={(benchmark) => `/results/${benchmark}/`}
+            labelFn={humanizeBenchmark}
+          />
+          <BrowseSection
+            title="Browse by Platform"
+            items={platformIds}
+            hrefFn={(platformId) => `/results/p/${platformId}/`}
+            labelFn={(platformId) => platformIdToName.get(platformId) ?? platformId}
+          />
+        </div>
       </div>
     </div>
   );
@@ -414,32 +425,6 @@ function matchesMultiFilter(value: string, selected: string[]): boolean {
   return selected.length === 0 || selected.includes(value);
 }
 
-function toggleMultiValue(
-  value: string,
-  current: string[],
-  setCurrent: (values: string[]) => void,
-  allValues: string[],
-) {
-  if (current.length === 0) {
-    setCurrent([value]);
-    return;
-  }
-
-  const base = new Set(current);
-  if (base.has(value)) {
-    base.delete(value);
-  } else {
-    base.add(value);
-  }
-
-  if (base.size === 0 || base.size === allValues.length) {
-    setCurrent([]);
-    return;
-  }
-
-  setCurrent(allValues.filter((candidate) => base.has(candidate)));
-}
-
 function StatCard({ value, label }: { value: number; label: string }) {
   return (
     <div class="card">
@@ -449,41 +434,88 @@ function StatCard({ value, label }: { value: number; label: string }) {
   );
 }
 
-function FilterGroup({
+function MultiSelectFilter({
+  label,
+  allLabel,
+  options,
+  current,
+  onSelect,
+  format,
+}: {
+  label: string;
+  allLabel: string;
+  options: string[];
+  current: string[];
+  onSelect: (value: string) => void;
+  format: (value: string) => string;
+}) {
+  if (options.length === 0) return null;
+  const value = current.length === 0 ? "all" : current.length === 1 ? current[0] : "__multiple";
+
+  return (
+    <label class="block">
+      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+      <select
+        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-white px-3 text-sm font-medium text-gray-900"
+        value={value}
+        onChange={(event) => onSelect((event.currentTarget as HTMLSelectElement).value)}
+      >
+        <option value="all">{allLabel}</option>
+        {current.length > 1 && (
+          <option value="__multiple" disabled>
+            Multiple selected
+          </option>
+        )}
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {format(option)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SelectFilter({
   label,
   options,
   current,
-  onToggle,
+  onSelect,
   format,
 }: {
   label: string;
   options: string[];
-  current: string[];
-  onToggle: (value: string) => void;
+  current: string;
+  onSelect: (value: string) => void;
   format: (value: string) => string;
 }) {
   if (options.length === 0) return null;
   return (
+    <label class="block">
+      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+      <select
+        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-white px-3 text-sm font-medium text-gray-900"
+        value={current}
+        onChange={(event) => onSelect((event.currentTarget as HTMLSelectElement).value)}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {format(option)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function CoverageSummary() {
+  return (
     <div>
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Deployment / cost</div>
       <div class="flex flex-wrap gap-2">
-        {options.map((value) => {
-          const active = current.length === 0 || current.includes(value);
-          return (
-            <button
-              key={value}
-              class={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                active
-                  ? "bg-brand-600 text-white"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
-              onClick={() => onToggle(value)}
-              aria-pressed={active}
-            >
-              {format(value)}
-            </button>
-          );
-        })}
+        <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500">
+          All public coverage
+        </span>
       </div>
     </div>
   );
