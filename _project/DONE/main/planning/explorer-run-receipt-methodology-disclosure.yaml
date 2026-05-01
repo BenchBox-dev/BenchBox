@@ -2,8 +2,9 @@ id: explorer-run-receipt-methodology-disclosure
 title: "Explorer: prominent run receipt and methodology disclosure"
 worktree: main
 priority: High
-status: "In Progress"
+status: "Completed"
 category: "Result Integrity"
+completed_date: "2026-05-01"
 
 description: |
   Add a trust-forward "Run Receipt" pattern to result detail, compare, and
