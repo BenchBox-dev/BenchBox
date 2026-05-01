@@ -224,3 +224,78 @@ def test_vendored_validator_matches_develop_script() -> None:
         "AND open a PR onto `published-results` with the same change. "
         "See the docstring at the top of this file for the resync workflow."
     )
+
+
+def test_validator_prefers_per_bundle_manifest_over_legacy(tmp_path: Path) -> None:
+    """Per-bundle manifest precedence: when both ``<stem>.manifest.json`` and
+    legacy ``submission-manifest.json`` are present, the per-bundle file
+    must win. The hosted-submit CLI emits per-bundle manifests exclusively;
+    if a future refactor flips precedence so legacy beats per-bundle, hosted
+    bundles mirrored into the PR corpus would fail with confusing errors.
+    """
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    bundle_filename = "tpch_duckdb.json"
+    bundle_path = bundle_dir / bundle_filename
+    bundle_path.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
+
+    actual_hash = hashlib.sha256(bundle_path.read_bytes()).hexdigest()
+
+    per_bundle_manifest = {
+        "bundle_file": bundle_filename,
+        "bundle_hash": actual_hash,
+        "companion_hashes": {},
+    }
+    legacy_manifest = {
+        "bundle_file": bundle_filename,
+        "bundle_hash": "0" * 64,  # Wrong hash — would fail if validator picked legacy.
+        "companion_hashes": {},
+    }
+    (bundle_dir / "tpch_duckdb.manifest.json").write_text(json.dumps(per_bundle_manifest), encoding="utf-8")
+    (bundle_dir / "submission-manifest.json").write_text(json.dumps(legacy_manifest), encoding="utf-8")
+
+    proc = subprocess.run(
+        [sys.executable, str(VENDORED_VALIDATOR), str(bundle_path)],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+    )
+    output = proc.stdout + proc.stderr
+
+    assert proc.returncode == 0, f"Validator must accept bundle when per-bundle manifest matches. Output:\n{output}"
+    assert "Bundle hash mismatch" not in output, output
+
+
+def test_validator_skips_per_bundle_manifest_during_discovery(tmp_path: Path) -> None:
+    """Discovery skip: ``*.manifest.json`` files must not be discovered as
+    bundles. Without this skip, an explicit-path validation that includes
+    the per-bundle manifest fails with "JSON object" or hash errors and the
+    published-results CI workflow falsely rejects valid PRs."""
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    bundle_filename = "tpch_duckdb.json"
+    bundle_path = bundle_dir / bundle_filename
+    bundle_path.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
+
+    actual_hash = hashlib.sha256(bundle_path.read_bytes()).hexdigest()
+    manifest = {
+        "bundle_file": bundle_filename,
+        "bundle_hash": actual_hash,
+        "companion_hashes": {},
+    }
+    manifest_path = bundle_dir / "tpch_duckdb.manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    # Pass BOTH paths explicitly, mirroring how the published-results
+    # workflow may pass changed files.
+    proc = subprocess.run(
+        [sys.executable, str(VENDORED_VALIDATOR), str(bundle_path), str(manifest_path)],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+    )
+    output = proc.stdout + proc.stderr
+
+    assert proc.returncode == 0, f"Validator must skip explicit-path *.manifest.json files. Output:\n{output}"
+    # Validate exactly one bundle was processed even though two paths were passed.
+    assert "Validated 1 bundle(s)" in output or "1 bundle" in output, output

@@ -101,7 +101,7 @@ def submit_hosted_bundle(
     if response.status == 401:
         raise HostedSubmitUnauthorized("Hosted submission token was rejected by the service.")
     if response.status in _TRANSIENT_STATUS_CODES:
-        _raise_for_response(response, {})
+        _raise_for_response(response, _json_payload_or_empty(response))
 
     if response.status == 200:
         payload = _json_payload(response)
@@ -181,7 +181,7 @@ def poll_submission_status(
             backoff = min(backoff * 2, max_backoff_seconds)
             continue
         if response.status in _TRANSIENT_STATUS_CODES:
-            _raise_for_response(response, {})
+            _raise_for_response(response, _json_payload_or_empty(response))
 
         if response.status != 200:
             _raise_for_response(response, _json_payload_or_empty(response))
@@ -388,7 +388,12 @@ def _raise_for_response(response: _HTTPResponse, payload: Mapping[str, Any]) -> 
         suffix = f" Retry after {retry_after} seconds." if retry_after else ""
         raise HostedSubmitError(f"Hosted submission was rate limited.{suffix}")
     if response.status in _TRANSIENT_STATUS_CODES:
-        raise HostedSubmitError(f"Hosted submission failed after retries: HTTP {response.status}.")
+        # Surface the server-supplied diagnostic when present so contributors
+        # can see *why* the upstream is returning 5xx (e.g. "ingest-cluster
+        # restarting") instead of a bare HTTP code.
+        message = _optional_str(payload.get("message")) or _optional_str(payload.get("error"))
+        suffix = f": {message}" if message else "."
+        raise HostedSubmitError(f"Hosted submission failed after retries: HTTP {response.status}{suffix}")
     message = _optional_str(payload.get("message")) or _optional_str(payload.get("error"))
     if message:
         raise HostedSubmitError(f"Hosted submission failed: HTTP {response.status}: {message}")

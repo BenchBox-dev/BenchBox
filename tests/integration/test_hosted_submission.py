@@ -162,7 +162,7 @@ def fast_transport(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_hosted_submission_success_polls_and_records_history(
-    hosted_service, result_file: Path, monkeypatch: pytest.MonkeyPatch
+    hosted_service, result_file: Path, monkeypatch: pytest.MonkeyPatch, fast_transport
 ) -> None:
     state, service_url = hosted_service
     monkeypatch.setenv("BENCHBOX_SUBMIT_TOKEN", "test-token")
@@ -223,7 +223,7 @@ def test_hosted_submission_401_prompts_refresh_and_retries(
 
 
 def test_hosted_submission_idempotent_resubmit_returns_existing_url(
-    hosted_service, result_file: Path, monkeypatch: pytest.MonkeyPatch
+    hosted_service, result_file: Path, monkeypatch: pytest.MonkeyPatch, fast_transport
 ) -> None:
     state, service_url = hosted_service
     monkeypatch.setenv("BENCHBOX_SUBMIT_TOKEN", "test-token")

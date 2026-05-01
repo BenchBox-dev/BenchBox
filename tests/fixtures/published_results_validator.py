@@ -432,6 +432,15 @@ def discover_bundles(path: Path) -> list[Path]:
 
 
 def _is_submission_manifest_path(path: Path) -> bool:
+    """True for the legacy filename or any per-bundle ``<stem>.manifest.json``.
+
+    The trailing-suffix match is intentionally broad. Any file ending in
+    ``.manifest.json`` is treated as a sidecar regardless of stem so that
+    co-located manifest variants (per-bundle, hashing tools, ad-hoc copies)
+    are never validated as bundles. The submit CLI emits
+    ``<bundle_stem>.manifest.json`` exclusively, and the published-results
+    workflow filter mirrors this skip pattern.
+    """
     return path.name == SUBMISSION_MANIFEST_FILENAME or path.name.endswith(SUBMISSION_MANIFEST_SUFFIX)
 
 

@@ -57,12 +57,27 @@ export function Home(_: RoutableProps) {
     };
   }, []);
 
+  // Cold-load mitigation (N5 in pass-2 review): listResults() can briefly
+  // resolve to [] on a cold DuckDB-WASM attach while the meta-leaderboard
+  // succeeds, which would otherwise paint "0 Results / 0 Benchmarks /
+  // 0 Platforms" before the real corpus arrives. Retrying once is a
+  // symptom-mitigation, not a root-cause fix; we have not pinned which of
+  // (a) WASM cold-cache partial read, (b) Preact effect-cleanup race, or
+  // (c) shared initPromise in db.ts is the trigger. The diagnostic log
+  // makes future investigation possible by surfacing the exact mismatch
+  // in browser DevTools without needing to re-run the audit setup.
   const hasInconsistentEmptySnapshot = results !== null && results.length === 0 && metaLeaderboard !== null;
 
   useEffect(() => {
     if (!hasInconsistentEmptySnapshot || retriedEmptyResults.current) return;
     let cancelled = false;
     retriedEmptyResults.current = true;
+    if (typeof console !== "undefined") {
+      console.warn(
+        "[Home] Inconsistent cold-load snapshot detected: listResults()=[] but meta-leaderboard has %d cohort(s). Retrying once.",
+        metaLeaderboard?.cohorts?.length ?? 0,
+      );
+    }
     listResults()
       .then((rows) => {
         if (!cancelled) setResults(rows);
