@@ -174,6 +174,43 @@ The reason.
     assert "status: dismissed" in text
 
 
+def test_stamp_frontmatter_replaces_sequence_shaped_status_node(tmp_path: Path) -> None:
+    stem = "2026-04-29-120006-sequence-status"
+    path = tmp_path / f"{stem}.md"
+    path.write_text(
+        f"""---
+id: {stem}
+date: 2026-04-29
+status:
+  - open
+finding_kind: other
+review_context: "unit test"
+todo_id: null
+---
+
+# Test Finding
+
+## Finding
+The finding.
+
+## Why this matters
+The reason.
+
+## Suggested next steps
+- [ ] Do the thing.
+""",
+        encoding="utf-8",
+    )
+    _data, raw, body = sweep_blind_spots.split_frontmatter(path.read_text(encoding="utf-8"))
+
+    sweep_blind_spots.stamp_frontmatter(path, raw, body, "dismissed", None)
+
+    data, raw, _body = sweep_blind_spots.split_frontmatter(path.read_text(encoding="utf-8"))
+    assert data["status"] == "dismissed"
+    assert raw.splitlines().count("status: dismissed") == 1
+    assert "  - open" not in raw
+
+
 def test_append_triage_log_inserts_before_next_section(tmp_path: Path) -> None:
     path = tmp_path / "finding.md"
     path.write_text(

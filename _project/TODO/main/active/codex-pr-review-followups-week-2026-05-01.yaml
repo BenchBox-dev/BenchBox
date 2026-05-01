@@ -2,7 +2,7 @@ id: codex-pr-review-followups-week-2026-05-01
 title: "Address unresolved Codex PR review follow-ups from the week ending 2026-05-01"
 worktree: main
 priority: High
-status: Identified
+status: In Progress
 category: Testing and Quality Assurance
 
 description: |
@@ -34,7 +34,7 @@ description: |
 work:
   - id: w1
     summary: "Make blind-spot frontmatter stamping replace complete YAML nodes"
-    status: pending
+    status: done
     notes: |
       Source review comment:
         - PR #59, P2, `_project/scripts/sweep_blind_spots.py`
@@ -465,7 +465,7 @@ anti_patterns:
 
 verification:
   - description: "This TODO item validates cleanly"
-    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/codex-pr-review-followups-week-2026-05-01.yaml"
+    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/active/codex-pr-review-followups-week-2026-05-01.yaml"
     expected_output: "Validation passes with no schema or DAG errors"
   - description: "TODO dependency graph remains valid"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
