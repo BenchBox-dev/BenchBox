@@ -2,7 +2,7 @@ id: dry-run-followup-bundle-table-conditionals
 title: "Clarify or drop the plans.json / tuning.json rows in the Step 2 bundle table"
 worktree: main
 priority: Low
-status: Identified
+status: In Progress
 category: Documentation
 
 description: |
@@ -27,13 +27,24 @@ description: |
 work:
   - id: w1
     summary: "Decide whether plans/tuning files are community-submittable"
-    status: pending
+    status: done
     notes: |
-      Talk to the maintainer or check the validate-submission CI
-      behavior: does the workflow accept a community PR carrying a
-      plans.json / tuning.json sidecar? If yes -> document the
-      opt-in flags in Step 1. If no -> drop the rows from the
-      community-facing doc.
+      Decision: plans.json / tuning.json sidecars are community-submittable
+      when present next to the primary result JSON. Evidence:
+
+      - `benchbox submit` discovers `.plans.json` and `.tuning.json`
+        companions beside the source result, copies them into `bundle/`,
+        and records per-file hashes in `manifest.companion_hashes`.
+      - `scripts/validate_submission.py` treats those suffixes as companion
+        files rather than primary bundles and verifies their hashes when
+        declared in the manifest.
+      - Unit coverage in `tests/unit/cli/commands/test_submit.py` and
+        `tests/unit/scripts/test_validate_submission.py` exercises companion
+        copy and hash validation behavior.
+
+      `/code review W1`: no required issues. The decision is backed by the
+      current submission/validation contract; W2 should document the opt-in
+      flags rather than removing the rows.
 
   - id: w2
     summary: "Apply the chosen change to docs/contributing-results.md"
