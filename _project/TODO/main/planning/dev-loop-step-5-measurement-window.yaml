@@ -54,16 +54,41 @@ work:
     status: pending
     needs: [w1]
     notes: |
-      Run `make dev-loop-metrics WINDOW=30d` (added in Step 4 w5).
-      Capture output. If artifacts coverage is below 80% of merges
-      (i.e., emission failures), extend the window 7 days and retry.
-      Also capture the raw JSON summary if the target supports it
-      (`make dev-loop-metrics WINDOW=30d FORMAT=json`), because w3 needs
-      exact counts for threshold evaluation.
+      Run `make dev-loop-metrics DEV_LOOP_METRICS_DAYS=30
+      DEV_LOOP_METRICS_LIMIT=500`. The target downloads `metrics`
+      artifacts from `develop-post-merge.yml` runs in the window and
+      prints PR-to-merge P50/P95, post-merge red rate, conflict rate,
+      and runner-minutes total. Capture stdout to the measurement
+      record below.
+
+      Output is plain text only; the target does not emit JSON. To
+      compute additional aggregates beyond the printed lines, download
+      the raw artifacts and aggregate with `jq`:
+
+        gh run list --workflow develop-post-merge.yml --branch develop \
+          --event push --created ">=<start>" --limit 500 \
+          --json databaseId --jq '.[].databaseId' \
+        | xargs -I{} gh run download {} -n metrics -D /tmp/metrics/{}
+        jq -s '...' /tmp/metrics/*/*.json
+
+      If artifact coverage is below 80% of merges (i.e., emission
+      failures), extend the window 7 days and retry.
+
+      Cross-run derivation needed for Step 4 placeholder fields:
+      `next_green_develop_run_at` and `time_to_recover_red_seconds` are
+      emitted as `null` in each per-SHA metrics file because recovery
+      can only be observed on a *later* SHA's run. W2 must pair each
+      `post_merge_red=true` artifact with the next chronologically
+      newer artifact whose `lint` and `fast-test` jobs succeeded, and
+      derive `time_to_recover_red_seconds` from the gap between
+      `develop_red_detected_at` and the next-green run's `merged_at`.
+      Store the derived series in the measurement record alongside the
+      raw printout.
 
       Metrics must combine:
         - Step 4 metrics artifacts (PR open->merged, post-merge red,
-          time-to-revert-PR, time-to-recover, runner minutes)
+          time-to-revert-PR, runner minutes; recovery time derived as
+          above)
         - PR audit for the same window:
           `gh pr list --state all --base develop --search "updated:>=<start>"`
           and labels/comments containing `queue:conflict`,
@@ -94,7 +119,11 @@ work:
 
       Data-source rules:
         - Use Step 4 artifacts for PR open->merged, post-merge red,
-          time-to-revert-PR, time-to-recover, and runner minutes.
+          time-to-revert-PR, and runner minutes.
+        - Use the cross-run derivation from w2 for time-to-recover red
+          develop. The per-SHA `time_to_recover_red_seconds` field is
+          emitted as `null` by Step 4 by design; the value is computed
+          in w2 by pairing red runs with the next green run.
         - Use the PR audit from w2 for cross-PR conflict repairs/week.
         - Count orphaned failed PRs from PRs labeled/commented as failed,
           conflicted, auto-reverted, or develop-red with no new commit,
@@ -202,7 +231,7 @@ metadata:
   created_date: "2026-04-30"
   due_date: "2026-05-30"
   step4_merged_at: "2026-04-30T21:33:45Z"
-  last_updated: "2026-04-30T21:33:45Z"
+  last_updated: "2026-04-30"
 
 impact:
   business_value: |
