@@ -655,8 +655,31 @@ work:
 
   - id: w13
     summary: "Apply test-plan errata (E1 / S2.2 Speedup) and promote QA plan to docs/operations/results-explorer-qa.md"
-    status: pending
+    status: done
     notes: |
+      Completed doc promotion:
+        - Corrected S2.2 speedup wording in the pass-2 audit plan:
+          best-in-cohort is `1.00×`, slower entries are below `1.00×`.
+        - Promoted the corrected plan to
+          `docs/operations/results-explorer-qa.md`.
+        - Replaced the older operations doc placeholder sections with
+          the full pass-2 QA checklist.
+        - Added `Prereqs (operator)` instructions for
+          `cd results-explorer && npm run dev` and fixture refresh.
+        - Added expected-hidden-controls notes for trust chips, tuning
+          dropdowns, and empty facet buckets.
+        - The promoted plan includes the W12 Q1 resolution:
+          `?metric=` is not a supported URL contract, and no primary
+          metric toggle is expected.
+
+      Verification:
+        - `rg '<…>|<\\.\\.\\.>|§[0-9].*<|manual QA test plan|Created|Last revised' docs/operations/results-explorer-qa.md`
+          returned no matches.
+        - `uv run --project _project/scripts --no-sync -- python _project/scripts/validate_todo.py _project/TODO/main/active/results-explorer-qa-pass2-fixes.yaml`
+          passed.
+        - `git diff --check` passed.
+        - `/code review W13`: no required issues.
+
       Two-part doc work:
 
       Part 1 — fix the Speedup expectation in the pass-2 plan

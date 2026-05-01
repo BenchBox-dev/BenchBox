@@ -77,7 +77,8 @@ Test on at least Home and one ResultDetail.
 - Three modes: **times** (default), **ranks**, **speedup**. Click each.
 - Verify URL updates to `?mode=ranks` / `?mode=speedup`. `mode=times` may or may not appear in the URL — note which.
 - Reload after switching: mode persists.
-- Numbers in cells change appropriately between modes (times = ms, ranks = small ints, speedup = ratios ≥1).
+- Numbers in cells change appropriately between modes: times = ms, ranks = small ints, speedup = best-in-cohort
+  `1.00×` with slower entries below `1.00×`.
 
 ### S2.3 Filter chips (multi-select: Benchmark, Scale)
 - Click a chip → row toggles, URL updates (`?bm=tpch` etc., array form).
