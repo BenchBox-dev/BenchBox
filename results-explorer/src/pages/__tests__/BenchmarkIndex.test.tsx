@@ -234,8 +234,15 @@ function defaultImpl(rows: typeof RESULT_ROWS, rankings: typeof RANKING_ROWS, ce
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/results/tpch/");
   vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS));
 });
+
+function getRenderedResultOrder(container: ParentNode): string[] {
+  return Array.from(container.querySelectorAll("tbody tr[data-testid]")).map(
+    (row) => row.getAttribute("data-testid") ?? "",
+  );
+}
 
 // ---------------------------------------------------------------------------
 // (a) Matrix view is the default
@@ -245,14 +252,32 @@ describe("BenchmarkIndex", () => {
   it("renders the page title", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByText("TPC-H Results")).toBeTruthy());
+    expect(document.title).toBe("TPC-H · BenchBox Results");
+  });
+
+  it("sets the not-found title for unknown benchmark slugs", async () => {
+    render(<BenchmarkIndex benchmark="does-not-exist" />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "404" })).toBeTruthy());
+    await waitFor(() => expect(document.title).toBe("Not found · BenchBox Results"));
   });
 
   it("shows QueryHeatmap (query column headers) by default", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => {
-      expect(screen.getByText("Q1")).toBeTruthy();
-      expect(screen.getByText("Q2")).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^Q2/ })).toBeTruthy();
     });
+  });
+
+  it("matrix view sorts rows from query headers", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
+
+    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    fireEvent.click(screen.getByRole("button", { name: /^Q1/ }));
+    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    fireEvent.click(screen.getByRole("button", { name: /^Q1/ }));
+    expect(getRenderedResultOrder(container)).toEqual(["r2", "r1"]);
   });
 
   it("shows platform names from the summary", async () => {
@@ -276,9 +301,20 @@ describe("BenchmarkIndex", () => {
     fireEvent.click(listBtn);
 
     // List view shows a table with Geomean column but no query columns
-    await waitFor(() => expect(screen.getByText("Geomean (ms)")).toBeTruthy());
-    expect(screen.queryByText("Q1")).toBeNull();
-    expect(screen.queryByText("Q2")).toBeNull();
+    await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Q2/ })).toBeNull();
+  });
+
+  it("list view sorts rows from table headers", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+    fireEvent.click(screen.getByText("List"));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
+    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    fireEvent.click(screen.getByRole("button", { name: /Geomean/ }));
+    expect(getRenderedResultOrder(container)).toEqual(["r2", "r1"]);
   });
 
   // -----------------------------------------------------------------------
@@ -356,6 +392,9 @@ describe("BenchmarkIndex", () => {
 
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("phase")).toBe("standard"),
+    );
 
     // Verify the last benchmark_rankings call targets "standard" (any earlier
     // call may still use the default phase filter before results resolve).
@@ -363,5 +402,39 @@ describe("BenchmarkIndex", () => {
       String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
     );
     expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "standard"]);
+  });
+
+  it("coerces an unavailable phase URL value to the rendered cohort phase", async () => {
+    window.history.replaceState(null, "", "/results/tpch/?sf=0.1&phase=standard");
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    // "power" is the useUrlState default, so correcting to it strips the
+    // phase key rather than leaving a redundant `?phase=power` param.
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("phase")).toBeNull(),
+    );
+
+    const rankingCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+      String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
+    );
+    expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "power"]);
+  });
+
+  it("coerces an invalid scale-factor URL value to the rendered scale", async () => {
+    window.history.replaceState(null, "", "/results/tpch/?sf=abc");
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("sf")).toBe("0.1"),
+    );
+
+    const rankingCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+      String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
+    );
+    expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "power"]);
   });
 });

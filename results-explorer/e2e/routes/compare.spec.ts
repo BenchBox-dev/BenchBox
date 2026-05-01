@@ -52,6 +52,16 @@ test.describe("Compare", () => {
       .toMatch(/^[0-9a-f]{8},[0-9a-f]{8}$/);
   });
 
+  test("a single-id compare URL redirects to the result detail page", async ({ page }) => {
+    await page.goto(`/results/compare?ids=${SHORT_DUCKDB}`);
+    await waitForShell(page);
+
+    await expect(page).toHaveURL(new RegExp(`/results/r/${LONG_DUCKDB}$`), {
+      timeout: 20_000,
+    });
+    await waitForDataLoaded(page, /Query Timings/);
+  });
+
   test("Share URL button copies the current URL and updates its label", async ({
     page,
     context,

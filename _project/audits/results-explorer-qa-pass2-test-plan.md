@@ -77,7 +77,8 @@ Test on at least Home and one ResultDetail.
 - Three modes: **times** (default), **ranks**, **speedup**. Click each.
 - Verify URL updates to `?mode=ranks` / `?mode=speedup`. `mode=times` may or may not appear in the URL — note which.
 - Reload after switching: mode persists.
-- Numbers in cells change appropriately between modes (times = ms, ranks = small ints, speedup = ratios ≥1).
+- Numbers in cells change appropriately between modes: times = ms, ranks = small ints, speedup = best-in-cohort
+  `1.00×` with slower entries below `1.00×`.
 
 ### S2.3 Filter chips (multi-select: Benchmark, Scale)
 - Click a chip → row toggles, URL updates (`?bm=tpch` etc., array form).
@@ -177,9 +178,11 @@ Sample IDs (pick at least one from each combination):
 - Trust badge and Tuning badge render with the right label/color for the bundle's metadata.
 - Methodology disclosure expands and collapses.
 
-### S5.2 Primary metric (`?metric=`)
-- URL accepts `?metric=power_score` and `?metric=display_geomean_ms`. Charts and the headline number switch.
-- **Pass-1 open question (Q1):** there is no in-page toggle UI for this. Confirm whether you see one. If not, that's the answer to Q1 — report status: Q.
+### S5.2 Primary metric (benchmark-derived)
+- Primary metric is derived from the published DuckDB ranking metadata for the result's benchmark.
+- `?metric=` is **not** a supported URL contract. Adding `?metric=power_score` or
+  `?metric=display_geomean_ms` must not switch chart semantics or headline values.
+- No in-page primary-metric toggle is expected.
 
 ### S5.3 Median timings table (sort: query_id / display_ms / sample_count)
 - Click each header, cycle asc → desc → asc. Indicator updates.
@@ -215,8 +218,10 @@ Sample IDs (pick at least one from each combination):
 - Compare across **different benchmarks** (`tpch` + `star_schema`) — banner should appear or compare should refuse.
 - Banner text is specific (names the dimension that differs), not generic.
 
-### S6.4 Primary metric (`?metric=`)
-- Same as S5.2 — `?metric=` accepted, no in-page toggle expected. Confirm.
+### S6.4 Primary metric (benchmark-derived)
+- Same as S5.2: primary metric is benchmark-derived from DuckDB ranking metadata.
+- `?metric=` is **not** a supported URL contract and must not switch Compare chart semantics.
+- No in-page primary-metric toggle is expected.
 
 ### S6.5 Bad inputs
 - `?ids=` empty → friendly error.

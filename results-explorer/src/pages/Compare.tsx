@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { route } from "preact-router";
 import type { RoutableProps } from "preact-router";
 import type { DetailResult } from "@/types";
 import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId, toShortIds } from "@/lib/duckdbQueries";
@@ -13,14 +14,27 @@ import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { perQuerySpeedup, vsSlowestRatio } from "@/lib/chartMath";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
+
+type PrimaryMetric = "power_score" | "display_geomean_ms";
+interface CompareState {
+  results: DetailResult[];
+  primaryMetric: PrimaryMetric;
+}
+
+const EMPTY_RESULTS: DetailResult[] = [];
 
 export function Compare(_: RoutableProps) {
-  const [results, setResults] = useState<DetailResult[]>([]);
-  const [primaryMetric, setPrimaryMetric] = useState<"power_score" | "display_geomean_ms">("display_geomean_ms");
+  const [compareState, setCompareState] = useState<CompareState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const results = compareState?.results ?? EMPTY_RESULTS;
+  const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
+  useDocumentTitle(
+    results.length > 0 ? `Compare (${results.length}) · BenchBox Results` : "Compare · BenchBox Results",
+  );
   useEffect(() => {
     let cancelled = false;
 
@@ -35,6 +49,33 @@ export function Compare(_: RoutableProps) {
     if (ids.length === 0) {
       setError("No result IDs provided. Add ?ids=id1,id2 to the URL.");
       setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (ids.length === 1) {
+      resolveShortId(ids[0]!)
+        .then(async (resolvedId) => {
+          if (cancelled) return;
+          const detail = await getDetailResult(resolvedId);
+          if (cancelled) return;
+          if (detail === null) {
+            setError(
+              `No result found for: ${resolvedId}. ` +
+                "These results may have been removed from the published dataset.",
+            );
+            setLoading(false);
+            return;
+          }
+          route(`/results/r/${encodeURIComponent(resolvedId)}`, true);
+        })
+        .catch((err: unknown) => {
+          if (!cancelled) {
+            setError(errMsg(err));
+            setLoading(false);
+          }
+        });
       return () => {
         cancelled = true;
       };
@@ -81,8 +122,7 @@ export function Compare(_: RoutableProps) {
 
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
-        setPrimaryMetric(metric);
-        setResults(details);
+        setCompareState({ results: details, primaryMetric: metric });
         setLoading(false);
       })
       .catch((err: unknown) => {

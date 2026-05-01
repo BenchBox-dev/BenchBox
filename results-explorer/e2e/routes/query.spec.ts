@@ -46,6 +46,22 @@ test.describe("Query workbench", () => {
     await expect(header).toContainText("↓");
   });
 
+  test("row-limit toggle updates the URL and shows the all-rows footer", async ({ page }) => {
+    await page.goto("/results/query");
+    await waitForDataLoaded(page, /matching result bundle/);
+
+    await page.getByRole("button", { name: /^All$/ }).click();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("limit"))
+      .toBe("all");
+    await expect(page.getByText(/Showing all returned rows:/)).toBeVisible();
+
+    await page.getByRole("button", { name: /^Default$/ }).click();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("limit"))
+      .toBeNull();
+  });
+
   test("toggling a column off removes it from the rendered table", async ({ page }) => {
     await page.goto("/results/query");
     await waitForDataLoaded(page, /matching result bundle/);

@@ -19,7 +19,7 @@
 
 import { useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import type { BenchmarkSummary, PlatformRow } from "@/types";
+import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import { TrustBadge } from "@/components/TrustBadge";
 import { fmtMs, fmtScore, fmtGeomean, complianceLabel } from "@/utils";
 
@@ -80,6 +80,10 @@ export function QueryHeatmap({
   // Determine primary display metric from the artifact's ranking config.
   const primaryMetric = ranking?.primary_metric ?? "display_geomean_ms";
   const higherIsBetter = ranking?.primary_order === "desc";
+  const defaultPrimaryDirection: SortDirection = higherIsBetter ? "desc" : "asc";
+  type MatrixSortKey = "platform" | "primary" | "geomean" | `query:${string}`;
+  const [sort, setSort] = useState<SortState<MatrixSortKey> | null>(null);
+  const activeSort = sort ?? { key: "primary", direction: defaultPrimaryDirection };
 
   function getPrimaryValue(row: PlatformRow): number | null {
     return primaryMetric === "power_score" ? row.power_score : row.display_geomean_ms;
@@ -90,18 +94,41 @@ export function QueryHeatmap({
     return primaryMetric === "power_score" ? fmtScore(val) : fmtGeomean(val);
   }
 
-  // Sort: eligible rows first, then by primary metric.
-  const sorted = [...platforms].sort((a, b) => {
-    if (a.is_ranking_eligible !== b.is_ranking_eligible) {
-      return a.is_ranking_eligible ? -1 : 1;
+  function compareNullableNumber(a: number | null, b: number | null, direction: SortDirection): number {
+    // Keep missing metrics last in both directions so sorting never hides
+    // populated rows below gaps.
+    if (a === null && b === null) return 0;
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return direction === "asc" ? a - b : b - a;
+  }
+
+  function compareMatrixRows(a: PlatformRow, b: PlatformRow, current: SortState<MatrixSortKey>): number {
+    if (current.key === "platform") {
+      return current.direction === "asc"
+        ? a.platform.localeCompare(b.platform)
+        : b.platform.localeCompare(a.platform);
     }
-    const av = getPrimaryValue(a);
-    const bv = getPrimaryValue(b);
-    if (av === null && bv === null) return 0;
-    if (av === null) return 1;
-    if (bv === null) return -1;
-    return higherIsBetter ? bv - av : av - bv;
-  });
+    if (current.key === "primary") {
+      if (a.is_ranking_eligible !== b.is_ranking_eligible) {
+        return a.is_ranking_eligible ? -1 : 1;
+      }
+      return compareNullableNumber(getPrimaryValue(a), getPrimaryValue(b), current.direction);
+    }
+    if (current.key === "geomean") {
+      return compareNullableNumber(a.display_geomean_ms, b.display_geomean_ms, current.direction);
+    }
+    if (current.key.startsWith("query:")) {
+      const queryId = current.key.slice("query:".length);
+      return compareNullableNumber(a.timings[queryId] ?? null, b.timings[queryId] ?? null, current.direction);
+    }
+    return 0;
+  }
+
+  const sorted = useMemo(
+    () => [...platforms].sort((a, b) => compareMatrixRows(a, b, activeSort)),
+    [activeSort, platforms],
+  );
 
   /** Returns the short_id for a row if available, otherwise falls back to result_id.
    *  The short_id is used for Compare URLs so bookmarks stay compact. */
@@ -116,6 +143,35 @@ export function QueryHeatmap({
     if (next.has(key)) next.delete(key);
     else next.add(key);
     onSelectionChange(next);
+  }
+
+  function toggleSort(key: MatrixSortKey, initialDirection: SortDirection = "asc") {
+    setSort((prev) => {
+      const current = prev ?? { key: "primary" as const, direction: defaultPrimaryDirection };
+      if (current.key === key) {
+        return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key, direction: initialDirection };
+    });
+  }
+
+  function ariaSort(key: MatrixSortKey): "ascending" | "descending" | "none" {
+    if (activeSort.key !== key) return "none";
+    return activeSort.direction === "asc" ? "ascending" : "descending";
+  }
+
+  function sortArrow(key: MatrixSortKey) {
+    if (activeSort.key !== key) return " ↕";
+    return activeSort.direction === "asc" ? " ↑" : " ↓";
+  }
+
+  function sortAnnouncement(key: MatrixSortKey) {
+    if (activeSort.key !== key) return null;
+    return (
+      <span class="sr-only">
+        {activeSort.direction === "asc" ? "sorted ascending" : "sorted descending"}
+      </span>
+    );
   }
 
   /** Keyboard handler for query timing cells - implements roving tabindex. */
@@ -192,8 +248,20 @@ export function QueryHeatmap({
           <thead class="bg-gray-50">
             <tr role="row">
               {hasSelection && <th role="columnheader" scope="col" aria-label="Select for comparison" class="table-th w-8 px-2" />}
-              <th role="columnheader" scope="col" class="table-th sticky left-0 z-10 min-w-44 bg-gray-50">
-                Platform
+              <th
+                role="columnheader"
+                scope="col"
+                class="sticky left-0 z-10 min-w-44 bg-gray-50 p-0"
+                aria-sort={ariaSort("platform")}
+              >
+                <button
+                  type="button"
+                  class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
+                  onClick={() => toggleSort("platform")}
+                >
+                  Platform{sortArrow("platform")}
+                  {sortAnnouncement("platform")}
+                </button>
               </th>
               <th role="columnheader" scope="col" class="table-th sticky left-44 z-10 whitespace-nowrap bg-gray-50">
                 Trust
@@ -201,20 +269,35 @@ export function QueryHeatmap({
               <th
                 role="columnheader"
                 scope="col"
-                aria-sort={higherIsBetter ? "descending" : "ascending"}
-                class="table-th whitespace-nowrap"
+                aria-sort={ariaSort("primary")}
+                class="whitespace-nowrap p-0"
                 title={primaryLabel}
               >
-                {primaryLabel}
+                <button
+                  type="button"
+                  class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
+                  onClick={() => toggleSort("primary", defaultPrimaryDirection)}
+                >
+                  {primaryLabel}{sortArrow("primary")}
+                  {sortAnnouncement("primary")}
+                </button>
               </th>
               {showGeomeanCol && (
                 <th
                   role="columnheader"
                   scope="col"
-                  class="table-th whitespace-nowrap text-gray-400"
+                  class="whitespace-nowrap p-0"
+                  aria-sort={ariaSort("geomean")}
                   title="Geometric mean of per-query display times"
                 >
-                  Geomean
+                  <button
+                    type="button"
+                    class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left text-gray-400"
+                    onClick={() => toggleSort("geomean")}
+                  >
+                    Geomean{sortArrow("geomean")}
+                    {sortAnnouncement("geomean")}
+                  </button>
                 </th>
               )}
               {query_ids.map((qid) => (
@@ -222,9 +305,17 @@ export function QueryHeatmap({
                   key={qid}
                   role="columnheader"
                   scope="col"
-                  class="table-th whitespace-nowrap font-mono"
+                  class="whitespace-nowrap p-0 font-mono"
+                  aria-sort={ariaSort(`query:${qid}`)}
                 >
-                  {qid}
+                  <button
+                    type="button"
+                    class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left font-mono"
+                    onClick={() => toggleSort(`query:${qid}`)}
+                  >
+                    {qid}{sortArrow(`query:${qid}`)}
+                    {sortAnnouncement(`query:${qid}`)}
+                  </button>
                 </th>
               ))}
             </tr>
@@ -236,6 +327,7 @@ export function QueryHeatmap({
                 <tr
                   key={row.result_id}
                   role="row"
+                  data-testid={row.result_id}
                   class={`hover:bg-gray-50 ${isSelected ? "bg-blue-50" : ""}`}
                 >
                   {hasSelection && (

@@ -21,7 +21,7 @@ vi.mock("@/lib/duckdbQueries", async () => {
   };
 });
 
-import { getDetailResult } from "@/lib/duckdbQueries";
+import { getDetailResult, getPrimaryMetricForBenchmark } from "@/lib/duckdbQueries";
 import { ResultDetail } from "@/pages/ResultDetail";
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,9 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
 
 describe("ResultDetail - median-first contract", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(getDetailResult).mockResolvedValue(makeDetail());
+    vi.mocked(getPrimaryMetricForBenchmark).mockResolvedValue("power_score");
   });
 
   it("(a) default table shows one row per display_timing, not per raw query", async () => {
@@ -86,6 +88,7 @@ describe("ResultDetail - median-first contract", () => {
 
     // Header should show display_timings count
     expect(screen.getByText("Query Timings (2)")).toBeTruthy();
+    await waitFor(() => expect(document.title).toBe("TPC-H · DuckDB · SF0.1 · BenchBox Results"));
 
     // The main table has "Median (ms)" column header (not "Duration (ms)")
     expect(screen.getAllByText(/Median \(ms\)/i).length).toBeGreaterThan(0);
@@ -106,6 +109,15 @@ describe("ResultDetail - median-first contract", () => {
     const sampleCells = screen.getAllByText("3");
     // At least 2 cells showing "3" (one per query in display_timings)
     expect(sampleCells.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("ignores metric URL params and uses the canonical benchmark metric", async () => {
+    window.history.replaceState(null, "", "/results/r/r1?metric=display_geomean_ms");
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch");
   });
 
   it("(c) expanding 'Individual samples' reveals raw queries table", async () => {

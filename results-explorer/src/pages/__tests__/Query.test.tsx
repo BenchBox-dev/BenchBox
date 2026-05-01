@@ -7,6 +7,7 @@ vi.mock("@/db", () => ({
 }));
 
 import { getDb, queryRows } from "@/db";
+import { DEFAULT_ROW_LIMIT, UNLIMITED_ROW_LIMIT } from "@/lib/queryFilters";
 import { Query } from "@/pages/Query";
 
 const SCHEMA = {
@@ -139,6 +140,7 @@ describe("Query", () => {
   it("loads facet counts and table rows from DuckDB", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+    expect(document.title).toBe("Query · BenchBox Results");
     const resultsTable = screen.getAllByRole("table")[0]!;
 
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
@@ -166,6 +168,47 @@ describe("Query", () => {
       );
       expect(selectCalls.at(-1)?.[0]).toContain("ORDER BY benchmark ASC");
     });
+  });
+
+  it("switches the result table row limit through URL state", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const selectCallsBefore = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+      String(sql).includes("SELECT benchmark, platform, scale_factor"),
+    );
+    expect(selectCallsBefore.at(-1)?.[0]).toContain(`LIMIT ${DEFAULT_ROW_LIMIT}`);
+
+    fireEvent.click(screen.getByRole("button", { name: /^All$/ }));
+
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("limit")).toBe("all"),
+    );
+    await waitFor(() => {
+      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+        String(sql).includes("SELECT benchmark, platform, scale_factor"),
+      );
+      expect(selectCalls.at(-1)?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
+    });
+    expect(screen.getByText("Showing all returned rows: 2")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Default$/ }));
+
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("limit")).toBeNull(),
+    );
+  });
+
+  it("coerces invalid row-limit URL state back to the default", async () => {
+    window.history.replaceState(null, "", "/results/query?limit=bogus");
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("limit")).toBeNull(),
+    );
+    expect(screen.getByRole("button", { name: /^Default$/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("exports the current table rows as CSV", async () => {

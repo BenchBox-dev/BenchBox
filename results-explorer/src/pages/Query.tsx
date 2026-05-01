@@ -15,6 +15,7 @@ import {
 } from "@/lib/queryFilters";
 import { getTableSchema, type SchemaColumn } from "@/lib/duckdbSchema";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 const EMPTY_STRING_ARRAY: string[] = [];
 
@@ -37,6 +38,7 @@ const DEFAULT_COLUMNS = [
 ];
 
 export function Query(_: RoutableProps) {
+  useDocumentTitle("Query · BenchBox Results");
   const [benchmarks, setBenchmarks] = useUrlState<string[]>("benchmark", EMPTY_STRING_ARRAY, arraySerde);
   const [platforms, setPlatforms] = useUrlState<string[]>("platform", EMPTY_STRING_ARRAY, arraySerde);
   const [scaleFactors, setScaleFactors] = useUrlState<string[]>("sf", EMPTY_STRING_ARRAY, arraySerde);
@@ -47,6 +49,7 @@ export function Query(_: RoutableProps) {
     EMPTY_STRING_ARRAY,
     arraySerde,
   );
+  const [rowLimitRaw, setRowLimitRaw] = useUrlState<string>("limit", "default", stringSerde);
   const [hasCost, setHasCost] = useUrlState<string>("has_cost", "all", stringSerde);
   const [dateWindow, setDateWindow] = useUrlState<string>("window", "all", stringSerde);
   const [schema, setSchema] = useState<SchemaColumn[]>([]);
@@ -60,6 +63,8 @@ export function Query(_: RoutableProps) {
   const [sqlRows, setSqlRows] = useState<ResultRow[]>([]);
   const [sqlError, setSqlError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
+  const rowLimit = rowLimitMode === "all" ? UNLIMITED_ROW_LIMIT : DEFAULT_ROW_LIMIT;
 
   const filters: QueryFilterState = useMemo(
     () => ({
@@ -74,6 +79,11 @@ export function Query(_: RoutableProps) {
     }),
     [benchmarks, dateWindow, hasCost, platforms, scaleFactors, trustTiers, tuningModes, validationStatuses],
   );
+
+  useEffect(() => {
+    if (rowLimitRaw === "default" || rowLimitRaw === "all") return;
+    setRowLimitRaw("default");
+  }, [rowLimitRaw, setRowLimitRaw]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,7 +121,7 @@ export function Query(_: RoutableProps) {
       has_cost: buildFacetCountQuery("cost_usd", filters, { exclude: "hasCost", derived: "has_cost" }),
       date_window: buildFacetCountQuery("run_date", filters, { exclude: "dateWindow", derived: "date_window" }),
     };
-    const selectQuery = buildSelectQuery(filters, visibleColumns, sort);
+    const selectQuery = buildSelectQuery(filters, visibleColumns, sort, rowLimit);
 
     Promise.all([
       queryRows<ResultRow>(selectQuery.sql, selectQuery.params),
@@ -133,7 +143,7 @@ export function Query(_: RoutableProps) {
         setError(err instanceof Error ? err.message : "DuckDB query failed");
         setLoading(false);
       });
-  }, [filters, schema, sort, visibleColumns]);
+  }, [filters, rowLimit, schema, sort, visibleColumns]);
 
   const sqlColumns = useMemo(() => [...new Set(sqlRows.flatMap((row) => Object.keys(row)))], [sqlRows]);
 
@@ -165,7 +175,7 @@ export function Query(_: RoutableProps) {
   }
 
   function buildSqlFromFilters() {
-    setSqlText(buildFacetSql(filters, visibleColumns, sort));
+    setSqlText(buildFacetSql(filters, visibleColumns, sort, rowLimit));
   }
 
   function downloadJson() {
@@ -338,13 +348,33 @@ export function Query(_: RoutableProps) {
           <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <div class="text-sm text-gray-500">
               {rows.length} matching result bundle(s)
-              {rows.length >= DEFAULT_ROW_LIMIT && (
+              {rowLimitMode === "default" && rows.length >= DEFAULT_ROW_LIMIT && (
                 <span class="ml-2 text-xs text-amber-600">
                   (capped at {DEFAULT_ROW_LIMIT.toLocaleString()} - add more filters to narrow)
                 </span>
               )}
             </div>
             <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 text-sm text-gray-600">
+                <span class="font-medium">Rows:</span>
+                <div class="flex overflow-hidden rounded-md border border-gray-300" role="group" aria-label="Result row limit">
+                  {(["default", "all"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      class={`px-3 py-1.5 text-sm ${
+                        rowLimitMode === mode
+                          ? "bg-brand-600 text-white"
+                          : "bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                      aria-pressed={rowLimitMode === mode}
+                      onClick={() => setRowLimitRaw(mode)}
+                    >
+                      {mode === "default" ? "Default" : "All"}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button class="btn btn-secondary" onClick={buildSqlFromFilters}>
                 Build SQL From Filters
               </button>
@@ -390,6 +420,15 @@ export function Query(_: RoutableProps) {
                     </tr>
                   ))}
                 </tbody>
+                {rowLimitMode === "all" && (
+                  <tfoot class="border-t border-gray-200 bg-gray-50">
+                    <tr>
+                      <td class="table-td text-sm text-gray-500" colSpan={visibleColumns.length + 1}>
+                        Showing all returned rows: {rows.length.toLocaleString()}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           )}

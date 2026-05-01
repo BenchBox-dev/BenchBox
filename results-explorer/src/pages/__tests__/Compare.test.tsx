@@ -12,11 +12,16 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { route } from "preact-router";
 import type { DetailResult } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Mock manifest module
 // ---------------------------------------------------------------------------
+
+vi.mock("preact-router", () => ({
+  route: vi.fn(),
+}));
 
 vi.mock("@/lib/duckdbQueries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/duckdbQueries")>("@/lib/duckdbQueries");
@@ -29,7 +34,7 @@ vi.mock("@/lib/duckdbQueries", async () => {
   };
 });
 
-import { getDetailResult } from "@/lib/duckdbQueries";
+import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId } from "@/lib/duckdbQueries";
 import { Compare } from "@/pages/Compare";
 
 // ---------------------------------------------------------------------------
@@ -91,16 +96,16 @@ const SQLITE = makeResult({
   ],
 });
 
-function setupUrl(ids: string[]) {
-  // jsdom doesn't support full navigation; set search directly.
-  Object.defineProperty(window, "location", {
-    writable: true,
-    value: { ...window.location, search: `?ids=${ids.join(",")}` },
-  });
+function setupUrl(ids: string[], extraParams: Record<string, string> = {}) {
+  const params = new URLSearchParams({ ids: ids.join(","), ...extraParams });
+  window.history.replaceState(null, "", `/results/compare?${params.toString()}`);
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   setupUrl(["r1", "r2"]);
+  vi.mocked(resolveShortId).mockImplementation((id) => Promise.resolve(id));
+  vi.mocked(getPrimaryMetricForBenchmark).mockResolvedValue("power_score");
   vi.mocked(getDetailResult).mockImplementation((id) =>
     id === "r1" ? Promise.resolve(DUCKDB) : Promise.resolve(SQLITE)
   );
@@ -111,12 +116,51 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("Compare", () => {
+  it("redirects a single compare ID to its result detail page", async () => {
+    setupUrl(["a556e716"]);
+    vi.mocked(resolveShortId).mockResolvedValue("tpch-duckdb-sf0.01-20260403-7fe93365");
+
+    render(<Compare />);
+
+    await waitFor(() =>
+      expect(route).toHaveBeenCalledWith(
+        "/results/r/tpch-duckdb-sf0.01-20260403-7fe93365",
+        true,
+      ),
+    );
+    expect(getDetailResult).toHaveBeenCalledWith("tpch-duckdb-sf0.01-20260403-7fe93365");
+  });
+
+  it("keeps a single unknown compare ID on the Compare error path", async () => {
+    setupUrl(["does-not-exist"]);
+    vi.mocked(getDetailResult).mockResolvedValue(null);
+
+    render(<Compare />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/No result found for: does-not-exist/)).toBeTruthy(),
+    );
+    expect(route).not.toHaveBeenCalled();
+  });
+
+  it("keeps the empty ids error on the Compare page", async () => {
+    setupUrl([]);
+
+    render(<Compare />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/No result IDs provided/)).toBeTruthy(),
+    );
+    expect(route).not.toHaveBeenCalled();
+  });
+
   it("shows 'vs worst' speedup of 10.00x in the DuckDB summary card (power_score primary)", async () => {
     // DUCKDB power_score=3000, SQLITE power_score=300 → DuckDB vs worst = 3000/300 = 10.00x
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
+    await waitFor(() => expect(document.title).toBe("Compare (2) · BenchBox Results"));
     // The summary card dt label
     expect(screen.getAllByText(/vs worst/i).length).toBeGreaterThan(0);
     // The computed ratio: 10.00x
@@ -147,6 +191,19 @@ describe("Compare", () => {
       expect(spans.length).toBeGreaterThan(0);
     });
     // Primary label should be "Power score" (not "Geomean query time")
+    const labels = screen.getAllByText(/Power score/i);
+    expect(labels.length).toBeGreaterThan(0);
+  });
+
+  it("ignores metric URL params and uses the canonical benchmark metric", async () => {
+    setupUrl(["r1", "r2"], { metric: "display_geomean_ms" });
+
+    render(<Compare />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+    });
+    expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch");
     const labels = screen.getAllByText(/Power score/i);
     expect(labels.length).toBeGreaterThan(0);
   });

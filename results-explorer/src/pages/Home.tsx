@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import type {
   MetaCohort,
@@ -14,12 +14,16 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
 import { arraySerde, stringSerde, useUrlState } from "@/lib/useUrlState";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 const EMPTY_STRING_ARRAY: string[] = [];
 
 export function Home(_: RoutableProps) {
+  useDocumentTitle("Results · BenchBox");
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [metaLeaderboard, setMetaLeaderboard] = useState<MetaLeaderboardData | null>(null);
+  const [metaLeaderboardLoaded, setMetaLeaderboardLoaded] = useState(false);
+  const retriedEmptyResults = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [benchmarkFilters, setBenchmarkFilters] = useUrlState<string[]>("bm", EMPTY_STRING_ARRAY, arraySerde);
   const [scaleFilters, setScaleFilters] = useUrlState<string[]>("sf", EMPTY_STRING_ARRAY, arraySerde);
@@ -40,15 +44,36 @@ export function Home(_: RoutableProps) {
       });
     getMetaLeaderboardData()
       .then((data) => {
-        if (!cancelled && data) setMetaLeaderboard(data);
+        if (!cancelled) {
+          setMetaLeaderboard(data);
+          setMetaLeaderboardLoaded(true);
+        }
       })
       .catch(() => {
-        /* non-critical - hide section */
+        if (!cancelled) setMetaLeaderboardLoaded(true);
       });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const hasInconsistentEmptySnapshot = results !== null && results.length === 0 && metaLeaderboard !== null;
+
+  useEffect(() => {
+    if (!hasInconsistentEmptySnapshot || retriedEmptyResults.current) return;
+    let cancelled = false;
+    retriedEmptyResults.current = true;
+    listResults()
+      .then((rows) => {
+        if (!cancelled) setResults(rows);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(errMsg(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasInconsistentEmptySnapshot]);
 
   const resultById = useMemo(
     () => new Map((results ?? []).map((result) => [result.result_id, result])),
@@ -132,7 +157,9 @@ export function Home(_: RoutableProps) {
   ]);
 
   if (error) return <ErrorMessage message={error} />;
-  if (!results) return <LoadingSpinner message="Loading results..." />;
+  if (!results || !metaLeaderboardLoaded || hasInconsistentEmptySnapshot) {
+    return <LoadingSpinner message="Loading results..." />;
+  }
 
   const mode: MetaLeaderboardMode =
     modeRaw === "ranks" || modeRaw === "speedup" ? modeRaw : "times";
