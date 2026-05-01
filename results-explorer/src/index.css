@@ -3,16 +3,34 @@
 @tailwind utilities;
 
 @layer base {
+    :root {
+        --bb-bg-primary: #0d1117;
+        --bb-bg-panel: #161b22;
+        --bb-bg-elevated: #21262d;
+        --bb-fg-primary: #f0f6fc;
+        --bb-fg-muted: #8b949e;
+        --bb-fg-inverse: #0d1117;
+        --bb-border-default: #30363d;
+        --bb-border-subtle: #21262d;
+        --bb-accent: #58a6ff;
+        --bb-accent-hover: #1f6feb;
+        --bb-status-success: #238636;
+        --bb-status-warning: #d29922;
+        --bb-status-danger: #f85149;
+        --bb-code-bg: #161b22;
+        --bb-code-fg: #f0f6fc;
+        --bb-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+        --bb-font-mono: "SF Mono", Monaco, Inconsolata, "Roboto Mono", "Fira Code", monospace;
+        --bb-text-xs: 0.75rem;
+        --bb-text-sm: 0.875rem;
+        --bb-text-base: 1rem;
+        --bb-text-lg: 1.125rem;
+        --bb-text-xl: 1.25rem;
+        --bb-text-2xl: 1.5rem;
+    }
+
     html {
-        font-family:
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            Roboto,
-            "Helvetica Neue",
-            Arial,
-            sans-serif;
+        font-family: var(--bb-font-sans);
     }
 
     body {
