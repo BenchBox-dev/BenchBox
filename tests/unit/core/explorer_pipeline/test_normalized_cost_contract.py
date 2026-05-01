@@ -113,3 +113,39 @@ def test_deployment_metadata_serializes_stable_contract_keys() -> None:
     ]
     assert payload["warehouse_size"] == "large"
     assert payload["cloud_provider"] is None
+
+
+def test_cost_usd_alias_behavior() -> None:
+    normalized_compute = NormalizedCost(
+        normalized_cost_usd=Decimal("1.25"),
+        cost_model_version="2026.05.0",
+        cost_model_source="benchbox.core.cost.pricing",
+        cost_scope="compute_only",
+        cost_status="normalized",
+        billing_unit="instance_hour",
+        pricing_region="us-east-1",
+    )
+    normalized_storage = NormalizedCost(
+        normalized_cost_usd=Decimal("1.50"),
+        cost_model_version="2026.05.0",
+        cost_model_source="benchbox.core.cost.pricing",
+        cost_scope="compute_plus_storage",
+        cost_status="normalized",
+        billing_unit="instance_hour",
+        pricing_region="us-east-1",
+    )
+    local_not_applicable = NormalizedCost(
+        normalized_cost_usd=Decimal("0"),
+        cost_model_version="2026.05.0",
+        cost_model_source="benchbox.core.cost.pricing",
+        cost_scope="compute_only",
+        cost_status="not_applicable_local",
+        billing_unit="not_applicable",
+        pricing_region="not_applicable",
+    )
+
+    assert normalized_compute.cost_usd == Decimal("1.25")
+    assert normalized_compute.to_dict()["cost_usd"] == "1.25"
+    assert normalized_storage.cost_usd is None
+    assert normalized_storage.to_dict()["cost_usd"] is None
+    assert local_not_applicable.cost_usd is None

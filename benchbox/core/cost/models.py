@@ -48,6 +48,11 @@ class NormalizedCost:
     self-hosted runs may use `cost_status == "not_applicable_local"` with
     `normalized_cost_usd == Decimal("0")`, but consumers must still treat the
     status as non-comparable with normalized cloud cost.
+
+    Compatibility: `cost_usd` remains available as a read-only deprecated alias
+    for legacy explorer consumers. The alias is populated only when
+    `cost_status == "normalized"` and `cost_scope == "compute_only"`; it is
+    `None` for storage-inclusive, local-not-applicable, and unavailable costs.
     """
 
     normalized_cost_usd: Decimal | None
@@ -71,10 +76,19 @@ class NormalizedCost:
         if self.cost_status == "unavailable" and self.normalized_cost_usd is not None:
             raise ValueError("unavailable cost must not carry normalized_cost_usd")
 
+    @property
+    def cost_usd(self) -> Decimal | None:
+        """Deprecated compute-only alias for legacy explorer cost consumers."""
+        if self.cost_status == "normalized" and self.cost_scope == "compute_only":
+            return self.normalized_cost_usd
+        return None
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to a serialization-ready dictionary without losing Decimal precision."""
+        cost_usd = self.cost_usd
         return {
             "normalized_cost_usd": str(self.normalized_cost_usd) if self.normalized_cost_usd is not None else None,
+            "cost_usd": str(cost_usd) if cost_usd is not None else None,
             "cost_model_version": self.cost_model_version,
             "cost_model_source": self.cost_model_source,
             "cost_scope": self.cost_scope,

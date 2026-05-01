@@ -2,7 +2,7 @@ id: results-normalized-cost-contract-cloud-facets
 title: "Results pipeline: normalized cost contract and cloud deployment facets"
 worktree: main
 priority: High
-status: "Not Started"
+status: "In Progress"
 category: "Result Integrity"
 
 description: |
@@ -44,7 +44,7 @@ work:
   - id: w2
     summary: "Document cost_usd compatibility decision (alias vs hard migrate)"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Locks the open decision in `must_preserve`. RECOMMENDED resolution:
       retain `cost_usd` as a read-only deprecated alias populated from
