@@ -3,7 +3,9 @@
  *
  * Renders a BenchmarkSummary as a heat-colored table where each cell shows
  * the canonical display_ms value for (platform, query), colored per column
- * using a log10(ratio-to-fastest) scale clamped at 10× (green → red).
+ * using a log10(ratio-to-fastest) scale clamped at 10×. The default CSS path
+ * uses a single-hue sequential palette, with grayscale lightness for reduced
+ * color / high-contrast contexts.
  *
  * Accessibility:
  *   - role="grid" on the table; role="gridcell" on data cells.
@@ -22,6 +24,7 @@ import type { JSX } from "preact";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { fmtMs, fmtScore, fmtGeomean, complianceLabel } from "@/utils";
+import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 
 // ---------------------------------------------------------------------------
 // Color math - sourced from chartMath.ts (single source of truth for parity)
@@ -54,6 +57,7 @@ export function QueryHeatmap({
   highContrast = false,
 }: QueryHeatmapProps) {
   const { query_ids, platforms, ranking } = summary;
+  const sortedQueryIds = useMemo(() => sortQueryIds(query_ids), [query_ids]);
   const hasSelection = onSelectionChange !== undefined;
   const gridRef = useRef<HTMLTableElement>(null);
 
@@ -64,10 +68,10 @@ export function QueryHeatmap({
 
   // Per-column minimum: fastest time across all platforms for each query.
   // Memoized on `summary` to avoid recomputing the full matrix on every render
-  // (the for loop runs query_ids.length × platforms.length iterations).
+  // (the for loop runs sortedQueryIds.length × platforms.length iterations).
   const colMins = useMemo<Record<string, number | null>>(() => {
     const mins: Record<string, number | null> = {};
-    for (const qid of query_ids) {
+    for (const qid of sortedQueryIds) {
       const vals = platforms
         .map((p) => p.timings[qid] ?? null)
         // Exclude zero/null cells; sub-ms values round to 0 in some runners.
@@ -75,7 +79,7 @@ export function QueryHeatmap({
       mins[qid] = vals.length > 0 ? Math.min(...vals) : null;
     }
     return mins;
-  }, [summary]);
+  }, [platforms, sortedQueryIds]);
 
   // Determine primary display metric from the artifact's ranking config.
   const primaryMetric = ranking?.primary_metric ?? "display_geomean_ms";
@@ -180,7 +184,7 @@ export function QueryHeatmap({
     let nextCol = colIdx;
     switch (e.key) {
       case "ArrowRight":
-        nextCol = Math.min(colIdx + 1, query_ids.length - 1);
+        nextCol = Math.min(colIdx + 1, sortedQueryIds.length - 1);
         break;
       case "ArrowLeft":
         nextCol = Math.max(colIdx - 1, 0);
@@ -195,7 +199,7 @@ export function QueryHeatmap({
         nextCol = 0;
         break;
       case "End":
-        nextCol = query_ids.length - 1;
+        nextCol = sortedQueryIds.length - 1;
         break;
       default:
         return;
@@ -300,7 +304,7 @@ export function QueryHeatmap({
                   </button>
                 </th>
               )}
-              {query_ids.map((qid) => (
+              {sortedQueryIds.map((qid) => (
                 <th
                   key={qid}
                   role="columnheader"
@@ -311,9 +315,10 @@ export function QueryHeatmap({
                   <button
                     type="button"
                     class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left font-mono"
+                    data-query-label={qid}
                     onClick={() => toggleSort(`query:${qid}`)}
                   >
-                    {qid}{sortArrow(`query:${qid}`)}
+                    {queryDisplayLabel(qid)}{sortArrow(`query:${qid}`)}
                     {sortAnnouncement(`query:${qid}`)}
                   </button>
                 </th>
@@ -372,7 +377,7 @@ export function QueryHeatmap({
                       {fmtGeomean(row.display_geomean_ms)}
                     </td>
                   )}
-                  {query_ids.map((qid, colIdx) => {
+                  {sortedQueryIds.map((qid, colIdx) => {
                     const ms = row.timings[qid] ?? null;
                     const minInCol = colMins[qid] ?? null;
                     const hue = suppressHeat ? null : colorForCell(ms, minInCol);
@@ -411,7 +416,7 @@ export function QueryHeatmap({
                         aria-label={ariaLabel}
                         title={ms === null ? "No published run for this query/platform cell." : undefined}
                         onKeyDown={(e) => handleCellKey(e as KeyboardEvent, rowIdx, colIdx)}
-                        onFocus={() => setAnnouncement(`${qid}: ${ariaLabel}`)}
+                        onFocus={() => setAnnouncement(`${queryDisplayLabel(qid)}: ${ariaLabel}`)}
                       >
                         {ms !== null ? fmtMs(ms) : "No run"}
                       </td>

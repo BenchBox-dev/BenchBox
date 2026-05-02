@@ -101,6 +101,25 @@ describe("QueryHeatmap rendering", () => {
     expect(screen.getByRole("button", { name: /^Q2/ })).toBeTruthy();
   });
 
+  it("sorts query headers naturally while preserving explicit labels", () => {
+    const summary = makeSummary({
+      query_ids: ["Q10", "Q2", "Q1"],
+      platforms: [
+        {
+          ...makeSummary().platforms[0]!,
+          timings: { Q1: 10, Q2: 20, Q10: 100 },
+        },
+      ],
+    });
+    const { container } = render(<QueryHeatmap summary={summary} />);
+
+    const labels = Array.from(container.querySelectorAll("thead button[data-query-label]")).map(
+      (button) => button.getAttribute("data-query-label"),
+    );
+    expect(labels).toStrictEqual(["Q1", "Q2", "Q10"]);
+    expect(screen.getByRole("button", { name: /^Q10/ })).toBeTruthy();
+  });
+
   it("renders compact receipt links and validation status badges", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
     const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
@@ -125,14 +144,32 @@ describe("QueryHeatmap rendering", () => {
     expect(rowOrder()).toEqual(["r2", "r1"]);
   });
 
-  it("heatmap cells have --cell-hue style set for multi-platform summaries", () => {
+  it("heatmap cells keep visible values and color variables for multi-platform summaries", () => {
     const { container } = render(<QueryHeatmap summary={makeSummary()} />);
     const heatCells = container.querySelectorAll(".heatmap-cell");
     // DuckDB Q1 (fastest) and SQLite Q1 (10× slower) = 2 cells; Q2 similarly
     expect(heatCells.length).toBeGreaterThan(0);
     for (const cell of Array.from(heatCells)) {
       expect((cell as HTMLElement).style.getPropertyValue("--cell-hue")).toBeTruthy();
+      expect((cell as HTMLElement).style.getPropertyValue("--cell-lightness")).toBeTruthy();
+      expect(cell.textContent).not.toBe("");
     }
+  });
+
+  it("exposes exact timing and relative-to-fastest accessible names", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+    const fastest = container.querySelector<HTMLElement>('[data-cell="0-0"]');
+    const slowest = container.querySelector<HTMLElement>('[data-cell="1-0"]');
+
+    expect(fastest?.textContent).toBe("10 ms");
+    expect(fastest?.getAttribute("aria-label")).toBe("10 ms, fastest in column");
+    expect(slowest?.textContent).toBe("100 ms");
+    expect(slowest?.getAttribute("aria-label")).toBe("100 ms, 10.0× fastest in column");
+  });
+
+  it("activates reduced-color class when high contrast is requested", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} highContrast />);
+    expect(container.firstElementChild?.className).toContain("heatmap-reduced-color");
   });
 
   // -----------------------------------------------------------------------

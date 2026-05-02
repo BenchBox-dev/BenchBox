@@ -124,30 +124,36 @@
         min-height: var(--bb-skeleton-row-height);
     }
 
-    /* Heatmap cells: background driven by --cell-hue CSS custom property.
-     Using custom properties lets dark-mode and high-contrast media queries
-     override saturation/lightness without hard-coding color values here. */
-    .heatmap-cell {
-        background-color: hsl(var(--cell-hue) 55% 50% / 0.3);
-    }
-
-    /* Reduced-color / high-contrast mode: switch to grayscale lightness steps.
-     Activated by the .heatmap-reduced-color class (explicit user toggle) or
-     automatically by the prefers-contrast: more media query.
-     Note: must be two separate rules - a class selector cannot be comma-joined
-     with an @media at-rule in a single rule block. */
-    .heatmap-reduced-color .heatmap-cell {
-        background-color: hsl(0 0% var(--cell-lightness, 95%) / 0.75);
-    }
-    @media (prefers-contrast: more) {
-        .heatmap-cell {
-            background-color: hsl(0 0% var(--cell-lightness, 95%) / 0.75);
-        }
+    /* Heatmap cells use a single-hue sequential palette by default.
+     Components still emit --cell-hue for chart-math parity, while
+     --cell-lightness drives a color-blind-safer light-to-dark scale. */
+    .heatmap-cell,
+    .meta-heatmap-cell {
+        background-color: hsl(205 80% var(--cell-lightness, 92%) / 0.38);
     }
 
     @media (prefers-color-scheme: dark) {
-        .heatmap-cell {
-            background-color: hsl(var(--cell-hue) 60% 35% / 0.5);
+        .heatmap-cell,
+        .meta-heatmap-cell {
+            background-color: hsl(205 70% var(--cell-lightness, 72%) / 0.42);
+        }
+    }
+
+    /* Reduced-color / high-contrast mode switches to grayscale lightness steps.
+     Activated by the .heatmap-reduced-color class where an explicit user toggle
+     exists, or automatically by the prefers-contrast: more media query.
+     Note: must be two separate rules - a class selector cannot be comma-joined
+     with an @media at-rule in a single rule block. Keep these rules after the
+     dark-mode rule so high-contrast users do not lose the reduced-color path. */
+    .heatmap-reduced-color .heatmap-cell,
+    .heatmap-reduced-color .meta-heatmap-cell {
+        background-color: hsl(0 0% var(--cell-lightness, 95%) / 0.62);
+    }
+
+    @media (prefers-contrast: more) {
+        .heatmap-cell,
+        .meta-heatmap-cell {
+            background-color: hsl(0 0% var(--cell-lightness, 95%) / 0.62);
         }
     }
 

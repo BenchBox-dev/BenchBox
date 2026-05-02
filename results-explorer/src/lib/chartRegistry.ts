@@ -55,15 +55,74 @@ export interface DataRequirements {
   requiresPercentileStats?: boolean;
 }
 
+export type ChartQuestionGroupId =
+  | "overview"
+  | "per_query"
+  | "distribution"
+  | "cost"
+  | "trend"
+  | "rank";
+
+export interface ChartQuestionGroup {
+  id: ChartQuestionGroupId;
+  label: string;
+  description: string;
+}
+
 export interface ChartRegistryEntry {
   /** Canonical ID - matches chart_types.py ALL_CHART_TYPES entry. */
   id: string;
   title: string;
   description: string;
+  /** Analytical question this chart answers in Explorer navigation. */
+  questionGroup: ChartQuestionGroupId;
   requires: DataRequirements;
   /** Python CLI equivalent chart type name (always === id). */
   cli_equivalent: string;
 }
+
+export interface ChartQuestionGroupWithCharts extends ChartQuestionGroup {
+  charts: ChartRegistryEntry[];
+}
+
+export const CHART_QUESTION_GROUPS: readonly ChartQuestionGroup[] = [
+  {
+    id: "overview",
+    label: "Overview",
+    description: "Top-line metric summaries and phase composition",
+  },
+  {
+    id: "per_query",
+    label: "Per-query",
+    description: "Query-level comparisons and outlier views",
+  },
+  {
+    id: "distribution",
+    label: "Distribution",
+    description: "Latency spread and percentile shape",
+  },
+  {
+    id: "cost",
+    label: "Cost",
+    description: "Cost and performance tradeoffs",
+  },
+  {
+    id: "trend",
+    label: "Trend",
+    description: "Historical movement over time",
+  },
+  {
+    id: "rank",
+    label: "Rank",
+    description: "Per-query ranking tables",
+  },
+] as const;
+
+export const CHART_QUESTION_GROUP_BY_ID: Readonly<Record<ChartQuestionGroupId, ChartQuestionGroup>> =
+  Object.fromEntries(CHART_QUESTION_GROUPS.map((group) => [group.id, group])) as Record<
+    ChartQuestionGroupId,
+    ChartQuestionGroup
+  >;
 
 // ---------------------------------------------------------------------------
 // Registry - must stay in sync with chart_types.py _CHART_SPECS order
@@ -74,6 +133,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "performance_bar",
     title: "Performance Bar",
     description: "Bar chart comparing total runtime across platforms",
+    questionGroup: "overview",
     requires: { requiresSummary: true },
     cli_equivalent: "performance_bar",
   },
@@ -81,6 +141,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "power_bar",
     title: "Power@Size Bar",
     description: "Bar chart comparing TPC Power@Size metric across platforms (higher is better)",
+    questionGroup: "overview",
     requires: { requiresSummary: true, requiresPowerScore: true },
     cli_equivalent: "power_bar",
   },
@@ -88,6 +149,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "distribution_box",
     title: "Distribution Box Plot",
     description: "Box plot showing query execution time distribution",
+    questionGroup: "distribution",
     requires: { requiresSummary: true, requiresQueryTimings: true },
     cli_equivalent: "distribution_box",
   },
@@ -95,6 +157,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "query_heatmap",
     title: "Query Heatmap",
     description: "Heatmap comparing per-query execution times across platforms",
+    questionGroup: "per_query",
     requires: { requiresSummary: true, requiresQueryTimings: true },
     cli_equivalent: "query_heatmap",
   },
@@ -103,6 +166,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     title: "Query Histogram",
     description:
       "Vertical bar histogram showing latency per query (auto-splits for >33 queries)",
+    questionGroup: "per_query",
     requires: { requiresSummary: true, requiresQueryTimings: true },
     cli_equivalent: "query_histogram",
   },
@@ -110,6 +174,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "cost_scatter",
     title: "Cost vs Performance Scatter",
     description: "Scatter plot of normalized cost vs performance with cost-status empty states",
+    questionGroup: "cost",
     requires: { requiresSummary: true },
     cli_equivalent: "cost_scatter",
   },
@@ -117,6 +182,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "time_series",
     title: "Performance Trend",
     description: "Line chart showing performance trends over time",
+    questionGroup: "trend",
     requires: { requiresHistorical: true },
     cli_equivalent: "time_series",
   },
@@ -125,6 +191,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     title: "Comparison Bar",
     description:
       "Paired side-by-side bars comparing two runs per query with % change annotations",
+    questionGroup: "per_query",
     requires: { requiresTwoResults: true },
     cli_equivalent: "comparison_bar",
   },
@@ -133,6 +200,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     title: "Diverging Bar",
     description:
       "Centered-zero chart showing regression/improvement distribution sorted by magnitude",
+    questionGroup: "per_query",
     requires: { requiresTwoResults: true },
     cli_equivalent: "diverging_bar",
   },
@@ -141,6 +209,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     title: "Summary Box",
     description:
       "Bordered panel with aggregate stats (geo mean, total time, improved/regressed counts)",
+    questionGroup: "overview",
     requires: {},
     cli_equivalent: "summary_box",
   },
@@ -148,6 +217,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "percentile_ladder",
     title: "Percentile Ladder",
     description: "Percentile ladder chart (P50/P90/P95/P99) across platforms",
+    questionGroup: "distribution",
     requires: { requiresSummary: true, requiresPercentileStats: true },
     cli_equivalent: "percentile_ladder",
   },
@@ -155,6 +225,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "normalized_speedup",
     title: "Normalized Speedup",
     description: "Normalized speedup chart relative to a selected baseline platform",
+    questionGroup: "per_query",
     requires: { requiresTwoResults: true },
     cli_equivalent: "normalized_speedup",
   },
@@ -162,6 +233,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "stacked_phase",
     title: "Stacked Phase Breakdown",
     description: "Stacked phase breakdown chart across benchmark execution phases",
+    questionGroup: "overview",
     requires: { requiresSummary: true, requiresPhaseDurations: true },
     cli_equivalent: "stacked_phase",
   },
@@ -169,6 +241,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "sparkline_table",
     title: "Sparkline Table",
     description: "Compact sparkline table of key metrics across platforms",
+    questionGroup: "overview",
     requires: { requiresSummary: true },
     cli_equivalent: "sparkline_table",
   },
@@ -176,6 +249,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "cdf_chart",
     title: "CDF Chart",
     description: "Cumulative distribution chart of per-query execution latency",
+    questionGroup: "distribution",
     requires: { requiresSummary: true, requiresQueryTimings: true },
     cli_equivalent: "cdf_chart",
   },
@@ -183,6 +257,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     id: "rank_table",
     title: "Rank Table",
     description: "Per-query platform ranking table (1st=fastest)",
+    questionGroup: "rank",
     requires: { requiresSummary: true, requiresQueryTimings: true },
     cli_equivalent: "rank_table",
   },
@@ -427,4 +502,13 @@ export function applicableCharts(context: ChartContext): ChartRegistryEntry[] {
     if (requires.requiresPercentileStats && !capabilities.hasPercentileStats) return false;
     return true;
   });
+}
+
+export function groupChartsByQuestion(
+  charts: readonly ChartRegistryEntry[],
+): ChartQuestionGroupWithCharts[] {
+  return CHART_QUESTION_GROUPS.map((group) => ({
+    ...group,
+    charts: charts.filter((chart) => chart.questionGroup === group.id),
+  })).filter((group) => group.charts.length > 0);
 }

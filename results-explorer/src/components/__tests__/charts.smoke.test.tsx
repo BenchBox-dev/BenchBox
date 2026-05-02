@@ -181,6 +181,18 @@ describe("RankTable", () => {
     const ranks = Array.from(cells).map((c) => c.textContent);
     expect(ranks.filter((r) => r === "1st").length).toBe(2);
   });
+
+  it("sorts query rows naturally and preserves explicit labels", () => {
+    const summary = makeSummary({
+      query_ids: ["Q10", "Q2", "Q1"],
+      platforms: [makePlatform({ timings: { Q1: 10, Q2: 20, Q10: 100 } })],
+    });
+    const { container } = render(<RankTable summary={summary} />);
+    const labels = Array.from(container.querySelectorAll("tbody tr td:first-child")).map(
+      (cell) => cell.textContent,
+    );
+    expect(labels).toStrictEqual(["Q1", "Q2", "Q10"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -226,6 +238,18 @@ describe("QueryHistogram", () => {
     const { container } = render(<QueryHistogram summary={summary} />);
     const svgs = container.querySelectorAll("svg");
     expect(svgs.length).toBeGreaterThan(1);
+  });
+
+  it("sorts query labels naturally and does not strip prefixes", () => {
+    const summary = makeSummary({
+      query_ids: ["Q10", "Q2", "Q1"],
+      platforms: [makePlatform({ timings: { Q1: 10, Q2: 20, Q10: 100 } })],
+    });
+    const { container } = render(<QueryHistogram summary={summary} />);
+    const labels = Array.from(container.querySelectorAll("text[data-query-label]")).map(
+      (label) => label.textContent,
+    );
+    expect(labels).toStrictEqual(["Q1", "Q2", "Q10"]);
   });
 });
 

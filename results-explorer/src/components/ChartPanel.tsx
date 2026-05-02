@@ -3,6 +3,7 @@ import type { BenchmarkSummary } from "@/types";
 import {
   applicableCharts,
   buildRenderableSummary,
+  groupChartsByQuestion,
   type ChartContext,
   type ChartHistoricalEntry,
   type ChartRegistryEntry,
@@ -24,6 +25,11 @@ import { CDFChart } from "@/components/CDFChart";
 import { RankTable } from "@/components/RankTable";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { paletteColor } from "@/lib/chartTheme";
+import {
+  buildLatencyBarScale,
+  latencyScaleFraction,
+  latencyScaleTicks,
+} from "@/lib/chartMath";
 
 interface ChartPanelProps {
   context: ChartContext;
@@ -34,8 +40,16 @@ interface CompareQueryRow {
   timings: ({ ms: number; status: "pass" } | null)[];
 }
 
+interface ValueLabelPlacement {
+  x: number;
+  textAnchor: "start" | "end";
+  fill: string;
+  placement: "outside" | "inside" | "gutter";
+}
+
 export function ChartPanel({ context }: ChartPanelProps) {
   const charts = useMemo(() => applicableCharts(context), [context]);
+  const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
   const summary = useMemo(() => buildRenderableSummary(context), [context]);
   const historical = useMemo(
     () =>
@@ -87,13 +101,54 @@ export function ChartPanel({ context }: ChartPanelProps) {
   if (charts.length === 0) return null;
 
   const activeChart = charts.find((chart) => chart.id === activeId) ?? charts[0]!;
+  const activeGroup =
+    chartGroups.find((group) => group.charts.some((chart) => chart.id === activeChart.id)) ??
+    chartGroups[0]!;
+  const activeGroupCharts = activeGroup.charts;
   const showBaseline = context.kind === "compare" && (activeId === "normalized_speedup" || activeId === "diverging_bar");
+
+  const selectGroup = (group: (typeof chartGroups)[number]) => {
+    const nextChart =
+      group.charts.find((chart) => chart.id === activeId) ??
+      group.charts.find((chart) => chart.id === preferredId) ??
+      group.charts[0];
+    if (nextChart) setActiveId(nextChart.id);
+  };
 
   return (
     <section class="card">
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <h2 class="text-base font-semibold text-gray-900">Charts</h2>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+          {chartGroups.length > 1 && (
+            <div
+              class="flex flex-wrap gap-1 rounded-md border border-gray-200 bg-gray-50 p-1"
+              role="tablist"
+              aria-label="Chart question groups"
+            >
+              {chartGroups.map((group) => {
+                const selected = group.id === activeGroup.id;
+                return (
+                  <button
+                    key={group.id}
+                    role="tab"
+                    type="button"
+                    aria-selected={selected}
+                    aria-controls="chart-panel-chart"
+                    class={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                      selected
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:bg-white hover:text-gray-900"
+                    }`}
+                    onClick={() => selectGroup(group)}
+                    title={group.description}
+                  >
+                    {group.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {showBaseline && summary && summary.platforms.length > 1 && (
             <div class="flex items-center gap-2">
               <label class="text-xs text-gray-500" for="chart-panel-baseline">
@@ -113,34 +168,43 @@ export function ChartPanel({ context }: ChartPanelProps) {
               </select>
             </div>
           )}
-          <div class="flex flex-wrap gap-1">
-            {charts.map((chart) => (
-              <button
-                key={chart.id}
-                class={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-                  activeChart.id === chart.id
-                    ? "bg-brand-600 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-                onClick={() => setActiveId(chart.id)}
-                aria-pressed={activeChart.id === chart.id}
-                title={chart.description}
-              >
-                {chart.title}
-              </button>
-            ))}
-          </div>
+          {activeGroupCharts.length > 1 && (
+            <div
+              class="flex flex-wrap justify-end gap-1"
+              role="group"
+              aria-label={`${activeGroup.label} charts`}
+            >
+              {activeGroupCharts.map((chart) => (
+                <button
+                  key={chart.id}
+                  type="button"
+                  class={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                    activeChart.id === chart.id
+                      ? "bg-brand-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                  onClick={() => setActiveId(chart.id)}
+                  aria-pressed={activeChart.id === chart.id}
+                  title={chart.description}
+                >
+                  {chart.title}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {renderChart(activeChart, {
-        context,
-        summary,
-        historical,
-        compareRows,
-        compareGroups,
-        baselineIdx,
-      })}
+      <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`}>
+        {renderChart(activeChart, {
+          context,
+          summary,
+          historical,
+          compareRows,
+          compareGroups,
+          baselineIdx,
+        })}
+      </div>
     </section>
   );
 }
@@ -305,10 +369,17 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   const rowHeight = 36;
   const axisHeight = 32;
   const topPadding = 8;
-  const valueWidth = 72;
-  const plotWidth = width - labelWidth - valueWidth;
+  const valueLabelGutter = 96;
+  const plotWidth = width - labelWidth - valueLabelGutter;
   const totalHeight = topPadding + rows.length * rowHeight + axisHeight;
-  const maxValue = Math.max(...rows.map((row) => row.display_geomean_ms ?? 0));
+  const scale = buildLatencyBarScale(rows.map((row) => row.display_geomean_ms));
+  if (scale === null) return null;
+
+  const ticks = latencyScaleTicks(scale);
+  const scaleLabel =
+    scale.mode === "log"
+      ? "Geomean query time (log scale) - lower is faster"
+      : "Geomean query time (median-of-passing) - lower is faster";
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
@@ -316,10 +387,23 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
         width={width}
         height={totalHeight}
         role="img"
-        aria-label="Geomean performance comparison"
+        aria-label={
+          scale.mode === "log"
+            ? "Geomean performance comparison (log scale)"
+            : "Geomean performance comparison"
+        }
       >
         {rows.map((row, index) => {
-          const barWidth = ((row.display_geomean_ms ?? 0) / maxValue) * plotWidth;
+          const fraction = latencyScaleFraction(row.display_geomean_ms, scale) ?? 0;
+          const barWidth = fraction * plotWidth;
+          const renderedBarWidth = Math.max(2, barWidth);
+          const valueLabel = fmtGeomean(row.display_geomean_ms);
+          const valueLabelPlacement = placePerformanceValueLabel({
+            barWidth: renderedBarWidth,
+            plotWidth,
+            labelWidth,
+            valueText: valueLabel,
+          });
           const y = topPadding + index * rowHeight;
           const midY = y + rowHeight * 0.5;
           const barHeight = rowHeight * 0.55;
@@ -336,7 +420,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
               <rect
                 x={labelWidth}
                 y={midY - barHeight / 2}
-                width={Math.max(2, barWidth)}
+                width={renderedBarWidth}
                 height={barHeight}
                 fill={row.color}
                 opacity={0.85}
@@ -344,12 +428,25 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
               >
                 <title>{`${row.platform}: ${fmtGeomean(row.display_geomean_ms)}`}</title>
               </rect>
+              {valueLabelPlacement.placement === "gutter" && (
+                <line
+                  x1={labelWidth + renderedBarWidth + 4}
+                  y1={midY}
+                  x2={valueLabelPlacement.x - 5}
+                  y2={midY}
+                  stroke="#d1d5db"
+                  strokeWidth={1}
+                  strokeDasharray="2 2"
+                />
+              )}
               <text
-                x={labelWidth + barWidth + 6}
+                x={valueLabelPlacement.x}
                 y={midY + 4}
-                style={{ fontSize: "11px", fill: "#374151" }}
+                textAnchor={valueLabelPlacement.textAnchor}
+                data-value-placement={valueLabelPlacement.placement}
+                style={{ fontSize: "11px", fill: valueLabelPlacement.fill }}
               >
-                {fmtGeomean(row.display_geomean_ms)}
+                {valueLabel}
               </text>
               {index < rows.length - 1 && (
                 <line
@@ -374,11 +471,11 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
             stroke="#d1d5db"
             strokeWidth={1}
           />
-          {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+          {ticks.map((value) => {
+            const fraction = latencyScaleFraction(value, scale) ?? 0;
             const x = labelWidth + fraction * plotWidth;
-            const value = fraction * maxValue;
             return (
-              <g key={fraction}>
+              <g key={value}>
                 <line x1={x} y1={0} x2={x} y2={4} stroke="#9ca3af" strokeWidth={1} />
                 <text
                   x={x}
@@ -397,12 +494,55 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
             textAnchor="middle"
             style={{ fontSize: "10px", fill: "#9ca3af" }}
           >
-            Geomean query time (median-of-passing) - lower is faster
+            {scaleLabel}
           </text>
         </g>
       </svg>
     </div>
   );
+}
+
+function placePerformanceValueLabel({
+  barWidth,
+  plotWidth,
+  labelWidth,
+  valueText,
+}: {
+  barWidth: number;
+  plotWidth: number;
+  labelWidth: number;
+  valueText: string;
+}): ValueLabelPlacement {
+  const labelGap = 6;
+  const labelPx = valueText.length * 6.5;
+  const plotRight = labelWidth + plotWidth;
+  const outsideX = labelWidth + barWidth + labelGap;
+  const outsideFits = outsideX + labelPx <= plotRight - labelGap;
+  if (outsideFits) {
+    return {
+      x: outsideX,
+      textAnchor: "start",
+      fill: "#374151",
+      placement: "outside",
+    };
+  }
+
+  const insideFits = barWidth >= labelPx + labelGap * 2;
+  if (insideFits) {
+    return {
+      x: labelWidth + barWidth - labelGap,
+      textAnchor: "end",
+      fill: "#ffffff",
+      placement: "inside",
+    };
+  }
+
+  return {
+    x: plotRight + labelGap,
+    textAnchor: "start",
+    fill: "#374151",
+    placement: "gutter",
+  };
 }
 
 function SummaryBoxPanel({

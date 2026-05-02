@@ -17,6 +17,90 @@
 import { HEAT_MIN_RATIO, HEAT_MAX_RATIO } from "@/lib/chartTheme";
 
 // ---------------------------------------------------------------------------
+// Latency magnitude scale
+// Explorer-only SVG layout policy for lower-is-better latency bars. The CLI
+// ASCII bar chart remains linear; the browser switches to log scale when a slow
+// outlier would otherwise collapse faster platforms into unreadable slivers.
+// ---------------------------------------------------------------------------
+
+export const LATENCY_LOG_SCALE_THRESHOLD = 10;
+
+export type LatencyScaleMode = "linear" | "log";
+
+export interface LatencyBarScale {
+  mode: LatencyScaleMode;
+  min: number;
+  max: number;
+  domainMin: number;
+  domainMax: number;
+  spanRatio: number;
+}
+
+const LATENCY_LOG_DOMAIN_PAD = Math.sqrt(10);
+const LATENCY_LOG_TICKS_MS = [0.1, 1, 10, 100, 1000, 10000, 100000, 1000000];
+
+function log2Latency(ms: number): number {
+  return Math.log2(Math.max(ms, Number.MIN_VALUE));
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+export function buildLatencyBarScale(
+  values: (number | null)[],
+  logThreshold = LATENCY_LOG_SCALE_THRESHOLD,
+): LatencyBarScale | null {
+  const valid = values.filter((value): value is number =>
+    value !== null && value > 0 && Number.isFinite(value),
+  );
+  if (valid.length === 0) return null;
+
+  const min = Math.min(...valid);
+  const max = Math.max(...valid);
+  const spanRatio = max / min;
+  const mode: LatencyScaleMode = spanRatio >= logThreshold ? "log" : "linear";
+
+  if (mode === "linear") {
+    return { mode, min, max, domainMin: 0, domainMax: max, spanRatio };
+  }
+
+  return {
+    mode,
+    min,
+    max,
+    domainMin: min / LATENCY_LOG_DOMAIN_PAD,
+    domainMax: max,
+    spanRatio,
+  };
+}
+
+export function latencyScaleFraction(value: number | null, scale: LatencyBarScale): number | null {
+  if (value === null || !Number.isFinite(value)) return null;
+  if (scale.mode === "linear") {
+    if (value < 0 || scale.domainMax <= 0) return null;
+    return clamp01(value / scale.domainMax);
+  }
+  if (value <= 0) return null;
+
+  const logMin = log2Latency(scale.domainMin);
+  const logMax = log2Latency(scale.domainMax);
+  const logRange = logMax - logMin || 1;
+  return clamp01((log2Latency(value) - logMin) / logRange);
+}
+
+export function latencyScaleTicks(scale: LatencyBarScale): number[] {
+  if (scale.mode === "linear") {
+    return [0, 0.25, 0.5, 0.75, 1].map((fraction) => fraction * scale.domainMax);
+  }
+
+  const ticks = LATENCY_LOG_TICKS_MS.filter(
+    (ms) => ms >= scale.domainMin * 0.99 && ms <= scale.domainMax * 1.01,
+  );
+  return ticks.length >= 2 ? ticks : [scale.min, scale.max];
+}
+
+// ---------------------------------------------------------------------------
 // Heatmap color math
 // Python reference: benchbox/core/visualization/ascii/heatmap.py
 // (log10-ratio → hue mapping)
