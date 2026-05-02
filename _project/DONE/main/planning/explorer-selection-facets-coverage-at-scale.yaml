@@ -2,7 +2,8 @@ id: explorer-selection-facets-coverage-at-scale
 title: "Explorer: selection-oriented facets and coverage signals for large public corpus"
 worktree: main
 priority: High
-status: "Not Started"
+status: Completed
+completed_date: "2026-05-02"
 category: "Core Functionality"
 
 deps:
