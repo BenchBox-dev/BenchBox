@@ -50,6 +50,8 @@ interface QueryHeatmapProps {
   highContrast?: boolean;
 }
 
+const MOBILE_OUTLIER_LIMIT = 3;
+
 export function QueryHeatmap({
   summary,
   selectedIds,
@@ -242,20 +244,129 @@ export function QueryHeatmap({
         {announcement}
       </div>
 
-      <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div
+        class="space-y-3 md:hidden"
+        data-testid="query-heatmap-mobile-cards"
+        role="list"
+        aria-label={`${summary.benchmark} compact query result cards`}
+      >
+        {sorted.map((row) => {
+          const isSelected = selectedIds?.has(rowKey(row)) ?? false;
+          const outliers = queryOutliers(row, sortedQueryIds, colMins);
+          return (
+            <article
+              key={row.result_id}
+              data-testid={`query-heatmap-mobile-card-${row.result_id}`}
+              role="listitem"
+              class={`rounded-lg border border-gray-200 bg-white p-3 shadow-sm ${
+                isSelected ? "border-brand-300 bg-blue-50" : ""
+              }`}
+            >
+              <div class="flex items-start gap-3">
+                {hasSelection && (
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleRow(row)}
+                    aria-label={`Select ${row.platform} for comparison`}
+                    class="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 focus:ring-2 focus:ring-brand-500"
+                  />
+                )}
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <h2 class="text-sm font-semibold text-gray-900">{row.platform}</h2>
+                    {!row.is_ranking_eligible && (
+                      <span class="text-xs text-gray-400">{complianceLabel(row.compliance_class)}</span>
+                    )}
+                  </div>
+                  {row.platform_version && (
+                    <div class="mt-0.5 text-xs text-gray-400">{row.platform_version}</div>
+                  )}
+                  <a
+                    href={`/results/r/${row.result_id}#run-receipt`}
+                    class="mt-1 inline-block text-xs font-medium no-underline"
+                  >
+                    Receipt →
+                  </a>
+                </div>
+                <dl class="shrink-0 text-right">
+                  <dt class="text-[0.65rem] font-semibold uppercase text-gray-400">{primaryLabel}</dt>
+                  <dd class="font-mono text-sm font-semibold text-gray-900">
+                    {fmtPrimary(getPrimaryValue(row))}
+                  </dd>
+                </dl>
+              </div>
+
+              <div class="mt-3 flex flex-wrap gap-1.5">
+                <TrustBadge trustLabel={row.trust_label} compact />
+                <ValidationBadge validationStatus={row.validation_status} showMissing />
+                {showGeomeanCol && (
+                  <span class="rounded-full bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-600">
+                    Geomean {fmtGeomean(row.display_geomean_ms)}
+                  </span>
+                )}
+              </div>
+
+              <div class="mt-3 border-t border-gray-100 pt-3">
+                <div class="text-[0.65rem] font-semibold uppercase text-gray-400">Query outliers</div>
+                {outliers.length > 0 ? (
+                  <div class="mt-2 grid gap-2" role="list" aria-label={`${row.platform} query outliers`}>
+                    {outliers.map((outlier) => (
+                      <div
+                        key={outlier.queryId}
+                        role="listitem"
+                        class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md bg-gray-50 px-2 py-1.5"
+                      >
+                        <div class="min-w-0">
+                          <div class="truncate font-mono text-xs font-semibold text-gray-800">
+                            {queryDisplayLabel(outlier.queryId)}
+                          </div>
+                          <div class="text-xs text-gray-500">{outlier.ratioLabel}</div>
+                        </div>
+                        <div class="font-mono text-xs font-semibold text-gray-900">
+                          {fmtMs(outlier.ms)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p class="mt-2 rounded-md bg-gray-50 px-2 py-1.5 text-xs text-gray-500">
+                    No query timings published.
+                  </p>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div class="hidden md:block">
+        <div class="mb-2 flex items-center justify-between gap-3 text-xs text-gray-500">
+          <span
+            data-testid="query-heatmap-scroll-hint"
+            class="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 font-medium shadow-sm"
+          >
+            Query columns →
+          </span>
+          <span>{sortedQueryIds.length.toLocaleString()} queries</span>
+        </div>
+        <div
+          class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm"
+          data-testid="query-heatmap-scroll-container"
+        >
         <table
           ref={gridRef}
           role="grid"
           aria-label={`${summary.benchmark} SF${summary.scale_factor} ${summary.phase} results`}
-          class="min-w-full text-sm"
+          class="min-w-max text-sm"
         >
           <thead class="bg-gray-50">
             <tr role="row">
-              {hasSelection && <th role="columnheader" scope="col" aria-label="Select for comparison" class="table-th w-8 px-2" />}
+              {hasSelection && <th role="columnheader" scope="col" aria-label="Select for comparison" class="table-th w-12 min-w-12 px-2" />}
               <th
                 role="columnheader"
                 scope="col"
-                class="sticky left-0 z-10 min-w-44 bg-gray-50 p-0"
+                class="sticky left-0 z-10 w-44 min-w-44 bg-gray-50 p-0"
                 aria-sort={ariaSort("platform")}
               >
                 <button
@@ -267,14 +378,14 @@ export function QueryHeatmap({
                   {sortAnnouncement("platform")}
                 </button>
               </th>
-              <th role="columnheader" scope="col" class="table-th sticky left-44 z-10 whitespace-nowrap bg-gray-50">
+              <th role="columnheader" scope="col" class="table-th sticky left-44 z-10 w-36 min-w-36 whitespace-nowrap bg-gray-50">
                 Trust
               </th>
               <th
                 role="columnheader"
                 scope="col"
                 aria-sort={ariaSort("primary")}
-                class="whitespace-nowrap p-0"
+                class="w-32 min-w-32 whitespace-nowrap p-0"
                 title={primaryLabel}
               >
                 <button
@@ -290,7 +401,7 @@ export function QueryHeatmap({
                 <th
                   role="columnheader"
                   scope="col"
-                  class="whitespace-nowrap p-0"
+                  class="w-32 min-w-32 whitespace-nowrap p-0"
                   aria-sort={ariaSort("geomean")}
                   title="Geometric mean of per-query display times"
                 >
@@ -309,7 +420,7 @@ export function QueryHeatmap({
                   key={qid}
                   role="columnheader"
                   scope="col"
-                  class="whitespace-nowrap p-0 font-mono"
+                  class="min-w-[7rem] whitespace-nowrap p-0 font-mono"
                   aria-sort={ariaSort(`query:${qid}`)}
                 >
                   <button
@@ -336,7 +447,7 @@ export function QueryHeatmap({
                   class={`hover:bg-gray-50 ${isSelected ? "bg-blue-50" : ""}`}
                 >
                   {hasSelection && (
-                    <td role="gridcell" class="table-td w-8 px-2">
+                    <td role="gridcell" class="table-td w-12 min-w-12 px-2">
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -346,7 +457,12 @@ export function QueryHeatmap({
                       />
                     </td>
                   )}
-                  <td role="gridcell" class="table-td sticky left-0 z-10 min-w-44 bg-white">
+                  <td
+                    role="gridcell"
+                    class={`table-td sticky left-0 z-10 w-44 min-w-44 ${
+                      isSelected ? "bg-blue-50" : "bg-white"
+                    }`}
+                  >
                     <div class="flex flex-wrap items-center gap-1.5">
                       <span class="font-medium text-gray-900">{row.platform}</span>
                       {!row.is_ranking_eligible && (
@@ -363,17 +479,22 @@ export function QueryHeatmap({
                       Receipt →
                     </a>
                   </td>
-                  <td role="gridcell" class="table-td sticky left-44 z-10 whitespace-nowrap bg-white">
+                  <td
+                    role="gridcell"
+                    class={`table-td sticky left-44 z-10 w-36 min-w-36 whitespace-nowrap ${
+                      isSelected ? "bg-blue-50" : "bg-white"
+                    }`}
+                  >
                     <div class="flex flex-wrap gap-1">
                       <TrustBadge trustLabel={row.trust_label} compact />
                       <ValidationBadge validationStatus={row.validation_status} showMissing />
                     </div>
                   </td>
-                  <td role="gridcell" class="table-td whitespace-nowrap font-mono">
+                  <td role="gridcell" class="table-td w-32 min-w-32 whitespace-nowrap font-mono">
                     {fmtPrimary(getPrimaryValue(row))}
                   </td>
                   {showGeomeanCol && (
-                    <td role="gridcell" class="table-td whitespace-nowrap font-mono text-gray-500">
+                    <td role="gridcell" class="table-td w-32 min-w-32 whitespace-nowrap font-mono text-gray-500">
                       {fmtGeomean(row.display_geomean_ms)}
                     </td>
                   )}
@@ -409,7 +530,7 @@ export function QueryHeatmap({
                         role="gridcell"
                         data-cell={`${rowIdx}-${colIdx}`}
                         tabIndex={isFocused ? 0 : -1}
-                        class={`table-td whitespace-nowrap text-right font-mono focus:outline focus:outline-2 focus:outline-brand-500 ${
+                        class={`table-td min-w-[7rem] whitespace-nowrap text-right font-mono focus:outline focus:outline-2 focus:outline-brand-500 ${
                           hue !== null ? "heatmap-cell" : ms === null ? "bg-gray-50 text-gray-400" : ""
                         }`}
                         style={cellStyle}
@@ -427,7 +548,44 @@ export function QueryHeatmap({
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
+}
+
+interface QueryOutlier {
+  queryId: string;
+  ms: number;
+  ratio: number;
+  ratioLabel: string;
+}
+
+function queryOutliers(
+  row: PlatformRow,
+  sortedQueryIds: string[],
+  colMins: Record<string, number | null>,
+): QueryOutlier[] {
+  return sortedQueryIds
+    .map((queryId) => {
+      const ms = row.timings[queryId] ?? null;
+      if (ms === null) return null;
+      const minInCol = colMins[queryId] ?? null;
+      const ratio = minInCol !== null && minInCol > 0 ? ms / minInCol : null;
+      return {
+        queryId,
+        ms,
+        ratio: ratio ?? 0,
+        ratioLabel: queryRatioLabel(ratio),
+      };
+    })
+    .filter((item): item is QueryOutlier => item !== null)
+    .sort((a, b) => b.ratio - a.ratio || b.ms - a.ms || a.queryId.localeCompare(b.queryId))
+    .slice(0, MOBILE_OUTLIER_LIMIT);
+}
+
+function queryRatioLabel(ratio: number | null): string {
+  if (ratio === null) return "No cohort baseline";
+  if (ratio <= 1.005) return "Fastest in cohort";
+  return `${ratio.toFixed(1)}× fastest`;
 }

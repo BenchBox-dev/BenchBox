@@ -91,8 +91,8 @@ function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummar
 describe("QueryHeatmap rendering", () => {
   it("renders platform names", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
-    expect(screen.getByText("DuckDB")).toBeTruthy();
-    expect(screen.getByText("SQLite")).toBeTruthy();
+    expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
   });
 
   it("renders query column headers", () => {
@@ -126,8 +126,8 @@ describe("QueryHeatmap rendering", () => {
 
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
     expect(receiptLinks[1]?.getAttribute("href")).toBe("/results/r/r2#run-receipt");
-    expect(screen.getByText("exact")).toBeTruthy();
-    expect(screen.getByText("loose")).toBeTruthy();
+    expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("loose").length).toBeGreaterThan(0);
   });
 
   it("clicking a query header sorts rows by that query", () => {
@@ -170,6 +170,55 @@ describe("QueryHeatmap rendering", () => {
   it("activates reduced-color class when high contrast is requested", () => {
     const { container } = render(<QueryHeatmap summary={makeSummary()} highContrast />);
     expect(container.firstElementChild?.className).toContain("heatmap-reduced-color");
+  });
+
+  it("renders an explicit horizontal scroll affordance with stable matrix cell widths", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+
+    const scrollContainer = screen.getByTestId("query-heatmap-scroll-container");
+    expect(scrollContainer.className).toContain("overflow-x-auto");
+    expect(screen.getByTestId("query-heatmap-scroll-hint").textContent).toContain("Query columns");
+    expect(screen.getByRole("grid").className).toContain("min-w-max");
+
+    const queryHeaders = Array.from(container.querySelectorAll("thead th"));
+    expect(queryHeaders.some((header) => header.className.includes("min-w-[7rem]"))).toBe(true);
+    const queryCells = Array.from(container.querySelectorAll("tbody td[data-cell]"));
+    expect(queryCells.every((cell) => cell.className.includes("min-w-[7rem]"))).toBe(true);
+  });
+
+  it("renders compact mobile cards grouped by platform with aggregate metric and query outliers", () => {
+    render(<QueryHeatmap summary={makeSummary()} />);
+
+    const cards = screen.getByTestId("query-heatmap-mobile-cards");
+    expect(cards.querySelectorAll('[data-testid^="query-heatmap-mobile-card-"]')).toHaveLength(2);
+
+    const sqliteCard = screen.getByTestId("query-heatmap-mobile-card-r2");
+    expect(sqliteCard.textContent).toContain("SQLite");
+    expect(sqliteCard.textContent).toContain("Power Score");
+    expect(sqliteCard.textContent).toContain("800");
+    expect(sqliteCard.textContent).toContain("Query outliers");
+    expect(sqliteCard.textContent).toContain("Q2");
+    expect(sqliteCard.textContent).toContain("200 ms");
+    expect(sqliteCard.textContent).toContain("10.0× fastest");
+  });
+
+  it("uses the same comparison selection ids from compact mobile cards", () => {
+    let selected: Set<string> | null = null;
+    render(
+      <QueryHeatmap
+        summary={makeSummary()}
+        selectedIds={new Set()}
+        onSelectionChange={(ids) => {
+          selected = ids;
+        }}
+      />,
+    );
+
+    const duckCard = screen.getByTestId("query-heatmap-mobile-card-r1");
+    const checkbox = duckCard.querySelector("input[type='checkbox']") as HTMLInputElement;
+    fireEvent.click(checkbox);
+
+    expect([...(selected ?? [])]).toEqual(["r1"]);
   });
 
   // -----------------------------------------------------------------------

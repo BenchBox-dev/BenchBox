@@ -27,6 +27,12 @@
         --bb-text-lg: 1.125rem;
         --bb-text-xl: 1.25rem;
         --bb-text-2xl: 1.5rem;
+        /* Responsive data surfaces: at and above --bb-bp-mobile, prefer horizontal
+           table scroll when the table has a stable sticky first column; below it,
+           fall back to compact platform cards. */
+        --bb-bp-mobile: 48rem;
+        --bb-bp-tablet: 64rem;
+        --bb-bp-desktop: 80rem;
         --bb-skeleton-surface: #e5e7eb;
         --bb-skeleton-highlight: #f9fafb;
         --bb-skeleton-dark-surface: #21262d;

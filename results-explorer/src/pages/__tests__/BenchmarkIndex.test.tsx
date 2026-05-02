@@ -370,8 +370,8 @@ describe("BenchmarkIndex", () => {
 
     const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
-    expect(screen.getByText("exact")).toBeTruthy();
-    expect(screen.getByText("loose")).toBeTruthy();
+    expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("loose").length).toBeGreaterThan(0);
   });
 
   it("compare tray shows selected metadata and links with short IDs", async () => {
