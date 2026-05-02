@@ -19,6 +19,12 @@ import { useFacetField, type DateWindowFacet } from "@/lib/facetModel";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { memoizedSnapshotQueryRows } from "@/lib/duckdbQueries";
+import {
+  EXPLORER_PERFORMANCE_MARKS,
+  EXPLORER_PERFORMANCE_MEASURES,
+  markExplorerPerformance,
+  measureExplorerPerformance,
+} from "@/lib/performanceMarks";
 
 const EMPTY_STRING_ARRAY: string[] = [];
 
@@ -216,6 +222,20 @@ export function Query(_: RoutableProps) {
       cancelled = true;
     };
   }, [selectQuery]);
+
+  useEffect(() => {
+    if (loading || rows.length === 0 || visibleColumns.length === 0) return;
+    markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.QUERY_WORKBENCH_RENDERED, {
+      once: true,
+      detail: { rowCount: rows.length, columnCount: visibleColumns.length },
+    });
+    measureExplorerPerformance(
+      EXPLORER_PERFORMANCE_MEASURES.QUERY_WORKBENCH_RENDER_AFTER_DB,
+      EXPLORER_PERFORMANCE_MARKS.DB_INIT_READY,
+      EXPLORER_PERFORMANCE_MARKS.QUERY_WORKBENCH_RENDERED,
+      { once: true },
+    );
+  }, [loading, rows.length, visibleColumns.length]);
 
   const sqlColumns = useMemo(() => [...new Set(sqlRows.flatMap((row) => Object.keys(row)))], [sqlRows]);
 

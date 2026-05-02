@@ -171,6 +171,16 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(params).toEqual(["duckdb"]);
   });
 
+  it("does not cache empty platform index rows so cold-load retries can recover", async () => {
+    const recoveredRows = [{ result_id: "r1" }];
+    mockedQueryRows.mockResolvedValueOnce([]);
+    mockedQueryRows.mockResolvedValueOnce(recoveredRows);
+
+    await expect(getPlatformIndexRows()).resolves.toEqual([]);
+    await expect(getPlatformIndexRows()).resolves.toBe(recoveredRows);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+  });
+
   it("getCohort selects all variants for a cohort_key", async () => {
     mockedQueryRows.mockResolvedValueOnce([]);
     await getCohort("tpch-sf0.1-power");

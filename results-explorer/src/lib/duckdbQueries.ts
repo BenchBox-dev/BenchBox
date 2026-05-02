@@ -545,6 +545,7 @@ export async function getPlatformIndexRows(platformId?: string): Promise<Platfor
   return memoizedSnapshotQuery(
     `platform-index:${platformId ?? "*"}`,
     () => loadPlatformIndexRows(platformId),
+    { cacheResult: (rows) => rows.length > 0 },
   );
 }
 

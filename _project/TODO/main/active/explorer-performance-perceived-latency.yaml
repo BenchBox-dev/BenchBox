@@ -82,7 +82,14 @@ work:
 - id: w5
   summary: "Add Playwright performance smoke with concrete budgets"
   needs: [w1, w3, w4]
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/package.json"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+  - "results-explorer/src/lib/performanceMarks.ts"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/e2e/performance.spec.ts"
   notes: |
     Provisional budgets, measured against the generated fixture corpus on a
     GitHub Actions Ubuntu runner with the project's standard Chromium build:

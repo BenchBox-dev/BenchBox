@@ -4,12 +4,14 @@ export const EXPLORER_PERFORMANCE_MARKS = {
   HOME_LEADERBOARD_DATA_START: "home-leaderboard-data-start",
   HOME_LEADERBOARD_DATA_READY: "leaderboard-data-ready",
   LEADERBOARD_RENDERED: "leaderboard-rendered",
+  QUERY_WORKBENCH_RENDERED: "query-workbench-rendered",
 } as const;
 
 export const EXPLORER_PERFORMANCE_MEASURES = {
   DB_INIT: "db-init",
   HOME_LEADERBOARD_DATA: "home-leaderboard-data",
   LEADERBOARD_RENDER_AFTER_DATA: "leaderboard-render-after-data",
+  QUERY_WORKBENCH_RENDER_AFTER_DB: "query-workbench-render-after-db",
 } as const;
 
 type ExplorerPerformanceMark =
