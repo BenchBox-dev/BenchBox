@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-214359-claim-orchestrator-false-failure
 date: 2026-04-30
-status: open
+status: actioned
 finding_kind: bug-class
 review_context: "/docs review of dev-loop worktree pool / chore/worktree-pool-docs-review — observed during make worktree-claim BRANCH=chore/worktree-pool-docs-review"
 related_paths:
@@ -83,3 +83,4 @@ dispatches a sub-make and inspects only the exit code (e.g.
   correct: pool-10 cleanly claimed on the requested branch, working
   tree clean. The bug class — orchestrator misreads child make
   target's success — is still live. Verified actionable.
+- 2026-05-02: actioned — Sweep 2026-05-02: fixed by chaining worktree-claim-locked recipe into a single shell with line continuations (the @-prefixed if/exit was running in a per-line subshell, so 'exit 0' exited only that subshell while make walked to the auto-sweep retry path). Added regression test tests/integration/worktree/test_worktree_claim_orchestrator_exit.py — verified it fails on the unfixed recipe and passes after the fix.
