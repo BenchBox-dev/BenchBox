@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { getDb, queryRows } from "@/db";
 import { ErrorMessage } from "@/components/ErrorMessage";
+import { FacetDrawer, type ActiveFacetChip, type FacetGroup } from "@/components/FacetRail";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { arraySerde, stringSerde, useUrlState } from "@/lib/useUrlState";
 import {
@@ -75,6 +76,7 @@ export function Query(_: RoutableProps) {
   const [sqlRows, setSqlRows] = useState<ResultRow[]>([]);
   const [sqlError, setSqlError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [visibleResultLimit, setVisibleResultLimit] = useState(TABLE_RENDER_LIMIT);
   const [visibleSqlLimit, setVisibleSqlLimit] = useState(TABLE_RENDER_LIMIT);
   const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
@@ -233,6 +235,64 @@ export function Query(_: RoutableProps) {
   if (schema.length === 0 && loading) return <LoadingSpinner message="Loading query workbench..." />;
 
   const columnNames = schema.map((column) => column.name);
+  const mobileFacetGroups: FacetGroup[] = [
+    makeFacetGroup("benchmark", "Benchmark", facetCounts.benchmark ?? [], benchmarks),
+    makeFacetGroup("platform", "Platform", facetCounts.platform ?? [], platforms),
+    makeFacetGroup("scale_factor", "Scale", facetCounts.scale_factor ?? [], scaleFactors, (value) => `SF ${value}`),
+    makeFacetGroup("tuning_mode", "Tuning", facetCounts.tuning_mode ?? [], tuningModes),
+    makeFacetGroup("trust_tier", "Trust", facetCounts.trust_label ?? [], trustTiers),
+    makeFacetGroup("validation_status", "Validation", facetCounts.validation_status ?? [], validationStatuses),
+    makeFacetGroup("cost_status", "Cost status", facetCounts.cost_status ?? [], costStatuses),
+    makeFacetGroup("cost_model", "Cost model", facetCounts.cost_model_version ?? [], costModelVersions),
+    makeFacetGroup("cloud_provider", "Cloud provider", facetCounts.cloud_provider ?? [], cloudProviders),
+    makeFacetGroup("cloud_region", "Cloud region", facetCounts.cloud_region ?? [], cloudRegions),
+    makeFacetGroup("instance_type", "Instance", facetCounts.instance_type ?? [], instanceTypes),
+    makeFacetGroup("warehouse_size", "Warehouse", facetCounts.warehouse_size ?? [], warehouseSizes),
+    makeFacetGroup("storage_format", "Storage", facetCounts.storage_format ?? [], storageFormats),
+    makeFacetGroup(
+      "has_cost",
+      "Has cost",
+      [{ value: "all", count: rows.length }, ...(facetCounts.has_cost ?? [])],
+      [hasCost],
+      formatHasCostLabel,
+    ),
+    makeFacetGroup(
+      "date_window",
+      "Date window",
+      [{ value: "all", count: rows.length }, ...(facetCounts.date_window ?? [])],
+      [dateWindow],
+      formatDateWindowLabel,
+    ),
+  ].filter((group) => group.options.length > 0);
+  const activeFilterChips: ActiveFacetChip[] = [
+    ...makeActiveChips("benchmark", "Benchmark", benchmarks, setBenchmarks),
+    ...makeActiveChips("platform", "Platform", platforms, setPlatforms),
+    ...makeActiveChips("scale_factor", "Scale", scaleFactors, setScaleFactors, (value) => `SF ${value}`),
+    ...makeActiveChips("tuning_mode", "Tuning", tuningModes, setTuningModes),
+    ...makeActiveChips("trust_tier", "Trust", trustTiers, setTrustTiers),
+    ...makeActiveChips("validation_status", "Validation", validationStatuses, setValidationStatuses),
+    ...makeActiveChips("cost_status", "Cost status", costStatuses, setCostStatuses),
+    ...makeActiveChips("cost_model", "Cost model", costModelVersions, setCostModelVersions),
+    ...makeActiveChips("cloud_provider", "Cloud provider", cloudProviders, setCloudProviders),
+    ...makeActiveChips("cloud_region", "Cloud region", cloudRegions, setCloudRegions),
+    ...makeActiveChips("instance_type", "Instance", instanceTypes, setInstanceTypes),
+    ...makeActiveChips("warehouse_size", "Warehouse", warehouseSizes, setWarehouseSizes),
+    ...makeActiveChips("storage_format", "Storage", storageFormats, setStorageFormats),
+    ...(hasCost === "all"
+      ? []
+      : [{
+          key: "has_cost",
+          label: `Has cost: ${formatHasCostLabel(hasCost)}`,
+          onClear: () => setHasCost("all"),
+        }]),
+    ...(dateWindow === "all"
+      ? []
+      : [{
+          key: "date_window",
+          label: `Date: ${formatDateWindowLabel(dateWindow)}`,
+          onClear: () => setDateWindow("all"),
+        }]),
+  ];
 
   function toggleMulti(value: string, selected: string[], setSelected: (next: string[]) => void) {
     const next = selected.includes(value) ? selected.filter((candidate) => candidate !== value) : [...selected, value];
@@ -254,6 +314,74 @@ export function Query(_: RoutableProps) {
         ? { column, direction: current.direction === "asc" ? "desc" : "asc" }
         : { column, direction: "asc" },
     );
+  }
+
+  function toggleQueryFacet(groupKey: string, value: string) {
+    switch (groupKey) {
+      case "benchmark":
+        toggleMulti(value, benchmarks, setBenchmarks);
+        break;
+      case "platform":
+        toggleMulti(value, platforms, setPlatforms);
+        break;
+      case "scale_factor":
+        toggleMulti(value, scaleFactors, setScaleFactors);
+        break;
+      case "tuning_mode":
+        toggleMulti(value, tuningModes, setTuningModes);
+        break;
+      case "trust_tier":
+        toggleMulti(value, trustTiers, setTrustTiers);
+        break;
+      case "validation_status":
+        toggleMulti(value, validationStatuses, setValidationStatuses);
+        break;
+      case "cost_status":
+        toggleMulti(value, costStatuses, setCostStatuses);
+        break;
+      case "cost_model":
+        toggleMulti(value, costModelVersions, setCostModelVersions);
+        break;
+      case "cloud_provider":
+        toggleMulti(value, cloudProviders, setCloudProviders);
+        break;
+      case "cloud_region":
+        toggleMulti(value, cloudRegions, setCloudRegions);
+        break;
+      case "instance_type":
+        toggleMulti(value, instanceTypes, setInstanceTypes);
+        break;
+      case "warehouse_size":
+        toggleMulti(value, warehouseSizes, setWarehouseSizes);
+        break;
+      case "storage_format":
+        toggleMulti(value, storageFormats, setStorageFormats);
+        break;
+      case "has_cost":
+        setHasCost(value);
+        break;
+      case "date_window":
+        setDateWindow(value);
+        break;
+    }
+  }
+
+  function resetQueryFilters() {
+    setBenchmarks([]);
+    setPlatforms([]);
+    setScaleFactors([]);
+    setTuningModes([]);
+    setTrustTiers([]);
+    setValidationStatuses([]);
+    setCostStatuses([]);
+    setCostModelVersions([]);
+    setCloudProviders([]);
+    setCloudRegions([]);
+    setInstanceTypes([]);
+    setWarehouseSizes([]);
+    setStorageFormats([]);
+    setHasCost("all");
+    setDateWindow("all");
   }
 
   function buildSqlFromFilters() {
@@ -350,7 +478,210 @@ export function Query(_: RoutableProps) {
       </div>
 
       <div class="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside class="space-y-4 lg:sticky lg:top-4 lg:self-start">
+        <section class="flex min-w-0 flex-col gap-4 lg:col-start-2">
+          <div
+            data-testid="query-result-summary"
+            class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm lg:order-2"
+          >
+            <div class="text-sm text-gray-500">
+              {rows.length} matching result bundle(s)
+              {rowLimitMode === "default" && rows.length >= DEFAULT_ROW_LIMIT && (
+                <span class="ml-2 text-xs text-amber-600">
+                  (capped at {DEFAULT_ROW_LIMIT.toLocaleString()} - add more filters to narrow)
+                </span>
+              )}
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex items-center gap-2 text-sm text-gray-600">
+                <span class="font-medium">Rows:</span>
+                <div class="flex overflow-hidden rounded-md border border-gray-300" role="group" aria-label="Result row limit">
+                  {(["default", "all"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      class={`px-3 py-1.5 text-sm ${
+                        rowLimitMode === mode
+                          ? "bg-brand-600 text-white"
+                          : "bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                      aria-pressed={rowLimitMode === mode}
+                      onClick={() => setRowLimitRaw(mode)}
+                    >
+                      {mode === "default" ? "Default" : "All"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button class="btn btn-secondary" onClick={buildSqlFromFilters}>
+                Build SQL From Filters
+              </button>
+              <button class="btn btn-secondary" onClick={downloadCsv}>
+                Download CSV
+              </button>
+              <button class="btn btn-secondary" onClick={downloadJson}>
+                Download JSON
+              </button>
+            </div>
+            {downloadError && <div class="w-full text-sm text-red-600">{downloadError}</div>}
+          </div>
+
+          <div data-testid="query-mobile-filter-drawer" class="order-2 lg:hidden">
+            <FacetDrawer
+              groups={mobileFacetGroups}
+              resultCount={rows.length}
+              activeChips={activeFilterChips}
+              onToggle={toggleQueryFacet}
+              onReset={resetQueryFilters}
+              open={mobileFiltersOpen}
+              onOpenChange={setMobileFiltersOpen}
+            />
+          </div>
+
+          <div data-testid="query-results-panel" class="order-3">
+            {loading ? (
+              <LoadingSpinner message="Querying results.duckdb..." />
+            ) : (
+              <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+                  <span>
+                    Showing {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} returned rows
+                  </span>
+                  <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
+                </div>
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      {visibleColumns.map((column) => (
+                        <th key={column} class="table-th cursor-pointer select-none" onClick={() => toggleSort(column)}>
+                          {column}
+                          {sort.column === column ? (sort.direction === "asc" ? " ↑" : " ↓") : ""}
+                        </th>
+                      ))}
+                      <th class="table-th" />
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100 bg-white">
+                    {visibleRows.map((row) => (
+                      <tr key={String(row.result_id)} class="hover:bg-gray-50">
+                        {visibleColumns.map((column) => (
+                          <td key={column} class="table-td">
+                            {formatCell(row[column])}
+                          </td>
+                        ))}
+                        <td class="table-td text-right">
+                          <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
+                            View →
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {visibleRows.length < rows.length && (
+                  <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      onClick={() => setVisibleResultLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
+                    >
+                      Show more results
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <details class="order-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <summary class="cursor-pointer text-sm font-medium text-gray-900">Advanced SQL</summary>
+            <div class="mt-4 space-y-4">
+              <StarterQueries onSelect={loadStarterQuery} />
+              <textarea
+                class="min-h-40 w-full rounded-lg border border-gray-300 p-3 font-mono text-sm"
+                value={sqlText}
+                onInput={(event) => setSqlText((event.target as HTMLTextAreaElement).value)}
+              />
+              <div class="flex items-center gap-2">
+                <button class="btn btn-secondary" onClick={runSql}>
+                  Run SQL
+                </button>
+                {sqlError && <span class="text-sm text-red-600">{sqlError}</span>}
+              </div>
+              {sqlRows.length > 0 && (
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                  <div class="border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+                    Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows
+                  </div>
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        {sqlColumns.map((column) => (
+                          <th key={column} class="table-th">
+                            {column}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white">
+                      {visibleSqlRows.map((row, index) => (
+                        <tr key={index}>
+                          {sqlColumns.map((column) => (
+                            <td key={column} class="table-td">
+                              {formatCell(row[column])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {visibleSqlRows.length < sqlRows.length && (
+                    <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+                      <button
+                        type="button"
+                        class="btn btn-secondary"
+                        onClick={() => setVisibleSqlLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
+                      >
+                        Show more SQL rows
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </details>
+
+          <div
+            data-testid="query-visible-columns"
+            class="order-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm lg:order-1"
+          >
+            <div>
+              <h2 class="text-base font-semibold text-gray-900">Visible Columns</h2>
+              <p class="text-xs text-gray-500">
+                Driven from DuckDB <code class="rounded bg-gray-100 px-1 font-mono">bench.results</code> introspection.
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              {columnNames.map((column) => (
+                <label
+                  key={column}
+                  class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
+                >
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.includes(column)}
+                    onChange={() => toggleColumn(column)}
+                  />
+                  {column}
+                </label>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <aside
+          data-testid="query-desktop-filters"
+          class="hidden space-y-4 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-1 lg:block lg:self-start"
+        >
           <FacetSection
             label="Benchmark"
             buckets={facetCounts.benchmark ?? []}
@@ -443,189 +774,52 @@ export function Query(_: RoutableProps) {
             onSelect={setDateWindow}
           />
         </aside>
-
-        <section class="space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div>
-              <h2 class="text-base font-semibold text-gray-900">Visible Columns</h2>
-              <p class="text-xs text-gray-500">
-                Driven from DuckDB <code class="rounded bg-gray-100 px-1 font-mono">bench.results</code> introspection.
-              </p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              {columnNames.map((column) => (
-                <label
-                  key={column}
-                  class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
-                >
-                  <input
-                    type="checkbox"
-                    checked={visibleColumns.includes(column)}
-                    onChange={() => toggleColumn(column)}
-                  />
-                  {column}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div class="text-sm text-gray-500">
-              {rows.length} matching result bundle(s)
-              {rowLimitMode === "default" && rows.length >= DEFAULT_ROW_LIMIT && (
-                <span class="ml-2 text-xs text-amber-600">
-                  (capped at {DEFAULT_ROW_LIMIT.toLocaleString()} - add more filters to narrow)
-                </span>
-              )}
-            </div>
-            <div class="flex items-center gap-2">
-              <div class="flex items-center gap-2 text-sm text-gray-600">
-                <span class="font-medium">Rows:</span>
-                <div class="flex overflow-hidden rounded-md border border-gray-300" role="group" aria-label="Result row limit">
-                  {(["default", "all"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      class={`px-3 py-1.5 text-sm ${
-                        rowLimitMode === mode
-                          ? "bg-brand-600 text-white"
-                          : "bg-white text-gray-600 hover:bg-gray-50"
-                      }`}
-                      aria-pressed={rowLimitMode === mode}
-                      onClick={() => setRowLimitRaw(mode)}
-                    >
-                      {mode === "default" ? "Default" : "All"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button class="btn btn-secondary" onClick={buildSqlFromFilters}>
-                Build SQL From Filters
-              </button>
-              <button class="btn btn-secondary" onClick={downloadCsv}>
-                Download CSV
-              </button>
-              <button class="btn btn-secondary" onClick={downloadJson}>
-                Download JSON
-              </button>
-            </div>
-            {downloadError && <div class="w-full text-sm text-red-600">{downloadError}</div>}
-          </div>
-
-          {loading ? (
-            <LoadingSpinner message="Querying results.duckdb..." />
-          ) : (
-            <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
-                <span>
-                  Showing {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} returned rows
-                </span>
-                <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
-              </div>
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                  <tr>
-                    {visibleColumns.map((column) => (
-                      <th key={column} class="table-th cursor-pointer select-none" onClick={() => toggleSort(column)}>
-                        {column}
-                        {sort.column === column ? (sort.direction === "asc" ? " ↑" : " ↓") : ""}
-                      </th>
-                    ))}
-                    <th class="table-th" />
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 bg-white">
-                  {visibleRows.map((row) => (
-                    <tr key={String(row.result_id)} class="hover:bg-gray-50">
-                      {visibleColumns.map((column) => (
-                        <td key={column} class="table-td">
-                          {formatCell(row[column])}
-                        </td>
-                      ))}
-                      <td class="table-td text-right">
-                        <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
-                          View →
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {visibleRows.length < rows.length && (
-                <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
-                  <button
-                    type="button"
-                    class="btn btn-secondary"
-                    onClick={() => setVisibleResultLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
-                  >
-                    Show more results
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          <details class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <summary class="cursor-pointer text-sm font-medium text-gray-900">Advanced SQL</summary>
-            <div class="mt-4 space-y-4">
-              <StarterQueries onSelect={loadStarterQuery} />
-              <textarea
-                class="min-h-40 w-full rounded-lg border border-gray-300 p-3 font-mono text-sm"
-                value={sqlText}
-                onInput={(event) => setSqlText((event.target as HTMLTextAreaElement).value)}
-              />
-              <div class="flex items-center gap-2">
-                <button class="btn btn-secondary" onClick={runSql}>
-                  Run SQL
-                </button>
-                {sqlError && <span class="text-sm text-red-600">{sqlError}</span>}
-              </div>
-              {sqlRows.length > 0 && (
-                <div class="overflow-hidden rounded-lg border border-gray-200">
-                  <div class="border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
-                    Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows
-                  </div>
-                  <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                      <tr>
-                        {sqlColumns.map((column) => (
-                          <th key={column} class="table-th">
-                            {column}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white">
-                      {visibleSqlRows.map((row, index) => (
-                        <tr key={index}>
-                          {sqlColumns.map((column) => (
-                            <td key={column} class="table-td">
-                              {formatCell(row[column])}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {visibleSqlRows.length < sqlRows.length && (
-                    <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
-                      <button
-                        type="button"
-                        class="btn btn-secondary"
-                        onClick={() => setVisibleSqlLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
-                      >
-                        Show more SQL rows
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </details>
-        </section>
       </div>
     </div>
   );
+}
+
+function makeFacetGroup(
+  key: string,
+  label: string,
+  buckets: FacetBucket[],
+  selected: string[],
+  formatLabel: (value: string) => string = (value) => value,
+): FacetGroup {
+  return {
+    key,
+    label,
+    selected,
+    options: buckets.map((bucket) => ({
+      value: bucket.value,
+      label: formatLabel(bucket.value),
+      count: bucket.count,
+    })),
+  };
+}
+
+function makeActiveChips(
+  keyPrefix: string,
+  label: string,
+  selected: string[],
+  setSelected: (next: string[]) => void,
+  formatLabel: (value: string) => string = (value) => value,
+): ActiveFacetChip[] {
+  return selected.map((value) => ({
+    key: `${keyPrefix}:${value}`,
+    label: `${label}: ${formatLabel(value)}`,
+    onClear: () => setSelected(selected.filter((candidate) => candidate !== value)),
+  }));
+}
+
+function formatHasCostLabel(value: string): string {
+  if (value === "all") return "All";
+  return value === "yes" ? "Has cost" : "No cost";
+}
+
+function formatDateWindowLabel(value: string): string {
+  if (value === "all") return "All";
+  return `Last ${value}`;
 }
 
 function FacetSection({

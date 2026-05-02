@@ -90,7 +90,10 @@ work:
 - id: w6
   summary: "Put Query Workbench results before deep filter controls on mobile"
   needs: [w4]
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/__tests__/Query.test.tsx"
   notes: |
     Query page mobile order should be: title/result count, active filters,
     table rows or SQL panel tabs, then full filters in a drawer. The default
