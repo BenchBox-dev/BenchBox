@@ -90,6 +90,14 @@ describe("facet URL contract", () => {
     expect(readFacetParam(params, "benchmark")).toEqual(["tpch", "ssb"]);
     expect(readFacetParam(params, "date_window")).toBe("30d");
   });
+
+  it("treats legacy all sentinel values as default selections", () => {
+    const params = new URLSearchParams("phase=all&tuning=all&trust=all");
+
+    expect(readFacetParam(params, "phase")).toEqual([]);
+    expect(readFacetParam(params, "tuning_mode")).toEqual([]);
+    expect(readFacetParam(params, "trust_tier")).toEqual([]);
+  });
 });
 
 describe("facetsToWhereClause", () => {
@@ -118,6 +126,7 @@ describe("facetsToWhereClause", () => {
     expect(sql).toContain("benchmark IN (?)");
     expect(sql).toContain("scale_factor IN (?)");
     expect(sql).toContain("test_type IN (?)");
+    expect(sql).toContain("(platform IN (?) OR platform_id IN (?))");
     expect(sql).toContain("(cloud_provider IS NOT NULL OR cost_status = ?)");
     expect(sql).toContain("COALESCE(instance_type, warehouse_size, cluster_size) IN (?)");
     expect(sql).toContain("run_date >= ?");
@@ -125,6 +134,7 @@ describe("facetsToWhereClause", () => {
       "tpch",
       0.01,
       "power",
+      "DuckDB",
       "DuckDB",
       "sql",
       "default",
@@ -142,5 +152,12 @@ describe("facetsToWhereClause", () => {
 
   it("returns an empty clause for default facets", () => {
     expect(facetsToWhereClause()).toEqual({ sql: "", params: [] });
+  });
+
+  it("preserves the legacy untuned tuning sentinel as NULL tuning mode", () => {
+    const { sql, params } = facetsToWhereClause({ tuning_mode: ["untuned", "auto"] });
+
+    expect(sql).toContain("(tuning_mode IN (?) OR tuning_mode IS NULL)");
+    expect(params).toEqual(["auto"]);
   });
 });

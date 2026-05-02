@@ -44,7 +44,12 @@ work:
   - id: w2
     summary: "Migrate Home page to shared facet model"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/facetModel.ts"
+      - "results-explorer/src/lib/duckdbQueries.ts"
+      - "results-explorer/src/pages/Home.tsx"
+      - "results-explorer/src/pages/__tests__/Home.test.tsx"
     notes: |
       Replace Home-local filter state with `useFacetState()`. URL must round-trip
       benchmark, scale_factor, phase, platform, deployment_class, cost_status.

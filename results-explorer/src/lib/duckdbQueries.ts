@@ -9,6 +9,7 @@
  */
 
 import { queryRows } from "@/db";
+import type { FacetWhereClause } from "@/lib/facetModel";
 import type {
   BenchmarkSummary,
   CostDeploymentFields,
@@ -181,8 +182,11 @@ export interface MetaLeaderboardRow {
 // Helpers
 // ---------------------------------------------------------------------------
 
-export async function listResults(): Promise<ResultRow[]> {
-  return queryRows<ResultRow>("SELECT * FROM bench.results ORDER BY run_date DESC");
+export async function listResults(where: FacetWhereClause = { sql: "", params: [] }): Promise<ResultRow[]> {
+  return queryRows<ResultRow>(
+    `SELECT * FROM bench.results ${where.sql} ORDER BY run_date DESC`,
+    where.params,
+  );
 }
 
 export async function getResultDetailMetrics(resultId: string): Promise<ResultDetailMetricsRow | null> {

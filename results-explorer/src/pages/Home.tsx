@@ -13,10 +13,17 @@ import { SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
-import { arraySerde, stringSerde, useUrlState } from "@/lib/useUrlState";
+import {
+  FACET_KEYS,
+  FACET_URL_KEYS,
+  useFacetState,
+  type DateWindowFacet,
+  type FacetKey,
+  type FacetState,
+} from "@/lib/facetModel";
+import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
-const EMPTY_STRING_ARRAY: string[] = [];
 const SUPPORTED_BENCHMARK_COUNT = new Set(Object.values(BENCHMARK_LABELS)).size;
 
 export function Home(_: RoutableProps) {
@@ -27,23 +34,31 @@ export function Home(_: RoutableProps) {
   const retriedEmptyResults = useRef(false);
   const [emptyResultsRetryFinished, setEmptyResultsRetryFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [benchmarkFilters, setBenchmarkFilters] = useUrlState<string[]>("bm", EMPTY_STRING_ARRAY, arraySerde);
-  const [scaleFilters, setScaleFilters] = useUrlState<string[]>("sf", EMPTY_STRING_ARRAY, arraySerde);
-  const [phaseFilter, setPhaseFilter] = useUrlState<string>("phase", "all", stringSerde);
-  const [tuningFilter, setTuningFilter] = useUrlState<string>("tuning", "all", stringSerde);
-  const [trustFilter, setTrustFilter] = useUrlState<string>("trust", "all", stringSerde);
-  const [dateWindow, setDateWindow] = useUrlState<string>("window", "all", stringSerde);
+  const { facets, where: facetWhere, setFacet } = useFacetState();
   const [modeRaw, setModeRaw] = useUrlState<string>("mode", "times", stringSerde);
+  const benchmarkFilters = facets.benchmark;
+  const scaleFilters = facets.scale_factor;
+  const phaseFilter = singleFacetValue(facets.phase);
+  const tuningFilter = singleFacetValue(facets.tuning_mode);
+  const trustFilter = singleFacetValue(facets.trust_tier);
+  const dateWindow = facets.date_window;
 
   useEffect(() => {
     let cancelled = false;
-    listResults()
+    listResults(facetWhere)
       .then((rows) => {
         if (!cancelled) setResults(rows);
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(errMsg(err));
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [facetWhere]);
+
+  useEffect(() => {
+    let cancelled = false;
     getMetaLeaderboardData()
       .then((data) => {
         if (!cancelled) {
@@ -59,7 +74,7 @@ export function Home(_: RoutableProps) {
     };
   }, []);
 
-  // Cold-load mitigation (N5 in pass-2 review): listResults() can briefly
+  // Cold-load mitigation (N5 in pass-2 review): unfiltered listResults() can briefly
   // resolve to [] on a cold DuckDB-WASM attach while the meta-leaderboard
   // succeeds, which would otherwise paint "0 Results / 0 Benchmarks /
   // 0 Platforms" before the real corpus arrives. Retrying once is a
@@ -68,7 +83,8 @@ export function Home(_: RoutableProps) {
   // (c) shared initPromise in db.ts is the trigger. The diagnostic log
   // makes future investigation possible by surfacing the exact mismatch
   // in browser DevTools without needing to re-run the audit setup.
-  const hasInconsistentEmptySnapshot = results !== null && results.length === 0 && metaLeaderboard !== null;
+  const hasInconsistentEmptySnapshot =
+    facetWhere.sql === "" && results !== null && results.length === 0 && metaLeaderboard !== null;
   const hasPersistentInconsistentEmptySnapshot = hasInconsistentEmptySnapshot && emptyResultsRetryFinished;
 
   useEffect(() => {
@@ -81,7 +97,7 @@ export function Home(_: RoutableProps) {
         metaLeaderboard?.cohorts?.length ?? 0,
       );
     }
-    listResults()
+    listResults(facetWhere)
       .then((rows) => {
         if (!cancelled) {
           setResults(rows);
@@ -97,7 +113,7 @@ export function Home(_: RoutableProps) {
     return () => {
       cancelled = true;
     };
-  }, [hasInconsistentEmptySnapshot]);
+  }, [facetWhere, hasInconsistentEmptySnapshot]);
 
   const resultById = useMemo(
     () => new Map((results ?? []).map((result) => [result.result_id, result])),
@@ -127,7 +143,7 @@ export function Home(_: RoutableProps) {
 
       return (cohort.platforms ?? []).some((row) => {
         const result = resultById.get(row.result_id);
-        return result !== undefined && matchesEntryFilters(result, tuningFilter, trustFilter, dateWindow);
+        return result !== undefined && matchesEntryFacets(result, facets);
       });
     });
 
@@ -139,7 +155,7 @@ export function Home(_: RoutableProps) {
             if (!visibleCohortKeys.has(cohortKey)) return false;
             const resultId = cohortPlatformIndex.get(cohortKey)?.get(platform.platform_id);
             const result = resultId ? resultById.get(resultId) : undefined;
-            return result !== undefined && matchesEntryFilters(result, tuningFilter, trustFilter, dateWindow);
+            return result !== undefined && matchesEntryFacets(result, facets);
           }),
         ) as Record<string, MetaRank>;
 
@@ -171,13 +187,11 @@ export function Home(_: RoutableProps) {
   }, [
     benchmarkFilters,
     cohortPlatformIndex,
-    dateWindow,
+    facets,
     metaLeaderboard,
     phaseFilter,
     resultById,
     scaleFilters,
-    trustFilter,
-    tuningFilter,
   ]);
 
   if (error) return <ErrorMessage message={error} />;
@@ -223,18 +237,14 @@ export function Home(_: RoutableProps) {
     const params = new URLSearchParams();
     params.set("sf", String(cohort.scale_factor));
     params.set("phase", cohort.phase);
-    if (tuningFilter !== "all") params.set("tuning", tuningFilter);
-    if (trustFilter !== "all") params.set("trust", trustFilter);
-    if (dateWindow !== "all") params.set("window", dateWindow);
+    appendFacetParams(params, facets, new Set(["benchmark", "scale_factor", "phase"]));
     const query = params.toString();
     return `/results/${cohort.benchmark}/${query ? `?${query}` : ""}`;
   }
 
   function buildPlatformHref(platformId: string): string {
     const params = new URLSearchParams();
-    if (tuningFilter !== "all") params.set("tuning", tuningFilter);
-    if (trustFilter !== "all") params.set("trust", trustFilter);
-    if (dateWindow !== "all") params.set("window", dateWindow);
+    appendFacetParams(params, facets, new Set(["platform"]));
     const query = params.toString();
     return `/results/p/${platformId}/${query ? `?${query}` : ""}`;
   }
@@ -261,7 +271,7 @@ export function Home(_: RoutableProps) {
                   allLabel="All benchmarks"
                   options={benchmarkOptions}
                   current={benchmarkFilters}
-                  onSelect={(value) => setBenchmarkFilters(value === "all" ? [] : [value])}
+                  onSelect={(value) => setFacet("benchmark", value === "all" ? [] : [value])}
                   format={(value) => humanizeBenchmark(value)}
                 />
                 <MultiSelectFilter
@@ -269,14 +279,14 @@ export function Home(_: RoutableProps) {
                   allLabel="All scales"
                   options={scaleOptions}
                   current={scaleFilters}
-                  onSelect={(value) => setScaleFilters(value === "all" ? [] : [value])}
+                  onSelect={(value) => setFacet("scale_factor", value === "all" ? [] : [value])}
                   format={(value) => `SF ${value}`}
                 />
                 <SelectFilter
                   label="Phase"
                   options={["all", ...phaseOptions]}
                   current={phaseFilter}
-                  onSelect={setPhaseFilter}
+                  onSelect={(value) => setFacet("phase", value === "all" ? [] : [value])}
                   format={(value) => (value === "all" ? "All phases" : value)}
                 />
                 <CoverageSummary />
@@ -291,21 +301,21 @@ export function Home(_: RoutableProps) {
                     label="Tuning"
                     options={tuningOptions}
                     current={tuningFilter}
-                    onSelect={setTuningFilter}
+                    onSelect={(value) => setFacet("tuning_mode", value === "all" ? [] : [value])}
                     format={(value) => (value === "all" ? "All tuning" : value)}
                   />
                   <SingleFilterGroup
                     label="Trust"
                     options={trustOptions}
                     current={trustFilter}
-                    onSelect={setTrustFilter}
+                    onSelect={(value) => setFacet("trust_tier", value === "all" ? [] : [value])}
                     format={(value) => (value === "all" ? "All trust tiers" : value)}
                   />
                   <SingleFilterGroup
                     label="Date window"
                     options={["all", "30d", "90d", "365d"]}
                     current={dateWindow}
-                    onSelect={setDateWindow}
+                    onSelect={(value) => setFacet("date_window", toDateWindowFacet(value))}
                     format={(value) => (value === "all" ? "All time" : `Last ${value}`)}
                   />
                 </div>
@@ -499,27 +509,83 @@ function SkeletonSelect({ label }: { label: string }) {
   );
 }
 
-function matchesEntryFilters(
-  entry: ResultRow,
-  tuningFilter: string,
-  trustFilter: string,
-  dateWindow: string,
-): boolean {
-  if (tuningFilter !== "all" && (entry.tuning_mode ?? "untuned") !== tuningFilter) return false;
-  if (trustFilter !== "all" && entry.trust_label !== trustFilter) return false;
-  return matchesDateWindow(entry.run_date, dateWindow);
+function appendFacetParams(params: URLSearchParams, facets: FacetState, omit: ReadonlySet<FacetKey>) {
+  for (const key of FACET_KEYS) {
+    if (omit.has(key)) continue;
+    const value = facets[key];
+    if (Array.isArray(value)) {
+      if (value.length > 0) params.set(FACET_URL_KEYS[key], value.join(","));
+    } else if (value !== "all") {
+      params.set(FACET_URL_KEYS[key], value);
+    }
+  }
 }
 
-function matchesDateWindow(runDate: string, windowValue: string): boolean {
+function singleFacetValue(values: string[]): string {
+  return values.length === 1 ? (values[0] ?? "all") : "all";
+}
+
+function toDateWindowFacet(value: string): DateWindowFacet {
+  if (value === "30d" || value === "90d" || value === "365d") return value;
+  return "all";
+}
+
+function matchesEntryFacets(entry: ResultRow, facets: FacetState): boolean {
+  if (!matchesMultiFilter(entry.benchmark, facets.benchmark)) return false;
+  if (!matchesMultiFilter(String(entry.scale_factor), facets.scale_factor)) return false;
+  if (!matchesOptionalFilter(entry.test_type, facets.phase)) return false;
+  if (!matchesPlatformFacet(entry, facets.platform)) return false;
+  if (!matchesOptionalFilter(entry.execution_mode, facets.execution_mode)) return false;
+  if (!matchesTuningFacet(entry, facets.tuning_mode)) return false;
+  if (!matchesMultiFilter(entry.trust_label, facets.trust_tier)) return false;
+  if (!matchesOptionalFilter(entry.validation_status, facets.validation_status)) return false;
+  if (!matchesDeploymentFacet(entry, facets.deployment_class)) return false;
+  if (!matchesOptionalFilter(entry.cloud_provider, facets.cloud_provider)) return false;
+  if (!matchesOptionalFilter(entry.cloud_region, facets.cloud_region)) return false;
+  if (!matchesOptionalFilter(entryShape(entry), facets.instance_or_warehouse)) return false;
+  if (!matchesOptionalFilter(entry.storage_format, facets.storage_format)) return false;
+  if (!matchesOptionalFilter(entry.cost_status, facets.cost_status)) return false;
+  return matchesDateWindow(entry.run_date, facets.date_window);
+}
+
+function matchesDateWindow(runDate: string, windowValue: DateWindowFacet): boolean {
   if (windowValue === "all") return true;
   const days = Number(windowValue.replace("d", ""));
-  if (Number.isNaN(days)) return true;
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   return new Date(runDate).getTime() >= cutoff;
 }
 
 function matchesMultiFilter(value: string, selected: string[]): boolean {
   return selected.length === 0 || selected.includes(value);
+}
+
+function matchesOptionalFilter(value: string | null | undefined, selected: string[]): boolean {
+  return selected.length === 0 || (value !== null && value !== undefined && selected.includes(value));
+}
+
+function matchesPlatformFacet(entry: ResultRow, selected: string[]): boolean {
+  return selected.length === 0 || selected.includes(entry.platform) || selected.includes(entry.platform_id);
+}
+
+function matchesTuningFacet(entry: ResultRow, selected: string[]): boolean {
+  return selected.length === 0 || selected.includes(entry.tuning_mode ?? "untuned");
+}
+
+function matchesDeploymentFacet(entry: ResultRow, selected: string[]): boolean {
+  if (selected.length === 0) return true;
+  const deployment = entryDeploymentClass(entry);
+  return deployment !== null && selected.includes(deployment);
+}
+
+function entryDeploymentClass(entry: ResultRow): string | null {
+  if (entry.cloud_provider) return "cloud";
+  if (entry.cost_status === "not_applicable_local") return "local";
+  if (entry.cost_status === "unavailable") return "unavailable";
+  return null;
+}
+
+function entryShape(entry: ResultRow): string | null {
+  return entry.instance_type ?? entry.warehouse_size ?? entry.cluster_size ?? null;
 }
 
 function normalizedCostValue(entry: ResultRow): number | null {

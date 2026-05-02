@@ -35,6 +35,14 @@ const RESULT_ROWS = [
     test_type: "power",
     validation_status: "exact",
     cost_usd: 1.1,
+    normalized_cost_usd: 1.1,
+    cost_status: "normalized",
+    cost_scope: "compute_only",
+    cost_model_version: "2026.05.0",
+    cloud_provider: "aws",
+    cloud_region: "us-east-1",
+    warehouse_size: "MEDIUM",
+    storage_format: "parquet",
     compliance_class: null,
     is_ranking_eligible: true,
     has_plans: false,
@@ -63,6 +71,14 @@ const RESULT_ROWS = [
     test_type: "power",
     validation_status: "exact",
     cost_usd: 2.3,
+    normalized_cost_usd: null,
+    cost_status: "not_applicable_local",
+    cost_scope: null,
+    cost_model_version: null,
+    cloud_provider: null,
+    cloud_region: null,
+    warehouse_size: null,
+    storage_format: null,
     compliance_class: null,
     is_ranking_eligible: true,
     has_plans: false,
@@ -91,6 +107,14 @@ const RESULT_ROWS = [
     test_type: "power",
     validation_status: "exact",
     cost_usd: 5.5,
+    normalized_cost_usd: 5.5,
+    cost_status: "normalized",
+    cost_scope: "compute_only",
+    cost_model_version: "2026.05.0",
+    cloud_provider: "gcp",
+    cloud_region: "us-central1",
+    warehouse_size: "LARGE",
+    storage_format: "parquet",
     compliance_class: null,
     is_ranking_eligible: true,
     has_plans: false,
@@ -186,6 +210,7 @@ function expectDocumentOrder(first: Element, second: Element) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   window.history.replaceState(null, "", "/results/");
   vi.mocked(queryRows).mockImplementation(async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
@@ -397,6 +422,40 @@ describe("Home", () => {
       expect(within(grid).getByRole("link", { name: "ClickBench SF0.1" })).toBeTruthy();
       expect(within(grid).queryByRole("link", { name: "TPC-H SF1" })).toBeNull();
     });
+  });
+
+  it("restores canonical URL facets and applies them to the Home result query", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/results/?benchmark=clickbench&sf=0.1&phase=power&platform=DuckDB&deployment=cloud&cost_status=normalized",
+    );
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
+    expect(within(grid).getByText("DuckDB")).toBeTruthy();
+    expect(within(grid).queryByText("SQLite")).toBeNull();
+    expect(within(grid).queryByRole("link", { name: "TPC-H SF1" })).toBeNull();
+
+    const resultCall = vi
+      .mocked(queryRows)
+      .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT * FROM bench.results WHERE"));
+    expect(String(resultCall?.[0])).toContain("benchmark IN (?)");
+    expect(String(resultCall?.[0])).toContain("scale_factor IN (?)");
+    expect(String(resultCall?.[0])).toContain("test_type IN (?)");
+    expect(String(resultCall?.[0])).toContain("(platform IN (?) OR platform_id IN (?))");
+    expect(String(resultCall?.[0])).toContain("cloud_provider IS NOT NULL");
+    expect(String(resultCall?.[0])).toContain("cost_status IN (?)");
+    expect(resultCall?.[1]).toEqual(["clickbench", 0.1, "power", "DuckDB", "DuckDB", "normalized"]);
+
+    const cohortLink = within(grid).getByRole("link", { name: "ClickBench SF0.1" }) as HTMLAnchorElement;
+    expect(cohortLink.getAttribute("href")).toContain("sf=0.1");
+    expect(cohortLink.getAttribute("href")).toContain("phase=power");
+    expect(cohortLink.getAttribute("href")).toContain("platform=DuckDB");
+    expect(cohortLink.getAttribute("href")).toContain("deployment=cloud");
+    expect(cohortLink.getAttribute("href")).toContain("cost_status=normalized");
   });
 
   it("surfaces leaderboard receipt links with trust and validation metadata", async () => {
