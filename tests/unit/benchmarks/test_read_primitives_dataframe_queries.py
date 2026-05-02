@@ -68,7 +68,8 @@ class TestSkipLists:
         # 3 correlated-subquery queries + 2 PySpark-only approximate-aggregate
         # queries (array-quantile and frequency-based top-K). The HLL distinct
         # pair (`approx_count_distinct_*`) and `approx_quantile_groupby` now
-        # have multi-platform DataFrame impls and are no longer skipped.
+        # have DataFrame impls. Some pandas-family engines use exact
+        # fallbacks where their API has no matching sketch aggregate.
         assert len(SKIP_FOR_DATAFRAME) == 5, f"Should have 5 skip entries, got {len(SKIP_FOR_DATAFRAME)}"
 
     def test_skip_for_dataframe_has_expected_queries(self):

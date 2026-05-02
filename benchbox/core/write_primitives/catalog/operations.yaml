@@ -2814,8 +2814,8 @@ operations:
       datafusion: null  # No DML
       # Redshift's HLLSKETCH covers HLL only — no Theta / KLL / Top-K
       # equivalents. DDL must use DISTSTYLE EVEN (HLLSKETCH cannot be
-      # DISTKEY/SORTKEY/PK/FK) and queries must group by a non-sketch
-      # column (HLLSKETCH is rejected in GROUP BY/ORDER BY/DISTINCT).
+      # DISTKEY/SORTKEY) and queries must group by a non-sketch column
+      # (HLLSKETCH is rejected in GROUP BY/ORDER BY/DISTINCT).
       redshift: |
         DROP TABLE IF EXISTS sketch_ops_daily_users;
         CREATE TABLE sketch_ops_daily_users (
@@ -3050,10 +3050,11 @@ operations:
           SELECT datasketch_theta_estimate(datasketch_theta(user_sketch)) AS distinct_orders
           FROM sketch_ops_daily_users
         # SF=0.01: lineitem has 15000 distinct l_orderkeys; theta merge
-        # observed at 14836.89 (deterministic over 5 runs). Bounds catch
-        # a regression to a no-op (0) or gross overestimate.
-        expected_value_min: 14000
-        expected_value_max: 16000
+        # observed at 14836.89 (deterministic over 5 runs). Bounds are
+        # intentionally tighter than the original [14000, 16000] while
+        # still catching only material regressions.
+        expected_value_min: 14500
+        expected_value_max: 15500
     cleanup_sql: |
       DROP TABLE IF EXISTS sketch_ops_daily_users
     expected_rows_affected: null
@@ -3099,16 +3100,15 @@ operations:
       # final BIGINT estimate. Family substitution documented in the
       # cross-platform doc.
       #
-      # Tolerance bounds for the merged distinct estimate are inherited
-      # from the operation-level validation_query [14000, 16000]. HLL++
-      # (Redshift's implementation) has typical ~0.8% bias at default
-      # logm=15; for SF=0.01's 15000 distinct l_orderkeys the merged
-      # estimate should land near 14880-15120. Bounds are wider than
-      # strict-HLL would need; they were authored against DataSketches
-      # Theta and re-tuning to Redshift-tighter bounds is deferred to
+      # Tolerance bounds for the merged distinct estimate come from the
+      # operation-level validation_query [14500, 15500]. Redshift HLL uses
+      # default logm=15, so m=32768 and classic HLL RSE is about
+      # 1.04/sqrt(m)=0.57%; for SF=0.01's 15000 distinct l_orderkeys,
+      # 1σ is ~86 rows. The current ±500 bounds are still conservative
+      # (~5.8σ) while no longer being the old ±1000 (~11.6σ) envelope.
+      # Re-tune with observed Redshift values in
       # write-primitives-sketch-cloud-verification when creds become
-      # available. The current bounds are loose enough to absorb HLL++
-      # bias.
+      # available.
       redshift: |
         DROP TABLE IF EXISTS sketch_ops_daily_users;
         CREATE TABLE sketch_ops_daily_users (

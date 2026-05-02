@@ -7,7 +7,7 @@ review_context: "TODO write-primitives-sketch-clickhouse-and-storage-metrics imp
 related_paths:
   - benchbox/core/write_primitives/catalog/operations.yaml
   - pyproject.toml
-suggested_sweep: "Pin or vendor a known-good datasketches community-extension build (e.g. ship the .duckdb_extension binary in _binaries/), or replace `datasketch_theta` / `datasketch_frequent_items` references with HLL family substitutes that the current extension actually exports. Add a CI smoke that calls `SELECT datasketch_theta(1)` to fail fast if a future extension rebuild drops the family again."
+suggested_sweep: "Pin or vendor a known-good datasketches community-extension build (e.g. ship the .duckdb_extension binary in _binaries/), or replace `datasketch_theta` / `datasketch_frequent_items` references with exported HLL-family substitutes. Add a CI smoke that enumerates required families (`theta`, `frequent_items`, `cpc`, `req`, `kll`, `hll`) so future community-extension rebuilds fail fast when any planned sketch family appears or disappears."
 todo_id: null
 ---
 
@@ -35,7 +35,10 @@ datasketch_theta does not exist! Did you mean "datasketch_tdigest"?`.
 
 `SELECT DISTINCT function_name FROM duckdb_functions() WHERE function_name
 ILIKE 'datasketch_%'` returns the families: `cpc`, `hll`, `kll`,
-`quantiles`, `req`, `tdigest`. No `theta`. No `frequent_items`.
+`quantiles`, `req`, `tdigest`. No `theta`. No `frequent_items`. CPC
+and REQ are present in the current build, so the direct develop breakage
+is the already-merged theta/frequent-items ops; CPC/REQ follow-up work is
+still exposed to the same unpinned-extension drift risk.
 
 Either the upstream extension build for v1.3.2 was rebuilt without the
 theta + frequent-items families between PR #114 morning and this audit,
@@ -64,9 +67,11 @@ changes BenchBox's behavior without any version bump or PR.
 
 ## Suggested next steps
 
-- [ ] Add a fast smoke in CI that calls `SELECT datasketch_theta(1)` and
-      `SELECT datasketch_frequent_items(8, 'x')` against a fresh DuckDB
-      install — fails the build if either family is absent.
+- [ ] Add a fast smoke in CI that calls representative functions for every
+      sketch family BenchBox depends on or plans to depend on:
+      `datasketch_theta`, `datasketch_frequent_items`, `datasketch_cpc`,
+      `datasketch_req`, `datasketch_kll`, and `datasketch_hll` against a
+      fresh DuckDB install. Fail the build if a required family is absent.
 - [ ] Decide between vendoring the community extension binary in
       `_binaries/datasketches/` (control over version, larger artifact
       tree) vs. switching the ops to families the upstream extension

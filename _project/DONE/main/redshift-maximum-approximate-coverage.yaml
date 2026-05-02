@@ -60,7 +60,7 @@ context_sections:
     HLLSKETCH columns have non-trivial DDL/query restrictions that
     don't fit the BINARY-portable model used elsewhere:
 
-      - Cannot be DISTKEY / SORTKEY / PRIMARY KEY / FOREIGN KEY.
+      - Cannot be DISTKEY / SORTKEY.
       - Cannot appear in GROUP BY / ORDER BY / DISTINCT clauses.
       - Fixed logm=15 (no precision tuning knob — the parameter-sweep
         TODO does not apply to Redshift).
@@ -156,7 +156,9 @@ work:
 
       Notes:
         - DISTSTYLE EVEN required: HLLSKETCH cannot be DISTKEY/SORTKEY.
-        - No PRIMARY KEY: HLLSKETCH cannot be PK/FK either.
+        - No PRIMARY KEY / FOREIGN KEY on these scratch tables: not needed
+          for benchmark semantics, and avoids mixing informational
+          constraints into HLLSKETCH-specific DDL.
         - This activates the previously-unused HLLSKETCH path on Redshift.
 
       For the validation_query, the existing `SELECT COUNT(*) FROM
@@ -223,7 +225,8 @@ work:
       Tolerance bounds: HLL++ (Redshift's implementation) produces
       different bias than DataSketches Theta. Cannot tune empirically
       without Redshift creds — set initial bounds wide
-      (e.g. [12000, 18000] vs DuckDB's [14000, 16000]) and document
+      (initial recommendation: [14500, 15500] for Redshift HLL logm=15
+      at SF=0.01, subject to live observation) and document
       "Redshift bounds initial estimate; re-tune in cloud-verification
       TODO" inline. Same approach used for cloud overrides in PR #112.
 
@@ -393,10 +396,10 @@ approach: |
   and load. Changelog (w8) is the final commit.
 
 anti_patterns:
-  - "DO NOT activate the existing _BINARY_TYPE_BY_DIALECT[redshift] = HLLSKETCH translator — because HLLSKETCH semantics (no DISTKEY/SORTKEY/PK/GROUP BY) don't fit the generic BINARY abstraction and silently breaking on Redshift in some other op would be very hard to debug — keep ops self-contained with explicit redshift: DDL."
+  - "DO NOT activate the existing _BINARY_TYPE_BY_DIALECT[redshift] = HLLSKETCH translator — because HLLSKETCH semantics (no DISTKEY/SORTKEY/GROUP BY) don't fit the generic BINARY abstraction and silently breaking on Redshift in some other op would be very hard to debug — keep ops self-contained with explicit redshift: DDL."
   - "DO NOT rename ops to reflect the HLL family substitution (e.g., sketch_insert_theta_per_partition → sketch_insert_hll_or_theta_per_partition) — because the op ID is the user-facing measurement key and changing it breaks cross-engine comparison — keep the ID as 'theta' and document the per-engine substitution in the cross-platform doc."
   - "DO NOT attempt UDF emulation of top-K, KLL, T-Digest etc. on Redshift — because the resulting numbers would measure UDF dispatch overhead, not sketch performance, and would mislead cross-engine comparisons — let those ops stay skipped with explicit rationale comments."
-  - "DO NOT use HLLSKETCH columns in DISTKEY / SORTKEY / PRIMARY KEY / GROUP BY / ORDER BY / DISTINCT — because Redshift rejects all of these — DDL must use DISTSTYLE EVEN (or AUTO) and queries must group by a non-sketch column (e.g., region or activity_date)."
+  - "DO NOT use HLLSKETCH columns in DISTKEY / SORTKEY / GROUP BY / ORDER BY / DISTINCT — because Redshift rejects these placements — DDL must use DISTSTYLE EVEN (or AUTO) and queries must group by a non-sketch column (e.g., region or activity_date)."
   - "DO NOT tune Redshift expected_value_min/max bounds tightly without empirical observations — because HLL++ vs DataSketches bias differs and cloud-verification can't run locally — set initial bounds wide with a 'Redshift bounds initial estimate; re-tune in cloud-verification TODO' inline comment."
 
 verification:

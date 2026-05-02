@@ -47,6 +47,12 @@ if TYPE_CHECKING:
     from benchbox.core.dataframe.context import DataFrameContext
 
 
+def _is_dask_context(ctx: DataFrameContext) -> bool:
+    """Return whether a pandas-family context is backed by Dask."""
+    platform = ctx.platform.lower().replace("_", "-")
+    return platform in {"dask", "dask-df"}
+
+
 # =============================================================================
 # Query IDs that should be skipped for DataFrame implementations
 # =============================================================================
@@ -1469,15 +1475,17 @@ def aggregation_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
 def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     """Approximate distinct count fallback for the pandas family.
 
-    Pandas, Modin, and cuDF expose only exact `.nunique()` at the API
-    surface, so the "approximate" label degrades to exact on those
-    platforms. Dask offers `nunique_approx()` (HLL) but adding the
-    branch requires per-platform context detection — captured as a
-    follow-up; current Dask coverage is exact via the same fallback.
+    Dask uses native `nunique_approx()` (HLL) for this single-value
+    query. Pandas, Modin, and cuDF expose only exact `.nunique()` at
+    the API surface, so the "approximate" label degrades to exact on
+    those platforms.
     """
     orders = ctx.get_table("orders")
 
     filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
+    if _is_dask_context(ctx):
+        return ctx.scalar_to_df({"unique_customers": filtered["o_custkey"].nunique_approx().compute()})
+
     result = filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
 
     return result
@@ -1486,9 +1494,10 @@ def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
 def approx_count_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     """Approximate distinct count groupby fallback for the pandas family.
 
-    Pandas, Modin, and cuDF expose only exact `.nunique()`. Dask's
-    `nunique_approx()` could replace this once a clean platform-aware
-    branch lands; current Dask coverage is exact via the same fallback.
+    Pandas, Modin, cuDF, and current Dask expose no groupby approximate
+    distinct aggregate matching this query shape. Dask has Series-level
+    `nunique_approx()`, but no groupby equivalent in the dask-expr API,
+    so this query remains an exact fallback for the pandas family.
     """
     return aggregation_groupby_impl(
         ctx,
@@ -3366,9 +3375,10 @@ def approx_quantile_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
 
     Pandas / Modin / cuDF have no sketch-backed quantile at the
     DataFrame layer, so this implementation returns the exact median.
-    Dask exposes `series.quantile(0.5, method='tdigest')` (T-Digest);
-    wiring it requires per-platform context detection inside the impl
-    body, captured as a follow-up note in this module's docstring.
+    Current Dask exposes Series-level T-Digest quantile only when the
+    optional `crick` dependency is installed, and does not expose a
+    groupby quantile method in the dask-expr API. This query therefore
+    remains exact on Dask too.
     """
     lineitem = ctx.get_table("lineitem")
 

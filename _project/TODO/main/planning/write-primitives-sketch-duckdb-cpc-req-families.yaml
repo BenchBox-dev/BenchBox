@@ -18,12 +18,14 @@ description: |
       installs has dropped the theta + frequent-items families
       (`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`)
 
-  This TODO additionally hits the second blocker directly: the
-  CPC/REQ family ops here would call `datasketch_cpc` and
-  `datasketch_req` against a community extension build that we
-  cannot reliably resolve via `INSTALL datasketches FROM community`
-  today. Both gaps need a fix-class TODO before any sketch work in
-  the matrix can land cross-engine.
+  This TODO additionally inherits the second blocker as a reliability
+  risk: the current community extension build does expose
+  `datasketch_cpc` and `datasketch_req`, but the same unpinned CDN
+  artifact already dropped theta + frequent-items without a BenchBox
+  version change. CPC/REQ implementation must smoke-test the exact
+  function family and merge semantics before relying on it. Both gaps
+  need a fix-class TODO before any sketch work in the matrix can land
+  cross-engine.
 
   Resolution path: `write-primitives-architecture-fixes` unblocks
   the shared architecture gaps, then
