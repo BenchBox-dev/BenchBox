@@ -64,6 +64,10 @@ function normalizeSql(sql: string): string {
   return sql.replace(/\s+/g, " ").trim();
 }
 
+function isDefaultResultSelect(sql: unknown): boolean {
+  return normalizeSql(String(sql)).startsWith("SELECT result_id, benchmark, platform, scale_factor");
+}
+
 beforeEach(() => {
   vi.mocked(queryRows).mockReset();
   vi.mocked(getDb).mockReset();
@@ -167,7 +171,7 @@ beforeEach(() => {
     if (normalized.startsWith("CREATE TABLE")) {
       throw new Error("read-only connection");
     }
-    if (normalized.startsWith("SELECT benchmark, platform, scale_factor")) {
+    if (isDefaultResultSelect(sql)) {
       return BASE_ROWS;
     }
     if (normalized.startsWith("SELECT * FROM bench.results")) {
@@ -196,19 +200,28 @@ describe("Query", () => {
 
     fireEvent.click(screen.getByLabelText(/DuckDB/i));
     await waitFor(() => {
-      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
-        String(sql).includes("SELECT benchmark, platform, scale_factor"),
-      );
+      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).toContain("platform IN (?)");
     });
 
     fireEvent.click(within(resultsTable).getAllByText(/^benchmark(?:\s[↑↓])?$/)[0]!);
     await waitFor(() => {
-      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
-        String(sql).includes("SELECT benchmark, platform, scale_factor"),
-      );
+      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).toContain("ORDER BY benchmark ASC");
     });
+  });
+
+  it("keeps hidden result IDs available for row actions without showing the column", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const resultsTable = screen.getAllByRole("table")[0]!;
+    expect(within(resultsTable).queryByRole("columnheader", { name: /^result_id$/ })).toBeNull();
+    expect(within(resultsTable).getAllByRole("link", { name: /View/i })[0]).toHaveAttribute(
+      "href",
+      "/results/r/r1",
+    );
+    expect(vi.mocked(queryRows).mock.calls.some(([sql]) => isDefaultResultSelect(sql))).toBe(true);
   });
 
   it("applies normalized cost and deployment facets to the generated query", async () => {
@@ -223,9 +236,7 @@ describe("Query", () => {
     fireEvent.click(within(warehouse).getByLabelText(/MEDIUM/i));
 
     await waitFor(() => {
-      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
-        String(sql).includes("SELECT benchmark, platform, scale_factor"),
-      );
+      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       const latest = String(selectCalls.at(-1)?.[0]);
       expect(latest).toContain("cost_status IN (?)");
       expect(latest).toContain("cloud_provider IN (?)");
@@ -252,7 +263,7 @@ describe("Query", () => {
 
     const sqlCalls = vi.mocked(queryRows).mock.calls.map(([sql]) => String(sql));
     expect(sqlCalls.join("\n")).not.toContain("CAST(cost_status AS VARCHAR)");
-    const selectCalls = sqlCalls.filter((sql) => sql.includes("SELECT benchmark, platform, scale_factor"));
+    const selectCalls = sqlCalls.filter((sql) => isDefaultResultSelect(sql));
     expect(selectCalls.at(-1)).not.toContain("cost_status IN (?)");
     expect(selectCalls.at(-1)).not.toContain("cloud_provider IN (?)");
     expect(selectCalls.at(-1)).not.toContain("warehouse_size IN (?)");
@@ -262,9 +273,7 @@ describe("Query", () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    const selectCallsBefore = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
-      String(sql).includes("SELECT benchmark, platform, scale_factor"),
-    );
+    const selectCallsBefore = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
     expect(selectCallsBefore.at(-1)?.[0]).toContain(`LIMIT ${DEFAULT_ROW_LIMIT}`);
 
     fireEvent.click(screen.getByRole("button", { name: /^All$/ }));
@@ -273,9 +282,7 @@ describe("Query", () => {
       expect(new URL(window.location.href).searchParams.get("limit")).toBe("all"),
     );
     await waitFor(() => {
-      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
-        String(sql).includes("SELECT benchmark, platform, scale_factor"),
-      );
+      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
     });
     expect(screen.getByText("Showing all returned rows: 2")).toBeTruthy();
@@ -371,6 +378,7 @@ describe("Query", () => {
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed.length).toBeGreaterThan(0);
     expect(parsed[0]).toHaveProperty("benchmark");
+    expect(parsed[0]).not.toHaveProperty("result_id");
   });
 
   it("runs read-only SQL and surfaces DDL errors", async () => {

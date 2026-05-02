@@ -81,8 +81,11 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     mockedQueryRows.mockResolvedValueOnce([]);
     await getPlatformIndexRows();
     const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.results r/);
+    expect(sql).toMatch(/LEFT JOIN bench\.benchmark_rankings br ON br\.result_id = r\.result_id/);
+    expect(sql).toMatch(/COALESCE\(br\.phase, r\.test_type, 'power'\) AS phase/);
+    expect(sql).toMatch(/br\.primary_metric/);
     expect(sql).toMatch(/validation_status/);
-    expect(sql).toMatch(/FROM bench\.results/);
     expect(sql).not.toMatch(/WHERE/);
     expect(params).toBeUndefined();
   });
@@ -91,7 +94,7 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     mockedQueryRows.mockResolvedValueOnce([]);
     await getPlatformIndexRows("duckdb");
     const [sql, params] = mockedQueryRows.mock.calls[0]!;
-    expect(sql).toMatch(/WHERE platform_id = \?/);
+    expect(sql).toMatch(/WHERE r\.platform_id = \?/);
     expect(params).toEqual(["duckdb"]);
   });
 
