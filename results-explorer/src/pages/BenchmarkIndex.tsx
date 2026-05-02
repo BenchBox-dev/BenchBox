@@ -154,6 +154,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     // needless empty-cohort fetch.
     if (!results || phases.length === 0) return;
     let cancelled = false;
+    setSelectedIds(new Set());
     setSummary(null);
     setSummaryError(null);
     setSummaryLoading(true);
@@ -179,11 +180,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     // double-fetch when the user picks a phase that is available.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, benchmark, effectiveSf, effectivePhase]);
-
-  // Clear selection when the summary changes.
-  useEffect(() => {
-    setSelectedIds(new Set());
-  }, [summary]);
 
   if (error) return <ErrorMessage message={error} />;
   if (!results) return <LoadingSpinner message="Loading results..." />;
@@ -278,10 +274,17 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     return matchesFacetFields(result, facets);
   });
 
-  // Build the Compare URL from selected result_ids.
+  const selectedCompareRowsById = new Map(
+    (summaryWithResultMetadata?.platforms ?? []).map((row) => [compareIdForBenchmarkRow(row), row]),
+  );
+  const selectedCompareRows = [...selectedIds]
+    .map((id) => selectedCompareRowsById.get(id))
+    .filter((row): row is PlatformRow => row !== undefined);
+
+  // Build the Compare URL from selected compact IDs when available.
   const compareUrl =
     selectedIds.size >= 2
-      ? `/results/compare?ids=${[...selectedIds].join(",")}`
+      ? buildCompareUrl([...selectedIds])
       : null;
 
   return (
@@ -512,12 +515,43 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       {/* Sticky Compare bar */}
       {compareUrl && (
         <div class="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white px-4 py-3 shadow-lg">
-          <div class="mx-auto flex max-w-7xl items-center justify-between">
-            <span class="text-sm text-gray-700">
-              <strong>{selectedIds.size}</strong> platforms selected
-            </span>
-            <div class="flex items-center gap-3">
+          <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0 flex-1">
+              <div class="text-sm text-gray-700">
+                <strong>{selectedIds.size}</strong> platforms selected for compare
+              </div>
+              <div
+                class="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1"
+                role="list"
+                aria-label="Selected compare results"
+              >
+                {selectedCompareRows.map((row) => {
+                  const id = compareIdForBenchmarkRow(row);
+                  const cohortBenchmark = summaryWithResultMetadata?.benchmark ?? benchmark;
+                  const cohortScale = summaryWithResultMetadata?.scale_factor ?? effectiveSf;
+                  const cohortPhase = summaryWithResultMetadata?.phase ?? effectivePhase;
+                  return (
+                    <div
+                      key={id}
+                      data-testid={`compare-tray-row-${id}`}
+                      role="listitem"
+                      class="flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-600"
+                    >
+                      <span class="font-medium text-gray-900">{row.platform}</span>
+                      <span>{humanizeBenchmark(cohortBenchmark)}</span>
+                      <span>SF {cohortScale}</span>
+                      <span>{cohortPhase}</span>
+                      <span>{row.run_date}</span>
+                      <TrustBadge trustLabel={row.trust_label} compact />
+                      <span class="font-mono text-gray-500">ID {displayCompareId(id)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div class="flex shrink-0 items-center gap-3">
               <button
+                type="button"
                 class="text-sm text-gray-500 hover:text-gray-700"
                 onClick={() => setSelectedIds(new Set())}
               >
@@ -603,6 +637,18 @@ function rowDeploymentClass(row: ResultRow | PlatformRow): string | null {
 
 function rowShape(row: ResultRow | PlatformRow): string | null {
   return row.instance_type ?? row.warehouse_size ?? row.cluster_size ?? null;
+}
+
+function compareIdForBenchmarkRow(row: PlatformRow): string {
+  return row.short_id || row.result_id;
+}
+
+function buildCompareUrl(ids: string[]): string {
+  return `/results/compare?ids=${ids.map(encodeURIComponent).join(",")}`;
+}
+
+function displayCompareId(id: string): string {
+  return id.length > 12 ? `${id.slice(0, 8)}...` : id;
 }
 
 function matchesDateWindow(runDate: string, windowValue: DateWindowFacet): boolean {

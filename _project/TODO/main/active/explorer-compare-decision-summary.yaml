@@ -92,7 +92,14 @@ work:
 
   - id: w5
     summary: "Improve compare tray metadata and URL shareability"
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/BenchmarkIndex.tsx"
+      - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      - "results-explorer/src/pages/PlatformIndex.tsx"
+      - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      - "results-explorer/src/lib/duckdbQueries.ts"
+      - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
     notes: |
       Sticky compare bars in BenchmarkIndex and PlatformIndex should show
       platform, benchmark, scale, phase, date, trust, and short id for selected
