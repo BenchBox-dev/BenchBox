@@ -237,7 +237,7 @@ work:
 - id: w14
   summary: "Add result-schema compatibility tests and golden fixtures"
   needs: [w3, w4, w6, w7, w8, w9, w10, w11, w12, w13]
-  status: pending
+  status: done
   notes: |
     Add focused fixtures for:
       - local embedded DuckDB or DataFrame process;
