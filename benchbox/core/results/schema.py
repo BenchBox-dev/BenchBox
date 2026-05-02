@@ -66,6 +66,7 @@ CONFIG_KEY_ORDER = [
     "tuning_mode",
     "tuning_config",
     "platform_options",
+    "platform_option_sources",
     "table_mode",
     "external_format",
     "table_format",
@@ -772,6 +773,7 @@ def _shorten_benchmark_name(name: str) -> str:
 _CONFIG_CTX_OR_RUN = ["seed", "phases", "query_subset"]
 _CONFIG_RUN_ONLY = [
     "platform_options",
+    "platform_option_sources",
     "tuning_mode",
     "tuning_config",
     "table_mode",

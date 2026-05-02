@@ -26,6 +26,7 @@ from benchbox.core.constants import (
 from benchbox.core.results.models import (
     BenchmarkResults,
 )
+from benchbox.core.results.platform_options import build_platform_options_capture
 from benchbox.core.runner.conversion import FormatConversionOrchestrator
 from benchbox.core.schemas import (
     BenchmarkConfig,
@@ -593,10 +594,34 @@ def _parse_partition_cols(raw: Any) -> list[str]:
     return []
 
 
+def _database_platform_options(database_config: DatabaseConfig | None) -> dict[str, Any]:
+    """Collect resolved platform options from DatabaseConfig options plus extra fields."""
+    if database_config is None:
+        return {}
+
+    collected = dict(getattr(database_config, "options", None) or {})
+    if hasattr(database_config, "model_dump"):
+        data = database_config.model_dump(exclude_none=True)
+    else:
+        data = dict(getattr(database_config, "__dict__", {}) or {})
+
+    standard_fields = {
+        "type",
+        "name",
+        "connection_string",
+        "options",
+    }
+    for key, value in data.items():
+        if key not in standard_fields:
+            collected.setdefault(key, value)
+    return collected
+
+
 def _build_run_config_from_options(
     benchmark_config: BenchmarkConfig,
     options: Mapping[str, Any],
     platform_config: dict[str, Any] | None,
+    database_config: DatabaseConfig | None,
     validation_opts: ValidationOptions,
     verbosity_settings: VerbositySettings,
     test_type: str,
@@ -612,6 +637,11 @@ def _build_run_config_from_options(
         or GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS
     )
     seed_raw = options.get("seed")
+    platform_options, platform_option_sources = build_platform_options_capture(
+        requested_options=options.get("platform_options"),
+        requested_sources=options.get("platform_option_sources"),
+        database_options=_database_platform_options(database_config),
+    )
     return RunConfig(
         benchmark=benchmark_config.name,
         query_subset=benchmark_config.queries,
@@ -619,6 +649,8 @@ def _build_run_config_from_options(
         test_execution_type=test_type,
         scale_factor=benchmark_config.scale_factor,
         seed=(int(seed_raw) if seed_raw is not None else None),
+        platform_options=platform_options or None,
+        platform_option_sources=platform_option_sources or None,
         connection={
             "database_path": (platform_config or {}).get("database_path"),
         },
@@ -1094,6 +1126,7 @@ def run_benchmark_lifecycle(
         benchmark_config=benchmark_config,
         options=options,
         platform_config=platform_config,
+        database_config=database_config,
         validation_opts=validation_opts,
         verbosity_settings=verbosity_settings,
         test_type=test_type,

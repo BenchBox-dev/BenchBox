@@ -172,6 +172,7 @@ class RunConfigInput:
     tuning_mode: str | None = None
     tuning_config: dict[str, Any] | None = None
     platform_options: dict[str, Any] | None = None
+    platform_option_sources: dict[str, str] | None = None
     table_mode: str | None = None
     external_format: str | None = None
     table_format: str | None = None
@@ -196,6 +197,8 @@ class RunConfigInput:
             data["tuning_config"] = self.tuning_config
         if self.platform_options:
             data["platform_options"] = self.platform_options
+        if self.platform_option_sources:
+            data["platform_option_sources"] = self.platform_option_sources
         if self.table_mode and self.table_mode != "native":
             data["table_mode"] = self.table_mode
         if self.external_format:
@@ -996,7 +999,12 @@ class ResultBuilder:
                 metadata["dataframe_family"] = self._platform.family
 
         if self._run_config:
-            metadata["run_config"] = self._run_config.to_dict()
+            run_config = {}
+            existing_run_config = metadata.get("run_config")
+            if isinstance(existing_run_config, dict):
+                run_config.update(existing_run_config)
+            run_config.update(self._run_config.to_dict())
+            metadata["run_config"] = run_config
         if self._phase_status:
             merged_phase_status: dict[str, dict[str, Any]] = {}
             existing_phase_status = metadata.get("phase_status")

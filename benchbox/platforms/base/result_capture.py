@@ -1470,6 +1470,7 @@ class ResultCaptureMixin:
                 "phases": run_config.get("phases"),
                 "query_subset": run_config.get("query_subset"),
                 "platform_options": run_config.get("platform_options"),
+                "platform_option_sources": run_config.get("platform_option_sources"),
                 "tuning_mode": run_config.get("tuning_mode"),
                 "tuning_config": run_config.get("tuning_config"),
                 "table_mode": self.table_mode if self.table_mode != "native" else None,

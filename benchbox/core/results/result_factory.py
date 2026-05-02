@@ -48,6 +48,7 @@ def _apply_run_config(builder: ResultBuilder, execution_metadata: dict[str, Any]
             tuning_mode=run_cfg.get("tuning_mode"),
             tuning_config=run_cfg.get("tuning_config"),
             platform_options=run_cfg.get("platform_options"),
+            platform_option_sources=run_cfg.get("platform_option_sources"),
             table_mode=run_cfg.get("table_mode"),
             external_format=run_cfg.get("external_format"),
             table_format=run_cfg.get("table_format"),

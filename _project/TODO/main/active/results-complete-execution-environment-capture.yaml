@@ -67,7 +67,7 @@ work:
 - id: w2
   summary: "Propagate requested platform options into result metadata with provenance"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     The CLI already parses `--platform-option` and uses those values to build
     `DatabaseConfig`, but the standard lifecycle does not reliably persist

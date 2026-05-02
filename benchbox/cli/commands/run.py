@@ -582,6 +582,44 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
         _reject_external_tuned(console, s.logger, s.ctx)
 
 
+def _platform_option_sources_for_state(s: types.SimpleNamespace) -> dict[str, str]:
+    """Return source provenance for parsed platform options in the current CLI state."""
+    if not s.platform_key or not s.parsed_platform_options:
+        return {}
+
+    explicit_keys = _explicit_platform_option_keys(s.platform_key, s.platform_option_pairs or ())
+    defaults = PlatformHookRegistry.get_default_options(s.platform_key)
+    sources: dict[str, str] = {}
+    for key in s.parsed_platform_options:
+        if key in explicit_keys:
+            sources[key] = "cli_option"
+        elif key in defaults:
+            sources[key] = "registered_default"
+        else:
+            sources[key] = "requested"
+    return sources
+
+
+def _explicit_platform_option_keys(platform_key: str, pairs: Iterable[tuple[str, str]]) -> set[str]:
+    specs = PlatformHookRegistry.list_option_specs(platform_key)
+    alias_index = {alias.lower(): name for name, spec in specs.items() for alias in spec.aliases}
+    explicit: set[str] = set()
+    for key, _value in pairs:
+        normalized = key.lower()
+        explicit.add(normalized if normalized in specs else alias_index.get(normalized, normalized))
+    return explicit
+
+
+def _platform_option_config_entries(s: types.SimpleNamespace) -> dict[str, Any]:
+    if not s.parsed_platform_options:
+        return {}
+    entries: dict[str, Any] = {"platform_options": dict(s.parsed_platform_options)}
+    sources = _platform_option_sources_for_state(s)
+    if sources:
+        entries["platform_option_sources"] = sources
+    return entries
+
+
 def _validate_non_interactive(s: types.SimpleNamespace) -> None:
     """Set env flag and validate required args for non-interactive mode."""
     if not s.non_interactive:
@@ -1188,6 +1226,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
@@ -1393,6 +1432,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
@@ -1638,6 +1678,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
@@ -1895,6 +1936,7 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
@@ -2115,6 +2157,10 @@ def _interactive_collect_flags(
             if s.database_config.options is None:
                 s.database_config.options = {}
             s.database_config.options.update(platform_opts)
+            s.benchmark_config.options["platform_options"] = dict(platform_opts)
+            s.benchmark_config.options["platform_option_sources"] = {
+                str(key): "runtime_override" for key in platform_opts
+            }
 
 
 def _interactive_prompt_seed(s: types.SimpleNamespace, prompt_seed_fn: Any) -> None:
