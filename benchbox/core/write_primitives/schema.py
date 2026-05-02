@@ -266,6 +266,28 @@ DDL_TRUNCATE_TARGET = {
     ],
 }
 
+# SKETCH operations staging table for theta+kll sketches partitioned by date/region.
+# Sketch columns use the logical BINARY type; translate_column_type rewrites it
+# per dialect (BLOB/BYTES/HLLSKETCH/etc.).
+SKETCH_OPS_DAILY_USERS = {
+    "name": "sketch_ops_daily_users",
+    "columns": [
+        {"name": "activity_date", "type": "DATE"},
+        {"name": "region", "type": "VARCHAR(25)"},
+        {"name": "user_sketch", "type": "BINARY", "nullable": True},
+        {"name": "rev_sketch", "type": "BINARY", "nullable": True},
+    ],
+}
+
+# SKETCH operations staging table for top-K sketches per shard.
+SKETCH_OPS_TOPK = {
+    "name": "sketch_ops_topk",
+    "columns": [
+        {"name": "shard_id", "type": "INTEGER"},
+        {"name": "topk_sketch", "type": "BINARY", "nullable": True},
+    ],
+}
+
 # Audit log for tracking write operations
 WRITE_OPS_LOG = {
     "name": "write_ops_log",
@@ -323,6 +345,8 @@ TABLES = {
     "merge_ops_summary_target": MERGE_OPS_SUMMARY_TARGET,
     "bulk_load_ops_target": BULK_LOAD_OPS_TARGET,
     "ddl_truncate_target": DDL_TRUNCATE_TARGET,
+    "sketch_ops_daily_users": SKETCH_OPS_DAILY_USERS,
+    "sketch_ops_topk": SKETCH_OPS_TOPK,
     # Metadata tables
     "write_ops_log": WRITE_OPS_LOG,
     "batch_metadata": BATCH_METADATA,
@@ -346,6 +370,10 @@ STAGING_TABLES = {
     "ddl_truncate_target": DDL_TRUNCATE_TARGET,
     "write_ops_log": WRITE_OPS_LOG,
     "batch_metadata": BATCH_METADATA,
+    # SKETCH_OPS_* tables are intentionally NOT in STAGING_TABLES — sketch
+    # operations manage their own CREATE / DROP via sketch_ddl_create_persistent_table
+    # and sketch_drop_persistent_table to keep BINARY-column DDL out of the
+    # bootstrap loop on dialects that lack a BINARY type (DataFusion, SQLite).
 }
 
 
@@ -522,6 +550,8 @@ __all__ = [
     "MERGE_OPS_SUMMARY_TARGET",
     "BULK_LOAD_OPS_TARGET",
     "DDL_TRUNCATE_TARGET",
+    "SKETCH_OPS_DAILY_USERS",
+    "SKETCH_OPS_TOPK",
     "WRITE_OPS_LOG",
     "BATCH_METADATA",
     "get_create_table_sql",
