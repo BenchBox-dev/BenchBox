@@ -2,8 +2,9 @@ id: results-complete-execution-environment-capture
 title: "Results pipeline: complete benchmark execution environment capture"
 worktree: main
 priority: High
-status: "In Progress"
+status: "Completed"
 category: "Result Integrity"
+completed_date: "2026-05-02"
 
 description: |
   Benchmark results currently capture the client host environment and a
@@ -253,7 +254,7 @@ work:
 - id: w15
   summary: "Document the environment-capture contract and migration guidance"
   needs: [w14]
-  status: pending
+  status: done
   notes: |
     Update development and result-artifact docs with the canonical field
     meanings, source/provenance rules, anonymization policy, and examples for
