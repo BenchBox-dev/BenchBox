@@ -14,6 +14,7 @@ import contextlib
 import json
 import logging
 import os
+from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlparse
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
 
 from benchbox.core.upload_validation import UploadValidationEngine
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
+from benchbox.platforms.base.runtime_metadata import build_default_normalized_result_metadata
 from benchbox.utils.datagen_manifest import MANIFEST_FILENAME
 from benchbox.utils.dependencies import (
     check_platform_dependencies,
@@ -72,6 +74,10 @@ def _select_databricks_warehouse(warehouses: list, very_verbose: bool, logger: l
     return available_wh
 
 
+def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
+
+
 class DatabricksAdapter(PlatformAdapter):
     """Databricks platform adapter with Delta Lake and Unity Catalog support."""
 
@@ -101,6 +107,7 @@ class DatabricksAdapter(PlatformAdapter):
         self.uc_volume = config.get("uc_volume")
         # Explicit staging root (e.g., dbfs:/Volumes/<cat>/<schema>/<volume>/... or s3://...)
         self.staging_root = config.get("staging_root")
+        self.region = config.get("region") or config.get("cloud_region") or config.get("workspace_region")
 
         # Delta Lake settings
         self.enable_delta_optimization = (
@@ -285,6 +292,16 @@ class DatabricksAdapter(PlatformAdapter):
             "uc_schema",
             "uc_volume",
             "staging_root",
+            "region",
+            "cloud_region",
+            "workspace_region",
+            "cluster_size",
+            "auto_terminate_minutes",
+            "enable_delta_optimization",
+            "delta_auto_optimize",
+            "delta_auto_compact",
+            "create_catalog",
+            "disable_result_cache",
         ]:
             if key in config:
                 adapter_config[key] = config[key]
@@ -357,12 +374,21 @@ class DatabricksAdapter(PlatformAdapter):
             "connection_mode": "remote",
             "host": self.server_hostname,
             "configuration": {
+                "server_hostname": self.server_hostname,
                 "catalog": self.catalog,
                 "schema": self.schema,
                 "http_path": self.http_path,
+                "warehouse_id": self._warehouse_id_from_http_path(self.http_path),
+                "staging_root": self.staging_root,
+                "uc_catalog": self.uc_catalog,
+                "uc_schema": self.uc_schema,
+                "uc_volume": self.uc_volume,
+                "region": self.region,
                 "enable_delta_optimization": self.enable_delta_optimization,
                 "delta_auto_optimize": self.delta_auto_optimize,
                 "delta_auto_compact": self.delta_auto_compact,
+                "cluster_size": self.cluster_size,
+                "auto_terminate_minutes": self.auto_terminate_minutes,
                 "cluster_mode": getattr(self, "cluster_mode", None),
                 "spark_version": getattr(self, "spark_version", None),
                 "result_cache_enabled": not self.disable_result_cache,
@@ -405,13 +431,9 @@ class DatabricksAdapter(PlatformAdapter):
             platform_info["platform_version"] = None
 
         # Try to get warehouse metadata using Databricks SDK (best effort)
+        warehouse_id = self._warehouse_id_from_http_path(self.http_path)
         try:
             from databricks.sdk import WorkspaceClient
-
-            # Extract warehouse ID from http_path (format: /sql/1.0/warehouses/{warehouse_id})
-            warehouse_id = None
-            if self.http_path and "/warehouses/" in self.http_path:
-                warehouse_id = self.http_path.split("/warehouses/")[-1].strip("/")
 
             if warehouse_id:
                 # Create workspace client
@@ -471,18 +493,183 @@ class DatabricksAdapter(PlatformAdapter):
                     "channel": channel_name,
                     "warehouse_version": warehouse_version,
                     "state": warehouse.state.value if hasattr(warehouse, "state") else None,
+                    "warehouse_metadata_collection_status": "available",
                 }
 
                 self.logger.debug(f"Successfully captured Databricks warehouse metadata for {warehouse_id}")
 
-        except ImportError:
+        except ImportError as e:
             self.logger.debug("databricks-sdk not installed, skipping warehouse metadata collection")
+            platform_info["compute_configuration"] = self._unavailable_warehouse_metadata(warehouse_id, e)
         except Exception as e:
             self.logger.debug(
                 f"Could not fetch Databricks warehouse metadata (insufficient permissions or API error): {e}"
             )
+            platform_info["compute_configuration"] = self._unavailable_warehouse_metadata(warehouse_id, e)
 
         return platform_info
+
+    def get_normalized_result_metadata(
+        self,
+        *,
+        connection: Any | None = None,
+        platform_info: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return Databricks-specific normalized workspace and warehouse metadata."""
+        info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
+        metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
+        config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
+        compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
+
+        metadata["platform_deployment"] = self._databricks_deployment_metadata(config, compute)
+        metadata["platform_cloud"] = self._databricks_cloud_metadata(config)
+        metadata["platform_compute"] = self._databricks_compute_metadata(config, compute)
+        metadata["platform_storage"] = self._databricks_storage_metadata(config)
+        return metadata
+
+    @staticmethod
+    def _warehouse_id_from_http_path(http_path: str | None) -> str | None:
+        if not http_path or "/warehouses/" not in http_path:
+            return None
+        return http_path.split("/warehouses/")[-1].strip("/") or None
+
+    @staticmethod
+    def _is_serverless_warehouse(compute: Mapping[str, Any]) -> bool:
+        warehouse_type = str(compute.get("warehouse_type") or "").lower()
+        return bool(compute.get("enable_serverless_compute") or warehouse_type == "serverless")
+
+    @staticmethod
+    def _unavailable_warehouse_metadata(warehouse_id: str | None, exc: Exception) -> dict[str, Any]:
+        return _compact_metadata(
+            {
+                "warehouse_id": warehouse_id,
+                "warehouse_metadata_collection_status": "unavailable",
+                "warehouse_metadata_error_class": type(exc).__name__,
+                "warehouse_metadata_error_message": str(exc),
+            }
+        )
+
+    @staticmethod
+    def _databricks_cloud_provider(host: Any) -> str | None:
+        host_value = str(host or "").lower()
+        if "azuredatabricks.net" in host_value:
+            return "azure"
+        if "gcp.databricks.com" in host_value:
+            return "gcp"
+        if "databricks.com" in host_value:
+            return "aws"
+        return None
+
+    @classmethod
+    def _databricks_deployment_metadata(
+        cls,
+        config: Mapping[str, Any],
+        compute: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        observed = bool(compute)
+        serverless = cls._is_serverless_warehouse(compute)
+        return _compact_metadata(
+            {
+                "deployment_type": "serverless" if serverless else "managed_cloud",
+                "connection_mode": "remote",
+                "endpoint_class": "cloud_endpoint",
+                "metadata_source": "observed" if observed else "requested",
+                "collection_status": "available" if observed else "partial",
+                "workspace_host": config.get("server_hostname"),
+                "http_path": config.get("http_path"),
+                "warehouse_id": compute.get("warehouse_id") or config.get("warehouse_id"),
+                "catalog": config.get("catalog"),
+                "schema": config.get("schema"),
+            }
+        )
+
+    @classmethod
+    def _databricks_cloud_metadata(cls, config: Mapping[str, Any]) -> dict[str, Any]:
+        host = config.get("server_hostname")
+        region = config.get("region") or config.get("cloud_region") or config.get("workspace_region")
+        provider = cls._databricks_cloud_provider(host)
+        has_cloud_metadata = bool(provider or region or host)
+        return _compact_metadata(
+            {
+                "provider": provider,
+                "region": region,
+                "workspace": host,
+                "region_collection_status": "available" if region else "unavailable",
+                "source": "inferred" if provider else "requested" if has_cloud_metadata else "unavailable",
+                "collection_status": "partial" if has_cloud_metadata else "unavailable",
+            }
+        )
+
+    @classmethod
+    def _databricks_compute_metadata(
+        cls,
+        config: Mapping[str, Any],
+        compute: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        observed = any(
+            compute.get(key) is not None
+            for key in (
+                "warehouse_name",
+                "warehouse_size",
+                "warehouse_type",
+                "enable_photon",
+                "enable_serverless_compute",
+                "warehouse_version",
+                "state",
+            )
+        )
+        warehouse_id = compute.get("warehouse_id") or config.get("warehouse_id")
+        serverless = cls._is_serverless_warehouse(compute)
+        auto_stop_mins = (
+            compute.get("auto_stop_mins")
+            if compute.get("auto_stop_mins") is not None
+            else config.get("auto_terminate_minutes")
+        )
+        return _compact_metadata(
+            {
+                "warehouse": compute.get("warehouse_name"),
+                "warehouse_id": warehouse_id,
+                "warehouse_size": compute.get("warehouse_size") or config.get("cluster_size"),
+                "warehouse_type": compute.get("warehouse_type"),
+                "serverless": serverless if observed else None,
+                "photon_enabled": compute.get("enable_photon"),
+                "min_cluster_count": compute.get("min_num_clusters"),
+                "max_cluster_count": compute.get("max_num_clusters"),
+                "auto_stop_mins": auto_stop_mins,
+                "spot_instance_policy": compute.get("spot_instance_policy"),
+                "channel": compute.get("channel"),
+                "warehouse_version": compute.get("warehouse_version"),
+                "state": compute.get("state"),
+                "result_cache_enabled": config.get("result_cache_enabled"),
+                "delta_auto_optimize": config.get("delta_auto_optimize"),
+                "delta_auto_compact": config.get("delta_auto_compact"),
+                "warehouse_metadata_collection_status": compute.get("warehouse_metadata_collection_status"),
+                "warehouse_metadata_error_class": compute.get("warehouse_metadata_error_class"),
+                "warehouse_metadata_error_message": compute.get("warehouse_metadata_error_message"),
+                "source": "observed" if observed else "requested",
+                "collection_status": "available" if observed else "partial",
+            }
+        )
+
+    @staticmethod
+    def _databricks_storage_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        staging_location = config.get("staging_root")
+        if not staging_location and config.get("uc_catalog") and config.get("uc_schema") and config.get("uc_volume"):
+            staging_location = f"dbfs:/Volumes/{config['uc_catalog']}/{config['uc_schema']}/{config['uc_volume']}"
+        has_storage = bool(staging_location or config.get("catalog") or config.get("schema"))
+        return _compact_metadata(
+            {
+                "table_format": "delta",
+                "staging_location": staging_location,
+                "catalog": config.get("catalog"),
+                "schema": config.get("schema"),
+                "uc_catalog": config.get("uc_catalog"),
+                "uc_schema": config.get("uc_schema"),
+                "uc_volume": config.get("uc_volume"),
+                "source": "requested" if has_storage else "unavailable",
+                "collection_status": "partial" if has_storage else "unavailable",
+            }
+        )
 
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect for Databricks."""

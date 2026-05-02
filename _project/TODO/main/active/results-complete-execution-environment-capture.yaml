@@ -183,7 +183,7 @@ work:
 - id: w10
   summary: "Normalize Databricks cloud metadata"
   needs: [w1, w5]
-  status: pending
+  status: done
   notes: |
     Map Databricks requested config and SDK-observed warehouse metadata into
     the new contract: workspace host, catalog/schema/http path, warehouse
