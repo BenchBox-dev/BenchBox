@@ -705,6 +705,22 @@ class TestFromConfig:
         adapter = RedshiftAdapter.from_config(config)
         assert adapter.port == 5439
 
+    def test_result_cache_options_passed_through(self):
+        from benchbox.platforms.redshift import RedshiftAdapter
+
+        config = {
+            "host": "cluster.us-east-1.redshift.amazonaws.com",
+            "username": "user",
+            "password": "pass",
+            "benchmark": "tpch",
+            "scale_factor": 1,
+            "disable_result_cache": False,
+            "strict_validation": False,
+        }
+        adapter = RedshiftAdapter.from_config(config)
+        assert adapter.disable_result_cache is False
+        assert adapter.strict_validation is False
+
     def test_custom_port_passed_through(self):
         from benchbox.platforms.redshift import RedshiftAdapter
 
@@ -866,6 +882,124 @@ class TestGetPlatformInfoWithConnectionProvisioned:
         assert info["configuration"]["deployment_type"] == "provisioned"
         assert info["configuration"]["node_type"] == "dc2.large"
         assert info["configuration"]["number_of_nodes"] == 2
+
+
+# ---------------------------------------------------------------------------
+# normalized result metadata
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizedResultMetadata:
+    """Test Redshift normalized execution/runtime metadata mappings."""
+
+    def _mock_connection(self):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("PostgreSQL 8.0.2 on Amazon Redshift 1.0.50481",)
+        mock_cursor.fetchall.return_value = []
+        return mock_conn
+
+    def test_serverless_metadata_maps_cloud_compute_storage_and_cache(self):
+        adapter = _make_adapter(
+            host="wg.123456789012.us-east-1.redshift-serverless.amazonaws.com",
+            staging_root="s3://bench-bucket/bench-prefix",
+            iam_role="arn:aws:iam::123456789012:role/RedshiftCopy",
+            disable_result_cache=False,
+        )
+        serverless_meta = {
+            "workgroup_name": "wg-prod",
+            "namespace_name": "ns-prod",
+            "base_capacity_rpu": 128,
+            "max_capacity_rpu": 512,
+            "status": "AVAILABLE",
+            "enhanced_vpc_routing": True,
+            "encrypted": True,
+        }
+
+        with patch.object(adapter, "_get_serverless_metadata_api", return_value=serverless_meta):
+            info = adapter.get_platform_info(connection=self._mock_connection())
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "serverless"
+        assert metadata["platform_deployment"]["deployment_type"] == "serverless"
+        assert metadata["platform_deployment"]["service_model"] == "serverless"
+        assert metadata["platform_deployment"]["workgroup"] == "wg-prod"
+        assert metadata["platform_deployment"]["namespace"] == "ns-prod"
+        assert metadata["platform_cloud"]["provider"] == "aws"
+        assert metadata["platform_cloud"]["region"] == "us-east-1"
+        assert metadata["platform_compute"]["service_model"] == "serverless"
+        assert metadata["platform_compute"]["workgroup"] == "wg-prod"
+        assert metadata["platform_compute"]["namespace"] == "ns-prod"
+        assert metadata["platform_compute"]["rpu"] == 128
+        assert metadata["platform_compute"]["base_capacity_rpu"] == 128
+        assert metadata["platform_compute"]["max_capacity_rpu"] == 512
+        assert metadata["platform_compute"]["result_cache_enabled"] is True
+        assert metadata["platform_compute"]["collection_status"] == "available"
+        assert metadata["platform_storage"]["bucket"] == "bench-bucket"
+        assert metadata["platform_storage"]["prefix"] == "bench-prefix"
+        assert metadata["platform_storage"]["staging_location"] == "s3://bench-bucket/bench-prefix"
+        assert metadata["platform_storage"]["iam_role_configured"] is True
+
+    def test_provisioned_metadata_maps_cluster_shape_and_storage_capacity(self):
+        adapter = _make_adapter(
+            host="prod-cluster.us-west-2.redshift.amazonaws.com",
+            s3_bucket="bench-bucket",
+            s3_prefix="bench-prefix",
+            iam_role="arn:aws:iam::123456789012:role/RedshiftCopy",
+            disable_result_cache=True,
+        )
+        provisioned_meta = {
+            "cluster_identifier": "prod-cluster",
+            "node_type": "ra3.4xlarge",
+            "number_of_nodes": 4,
+            "cluster_status": "available",
+            "cluster_version": "1.0.50481",
+            "total_storage_capacity_mb": 204800,
+            "enhanced_vpc_routing": False,
+            "encrypted": True,
+        }
+
+        with patch.object(adapter, "_get_provisioned_metadata_api", return_value=provisioned_meta):
+            info = adapter.get_platform_info(connection=self._mock_connection())
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "managed_cloud"
+        assert metadata["platform_deployment"]["deployment_type"] == "managed_cloud"
+        assert metadata["platform_deployment"]["service_model"] == "provisioned"
+        assert metadata["platform_deployment"]["cluster_identifier"] == "prod-cluster"
+        assert metadata["platform_cloud"]["provider"] == "aws"
+        assert metadata["platform_cloud"]["region"] == "us-west-2"
+        assert metadata["platform_compute"]["service_model"] == "provisioned"
+        assert metadata["platform_compute"]["cluster_id"] == "prod-cluster"
+        assert metadata["platform_compute"]["node_type"] == "ra3.4xlarge"
+        assert metadata["platform_compute"]["node_count"] == 4
+        assert metadata["platform_compute"]["cluster_version"] == "1.0.50481"
+        assert metadata["platform_compute"]["result_cache_enabled"] is False
+        assert metadata["platform_compute"]["collection_status"] == "available"
+        assert metadata["platform_storage"]["bucket"] == "bench-bucket"
+        assert metadata["platform_storage"]["prefix"] == "bench-prefix"
+        assert metadata["platform_storage"]["storage_capacity_mb"] == 204800
+
+    def test_serverless_sql_fallback_preserves_current_rpu_capacity(self):
+        adapter = _make_adapter(host="wg.123456789012.us-east-1.redshift-serverless.amazonaws.com")
+        sql_meta = {"current_rpu_capacity": 32}
+
+        with (
+            patch.object(adapter, "_get_serverless_metadata_api", return_value={}),
+            patch.object(adapter, "_get_serverless_metadata_sql", return_value=sql_meta),
+        ):
+            info = adapter.get_platform_info(connection=self._mock_connection())
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert info["configuration"]["current_rpu_capacity"] == 32
+        assert metadata["platform_deployment"]["workgroup"] == "wg"
+        assert metadata["platform_compute"]["rpu"] == 32
+        assert metadata["platform_compute"]["current_rpu_capacity"] == 32
+        assert metadata["platform_compute"]["collection_status"] == "available"
 
 
 # ---------------------------------------------------------------------------

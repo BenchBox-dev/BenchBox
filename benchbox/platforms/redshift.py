@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -35,6 +36,7 @@ from ..utils.dependencies import (
 from ..utils.file_format import detect_compression, is_parquet_format
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, FileFormatRegistry, resolve_csv_dialect
+from .base.runtime_metadata import build_default_normalized_result_metadata
 
 try:
     import redshift_connector
@@ -53,6 +55,10 @@ try:
     from botocore.exceptions import ClientError, NoCredentialsError
 except ImportError:
     boto3 = None
+
+
+def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
 
 
 class RedshiftAdapter(PlatformAdapter):
@@ -118,6 +124,7 @@ class RedshiftAdapter(PlatformAdapter):
         # S3 configuration for data loading
         # Check for staging_root first (set by orchestrator for CloudStagingPath)
         staging_root = config.get("staging_root")
+        self.staging_root = staging_root
         if staging_root:
             # Parse s3://bucket/path format to extract bucket and prefix
             from benchbox.utils.cloud_storage import get_cloud_path_info
@@ -275,6 +282,8 @@ class RedshiftAdapter(PlatformAdapter):
             "compupdate",
             "auto_vacuum",
             "auto_analyze",
+            "disable_result_cache",
+            "strict_validation",
         ]:
             if key in config:
                 adapter_config[key] = config[key]
@@ -299,6 +308,8 @@ class RedshiftAdapter(PlatformAdapter):
         config["namespace_name"] = metadata.get("namespace_name")
         config["base_capacity_rpu"] = metadata.get("base_capacity_rpu")
         config["max_capacity_rpu"] = metadata.get("max_capacity_rpu")
+        config["current_rpu_capacity"] = metadata.get("current_rpu_capacity")
+        config["status"] = metadata.get("status")
         config["enhanced_vpc_routing"] = metadata.get("enhanced_vpc_routing")
         config["encrypted"] = metadata.get("encrypted")
 
@@ -310,6 +321,8 @@ class RedshiftAdapter(PlatformAdapter):
         config["node_type"] = metadata.get("node_type")
         config["number_of_nodes"] = metadata.get("number_of_nodes")
         config["total_storage_capacity_mb"] = metadata.get("total_storage_capacity_mb")
+        config["cluster_status"] = metadata.get("cluster_status")
+        config["cluster_version"] = metadata.get("cluster_version")
         config["enhanced_vpc_routing"] = metadata.get("enhanced_vpc_routing")
         config["encrypted"] = metadata.get("encrypted")
 
@@ -444,11 +457,18 @@ class RedshiftAdapter(PlatformAdapter):
             "port": self.port,
             "configuration": {
                 "database": self.database,
+                "schema": self.schema,
                 "region": region,
                 "s3_bucket": self.s3_bucket,
+                "s3_prefix": self.s3_prefix,
+                "staging_root": self.staging_root,
                 "iam_role": self.iam_role,
+                "iam_role_configured": bool(self.iam_role),
+                "cluster_identifier": self.cluster_identifier or identifier,
                 "compupdate": getattr(self, "compupdate", None),
                 "result_cache_enabled": not self.disable_result_cache,
+                "wlm_query_slot_count": self.wlm_query_slot_count,
+                "wlm_query_queue_name": self.wlm_query_queue_name,
                 "deployment_type": deployment_type,
             },
             "client_library_version": self._detect_client_library_version(),
@@ -460,6 +480,148 @@ class RedshiftAdapter(PlatformAdapter):
             platform_info["platform_version"] = None
 
         return platform_info
+
+    def get_normalized_result_metadata(
+        self,
+        *,
+        connection: Any | None = None,
+        platform_info: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return Redshift-specific normalized cloud/runtime metadata."""
+        info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
+        metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
+        config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
+        compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
+
+        metadata["platform_deployment"] = self._redshift_deployment_metadata(config)
+        metadata["platform_cloud"] = self._redshift_cloud_metadata(config)
+        metadata["platform_compute"] = self._redshift_compute_metadata(config, compute)
+        metadata["platform_storage"] = self._redshift_storage_metadata(config)
+        return metadata
+
+    @staticmethod
+    def _redshift_service_model(config: Mapping[str, Any]) -> str:
+        deployment_type = str(config.get("deployment_type") or "unknown").lower()
+        if deployment_type in {"serverless", "provisioned"}:
+            return deployment_type
+        return "unknown"
+
+    @classmethod
+    def _redshift_deployment_metadata(cls, config: Mapping[str, Any]) -> dict[str, Any]:
+        service_model = cls._redshift_service_model(config)
+        observed = any(
+            config.get(key) is not None
+            for key in (
+                "workgroup_name",
+                "namespace_name",
+                "base_capacity_rpu",
+                "current_rpu_capacity",
+                "node_type",
+                "number_of_nodes",
+                "total_storage_capacity_mb",
+            )
+        )
+        return _compact_metadata(
+            {
+                "deployment_type": "serverless" if service_model == "serverless" else "managed_cloud",
+                "service_model": service_model,
+                "connection_mode": "remote",
+                "endpoint_class": "cloud_endpoint",
+                "metadata_source": "observed" if observed else "inferred",
+                "collection_status": "available" if observed else "partial",
+                "database": config.get("database"),
+                "schema": config.get("schema"),
+                "workgroup": config.get("workgroup_name"),
+                "namespace": config.get("namespace_name"),
+                "cluster_identifier": config.get("cluster_identifier"),
+            }
+        )
+
+    @staticmethod
+    def _redshift_cloud_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        region = config.get("region")
+        return _compact_metadata(
+            {
+                "provider": "aws",
+                "region": region,
+                "source": "inferred" if region else "unavailable",
+                "collection_status": "partial" if region else "unavailable",
+            }
+        )
+
+    @classmethod
+    def _redshift_compute_metadata(
+        cls,
+        config: Mapping[str, Any],
+        compute: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        service_model = cls._redshift_service_model(config)
+        rpu = config.get("base_capacity_rpu") or config.get("current_rpu_capacity")
+        node_type = config.get("node_type") or compute.get("node_type")
+        node_count = config.get("number_of_nodes") or compute.get("num_compute_nodes")
+        observed = any(
+            value is not None
+            for value in (
+                rpu,
+                config.get("max_capacity_rpu"),
+                config.get("current_rpu_capacity"),
+                node_type,
+                node_count,
+                config.get("total_storage_capacity_mb"),
+                compute.get("wlm_queues"),
+            )
+        )
+        collection_status = "available" if observed else "partial"
+        if service_model == "unknown" and not observed:
+            collection_status = "unavailable"
+        return _compact_metadata(
+            {
+                "service_model": service_model,
+                "workgroup": config.get("workgroup_name"),
+                "namespace": config.get("namespace_name"),
+                "cluster_id": config.get("cluster_identifier"),
+                "cluster_name": config.get("cluster_identifier"),
+                "cluster_status": config.get("cluster_status") or config.get("status"),
+                "cluster_version": config.get("cluster_version") or compute.get("cluster_version"),
+                "rpu": rpu,
+                "base_capacity_rpu": config.get("base_capacity_rpu"),
+                "current_rpu_capacity": config.get("current_rpu_capacity"),
+                "max_capacity_rpu": config.get("max_capacity_rpu"),
+                "node_type": node_type,
+                "node_count": node_count,
+                "enhanced_vpc_routing": config.get("enhanced_vpc_routing"),
+                "encrypted": config.get("encrypted"),
+                "result_cache_enabled": config.get("result_cache_enabled"),
+                "compupdate": config.get("compupdate"),
+                "wlm_query_slot_count": config.get("wlm_query_slot_count"),
+                "wlm_query_queue_name": config.get("wlm_query_queue_name"),
+                "wlm_queues": compute.get("wlm_queues"),
+                "source": "observed" if observed else "inferred",
+                "collection_status": collection_status,
+            }
+        )
+
+    @staticmethod
+    def _redshift_storage_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        bucket = config.get("s3_bucket")
+        prefix = config.get("s3_prefix") if bucket or config.get("staging_root") else None
+        staging_location = config.get("staging_root")
+        if not staging_location and bucket:
+            staging_location = f"s3://{bucket}/{prefix or ''}".rstrip("/")
+        storage_capacity_mb = config.get("total_storage_capacity_mb")
+        iam_role_configured = config.get("iam_role_configured")
+        has_storage_metadata = bool(staging_location or bucket or storage_capacity_mb or iam_role_configured)
+        return _compact_metadata(
+            {
+                "staging_location": staging_location,
+                "bucket": bucket,
+                "prefix": prefix,
+                "storage_capacity_mb": storage_capacity_mb,
+                "iam_role_configured": iam_role_configured,
+                "source": "requested",
+                "collection_status": "partial" if has_storage_metadata else "unavailable",
+            }
+        )
 
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect for Redshift."""
@@ -2617,6 +2779,8 @@ def _build_redshift_config(
             "connect_timeout",
             "statement_timeout",
             "sslmode",
+            "disable_result_cache",
+            "strict_validation",
         ],
         options=options,
         overrides=overrides,

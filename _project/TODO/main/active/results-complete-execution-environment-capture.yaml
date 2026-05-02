@@ -160,7 +160,7 @@ work:
 - id: w8
   summary: "Normalize Redshift cloud metadata"
   needs: [w1, w5]
-  status: pending
+  status: done
   notes: |
     Map existing Redshift requested config and observed metadata into the new
     contract: AWS region, serverless vs provisioned deployment,
