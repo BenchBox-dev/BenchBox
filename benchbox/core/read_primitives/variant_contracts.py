@@ -45,9 +45,6 @@ _HIGH_RISK_CATEGORIES = {
 _HIGH_RISK_QUERY_IDS = {
     "any_value_simple",
     "any_value_with_filter",
-    # Historical guard: intrinsic_appx_median has no active variant today,
-    # but any reintroduced variant is also covered by the all-variants rule.
-    "intrinsic_appx_median",
 }
 
 

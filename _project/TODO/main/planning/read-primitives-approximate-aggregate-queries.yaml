@@ -76,7 +76,7 @@ work:
 - id: w2
   summary: "Retire historical guard for renamed query in variant_contracts.py"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     `benchbox/core/read_primitives/variant_contracts.py:48-51` has a
     "historical guard" entry for `intrinsic_appx_median` in
