@@ -2,7 +2,7 @@ id: explorer-compare-decision-summary
 title: "Explorer: summary-led compare workflow with cohort guardrails"
 worktree: main
 priority: "Medium-High"
-status: "Not Started"
+status: "In Progress"
 category: "Core Functionality"
 
 deps:
@@ -20,7 +20,14 @@ description: |
 work:
   - id: w1
     summary: "Add compare decision summary computed from selected results"
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/Compare.tsx"
+      - "results-explorer/src/components/CompareSummary.tsx"
+      - "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+      - "results-explorer/src/lib/compareSummary.ts"
+      - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
     notes: |
       At the top of Compare.tsx, render a compact summary:
         - winner by primary cohort metric

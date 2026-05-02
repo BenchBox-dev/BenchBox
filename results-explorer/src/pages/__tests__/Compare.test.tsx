@@ -167,6 +167,22 @@ describe("Compare", () => {
     expect(screen.getAllByText("10.00x").length).toBeGreaterThan(0);
   });
 
+  it("renders a computed decision summary before charts and query evidence", async () => {
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+    });
+
+    const summary = screen.getByRole("heading", { name: "Decision Summary" });
+    const chartsHeading = screen.getByText("Charts");
+    const queryBreakdownHeading = screen.getByRole("heading", { name: "Query Breakdown" });
+
+    expect(summary.closest("section")).toHaveTextContent("DuckDB leads by 10.00x on power score.");
+    expect(summary.closest("section")).toHaveTextContent("2/2 fastest");
+    expect(summary.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(summary.compareDocumentPosition(queryBreakdownHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("summary card speedup and breakdown table Δ fastest are consistent for 2-platform fixture", async () => {
     // DUCKDB Q1=10ms, Q2=20ms; SQLITE Q1=100ms, Q2=200ms → per-query Δ fastest = 10.00x for both
     // DuckDB summary card: power_score 3000 vs worst 300 → 10.00x

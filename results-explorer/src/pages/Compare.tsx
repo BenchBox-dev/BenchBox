@@ -10,8 +10,10 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
 import { ComparabilityReceipt } from "@/components/ComparabilityReceipt";
+import { CompareSummary } from "@/components/CompareSummary";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { perQuerySpeedup, vsSlowestRatio } from "@/lib/chartMath";
+import { buildCompareDecisionSummary } from "@/lib/compareSummary";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -199,6 +201,7 @@ export function Compare(_: RoutableProps) {
   const primaries: (number | null)[] = results.map((r) =>
     primaryMetric === "power_score" ? r.power_score : r.display_geomean_ms,
   );
+  const decisionSummary = buildCompareDecisionSummary(results, primaryMetric);
 
   const validPrimaries = primaries.filter((v): v is number => v !== null);
   const fastestPrimary =
@@ -262,6 +265,7 @@ export function Compare(_: RoutableProps) {
       </div>
 
       <ComparabilityReceipt results={results} />
+      <CompareSummary summary={decisionSummary} />
 
       <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rowData.map((r, i) => {
