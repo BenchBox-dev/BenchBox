@@ -136,7 +136,7 @@ work:
 - id: w6
   summary: "Add changelog entry under unreleased"
   needs: [w4, w5]
-  status: pending
+  status: done
   notes: |
     Terse user-facing bullet under unreleased:
     "read_primitives: add approximate-aggregate query coverage
