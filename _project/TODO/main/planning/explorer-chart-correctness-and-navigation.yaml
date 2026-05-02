@@ -68,11 +68,19 @@ work:
   - id: w4
     summary: "Split platform trend charts by cohort or metric"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/PlatformIndex.tsx"
+      - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
     notes: |
       Carry forward the critical defect fix: trend charts must not mix
       benchmark/scale/phase cohorts. Render cohort-specific small multiples or
       require a selected cohort before showing the time series.
+
+      Already satisfied by `explorer-critical-results-ux-defects` w3/w6 on the
+      current base: `buildTrendCohorts` groups by benchmark, scale factor,
+      phase, and primary metric, and `PlatformIndex.test.tsx` asserts TPC-H and
+      SSB trend points do not cross cohort sections.
 
   - id: w5
     summary: "Add natural query sorting and explicit query labels in heatmaps and tables"
