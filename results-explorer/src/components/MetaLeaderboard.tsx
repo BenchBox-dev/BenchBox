@@ -44,6 +44,8 @@ const SORT_LABELS: Record<MetaLeaderboardSort, string> = {
   recent_activity: "Recent",
 };
 const MISSING_COHORT_TITLE = `No published run for this cohort. ${COVERAGE_POLICY_COPY}`;
+const PLATFORM_RENDER_LIMIT = 200;
+const PLATFORM_RENDER_INCREMENT = 200;
 
 export function MetaLeaderboard({
   data,
@@ -58,6 +60,7 @@ export function MetaLeaderboard({
   const [focusPos, setFocusPos] = useState({ row: 0, col: 0 });
   const [announcement, setAnnouncement] = useState("");
   const [sortKey, setSortKey] = useState<MetaLeaderboardSort>("avg_rank");
+  const [visiblePlatformLimit, setVisiblePlatformLimit] = useState(PLATFORM_RENDER_LIMIT);
 
   const columnMins = useMemo(() => {
     const mins = new Map<string, number | null>();
@@ -77,6 +80,12 @@ export function MetaLeaderboard({
       ),
     [cohorts, platforms, resultMetadataById, sortKey],
   );
+  const visiblePlatforms = sortedPlatforms.slice(0, visiblePlatformLimit);
+
+  useEffect(() => {
+    setVisiblePlatformLimit(PLATFORM_RENDER_LIMIT);
+    setFocusPos({ row: 0, col: 0 });
+  }, [cohorts, platforms, sortKey]);
 
   useEffect(() => {
     if (platforms.length === 0 || cohorts.length === 0) return;
@@ -105,7 +114,7 @@ export function MetaLeaderboard({
         nextCol = Math.max(colIdx - 1, 0);
         break;
       case "ArrowDown":
-        nextRow = Math.min(rowIdx + 1, sortedPlatforms.length - 1);
+        nextRow = Math.min(rowIdx + 1, visiblePlatforms.length - 1);
         break;
       case "ArrowUp":
         nextRow = Math.max(rowIdx - 1, 0);
@@ -120,7 +129,7 @@ export function MetaLeaderboard({
         nextRow = 0;
         break;
       case "PageDown":
-        nextRow = sortedPlatforms.length - 1;
+        nextRow = visiblePlatforms.length - 1;
         break;
       case "Enter":
       case " ": {
@@ -128,7 +137,7 @@ export function MetaLeaderboard({
         // Activation matches the row's mouse-click target (platform page), so
         // keyboard and pointer paths navigate to the same destination. The
         // column's cohort link is reachable via Tab on the header row.
-        const platform = sortedPlatforms[rowIdx];
+        const platform = visiblePlatforms[rowIdx];
         if (platform) route(platformHref(platform.platform_id));
         return;
       }
@@ -211,147 +220,164 @@ export function MetaLeaderboard({
         </div>
       </div>
 
-      <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-        <table
-          ref={gridRef}
-          role="grid"
-          aria-label="Cross-benchmark leaderboard"
-          class="min-w-full text-sm"
-        >
-          <thead class="bg-gray-50">
-            <tr role="row">
-              <th scope="col" class="table-th sticky left-0 z-10 min-w-40 bg-gray-50">
-                Platform
-              </th>
-              {cohorts.map((cohort) => (
-                <th
-                  key={cohort.key}
-                  scope="col"
-                  class="table-th whitespace-nowrap"
-                  title={`${humanizeBenchmark(cohort.benchmark)} SF${cohort.scale_factor} ${cohort.phase} - ${cohort.platform_count} platforms`}
-                >
-                  <a
-                    href={cohortHref(cohort)}
-                    class="no-underline text-gray-500 hover:text-brand-600"
-                  >
-                    {cohort.label}
-                  </a>
+      <div class="mb-2 text-sm text-gray-500">
+        Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} platforms
+      </div>
+
+      <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-x-auto">
+          <table
+            ref={gridRef}
+            role="grid"
+            aria-label="Cross-benchmark leaderboard"
+            class="min-w-full text-sm"
+          >
+            <thead class="bg-gray-50">
+              <tr role="row">
+                <th scope="col" class="table-th sticky left-0 z-10 min-w-40 bg-gray-50">
+                  Platform
                 </th>
-              ))}
-              <th
-                scope="col"
-                class="table-th whitespace-nowrap text-gray-700"
-                title={`Average rank over cohorts where the platform has a published run. ${COVERAGE_POLICY_COPY}`}
-              >
-                {AVG_RANK_LABEL}
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            {sortedPlatforms.map((platform, rowIdx) => (
-              <tr
-                key={platform.platform_id}
-                class="cursor-pointer hover:bg-gray-50"
-                onClick={() => route(platformHref(platform.platform_id))}
-              >
-                <td class="table-td sticky left-0 z-10 bg-white font-medium text-gray-900">
-                  <div class="flex flex-wrap items-center gap-2">
+                {cohorts.map((cohort) => (
+                  <th
+                    key={cohort.key}
+                    scope="col"
+                    class="table-th whitespace-nowrap"
+                    title={`${humanizeBenchmark(cohort.benchmark)} SF${cohort.scale_factor} ${cohort.phase} - ${cohort.platform_count} platforms`}
+                  >
                     <a
-                      href={platformHref(platform.platform_id)}
-                      class="no-underline hover:text-brand-600"
-                      onClick={(event) => event.stopPropagation()}
+                      href={cohortHref(cohort)}
+                      class="no-underline text-gray-500 hover:text-brand-600"
                     >
-                      {platform.platform}
+                      {cohort.label}
                     </a>
-                    <span
-                      class="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[11px] font-medium text-gray-500"
-                      title={`Covered cohorts in the current leaderboard view. ${COVERAGE_POLICY_COPY}`}
-                    >
-                      {platform.n_cohorts}/{cohorts.length} cohorts
-                    </span>
-                  </div>
-                </td>
-                {cohorts.map((cohort, colIdx) => {
-                  const rank = platform.ranks[cohort.key];
-                  const missing = rank === undefined;
-                  const shadeMetric = cellShadeMetric(rank, mode, cohort);
-                  const minInCol = columnMins.get(cohort.key) ?? null;
-                  const hue = shadeMetric !== null ? colorForCell(shadeMetric, minInCol) : null;
-                  const lightness = shadeMetric !== null ? lightnessForCell(shadeMetric, minInCol) : null;
-                  const active = focusPos.row === rowIdx && focusPos.col === colIdx;
-                  const text = describeCell(platform, cohort, rank, mode);
-                  const result = cohort.platforms?.find((row) => row.platform_id === platform.platform_id);
-                  const metadata = result ? resultMetadataById?.get(result.result_id) : undefined;
-                  const receiptHref = result ? `/results/r/${result.result_id}#run-receipt` : null;
-                  const cellStyle: JSX.CSSProperties | undefined =
-                    hue !== null
-                      ? ({
-                          "--cell-hue": String(hue),
-                          "--cell-lightness": lightness ?? "95%",
-                        } as JSX.CSSProperties)
-                      : undefined;
-                  return (
-                    <td
-                      key={cohort.key}
-                      role="gridcell"
-                      aria-colindex={colIdx + 1}
-                      aria-rowindex={rowIdx + 1}
-                      aria-label={text}
-                      title={missing ? MISSING_COHORT_TITLE : undefined}
-                      class={`table-td text-center font-mono ${
-                        hue !== null ? "meta-heatmap-cell" : ""
-                      } ${
-                        missing ? "bg-gray-50 text-gray-400" : ""
-                      } ${active ? "ring-2 ring-brand-500 ring-inset" : ""}`}
-                      style={cellStyle}
-                      tabIndex={active ? 0 : -1}
-                      data-cell={`${rowIdx}-${colIdx}`}
-                      onFocus={() => {
-                        setFocusPos({ row: rowIdx, col: colIdx });
-                        setAnnouncement(text);
-                      }}
-                      onKeyDown={(event) => handleCellKey(event, rowIdx, colIdx)}
-                    >
-                      {receiptHref ? (
-                        <a
-                          href={receiptHref}
-                          class="font-mono no-underline hover:text-brand-700"
-                          onClick={(event) => event.stopPropagation()}
-                          title="Open result receipt"
-                        >
-                          {renderCellValue(rank, cohort, mode)}
-                        </a>
-                      ) : (
-                        renderCellValue(rank, cohort, mode)
-                      )}
-                      {metadata && (
-                        <div class="mt-1 flex flex-wrap justify-center gap-1">
-                          <TrustBadge trustLabel={metadata.trust_label} compact />
-                          <ValidationBadge validationStatus={metadata.validation_status} showMissing />
-                        </div>
-                      )}
-                    </td>
-                  );
-                })}
-                <td
-                  class="table-td text-center font-mono font-semibold text-gray-700"
-                  title={`${AVG_RANK_LABEL}: ${platform.n_cohorts}/${cohorts.length}. ${COVERAGE_POLICY_COPY}`}
+                  </th>
+                ))}
+                <th
+                  scope="col"
+                  class="table-th whitespace-nowrap text-gray-700"
+                  title={`Average rank over cohorts where the platform has a published run. ${COVERAGE_POLICY_COPY}`}
                 >
-                  {platform.avg_rank !== null ? (
-                    <>
-                      <span>{platform.avg_rank.toFixed(1)}</span>
-                      <span class="mt-0.5 block text-[11px] font-normal text-gray-400">
-                        over {platform.n_cohorts}/{cohorts.length}
-                      </span>
-                    </>
-                  ) : (
-                    <span class="text-gray-300">No score</span>
-                  )}
-                </td>
+                  {AVG_RANK_LABEL}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              {visiblePlatforms.map((platform, rowIdx) => (
+                <tr
+                  key={platform.platform_id}
+                  class="cursor-pointer hover:bg-gray-50"
+                  onClick={() => route(platformHref(platform.platform_id))}
+                >
+                  <td class="table-td sticky left-0 z-10 bg-white font-medium text-gray-900">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <a
+                        href={platformHref(platform.platform_id)}
+                        class="no-underline hover:text-brand-600"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {platform.platform}
+                      </a>
+                      <span
+                        class="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[11px] font-medium text-gray-500"
+                        title={`Covered cohorts in the current leaderboard view. ${COVERAGE_POLICY_COPY}`}
+                      >
+                        {platform.n_cohorts}/{cohorts.length} cohorts
+                      </span>
+                    </div>
+                  </td>
+                  {cohorts.map((cohort, colIdx) => {
+                    const rank = platform.ranks[cohort.key];
+                    const missing = rank === undefined;
+                    const shadeMetric = cellShadeMetric(rank, mode, cohort);
+                    const minInCol = columnMins.get(cohort.key) ?? null;
+                    const hue = shadeMetric !== null ? colorForCell(shadeMetric, minInCol) : null;
+                    const lightness = shadeMetric !== null ? lightnessForCell(shadeMetric, minInCol) : null;
+                    const active = focusPos.row === rowIdx && focusPos.col === colIdx;
+                    const text = describeCell(platform, cohort, rank, mode);
+                    const result = cohort.platforms?.find((row) => row.platform_id === platform.platform_id);
+                    const metadata = result ? resultMetadataById?.get(result.result_id) : undefined;
+                    const receiptHref = result ? `/results/r/${result.result_id}#run-receipt` : null;
+                    const cellStyle: JSX.CSSProperties | undefined =
+                      hue !== null
+                        ? ({
+                            "--cell-hue": String(hue),
+                            "--cell-lightness": lightness ?? "95%",
+                          } as JSX.CSSProperties)
+                        : undefined;
+                    return (
+                      <td
+                        key={cohort.key}
+                        role="gridcell"
+                        aria-colindex={colIdx + 1}
+                        aria-rowindex={rowIdx + 1}
+                        aria-label={text}
+                        title={missing ? MISSING_COHORT_TITLE : undefined}
+                        class={`table-td text-center font-mono ${
+                          hue !== null ? "meta-heatmap-cell" : ""
+                        } ${
+                          missing ? "bg-gray-50 text-gray-400" : ""
+                        } ${active ? "ring-2 ring-brand-500 ring-inset" : ""}`}
+                        style={cellStyle}
+                        tabIndex={active ? 0 : -1}
+                        data-cell={`${rowIdx}-${colIdx}`}
+                        onFocus={() => {
+                          setFocusPos({ row: rowIdx, col: colIdx });
+                          setAnnouncement(text);
+                        }}
+                        onKeyDown={(event) => handleCellKey(event, rowIdx, colIdx)}
+                      >
+                        {receiptHref ? (
+                          <a
+                            href={receiptHref}
+                            class="font-mono no-underline hover:text-brand-700"
+                            onClick={(event) => event.stopPropagation()}
+                            title="Open result receipt"
+                          >
+                            {renderCellValue(rank, cohort, mode)}
+                          </a>
+                        ) : (
+                          renderCellValue(rank, cohort, mode)
+                        )}
+                        {metadata && (
+                          <div class="mt-1 flex flex-wrap justify-center gap-1">
+                            <TrustBadge trustLabel={metadata.trust_label} compact />
+                            <ValidationBadge validationStatus={metadata.validation_status} showMissing />
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td
+                    class="table-td text-center font-mono font-semibold text-gray-700"
+                    title={`${AVG_RANK_LABEL}: ${platform.n_cohorts}/${cohorts.length}. ${COVERAGE_POLICY_COPY}`}
+                  >
+                    {platform.avg_rank !== null ? (
+                      <>
+                        {platform.avg_rank.toFixed(1)}
+                        <span class="mt-1 block text-[11px] font-normal text-gray-500">
+                          over {platform.n_cohorts}/{cohorts.length}
+                        </span>
+                      </>
+                    ) : (
+                      <span class="text-gray-400">No score</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {visiblePlatforms.length < sortedPlatforms.length && (
+          <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              onClick={() => setVisiblePlatformLimit((limit) => limit + PLATFORM_RENDER_INCREMENT)}
+            >
+              Show more platforms
+            </button>
+          </div>
+        )}
       </div>
 
       <details class="mt-3">

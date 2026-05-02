@@ -55,7 +55,10 @@ work:
 
 - id: w3
   summary: "Bound large table rendering with pagination, limits, or virtualization"
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/src/components/MetaLeaderboard.tsx"
+  - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
   notes: |
     Query Workbench already has default/unlimited row limit. Audit all table
     surfaces for unbounded rendering and add explicit limits where corpus
