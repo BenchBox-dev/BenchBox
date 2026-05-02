@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -29,6 +30,7 @@ from ..utils.cloud_storage import get_cloud_path_info
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, resolve_csv_dialect
+from .base.runtime_metadata import build_default_normalized_result_metadata
 
 try:
     import snowflake.connector
@@ -36,6 +38,10 @@ try:
 except ImportError:
     snowflake = None
     DictCursor = None
+
+
+def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
 
 
 class SnowflakeAdapter(PlatformAdapter):
@@ -233,6 +239,10 @@ class SnowflakeAdapter(PlatformAdapter):
             "timezone",
             "file_format",
             "compression",
+            "staging_root",
+            "iceberg_external_volume",
+            "iceberg_catalog",
+            "delta_table_format",
             # Behavior control options
             "disable_result_cache",
             "strict_validation",
@@ -267,7 +277,13 @@ class SnowflakeAdapter(PlatformAdapter):
                 "schema": self.schema,
                 "role": self.role,
                 "warehouse_size": getattr(self, "warehouse_size", None),
+                "auto_suspend": self.auto_suspend,
+                "auto_resume": self.auto_resume,
+                "multi_cluster_warehouse": self.multi_cluster_warehouse,
                 "result_cache_enabled": not self.disable_result_cache,
+                "file_format": self.file_format,
+                "compression": self.compression,
+                "staging_root": self.staging_root,
             },
         }
 
@@ -334,6 +350,7 @@ class SnowflakeAdapter(PlatformAdapter):
                                 f"Successfully captured Snowflake warehouse metadata for {self.warehouse}"
                             )
                     except Exception as e:
+                        platform_info["compute_configuration"] = self._unavailable_warehouse_metadata(e)
                         self.logger.debug(
                             f"Could not fetch Snowflake warehouse metadata (insufficient permissions or warehouse not found): {e}"
                         )
@@ -359,6 +376,117 @@ class SnowflakeAdapter(PlatformAdapter):
             platform_info["platform_version"] = None
 
         return platform_info
+
+    def get_normalized_result_metadata(
+        self,
+        *,
+        connection: Any | None = None,
+        platform_info: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return Snowflake-specific normalized cloud/runtime metadata."""
+        info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
+        metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
+        config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
+        compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
+
+        metadata["platform_deployment"] = self._snowflake_deployment_metadata(config)
+        metadata["platform_cloud"] = self._snowflake_cloud_metadata(info, config)
+        metadata["platform_compute"] = self._snowflake_compute_metadata(config, compute)
+        metadata["platform_storage"] = self._snowflake_storage_metadata(config)
+        return metadata
+
+    @staticmethod
+    def _unavailable_warehouse_metadata(exc: Exception) -> dict[str, Any]:
+        return {
+            "metadata_collection_status": "unavailable",
+            "collection_error_class": type(exc).__name__,
+            "collection_error_message": str(exc),
+        }
+
+    @staticmethod
+    def _snowflake_deployment_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        return _compact_metadata(
+            {
+                "deployment_type": "managed_cloud",
+                "connection_mode": "remote",
+                "endpoint_class": "cloud_endpoint",
+                "metadata_source": "observed" if config.get("account_name") else "requested",
+                "collection_status": "partial",
+                "role": config.get("role"),
+                "database": config.get("database"),
+                "schema": config.get("schema"),
+            }
+        )
+
+    @staticmethod
+    def _snowflake_cloud_metadata(info: Mapping[str, Any], config: Mapping[str, Any]) -> dict[str, Any]:
+        provider = info.get("cloud_provider")
+        region = info.get("cloud_region")
+        account = config.get("account_name") or config.get("account")
+        payload = {
+            "provider": str(provider).lower() if provider else None,
+            "region": region,
+            "account": account,
+            "organization": config.get("organization_name"),
+            "source": "observed" if provider or region or config.get("account_name") else "requested",
+            "collection_status": "partial" if account or provider or region else "unavailable",
+        }
+        return _compact_metadata(payload)
+
+    @staticmethod
+    def _snowflake_compute_metadata(config: Mapping[str, Any], compute: Mapping[str, Any]) -> dict[str, Any]:
+        observed = any(
+            compute.get(key) is not None
+            for key in (
+                "warehouse_state",
+                "warehouse_type",
+                "min_cluster_count",
+                "max_cluster_count",
+                "scaling_policy",
+            )
+        )
+        collection_error = compute.get("collection_error_class")
+        collection_status = "available" if observed else "partial"
+        if collection_error and not (config.get("warehouse") or config.get("warehouse_size")):
+            collection_status = "unavailable"
+
+        payload = {
+            "warehouse": compute.get("warehouse_name") or config.get("warehouse"),
+            "warehouse_size": compute.get("warehouse_size") or config.get("warehouse_size"),
+            "warehouse_type": compute.get("warehouse_type"),
+            "warehouse_state": compute.get("warehouse_state"),
+            "min_cluster_count": compute.get("min_cluster_count"),
+            "max_cluster_count": compute.get("max_cluster_count"),
+            "auto_suspend": compute.get("auto_suspend")
+            if compute.get("auto_suspend") is not None
+            else config.get("auto_suspend"),
+            "auto_resume": compute.get("auto_resume")
+            if compute.get("auto_resume") is not None
+            else config.get("auto_resume"),
+            "multi_cluster_warehouse": config.get("multi_cluster_warehouse"),
+            "query_acceleration_enabled": compute.get("enable_query_acceleration"),
+            "query_acceleration_max_scale_factor": compute.get("query_acceleration_max_scale_factor"),
+            "scaling_policy": compute.get("scaling_policy"),
+            "result_cache_enabled": config.get("result_cache_enabled"),
+            "source": "observed" if observed else "requested",
+            "collection_status": collection_status,
+            "collection_error_class": collection_error,
+            "collection_error_message": compute.get("collection_error_message"),
+        }
+        return _compact_metadata(payload)
+
+    @staticmethod
+    def _snowflake_storage_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        payload = {
+            "table_format": config.get("file_format"),
+            "staging_location": config.get("staging_root"),
+            "compression": config.get("compression"),
+            "source": "requested",
+            "collection_status": "partial"
+            if config.get("file_format") or config.get("staging_root") or config.get("compression")
+            else "unavailable",
+        }
+        return _compact_metadata(payload)
 
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect for Snowflake."""

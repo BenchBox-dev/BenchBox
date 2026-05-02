@@ -136,7 +136,7 @@ work:
 - id: w6
   summary: "Normalize Snowflake cloud metadata"
   needs: [w1, w5]
-  status: pending
+  status: done
   notes: |
     Map existing Snowflake requested config and observed metadata into the
     new contract: cloud provider, region, account, role, database/schema,
