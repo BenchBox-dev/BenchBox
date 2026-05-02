@@ -42,9 +42,9 @@ description: |
   resumes. The catalog work in the work[] block is otherwise still
   the correct shape.
 
-  Re-attempt after the fix-class TODO covering both gaps lands; add
-  a `deps.needs:` edge from this TODO to the new fix TODO at that
-  point. Keep this TODO's scope_limit unchanged.
+  Re-attempt after `write-primitives-architecture-fixes` lands. This
+  TODO now has a `deps.needs:` edge to that fix-class TODO. Keep this
+  TODO's scope_limit unchanged.
 
   ## Original description
 
@@ -259,7 +259,8 @@ deferred:
     reason: "Adds weighted-quantile coverage but is a niche capability not paralleled in DataSketches KLL. Defer until weighted-quantile becomes a stated cross-engine requirement."
 
 deps:
-  needs: []
+  needs:
+    - write-primitives-architecture-fixes
 
 metadata:
   owners:

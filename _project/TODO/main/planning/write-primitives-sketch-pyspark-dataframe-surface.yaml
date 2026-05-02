@@ -35,10 +35,10 @@ description: |
   later, plus any future aggregate-state-persistence benchmark
   category (materialised views, summary tables, ML feature stores).
 
-  Re-attempt after the fix-class TODO covering that gap lands; add a
-  `deps.needs:` edge from this TODO to the new fix TODO at that point.
-  Keep w2-w5 work specifications below unchanged — they remain the
-  correct shape once the model accepts aggregate-state ops.
+  Re-attempt after `write-primitives-architecture-fixes` lands. This
+  TODO now has a `deps.needs:` edge to that fix-class TODO. Keep w2-w5
+  work specifications below unchanged — they remain the correct shape
+  once the model accepts aggregate-state ops.
 
   ## Original description
 
@@ -171,7 +171,8 @@ deferred:
     reason: "Storage-size methodology is being added in `write-primitives-sketch-clickhouse-and-storage-metrics` for the SQL surface. Once that lands, mirror it for the DataFrame surface — but do that as a follow-up, not in this TODO."
 
 deps:
-  needs: []
+  needs:
+    - write-primitives-architecture-fixes
 
 metadata:
   owners:

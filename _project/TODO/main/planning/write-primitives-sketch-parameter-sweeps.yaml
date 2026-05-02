@@ -27,10 +27,11 @@ description: |
   way. The size of the sweep makes it especially worth waiting for
   the underlying architecture to be solid before adding axes.
 
-  Resolution path: same fix-class TODO that unblocks
-  `write-primitives-sketch-clickhouse-and-storage-metrics` will
-  unblock this TODO too. Re-attempt after that lands; keep the
-  scope_limit and work[] block unchanged.
+  Resolution path: `write-primitives-architecture-fixes` unblocks
+  the shared architecture gaps, then
+  `write-primitives-sketch-clickhouse-and-storage-metrics` can resume
+  the transitive sketch groundwork. Re-attempt after both deps land;
+  keep the scope_limit and work[] block unchanged.
 
   ## Original description
 
@@ -152,6 +153,7 @@ deferred:
 
 deps:
   needs:
+    - write-primitives-architecture-fixes
     - write-primitives-sketch-clickhouse-and-storage-metrics
 
 metadata:
