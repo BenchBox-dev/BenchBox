@@ -120,7 +120,7 @@ work:
 - id: w4
   summary: "Add 8 sketch operations to operations.yaml"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     In `benchbox/core/write_primitives/catalog/operations.yaml` add
     `category: sketch` with these ops:
@@ -140,7 +140,7 @@ work:
 - id: w5
   summary: "Empirically tune validation tolerances against real engines"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Run the new sketch ops on duckdb (with extension if loaded), and
     where credentials available on databricks / snowflake / bigquery.
