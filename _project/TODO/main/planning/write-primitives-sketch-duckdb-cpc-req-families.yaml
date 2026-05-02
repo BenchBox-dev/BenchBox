@@ -25,10 +25,11 @@ description: |
   today. Both gaps need a fix-class TODO before any sketch work in
   the matrix can land cross-engine.
 
-  Resolution path: same fix-class TODO that unblocks
-  `write-primitives-sketch-clickhouse-and-storage-metrics` will
-  unblock this TODO too. Re-attempt after that lands; keep the
-  scope_limit and work[] block unchanged.
+  Resolution path: `write-primitives-architecture-fixes` unblocks
+  the shared architecture gaps, then
+  `write-primitives-sketch-clickhouse-and-storage-metrics` can resume
+  the transitive sketch groundwork. Re-attempt after both deps land;
+  keep the scope_limit and work[] block unchanged.
 
   ## Original description
 
@@ -148,6 +149,7 @@ deferred:
 
 deps:
   needs:
+    - write-primitives-architecture-fixes
     - write-primitives-sketch-clickhouse-and-storage-metrics
 
 metadata:
