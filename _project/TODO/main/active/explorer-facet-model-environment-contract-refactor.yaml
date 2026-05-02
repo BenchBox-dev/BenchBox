@@ -65,7 +65,7 @@ work:
 - id: w3
   summary: "Update DuckDB queries to read normalized contract columns"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Update `results-explorer/src/lib/queryFilters.ts` and
     `results-explorer/src/lib/duckdbQueries.ts` so leaderboard, benchmark,

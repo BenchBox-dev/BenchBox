@@ -115,6 +115,8 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   display_geomean_ms: number | null;
   sample_geomean_ms: number | null;
   cost_usd: number | null;
+  deployment_class?: string | null;
+  instance_or_warehouse?: string | null;
   primary_metric: string;
   primary_order: "asc" | "desc";
   rank: number | null;
@@ -147,6 +149,8 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   execution_mode: string | null;
   compliance_class: string | null;
   cost_usd: number | null;
+  deployment_class?: string | null;
+  instance_or_warehouse?: string | null;
   primary_metric: string;
 }
 
@@ -235,7 +239,9 @@ export async function getQueryExecutions(resultId: string): Promise<QueryExecuti
     "SELECT result_id, query_id, duration_ms, status, run_type, iter, stream" +
       " FROM bench.query_executions" +
       " WHERE result_id = ?" +
-      " ORDER BY query_id, COALESCE(stream, 0), COALESCE(iter, 0)",
+      " ORDER BY query_id," +
+      " CASE WHEN stream IS NULL THEN 0 ELSE stream END," +
+      " CASE WHEN iter IS NULL THEN 0 ELSE iter END",
     [resultId],
   );
 }
@@ -346,8 +352,8 @@ export async function getBenchmarkRanking(
   return queryRows<BenchmarkRankingRow>(
     "SELECT br.*, r.normalized_cost_usd, r.cost_model_version, r.cost_model_source," +
       " r.cost_scope, r.cost_status, r.billing_unit, r.pricing_region," +
-      " r.cloud_provider, r.cloud_region, r.instance_type, r.warehouse_size," +
-      " r.node_count, r.cluster_size, r.storage_format, r.storage_tier" +
+      " r.deployment_class, r.cloud_provider, r.cloud_region, r.instance_or_warehouse," +
+      " r.storage_format" +
       " FROM bench.benchmark_rankings br" +
       " LEFT JOIN bench.results r USING (result_id)" +
       " WHERE br.benchmark = ? AND br.scale_factor = ? AND br.phase = ?" +
@@ -468,14 +474,11 @@ async function loadBenchmarkSummaryFromDuckDB(
       cost_status: row.cost_status,
       billing_unit: row.billing_unit,
       pricing_region: row.pricing_region,
+      deployment_class: row.deployment_class,
       cloud_provider: row.cloud_provider,
       cloud_region: row.cloud_region,
-      instance_type: row.instance_type,
-      warehouse_size: row.warehouse_size,
-      node_count: row.node_count,
-      cluster_size: row.cluster_size,
+      instance_or_warehouse: row.instance_or_warehouse,
       storage_format: row.storage_format,
-      storage_tier: row.storage_tier,
       compliance_class: row.compliance_class,
       percentile_stats: percentileStats,
       phase_durations: phaseDurationsByResult.get(row.result_id) ?? null,
@@ -512,7 +515,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.result_id," +
     " r.benchmark," +
     " r.scale_factor," +
-    " COALESCE(br.phase, r.test_type, 'power') AS phase," +
+    " CASE WHEN br.phase IS NOT NULL THEN br.phase WHEN r.test_type IS NOT NULL THEN r.test_type ELSE 'power' END AS phase," +
     " r.platform," +
     " r.platform_id," +
     " r.driver_version," +
@@ -535,15 +538,12 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.cost_status," +
     " r.billing_unit," +
     " r.pricing_region," +
+    " r.deployment_class," +
     " r.cloud_provider," +
     " r.cloud_region," +
-    " r.instance_type," +
-    " r.warehouse_size," +
-    " r.node_count," +
-    " r.cluster_size," +
+    " r.instance_or_warehouse," +
     " r.storage_format," +
-    " r.storage_tier," +
-    " COALESCE(br.primary_metric, CASE WHEN r.power_score IS NOT NULL THEN 'power_score' ELSE 'display_geomean_ms' END)" +
+    " CASE WHEN br.primary_metric IS NOT NULL THEN br.primary_metric WHEN r.power_score IS NOT NULL THEN 'power_score' ELSE 'display_geomean_ms' END" +
     " AS primary_metric" +
     " FROM bench.results r" +
     " LEFT JOIN bench.benchmark_rankings br ON br.result_id = r.result_id";
