@@ -99,7 +99,7 @@ work:
 - id: w6
   summary: "Update tests to assert against normalized contract"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Update `lib/__tests__/facetModel.test.ts` and
     `lib/__tests__/queryFilters.test.ts` to assert canonical field names
