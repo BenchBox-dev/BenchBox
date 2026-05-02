@@ -1283,6 +1283,144 @@ class TestBuildFireboltConfig:
 
         assert config.database == "explicit_db"
 
+    def test_builds_config_with_runtime_metadata_fields(self):
+        """_build_firebolt_config preserves metadata-only cloud fields."""
+        from benchbox.platforms.firebolt import _build_firebolt_config
+
+        mock_info = Mock()
+        mock_info.display_name = "Firebolt"
+        mock_info.driver_package = "firebolt-sdk"
+        mock_cred_mgr = Mock()
+        mock_cred_mgr.get_platform_credentials.return_value = {}
+
+        options = {
+            "region": "us-east-1",
+            "cloud_provider": "aws",
+            "engine_type": "GENERAL_PURPOSE",
+            "engine_size": "large",
+            "s3_staging_url": "s3://bench-bucket/stage/",
+            "s3_region": "us-east-1",
+        }
+        overrides = {"benchmark": "tpch", "scale_factor": 1.0}
+
+        with patch("benchbox.security.credentials.CredentialManager", return_value=mock_cred_mgr):
+            config = _build_firebolt_config("firebolt", options, overrides, mock_info)
+
+        assert config.options["region"] == "us-east-1"
+        assert config.options["cloud_provider"] == "aws"
+        assert config.options["engine_type"] == "GENERAL_PURPOSE"
+        assert config.options["engine_size"] == "large"
+        assert config.options["s3_staging_url"] == "s3://bench-bucket/stage/"
+
+    def test_firebolt_platform_options_parse_metadata_aliases(self):
+        """Platform options expose deployment and region aliases used by CLI callers."""
+        from benchbox.cli.platform_hooks import PlatformHookRegistry
+
+        parsed = PlatformHookRegistry.parse_options(
+            "firebolt",
+            [
+                ("firebolt_mode", "cloud"),
+                ("cloud_region", "us-east-1"),
+                ("disable_result_cache", "false"),
+            ],
+        )
+
+        assert parsed["deployment_mode"] == "cloud"
+        assert parsed["region"] == "us-east-1"
+        assert parsed["disable_result_cache"] is False
+
+
+class TestNormalizedResultMetadata:
+    """Tests for Firebolt normalized runtime and cloud metadata."""
+
+    def test_cloud_metadata_maps_observed_engine_and_s3_staging(self):
+        """Cloud mode maps account, engine, region, compute, cache, and staging metadata."""
+        adapter = _make_cloud_adapter(
+            database="bench",
+            region="us-east-1",
+            cloud_provider="aws",
+            engine_size="large",
+            s3_staging_url="s3://bench-bucket/stage/",
+            s3_region="us-east-1",
+            disable_result_cache=False,
+        )
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.side_effect = [
+            ("3.0.0",),
+            ("engine", "GENERAL_PURPOSE", "RUNNING"),
+        ]
+
+        info = adapter.get_platform_info(mock_conn)
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "managed_cloud"
+        assert metadata["platform_deployment"]["deployment_type"] == "managed_cloud"
+        assert metadata["platform_deployment"]["account"] == "acct"
+        assert metadata["platform_deployment"]["engine"] == "engine"
+        assert metadata["platform_cloud"]["provider"] == "aws"
+        assert metadata["platform_cloud"]["region"] == "us-east-1"
+        assert metadata["platform_cloud"]["region_collection_status"] == "available"
+        assert metadata["platform_compute"]["engine"] == "engine"
+        assert metadata["platform_compute"]["engine_type"] == "GENERAL_PURPOSE"
+        assert metadata["platform_compute"]["engine_size"] == "large"
+        assert metadata["platform_compute"]["engine_status"] == "RUNNING"
+        assert metadata["platform_compute"]["result_cache_enabled"] is True
+        assert metadata["platform_compute"]["collection_status"] == "available"
+        assert metadata["platform_storage"]["staging_url_type"] == "s3"
+        assert metadata["platform_storage"]["bucket"] == "bench-bucket"
+        assert metadata["platform_storage"]["prefix"] == "stage/"
+        assert metadata["platform_storage"]["region"] == "us-east-1"
+
+    def test_cloud_malformed_engine_metadata_remains_requested(self):
+        """Malformed engine rows do not masquerade as observed compute metadata."""
+        adapter = _make_cloud_adapter(engine_type="GENERAL_PURPOSE")
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.side_effect = [
+            ("3.0.0",),
+            ("engine",),
+        ]
+
+        info = adapter.get_platform_info(mock_conn)
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert metadata["platform_compute"]["engine"] == "engine"
+        assert metadata["platform_compute"]["engine_type"] == "GENERAL_PURPOSE"
+        assert metadata["platform_compute"]["engine_metadata_collection_status"] == "unavailable"
+        assert metadata["platform_compute"]["source"] == "requested"
+        assert metadata["platform_compute"]["collection_status"] == "partial"
+
+    def test_cloud_sparse_metadata_marks_region_and_engine_metadata_unavailable(self):
+        """Sparse Cloud config keeps missing region explicit and compute partial."""
+        adapter = _make_cloud_adapter()
+
+        info = adapter.get_platform_info(connection=None)
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "managed_cloud"
+        assert metadata["platform_cloud"]["region_collection_status"] == "unavailable"
+        assert "region" not in metadata["platform_cloud"]
+        assert metadata["platform_compute"]["engine"] == "engine"
+        assert metadata["platform_compute"]["collection_status"] == "partial"
+        assert metadata["platform_storage"]["table_format"] == "firebolt_engine_table"
+        assert metadata["platform_storage"]["staging_url_type_status"] == "unavailable"
+
+    def test_core_metadata_maps_localhost_self_hosted_runtime(self):
+        """Core mode maps to self-hosted localhost with no cloud facets."""
+        adapter = _make_core_adapter(database="core_db")
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=adapter.get_platform_info(connection=None))
+
+        assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "remote_server"
+        assert metadata["platform_deployment"]["deployment_type"] == "self_hosted"
+        assert metadata["platform_deployment"]["endpoint_class"] == "localhost_port"
+        assert metadata["platform_deployment"]["url"] == "http://localhost:3473"
+        assert metadata["platform_cloud"]["collection_status"] == "unavailable"
+        assert metadata["platform_compute"]["service_model"] == "core"
+
 
 # ---------------------------------------------------------------------------
 # _quote_identifier edge cases

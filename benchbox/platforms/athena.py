@@ -19,6 +19,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -42,6 +43,7 @@ from ..utils.dependencies import (
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import DataSourceResolver, FileFormatRegistry
 from .base.ddl_helpers import strip_with_properties
+from .base.runtime_metadata import build_default_normalized_result_metadata
 
 try:
     import boto3
@@ -49,6 +51,10 @@ try:
 except ImportError:
     boto3 = None
     athena_connect = None
+
+
+def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
 
 
 class AthenaAdapter(PlatformAdapter):
@@ -346,9 +352,15 @@ class AthenaAdapter(PlatformAdapter):
                 "database": self.database,
                 "catalog": self.catalog,
                 "s3_output_location": self.s3_output_location,
+                "s3_staging_dir": self.s3_staging_dir,
+                "s3_bucket": self.s3_bucket,
+                "s3_prefix": self.s3_prefix,
                 "data_format": self.data_format,
+                "default_format": self.default_format,
                 "compression": self.compression,
                 "cleanup_staging": self.cleanup_staging,
+                "query_timeout": self.query_timeout,
+                "encryption": self.encryption,
             },
         }
 
@@ -376,6 +388,106 @@ class AthenaAdapter(PlatformAdapter):
             platform_info["client_library_version"] = None
 
         return platform_info
+
+    def get_normalized_result_metadata(
+        self,
+        *,
+        connection: Any | None = None,
+        platform_info: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return Athena-specific normalized serverless and S3 metadata."""
+        info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
+        metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
+        config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
+
+        metadata["platform_deployment"] = self._athena_deployment_metadata(config)
+        metadata["platform_cloud"] = self._athena_cloud_metadata(config)
+        metadata["platform_compute"] = self._athena_compute_metadata(config)
+        metadata["platform_storage"] = self._athena_storage_metadata(config)
+        return metadata
+
+    @staticmethod
+    def _athena_deployment_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        return _compact_metadata(
+            {
+                "deployment_type": "serverless",
+                "connection_mode": "serverless",
+                "endpoint_class": "cloud_endpoint",
+                "metadata_source": "requested",
+                "collection_status": "partial",
+                "workgroup": config.get("workgroup"),
+                "catalog": config.get("catalog"),
+                "database": config.get("database"),
+            }
+        )
+
+    @staticmethod
+    def _athena_cloud_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        region = config.get("region") or config.get("aws_region")
+        return _compact_metadata(
+            {
+                "provider": "aws",
+                "region": region,
+                "source": "requested" if region else "unavailable",
+                "collection_status": "partial" if region else "unavailable",
+            }
+        )
+
+    @staticmethod
+    def _athena_compute_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        has_compute_config = bool(config.get("workgroup") or config.get("query_timeout") is not None)
+        return _compact_metadata(
+            {
+                "service_model": "serverless",
+                "engine": "athena",
+                "workgroup": config.get("workgroup"),
+                "query_timeout": config.get("query_timeout"),
+                "source": "requested" if has_compute_config else "unavailable",
+                "collection_status": "partial" if has_compute_config else "unavailable",
+            }
+        )
+
+    @staticmethod
+    def _athena_storage_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        bucket = config.get("s3_bucket")
+        prefix = config.get("s3_prefix") if bucket or config.get("s3_staging_dir") else None
+        query_output_location = config.get("s3_output_location")
+        staging_location = config.get("s3_staging_dir")
+        if not staging_location and bucket:
+            staging_location = f"s3://{bucket}/{prefix or ''}".rstrip("/")
+        cleanup_staging = config.get("cleanup_staging")
+        cleanup_policy = None
+        if cleanup_staging is not None:
+            cleanup_policy = "drop_staging" if cleanup_staging else "preserve_staging"
+
+        has_storage_config = bool(
+            query_output_location
+            or staging_location
+            or bucket
+            or config.get("data_format")
+            or config.get("default_format")
+            or config.get("compression")
+            or config.get("cleanup_staging") is not None
+        )
+        return _compact_metadata(
+            {
+                "table_format": config.get("default_format"),
+                "data_format": config.get("data_format"),
+                "staging_location": staging_location,
+                "query_output_location": query_output_location,
+                "bucket": bucket,
+                "prefix": prefix,
+                "compression": config.get("compression"),
+                "cleanup_policy": cleanup_policy,
+                "encryption": config.get("encryption"),
+                "query_output_location_status": "available" if query_output_location else "unavailable",
+                "staging_location_status": "available" if staging_location else "unavailable",
+                "cleanup_policy_status": "available" if cleanup_policy else "unavailable",
+                "encryption_status": "available" if config.get("encryption") else "unavailable",
+                "source": "requested" if has_storage_config else "unavailable",
+                "collection_status": "partial" if has_storage_config else "unavailable",
+            }
+        )
 
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect for Athena."""
@@ -1356,8 +1468,11 @@ def _build_athena_config(
             "aws_access_key_id",
             "aws_secret_access_key",
             "data_format",
+            "default_format",
             "compression",
             "cleanup_staging",
+            "query_timeout",
+            "encryption",
         ],
         options=options,
         overrides=overrides,

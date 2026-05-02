@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -33,6 +34,7 @@ from benchbox.utils.printing import emit
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import NO_BENCHMARK, DataSource, DataSourceResolver, resolve_csv_dialect
+from .base.runtime_metadata import build_default_normalized_result_metadata
 
 try:
     import google.auth
@@ -46,6 +48,10 @@ except ImportError:
     bigquery = None
     storage = None
     service_account = None
+
+
+def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
 
 
 class BigQueryAdapter(PlatformAdapter):
@@ -189,6 +195,13 @@ class BigQueryAdapter(PlatformAdapter):
             "location",
             "credentials_path",
             "storage_bucket",
+            "storage_prefix",
+            "staging_root",
+            "job_priority",
+            "biglake_connection",
+            "query_cache",
+            "disable_result_cache",
+            "maximum_bytes_billed",
             "tuning_config",
             "verbose_enabled",
             "very_verbose",
@@ -211,13 +224,14 @@ class BigQueryAdapter(PlatformAdapter):
         except (ImportError, AttributeError):
             return None
 
-    def _collect_bigquery_dataset_metadata(self, connection: Any) -> dict[str, Any] | None:
-        """Fetch dataset metadata from the BigQuery client; returns None on failure."""
+    def _collect_bigquery_dataset_metadata(self, connection: Any) -> dict[str, Any]:
+        """Fetch dataset metadata from the BigQuery client with explicit unavailable status on failure."""
         try:
             dataset_ref = f"{self.project_id}.{self.dataset_id}"
             dataset = connection.get_dataset(dataset_ref)
             self.logger.debug(f"Successfully captured BigQuery dataset metadata for {dataset_ref}")
             return {
+                "dataset_metadata_collection_status": "available",
                 "dataset_location": dataset.location,
                 "dataset_default_table_expiration_ms": dataset.default_table_expiration_ms,
                 "dataset_default_partition_expiration_ms": dataset.default_partition_expiration_ms,
@@ -226,7 +240,11 @@ class BigQueryAdapter(PlatformAdapter):
             }
         except Exception as e:
             self.logger.debug(f"Could not fetch BigQuery dataset metadata: {e}")
-            return None
+            return {
+                "dataset_metadata_collection_status": "unavailable",
+                "dataset_metadata_error_class": type(e).__name__,
+                "dataset_metadata_error_message": str(e),
+            }
 
     @staticmethod
     def _determine_bigquery_pricing(
@@ -306,9 +324,13 @@ class BigQueryAdapter(PlatformAdapter):
                 "dataset_id": self.dataset_id,
                 "location": self.location,
                 "storage_bucket": self.storage_bucket,
+                "storage_prefix": self.storage_prefix,
+                "staging_root": self.staging_root,
+                "biglake_connection": self.biglake_connection,
                 "job_timeout": getattr(self, "job_timeout", None),
                 "job_priority": self.job_priority,
                 "query_cache_enabled": self.query_cache,
+                "maximum_bytes_billed": self.maximum_bytes_billed,
             },
             "client_library_version": self._detect_bigquery_client_version(),
             "platform_version": None,
@@ -457,6 +479,7 @@ class BigQueryAdapter(PlatformAdapter):
                             "assignment_id": row.assignment_id if hasattr(row, "assignment_id") else None,
                             "assignee_type": row.assignee_type if hasattr(row, "assignee_type") else None,
                             "job_type": row.job_type if hasattr(row, "job_type") else None,
+                            "reservation_name": row.reservation_name if hasattr(row, "reservation_name") else None,
                         }
                         self.logger.debug(
                             f"Successfully captured reservation assignment: {assignment_info['assignment_id']}"
@@ -484,6 +507,115 @@ class BigQueryAdapter(PlatformAdapter):
                 self.logger.debug(f"Error collecting BigQuery platform info: {e}")
 
         return platform_info
+
+    def get_normalized_result_metadata(
+        self,
+        *,
+        connection: Any | None = None,
+        platform_info: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return BigQuery-specific normalized cloud/runtime metadata."""
+        info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
+        metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
+        config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
+        compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
+
+        metadata["platform_deployment"] = self._bigquery_deployment_metadata(config)
+        metadata["platform_cloud"] = self._bigquery_cloud_metadata(config, compute)
+        metadata["platform_compute"] = self._bigquery_compute_metadata(config, compute)
+        metadata["platform_storage"] = self._bigquery_storage_metadata(config)
+        return metadata
+
+    @staticmethod
+    def _bigquery_deployment_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        return _compact_metadata(
+            {
+                "deployment_type": "serverless",
+                "connection_mode": "remote",
+                "endpoint_class": "cloud_endpoint",
+                "metadata_source": "requested",
+                "collection_status": "partial",
+                "dataset": config.get("dataset_id"),
+            }
+        )
+
+    @staticmethod
+    def _bigquery_cloud_metadata(config: Mapping[str, Any], compute: Mapping[str, Any]) -> dict[str, Any]:
+        location = compute.get("dataset_location") or config.get("location")
+        return _compact_metadata(
+            {
+                "provider": "gcp",
+                "location": location,
+                "project": config.get("project_id"),
+                "source": "observed" if compute.get("dataset_location") else "requested",
+                "collection_status": "partial" if config.get("project_id") or location else "unavailable",
+            }
+        )
+
+    @staticmethod
+    def _bigquery_compute_metadata(config: Mapping[str, Any], compute: Mapping[str, Any]) -> dict[str, Any]:
+        reservation = (
+            compute.get("reservation_details") if isinstance(compute.get("reservation_details"), Mapping) else {}
+        )
+        commitment = (
+            compute.get("capacity_commitment") if isinstance(compute.get("capacity_commitment"), Mapping) else {}
+        )
+        assignment = compute.get("assignment") if isinstance(compute.get("assignment"), Mapping) else {}
+        observed = bool(
+            compute.get("dataset_location")
+            or reservation
+            or commitment
+            or assignment
+            or compute.get("dataset_metadata_collection_status") == "available"
+        )
+        dataset_metadata_unavailable = compute.get("dataset_metadata_collection_status") == "unavailable"
+        collection_status = "available" if observed else "partial"
+        if dataset_metadata_unavailable:
+            collection_status = "partial"
+        payload = {
+            "serverless_slots": compute.get("slot_capacity"),
+            "pricing_model": compute.get("pricing_model"),
+            "edition": compute.get("edition"),
+            "reservation": reservation.get("name"),
+            "reservation_slot_capacity": reservation.get("slot_capacity"),
+            "reservation_ignore_idle_slots": reservation.get("ignore_idle_slots"),
+            "autoscale_max_slots": compute.get("autoscale_max_slots"),
+            "capacity_commitment_id": commitment.get("commitment_id"),
+            "capacity_commitment_plan": commitment.get("commitment_plan"),
+            "capacity_commitment_slots": commitment.get("slot_count"),
+            "reservation_assignment_id": assignment.get("assignment_id"),
+            "reservation_assignment": assignment.get("reservation_name"),
+            "reservation_assignment_job_type": assignment.get("job_type"),
+            "job_priority": config.get("job_priority"),
+            "cache_enabled": config.get("query_cache_enabled"),
+            "maximum_bytes_billed": config.get("maximum_bytes_billed"),
+            "dataset_metadata_collection_status": compute.get("dataset_metadata_collection_status"),
+            "dataset_metadata_error_class": compute.get("dataset_metadata_error_class"),
+            "dataset_metadata_error_message": compute.get("dataset_metadata_error_message"),
+            "source": "observed" if observed else "requested",
+            "collection_status": collection_status,
+        }
+        return _compact_metadata(payload)
+
+    @staticmethod
+    def _bigquery_storage_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        bucket = config.get("storage_bucket")
+        staging_location = config.get("staging_root")
+        biglake_connection = config.get("biglake_connection")
+        has_storage_target = bool(bucket or staging_location or biglake_connection)
+        prefix = config.get("storage_prefix") if bucket or staging_location else None
+        if not staging_location and bucket:
+            staging_location = f"gs://{bucket}/{prefix or ''}".rstrip("/")
+        return _compact_metadata(
+            {
+                "staging_location": staging_location,
+                "bucket": bucket,
+                "prefix": prefix,
+                "biglake_connection": biglake_connection,
+                "source": "requested",
+                "collection_status": "partial" if has_storage_target else "unavailable",
+            }
+        )
 
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect for BigQuery."""

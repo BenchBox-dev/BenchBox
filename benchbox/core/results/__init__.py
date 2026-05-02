@@ -30,6 +30,16 @@ from .display import (
     print_dry_run_summary,
     print_phase_header,
 )
+from .environment import (
+    ClientHostEnvironment,
+    ContainerEnvironment,
+    NormalizedExecutionEnvironment,
+    PlatformCloudMetadata,
+    PlatformComputeMetadata,
+    PlatformDeploymentMetadata,
+    PlatformRuntimeEnvironment,
+    PlatformStorageMetadata,
+)
 from .metrics import TimingStatsCalculator, TPCMetricsCalculator
 from .platform_info import (
     PlatformInfoInput,
@@ -71,6 +81,15 @@ __all__ = [
     "print_completion_message",
     "print_dry_run_summary",
     "print_phase_header",
+    # Environment
+    "ClientHostEnvironment",
+    "ContainerEnvironment",
+    "NormalizedExecutionEnvironment",
+    "PlatformCloudMetadata",
+    "PlatformComputeMetadata",
+    "PlatformDeploymentMetadata",
+    "PlatformRuntimeEnvironment",
+    "PlatformStorageMetadata",
     # Metrics
     "TPCMetricsCalculator",
     "TimingStatsCalculator",
