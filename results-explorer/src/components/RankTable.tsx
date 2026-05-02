@@ -13,6 +13,7 @@
 import type { BenchmarkSummary } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 import { computeRankTable } from "@/lib/chartMath";
+import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 
 interface Props {
   summary: BenchmarkSummary;
@@ -27,14 +28,15 @@ function ordinal(n: number): string {
 export function RankTable({ summary }: Props) {
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
+  const sortedQueryIds = sortQueryIds(query_ids);
 
   const ranks = computeRankTable(
-    query_ids,
+    sortedQueryIds,
     platforms.map((p) => p.timings),
   );
 
   const winCounts = platforms.map((_, i) =>
-    query_ids.filter((qid) => ranks[qid]?.[i] === 1).length,
+    sortedQueryIds.filter((qid) => ranks[qid]?.[i] === 1).length,
   );
   const maxWins = Math.max(...winCounts);
 
@@ -64,10 +66,10 @@ export function RankTable({ summary }: Props) {
           </tr>
         </thead>
         <tbody>
-          {query_ids.map((qid) => (
+          {sortedQueryIds.map((qid) => (
             <tr key={qid} class="hover:bg-gray-50">
               <td class="px-2 py-1 border-b border-gray-100 text-gray-600 font-mono sticky left-0 bg-white">
-                {qid}
+                {queryDisplayLabel(qid)}
               </td>
               {platforms.map((_, i) => {
                 const r = ranks[qid]?.[i] ?? null;

@@ -101,6 +101,25 @@ describe("QueryHeatmap rendering", () => {
     expect(screen.getByRole("button", { name: /^Q2/ })).toBeTruthy();
   });
 
+  it("sorts query headers naturally while preserving explicit labels", () => {
+    const summary = makeSummary({
+      query_ids: ["Q10", "Q2", "Q1"],
+      platforms: [
+        {
+          ...makeSummary().platforms[0]!,
+          timings: { Q1: 10, Q2: 20, Q10: 100 },
+        },
+      ],
+    });
+    const { container } = render(<QueryHeatmap summary={summary} />);
+
+    const labels = Array.from(container.querySelectorAll("thead button[data-query-label]")).map(
+      (button) => button.getAttribute("data-query-label"),
+    );
+    expect(labels).toStrictEqual(["Q1", "Q2", "Q10"]);
+    expect(screen.getByRole("button", { name: /^Q10/ })).toBeTruthy();
+  });
+
   it("renders compact receipt links and validation status badges", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
     const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];

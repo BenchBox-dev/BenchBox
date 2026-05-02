@@ -84,7 +84,15 @@ work:
 
   - id: w5
     summary: "Add natural query sorting and explicit query labels in heatmaps and tables"
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/queryLabels.ts"
+      - "results-explorer/src/components/QueryHeatmap.tsx"
+      - "results-explorer/src/components/QueryHistogram.tsx"
+      - "results-explorer/src/components/RankTable.tsx"
+      - "results-explorer/src/__tests__/queryLabels.test.ts"
+      - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      - "results-explorer/src/components/__tests__/charts.smoke.test.tsx"
     notes: |
       Query IDs should sort Q1, Q2, ..., Q10 rather than lexicographic 1, 10,
       11, ..., 2. Labels should preserve benchmark-specific prefixes where
@@ -177,6 +185,7 @@ scope_limit:
   only_modify:
     - "results-explorer/src/lib/chartRegistry.ts"
     - "results-explorer/src/lib/chartMath.ts"
+    - "results-explorer/src/lib/queryLabels.ts"
     - "results-explorer/src/components/"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/pages/PlatformIndex.tsx"
