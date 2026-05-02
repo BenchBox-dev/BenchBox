@@ -119,7 +119,7 @@ work:
 - id: w5
   summary: "Add base adapter hooks for normalized runtime and deployment metadata"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     Add base-platform helpers so adapters can return normalized metadata
     without duplicating schema assembly. The default path should map existing

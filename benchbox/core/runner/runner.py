@@ -51,6 +51,10 @@ except ImportError:
 
 
 from benchbox.platforms import get_platform_adapter
+from benchbox.platforms.base.runtime_metadata import (
+    apply_normalized_result_metadata,
+    collect_normalized_result_metadata,
+)
 from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
 from benchbox.utils.cloud_storage import create_path_handler
 from benchbox.utils.format_converters import ConversionOptions
@@ -340,6 +344,47 @@ def _enrich_driver_runtime_metadata(
     _apply_driver_meta_to_dicts(meta, result)
 
     return result
+
+
+def _enrich_normalized_runtime_metadata(
+    result: BenchmarkResults,
+    *,
+    adapter: Any | None,
+    platform_config: Mapping[str, Any] | None = None,
+) -> BenchmarkResults:
+    """Attach normalized execution-environment metadata from optional adapter hooks."""
+    if adapter is None:
+        return result
+    if _has_adapter_runtime_metadata(result):
+        return result
+
+    platform_info = result.platform_info if isinstance(result.platform_info, Mapping) else None
+    execution_metadata = result.execution_metadata if isinstance(result.execution_metadata, Mapping) else {}
+    metadata = collect_normalized_result_metadata(
+        adapter,
+        platform_info=platform_info,
+        platform_config=platform_config,
+        execution_mode=str(execution_metadata.get("mode") or execution_metadata.get("execution_mode") or ""),
+    )
+    return apply_normalized_result_metadata(result, metadata)
+
+
+def _has_adapter_runtime_metadata(result: BenchmarkResults) -> bool:
+    """Return True when a result already carries adapter-supplied normalized metadata."""
+    environment = result.execution_environment if isinstance(result.execution_environment, Mapping) else {}
+    runtime = environment.get("platform_runtime") if isinstance(environment.get("platform_runtime"), Mapping) else {}
+    deployment = result.platform_deployment if isinstance(result.platform_deployment, Mapping) else {}
+
+    has_runtime = bool(
+        runtime
+        and (
+            runtime.get("runtime_type") not in (None, "", "unknown")
+            or runtime.get("collection_error_class") not in (None, "")
+            or runtime.get("collection_status") not in (None, "", "unavailable")
+        )
+    )
+    has_deployment = bool(deployment and deployment.get("deployment_type") not in (None, "", "unknown"))
+    return has_runtime and has_deployment
 
 
 def _execute_load_only_mode(
@@ -798,6 +843,7 @@ def _build_setup_only_result(
     benchmark: Any,
     adapter: Any,
     database_config: DatabaseConfig | None,
+    platform_config: Mapping[str, Any] | None,
     phases: LifecyclePhases,
     validation_records: list[tuple[str, ValidationResult]],
     execution_context: ExecutionContext | None,
@@ -818,6 +864,11 @@ def _build_setup_only_result(
     )
     result_obj = _finalize_validation_metadata(result_obj, validation_records)
     result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
+    result_obj = _enrich_normalized_runtime_metadata(
+        result_obj,
+        adapter=adapter,
+        platform_config=platform_config,
+    )
     if execution_context is not None:
         result_obj.execution_context = execution_context.model_dump()
     return result_obj
@@ -971,6 +1022,7 @@ def _finalize_lifecycle_result(
     *,
     adapter: Any | None,
     database_config: DatabaseConfig | None,
+    platform_config: Mapping[str, Any] | None,
     monitor: PerformanceMonitor | None,
     resource_monitor: ResourceMonitor | None,
     execution_context: ExecutionContext | None,
@@ -984,6 +1036,11 @@ def _finalize_lifecycle_result(
         result_with_validation,
         adapter=adapter,
         database_config=database_config,
+    )
+    result_with_validation = _enrich_normalized_runtime_metadata(
+        result_with_validation,
+        adapter=adapter,
+        platform_config=platform_config,
     )
 
     if monitor is not None:
@@ -1106,6 +1163,11 @@ def run_benchmark_lifecycle(
         )
         result_obj = _finalize_validation_metadata(result_obj, validation_records)
         result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
+        result_obj = _enrich_normalized_runtime_metadata(
+            result_obj,
+            adapter=adapter,
+            platform_config=platform_config,
+        )
         if execution_context is not None:
             result_obj.execution_context = execution_context.model_dump()
         return result_obj
@@ -1115,6 +1177,7 @@ def run_benchmark_lifecycle(
             benchmark=benchmark,
             adapter=adapter,
             database_config=database_config,
+            platform_config=platform_config,
             phases=phases,
             validation_records=validation_records,
             execution_context=execution_context,
@@ -1157,6 +1220,7 @@ def run_benchmark_lifecycle(
         validation_records,
         adapter=adapter,
         database_config=database_config,
+        platform_config=platform_config,
         monitor=monitor,
         resource_monitor=resource_monitor,
         execution_context=execution_context,

@@ -303,7 +303,7 @@ def _classify_endpoint(
     platform_config: Mapping[str, Any],
 ) -> EndpointClass:
     mode = str(connection_mode).lower() if connection_mode is not None else ""
-    if mode in {"embedded", "in-memory", "in_memory", "file", "local_process"}:
+    if mode in {"embedded", "in-memory", "in_memory", "file", "local_process", "memory"}:
         return "embedded_process"
 
     host = _first_config_value(platform_config, ("host", "hostname", "server", "endpoint"))
