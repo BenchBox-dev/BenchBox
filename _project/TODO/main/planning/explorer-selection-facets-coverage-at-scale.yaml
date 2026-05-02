@@ -25,7 +25,10 @@ description: |
 work:
   - id: w1
     summary: "Define shared facet model and URL contract in lib/facetModel.ts"
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/facetModel.ts"
+      - "results-explorer/src/lib/__tests__/facetModel.test.ts"
     notes: |
       Add `results-explorer/src/lib/facetModel.ts` exporting:
         - a `FacetKey` union (benchmark, scale_factor, phase, platform,
