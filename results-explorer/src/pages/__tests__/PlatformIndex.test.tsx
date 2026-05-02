@@ -47,8 +47,10 @@ function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRow
     cost_status: "not_applicable_local",
     cost_scope: null,
     cost_model_version: null,
+    deployment_class: "local",
     cloud_provider: null,
     cloud_region: null,
+    instance_or_warehouse: null,
     warehouse_size: null,
     storage_format: null,
     primary_metric: "display_geomean_ms",
@@ -68,8 +70,10 @@ const ROWS: PlatformIndexRowRow[] = [
     cost_status: "normalized",
     cost_scope: "compute_only",
     cost_model_version: "2026.05.0",
+    deployment_class: "cloud",
     cloud_provider: "aws",
     cloud_region: "us-east-1",
+    instance_or_warehouse: "MEDIUM",
     warehouse_size: "MEDIUM",
     storage_format: "parquet",
   }),
@@ -172,6 +176,31 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(getRowOrder(container)).toEqual(["r-tpch-fast"]);
     expect(screen.queryByText("SSB")).toBeNull();
     expect(screen.queryByTestId("r-tpch-slow")).toBeNull();
+  });
+
+  it("filters deployment and shape from normalized fields instead of legacy proxy columns", async () => {
+    window.history.replaceState(null, "", "/results/p/duckdb/?deployment=cloud&shape=MEDIUM");
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({
+        result_id: "r-normalized-cloud",
+        deployment_class: "cloud",
+        cloud_provider: null,
+        instance_or_warehouse: "MEDIUM",
+        warehouse_size: null,
+      }),
+      makeRow({
+        result_id: "r-legacy-proxy-cloud",
+        deployment_class: "local",
+        cloud_provider: "aws",
+        instance_or_warehouse: null,
+        warehouse_size: "MEDIUM",
+      }),
+    ]);
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    expect(getRowOrder(container)).toEqual(["r-normalized-cloud"]);
   });
 
   it("splits trend charts by benchmark, scale, phase, and primary metric", async () => {

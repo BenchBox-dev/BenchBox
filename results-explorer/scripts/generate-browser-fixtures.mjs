@@ -17,7 +17,7 @@
  * record this generator implements.
  */
 
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -130,6 +130,105 @@ const VARIANTS = [
 
 const log = (...args) => console.log("[generate-browser-fixtures]", ...args);
 
+const LOCAL_PLATFORM_METADATA = {
+  duckdb: {
+    runtimeType: "local_process",
+    deployment: {
+      deployment_type: "embedded",
+      connection_mode: "file",
+      endpoint_class: "embedded_process",
+      metadata_source: "observed",
+      collection_status: "available",
+    },
+    storage: {
+      table_format: "duckdb_native",
+      source: "inferred",
+      collection_status: "partial",
+    },
+  },
+  datafusion: {
+    runtimeType: "dataframe_process",
+    deployment: {
+      deployment_type: "embedded",
+      connection_mode: "dataframe",
+      endpoint_class: "embedded_process",
+      metadata_source: "observed",
+      collection_status: "available",
+    },
+    storage: {
+      table_format: "parquet",
+      source: "inferred",
+      collection_status: "partial",
+    },
+  },
+  polars: {
+    runtimeType: "dataframe_process",
+    deployment: {
+      deployment_type: "embedded",
+      connection_mode: "dataframe",
+      endpoint_class: "embedded_process",
+      metadata_source: "observed",
+      collection_status: "available",
+    },
+    storage: {
+      table_format: "parquet",
+      source: "inferred",
+      collection_status: "partial",
+    },
+  },
+};
+
+const platformKey = (bundle) => {
+  const name = String(bundle.platform?.name ?? "").toLowerCase();
+  if (name.includes("datafusion")) return "datafusion";
+  if (name.includes("polars")) return "polars";
+  return "duckdb";
+};
+
+const clientHostFromLegacy = (environment) => {
+  if (!environment || typeof environment !== "object") return undefined;
+  const clientHost = {
+    os: environment.os,
+    arch: environment.arch,
+    cpu_count: environment.cpu_count,
+    memory_gb: environment.memory_gb,
+    python: environment.python,
+    machine_id: environment.machine_id,
+  };
+  return Object.fromEntries(Object.entries(clientHost).filter(([, value]) => value !== undefined && value !== null));
+};
+
+const withNormalizedEnvironment = (bundle) => {
+  const mutated = structuredClone(bundle);
+  const metadata = LOCAL_PLATFORM_METADATA[platformKey(mutated)];
+  const environment = mutated.environment && typeof mutated.environment === "object" ? mutated.environment : {};
+  const platform = mutated.platform && typeof mutated.platform === "object" ? mutated.platform : {};
+
+  mutated.environment = {
+    ...environment,
+    client_host: environment.client_host ?? clientHostFromLegacy(environment),
+    platform_runtime: environment.platform_runtime ?? {
+      runtime_type: metadata.runtimeType,
+      collection_status: "available",
+      source: "observed",
+    },
+  };
+  mutated.platform = {
+    ...platform,
+    deployment: platform.deployment ?? metadata.deployment,
+    cloud: platform.cloud ?? {
+      source: "unavailable",
+      collection_status: "unavailable",
+    },
+    compute: platform.compute ?? {
+      source: "unavailable",
+      collection_status: "unavailable",
+    },
+    storage: platform.storage ?? metadata.storage,
+  };
+  return mutated;
+};
+
 const wipeGenerated = () => {
   if (existsSync(genRoot)) {
     rmSync(genRoot, { recursive: true, force: true });
@@ -145,7 +244,9 @@ const copySources = () => {
     throw new Error(`no source bundles found under ${sourceBundlesDir}`);
   }
   for (const entry of files) {
-    cpSync(join(sourceBundlesDir, entry.name), join(genBundlesDir, entry.name));
+    const bundle = JSON.parse(readFileSync(join(sourceBundlesDir, entry.name), "utf8"));
+    const normalized = withNormalizedEnvironment(bundle);
+    writeFileSync(join(genBundlesDir, entry.name), JSON.stringify(normalized, null, 2));
   }
   log(`copied ${files.length} source bundle(s)`);
 };
@@ -160,7 +261,8 @@ const writeVariants = () => {
     mkdirSync(targetDir, { recursive: true });
 
     const bundle = JSON.parse(readFileSync(sourcePath, "utf8"));
-    const mutated = variant.mutate ? variant.mutate(bundle) : bundle;
+    const variantBundle = variant.mutate ? variant.mutate(bundle) : bundle;
+    const mutated = withNormalizedEnvironment(variantBundle);
     writeFileSync(join(targetDir, variant.derived), JSON.stringify(mutated, null, 2));
 
     for (const [sidecarName, payload] of Object.entries(variant.sidecars ?? {})) {

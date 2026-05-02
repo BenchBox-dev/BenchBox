@@ -40,8 +40,10 @@ const RESULT_ROWS = [
     cost_status: "normalized",
     cost_scope: "compute_only",
     cost_model_version: "2026.05.0",
+    deployment_class: "cloud",
     cloud_provider: "aws",
     cloud_region: "us-east-1",
+    instance_or_warehouse: "MEDIUM",
     warehouse_size: "MEDIUM",
     storage_format: "parquet",
     compliance_class: null,
@@ -76,8 +78,10 @@ const RESULT_ROWS = [
     cost_status: "not_applicable_local",
     cost_scope: null,
     cost_model_version: null,
+    deployment_class: "local",
     cloud_provider: null,
     cloud_region: null,
+    instance_or_warehouse: null,
     warehouse_size: null,
     storage_format: null,
     compliance_class: null,
@@ -112,8 +116,10 @@ const RESULT_ROWS = [
     cost_status: "normalized",
     cost_scope: "compute_only",
     cost_model_version: "2026.05.0",
+    deployment_class: "cloud",
     cloud_provider: "gcp",
     cloud_region: "us-central1",
+    instance_or_warehouse: "LARGE",
     warehouse_size: "LARGE",
     storage_format: "parquet",
     compliance_class: null,
@@ -474,9 +480,9 @@ describe("Home", () => {
     expect(String(resultCall?.[0])).toContain("scale_factor IN (?)");
     expect(String(resultCall?.[0])).toContain("test_type IN (?)");
     expect(String(resultCall?.[0])).toContain("(platform IN (?) OR platform_id IN (?))");
-    expect(String(resultCall?.[0])).toContain("cloud_provider IS NOT NULL");
+    expect(String(resultCall?.[0])).toContain("deployment_class IN (?)");
     expect(String(resultCall?.[0])).toContain("cost_status IN (?)");
-    expect(resultCall?.[1]).toEqual(["clickbench", 0.1, "power", "DuckDB", "DuckDB", "normalized"]);
+    expect(resultCall?.[1]).toEqual(["clickbench", 0.1, "power", "DuckDB", "DuckDB", "cloud", "normalized"]);
 
     const cohortLink = within(grid).getByRole("link", { name: "ClickBench SF0.1" }) as HTMLAnchorElement;
     expect(cohortLink.getAttribute("href")).toContain("sf=0.1");

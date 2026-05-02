@@ -61,12 +61,14 @@ describe("buildSelectQuery LIMIT", () => {
   it("allows normalized cost and deployment columns in projections and sorting", () => {
     const { sql } = buildSelectQuery(
       EMPTY_FILTERS,
-      ["result_id", "normalized_cost_usd", "cost_status", "cloud_provider", "warehouse_size"],
+      ["result_id", "normalized_cost_usd", "cost_status", "deployment_class", "instance_or_warehouse"],
       { column: "normalized_cost_usd", direction: "asc" },
       25,
     );
 
-    expect(sql).toContain("SELECT result_id, normalized_cost_usd, cost_status, cloud_provider, warehouse_size");
+    expect(sql).toContain(
+      "SELECT result_id, normalized_cost_usd, cost_status, deployment_class, instance_or_warehouse",
+    );
     expect(sql).toContain("ORDER BY normalized_cost_usd ASC");
   });
 });
@@ -77,9 +79,10 @@ describe("buildWhereClause - normalized cost/deployment facets", () => {
       ...EMPTY_FILTERS,
       costStatuses: ["normalized"],
       costModelVersions: ["2026.05.0"],
+      deploymentClasses: ["cloud"],
       cloudProviders: ["aws"],
       cloudRegions: ["us-east-1"],
-      warehouseSizes: ["MEDIUM"],
+      instanceOrWarehouses: ["MEDIUM"],
       storageFormats: ["parquet"],
     };
 
@@ -87,11 +90,27 @@ describe("buildWhereClause - normalized cost/deployment facets", () => {
 
     expect(sql).toContain("cost_status IN (?)");
     expect(sql).toContain("cost_model_version IN (?)");
+    expect(sql).toContain("deployment_class IN (?)");
     expect(sql).toContain("cloud_provider IN (?)");
     expect(sql).toContain("cloud_region IN (?)");
-    expect(sql).toContain("warehouse_size IN (?)");
+    expect(sql).toContain("instance_or_warehouse IN (?)");
     expect(sql).toContain("storage_format IN (?)");
-    expect(params).toEqual(["normalized", "2026.05.0", "aws", "us-east-1", "MEDIUM", "parquet"]);
+    expect(params).toEqual(["normalized", "2026.05.0", "cloud", "aws", "us-east-1", "MEDIUM", "parquet"]);
+  });
+
+  it("maps legacy instance and warehouse filters onto the unified normalized shape column", () => {
+    const filters: QueryFilterState = {
+      ...EMPTY_FILTERS,
+      instanceTypes: ["m6i.large"],
+      warehouseSizes: ["MEDIUM"],
+    };
+
+    const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
+
+    expect(sql).toContain("instance_or_warehouse IN (?, ?)");
+    expect(sql).not.toContain("instance_type IN");
+    expect(sql).not.toContain("warehouse_size IN");
+    expect(params).toEqual(["m6i.large", "MEDIUM"]);
   });
 
   it("can exclude one deployment facet while preserving the others", () => {

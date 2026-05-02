@@ -10,6 +10,7 @@ import {
   listResults,
   getResultDetailMetrics,
   getQueryDisplayTimings,
+  getQueryExecutions,
   getBenchmarkMatrixCells,
   getBenchmarkRanking,
   getPlatformIndexRows,
@@ -68,6 +69,17 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(params).toEqual(["r1"]);
   });
 
+  it("getQueryExecutions preserves null-as-zero stream and iteration ordering without COALESCE", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await getQueryExecutions("r1");
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.query_executions/);
+    expect(sql).toMatch(/CASE WHEN stream IS NULL THEN 0 ELSE stream END/);
+    expect(sql).toMatch(/CASE WHEN iter IS NULL THEN 0 ELSE iter END/);
+    expect(sql).not.toMatch(/COALESCE/);
+    expect(params).toEqual(["r1"]);
+  });
+
   it("getBenchmarkMatrixCells scopes by (benchmark, scale_factor, phase)", async () => {
     mockedQueryRows.mockResolvedValueOnce([]);
     await getBenchmarkMatrixCells("tpch", 0.1, "power");
@@ -84,6 +96,8 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(sql).toMatch(/LEFT JOIN bench\.results/);
     expect(sql).toMatch(/normalized_cost_usd/);
     expect(sql).toMatch(/cost_model_version/);
+    expect(sql).toMatch(/deployment_class/);
+    expect(sql).toMatch(/instance_or_warehouse/);
     expect(sql).toMatch(/ORDER BY br\.rank NULLS LAST/);
   });
 
@@ -95,12 +109,15 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(sql).toMatch(/COALESCE\(si\.short_id, ''\) AS short_id/);
     expect(sql).toMatch(/LEFT JOIN bench\.short_ids si ON si\.result_id = r\.result_id/);
     expect(sql).toMatch(/LEFT JOIN bench\.benchmark_rankings br ON br\.result_id = r\.result_id/);
-    expect(sql).toMatch(/COALESCE\(br\.phase, r\.test_type, 'power'\) AS phase/);
+    expect(sql).toMatch(/CASE WHEN br\.phase IS NOT NULL THEN br\.phase/);
     expect(sql).toMatch(/br\.primary_metric/);
     expect(sql).toMatch(/validation_status/);
     expect(sql).toMatch(/normalized_cost_usd/);
+    expect(sql).toMatch(/deployment_class/);
     expect(sql).toMatch(/cloud_provider/);
+    expect(sql).toMatch(/instance_or_warehouse/);
     expect(sql).toMatch(/storage_format/);
+    expect(sql.match(/COALESCE\(/g)).toHaveLength(1);
     expect(sql).not.toMatch(/WHERE/);
     expect(params).toBeUndefined();
   });

@@ -314,6 +314,81 @@ def _cost_usd_alias(cost: NormalizedCost) -> float | None:
     return float(cost.cost_usd)
 
 
+def _mapping_or_empty(raw: Any) -> dict[str, Any]:
+    return raw if isinstance(raw, dict) else {}
+
+
+def _string_or_none(raw: Any) -> str | None:
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    return value or None
+
+
+def _first_string(*values: Any) -> str | None:
+    for value in values:
+        parsed = _string_or_none(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _deployment_class_from_contract(data: dict[str, Any]) -> str | None:
+    """Classify deployment from normalized runtime/deployment metadata only."""
+    environment = _mapping_or_empty(data.get("environment"))
+    runtime = _mapping_or_empty(environment.get("platform_runtime"))
+    platform = _mapping_or_empty(data.get("platform"))
+    deployment = _mapping_or_empty(platform.get("deployment"))
+
+    runtime_type = _string_or_none(runtime.get("runtime_type"))
+    deployment_type = _string_or_none(deployment.get("deployment_type"))
+    endpoint_class = _string_or_none(deployment.get("endpoint_class"))
+
+    runtime_key = runtime_type.lower() if runtime_type else None
+    deployment_key = deployment_type.lower() if deployment_type else None
+    endpoint_key = endpoint_class.lower() if endpoint_class else None
+
+    if runtime_key in {"managed_cloud", "serverless"}:
+        return "cloud"
+    if deployment_key in {"managed_cloud", "serverless"} or endpoint_key == "cloud_endpoint":
+        return "cloud"
+    if runtime_key in {"local_process", "dataframe_process", "docker_container"}:
+        return "local"
+    if deployment_key == "embedded" or endpoint_key in {"embedded_process", "localhost_port"}:
+        return "local"
+    if runtime_key == "unknown" or deployment_key == "unknown" or endpoint_key == "unknown":
+        return "unavailable"
+    if runtime_key or deployment_key or endpoint_key:
+        return "unavailable"
+    return None
+
+
+def _environment_facets(data: dict[str, Any]) -> dict[str, str | None]:
+    """Flatten normalized execution-environment facets for the browser store."""
+    platform = _mapping_or_empty(data.get("platform"))
+    cloud = _mapping_or_empty(platform.get("cloud"))
+    compute = _mapping_or_empty(platform.get("compute"))
+    storage = _mapping_or_empty(platform.get("storage"))
+
+    return {
+        "deployment_class": _deployment_class_from_contract(data),
+        "cloud_provider": _string_or_none(cloud.get("provider")),
+        "cloud_region": _first_string(cloud.get("region"), cloud.get("location")),
+        "instance_or_warehouse": _first_string(
+            compute.get("node_type"),
+            compute.get("warehouse_size"),
+            compute.get("warehouse"),
+            compute.get("cluster_id"),
+            compute.get("cluster_name"),
+            compute.get("rpu"),
+            compute.get("serverless_slots"),
+            compute.get("worker_shape"),
+            compute.get("driver_shape"),
+        ),
+        "storage_format": _string_or_none(storage.get("table_format")),
+    }
+
+
 def _compliance_class(data: dict[str, Any]) -> str | None:
     """Extract compliance class from the benchmark block of a schema-v2 bundle."""
     benchmark = data.get("benchmark", {})
@@ -552,6 +627,7 @@ class BundleTransformer:
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
         normalized_cost = _normalized_cost(bundle_data)
+        environment_facets = _environment_facets(bundle_data)
         return ManifestEntry(
             result_id=rid,
             benchmark=benchmark,
@@ -575,6 +651,11 @@ class BundleTransformer:
             validation_status=_validation_status(bundle_data),
             cost_usd=_cost_usd_alias(normalized_cost),
             normalized_cost=normalized_cost.to_dict(),
+            deployment_class=environment_facets["deployment_class"],
+            cloud_provider=environment_facets["cloud_provider"],
+            cloud_region=environment_facets["cloud_region"],
+            instance_or_warehouse=environment_facets["instance_or_warehouse"],
+            storage_format=environment_facets["storage_format"],
             compliance_class=_compliance_class(bundle_data),
         )
 

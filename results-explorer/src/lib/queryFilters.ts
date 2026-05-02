@@ -7,8 +7,10 @@ export interface QueryFilterState {
   validationStatuses: string[];
   costStatuses: string[];
   costModelVersions: string[];
+  deploymentClasses?: string[];
   cloudProviders: string[];
   cloudRegions: string[];
+  instanceOrWarehouses?: string[];
   instanceTypes: string[];
   warehouseSizes: string[];
   storageFormats: string[];
@@ -53,8 +55,10 @@ const ALLOWED_COLUMNS = new Set([
   "cost_status",
   "billing_unit",
   "pricing_region",
+  "deployment_class",
   "cloud_provider",
   "cloud_region",
+  "instance_or_warehouse",
   "instance_type",
   "warehouse_size",
   "node_count",
@@ -96,10 +100,19 @@ export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
   expandListFilter("validation_status", filters.validationStatuses, clauses, params);
   expandListFilter("cost_status", filters.costStatuses, clauses, params);
   expandListFilter("cost_model_version", filters.costModelVersions, clauses, params);
+  expandListFilter("deployment_class", filters.deploymentClasses ?? [], clauses, params);
   expandListFilter("cloud_provider", filters.cloudProviders, clauses, params);
   expandListFilter("cloud_region", filters.cloudRegions, clauses, params);
-  expandListFilter("instance_type", filters.instanceTypes, clauses, params);
-  expandListFilter("warehouse_size", filters.warehouseSizes, clauses, params);
+  expandListFilter(
+    "instance_or_warehouse",
+    uniqueStrings([
+      ...(filters.instanceOrWarehouses ?? []),
+      ...filters.instanceTypes,
+      ...filters.warehouseSizes,
+    ]),
+    clauses,
+    params,
+  );
   expandListFilter("storage_format", filters.storageFormats, clauses, params);
 
   if (filters.hasCost === "yes") clauses.push("cost_usd IS NOT NULL");
@@ -155,8 +168,12 @@ export function buildFacetCountQuery(
     costStatuses: options.exclude === "costStatuses" ? [] : filters.costStatuses,
     costModelVersions:
       options.exclude === "costModelVersions" ? [] : filters.costModelVersions,
+    deploymentClasses:
+      options.exclude === "deploymentClasses" ? [] : filters.deploymentClasses,
     cloudProviders: options.exclude === "cloudProviders" ? [] : filters.cloudProviders,
     cloudRegions: options.exclude === "cloudRegions" ? [] : filters.cloudRegions,
+    instanceOrWarehouses:
+      options.exclude === "instanceOrWarehouses" ? [] : filters.instanceOrWarehouses,
     instanceTypes: options.exclude === "instanceTypes" ? [] : filters.instanceTypes,
     warehouseSizes: options.exclude === "warehouseSizes" ? [] : filters.warehouseSizes,
     storageFormats: options.exclude === "storageFormats" ? [] : filters.storageFormats,
@@ -206,7 +223,7 @@ export function buildFacetCountQuery(
 
   return {
     sql: `
-      SELECT COALESCE(CAST(${column} AS VARCHAR), 'unknown') AS value, COUNT(*) AS count
+      SELECT CASE WHEN ${column} IS NULL THEN 'unknown' ELSE CAST(${column} AS VARCHAR) END AS value, COUNT(*) AS count
       FROM bench.results
       ${where.sql}
       GROUP BY 1
@@ -214,6 +231,10 @@ export function buildFacetCountQuery(
     `,
     params: where.params,
   };
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 export function buildFacetSql(

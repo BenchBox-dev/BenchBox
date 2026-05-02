@@ -110,6 +110,11 @@ class ManifestEntry(BaseModel):
     validation_status: str | None = None
     cost_usd: float | None = None
     normalized_cost: dict[str, Any] = Field(default_factory=unavailable_normalized_cost_payload)
+    deployment_class: str | None = None
+    cloud_provider: str | None = None
+    cloud_region: str | None = None
+    instance_or_warehouse: str | None = None
+    storage_format: str | None = None
     compliance_class: str | None = None
 
 

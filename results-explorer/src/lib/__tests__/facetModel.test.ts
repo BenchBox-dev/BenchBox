@@ -86,10 +86,14 @@ describe("facet URL contract", () => {
   }
 
   it("reads legacy aliases while preserving the new canonical key", () => {
-    const params = new URLSearchParams("bm=tpch,ssb&date_window=30d");
+    const params = new URLSearchParams(
+      "bm=tpch,ssb&date_window=30d&deployment_class=cloud&instance_type=m6i.large&warehouse_size=MEDIUM",
+    );
 
     expect(readFacetParam(params, "benchmark")).toEqual(["tpch", "ssb"]);
     expect(readFacetParam(params, "date_window")).toBe("30d");
+    expect(readFacetParam(params, "deployment_class")).toEqual(["cloud"]);
+    expect(readFacetParam(params, "instance_or_warehouse")).toEqual(["m6i.large"]);
   });
 
   it("treats legacy all sentinel values as default selections", () => {
@@ -136,8 +140,8 @@ describe("facetsToWhereClause", () => {
     expect(sql).toContain("scale_factor IN (?)");
     expect(sql).toContain("test_type IN (?)");
     expect(sql).toContain("(platform IN (?) OR platform_id IN (?))");
-    expect(sql).toContain("(cloud_provider IS NOT NULL OR cost_status = ?)");
-    expect(sql).toContain("COALESCE(instance_type, warehouse_size, cluster_size) IN (?)");
+    expect(sql).toContain("deployment_class IN (?, ?)");
+    expect(sql).toContain("instance_or_warehouse IN (?)");
     expect(sql).toContain("run_date >= ?");
     expect(params).toEqual([
       "tpch",
@@ -149,7 +153,8 @@ describe("facetsToWhereClause", () => {
       "default",
       "maintainer-run",
       "exact",
-      "not_applicable_local",
+      "cloud",
+      "local",
       "aws",
       "us-east-1",
       "MEDIUM",
