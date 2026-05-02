@@ -35,8 +35,10 @@ export interface CostDeploymentFields {
   cost_status?: string | null;
   billing_unit?: string | null;
   pricing_region?: string | null;
+  deployment_class?: string | null;
   cloud_provider?: string | null;
   cloud_region?: string | null;
+  instance_or_warehouse?: string | null;
   instance_type?: string | null;
   warehouse_size?: string | null;
   node_count?: number | null;

@@ -115,8 +115,6 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   display_geomean_ms: number | null;
   sample_geomean_ms: number | null;
   cost_usd: number | null;
-  deployment_class?: string | null;
-  instance_or_warehouse?: string | null;
   primary_metric: string;
   primary_order: "asc" | "desc";
   rank: number | null;
@@ -149,8 +147,6 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   execution_mode: string | null;
   compliance_class: string | null;
   cost_usd: number | null;
-  deployment_class?: string | null;
-  instance_or_warehouse?: string | null;
   primary_metric: string;
 }
 

@@ -88,7 +88,7 @@ work:
 - id: w5
   summary: "Re-validate coverage signals against the normalized contract"
   needs: [w3, w4]
-  status: pending
+  status: done
   notes: |
     Coverage badges, missing-cell rendering, and "average rank over
     covered cohorts" must continue to behave correctly when cohort

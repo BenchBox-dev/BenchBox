@@ -57,8 +57,10 @@ const RESULT_ROWS = [
     cost_status: "normalized",
     cost_scope: "compute_only",
     cost_model_version: "2026.05.0",
+    deployment_class: "cloud",
     cloud_provider: "aws",
     cloud_region: "us-east-1",
+    instance_or_warehouse: "MEDIUM",
     warehouse_size: "MEDIUM",
     storage_format: "parquet",
     compliance_class: null,
@@ -93,8 +95,10 @@ const RESULT_ROWS = [
     cost_status: "not_applicable_local",
     cost_scope: null,
     cost_model_version: null,
+    deployment_class: "local",
     cloud_provider: null,
     cloud_region: null,
+    instance_or_warehouse: null,
     warehouse_size: null,
     storage_format: null,
     compliance_class: null,
@@ -129,8 +133,10 @@ const RANKING_ROWS = [
     cost_status: "normalized",
     cost_scope: "compute_only",
     cost_model_version: "2026.05.0",
+    deployment_class: "cloud",
     cloud_provider: "aws",
     cloud_region: "us-east-1",
+    instance_or_warehouse: "MEDIUM",
     warehouse_size: "MEDIUM",
     storage_format: "parquet",
     primary_metric: "power_score",
@@ -165,8 +171,10 @@ const RANKING_ROWS = [
     cost_status: "not_applicable_local",
     cost_scope: null,
     cost_model_version: null,
+    deployment_class: "local",
     cloud_provider: null,
     cloud_region: null,
+    instance_or_warehouse: null,
     warehouse_size: null,
     storage_format: null,
     primary_metric: "power_score",
@@ -211,6 +219,8 @@ const SUMMARY: BenchmarkSummary = {
       compliance_class: null,
       sample_geomean_ms: 12,
       cost_usd: null,
+      deployment_class: "cloud",
+      instance_or_warehouse: "MEDIUM",
       percentile_stats: null,
       phase_durations: null,
       timings: { Q1: 10, Q2: 20 },
@@ -232,6 +242,8 @@ const SUMMARY: BenchmarkSummary = {
       compliance_class: null,
       sample_geomean_ms: 220,
       cost_usd: null,
+      deployment_class: "local",
+      instance_or_warehouse: null,
       percentile_stats: null,
       phase_durations: null,
       timings: { Q1: 100, Q2: 200 },
@@ -354,11 +366,11 @@ describe("BenchmarkIndex", () => {
     const resultSql = String(resultCall?.[0]);
     expect(resultSql).toContain("benchmark IN (?)");
     expect(resultSql).toContain("(platform IN (?) OR platform_id IN (?))");
-    expect(resultSql).toContain("cloud_provider IS NOT NULL");
+    expect(resultSql).toContain("deployment_class IN (?)");
     expect(resultSql).toContain("cost_status IN (?)");
     expect(resultSql).not.toContain("scale_factor IN (?)");
     expect(resultSql).not.toContain("test_type IN (?)");
-    expect(resultCall?.[1]).toEqual(["tpch", "duckdb", "duckdb", "normalized"]);
+    expect(resultCall?.[1]).toEqual(["tpch", "duckdb", "duckdb", "cloud", "normalized"]);
 
     const rankingCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
       String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),

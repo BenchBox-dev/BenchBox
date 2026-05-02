@@ -726,14 +726,11 @@ function matchesDeploymentFacet(entry: ResultRow, selected: string[]): boolean {
 }
 
 function entryDeploymentClass(entry: ResultRow): string | null {
-  if (entry.cloud_provider) return "cloud";
-  if (entry.cost_status === "not_applicable_local") return "local";
-  if (entry.cost_status === "unavailable") return "unavailable";
-  return null;
+  return entry.deployment_class ?? null;
 }
 
 function entryShape(entry: ResultRow): string | null {
-  return entry.instance_type ?? entry.warehouse_size ?? entry.cluster_size ?? null;
+  return entry.instance_or_warehouse ?? null;
 }
 
 function normalizedCostValue(entry: ResultRow): number | null {
