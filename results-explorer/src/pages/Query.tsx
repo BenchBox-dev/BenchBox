@@ -10,6 +10,7 @@ import {
   buildSelectQuery,
   DEFAULT_ROW_LIMIT,
   UNLIMITED_ROW_LIMIT,
+  type BuiltQuery,
   type QueryFilterState,
   type QuerySort,
 } from "@/lib/queryFilters";
@@ -49,6 +50,21 @@ export function Query(_: RoutableProps) {
     EMPTY_STRING_ARRAY,
     arraySerde,
   );
+  const [costStatuses, setCostStatuses] = useUrlState<string[]>("cost_status", EMPTY_STRING_ARRAY, arraySerde);
+  const [costModelVersions, setCostModelVersions] = useUrlState<string[]>(
+    "cost_model",
+    EMPTY_STRING_ARRAY,
+    arraySerde,
+  );
+  const [cloudProviders, setCloudProviders] = useUrlState<string[]>(
+    "cloud_provider",
+    EMPTY_STRING_ARRAY,
+    arraySerde,
+  );
+  const [cloudRegions, setCloudRegions] = useUrlState<string[]>("cloud_region", EMPTY_STRING_ARRAY, arraySerde);
+  const [instanceTypes, setInstanceTypes] = useUrlState<string[]>("instance_type", EMPTY_STRING_ARRAY, arraySerde);
+  const [warehouseSizes, setWarehouseSizes] = useUrlState<string[]>("warehouse_size", EMPTY_STRING_ARRAY, arraySerde);
+  const [storageFormats, setStorageFormats] = useUrlState<string[]>("storage_format", EMPTY_STRING_ARRAY, arraySerde);
   const [rowLimitRaw, setRowLimitRaw] = useUrlState<string>("limit", "default", stringSerde);
   const [hasCost, setHasCost] = useUrlState<string>("has_cost", "all", stringSerde);
   const [dateWindow, setDateWindow] = useUrlState<string>("window", "all", stringSerde);
@@ -65,7 +81,6 @@ export function Query(_: RoutableProps) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
   const rowLimit = rowLimitMode === "all" ? UNLIMITED_ROW_LIMIT : DEFAULT_ROW_LIMIT;
-  const rowQueryColumns = useMemo(() => withRowIdentityColumn(visibleColumns, schema), [schema, visibleColumns]);
 
   const filters: QueryFilterState = useMemo(
     () => ({
@@ -75,11 +90,39 @@ export function Query(_: RoutableProps) {
       tuningModes,
       trustTiers,
       validationStatuses,
+      costStatuses,
+      costModelVersions,
+      cloudProviders,
+      cloudRegions,
+      instanceTypes,
+      warehouseSizes,
+      storageFormats,
       hasCost: hasCost === "yes" || hasCost === "no" ? hasCost : "all",
       dateWindow: dateWindow === "30d" || dateWindow === "90d" || dateWindow === "365d" ? dateWindow : "all",
     }),
-    [benchmarks, dateWindow, hasCost, platforms, scaleFactors, trustTiers, tuningModes, validationStatuses],
+    [
+      benchmarks,
+      cloudProviders,
+      cloudRegions,
+      costModelVersions,
+      costStatuses,
+      dateWindow,
+      hasCost,
+      instanceTypes,
+      platforms,
+      scaleFactors,
+      storageFormats,
+      trustTiers,
+      tuningModes,
+      validationStatuses,
+      warehouseSizes,
+    ],
   );
+  const queryColumns = useMemo(
+    () => (visibleColumns.includes("result_id") ? visibleColumns : ["result_id", ...visibleColumns]),
+    [visibleColumns],
+  );
+  const activeFilters = useMemo(() => applySchemaFilterSupport(filters, schema), [filters, schema]);
 
   useEffect(() => {
     if (rowLimitRaw === "default" || rowLimitRaw === "all") return;
@@ -112,17 +155,47 @@ export function Query(_: RoutableProps) {
     setLoading(true);
     setError(null);
 
-    const facetQueries = {
-      benchmark: buildFacetCountQuery("benchmark", filters, { exclude: "benchmarks" }),
-      platform: buildFacetCountQuery("platform", filters, { exclude: "platforms" }),
-      scale_factor: buildFacetCountQuery("scale_factor", filters, { exclude: "scaleFactors" }),
-      tuning_mode: buildFacetCountQuery("tuning_mode", filters, { exclude: "tuningModes" }),
-      trust_label: buildFacetCountQuery("trust_label", filters, { exclude: "trustTiers" }),
-      validation_status: buildFacetCountQuery("validation_status", filters, { exclude: "validationStatuses" }),
-      has_cost: buildFacetCountQuery("cost_usd", filters, { exclude: "hasCost", derived: "has_cost" }),
-      date_window: buildFacetCountQuery("run_date", filters, { exclude: "dateWindow", derived: "date_window" }),
+    const schemaColumns = new Set(schema.map((column) => column.name));
+    const facetQueries: Record<string, BuiltQuery> = {
+      benchmark: buildFacetCountQuery("benchmark", activeFilters, { exclude: "benchmarks" }),
+      platform: buildFacetCountQuery("platform", activeFilters, { exclude: "platforms" }),
+      scale_factor: buildFacetCountQuery("scale_factor", activeFilters, { exclude: "scaleFactors" }),
+      tuning_mode: buildFacetCountQuery("tuning_mode", activeFilters, { exclude: "tuningModes" }),
+      trust_label: buildFacetCountQuery("trust_label", activeFilters, { exclude: "trustTiers" }),
+      validation_status: buildFacetCountQuery("validation_status", activeFilters, { exclude: "validationStatuses" }),
+      has_cost: buildFacetCountQuery("cost_usd", activeFilters, { exclude: "hasCost", derived: "has_cost" }),
+      date_window: buildFacetCountQuery("run_date", activeFilters, { exclude: "dateWindow", derived: "date_window" }),
     };
-    const selectQuery = buildSelectQuery(filters, rowQueryColumns, sort, rowLimit);
+    if (schemaColumns.has("cost_status")) {
+      facetQueries.cost_status = buildFacetCountQuery("cost_status", activeFilters, { exclude: "costStatuses" });
+    }
+    if (schemaColumns.has("cost_model_version")) {
+      facetQueries.cost_model_version = buildFacetCountQuery("cost_model_version", activeFilters, {
+        exclude: "costModelVersions",
+      });
+    }
+    if (schemaColumns.has("cloud_provider")) {
+      facetQueries.cloud_provider = buildFacetCountQuery("cloud_provider", activeFilters, {
+        exclude: "cloudProviders",
+      });
+    }
+    if (schemaColumns.has("cloud_region")) {
+      facetQueries.cloud_region = buildFacetCountQuery("cloud_region", activeFilters, { exclude: "cloudRegions" });
+    }
+    if (schemaColumns.has("instance_type")) {
+      facetQueries.instance_type = buildFacetCountQuery("instance_type", activeFilters, { exclude: "instanceTypes" });
+    }
+    if (schemaColumns.has("warehouse_size")) {
+      facetQueries.warehouse_size = buildFacetCountQuery("warehouse_size", activeFilters, {
+        exclude: "warehouseSizes",
+      });
+    }
+    if (schemaColumns.has("storage_format")) {
+      facetQueries.storage_format = buildFacetCountQuery("storage_format", activeFilters, {
+        exclude: "storageFormats",
+      });
+    }
+    const selectQuery = buildSelectQuery(activeFilters, queryColumns, sort, rowLimit);
 
     Promise.all([
       queryRows<ResultRow>(selectQuery.sql, selectQuery.params),
@@ -144,7 +217,7 @@ export function Query(_: RoutableProps) {
         setError(err instanceof Error ? err.message : "DuckDB query failed");
         setLoading(false);
       });
-  }, [filters, rowLimit, rowQueryColumns, schema, sort, visibleColumns]);
+  }, [activeFilters, queryColumns, rowLimit, schema, sort, visibleColumns]);
 
   const sqlColumns = useMemo(() => [...new Set(sqlRows.flatMap((row) => Object.keys(row)))], [sqlRows]);
 
@@ -176,14 +249,14 @@ export function Query(_: RoutableProps) {
   }
 
   function buildSqlFromFilters() {
-    setSqlText(buildFacetSql(filters, visibleColumns, sort, rowLimit));
+    setSqlText(buildFacetSql(activeFilters, visibleColumns, sort, rowLimit));
   }
 
   function downloadJson() {
     setDownloadError(null);
     try {
       const exportName = `benchbox-query-export-${Date.now()}.json`;
-      const blob = new Blob([JSON.stringify(projectVisibleColumns(rows, visibleColumns), null, 2)], {
+      const blob = new Blob([JSON.stringify(rows.map((row) => projectVisibleRow(row, visibleColumns)), null, 2)], {
         type: "application/json;charset=utf-8",
       });
       const url = URL.createObjectURL(blob);
@@ -214,7 +287,7 @@ export function Query(_: RoutableProps) {
       setDownloadError("Internal error: unexpected export filename");
       return;
     }
-    const selectQuery = buildSelectQuery(filters, visibleColumns, sort, UNLIMITED_ROW_LIMIT);
+    const selectQuery = buildSelectQuery(activeFilters, visibleColumns, sort, UNLIMITED_ROW_LIMIT);
     let statement: {
       query: (...params: unknown[]) => Promise<unknown>;
       close?: () => Promise<void>;
@@ -306,6 +379,48 @@ export function Query(_: RoutableProps) {
             buckets={facetCounts.validation_status ?? []}
             selected={validationStatuses}
             onToggle={(value) => toggleMulti(value, validationStatuses, setValidationStatuses)}
+          />
+          <FacetSection
+            label="Cost status"
+            buckets={facetCounts.cost_status ?? []}
+            selected={costStatuses}
+            onToggle={(value) => toggleMulti(value, costStatuses, setCostStatuses)}
+          />
+          <FacetSection
+            label="Cost model"
+            buckets={facetCounts.cost_model_version ?? []}
+            selected={costModelVersions}
+            onToggle={(value) => toggleMulti(value, costModelVersions, setCostModelVersions)}
+          />
+          <FacetSection
+            label="Cloud provider"
+            buckets={facetCounts.cloud_provider ?? []}
+            selected={cloudProviders}
+            onToggle={(value) => toggleMulti(value, cloudProviders, setCloudProviders)}
+          />
+          <FacetSection
+            label="Cloud region"
+            buckets={facetCounts.cloud_region ?? []}
+            selected={cloudRegions}
+            onToggle={(value) => toggleMulti(value, cloudRegions, setCloudRegions)}
+          />
+          <FacetSection
+            label="Instance"
+            buckets={facetCounts.instance_type ?? []}
+            selected={instanceTypes}
+            onToggle={(value) => toggleMulti(value, instanceTypes, setInstanceTypes)}
+          />
+          <FacetSection
+            label="Warehouse"
+            buckets={facetCounts.warehouse_size ?? []}
+            selected={warehouseSizes}
+            onToggle={(value) => toggleMulti(value, warehouseSizes, setWarehouseSizes)}
+          />
+          <FacetSection
+            label="Storage"
+            buckets={facetCounts.storage_format ?? []}
+            selected={storageFormats}
+            onToggle={(value) => toggleMulti(value, storageFormats, setStorageFormats)}
           />
           <SingleFacetSection
             label="Has cost"
@@ -406,27 +521,20 @@ export function Query(_: RoutableProps) {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white">
-                  {rows.map((row, index) => {
-                    const resultId = resultIdFromRow(row);
-                    return (
-                      <tr key={resultId ?? index} class="hover:bg-gray-50">
-                        {visibleColumns.map((column) => (
-                          <td key={column} class="table-td">
-                            {formatCell(row[column])}
-                          </td>
-                        ))}
-                        <td class="table-td text-right">
-                          {resultId ? (
-                            <a href={`/results/r/${resultId}`} class="text-xs font-medium no-underline">
-                              View →
-                            </a>
-                          ) : (
-                            <span class="text-xs text-gray-400">-</span>
-                          )}
+                  {rows.map((row) => (
+                    <tr key={String(row.result_id)} class="hover:bg-gray-50">
+                      {visibleColumns.map((column) => (
+                        <td key={column} class="table-td">
+                          {formatCell(row[column])}
                         </td>
-                      </tr>
-                    );
-                  })}
+                      ))}
+                      <td class="table-td text-right">
+                        <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
+                          View →
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
                 {rowLimitMode === "all" && (
                   <tfoot class="border-t border-gray-200 bg-gray-50">
@@ -564,24 +672,29 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
-function withRowIdentityColumn(columns: string[], schema: SchemaColumn[]): string[] {
-  if (!schema.some((column) => column.name === "result_id") || columns.includes("result_id")) return columns;
-  return ["result_id", ...columns];
+function projectVisibleRow(row: ResultRow, visibleColumns: string[]): ResultRow {
+  return Object.fromEntries(visibleColumns.map((column) => [column, row[column]]));
 }
 
-function resultIdFromRow(row: ResultRow): string | null {
-  const value = row.result_id;
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function projectVisibleColumns(rows: ResultRow[], visibleColumns: string[]): ResultRow[] {
-  return rows.map((row) => Object.fromEntries(visibleColumns.map((column) => [column, row[column]])));
+function applySchemaFilterSupport(filters: QueryFilterState, schema: SchemaColumn[]): QueryFilterState {
+  const columns = new Set(schema.map((column) => column.name));
+  return {
+    ...filters,
+    costStatuses: columns.has("cost_status") ? filters.costStatuses : [],
+    costModelVersions: columns.has("cost_model_version") ? filters.costModelVersions : [],
+    cloudProviders: columns.has("cloud_provider") ? filters.cloudProviders : [],
+    cloudRegions: columns.has("cloud_region") ? filters.cloudRegions : [],
+    instanceTypes: columns.has("instance_type") ? filters.instanceTypes : [],
+    warehouseSizes: columns.has("warehouse_size") ? filters.warehouseSizes : [],
+    storageFormats: columns.has("storage_format") ? filters.storageFormats : [],
+  };
 }
 
 function StarterQueries({ onSelect }: { onSelect: (sql: string) => void }) {
   const grouped = starterQueriesByCategory();
   const categoryOrder: StarterQueryCategory[] = [
     "results",
+    "cost_and_deployment",
     "per_query_timings",
     "cohort_comparisons",
     "trust_and_tuning",

@@ -11,6 +11,7 @@
 import { queryRows } from "@/db";
 import type {
   BenchmarkSummary,
+  CostDeploymentFields,
   DetailResult,
   Environment,
   MetaCohort,
@@ -27,7 +28,7 @@ import type {
 // Row shapes - one-to-one with the DDL in browser-duckdb-schema.sql
 // ---------------------------------------------------------------------------
 
-export interface ResultRow {
+export interface ResultRow extends CostDeploymentFields {
   result_id: string;
   benchmark: string;
   scale_factor: number;
@@ -92,7 +93,7 @@ export interface BenchmarkMatrixCellRow {
   display_ms: number | null;
 }
 
-export interface BenchmarkRankingRow {
+export interface BenchmarkRankingRow extends CostDeploymentFields {
   benchmark: string;
   scale_factor: number;
   phase: string;
@@ -125,10 +126,11 @@ export interface BenchmarkRankingRow {
   speedup_vs_slowest_in_cohort: number | null;
 }
 
-export interface PlatformIndexRowRow {
+export interface PlatformIndexRowRow extends CostDeploymentFields {
   result_id: string;
   benchmark: string;
   scale_factor: number;
+  phase: string;
   platform: string;
   platform_id: string;
   driver_version: string | null;
@@ -140,13 +142,11 @@ export interface PlatformIndexRowRow {
   query_count: number;
   trust_label: string;
   validation_status?: string | null;
-  test_type?: string | null;
-  phase?: string | null;
-  primary_metric?: string | null;
   tuning_mode: string | null;
   execution_mode: string | null;
   compliance_class: string | null;
   cost_usd: number | null;
+  primary_metric: string;
 }
 
 export interface CohortMetadataRow {
@@ -278,6 +278,21 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     test_type: wide.test_type,
     validation_status: wide.validation_status,
     cost_usd: wide.cost_usd,
+    normalized_cost_usd: wide.normalized_cost_usd,
+    cost_model_version: wide.cost_model_version,
+    cost_model_source: wide.cost_model_source,
+    cost_scope: wide.cost_scope,
+    cost_status: wide.cost_status,
+    billing_unit: wide.billing_unit,
+    pricing_region: wide.pricing_region,
+    cloud_provider: wide.cloud_provider,
+    cloud_region: wide.cloud_region,
+    instance_type: wide.instance_type,
+    warehouse_size: wide.warehouse_size,
+    node_count: wide.node_count,
+    cluster_size: wide.cluster_size,
+    storage_format: wide.storage_format,
+    storage_tier: wide.storage_tier,
     compliance_class: wide.compliance_class,
   };
 }
@@ -302,9 +317,14 @@ export async function getBenchmarkRanking(
   phase: string,
 ): Promise<BenchmarkRankingRow[]> {
   return queryRows<BenchmarkRankingRow>(
-    "SELECT * FROM bench.benchmark_rankings" +
-      " WHERE benchmark = ? AND scale_factor = ? AND phase = ?" +
-      " ORDER BY rank NULLS LAST, platform_id",
+    "SELECT br.*, r.normalized_cost_usd, r.cost_model_version, r.cost_model_source," +
+      " r.cost_scope, r.cost_status, r.billing_unit, r.pricing_region," +
+      " r.cloud_provider, r.cloud_region, r.instance_type, r.warehouse_size," +
+      " r.node_count, r.cluster_size, r.storage_format, r.storage_tier" +
+      " FROM bench.benchmark_rankings br" +
+      " LEFT JOIN bench.results r USING (result_id)" +
+      " WHERE br.benchmark = ? AND br.scale_factor = ? AND br.phase = ?" +
+      " ORDER BY br.rank NULLS LAST, br.platform_id",
     [benchmark, scaleFactor, phase],
   );
 }
@@ -403,6 +423,21 @@ export async function getBenchmarkSummaryFromDuckDB(
       display_geomean_ms: row.display_geomean_ms,
       sample_geomean_ms: row.sample_geomean_ms,
       cost_usd: row.cost_usd,
+      normalized_cost_usd: row.normalized_cost_usd,
+      cost_model_version: row.cost_model_version,
+      cost_model_source: row.cost_model_source,
+      cost_scope: row.cost_scope,
+      cost_status: row.cost_status,
+      billing_unit: row.billing_unit,
+      pricing_region: row.pricing_region,
+      cloud_provider: row.cloud_provider,
+      cloud_region: row.cloud_region,
+      instance_type: row.instance_type,
+      warehouse_size: row.warehouse_size,
+      node_count: row.node_count,
+      cluster_size: row.cluster_size,
+      storage_format: row.storage_format,
+      storage_tier: row.storage_tier,
       compliance_class: row.compliance_class,
       percentile_stats: percentileStats,
       phase_durations: phaseDurationsByResult.get(row.result_id) ?? null,
@@ -427,21 +462,36 @@ export async function getBenchmarkSummaryFromDuckDB(
 }
 
 export async function getPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow[]> {
-  const selectPlatformRows =
-    "SELECT r.result_id, r.benchmark, r.scale_factor, r.platform, r.platform_id, r.driver_version, r.run_date," +
-    " r.power_score, r.total_duration_s, r.geomean_ms, r.display_geomean_ms, r.query_count, r.trust_label," +
-    " r.validation_status, r.test_type, COALESCE(br.phase, r.test_type, 'power') AS phase, br.primary_metric," +
-    " r.tuning_mode, r.execution_mode, r.compliance_class, r.cost_usd" +
-    " FROM bench.results r LEFT JOIN bench.benchmark_rankings br" +
-    " ON br.result_id = r.result_id" +
-    " AND br.benchmark = r.benchmark" +
-    " AND br.scale_factor = r.scale_factor" +
-    " AND br.phase = COALESCE(r.test_type, 'power')";
+  const sql =
+    "SELECT" +
+    " r.result_id," +
+    " r.benchmark," +
+    " r.scale_factor," +
+    " COALESCE(br.phase, r.test_type, 'power') AS phase," +
+    " r.platform," +
+    " r.platform_id," +
+    " r.driver_version," +
+    " r.run_date," +
+    " r.power_score," +
+    " r.total_duration_s," +
+    " r.geomean_ms," +
+    " r.display_geomean_ms," +
+    " r.query_count," +
+    " r.trust_label," +
+    " r.validation_status," +
+    " r.tuning_mode," +
+    " r.execution_mode," +
+    " r.compliance_class," +
+    " r.cost_usd," +
+    " COALESCE(br.primary_metric, CASE WHEN r.power_score IS NOT NULL THEN 'power_score' ELSE 'display_geomean_ms' END)" +
+    " AS primary_metric" +
+    " FROM bench.results r" +
+    " LEFT JOIN bench.benchmark_rankings br ON br.result_id = r.result_id";
   if (platformId === undefined) {
-    return queryRows<PlatformIndexRowRow>(`${selectPlatformRows} ORDER BY r.run_date DESC`);
+    return queryRows<PlatformIndexRowRow>(`${sql} ORDER BY r.run_date DESC`);
   }
   return queryRows<PlatformIndexRowRow>(
-    `${selectPlatformRows} WHERE r.platform_id = ? ORDER BY r.run_date DESC`,
+    `${sql} WHERE r.platform_id = ? ORDER BY r.run_date DESC`,
     [platformId],
   );
 }

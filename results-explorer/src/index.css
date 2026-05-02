@@ -3,16 +3,41 @@
 @tailwind utilities;
 
 @layer base {
+    :root {
+        --bb-bg-primary: #0d1117;
+        --bb-bg-panel: #161b22;
+        --bb-bg-elevated: #21262d;
+        --bb-fg-primary: #f0f6fc;
+        --bb-fg-muted: #8b949e;
+        --bb-fg-inverse: #0d1117;
+        --bb-border-default: #30363d;
+        --bb-border-subtle: #21262d;
+        --bb-accent: #58a6ff;
+        --bb-accent-hover: #1f6feb;
+        --bb-status-success: #238636;
+        --bb-status-warning: #d29922;
+        --bb-status-danger: #f85149;
+        --bb-code-bg: #161b22;
+        --bb-code-fg: #f0f6fc;
+        --bb-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+        --bb-font-mono: "SF Mono", Monaco, Inconsolata, "Roboto Mono", "Fira Code", monospace;
+        --bb-text-xs: 0.75rem;
+        --bb-text-sm: 0.875rem;
+        --bb-text-base: 1rem;
+        --bb-text-lg: 1.125rem;
+        --bb-text-xl: 1.25rem;
+        --bb-text-2xl: 1.5rem;
+        --bb-skeleton-surface: #e5e7eb;
+        --bb-skeleton-highlight: #f9fafb;
+        --bb-skeleton-dark-surface: #21262d;
+        --bb-skeleton-dark-highlight: #30363d;
+        --bb-skeleton-radius-sm: 0.25rem;
+        --bb-skeleton-radius-md: 0.375rem;
+        --bb-skeleton-row-height: 2.75rem;
+    }
+
     html {
-        font-family:
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            Roboto,
-            "Helvetica Neue",
-            Arial,
-            sans-serif;
+        font-family: var(--bb-font-sans);
     }
 
     body {
@@ -73,6 +98,32 @@
         @apply px-4 py-3 text-sm text-gray-700;
     }
 
+    .bb-skeleton {
+        border-radius: var(--bb-skeleton-radius-md);
+        background: linear-gradient(
+            90deg,
+            var(--bb-skeleton-surface) 0%,
+            var(--bb-skeleton-highlight) 45%,
+            var(--bb-skeleton-surface) 90%
+        );
+        background-size: 220% 100%;
+        animation: bb-skeleton-shimmer 1.35s ease-in-out infinite;
+    }
+
+    .bb-skeleton-dark {
+        background: linear-gradient(
+            90deg,
+            var(--bb-skeleton-dark-surface) 0%,
+            var(--bb-skeleton-dark-highlight) 45%,
+            var(--bb-skeleton-dark-surface) 90%
+        );
+        background-size: 220% 100%;
+    }
+
+    .bb-skeleton-row {
+        min-height: var(--bb-skeleton-row-height);
+    }
+
     /* Heatmap cells: background driven by --cell-hue CSS custom property.
      Using custom properties lets dark-mode and high-contrast media queries
      override saturation/lightness without hard-coding color values here. */
@@ -111,5 +162,21 @@
         clip: rect(0, 0, 0, 0);
         white-space: nowrap;
         border-width: 0;
+    }
+
+    @keyframes bb-skeleton-shimmer {
+        0% {
+            background-position: 120% 0;
+        }
+        100% {
+            background-position: -120% 0;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .bb-skeleton,
+        .bb-skeleton-dark {
+            animation: none;
+        }
     }
 }

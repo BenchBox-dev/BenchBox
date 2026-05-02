@@ -9,7 +9,26 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from benchbox.core.cost.models import NormalizedCost
+from benchbox.core.cost.pricing import PRICING_VERSION
+
+_COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
+
+
+def unavailable_normalized_cost_payload() -> dict[str, Any]:
+    """Return the explicit normalized-cost unavailable payload for old bundles."""
+    return NormalizedCost(
+        normalized_cost_usd=None,
+        cost_model_version=PRICING_VERSION,
+        cost_model_source=_COST_MODEL_SOURCE,
+        cost_scope="compute_only",
+        cost_status="unavailable",
+        billing_unit="unknown",
+        pricing_region="unknown",
+    ).to_dict()
+
 
 # ---------------------------------------------------------------------------
 # Platform identity helpers
@@ -90,6 +109,7 @@ class ManifestEntry(BaseModel):
     test_type: str | None = None
     validation_status: str | None = None
     cost_usd: float | None = None
+    normalized_cost: dict[str, Any] = Field(default_factory=unavailable_normalized_cost_payload)
     compliance_class: str | None = None
 
 
@@ -142,6 +162,7 @@ class DetailResult(BaseModel):
     test_type: str | None = None
     validation_status: str | None = None
     cost_usd: float | None = None
+    normalized_cost: dict[str, Any] = Field(default_factory=unavailable_normalized_cost_payload)
     compliance_class: str | None = None
     # Phase durations in seconds (None for pre-pipeline rows).
     phase_durations: dict[str, float] | None = None
@@ -434,4 +455,5 @@ __all__ = [
     "is_ranking_eligible",
     "MetaRank",
     "select_canonical_row",
+    "unavailable_normalized_cost_payload",
 ]

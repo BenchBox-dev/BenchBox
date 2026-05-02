@@ -12,9 +12,12 @@ import logging
 import math
 import re
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata, NormalizedCost
+from benchbox.core.cost.pricing import PRICING_VERSION
 from benchbox.core.explorer_pipeline.models import (
     ComparabilityWarning,
     ComparisonArtifact,
@@ -34,6 +37,9 @@ logger = logging.getLogger(__name__)
 
 # Status values that are considered passing for the query timing status field.
 _PASS_STATUSES = {"SUCCESS", "PASS", "pass", "success"}
+_COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
+_COST_SCOPES: frozenset[str] = frozenset({"compute_only", "compute_plus_storage"})
+_COST_STATUSES: frozenset[str] = frozenset({"normalized", "not_applicable_local", "unavailable"})
 
 
 def _load_bundle(bundle_path: Path) -> tuple[dict[str, Any], bytes]:
@@ -198,18 +204,114 @@ def _validation_status(data: dict[str, Any]) -> str | None:
     return None
 
 
-def _cost_usd(data: dict[str, Any]) -> float | None:
-    """Extract total cost in USD from schema-v2 bundle cost block."""
+def _unavailable_normalized_cost() -> NormalizedCost:
+    """Return explicit normalized-cost-unavailable metadata for old bundles."""
+    return NormalizedCost(
+        normalized_cost_usd=None,
+        cost_model_version=PRICING_VERSION,
+        cost_model_source=_COST_MODEL_SOURCE,
+        cost_scope="compute_only",
+        cost_status="unavailable",
+        billing_unit="unknown",
+        pricing_region="unknown",
+    )
+
+
+def _raw_normalized_cost_block(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Find a normalized cost block in current or near-future bundle shapes."""
+    raw = data.get("normalized_cost")
+    if isinstance(raw, dict):
+        return raw
+
     cost = data.get("cost", {})
     if not isinstance(cost, dict):
         return None
-    val = cost.get("total_usd")
-    if val is None:
-        return None
+
+    for key in ("normalized_cost", "normalized"):
+        raw = cost.get(key)
+        if isinstance(raw, dict):
+            return raw
+
+    normalized_keys = {
+        "normalized_cost_usd",
+        "cost_model_version",
+        "cost_model_source",
+        "cost_scope",
+        "cost_status",
+    }
+    if normalized_keys.intersection(cost):
+        return cost
+
+    return None
+
+
+def _decimal_or_none(val: Any) -> Decimal | None:
     try:
-        return float(val)
-    except (TypeError, ValueError):
+        parsed = Decimal(str(val)) if val is not None else None
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError(f"Invalid normalized_cost_usd value: {val!r}") from exc
+    if parsed is not None and not parsed.is_finite():
+        raise ValueError(f"Invalid normalized_cost_usd value: {val!r}")
+    return parsed
+
+
+def _deployment_metadata(raw: Any) -> DeploymentMetadata:
+    if not isinstance(raw, dict):
+        return DeploymentMetadata()
+    node_count = raw.get("node_count")
+    return DeploymentMetadata(
+        cloud_provider=raw.get("cloud_provider"),
+        cloud_region=raw.get("cloud_region"),
+        instance_type=raw.get("instance_type"),
+        warehouse_size=raw.get("warehouse_size"),
+        node_count=int(node_count) if node_count is not None else None,
+        cluster_size=raw.get("cluster_size"),
+        storage_format=raw.get("storage_format"),
+        storage_tier=raw.get("storage_tier"),
+    )
+
+
+def _require_cost_choice(raw: dict[str, Any], key: str, choices: frozenset[str]) -> str:
+    value = raw.get(key)
+    if value not in choices:
+        raise ValueError(f"Normalized cost field {key!r} must be one of {sorted(choices)}; got {value!r}")
+    return str(value)
+
+
+def _require_cost_string(raw: dict[str, Any], key: str) -> str:
+    value = raw.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"Normalized cost field {key!r} must be a non-empty string")
+    return value
+
+
+def _normalized_cost_from_block(raw: dict[str, Any]) -> NormalizedCost:
+    """Build a validated NormalizedCost from a bundle payload."""
+    return NormalizedCost(
+        normalized_cost_usd=_decimal_or_none(raw.get("normalized_cost_usd")),
+        cost_model_version=_require_cost_string(raw, "cost_model_version"),
+        cost_model_source=_require_cost_string(raw, "cost_model_source"),
+        cost_scope=cast(CostScope, _require_cost_choice(raw, "cost_scope", _COST_SCOPES)),
+        cost_status=cast(CostStatus, _require_cost_choice(raw, "cost_status", _COST_STATUSES)),
+        billing_unit=_require_cost_string(raw, "billing_unit"),
+        pricing_region=_require_cost_string(raw, "pricing_region"),
+        deployment=_deployment_metadata(raw.get("deployment")),
+    )
+
+
+def _normalized_cost(data: dict[str, Any]) -> NormalizedCost:
+    """Extract normalized BenchBox cost or explicit unavailable metadata."""
+    raw = _raw_normalized_cost_block(data)
+    if raw is None:
+        return _unavailable_normalized_cost()
+    return _normalized_cost_from_block(raw)
+
+
+def _cost_usd_alias(cost: NormalizedCost) -> float | None:
+    """Return the legacy compute-only cost alias for read-model compatibility."""
+    if cost.cost_usd is None:
         return None
+    return float(cost.cost_usd)
 
 
 def _compliance_class(data: dict[str, Any]) -> str | None:
@@ -449,6 +551,7 @@ class BundleTransformer:
         # large bundles (≤99 queries makes this negligible today).
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
+        normalized_cost = _normalized_cost(bundle_data)
         return ManifestEntry(
             result_id=rid,
             benchmark=benchmark,
@@ -470,7 +573,8 @@ class BundleTransformer:
             tuning_hash=_tuning_hash(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
-            cost_usd=_cost_usd(bundle_data),
+            cost_usd=_cost_usd_alias(normalized_cost),
+            normalized_cost=normalized_cost.to_dict(),
             compliance_class=_compliance_class(bundle_data),
         )
 
@@ -506,6 +610,7 @@ class BundleTransformer:
 
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
+        normalized_cost = _normalized_cost(bundle_data)
         return DetailResult(
             result_id=result_id,
             benchmark=benchmark,
@@ -532,7 +637,8 @@ class BundleTransformer:
             tuning_hash=_tuning_hash(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
-            cost_usd=_cost_usd(bundle_data),
+            cost_usd=_cost_usd_alias(normalized_cost),
+            normalized_cost=normalized_cost.to_dict(),
             compliance_class=_compliance_class(bundle_data),
             phase_durations=_phase_durations(bundle_data),
         )

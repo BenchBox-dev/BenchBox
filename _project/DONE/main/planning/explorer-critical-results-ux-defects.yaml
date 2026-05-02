@@ -2,7 +2,8 @@ id: explorer-critical-results-ux-defects
 title: "Explorer: fix critical result-browser defects found in design audit"
 worktree: main
 priority: Critical
-status: "Completed"
+status: Completed
+completed_date: "2026-05-01"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -31,9 +32,6 @@ work:
     `result_id` in the SELECT projection as a hidden key and render only the
     user-selected columns. Add a regression test where DEFAULT_COLUMNS omits
     `result_id` but the "View" link still points to `/results/r/{id}`.
-    Owned files for this work unit:
-      - results-explorer/src/pages/Query.tsx
-      - results-explorer/src/pages/__tests__/Query.test.tsx
 
 - id: w2
   summary: "Correct Result Detail methodology copy to distinguish logical queries from samples"
@@ -45,8 +43,6 @@ work:
     `detail.queries.length`. The UI should say, for example, "22 queries,
     88 measurement samples" rather than "88 queries" when samples are the
     larger number.
-    Owned files for this work unit:
-      - results-explorer/src/components/MethodologyDisclosure.tsx
 
 - id: w3
   summary: "Stop Platform page trend chart from combining different cohorts into one time series"
@@ -57,9 +53,6 @@ work:
     data by `(benchmark, scale_factor, phase, primary_metric)` before drawing.
     Either render cohort-specific small multiples or require an explicit cohort
     selector. Do not plot mixed cohorts on one y-axis.
-    Owned files for this work unit:
-      - results-explorer/src/lib/duckdbQueries.ts
-      - results-explorer/src/pages/PlatformIndex.tsx
 
 - id: w4
   summary: "Add Query Workbench regression test for default row link without visible result_id"
@@ -78,8 +71,6 @@ work:
     Extend ResultDetail.test.tsx or MethodologyDisclosure.test.tsx to assert
     "queries" and "measurement samples" render as distinct counts when sample
     count exceeds logical query count. Commit with the w2 fix.
-    Owned files for this work unit:
-      - results-explorer/src/components/__tests__/MethodologyDisclosure.test.tsx
 
 - id: w6
   summary: "Add Platform trend regression test against mixed cohorts"
@@ -90,8 +81,6 @@ work:
     `(benchmark, scale_factor)` cohorts and assert the trend renderer either
     splits cohorts into small multiples or refuses to render a single merged
     line. Commit with the w3 fix.
-    Owned files for this work unit:
-      - results-explorer/src/pages/__tests__/PlatformIndex.test.tsx
 
 metadata:
   tags:
@@ -101,7 +90,6 @@ metadata:
   - navigation
   estimated_effort: "Medium (1 day)"
   created_date: "2026-05-01"
-  completed_date: "2026-05-01"
 
 impact:
   business_value: |

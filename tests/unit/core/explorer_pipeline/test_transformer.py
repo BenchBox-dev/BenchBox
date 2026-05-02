@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
 from benchbox.core.explorer_pipeline.models import DetailResult, ManifestEntry
 from benchbox.core.explorer_pipeline.transformer import BundleTransformer
 from tests.unit.core.explorer_pipeline.conftest import MINIMAL_BUNDLE
@@ -324,8 +325,10 @@ class TestExtendedManifestFields:
         entry = transformer.to_manifest_entry(bundle_file)
 
         assert entry.cost_usd is None
+        assert entry.normalized_cost["cost_status"] == "unavailable"
+        assert entry.normalized_cost["normalized_cost_usd"] is None
 
-    def test_cost_usd_extracted(self, tmp_path: Path) -> None:
+    def test_legacy_total_cost_does_not_populate_normalized_alias(self, tmp_path: Path) -> None:
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -336,7 +339,110 @@ class TestExtendedManifestFields:
         transformer = BundleTransformer()
         entry = transformer.to_manifest_entry(bundle)
 
-        assert entry.cost_usd == pytest.approx(1.23)
+        assert entry.cost_usd is None
+        assert entry.normalized_cost["cost_status"] == "unavailable"
+
+    @pytest.mark.parametrize(
+        ("normalized_cost", "expected_cost_usd"),
+        [
+            (
+                NormalizedCost(
+                    normalized_cost_usd="1.23",
+                    cost_model_version="2026.05.0",
+                    cost_model_source="benchbox.core.cost.pricing",
+                    cost_scope="compute_only",
+                    cost_status="normalized",
+                    billing_unit="instance_hour",
+                    pricing_region="us-east-1",
+                    deployment=DeploymentMetadata(
+                        cloud_provider="aws",
+                        cloud_region="us-east-1",
+                        instance_type="r7i.4xlarge",
+                        node_count=2,
+                        storage_format="parquet",
+                    ),
+                ),
+                1.23,
+            ),
+            (
+                NormalizedCost(
+                    normalized_cost_usd="0",
+                    cost_model_version="2026.05.0",
+                    cost_model_source="benchbox.core.cost.pricing",
+                    cost_scope="compute_only",
+                    cost_status="not_applicable_local",
+                    billing_unit="not_applicable",
+                    pricing_region="not_applicable",
+                ),
+                None,
+            ),
+            (
+                NormalizedCost(
+                    normalized_cost_usd=None,
+                    cost_model_version="2026.05.0",
+                    cost_model_source="benchbox.core.cost.pricing",
+                    cost_scope="compute_only",
+                    cost_status="unavailable",
+                    billing_unit="unknown",
+                    pricing_region="unknown",
+                ),
+                None,
+            ),
+        ],
+    )
+    def test_normalized_cost_statuses_extracted(
+        self,
+        tmp_path: Path,
+        normalized_cost: NormalizedCost,
+        expected_cost_usd: float | None,
+    ) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["normalized_cost"] = normalized_cost.to_dict()
+        bundle = tmp_path / f"{normalized_cost.cost_status}.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+        rid = transformer.result_id_from_bundle(bundle)
+        detail = transformer.to_detail_result(bundle, rid)
+
+        assert entry.cost_usd == expected_cost_usd
+        assert detail.cost_usd == expected_cost_usd
+        assert entry.normalized_cost == normalized_cost.to_dict()
+        assert detail.normalized_cost == normalized_cost.to_dict()
+
+    def test_partial_normalized_cost_rejected(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["normalized_cost"] = {
+            "normalized_cost_usd": "1.23",
+            "cost_status": "normalized",
+        }
+        bundle = tmp_path / "partial_normalized_cost.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError, match="cost_model_version"):
+            transformer.to_manifest_entry(bundle)
+
+    @pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity"])
+    def test_non_finite_normalized_cost_rejected(self, tmp_path: Path, value: str) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["normalized_cost"] = NormalizedCost(
+            normalized_cost_usd="1.23",
+            cost_model_version="2026.05.0",
+            cost_model_source="benchbox.core.cost.pricing",
+            cost_scope="compute_only",
+            cost_status="normalized",
+            billing_unit="instance_hour",
+            pricing_region="us-east-1",
+        ).to_dict()
+        data["normalized_cost"]["normalized_cost_usd"] = value
+        bundle = tmp_path / f"non_finite_{value}.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError, match="Invalid normalized_cost_usd"):
+            transformer.to_manifest_entry(bundle)
 
     def test_test_type_inferred_from_phases(self, tmp_path: Path) -> None:
         """test_type falls back to phases block when benchmark.test_type is absent."""

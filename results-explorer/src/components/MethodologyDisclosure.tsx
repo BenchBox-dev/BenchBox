@@ -26,8 +26,10 @@ export function testTypeLabel(testType: string | null): string {
 
 export function MethodologyDisclosure({ detail }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const queryCount = logicalQueryCount(detail);
-  const sampleCount = measurementSampleCount(detail);
+  const logicalQueryCount = detail.display_timings.length > 0
+    ? detail.display_timings.length
+    : new Set(detail.queries.map((query) => query.query_id)).size;
+  const measurementSampleCount = detail.queries.length;
 
   return (
     <section class="card">
@@ -60,29 +62,17 @@ export function MethodologyDisclosure({ detail }: Props) {
           </div>
           <DisclosureRow
             label="Query scope"
-            value={`${queryCount} ${queryCount === 1 ? "query" : "queries"}`}
+            value={formatCount(logicalQueryCount, "query", "queries")}
           />
           <DisclosureRow
             label="Measurement samples"
-            value={`${sampleCount} measurement sample${sampleCount === 1 ? "" : "s"}`}
+            value={formatCount(measurementSampleCount, "measurement sample", "measurement samples")}
           />
           <DisclosureRow label="Validation" value={detail.validation_status ?? "Not recorded"} />
         </dl>
       )}
     </section>
   );
-}
-
-function logicalQueryCount(detail: DetailResult): number {
-  if (detail.display_timings.length > 0) return detail.display_timings.length;
-  return new Set(detail.queries.map((query) => query.query_id)).size;
-}
-
-function measurementSampleCount(detail: DetailResult): number {
-  if (detail.display_timings.length > 0) {
-    return detail.display_timings.reduce((total, timing) => total + timing.sample_count, 0);
-  }
-  return detail.queries.length;
 }
 
 function DisclosureRow({ label, value }: { label: string; value: string }) {
@@ -92,4 +82,8 @@ function DisclosureRow({ label, value }: { label: string; value: string }) {
       <dd class="text-gray-700">{value}</dd>
     </div>
   );
+}
+
+function formatCount(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
 }

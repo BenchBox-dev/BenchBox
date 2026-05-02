@@ -67,7 +67,7 @@ describe("G-3 cross-surface metric parity", () => {
       // Every surface's SQL must either SELECT * (inherits canonical column)
       // or explicitly name the canonical column - never a re-derived alias.
       const sqlLower = (sql as string).toLowerCase();
-      const mentionsStar = /select\s+\*/.test(sqlLower);
+      const mentionsStar = /select\s+(?:\*|\w+\.\*)/.test(sqlLower);
       const namesPowerScore = /\bpower_score\b/.test(sqlLower);
       const surfaceDisplaysPowerScore = !sqlLower.includes("query_display_timings")
         && !sqlLower.includes("query_executions")

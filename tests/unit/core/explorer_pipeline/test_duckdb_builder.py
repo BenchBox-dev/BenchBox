@@ -8,6 +8,8 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
+from benchbox.core.cost.pricing import PRICING_VERSION
 from benchbox.core.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder
 from benchbox.core.explorer_pipeline.models import ManifestEntry
 
@@ -69,6 +71,21 @@ class TestDuckDBSnapshotBuilder:
             "test_type",
             "validation_status",
             "cost_usd",
+            "normalized_cost_usd",
+            "cost_model_version",
+            "cost_model_source",
+            "cost_scope",
+            "cost_status",
+            "billing_unit",
+            "pricing_region",
+            "cloud_provider",
+            "cloud_region",
+            "instance_type",
+            "warehouse_size",
+            "node_count",
+            "cluster_size",
+            "storage_format",
+            "storage_tier",
         }
         assert expected.issubset(cols)
 
@@ -116,6 +133,25 @@ class TestDuckDBSnapshotBuilder:
             test_type="power",
             validation_status="passed",
             cost_usd=0.42,
+            normalized_cost=NormalizedCost(
+                normalized_cost_usd="0.42",
+                cost_model_version="2026.05.0",
+                cost_model_source="benchbox.core.cost.pricing",
+                cost_scope="compute_only",
+                cost_status="normalized",
+                billing_unit="instance_hour",
+                pricing_region="us-east-1",
+                deployment=DeploymentMetadata(
+                    cloud_provider="aws",
+                    cloud_region="us-east-1",
+                    instance_type="r7i.4xlarge",
+                    warehouse_size="large",
+                    node_count=2,
+                    cluster_size="2x",
+                    storage_format="parquet",
+                    storage_tier="s3-standard",
+                ),
+            ).to_dict(),
         )
         builder = DuckDBSnapshotBuilder()
         out = tmp_path / "results.duckdb"
@@ -124,7 +160,11 @@ class TestDuckDBSnapshotBuilder:
         with duckdb.connect(str(out), read_only=True) as con:
             row = con.execute(
                 "SELECT geomean_ms, platform_version, execution_mode, tuning_mode,"
-                " tuning_hash, test_type, validation_status, cost_usd FROM results"
+                " tuning_hash, test_type, validation_status, cost_usd,"
+                " normalized_cost_usd, cost_model_version, cost_model_source,"
+                " cost_scope, cost_status, billing_unit, pricing_region,"
+                " cloud_provider, cloud_region, instance_type, warehouse_size,"
+                " node_count, cluster_size, storage_format, storage_tier FROM results"
             ).fetchone()
 
         assert row[0] == pytest.approx(5656.85)
@@ -135,6 +175,21 @@ class TestDuckDBSnapshotBuilder:
         assert row[5] == "power"
         assert row[6] == "passed"
         assert row[7] == pytest.approx(0.42)
+        assert row[8] == pytest.approx(0.42)
+        assert row[9] == "2026.05.0"
+        assert row[10] == "benchbox.core.cost.pricing"
+        assert row[11] == "compute_only"
+        assert row[12] == "normalized"
+        assert row[13] == "instance_hour"
+        assert row[14] == "us-east-1"
+        assert row[15] == "aws"
+        assert row[16] == "us-east-1"
+        assert row[17] == "r7i.4xlarge"
+        assert row[18] == "large"
+        assert row[19] == 2
+        assert row[20] == "2x"
+        assert row[21] == "parquet"
+        assert row[22] == "s3-standard"
 
     def test_extended_fields_null_when_absent(self, tmp_path: Path) -> None:
         """All extended columns store NULL when the entry has no value."""
@@ -150,6 +205,64 @@ class TestDuckDBSnapshotBuilder:
             ).fetchone()
 
         assert row is not None and all(v is None for v in row)
+
+    def test_normalized_cost_columns_default_to_unavailable(self, tmp_path: Path) -> None:
+        """Entries without normalized cost still carry explicit unavailable metadata."""
+        entry = _make_entry()
+        builder = DuckDBSnapshotBuilder()
+        out = tmp_path / "results.duckdb"
+        builder.build([entry], out)
+
+        with duckdb.connect(str(out), read_only=True) as con:
+            row = con.execute(
+                "SELECT normalized_cost_usd, cost_model_version, cost_model_source,"
+                " cost_scope, cost_status, billing_unit, pricing_region,"
+                " cloud_provider, cloud_region, instance_type, warehouse_size,"
+                " node_count, cluster_size, storage_format, storage_tier FROM results"
+            ).fetchone()
+
+        assert row is not None
+        assert row[:7] == (
+            None,
+            PRICING_VERSION,
+            "benchbox.core.cost.pricing",
+            "compute_only",
+            "unavailable",
+            "unknown",
+            "unknown",
+        )
+        assert all(value is None for value in row[7:])
+
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            ("normalized_cost_usd", "NaN", "must be finite"),
+            ("cost_status", "bogus", "must be one of"),
+            ("cost_model_version", "", "must be a non-empty string"),
+        ],
+    )
+    def test_malformed_normalized_cost_columns_rejected(
+        self,
+        tmp_path: Path,
+        field: str,
+        value: str,
+        message: str,
+    ) -> None:
+        normalized_cost = NormalizedCost(
+            normalized_cost_usd="0.42",
+            cost_model_version="2026.05.0",
+            cost_model_source="benchbox.core.cost.pricing",
+            cost_scope="compute_only",
+            cost_status="normalized",
+            billing_unit="instance_hour",
+            pricing_region="us-east-1",
+        ).to_dict()
+        normalized_cost[field] = value
+        entry = _make_entry(normalized_cost=normalized_cost)
+
+        builder = DuckDBSnapshotBuilder()
+        with pytest.raises(ValueError, match=message):
+            builder.build([entry], tmp_path / "results.duckdb")
 
     def test_results_schema_json_emitted(self, tmp_path: Path) -> None:
         """results_schema.json is written next to results.duckdb."""

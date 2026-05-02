@@ -56,6 +56,27 @@ def _minimal_bundle() -> dict:
     }
 
 
+def _normalized_cost_block(cost: str | None = "1.25", status: str = "normalized") -> dict:
+    """Return a minimal valid BenchBox normalized-cost provenance block."""
+    billing_unit = "instance_hour" if status == "normalized" else "not_applicable"
+    pricing_region = "us-east-1" if status == "normalized" else "not_applicable"
+    return {
+        "normalized_cost_usd": cost,
+        "cost_model_version": "2026.05.0",
+        "cost_model_source": "benchbox.core.cost.pricing",
+        "cost_scope": "compute_only",
+        "cost_status": status,
+        "billing_unit": billing_unit,
+        "pricing_region": pricing_region,
+        "deployment": {
+            "cloud_provider": "aws" if status == "normalized" else None,
+            "cloud_region": "us-east-1" if status == "normalized" else None,
+            "instance_type": "r7i.4xlarge" if status == "normalized" else None,
+            "node_count": 2 if status == "normalized" else None,
+        },
+    }
+
+
 @pytest.fixture
 def valid_bundle_file(tmp_path: Path) -> Path:
     """Write a valid bundle to a temp file."""
@@ -199,6 +220,82 @@ class TestValidateBundle:
         _validate_bundle(data, vr)
         assert vr.ok  # warning, not error
         assert any("queries array is empty" in w for w in vr.warnings)
+
+    def test_user_supplied_cost_total_without_normalized_provenance_fails(self):
+        data = _minimal_bundle()
+        data["cost"] = {"total_usd": 1.25, "model": "manual"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("cost.total_usd" in e and "normalized_cost provenance" in e for e in vr.errors)
+
+    def test_cost_total_with_matching_normalized_provenance_passes(self):
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="1.25")
+        data["cost"] = {"total_usd": 1.25, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert vr.ok
+
+    def test_cost_total_must_match_normalized_cost(self):
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="1.25")
+        data["cost"] = {"total_usd": 1.50, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("must match normalized_cost.normalized_cost_usd" in e for e in vr.errors)
+
+    def test_cost_total_with_unavailable_normalized_cost_fails(self):
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost=None, status="unavailable")
+        data["cost"] = {"total_usd": 0, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("cannot accompany cost_status 'unavailable'" in e for e in vr.errors)
+
+    def test_local_zero_cost_total_with_not_applicable_provenance_passes(self):
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="0", status="not_applicable_local")
+        data["cost"] = {"total_usd": 0, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert vr.ok
+
+    def test_non_benchbox_normalized_cost_source_fails(self):
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="1.25")
+        data["normalized_cost"]["cost_model_source"] = "manual"
+        data["cost"] = {"total_usd": 1.25, "model": "manual"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("cost_model_source" in e and "benchbox.core.cost.pricing" in e for e in vr.errors)
+
+    def test_normalized_cost_total_requires_deployment_metadata(self):
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="1.25")
+        del data["normalized_cost"]["deployment"]
+        data["cost"] = {"total_usd": 1.25, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("requires deployment metadata" in e for e in vr.errors)
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
  * that default switches direction on repeated clicks of the same key.
  */
 
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
+import { render, screen, fireEvent, waitFor } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 
@@ -26,6 +26,7 @@ function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRow
     result_id: "r-base",
     benchmark: "tpch",
     scale_factor: 0.1,
+    phase: "power",
     platform: "DuckDB",
     platform_id: "duckdb",
     driver_version: null,
@@ -41,6 +42,7 @@ function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRow
     execution_mode: null,
     compliance_class: null,
     cost_usd: null,
+    primary_metric: "display_geomean_ms",
     ...overrides,
   };
 }
@@ -131,6 +133,60 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(benchTh?.getAttribute("aria-sort")).toBe("descending");
   });
 
+  it("splits trend charts by benchmark, scale, phase, and primary metric", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({
+        result_id: "r-tpch-a",
+        benchmark: "tpch",
+        scale_factor: 0.01,
+        phase: "power",
+        run_date: "2026-04-01",
+        power_score: 1000,
+        primary_metric: "power_score",
+      }),
+      makeRow({
+        result_id: "r-tpch-b",
+        benchmark: "tpch",
+        scale_factor: 0.01,
+        phase: "power",
+        run_date: "2026-04-02",
+        power_score: 1200,
+        primary_metric: "power_score",
+      }),
+      makeRow({
+        result_id: "r-ssb-a",
+        benchmark: "star_schema",
+        scale_factor: 0.1,
+        phase: "power",
+        run_date: "2026-04-01",
+        display_geomean_ms: 20,
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
+        result_id: "r-ssb-b",
+        benchmark: "star_schema",
+        scale_factor: 0.1,
+        phase: "power",
+        run_date: "2026-04-02",
+        display_geomean_ms: 18,
+        primary_metric: "display_geomean_ms",
+      }),
+    ]);
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const tpch = screen.getByTestId("trend-cohort-tpch-sf0.01-power-power_score");
+    const ssb = screen.getByTestId("trend-cohort-star_schema-sf0.1-power-display_geomean_ms");
+    expect(container.querySelectorAll("svg[aria-label$='trend over time']")).toHaveLength(2);
+    expect(tpch.querySelector('[data-result-id="r-tpch-a"]')).toBeTruthy();
+    expect(tpch.querySelector('[data-result-id="r-tpch-b"]')).toBeTruthy();
+    expect(tpch.querySelector('[data-result-id="r-ssb-a"]')).toBeNull();
+    expect(ssb.querySelector('[data-result-id="r-ssb-a"]')).toBeTruthy();
+    expect(ssb.querySelector('[data-result-id="r-ssb-b"]')).toBeTruthy();
+    expect(ssb.querySelector('[data-result-id="r-tpch-a"]')).toBeNull();
+  });
+
   it("shows receipt links and validation status for each platform result", async () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
@@ -187,11 +243,11 @@ describe("PlatformIndex - sortable table headers", () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
-    const tpchTrend = screen.getByRole("region", { name: "TPC-H · SF 0.1 · power · Geomean trend" });
-    const ssbTrend = screen.getByRole("region", { name: "SSB · SF 0.1 · power · Geomean trend" });
+    const tpchTrend = screen.getByTestId("trend-cohort-tpch-sf0.1-power-display_geomean_ms");
+    const ssbTrend = screen.getByTestId("trend-cohort-star_schema-sf0.1-power-display_geomean_ms");
     expect(screen.getAllByRole("img", { name: "Geomean ms trend over time" })).toHaveLength(2);
-    expect(within(tpchTrend).getByText("2 runs")).toBeTruthy();
-    expect(within(ssbTrend).getByText("2 runs")).toBeTruthy();
+    expect(screen.getByText("TPC-H · SF 0.1 · power")).toBeTruthy();
+    expect(screen.getByText("SSB · SF 0.1 · power")).toBeTruthy();
     expect(tpchTrend.querySelector('[data-result-id="r-tpch-a"]')).toBeTruthy();
     expect(tpchTrend.querySelector('[data-result-id="r-ssb-a"]')).toBeNull();
     expect(ssbTrend.querySelector('[data-result-id="r-ssb-a"]')).toBeTruthy();

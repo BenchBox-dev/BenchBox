@@ -2,13 +2,13 @@
 // SparklineTable - compact metrics table with inline spark bars
 //
 // One row per platform, columns: platform name, geomean_ms (bar+value),
-// power_score (bar+value, when applicable), P99 latency, cost_usd.
+// power_score (bar+value, when applicable), P99 latency, normalized cost.
 // Inline bars make relative sizes visible at a glance.
 //
 // Python reference: textcharts.sparkline_table.SparklineTable
 // ---------------------------------------------------------------------------
 
-import type { BenchmarkSummary } from "@/types";
+import type { BenchmarkSummary, PlatformRow } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 
 interface Props {
@@ -25,6 +25,28 @@ function fmtMs(ms: number | null): string {
 function fmtScore(s: number | null): string {
   if (s === null) return "-";
   return s.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function normalizedCostValue(row: PlatformRow): number | null {
+  if (row.cost_status !== "normalized") return null;
+  return row.normalized_cost_usd ?? null;
+}
+
+function costStatusLabel(row: PlatformRow): string {
+  if (row.cost_status === "not_applicable_local") return "local";
+  if (row.cost_status === "unavailable") return "unavailable";
+  return "-";
+}
+
+function normalizedCostHeader(platforms: PlatformRow[]): string {
+  const normalized = platforms.filter((platform) => normalizedCostValue(platform) !== null);
+  const versions = [...new Set(normalized.map((platform) => platform.cost_model_version).filter(Boolean))];
+  const scopes = [
+    ...new Set(normalized.map((platform) => platform.cost_scope?.split("_").join(" ")).filter(Boolean)),
+  ];
+  const version = versions.length === 1 ? `model ${versions[0]}` : versions.length > 1 ? "multiple models" : "model unavailable";
+  const scope = scopes.length === 1 ? scopes[0] : scopes.length > 1 ? "mixed scopes" : "scope unavailable";
+  return `Normalized USD, ${scope}, ${version}`;
 }
 
 // Inline bar: MAX_BAR_PX pixels = full-width bar.
@@ -70,7 +92,7 @@ export function SparklineTable({ summary }: Props) {
   const metric = summary.ranking?.primary_metric ?? "display_geomean_ms";
   const showPower = metric === "power_score" && platforms.some((p) => p.power_score !== null);
   const showP99 = platforms.some((p) => p.percentile_stats !== null);
-  const showCost = platforms.some((p) => p.cost_usd !== null);
+  const showCost = platforms.some((p) => normalizedCostValue(p) !== null);
 
   const maxGeomean = Math.max(...platforms.map((p) => p.display_geomean_ms ?? 0), 1);
   const maxPower = Math.max(...platforms.map((p) => p.power_score ?? 0), 1);
@@ -97,7 +119,9 @@ export function SparklineTable({ summary }: Props) {
               <th class="text-right px-2 py-1.5 text-gray-500 font-normal">P99</th>
             )}
             {showCost && (
-              <th class="text-right px-2 py-1.5 text-gray-500 font-normal">Cost</th>
+              <th class="text-right px-2 py-1.5 text-gray-500 font-normal" title={normalizedCostHeader(platforms)}>
+                Normalized cost
+              </th>
             )}
           </tr>
         </thead>
@@ -145,7 +169,7 @@ export function SparklineTable({ summary }: Props) {
                 {/* Cost */}
                 {showCost && (
                   <td class="px-2 py-1.5 text-right font-mono text-gray-500">
-                    {p.cost_usd !== null ? `$${p.cost_usd.toFixed(2)}` : "-"}
+                    {normalizedCostValue(p) !== null ? `$${normalizedCostValue(p)!.toFixed(2)}` : costStatusLabel(p)}
                   </td>
                 )}
               </tr>

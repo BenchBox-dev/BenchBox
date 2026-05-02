@@ -71,15 +71,21 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     await getBenchmarkRanking("tpch", 0.1, "power");
     const [sql] = mockedQueryRows.mock.calls[0]!;
     expect(sql).toMatch(/FROM bench\.benchmark_rankings/);
-    expect(sql).toMatch(/ORDER BY rank NULLS LAST/);
+    expect(sql).toMatch(/LEFT JOIN bench\.results/);
+    expect(sql).toMatch(/normalized_cost_usd/);
+    expect(sql).toMatch(/cost_model_version/);
+    expect(sql).toMatch(/ORDER BY br\.rank NULLS LAST/);
   });
 
   it("getPlatformIndexRows omits the filter when platformId is undefined", async () => {
     mockedQueryRows.mockResolvedValueOnce([]);
     await getPlatformIndexRows();
     const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.results r/);
+    expect(sql).toMatch(/LEFT JOIN bench\.benchmark_rankings br ON br\.result_id = r\.result_id/);
+    expect(sql).toMatch(/COALESCE\(br\.phase, r\.test_type, 'power'\) AS phase/);
+    expect(sql).toMatch(/br\.primary_metric/);
     expect(sql).toMatch(/validation_status/);
-    expect(sql).toMatch(/FROM bench\.results/);
     expect(sql).not.toMatch(/WHERE/);
     expect(params).toBeUndefined();
   });
