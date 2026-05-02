@@ -73,6 +73,7 @@ class TestSetupCommand:
         assert "Snowflake" in result.output
         assert "BigQuery" in result.output
         assert "Redshift" in result.output
+        assert "MotherDuck" in result.output
         assert "✅ Configured" in result.output
         assert "○ Not configured" in result.output
 
@@ -285,6 +286,24 @@ class TestSetupCommand:
 
     @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
+    @patch("benchbox.platforms.credentials.motherduck.setup_motherduck_credentials")
+    def test_setup_interactive_motherduck(self, mock_setup_motherduck, mock_check_deps, mock_cred_manager_class):
+        """Test interactive setup for MotherDuck."""
+        mock_manager = MagicMock()
+        mock_cred_manager_class.return_value = mock_manager
+        mock_check_deps.return_value = (True, [])
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["setup", "--platform", "motherduck"])
+
+        assert result.exit_code == 0
+        assert "MotherDuck Credentials Setup" in result.output
+        mock_setup_motherduck.assert_called_once()
+        call_args = mock_setup_motherduck.call_args
+        assert call_args[0][0] == mock_manager
+
+    @patch("benchbox.cli.commands.setup.CredentialManager")
+    @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.bigquery.setup_bigquery_credentials")
     def test_setup_interactive_bigquery(self, mock_setup_bigquery, mock_check_deps, mock_cred_manager_class):
         """Test interactive setup for BigQuery."""
@@ -366,6 +385,28 @@ class TestSetupValidation:
         assert result.exit_code == 0
         assert "Redshift credentials are valid" in result.output
 
+    @patch("benchbox.cli.commands.setup.CredentialManager")
+    @patch("benchbox.platforms.credentials.motherduck.validate_motherduck_credentials")
+    def test_validate_motherduck_without_stored_credentials(self, mock_validate, mock_cred_manager_class):
+        """MotherDuck validates from MOTHERDUCK_TOKEN even without stored credentials."""
+        mock_manager = MagicMock()
+        mock_manager.has_credentials.return_value = False
+        mock_cred_manager_class.return_value = mock_manager
+        mock_validate.return_value = (True, None)
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["setup", "--platform", "motherduck", "--validate-only"])
+
+        assert result.exit_code == 0
+        assert "MotherDuck credentials are valid" in result.output
+        mock_validate.assert_called_once_with(mock_manager)
+        mock_manager.set_platform_credentials.assert_called_once()
+        saved_credentials = mock_manager.set_platform_credentials.call_args[0][1]
+        assert saved_credentials == {
+            "database": "benchbox",
+            "token_env_var": "MOTHERDUCK_TOKEN",
+        }
+
 
 class TestSetupIntegration:
     """Integration tests for setup command."""
@@ -379,6 +420,7 @@ class TestSetupIntegration:
         assert "Cloud Platforms Requiring Credentials" in result.output
         assert "Databricks" in result.output
         assert "Snowflake" in result.output
+        assert "MotherDuck" in result.output
 
     def test_setup_real_execution_status(self):
         """Test setup --status with real execution."""
