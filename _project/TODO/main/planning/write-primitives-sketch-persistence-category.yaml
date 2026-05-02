@@ -165,7 +165,7 @@ work:
 - id: w7
   summary: "Write cross-platform sketch documentation in benchmark help-topic and README"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Capture the cross-platform sketch-storage table in user-facing docs:
       - Add `docs/benchmarks/write-primitives-sketch-functions.md` with:
