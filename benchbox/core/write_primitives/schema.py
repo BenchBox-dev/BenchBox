@@ -349,6 +349,37 @@ STAGING_TABLES = {
 }
 
 
+# Per-dialect rewrites for the logical BINARY column type used by sketch ops.
+# Engines without a binary type (e.g. SQLite) are listed here as None to opt
+# out — callers must handle the None by skipping the table for that dialect.
+_BINARY_TYPE_BY_DIALECT: dict[str, str | None] = {
+    "standard": "BINARY",
+    "duckdb": "BLOB",
+    "databricks": "BINARY",
+    "snowflake": "BINARY",
+    "bigquery": "BYTES",
+    "clickhouse": "String",
+    "postgres": "BYTEA",
+    "redshift": "HLLSKETCH",
+    "sqlite": None,
+    "datafusion": None,
+}
+
+
+def translate_column_type(type_str: str, dialect: str) -> str | None:
+    """Translate a logical column type string to a dialect-specific one.
+
+    Currently only rewrites the logical `BINARY` type. Returns the input
+    unchanged for any other type. Returns `None` when the dialect does
+    not support the requested type — callers must skip the column or
+    table accordingly.
+    """
+    canonical = type_str.strip().upper()
+    if canonical == "BINARY":
+        return _BINARY_TYPE_BY_DIALECT.get(dialect.lower(), "BINARY")
+    return type_str
+
+
 def _supports_primary_keys(dialect: str) -> bool:
     """Return whether the target SQL dialect supports PRIMARY KEY in CREATE TABLE."""
     import benchbox.sql_compat.rules.schema_emit.pk_capability  # noqa: F401
@@ -394,7 +425,13 @@ def get_create_table_sql(table_name: str, dialect: str = "standard", if_not_exis
     columns: list[str] = []
 
     for col in table["columns"]:
-        col_def = f"{col['name']} {col['type']}"
+        column_type = translate_column_type(col["type"], dialect)
+        if column_type is None:
+            raise ValueError(
+                f"Column '{col['name']}' uses logical type '{col['type']}' which has no "
+                f"mapping for dialect '{dialect}'. Skip this table or pick a dialect with support."
+            )
+        col_def = f"{col['name']} {column_type}"
         if col.get("primary_key") and supports_primary_keys:
             col_def += " PRIMARY KEY"
         if not col.get("nullable", False) and not col.get("primary_key"):
@@ -490,4 +527,5 @@ __all__ = [
     "get_create_table_sql",
     "get_all_staging_tables_sql",
     "get_table_schema",
+    "translate_column_type",
 ]
