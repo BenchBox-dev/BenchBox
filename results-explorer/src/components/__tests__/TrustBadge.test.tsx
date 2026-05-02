@@ -11,7 +11,7 @@
 
 import { render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
-import { TrustBadge } from "@/components/TrustBadge";
+import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 
 describe("TrustBadge", () => {
   // -----------------------------------------------------------------------
@@ -127,5 +127,23 @@ describe("TrustBadge", () => {
     const { container } = render(<TrustBadge trustLabel="maintainer-run" />);
     const badge = container.querySelector(".badge");
     expect(badge?.className).not.toContain("badge-gray");
+  });
+});
+
+describe("ValidationBadge", () => {
+  it("renders exact validation with green badge semantics", () => {
+    const { container } = render(<ValidationBadge validationStatus="exact" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.className).toContain("badge-green");
+    expect(badge?.textContent).toBe("exact");
+    expect(badge?.getAttribute("title")).toContain("Validation status: exact");
+  });
+
+  it("suppresses missing status unless requested", () => {
+    const hidden = render(<ValidationBadge validationStatus={null} />);
+    expect(hidden.container.querySelector(".badge")).toBeNull();
+
+    const shown = render(<ValidationBadge validationStatus={null} showMissing />);
+    expect(shown.getByText("validation n/a")).toBeTruthy();
   });
 });

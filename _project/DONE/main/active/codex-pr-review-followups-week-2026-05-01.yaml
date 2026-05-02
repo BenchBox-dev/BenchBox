@@ -432,7 +432,6 @@ files_affected:
     - "results-explorer/src/pages/__tests__/Home.test.tsx"
     - "results-explorer/e2e/failures/platform-index-cold-load.spec.ts"
     - "benchbox/cli/commands/auth.py"
-    - "benchbox/cli/submit_auth.py"
     - "tests/unit/cli/commands/test_auth.py"
   created:
     - "_project/audits/codex-thread-rescan-week-2026-05-01.md"
@@ -466,7 +465,7 @@ anti_patterns:
 
 verification:
   - description: "This TODO item validates cleanly"
-    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/active/codex-pr-review-followups-week-2026-05-01.yaml"
+    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/DONE/main/active/codex-pr-review-followups-week-2026-05-01.yaml"
     expected_output: "Validation passes with no schema or DAG errors"
   - description: "TODO dependency graph remains valid"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
@@ -475,8 +474,8 @@ verification:
     command: "uv run -- python -m pytest tests/unit/scripts/test_blind_spot_tools.py -q"
     expected_output: "All blind-spot tests pass, including the new block/sequence-shaped status field regression"
   - description: "w2 - test-unlock honors BENCHBOX_TEST_LOCK_DIR with ~"
-    command: "BENCHBOX_TEST_LOCK_DIR='~/tmp/benchbox-lock-probe' make -n test-unlock | grep -F \"$HOME/tmp/benchbox-lock-probe/test.lock\""
-    expected_output: "Resolved lock path expands ~ to $HOME (exit 0)"
+    command: "tmp_home=$(mktemp -d); trap 'rm -rf \"$tmp_home\"' EXIT; mkdir -p \"$tmp_home/tmp/benchbox-lock-probe\"; touch \"$tmp_home/tmp/benchbox-lock-probe/test.lock\"; HOME=\"$tmp_home\" PATH='/usr/bin:/bin' BENCHBOX_TEST_LOCK_DIR='~/tmp/benchbox-lock-probe' make test-unlock; test ! -e \"$tmp_home/tmp/benchbox-lock-probe/test.lock\""
+    expected_output: "Resolved lock path expands ~ to $HOME and deletes the stale lock without requiring uv on PATH"
   - description: "w3 - worktree-release refuses dirty trees without FORCE=1"
     command: "uv run -- python -m pytest tests/integration/worktree/test_worktree_release_dirty_guard.py -q || echo 'test must be created by w3 implementation'"
     expected_output: "New test exercises a pool worktree with staged changes and confirms release exits nonzero without FORCE=1"

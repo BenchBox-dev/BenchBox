@@ -39,6 +39,7 @@ function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummar
         tuning_hash: null,
         execution_mode: null,
         trust_label: "maintainer-run",
+        validation_status: "exact",
         run_date: "2026-04-01",
         is_ranking_eligible: true,
         power_score: 3000,
@@ -60,6 +61,7 @@ function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummar
         tuning_hash: null,
         execution_mode: null,
         trust_label: "maintainer-run",
+        validation_status: "loose",
         run_date: "2026-04-01",
         is_ranking_eligible: true,
         power_score: 800,
@@ -97,6 +99,16 @@ describe("QueryHeatmap rendering", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
     expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Q2/ })).toBeTruthy();
+  });
+
+  it("renders compact receipt links and validation status badges", () => {
+    render(<QueryHeatmap summary={makeSummary()} />);
+    const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
+
+    expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
+    expect(receiptLinks[1]?.getAttribute("href")).toBe("/results/r/r2#run-receipt");
+    expect(screen.getByText("exact")).toBeTruthy();
+    expect(screen.getByText("loose")).toBeTruthy();
   });
 
   it("clicking a query header sorts rows by that query", () => {

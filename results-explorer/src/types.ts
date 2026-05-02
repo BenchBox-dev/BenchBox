@@ -89,6 +89,7 @@ export interface PlatformRow {
   tuning_hash: string | null;
   execution_mode: string | null;
   trust_label: string;
+  validation_status?: string | null;
   run_date: string;
   is_ranking_eligible: boolean;
   power_score: number | null;

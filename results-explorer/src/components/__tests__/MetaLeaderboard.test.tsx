@@ -104,6 +104,28 @@ describe("MetaLeaderboard", () => {
     expect(onModeChange).toHaveBeenCalledWith("speedup");
   });
 
+  it("links metric cells to run receipts with compact methodology metadata", () => {
+    render(
+      <MetaLeaderboard
+        data={DATA}
+        mode="times"
+        onModeChange={vi.fn()}
+        resultMetadataById={new Map([
+          ["r1", { trust_label: "maintainer-run", validation_status: "exact" }],
+          ["r2", { trust_label: "community-submission", validation_status: "loose" }],
+        ])}
+      />,
+    );
+
+    const receiptLink = screen.getByRole("link", { name: "10 ms" }) as HTMLAnchorElement;
+    expect(receiptLink.getAttribute("href")).toBe("/results/r/r1#run-receipt");
+    expect(screen.getByText("Maintainer")).toBeTruthy();
+    expect(screen.getByText("Community")).toBeTruthy();
+    expect(screen.getByText("exact")).toBeTruthy();
+    expect(screen.getByText("loose")).toBeTruthy();
+  });
+
+
   it("renders null when platforms list is empty", () => {
     const { container } = render(
       <MetaLeaderboard data={{ ...DATA, platforms: [] }} mode="times" onModeChange={vi.fn()} />,
