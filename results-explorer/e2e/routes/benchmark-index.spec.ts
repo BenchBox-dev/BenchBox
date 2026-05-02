@@ -23,8 +23,9 @@ test.describe("BenchmarkIndex", () => {
     await waitForShell(page);
     await expect(page.getByRole("heading", { name: /TPC-H Results/ })).toBeVisible();
 
+    const grid = page.getByRole("grid", { name: /tpch SF0\.01 standard results/i });
     for (const platform of ["DuckDB", "DataFusion", "Polars"]) {
-      await expect(page.getByText(platform, { exact: false }).first()).toBeVisible({
+      await expect(grid.getByText(platform, { exact: false }).first()).toBeVisible({
         timeout: 20_000,
       });
     }

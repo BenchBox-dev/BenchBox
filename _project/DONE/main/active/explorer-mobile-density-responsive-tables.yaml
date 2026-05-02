@@ -2,7 +2,8 @@ id: explorer-mobile-density-responsive-tables
 title: "Explorer: mobile-responsive dense leaderboard, filters, and charts"
 worktree: main
 priority: "Medium-High"
-status: "In Progress"
+status: Completed
+completed_date: "2026-05-02"
 category: "User Experience"
 
 deps:
@@ -116,6 +117,9 @@ work:
   status: done
   owned_files:
   - "results-explorer/e2e/responsive.spec.ts"
+  - "results-explorer/e2e/routes/benchmark-index.spec.ts"
+  - "results-explorer/e2e/routes/index-sort-headers.spec.ts"
+  - "results-explorer/e2e/routes/query.spec.ts"
   notes: |
     Mechanical assertions, not screenshot-only smokes. For `/results/`,
     `/results/star_schema/?phase=standard`, `/results/query`, and

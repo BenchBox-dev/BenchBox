@@ -21,12 +21,18 @@ async function columnTexts(rows: Locator, columnIndex: number): Promise<string[]
   );
 }
 
-function parseScale(cellText: string): number {
-  return Number(cellText.match(/[\d.]+/)?.[0] ?? Number.NaN);
+async function linkedCellTexts(rows: Locator, columnIndex: number): Promise<string[]> {
+  return rows.evaluateAll(
+    (elements, index) =>
+      elements.map((row) =>
+        (row.children.item(index)?.querySelector("a")?.textContent ?? "").trim(),
+      ),
+    columnIndex,
+  );
 }
 
-function leadingLabel(cellText: string): string {
-  return cellText.split(/\s+/)[0] ?? "";
+function parseScale(cellText: string): number {
+  return Number(cellText.match(/[\d.]+/)?.[0] ?? Number.NaN);
 }
 
 test.describe("Index sortable headers", () => {
@@ -67,7 +73,7 @@ test.describe("Index sortable headers", () => {
     await platformHeader.getByRole("button", { name: /Platform/ }).click();
 
     await expect(platformHeader).toHaveAttribute("aria-sort", "ascending");
-    const platforms = (await columnTexts(rows, 1)).map(leadingLabel);
+    const platforms = await linkedCellTexts(rows, 1);
     expect(platforms).toEqual([...platforms].sort((a, b) => a.localeCompare(b)));
     expect(await rowIds(rows)).not.toEqual(initialOrder);
   });
@@ -87,7 +93,7 @@ test.describe("Index sortable headers", () => {
     await platformHeader.getByRole("button", { name: /Platform/ }).click();
 
     await expect(platformHeader).toHaveAttribute("aria-sort", "ascending");
-    const platforms = (await columnTexts(rows, 0)).map(leadingLabel);
+    const platforms = await linkedCellTexts(rows, 0);
     expect(platforms).toEqual([...platforms].sort((a, b) => a.localeCompare(b)));
     expect(await rowIds(rows)).not.toEqual(initialOrder);
   });
