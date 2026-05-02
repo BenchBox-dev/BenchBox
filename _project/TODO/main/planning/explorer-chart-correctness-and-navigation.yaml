@@ -20,7 +20,12 @@ description: |
 work:
   - id: w1
     summary: "Audit chart registry and group charts by analytical question"
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/chartRegistry.ts"
+      - "results-explorer/src/components/ChartPanel.tsx"
+      - "results-explorer/src/__tests__/chartRegistry.meta.test.ts"
+      - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
     notes: |
       In `results-explorer/src/lib/chartRegistry.ts` and ChartPanel, replace the
       flat 10+ chip list with grouped tabs or segmented controls:

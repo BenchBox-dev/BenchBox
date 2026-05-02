@@ -160,7 +160,7 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
 }
 
 describe("ChartPanel", () => {
-  it("renders summary charts from registry requirements", () => {
+  it("groups summary charts by analytical question", () => {
     render(
       <ChartPanel
         context={{
@@ -174,10 +174,25 @@ describe("ChartPanel", () => {
       />,
     );
 
+    expect(screen.getByRole("tablist", { name: "Chart question groups" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toStrictEqual([
+      "Overview",
+      "Per-query",
+      "Distribution",
+      "Cost",
+      "Trend",
+      "Rank",
+    ]);
     expect(screen.getByRole("button", { name: "Sparkline Table" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Performance Trend" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Cost vs Performance Scatter" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Query Heatmap" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Comparison Bar" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Trend" }));
+
+    expect(screen.getByRole("tab", { name: "Trend" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("img", { name: "Geomean ms trend over time" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
   });
 
   it("keeps the cost chart reachable so normalized-cost empty states are visible", () => {
@@ -201,7 +216,7 @@ describe("ChartPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Cost vs Performance Scatter" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Cost" }));
 
     expect(screen.getByText(/No normalized cost data/)).toBeTruthy();
     expect(screen.getByText(/No row has cost_status=normalized/)).toBeTruthy();
@@ -233,6 +248,7 @@ describe("ChartPanel", () => {
     expect(screen.getByRole("button", { name: "Comparison Bar" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Normalized Speedup" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Query Heatmap" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Per-query" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
   });
 
@@ -260,6 +276,7 @@ describe("ChartPanel", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
     fireEvent.click(screen.getByRole("button", { name: "Summary Box" }));
     expect(screen.getByText("throughput")).toBeTruthy();
   });
@@ -275,7 +292,8 @@ describe("ChartPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "Query Histogram" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Rank Table" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Rank" }));
+    expect(screen.getByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Normalized Speedup" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
   });

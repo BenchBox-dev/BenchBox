@@ -12,7 +12,13 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { CHART_REGISTRY, ALL_CHART_IDS, isValidChartId } from "@/lib/chartRegistry";
+import {
+  CHART_REGISTRY,
+  ALL_CHART_IDS,
+  CHART_QUESTION_GROUPS,
+  groupChartsByQuestion,
+  isValidChartId,
+} from "@/lib/chartRegistry";
 
 // Hard-coded canonical list from chart_types.py _CHART_SPECS (order matters).
 // chart_types.py is the SINGLE SOURCE OF TRUTH. This list must be kept in sync
@@ -66,5 +72,40 @@ describe("chartRegistry parity with chart_types.py", () => {
       const entry = CHART_REGISTRY.find((e) => e.id === id);
       expect(entry?.requires.requiresTwoResults, `${id} should requiresTwoResults`).toBe(true);
     }
+  });
+
+  it("assigns every chart to a known analytical question group", () => {
+    const groupIds = new Set(CHART_QUESTION_GROUPS.map((group) => group.id));
+
+    for (const entry of CHART_REGISTRY) {
+      expect(groupIds.has(entry.questionGroup), `${entry.id} has a known question group`).toBe(true);
+    }
+  });
+
+  it("groups charts by Explorer analytical question without changing registry order", () => {
+    const grouped = groupChartsByQuestion(CHART_REGISTRY);
+
+    expect(grouped.map((group) => group.label)).toStrictEqual([
+      "Overview",
+      "Per-query",
+      "Distribution",
+      "Cost",
+      "Trend",
+      "Rank",
+    ]);
+    expect(grouped.find((group) => group.id === "overview")?.charts.map((chart) => chart.id)).toStrictEqual([
+      "performance_bar",
+      "power_bar",
+      "summary_box",
+      "stacked_phase",
+      "sparkline_table",
+    ]);
+    expect(grouped.find((group) => group.id === "per_query")?.charts.map((chart) => chart.id)).toStrictEqual([
+      "query_heatmap",
+      "query_histogram",
+      "comparison_bar",
+      "diverging_bar",
+      "normalized_speedup",
+    ]);
   });
 });

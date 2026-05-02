@@ -3,6 +3,7 @@ import type { BenchmarkSummary } from "@/types";
 import {
   applicableCharts,
   buildRenderableSummary,
+  groupChartsByQuestion,
   type ChartContext,
   type ChartHistoricalEntry,
   type ChartRegistryEntry,
@@ -36,6 +37,7 @@ interface CompareQueryRow {
 
 export function ChartPanel({ context }: ChartPanelProps) {
   const charts = useMemo(() => applicableCharts(context), [context]);
+  const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
   const summary = useMemo(() => buildRenderableSummary(context), [context]);
   const historical = useMemo(
     () =>
@@ -87,13 +89,54 @@ export function ChartPanel({ context }: ChartPanelProps) {
   if (charts.length === 0) return null;
 
   const activeChart = charts.find((chart) => chart.id === activeId) ?? charts[0]!;
+  const activeGroup =
+    chartGroups.find((group) => group.charts.some((chart) => chart.id === activeChart.id)) ??
+    chartGroups[0]!;
+  const activeGroupCharts = activeGroup.charts;
   const showBaseline = context.kind === "compare" && (activeId === "normalized_speedup" || activeId === "diverging_bar");
+
+  const selectGroup = (group: (typeof chartGroups)[number]) => {
+    const nextChart =
+      group.charts.find((chart) => chart.id === activeId) ??
+      group.charts.find((chart) => chart.id === preferredId) ??
+      group.charts[0];
+    if (nextChart) setActiveId(nextChart.id);
+  };
 
   return (
     <section class="card">
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <h2 class="text-base font-semibold text-gray-900">Charts</h2>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+          {chartGroups.length > 1 && (
+            <div
+              class="flex flex-wrap gap-1 rounded-md border border-gray-200 bg-gray-50 p-1"
+              role="tablist"
+              aria-label="Chart question groups"
+            >
+              {chartGroups.map((group) => {
+                const selected = group.id === activeGroup.id;
+                return (
+                  <button
+                    key={group.id}
+                    role="tab"
+                    type="button"
+                    aria-selected={selected}
+                    aria-controls="chart-panel-chart"
+                    class={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                      selected
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:bg-white hover:text-gray-900"
+                    }`}
+                    onClick={() => selectGroup(group)}
+                    title={group.description}
+                  >
+                    {group.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {showBaseline && summary && summary.platforms.length > 1 && (
             <div class="flex items-center gap-2">
               <label class="text-xs text-gray-500" for="chart-panel-baseline">
@@ -113,34 +156,43 @@ export function ChartPanel({ context }: ChartPanelProps) {
               </select>
             </div>
           )}
-          <div class="flex flex-wrap gap-1">
-            {charts.map((chart) => (
-              <button
-                key={chart.id}
-                class={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-                  activeChart.id === chart.id
-                    ? "bg-brand-600 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-                onClick={() => setActiveId(chart.id)}
-                aria-pressed={activeChart.id === chart.id}
-                title={chart.description}
-              >
-                {chart.title}
-              </button>
-            ))}
-          </div>
+          {activeGroupCharts.length > 1 && (
+            <div
+              class="flex flex-wrap justify-end gap-1"
+              role="group"
+              aria-label={`${activeGroup.label} charts`}
+            >
+              {activeGroupCharts.map((chart) => (
+                <button
+                  key={chart.id}
+                  type="button"
+                  class={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                    activeChart.id === chart.id
+                      ? "bg-brand-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                  onClick={() => setActiveId(chart.id)}
+                  aria-pressed={activeChart.id === chart.id}
+                  title={chart.description}
+                >
+                  {chart.title}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {renderChart(activeChart, {
-        context,
-        summary,
-        historical,
-        compareRows,
-        compareGroups,
-        baselineIdx,
-      })}
+      <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`}>
+        {renderChart(activeChart, {
+          context,
+          summary,
+          historical,
+          compareRows,
+          compareGroups,
+          baselineIdx,
+        })}
+      </div>
     </section>
   );
 }
