@@ -183,10 +183,8 @@ export interface MetaLeaderboardRow {
 // ---------------------------------------------------------------------------
 
 export async function listResults(where: FacetWhereClause = { sql: "", params: [] }): Promise<ResultRow[]> {
-  return queryRows<ResultRow>(
-    `SELECT * FROM bench.results ${where.sql} ORDER BY run_date DESC`,
-    where.params,
-  );
+  const sql = `SELECT * FROM bench.results ${where.sql} ORDER BY run_date DESC`;
+  return where.params.length > 0 ? queryRows<ResultRow>(sql, where.params) : queryRows<ResultRow>(sql);
 }
 
 export async function getResultDetailMetrics(resultId: string): Promise<ResultDetailMetricsRow | null> {
@@ -487,6 +485,21 @@ export async function getPlatformIndexRows(platformId?: string): Promise<Platfor
     " r.execution_mode," +
     " r.compliance_class," +
     " r.cost_usd," +
+    " r.normalized_cost_usd," +
+    " r.cost_model_version," +
+    " r.cost_model_source," +
+    " r.cost_scope," +
+    " r.cost_status," +
+    " r.billing_unit," +
+    " r.pricing_region," +
+    " r.cloud_provider," +
+    " r.cloud_region," +
+    " r.instance_type," +
+    " r.warehouse_size," +
+    " r.node_count," +
+    " r.cluster_size," +
+    " r.storage_format," +
+    " r.storage_tier," +
     " COALESCE(br.primary_metric, CASE WHEN r.power_score IS NOT NULL THEN 'power_score' ELSE 'display_geomean_ms' END)" +
     " AS primary_metric" +
     " FROM bench.results r" +

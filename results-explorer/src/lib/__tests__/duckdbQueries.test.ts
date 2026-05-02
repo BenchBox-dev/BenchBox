@@ -34,6 +34,14 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(params).toBeUndefined();
   });
 
+  it("listResults accepts a parameterized facet WHERE clause", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await listResults({ sql: "WHERE benchmark IN (?)", params: ["tpch"] });
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toContain("WHERE benchmark IN (?)");
+    expect(params).toEqual(["tpch"]);
+  });
+
   it("getResultDetailMetrics returns the single matching row or null", async () => {
     mockedQueryRows.mockResolvedValueOnce([{ result_id: "r1" }]);
     const row = await getResultDetailMetrics("r1");
@@ -86,6 +94,9 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(sql).toMatch(/COALESCE\(br\.phase, r\.test_type, 'power'\) AS phase/);
     expect(sql).toMatch(/br\.primary_metric/);
     expect(sql).toMatch(/validation_status/);
+    expect(sql).toMatch(/normalized_cost_usd/);
+    expect(sql).toMatch(/cloud_provider/);
+    expect(sql).toMatch(/storage_format/);
     expect(sql).not.toMatch(/WHERE/);
     expect(params).toBeUndefined();
   });

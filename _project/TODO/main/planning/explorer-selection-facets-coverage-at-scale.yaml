@@ -72,7 +72,12 @@ work:
   - id: w4
     summary: "Migrate PlatformIndex page to shared facet model"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/duckdbQueries.ts"
+      - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+      - "results-explorer/src/pages/PlatformIndex.tsx"
+      - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
     notes: |
       Default facets: benchmark, scale_factor, phase, deployment_class,
       cloud_provider, cloud_region, cost_status, date_window. Preserve cohort

@@ -42,13 +42,35 @@ function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRow
     execution_mode: null,
     compliance_class: null,
     cost_usd: null,
+    normalized_cost_usd: null,
+    cost_status: "not_applicable_local",
+    cost_scope: null,
+    cost_model_version: null,
+    cloud_provider: null,
+    cloud_region: null,
+    warehouse_size: null,
+    storage_format: null,
     primary_metric: "display_geomean_ms",
     ...overrides,
   };
 }
 
 const ROWS: PlatformIndexRowRow[] = [
-  makeRow({ result_id: "r-tpch-fast", benchmark: "tpch", run_date: "2026-04-03", power_score: 5000, geomean_ms: 5 }),
+  makeRow({
+    result_id: "r-tpch-fast",
+    benchmark: "tpch",
+    run_date: "2026-04-03",
+    power_score: 5000,
+    geomean_ms: 5,
+    normalized_cost_usd: 1.25,
+    cost_status: "normalized",
+    cost_scope: "compute_only",
+    cost_model_version: "2026.05.0",
+    cloud_provider: "aws",
+    cloud_region: "us-east-1",
+    warehouse_size: "MEDIUM",
+    storage_format: "parquet",
+  }),
   makeRow({ result_id: "r-ssb-mid", benchmark: "star_schema", run_date: "2026-04-01", power_score: 3000, geomean_ms: 15 }),
   makeRow({ result_id: "r-tpch-slow", benchmark: "tpch", run_date: "2026-04-02", power_score: 1000, geomean_ms: 50 }),
   makeRow({ result_id: "r-null-geo", benchmark: "tpch", run_date: "2026-04-04", power_score: null, geomean_ms: null }),
@@ -64,6 +86,8 @@ function getRowOrder(container: ParentNode): string[] {
 
 describe("PlatformIndex - sortable table headers", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    window.history.replaceState(null, "", "/results/p/duckdb/");
     vi.mocked(getPlatformIndexRows).mockResolvedValue(ROWS);
   });
 
@@ -131,6 +155,21 @@ describe("PlatformIndex - sortable table headers", () => {
     // Click again; direction flips.
     fireEvent.click(screen.getByRole("button", { name: /Benchmark/ }));
     expect(benchTh?.getAttribute("aria-sort")).toBe("descending");
+  });
+
+  it("restores platform page URL facets for benchmark, cohort, deployment, and cost filters", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/results/p/duckdb/?benchmark=tpch&sf=0.1&phase=power&deployment=cloud&cost_status=normalized",
+    );
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    expect(getRowOrder(container)).toEqual(["r-tpch-fast"]);
+    expect(screen.queryByText("SSB")).toBeNull();
+    expect(screen.queryByTestId("r-tpch-slow")).toBeNull();
   });
 
   it("splits trend charts by benchmark, scale, phase, and primary metric", async () => {
