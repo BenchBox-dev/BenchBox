@@ -23,6 +23,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from benchbox.core.results.builder import normalize_benchmark_id
+from benchbox.core.results.environment import (
+    build_environment_payload,
+    build_platform_metadata_payload,
+)
 from benchbox.core.results.query_normalizer import normalize_query_id
 
 if TYPE_CHECKING:
@@ -276,7 +280,7 @@ def build_result_payload(result: BenchmarkResults) -> dict[str, Any]:
     platform = _build_platform_section(result, driver_metadata)
 
     # Build environment block
-    environment = _build_environment_block(result.system_profile)
+    environment = _build_environment_block(result)
 
     # Build tables block (compact)
     tables = _build_tables_block(result.table_statistics)
@@ -297,7 +301,23 @@ def build_result_payload(result: BenchmarkResults) -> dict[str, Any]:
             run, ["id", "timestamp", "total_duration_ms", "query_time_ms", "iterations", "streams", "query_subset"]
         ),
         "benchmark": order_dict(benchmark, ["id", "name", "scale_factor", "test_type"]),
-        "platform": order_dict(platform, ["name", "version", "client_version", "variant", "config", "tuning"]),
+        "platform": order_dict(
+            platform,
+            [
+                "name",
+                "version",
+                "client_version",
+                "variant",
+                "config",
+                "deployment",
+                "cloud",
+                "compute",
+                "storage",
+                "raw_config",
+                "raw_metadata",
+                "tuning",
+            ],
+        ),
         "config": order_dict(config_block, CONFIG_KEY_ORDER),
         "summary": order_dict(summary, ["queries", "timing", "data", "validation", "tpc_metrics"]),
         "phases": order_dict(phases_block, PHASE_KEY_ORDER),
@@ -467,6 +487,7 @@ def _build_platform_section(result: BenchmarkResults, driver_metadata: dict[str,
     """Build the platform block of the payload."""
     platform_name = str(result.platform).replace(" (DataFrame)", "")
     platform: dict[str, Any] = {"name": platform_name}
+    config: dict[str, Any] = {}
 
     if result.platform_info:
         version = result.platform_info.get("platform_version") or result.platform_info.get("version")
@@ -480,6 +501,23 @@ def _build_platform_section(result: BenchmarkResults, driver_metadata: dict[str,
         config = _extract_platform_config(result.platform_info)
         if config:
             platform["config"] = config
+
+    platform.update(
+        build_platform_metadata_payload(
+            platform_info=result.platform_info,
+            platform_config=config,
+            deployment=getattr(result, "platform_deployment", None),
+            cloud=getattr(result, "platform_cloud", None),
+            compute=getattr(result, "platform_compute", None),
+            storage=getattr(result, "platform_storage", None),
+            raw_config=getattr(result, "platform_raw_config", None) or config,
+            raw_metadata=(
+                getattr(result, "platform_raw_metadata", None)
+                if getattr(result, "platform_raw_metadata", None) is not None
+                else getattr(result, "platform_metadata", None)
+            ),
+        )
+    )
 
     for src_key, dest_key in _DRIVER_PLATFORM_KEYS:
         if driver_metadata.get(src_key):
@@ -1164,45 +1202,12 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     return summary if summary else None
 
 
-def _build_environment_block(system_profile: dict[str, Any] | None) -> dict[str, Any]:
-    """Build environment block from system profile."""
-    if not system_profile:
-        return {}
-
-    env: dict[str, Any] = {}
-
-    # OS info
-    os_type = system_profile.get("os_type") or system_profile.get("os")
-    os_release = system_profile.get("os_release", "")
-    if os_type:
-        env["os"] = f"{os_type} {os_release}".strip() if os_release else os_type
-
-    # Architecture
-    arch = system_profile.get("architecture") or system_profile.get("arch")
-    if arch:
-        env["arch"] = arch
-
-    # CPU
-    cpu_count = system_profile.get("cpu_count")
-    if cpu_count:
-        env["cpu_count"] = cpu_count
-
-    # Memory
-    memory_gb = system_profile.get("memory_gb")
-    if memory_gb:
-        env["memory_gb"] = memory_gb
-
-    # Python version
-    python_version = system_profile.get("python_version")
-    if python_version:
-        env["python"] = python_version
-
-    # Machine ID (anonymized)
-    machine_id = system_profile.get("machine_id") or system_profile.get("anonymous_machine_id")
-    if machine_id:
-        env["machine_id"] = machine_id
-
-    return env
+def _build_environment_block(result: BenchmarkResults) -> dict[str, Any]:
+    """Build environment block with legacy flat keys plus normalized metadata."""
+    return build_environment_payload(
+        system_profile=getattr(result, "system_profile", None),
+        execution_environment=getattr(result, "execution_environment", None),
+    )
 
 
 def _build_tables_block(table_statistics: dict[str, Any] | None) -> dict[str, Any]:

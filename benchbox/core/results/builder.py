@@ -30,6 +30,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from benchbox.core.results.environment import (
+    NormalizedExecutionEnvironment,
+    PlatformCloudMetadata,
+    PlatformComputeMetadata,
+    PlatformDeploymentMetadata,
+    PlatformStorageMetadata,
+)
 from benchbox.core.results.metrics import (
     TimingStatsCalculator,
     TPCMetricsCalculator,
@@ -252,6 +259,13 @@ class ResultBuilder:
         self._run_config: RunConfigInput | None = None
         self._phase_status: dict[str, dict[str, Any]] = {}
         self._system_profile: dict[str, Any] | None = None
+        self._execution_environment: NormalizedExecutionEnvironment | dict[str, Any] | None = None
+        self._platform_deployment: PlatformDeploymentMetadata | dict[str, Any] | None = None
+        self._platform_cloud: PlatformCloudMetadata | dict[str, Any] | None = None
+        self._platform_compute: PlatformComputeMetadata | dict[str, Any] | None = None
+        self._platform_storage: PlatformStorageMetadata | dict[str, Any] | None = None
+        self._platform_raw_config: dict[str, Any] | None = None
+        self._platform_raw_metadata: dict[str, Any] | None = None
         self._tunings_applied: dict[str, Any] | None = None
         self._tuning_config_hash: str | None = None
         self._tuning_source_file: str | None = None
@@ -417,6 +431,34 @@ class ResultBuilder:
     def set_system_profile(self, profile: dict[str, Any]) -> None:
         """Set system profile information."""
         self._system_profile = profile
+
+    def set_execution_environment(self, environment: NormalizedExecutionEnvironment | dict[str, Any]) -> None:
+        """Set normalized execution-environment metadata."""
+        self._execution_environment = environment
+
+    def set_platform_environment_metadata(
+        self,
+        *,
+        deployment: PlatformDeploymentMetadata | dict[str, Any] | None = None,
+        cloud: PlatformCloudMetadata | dict[str, Any] | None = None,
+        compute: PlatformComputeMetadata | dict[str, Any] | None = None,
+        storage: PlatformStorageMetadata | dict[str, Any] | None = None,
+        raw_config: dict[str, Any] | None = None,
+        raw_metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Set normalized platform deployment/cloud/compute/storage metadata."""
+        if deployment is not None:
+            self._platform_deployment = deployment
+        if cloud is not None:
+            self._platform_cloud = cloud
+        if compute is not None:
+            self._platform_compute = compute
+        if storage is not None:
+            self._platform_storage = storage
+        if raw_config is not None:
+            self._platform_raw_config = raw_config
+        if raw_metadata is not None:
+            self._platform_raw_metadata = raw_metadata
 
     def set_tuning_info(
         self,
@@ -590,6 +632,13 @@ class ResultBuilder:
             # Validation
             validation_status=validation_status,
             validation_details=self._validation_details,
+            execution_environment=self._execution_environment,
+            platform_deployment=self._platform_deployment,
+            platform_cloud=self._platform_cloud,
+            platform_compute=self._platform_compute,
+            platform_storage=self._platform_storage,
+            platform_raw_config=self._platform_raw_config,
+            platform_raw_metadata=self._platform_raw_metadata,
             # Platform info
             platform_info=platform_info,
             # Execution metadata

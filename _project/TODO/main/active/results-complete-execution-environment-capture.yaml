@@ -1,0 +1,482 @@
+id: results-complete-execution-environment-capture
+title: "Results pipeline: complete benchmark execution environment capture"
+worktree: main
+priority: High
+status: "In Progress"
+category: "Result Integrity"
+
+description: |
+  Benchmark results currently capture the client host environment and a
+  platform-specific `platform_info` block, but they do not fully describe where
+  the measured database engine actually ran. This is misleading for common local
+  development and integration-test workflows where BenchBox runs on macOS while
+  the data platform runs in a Linux Docker container because the platform is not
+  natively compatible with macOS.
+
+  The same gap exists for cloud runs. Some adapters capture useful fields such
+  as region, warehouse size, workgroup, storage bucket, reservation, or cluster
+  metadata, but those fields are adapter-specific and exported as raw config
+  rather than a stable result contract. Downstream consumers cannot reliably
+  compare or filter benchmark results by runtime type, container image, cloud
+  provider, region, compute shape, storage configuration, or whether a field was
+  requested by the user vs observed from the platform.
+
+  Build a normalized execution-environment contract for result artifacts that
+  separates:
+    - the BenchBox client process host;
+    - the measured platform runtime;
+    - requested platform options;
+    - observed platform deployment details;
+    - cloud provider, region, compute, and storage facets;
+    - raw adapter metadata retained for compatibility; and
+    - anonymized/redacted public export behavior.
+
+work:
+- id: w1
+  summary: "Define the normalized execution-environment result contract"
+  status: done
+  notes: |
+    Add explicit result-model fields for:
+      - `environment.client_host`: current `system_profile` shape, kept for
+        backward compatibility with existing host metadata.
+      - `environment.platform_runtime`: runtime type
+        (`local_process`, `docker_container`, `remote_server`,
+        `managed_cloud`, `serverless`, `dataframe_process`, `unknown`),
+        OS, arch, engine process host when known, and collection status.
+      - `environment.container`: Docker engine/version, image, image digest,
+        container id/name, container OS/arch, requested platform, CPU limit,
+        memory limit, port mappings, relevant bind mounts/volumes, and
+        collection errors. This block must be absent or explicitly
+        `collection_status="unavailable"` when Docker is not involved.
+      - `platform.deployment`: deployment type, connection mode, service
+        endpoint class (`localhost_port`, `remote_host`, `cloud_endpoint`,
+        `embedded_process`), and whether runtime metadata was requested,
+        observed, inferred, or unavailable.
+      - `platform.cloud`: provider, region/location, account/project/workspace
+        identifiers after anonymization policy is applied.
+      - `platform.compute`: warehouse, cluster, serverless slots, RPU, node
+        type/count, worker/driver shape, cache/result-cache flags, and source.
+      - `platform.storage`: data table format, staging location, bucket/prefix,
+        storage tier, compression, cleanup policy, and source.
+      - `platform.raw_config` and `platform.raw_metadata`: existing
+        adapter-specific output retained for compatibility and diagnostics.
+    Keep the current top-level `environment` and `platform.config` keys
+    readable by old consumers during the transition, but make the normalized
+    fields the canonical contract in tests and docs.
+
+- id: w2
+  summary: "Propagate requested platform options into result metadata with provenance"
+  needs: [w1]
+  status: pending
+  notes: |
+    The CLI already parses `--platform-option` and uses those values to build
+    `DatabaseConfig`, but the standard lifecycle does not reliably persist
+    them into `execution_metadata.run_config.platform_options`.
+    Update the run/orchestration path so result artifacts include sanitized
+    requested platform options with source provenance:
+      - registered default;
+      - saved credential/config;
+      - environment variable;
+      - CLI option;
+      - runtime override.
+    Preserve enough detail to reconstruct region, warehouse/instance shape,
+    storage bucket/prefix, table format, deployment mode, and local Docker
+    service hints. Do not persist raw secrets; secret-like keys must be
+    redacted before reaching result export.
+
+- id: w3
+  summary: "Refactor result builder/exporter to emit client host vs platform runtime"
+  needs: [w1, w2]
+  status: pending
+  notes: |
+    Touch `BenchmarkResults`, `ResultBuilder`, `result_factory`, and
+    `schema.build_result_payload` so the result object carries both the
+    BenchBox process host profile and the measured platform runtime profile.
+    Existing `system_profile` input should continue to work and populate
+    `environment.client_host`. New normalized runtime/deployment fields should
+    be generated by the builder even when adapters only provide legacy
+    `platform_info`, using conservative `unknown`/`unavailable` statuses
+    rather than guesses.
+
+- id: w4
+  summary: "Add Docker runtime discovery for local container-backed platforms"
+  needs: [w1, w3]
+  status: pending
+  notes: |
+    Add a small Docker metadata collector that is optional, best-effort, and
+    unit-testable without a live daemon. It should discover BenchBox-managed
+    or known integration-test containers by compose labels, service name,
+    image name, exposed host port, and adapter config. Capture image tag and
+    digest, container platform, OS/arch, CPU/memory limits, port mappings,
+    bind mounts/volumes, container state, Docker engine version when
+    available, and collection errors. When Docker is absent, unavailable, or
+    permission-denied, the result must say so explicitly without failing the
+    benchmark.
+    Cover ClickHouse Server, Trino, Presto, PostgreSQL, StarRocks, Doris,
+    SingleStore, Databend, and other Docker integration platforms that connect
+    through localhost ports.
+
+- id: w5
+  summary: "Add base adapter hooks for normalized runtime and deployment metadata"
+  needs: [w1, w3]
+  status: pending
+  notes: |
+    Add base-platform helpers so adapters can return normalized metadata
+    without duplicating schema assembly. The default path should map existing
+    `get_platform_info()` output into conservative normalized fields:
+      - embedded engines and DataFrame adapters become local process or
+        dataframe process runtimes;
+      - localhost server adapters remain `unknown` until Docker discovery or
+        explicit runtime metadata proves containerization;
+      - remote host adapters become `remote_server`;
+      - cloud adapters become `managed_cloud` or `serverless`.
+    Avoid making every adapter implement a new required abstract method in
+    one PR. Add optional hooks/mixins and migrate adapters incrementally.
+
+- id: w6
+  summary: "Normalize Snowflake cloud metadata"
+  needs: [w1, w5]
+  status: pending
+  notes: |
+    Map existing Snowflake requested config and observed metadata into the
+    new contract: cloud provider, region, account, role, database/schema,
+    warehouse name/size/type, min/max clusters, auto suspend/resume, query
+    acceleration, scaling policy, and result cache. Add fixture-backed unit
+    tests that cover both successful warehouse metadata collection and
+    permission-denied/unavailable metadata without live Snowflake credentials.
+
+- id: w7
+  summary: "Normalize BigQuery cloud metadata"
+  needs: [w1, w5]
+  status: pending
+  notes: |
+    Map existing BigQuery requested config and observed metadata into the new
+    contract: provider, project, dataset, location, storage bucket/prefix,
+    job priority/cache settings, reservation assignment, slot capacity, and
+    pricing/reservation model when available. Add fixture-backed unit tests
+    that cover on-demand, reservation-backed, and metadata-unavailable cases
+    without live BigQuery credentials.
+
+- id: w8
+  summary: "Normalize Redshift cloud metadata"
+  needs: [w1, w5]
+  status: pending
+  notes: |
+    Map existing Redshift requested config and observed metadata into the new
+    contract: AWS region, serverless vs provisioned deployment,
+    namespace/workgroup or cluster id, RPU or node type/count, storage
+    capacity when available, S3 staging bucket/prefix, IAM role presence, and
+    result cache. Add fixture-backed tests for both serverless and
+    provisioned metadata shapes without live AWS credentials.
+
+- id: w9
+  summary: "Normalize Athena cloud metadata"
+  needs: [w1, w5]
+  status: pending
+  notes: |
+    Map Athena requested config into the new serverless contract: AWS
+    provider, region, workgroup, catalog/database, S3 output location,
+    staging root, data format, compression, cleanup policy, and serverless
+    runtime type. Add fixture-backed tests that prove missing optional fields
+    are represented as unavailable, not silently omitted.
+
+- id: w10
+  summary: "Normalize Databricks cloud metadata"
+  needs: [w1, w5]
+  status: pending
+  notes: |
+    Map Databricks requested config and SDK-observed warehouse metadata into
+    the new contract: workspace host, catalog/schema/http path, warehouse
+    id/name/size/type, serverless flag, photon flag, min/max clusters, spot
+    policy, runtime/channel, and state. Add an explicit region field when it
+    can be configured or observed; otherwise record
+    `collection_status="unavailable"`. Add fixture-backed tests without live
+    Databricks credentials.
+
+- id: w11
+  summary: "Normalize ClickHouse Cloud metadata"
+  needs: [w1, w5]
+  status: pending
+  notes: |
+    Map ClickHouse Cloud requested config and any observed service metadata
+    into the new contract: managed deployment, auth mode, service endpoint,
+    staging URL type, and region/compute fields when exposed by config or API
+    metadata. Add fixture-backed tests for fully populated and sparse metadata
+    cases.
+
+- id: w12
+  summary: "Normalize Firebolt cloud metadata"
+  needs: [w1, w5]
+  status: pending
+  notes: |
+    Map Firebolt requested config and observed metadata into the new contract:
+    account/engine/database identifiers, endpoint class, deployment mode,
+    engine shape when available, and explicit missing-region status when the
+    region cannot be observed. Add fixture-backed tests for core and cloud
+    deployment modes.
+
+- id: w13
+  summary: "Extend anonymization and redaction across platform, config, and execution metadata"
+  needs: [w2, w6, w7, w8, w9, w10, w11, w12]
+  status: pending
+  notes: |
+    Current export anonymization focuses on host environment. Extend it to
+    every field that can reveal infrastructure identity:
+      - hostnames, account ids, project ids, workspace urls, http paths,
+        bucket names, prefixes, database/schema names, warehouse names,
+        workgroup names, cluster ids, IAM role ARNs, container names, bind
+        mount paths, and usernames;
+      - secret-like keys such as password, token, secret, access_key,
+        private_key, session token, connection string, and credential file.
+    Public export should hash stable identifiers when comparisons need
+    grouping and redact values when grouping is not needed. Private/internal
+    result export can preserve raw metadata only behind an explicit option.
+    Add tests that prove no raw secrets or obvious infrastructure identifiers
+    remain after anonymized JSON export.
+
+- id: w14
+  summary: "Add result-schema compatibility tests and golden fixtures"
+  needs: [w3, w4, w6, w7, w8, w9, w10, w11, w12, w13]
+  status: pending
+  notes: |
+    Add focused fixtures for:
+      - local embedded DuckDB or DataFrame process;
+      - macOS client plus Docker-backed localhost platform;
+      - remote self-hosted server with no Docker proof;
+      - managed cloud warehouse;
+      - serverless cloud query engine;
+      - missing/permission-denied metadata collection.
+    Tests should assert the normalized fields, backward-compatible raw fields,
+    anonymized export behavior, and that old minimal result objects still
+    serialize without failure.
+
+- id: w15
+  summary: "Document the environment-capture contract and migration guidance"
+  needs: [w14]
+  status: pending
+  notes: |
+    Update development and result-artifact docs with the canonical field
+    meanings, source/provenance rules, anonymization policy, and examples for
+    local process, Docker-backed local server, remote self-hosted server,
+    managed cloud warehouse, and serverless cloud. Include a migration note
+    for existing `platform.config`, `system_profile`, and `platform_metadata`
+    consumers.
+
+metadata:
+  tags:
+  - result-schema
+  - execution-environment
+  - docker
+  - cloud
+  - reproducibility
+  - anonymization
+  estimated_effort: "Large (6-10 days)"
+  created_date: "2026-05-02"
+
+impact:
+  business_value: |
+    Makes public and internal benchmark comparisons credible by exposing where
+    the measured engine actually ran. Prevents local Docker-backed results from
+    being misread as native macOS database performance and enables cloud-region
+    and compute-shape analysis.
+  user_impact: |
+    Users can compare results with enough context to understand runtime type,
+    containerization, cloud provider, region, warehouse/instance shape, storage
+    layout, and cache/storage settings instead of guessing from platform name
+    and localhost connection strings.
+  technical_debt: |
+    Replaces adapter-specific metadata fragments with a durable result contract
+    while retaining raw metadata for compatibility and diagnostics.
+
+files_affected:
+  modified:
+  - "benchbox/core/results/models.py"
+  - "benchbox/core/results/builder.py"
+  - "benchbox/core/results/result_factory.py"
+  - "benchbox/core/results/schema.py"
+  - "benchbox/core/results/exporter.py"
+  - "benchbox/core/results/anonymization.py"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/core/schemas.py"
+  - "benchbox/cli/orchestrator.py"
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/core/platform_config.py"
+  - "benchbox/platforms/base/adapter.py"
+  - "benchbox/platforms/base/config_utils.py"
+  - "benchbox/platforms/clickhouse/"
+  - "benchbox/platforms/clickhouse_server.py"
+  - "benchbox/platforms/trino.py"
+  - "benchbox/platforms/presto.py"
+  - "benchbox/platforms/presto_trino_utils.py"
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/starrocks/"
+  - "benchbox/platforms/doris.py"
+  - "benchbox/platforms/singlestore.py"
+  - "benchbox/platforms/databend/"
+  - "benchbox/platforms/platform_config_utils.py"
+  - "benchbox/platforms/snowflake.py"
+  - "benchbox/platforms/bigquery.py"
+  - "benchbox/platforms/redshift.py"
+  - "benchbox/platforms/athena.py"
+  - "benchbox/platforms/databricks/adapter.py"
+  - "benchbox/platforms/clickhouse_cloud.py"
+  - "benchbox/platforms/firebolt.py"
+  - "tests/integration/platforms/"
+  added:
+  - "benchbox/core/results/environment.py"
+  - "tests/unit/core/results/test_execution_environment_contract.py"
+  - "tests/unit/core/results/test_platform_options_capture.py"
+  - "tests/unit/core/results/test_environment_anonymization.py"
+  - "tests/unit/platforms/test_docker_runtime_metadata.py"
+  - "tests/unit/platforms/test_cloud_environment_metadata.py"
+  - "docs/development/result-execution-environment.md"
+
+must_preserve:
+- "Existing result JSON artifacts without normalized environment fields continue to load and export through the compatibility
+  path."
+- "Existing `platform_info`, `platform.config`, `system_profile`, `driver_metadata`, and `engine_version` consumers keep receiving
+  equivalent data during the migration."
+- "Benchmarks do not fail when Docker, cloud metadata APIs, or permissioned system introspection are unavailable; results
+  must record unavailable metadata explicitly."
+- "No benchmark timing path includes Docker or cloud metadata collection in the measured query execution duration."
+- "Existing cloud adapters remain lazy about optional SDK imports and do not require cloud credentials during unit tests."
+- "Anonymized exports never include raw passwords, tokens, private keys, access keys, credential file paths, or full connection
+  strings."
+
+approach: |
+  Start with the result contract and tests, then wire producers. Do not try to
+  infer Docker or cloud shape from platform name alone; record source and
+  collection status for every normalized field. Reuse the existing
+  `platform_info` output and `platform_config_utils` helpers where possible,
+  but treat them as inputs to a normalized contract rather than the contract
+  itself. Add Docker inspection as an optional metadata collection step outside
+  measured benchmark timing. For cloud platforms, prefer observed metadata when
+  permissions allow and fall back to sanitized requested config with
+  `source="requested"` when observation is unavailable.
+
+anti_patterns:
+- "DO NOT represent localhost server adapters as native local database processes - because many localhost services are Docker-backed
+  Linux runtimes on macOS - use `unknown` until Docker or explicit runtime metadata proves the substrate."
+- "DO NOT add Docker inspection to measured query execution timing - because environment capture must not perturb benchmark
+  timings - collect before/after measured phases and record collection status."
+- "DO NOT persist raw platform options directly - because they can contain credentials and infrastructure identifiers - sanitize,
+  classify, and apply anonymization before export."
+- "DO NOT flatten cloud region, compute, and storage into adapter-specific `platform.config` only - because downstream consumers
+  need stable cross-platform facets - emit normalized `platform.cloud`, `platform.compute`, and `platform.storage` blocks."
+- "DO NOT fail a benchmark because cloud metadata APIs lack permission - because benchmark execution can still be valid -
+  record unavailable metadata with the error class and continue."
+- "DO NOT make every adapter implement a new required abstract method in one migration - because that creates a risky broad
+  adapter change - add optional hooks and conservative defaults."
+
+verification:
+- description: "Result environment contract unit tests pass."
+  command: "uv run -- python -m pytest tests/unit/core/results/test_execution_environment_contract.py tests/unit/core/results/test_platform_options_capture.py
+    tests/unit/core/results/test_environment_anonymization.py -q"
+  expected_output: "All result environment, platform option, and anonymization tests pass."
+- description: "Docker runtime metadata tests pass without requiring a live Docker daemon."
+  command: "uv run -- python -m pytest tests/unit/platforms/test_docker_runtime_metadata.py -q"
+  expected_output: "Docker metadata tests pass using mocked Docker inspect output and unavailable-daemon fixtures."
+- description: "Optional live Docker smoke captures a container-backed localhost runtime when Docker is available."
+  command: "make test-docker-postgresql"
+  expected_output: "PostgreSQL Docker integration passes and result assertions show a Darwin/macOS client host separately
+    from a Docker/Linux platform runtime when run on macOS."
+- description: "Cloud metadata normalization tests pass without live cloud credentials."
+  command: "uv run -- python -m pytest tests/unit/platforms/test_cloud_environment_metadata.py -q"
+  expected_output: "Cloud metadata tests pass for Snowflake, BigQuery, Redshift, Athena, Databricks, ClickHouse Cloud, and
+    Firebolt fixtures."
+- description: "Fast suite still passes after result-schema changes."
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "Fast test suite passes with no regressions."
+- description: "Result artifact export remains compatible with existing fixtures."
+  command: "uv run -- python -m pytest tests/unit/core/results -q"
+  expected_output: "Existing and new result export tests pass."
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/results/"
+  - "benchbox/core/runner/runner.py"
+  - "benchbox/core/schemas.py"
+  - "benchbox/core/platform_config.py"
+  - "benchbox/cli/orchestrator.py"
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/platforms/base/"
+  - "benchbox/platforms/clickhouse/"
+  - "benchbox/platforms/clickhouse_server.py"
+  - "benchbox/platforms/platform_config_utils.py"
+  - "benchbox/platforms/trino.py"
+  - "benchbox/platforms/presto.py"
+  - "benchbox/platforms/presto_trino_utils.py"
+  - "benchbox/platforms/postgresql.py"
+  - "benchbox/platforms/starrocks/"
+  - "benchbox/platforms/doris.py"
+  - "benchbox/platforms/singlestore.py"
+  - "benchbox/platforms/databend/"
+  - "benchbox/platforms/snowflake.py"
+  - "benchbox/platforms/bigquery.py"
+  - "benchbox/platforms/redshift.py"
+  - "benchbox/platforms/athena.py"
+  - "benchbox/platforms/databricks/"
+  - "benchbox/platforms/clickhouse_cloud.py"
+  - "benchbox/platforms/firebolt.py"
+  - "tests/unit/core/results/"
+  - "tests/unit/platforms/"
+  - "tests/integration/platforms/"
+  - "docs/development/"
+  do_not_modify:
+  - "benchmark_runs/"
+  - "_binaries/"
+
+context_sections:
+  "Research Findings": |
+    Review found that `BenchmarkResults` has flexible fields such as
+    `platform_info`, `platform_metadata`, `system_profile`, and
+    `execution_metadata`, but no normalized execution-environment contract.
+    `schema._build_environment_block()` currently describes the BenchBox host
+    process only. Local Docker-backed integration platforms connect through
+    localhost ports and expose host/port/deployment hints, but not container
+    image, OS/arch, Docker platform, resource limits, or volume/storage details.
+    Cloud adapters collect useful metadata unevenly: Snowflake and BigQuery are
+    relatively rich, Redshift and Athena expose some region/storage fields,
+    Databricks captures warehouse shape but not normalized region, and
+    ClickHouse Cloud/Firebolt are sparse. Export anonymization currently focuses
+    on environment rather than platform/config metadata.
+
+technical_requirements:
+  constraints:
+  - "All metadata collection must be outside measured query execution timing and must use monotonic timing policy only for
+    any durations it reports."
+  - "Docker and cloud metadata collection must be optional and best-effort; unavailable metadata is a result state, not a
+    benchmark failure."
+  - "Normalized fields must carry source/provenance when values can be requested, inferred, or observed."
+  - "Public exports must redact or hash infrastructure identifiers and secrets consistently across platform, config, and execution
+    metadata."
+  - "Backward compatibility must preserve old result artifacts and existing result readers during migration."
+  compatibility: |
+    The first implementation should emit both old and new fields. Consumers can
+    migrate to normalized fields over time, after which a separate compatibility
+    cleanup can decide whether legacy aliases are retained or deprecated.
+
+success_metrics:
+- "A macOS client running a Docker-backed platform exports `client_host.os=Darwin` and `platform_runtime.runtime_type=docker_container`
+  with Linux/container metadata when Docker inspection is available."
+- "Every cloud adapter listed in this TODO emits normalized provider, region/location status, compute status, and storage
+  status, even when some values are unavailable."
+- "CLI `--platform-option` values that affect reproducibility appear in sanitized result metadata with provenance."
+- "Anonymized JSON exports contain no raw secrets or obvious infrastructure identifiers from platform/config/execution metadata."
+- "Existing result export tests and the fast test suite pass."
+
+open_questions:
+- "Should private/internal result export preserve raw infrastructure identifiers by default, or require an explicit opt-in
+  flag?"
+- "Should Docker runtime capture rely only on BenchBox-managed compose labels, or also attempt host-port matching for externally
+  managed containers?"
+- "Which cloud identifiers need stable hashes for grouping versus full redaction in public artifacts?"
+- "Should normalized environment fields become required in a future result schema version after a compatibility window?"
+
+deferred:
+- summary: "Normalize benchmark cost from cloud compute and storage metadata"
+  reason: "Tracked separately by `results-normalized-cost-contract-cloud-facets`; this TODO captures environment and deployment
+    metadata needed by that cost work."
+- summary: "Backfill every historical benchmark artifact"
+  reason: "Historical artifacts often lack enough raw data to reconstruct runtime/container/cloud metadata reliably; add compatibility
+    markers first, then decide on backfill policy."

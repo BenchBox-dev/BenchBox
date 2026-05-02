@@ -277,17 +277,26 @@ class ResultExporter:
         system_profile = self.anonymization_manager.anonymize_system_profile()
         if system_profile:
             env_block = payload.get("environment", {})
+            client_host = env_block.get("client_host") if isinstance(env_block.get("client_host"), dict) else {}
+            anonymized_host: dict[str, Any] = {}
             # Update with anonymized values
             if system_profile.get("os_type"):
-                env_block["os"] = f"{system_profile.get('os_type', '')} {system_profile.get('os_release', '')}".strip()
+                anonymized_host["os"] = (
+                    f"{system_profile.get('os_type', '')} {system_profile.get('os_release', '')}".strip()
+                )
             if system_profile.get("architecture"):
-                env_block["arch"] = system_profile["architecture"]
+                anonymized_host["arch"] = system_profile["architecture"]
             if system_profile.get("cpu_count"):
-                env_block["cpu_count"] = system_profile["cpu_count"]
+                anonymized_host["cpu_count"] = system_profile["cpu_count"]
             if system_profile.get("memory_gb"):
-                env_block["memory_gb"] = system_profile["memory_gb"]
+                anonymized_host["memory_gb"] = system_profile["memory_gb"]
             if system_profile.get("python_version"):
-                env_block["python"] = system_profile["python_version"]
+                anonymized_host["python"] = system_profile["python_version"]
+
+            env_block.update(anonymized_host)
+            client_host.update(anonymized_host)
+            if client_host:
+                env_block["client_host"] = client_host
 
             if env_block:
                 payload["environment"] = env_block
@@ -295,7 +304,11 @@ class ResultExporter:
         # Add anonymous machine ID
         machine_id = self.anonymization_manager.get_anonymous_machine_id()
         if machine_id:
-            payload.setdefault("environment", {})["machine_id"] = machine_id
+            env_block = payload.setdefault("environment", {})
+            env_block["machine_id"] = machine_id
+            client_host = env_block.get("client_host") if isinstance(env_block.get("client_host"), dict) else {}
+            client_host["machine_id"] = machine_id
+            env_block["client_host"] = client_host
 
     def _convert_datetimes_to_iso(self, obj: Any) -> Any:
         """Convert datetime objects to ISO format strings."""
