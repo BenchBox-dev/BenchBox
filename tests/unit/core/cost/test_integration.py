@@ -67,7 +67,14 @@ class TestAddCostEstimationToResults:
         assert "total_cost" in updated_results.cost_summary
         assert "currency" in updated_results.cost_summary
         assert "phase_costs" in updated_results.cost_summary
+        assert "normalized_cost" in updated_results.cost_summary
         assert updated_results.cost_summary["currency"] == "USD"
+        normalized_cost = updated_results.cost_summary["normalized_cost"]
+        assert normalized_cost["cost_status"] == "normalized"
+        assert normalized_cost["normalized_cost_usd"] == "2.6"
+        assert normalized_cost["deployment"]["cloud_provider"] == "aws"
+        assert normalized_cost["deployment"]["cloud_region"] == "us-east-1"
+        assert normalized_cost["deployment"]["warehouse_size"] == "MEDIUM"
 
     def test_adds_per_query_costs(self):
         """Test that per-query costs are added to query_results."""
@@ -653,3 +660,33 @@ class TestMultiPlatformIntegration:
 
         assert updated_results.query_results[0]["cost"] == 0.0
         assert updated_results.cost_summary["total_cost"] == 0.0
+        normalized_cost = updated_results.cost_summary["normalized_cost"]
+        assert normalized_cost["cost_status"] == "not_applicable_local"
+        assert normalized_cost["normalized_cost_usd"] == "0"
+        assert normalized_cost["cost_usd"] is None
+
+    def test_missing_cloud_metadata_marks_normalized_cost_unavailable(self, caplog):
+        """Defaulted cloud metadata is warned about and not ranked as normalized cost."""
+        results = create_test_results(
+            benchmark_name="TPC-H",
+            platform="snowflake",
+            scale_factor=1,
+            platform_info={
+                "platform_type": "snowflake",
+                "configuration": {"warehouse_size": "MEDIUM"},
+            },
+            query_results=[
+                {
+                    "query_id": "Q1",
+                    "resource_usage": {"credits_used": 0.5},
+                },
+            ],
+        )
+
+        with caplog.at_level("WARNING"):
+            updated_results = add_cost_estimation_to_results(results)
+
+        normalized_cost = updated_results.cost_summary["normalized_cost"]
+        assert normalized_cost["cost_status"] == "unavailable"
+        assert normalized_cost["normalized_cost_usd"] is None
+        assert any("metadata was defaulted" in record.message for record in caplog.records)

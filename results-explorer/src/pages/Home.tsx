@@ -217,6 +217,7 @@ export function Home(_: RoutableProps) {
   const recent = [...results]
     .sort((a, b) => b.run_date.localeCompare(a.run_date))
     .slice(0, 5);
+  const showRecentCost = recent.some((result) => normalizedCostValue(result) !== null);
 
   function buildCohortHref(cohort: MetaCohort): string {
     const params = new URLSearchParams();
@@ -374,12 +375,20 @@ export function Home(_: RoutableProps) {
                   >
                     Geomean (ms)
                   </th>
+                  {showRecentCost && (
+                    <th
+                      class="table-th"
+                      title="BenchBox normalized USD from emitted normalized_cost metadata. Local and unavailable rows are not comparable cloud cost."
+                    >
+                      Normalized cost
+                    </th>
+                  )}
                   <th class="table-th" />
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 bg-white">
                 {recent.map((result) => (
-                  <RecentRow key={result.result_id} entry={result} />
+                  <RecentRow key={result.result_id} entry={result} showCost={showRecentCost} />
                 ))}
               </tbody>
             </table>
@@ -511,6 +520,20 @@ function matchesDateWindow(runDate: string, windowValue: string): boolean {
 
 function matchesMultiFilter(value: string, selected: string[]): boolean {
   return selected.length === 0 || selected.includes(value);
+}
+
+function normalizedCostValue(entry: ResultRow): number | null {
+  if (entry.cost_status !== "normalized") return null;
+  if (entry.normalized_cost_usd === null || entry.normalized_cost_usd === undefined) return null;
+  return Number.isFinite(entry.normalized_cost_usd) ? entry.normalized_cost_usd : null;
+}
+
+function normalizedCostLabel(entry: ResultRow): string {
+  const value = normalizedCostValue(entry);
+  if (value !== null) return `$${value.toFixed(2)}`;
+  if (entry.cost_status === "not_applicable_local") return "local";
+  if (entry.cost_status === "unavailable") return "unavailable";
+  return "-";
 }
 
 function StatCard({
@@ -689,7 +712,7 @@ function SingleFilterGroup({
   );
 }
 
-function RecentRow({ entry }: { entry: ResultRow }) {
+function RecentRow({ entry, showCost }: { entry: ResultRow; showCost: boolean }) {
   return (
     <tr class="hover:bg-gray-50">
       <td class="table-td font-medium">{humanizeBenchmark(entry.benchmark)}</td>
@@ -700,6 +723,7 @@ function RecentRow({ entry }: { entry: ResultRow }) {
       <td class="table-td text-gray-500">{entry.run_date}</td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.geomean_ms)}</td>
+      {showCost && <td class="table-td font-mono text-gray-500">{normalizedCostLabel(entry)}</td>}
       <td class="table-td text-right">
         <a href={`/results/r/${entry.result_id}`} class="text-xs font-medium no-underline">
           View →

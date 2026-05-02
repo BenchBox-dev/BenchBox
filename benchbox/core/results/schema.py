@@ -45,6 +45,7 @@ CANONICAL_KEY_ORDER = [
     "validation",
     "comparisons",
     "cost",
+    "normalized_cost",
     "execution",
     "environment",
     "export",
@@ -170,7 +171,18 @@ class SchemaV2Validator:
     """
 
     REQUIRED_KEYS = ("version", "run", "benchmark", "platform", "summary", "queries")
-    OPTIONAL_KEYS = ("environment", "tables", "errors", "cost", "export", "tuning", "execution", "config", "phases")
+    OPTIONAL_KEYS = (
+        "environment",
+        "tables",
+        "errors",
+        "cost",
+        "normalized_cost",
+        "export",
+        "tuning",
+        "execution",
+        "config",
+        "phases",
+    )
 
     RUN_REQUIRED = ("id", "timestamp", "total_duration_ms", "query_time_ms")
     BENCHMARK_REQUIRED = ("id", "name", "scale_factor")
@@ -519,6 +531,9 @@ def _add_comparisons_section(payload: dict[str, Any], result: BenchmarkResults) 
 def _add_cost_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
     """Add cost summary to payload if available."""
     if result.cost_summary:
+        normalized_cost = result.cost_summary.get("normalized_cost")
+        if isinstance(normalized_cost, dict):
+            payload["normalized_cost"] = normalized_cost
         cost_block: dict[str, Any] = {}
         if "total_cost" in result.cost_summary:
             cost_block["total_usd"] = result.cost_summary["total_cost"]

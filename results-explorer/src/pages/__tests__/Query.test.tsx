@@ -10,21 +10,28 @@ import { getDb, queryRows } from "@/db";
 import { DEFAULT_ROW_LIMIT, UNLIMITED_ROW_LIMIT } from "@/lib/queryFilters";
 import { Query } from "@/pages/Query";
 
-const SCHEMA = {
-  columns: [
-    { name: "result_id", type: "VARCHAR" },
-    { name: "benchmark", type: "VARCHAR" },
-    { name: "platform", type: "VARCHAR" },
-    { name: "scale_factor", type: "DOUBLE" },
-    { name: "run_date", type: "VARCHAR" },
-    { name: "power_score", type: "DOUBLE" },
-    { name: "geomean_ms", type: "DOUBLE" },
-    { name: "trust_label", type: "VARCHAR" },
-    { name: "tuning_mode", type: "VARCHAR" },
-    { name: "validation_status", type: "VARCHAR" },
-    { name: "cost_usd", type: "DOUBLE" },
-  ],
-};
+const BASE_SCHEMA_COLUMNS = [
+  { name: "result_id", type: "VARCHAR" },
+  { name: "benchmark", type: "VARCHAR" },
+  { name: "platform", type: "VARCHAR" },
+  { name: "scale_factor", type: "DOUBLE" },
+  { name: "run_date", type: "VARCHAR" },
+  { name: "power_score", type: "DOUBLE" },
+  { name: "geomean_ms", type: "DOUBLE" },
+  { name: "trust_label", type: "VARCHAR" },
+  { name: "tuning_mode", type: "VARCHAR" },
+  { name: "validation_status", type: "VARCHAR" },
+  { name: "cost_usd", type: "DOUBLE" },
+  { name: "normalized_cost_usd", type: "DOUBLE" },
+  { name: "cost_model_version", type: "VARCHAR" },
+  { name: "cost_status", type: "VARCHAR" },
+  { name: "cloud_provider", type: "VARCHAR" },
+  { name: "cloud_region", type: "VARCHAR" },
+  { name: "instance_type", type: "VARCHAR" },
+  { name: "warehouse_size", type: "VARCHAR" },
+  { name: "storage_format", type: "VARCHAR" },
+];
+let schemaColumns = BASE_SCHEMA_COLUMNS;
 
 const BASE_ROWS = [
   {
@@ -36,6 +43,8 @@ const BASE_ROWS = [
     power_score: null,
     geomean_ms: 10,
     trust_label: "maintainer-run",
+    cost_status: "not_applicable_local",
+    cloud_provider: null,
   },
   {
     result_id: "r2",
@@ -46,6 +55,8 @@ const BASE_ROWS = [
     power_score: null,
     geomean_ms: 20,
     trust_label: "community-submission",
+    cost_status: "normalized",
+    cloud_provider: "aws",
   },
 ];
 
@@ -54,12 +65,15 @@ function normalizeSql(sql: string): string {
 }
 
 beforeEach(() => {
+  vi.mocked(queryRows).mockReset();
+  vi.mocked(getDb).mockReset();
+  schemaColumns = BASE_SCHEMA_COLUMNS;
   window.history.replaceState(null, "", "/results/query");
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => SCHEMA,
+      json: async () => ({ columns: schemaColumns }),
     }),
   );
   vi.stubGlobal("ResizeObserver", class {
@@ -88,7 +102,7 @@ beforeEach(() => {
     const normalized = normalizeSql(sql);
 
     if (normalized.includes("FROM duckdb_columns()")) {
-      return SCHEMA.columns;
+      return schemaColumns;
     }
     if (normalized.includes("SELECT COALESCE(CAST(benchmark AS VARCHAR), 'unknown') AS value")) {
       return [{ value: "clickbench", count: 2 }];
@@ -116,6 +130,33 @@ beforeEach(() => {
     }
     if (normalized.includes("SELECT COALESCE(CAST(validation_status AS VARCHAR), 'unknown') AS value")) {
       return [{ value: "exact", count: 2 }];
+    }
+    if (normalized.includes("SELECT COALESCE(CAST(cost_status AS VARCHAR), 'unknown') AS value")) {
+      return [
+        { value: "normalized", count: 1 },
+        { value: "not_applicable_local", count: 1 },
+      ];
+    }
+    if (normalized.includes("SELECT COALESCE(CAST(cost_model_version AS VARCHAR), 'unknown') AS value")) {
+      return [{ value: "2026.05.0", count: 1 }];
+    }
+    if (normalized.includes("SELECT COALESCE(CAST(cloud_provider AS VARCHAR), 'unknown') AS value")) {
+      return [
+        { value: "aws", count: 1 },
+        { value: "unknown", count: 1 },
+      ];
+    }
+    if (normalized.includes("SELECT COALESCE(CAST(cloud_region AS VARCHAR), 'unknown') AS value")) {
+      return [{ value: "us-east-1", count: 1 }];
+    }
+    if (normalized.includes("SELECT COALESCE(CAST(instance_type AS VARCHAR), 'unknown') AS value")) {
+      return [{ value: "r6i.xlarge", count: 1 }];
+    }
+    if (normalized.includes("SELECT COALESCE(CAST(warehouse_size AS VARCHAR), 'unknown') AS value")) {
+      return [{ value: "MEDIUM", count: 1 }];
+    }
+    if (normalized.includes("SELECT COALESCE(CAST(storage_format AS VARCHAR), 'unknown') AS value")) {
+      return [{ value: "parquet", count: 1 }];
     }
     if (normalized.includes("SELECT CASE WHEN cost_usd IS NULL THEN 'no' ELSE 'yes' END AS value")) {
       return [
@@ -168,6 +209,53 @@ describe("Query", () => {
       );
       expect(selectCalls.at(-1)?.[0]).toContain("ORDER BY benchmark ASC");
     });
+  });
+
+  it("applies normalized cost and deployment facets to the generated query", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const costStatus = screen.getByText("Cost status").closest("section")!;
+    const cloudProvider = screen.getByText("Cloud provider").closest("section")!;
+    const warehouse = screen.getByText("Warehouse").closest("section")!;
+    fireEvent.click(within(costStatus).getByLabelText(/normalized/i));
+    fireEvent.click(within(cloudProvider).getByLabelText(/^aws/i));
+    fireEvent.click(within(warehouse).getByLabelText(/MEDIUM/i));
+
+    await waitFor(() => {
+      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+        String(sql).includes("SELECT benchmark, platform, scale_factor"),
+      );
+      const latest = String(selectCalls.at(-1)?.[0]);
+      expect(latest).toContain("cost_status IN (?)");
+      expect(latest).toContain("cloud_provider IN (?)");
+      expect(latest).toContain("warehouse_size IN (?)");
+    });
+    const params = new URL(window.location.href).searchParams;
+    expect(params.get("cost_status")).toBe("normalized");
+    expect(params.get("cloud_provider")).toBe("aws");
+    expect(params.get("warehouse_size")).toBe("MEDIUM");
+  });
+
+  it("does not query normalized cost facets when an older DuckDB schema lacks those columns", async () => {
+    schemaColumns = BASE_SCHEMA_COLUMNS.filter(
+      (column) => !["cost_status", "cloud_provider", "warehouse_size"].includes(column.name),
+    );
+    window.history.replaceState(
+      null,
+      "",
+      "/results/query?cost_status=normalized&cloud_provider=aws&warehouse_size=MEDIUM",
+    );
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const sqlCalls = vi.mocked(queryRows).mock.calls.map(([sql]) => String(sql));
+    expect(sqlCalls.join("\n")).not.toContain("CAST(cost_status AS VARCHAR)");
+    const selectCalls = sqlCalls.filter((sql) => sql.includes("SELECT benchmark, platform, scale_factor"));
+    expect(selectCalls.at(-1)).not.toContain("cost_status IN (?)");
+    expect(selectCalls.at(-1)).not.toContain("cloud_provider IN (?)");
+    expect(selectCalls.at(-1)).not.toContain("warehouse_size IN (?)");
   });
 
   it("switches the result table row limit through URL state", async () => {
@@ -251,6 +339,19 @@ describe("Query", () => {
     const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
     expect(textarea.value).toContain("FROM bench.results");
     expect(textarea.value).toContain("ORDER BY run_date DESC");
+  });
+
+  it("loads normalized cost starter queries into the SQL editor", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getByText("Advanced SQL"));
+    fireEvent.click(screen.getByRole("button", { name: "Normalized cost leaderboard" }));
+
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(textarea.value).toContain("normalized_cost_usd");
+    expect(textarea.value).toContain("cost_status = 'normalized'");
+    expect(textarea.value).toContain("cloud_provider");
   });
 
   it("exports the current table rows as JSON", async () => {
