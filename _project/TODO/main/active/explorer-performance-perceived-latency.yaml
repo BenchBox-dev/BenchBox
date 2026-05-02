@@ -37,7 +37,14 @@ work:
 
 - id: w2
   summary: "Apply identity-owned skeletons to MetaLeaderboard, BenchmarkIndex, Query, and Compare"
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/src/components/LoadingSpinner.tsx"
+  - "results-explorer/src/components/__tests__/LoadingSpinner.test.tsx"
+  - "results-explorer/src/pages/Home.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
   notes: |
     Skeleton TOKENS and the Home/Layout skeleton treatment are owned by
     `explorer-leaderboard-first-identity-unification` w6. This work unit

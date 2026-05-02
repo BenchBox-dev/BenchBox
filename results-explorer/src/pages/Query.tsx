@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { getDb, queryRows } from "@/db";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { QueryRowsSkeleton } from "@/components/LoadingSpinner";
 import { arraySerde, stringSerde, useUrlState } from "@/lib/useUrlState";
 import {
   buildFacetCountQuery,
@@ -234,7 +234,13 @@ export function Query(_: RoutableProps) {
   const sqlColumns = useMemo(() => [...new Set(sqlRows.flatMap((row) => Object.keys(row)))], [sqlRows]);
 
   if (error) return <ErrorMessage message={error} />;
-  if (schema.length === 0 && loading) return <LoadingSpinner message="Loading query workbench..." />;
+  if (schema.length === 0 && loading) {
+    return (
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <QueryRowsSkeleton message="Loading query workbench..." />
+      </div>
+    );
+  }
 
   const columnNames = schema.map((column) => column.name);
 
@@ -517,7 +523,10 @@ export function Query(_: RoutableProps) {
           </div>
 
           {loading ? (
-            <LoadingSpinner message="Querying results.duckdb..." />
+            <QueryRowsSkeleton
+              message="Querying results.duckdb..."
+              columns={visibleColumns.length || DEFAULT_COLUMNS.length}
+            />
           ) : (
             <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
               <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
