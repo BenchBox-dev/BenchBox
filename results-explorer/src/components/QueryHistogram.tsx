@@ -11,6 +11,7 @@
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
+import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 
 const MAX_PER_PANEL = 33;
 const BAR_GAP = 3;
@@ -35,11 +36,12 @@ export function QueryHistogram({ summary }: Props) {
 
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
+  const sortedQueryIds = sortQueryIds(query_ids);
 
   // Split into panels
   const panels: string[][] = [];
-  for (let i = 0; i < query_ids.length; i += MAX_PER_PANEL) {
-    panels.push(query_ids.slice(i, i + MAX_PER_PANEL));
+  for (let i = 0; i < sortedQueryIds.length; i += MAX_PER_PANEL) {
+    panels.push(sortedQueryIds.slice(i, i + MAX_PER_PANEL));
   }
 
   function renderPanel(qids: string[], panelIdx: number) {
@@ -63,7 +65,7 @@ export function QueryHistogram({ summary }: Props) {
       <div key={panelIdx} class="mb-2">
         {panels.length > 1 && (
           <p class="text-[10px] text-gray-400 mb-0.5 ml-[44px]">
-            Queries {panelIdx * MAX_PER_PANEL + 1}-{Math.min((panelIdx + 1) * MAX_PER_PANEL, query_ids.length)}
+            Queries {panelIdx * MAX_PER_PANEL + 1}-{Math.min((panelIdx + 1) * MAX_PER_PANEL, sortedQueryIds.length)}
           </p>
         )}
         <svg
@@ -112,7 +114,7 @@ export function QueryHistogram({ summary }: Props) {
                         strokeDasharray="2,1"
                         opacity={0.5}
                       >
-                        <title>{`${p.platform} · ${qid}: no result`}</title>
+                        <title>{`${p.platform} · ${queryDisplayLabel(qid)}: no result`}</title>
                       </line>
                     );
                   }
@@ -126,7 +128,7 @@ export function QueryHistogram({ summary }: Props) {
                       fill={paletteColor(pi)}
                       fillOpacity={0.85}
                     >
-                      <title>{`${p.platform} · ${qid}: ${ms.toFixed(1)}ms`}</title>
+                      <title>{`${p.platform} · ${queryDisplayLabel(qid)}: ${ms.toFixed(1)}ms`}</title>
                     </rect>
                   );
                 })}
@@ -134,9 +136,10 @@ export function QueryHistogram({ summary }: Props) {
                   x={groupX + innerW / 2}
                   y={PADDING_TOP + CHART_H + 14}
                   textAnchor="middle"
+                  data-query-label={qid}
                   style={{ fontSize: "9px", fill: "#9ca3af" }}
                 >
-                  {qid.replace(/^[Qq]/, "")}
+                  {queryDisplayLabel(qid)}
                 </text>
               </g>
             );

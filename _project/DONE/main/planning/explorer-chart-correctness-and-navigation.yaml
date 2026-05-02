@@ -2,7 +2,7 @@ id: explorer-chart-correctness-and-navigation
 title: "Explorer: chart correctness, log-scale latency encoding, and chart navigation"
 worktree: main
 priority: High
-status: "Not Started"
+status: "Completed"
 category: "Data Visualization"
 
 deps:
@@ -20,7 +20,12 @@ description: |
 work:
   - id: w1
     summary: "Audit chart registry and group charts by analytical question"
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/chartRegistry.ts"
+      - "results-explorer/src/components/ChartPanel.tsx"
+      - "results-explorer/src/__tests__/chartRegistry.meta.test.ts"
+      - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
     notes: |
       In `results-explorer/src/lib/chartRegistry.ts` and ChartPanel, replace the
       flat 10+ chip list with grouped tabs or segmented controls:
@@ -36,7 +41,12 @@ work:
   - id: w2
     summary: "Use log-scale or ratio-based encoding for latency bars where values span orders of magnitude"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/chartMath.ts"
+      - "results-explorer/src/components/ChartPanel.tsx"
+      - "results-explorer/src/__tests__/chartMath.scale.test.ts"
+      - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
     notes: |
       Update PowerBar/ChartPanel latency views so linear bars do not compress
       faster engines against a slow outlier. Use log scale for latency magnitude
@@ -46,7 +56,10 @@ work:
   - id: w3
     summary: "Fix label overlap in SSB/star_schema performance bar charts"
     needs: [w2]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/ChartPanel.tsx"
+      - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
     notes: |
       The audited SSB Performance Bar showed labels crowding near the origin.
       Implement collision-aware label placement: outside labels when space is
@@ -55,15 +68,31 @@ work:
   - id: w4
     summary: "Split platform trend charts by cohort or metric"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/PlatformIndex.tsx"
+      - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
     notes: |
       Carry forward the critical defect fix: trend charts must not mix
       benchmark/scale/phase cohorts. Render cohort-specific small multiples or
       require a selected cohort before showing the time series.
 
+      Already satisfied by `explorer-critical-results-ux-defects` w3/w6 on the
+      current base: `buildTrendCohorts` groups by benchmark, scale factor,
+      phase, and primary metric, and `PlatformIndex.test.tsx` asserts TPC-H and
+      SSB trend points do not cross cohort sections.
+
   - id: w5
     summary: "Add natural query sorting and explicit query labels in heatmaps and tables"
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/queryLabels.ts"
+      - "results-explorer/src/components/QueryHeatmap.tsx"
+      - "results-explorer/src/components/QueryHistogram.tsx"
+      - "results-explorer/src/components/RankTable.tsx"
+      - "results-explorer/src/__tests__/queryLabels.test.ts"
+      - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+      - "results-explorer/src/components/__tests__/charts.smoke.test.tsx"
     notes: |
       Query IDs should sort Q1, Q2, ..., Q10 rather than lexicographic 1, 10,
       11, ..., 2. Labels should preserve benchmark-specific prefixes where
@@ -72,7 +101,14 @@ work:
   - id: w6
     summary: "Add high-contrast and reduced-color paths for heatmaps"
     needs: [w5]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/MetaLeaderboard.tsx"
+      - "results-explorer/src/components/QueryHeatmap.tsx"
+      - "results-explorer/src/index.css"
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
     notes: |
       MetaLeaderboard and QueryHeatmap should have text/value labels sufficient
       for interpretation without relying only on color. Add or preserve
@@ -82,11 +118,18 @@ work:
   - id: w7
     summary: "Add chart math and rendering tests for scale, sorting, and labels"
     needs: [w2, w3, w4, w5, w6]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
     notes: |
       Extend chartMath and component tests for log-scale mapping, label
       collision behavior, cohort-split trend data, natural query sort, and
       heatmap accessible names/values.
+
+      Existing W2-W6 commits cover log-scale chart math, ChartPanel log-scale
+      rendering, collision-aware value label placement, cohort-split trend
+      rendering, natural query sort, and MetaLeaderboard heatmap values. W7
+      closes the remaining exact accessible-name assertion for QueryHeatmap.
 
 metadata:
   tags:
@@ -96,6 +139,7 @@ metadata:
     - accessibility
   estimated_effort: "Large (3-5 days)"
   created_date: "2026-05-01"
+completed_date: "2026-05-02"
 
 impact:
   business_value: |
@@ -112,17 +156,21 @@ files_affected:
   modified:
     - "results-explorer/src/lib/chartRegistry.ts"
     - "results-explorer/src/lib/chartMath.ts"
+    - "results-explorer/src/lib/queryLabels.ts"
     - "results-explorer/src/components/ChartPanel.tsx"
     - "results-explorer/src/components/PowerBar.tsx"
     - "results-explorer/src/components/TimeSeries.tsx"
     - "results-explorer/src/components/QueryHeatmap.tsx"
     - "results-explorer/src/components/MetaLeaderboard.tsx"
+    - "results-explorer/src/index.css"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/pages/PlatformIndex.tsx"
     - "results-explorer/src/__tests__/chartRegistry.meta.test.ts"
     - "results-explorer/src/__tests__/chartTheme.test.ts"
     - "results-explorer/src/__tests__/parity/chartMath.parity.test.ts"
     - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
     - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
 
 must_preserve:
@@ -156,7 +204,9 @@ scope_limit:
   only_modify:
     - "results-explorer/src/lib/chartRegistry.ts"
     - "results-explorer/src/lib/chartMath.ts"
+    - "results-explorer/src/lib/queryLabels.ts"
     - "results-explorer/src/components/"
+    - "results-explorer/src/index.css"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/pages/PlatformIndex.tsx"
     - "results-explorer/src/__tests__/"

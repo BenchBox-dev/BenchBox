@@ -160,7 +160,7 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
 }
 
 describe("ChartPanel", () => {
-  it("renders summary charts from registry requirements", () => {
+  it("groups summary charts by analytical question", () => {
     render(
       <ChartPanel
         context={{
@@ -174,10 +174,84 @@ describe("ChartPanel", () => {
       />,
     );
 
+    expect(screen.getByRole("tablist", { name: "Chart question groups" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toStrictEqual([
+      "Overview",
+      "Per-query",
+      "Distribution",
+      "Cost",
+      "Trend",
+      "Rank",
+    ]);
     expect(screen.getByRole("button", { name: "Sparkline Table" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Performance Trend" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Cost vs Performance Scatter" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Query Heatmap" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Comparison Bar" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Trend" }));
+
+    expect(screen.getByRole("tab", { name: "Trend" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("img", { name: "Geomean ms trend over time" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
+  });
+
+  it("uses log scale for performance bars when latency spans an order of magnitude", () => {
+    const { container } = render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            platforms: [
+              makePlatformRow({ result_id: "fast", platform: "FastDB", display_geomean_ms: 10 }),
+              makePlatformRow({ result_id: "middle", platform: "MidDB", display_geomean_ms: 100 }),
+              makePlatformRow({ result_id: "slow", platform: "SlowDB", display_geomean_ms: 1000 }),
+            ],
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Performance Bar" }));
+
+    expect(screen.getByRole("img", { name: "Geomean performance comparison (log scale)" })).toBeTruthy();
+    expect(screen.getByText("Geomean query time (log scale) - lower is faster")).toBeTruthy();
+
+    const widths = Array.from(
+      container.querySelectorAll('svg[aria-label="Geomean performance comparison (log scale)"] rect'),
+    ).map((rect) => Number(rect.getAttribute("width")));
+    expect(widths).toHaveLength(3);
+    expect(widths[0]).toBeGreaterThan(2);
+    expect(widths[0]).toBeLessThan(widths[1]!);
+    expect(widths[1]!).toBeLessThan(widths[2]!);
+  });
+
+  it("places performance labels away from cramped bar edges and keeps tooltip values", () => {
+    const { container } = render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            platforms: [
+              makePlatformRow({ result_id: "fast", platform: "FastDB", display_geomean_ms: 10 }),
+              makePlatformRow({ result_id: "slow", platform: "SlowDB", display_geomean_ms: 1000 }),
+            ],
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Performance Bar" }));
+
+    const valueLabels = Array.from(container.querySelectorAll("text[data-value-placement]"));
+    expect(valueLabels.map((label) => label.getAttribute("data-value-placement"))).toContain("outside");
+    expect(valueLabels.map((label) => label.getAttribute("data-value-placement"))).toContain("inside");
+    expect(
+      valueLabels.find((label) => label.textContent === "1000 ms")?.getAttribute("data-value-placement"),
+    ).toBe("inside");
+
+    const tooltips = Array.from(container.querySelectorAll("rect title")).map((title) => title.textContent);
+    expect(tooltips).toContain("FastDB: 10 ms");
+    expect(tooltips).toContain("SlowDB: 1000 ms");
   });
 
   it("keeps the cost chart reachable so normalized-cost empty states are visible", () => {
@@ -201,7 +275,7 @@ describe("ChartPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Cost vs Performance Scatter" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Cost" }));
 
     expect(screen.getByText(/No normalized cost data/)).toBeTruthy();
     expect(screen.getByText(/No row has cost_status=normalized/)).toBeTruthy();
@@ -233,6 +307,7 @@ describe("ChartPanel", () => {
     expect(screen.getByRole("button", { name: "Comparison Bar" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Normalized Speedup" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Query Heatmap" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Per-query" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
   });
 
@@ -260,6 +335,7 @@ describe("ChartPanel", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
     fireEvent.click(screen.getByRole("button", { name: "Summary Box" }));
     expect(screen.getByText("throughput")).toBeTruthy();
   });
@@ -275,7 +351,8 @@ describe("ChartPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "Query Histogram" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Rank Table" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Rank" }));
+    expect(screen.getByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Normalized Speedup" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
   });

@@ -1,7 +1,8 @@
+import type { JSX } from "preact";
 import { useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
 import type { MetaCohort, MetaLeaderboard as MetaLeaderboardData, MetaPlatform, MetaRank } from "@/types";
-import { colorForCell } from "@/lib/chartMath";
+import { colorForCell, lightnessForCell } from "@/lib/chartMath";
 import { fmtGeomean, fmtScore, humanizeBenchmark } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 
@@ -194,11 +195,19 @@ export function MetaLeaderboard({
                   const shadeMetric = cellShadeMetric(rank, mode, cohort);
                   const minInCol = columnMins.get(cohort.key) ?? null;
                   const hue = shadeMetric !== null ? colorForCell(shadeMetric, minInCol) : null;
+                  const lightness = shadeMetric !== null ? lightnessForCell(shadeMetric, minInCol) : null;
                   const active = focusPos.row === rowIdx && focusPos.col === colIdx;
                   const text = describeCell(platform, cohort, rank, mode);
                   const result = cohort.platforms?.find((row) => row.platform_id === platform.platform_id);
                   const metadata = result ? resultMetadataById?.get(result.result_id) : undefined;
                   const receiptHref = result ? `/results/r/${result.result_id}#run-receipt` : null;
+                  const cellStyle: JSX.CSSProperties | undefined =
+                    hue !== null
+                      ? ({
+                          "--cell-hue": String(hue),
+                          "--cell-lightness": lightness ?? "95%",
+                        } as JSX.CSSProperties)
+                      : undefined;
                   return (
                     <td
                       key={cohort.key}
@@ -206,10 +215,10 @@ export function MetaLeaderboard({
                       aria-colindex={colIdx + 1}
                       aria-rowindex={rowIdx + 1}
                       aria-label={text}
-                      class={`table-td text-center font-mono ${active ? "ring-2 ring-brand-500 ring-inset" : ""}`}
-                      style={{
-                        backgroundColor: hue !== null ? `hsl(${hue} 72% 93%)` : undefined,
-                      }}
+                      class={`table-td text-center font-mono ${
+                        hue !== null ? "meta-heatmap-cell" : ""
+                      } ${active ? "ring-2 ring-brand-500 ring-inset" : ""}`}
+                      style={cellStyle}
                       tabIndex={active ? 0 : -1}
                       data-cell={`${rowIdx}-${colIdx}`}
                       onFocus={() => {
