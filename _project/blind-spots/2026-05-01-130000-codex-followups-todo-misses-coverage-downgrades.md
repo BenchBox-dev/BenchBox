@@ -85,3 +85,19 @@ never flagged the test downgrade in the first place.
    should include "tests weakened in this window" as an explicit
    axis, sourced from `git log -p -- '*.spec.ts' '*test*.py'` and
    filtered for assertion-loosening patterns.
+
+## Triage log
+
+- 2026-05-02: partially actioned; rubric/template change still owed.
+  Step 2 landed inside
+  `_project/DONE/main/active/codex-pr-review-followups-week-2026-05-01.yaml`
+  — the TODO is `Completed`, w9 covers the Home.tsx persistent-mismatch
+  fix, and the file's `must_not_do` list explicitly forbids landing the
+  Home.tsx fix without restoring `toHaveCount` in
+  `platform-index-cold-load.spec.ts` (the row counts were restored;
+  see `2026-05-01-103002-...-coverage-weakened.md → actioned`). Step 1
+  (process change to next weekly sweep) and Step 3 (rubric axis "tests
+  weakened in this window") have NOT been encoded as a reusable
+  template — there is no `_project/templates/` directory and no
+  weekly-sweep template to amend. Verified actionable for the
+  framework-gap dimension only.

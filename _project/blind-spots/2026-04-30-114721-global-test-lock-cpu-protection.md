@@ -22,3 +22,15 @@ Removing the global lock by default can shift pain from blocked pushes to CPU sa
 ## Suggested next steps
 - [ ] Track whether developers actually need `BENCHBOX_TEST_LOCK_DIR` outside isolated debug sessions.
 - [ ] Keep the default lock global unless measurement shows concurrent xdist runs are safe.
+
+## Triage log
+
+- 2026-05-02: verified actionable (advice still load-bearing). Default
+  lock path remains `$HOME/.benchbox/test.lock`
+  (`tests/conftest.py:_get_test_lock_path`, `Makefile:test-unlock`). The
+  override knob `BENCHBOX_TEST_LOCK_DIR` is still opt-in and now
+  expanduser-correct on both sides (codex w2 / commit fe393e748). No
+  measurement of concurrent-xdist safety has been collected yet, so the
+  rule "keep default global" is preserved by inertia rather than
+  evidence — the survey/measurement work item below is still owed.
+  Re-evaluate when dev-loop-step-5-measurement-window completes.

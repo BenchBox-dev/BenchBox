@@ -1,7 +1,7 @@
 ---
 id: 2026-05-01-103001-published-results-validator-no-per-bundle-test
 date: 2026-05-01
-status: open
+status: actioned
 finding_kind: bug-class
 review_context: "/code review of PR #87 (validator manifest compatibility) and PR #88 (closure)"
 related_paths:
@@ -56,3 +56,7 @@ Add a `test_per_bundle_manifest_preferred_over_legacy` to
    and `submission-manifest.json` (incorrect hash).
 2. Run the validator and assert it succeeds, proving per-bundle wins.
 3. Mirror the test for the per-bundle-only case.
+
+## Triage log
+
+- 2026-05-02: actioned — Sweep 2026-05-02: tests/integration/test_cross_branch_validator_contract.py now contains test_validator_prefers_per_bundle_manifest_over_legacy (line 229) which asserts the validator prefers <stem>.manifest.json over submission-manifest.json when both are present, and test_validator_skips_per_bundle_manifest_during_discovery (line 269) which guards the discovery skip. Both run against the develop script and the vendored fixture, exercising the per-bundle code path the original PR #87 added.

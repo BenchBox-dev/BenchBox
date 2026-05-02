@@ -23,3 +23,14 @@ Agents can walk away after auto-merge only because the current dwell time is sho
 ## Suggested next steps
 - [ ] Treat dwell-time targets as part of any queue acceptance criteria.
 - [ ] Update agent handoff guidance if queue dwell becomes materially longer than current CI time.
+
+## Triage log
+
+- 2026-05-02: verified actionable. Dwell time on `develop` PRs is
+  still short by design (auto-merge + lightweight `pr.yml` gate;
+  `make dev-loop-metrics` measures PR-to-merge P50/P95). The agent
+  contract in CLAUDE.md ("walk away — don't poll") still holds.
+  This finding becomes load-bearing only when Step 5 measurement
+  surfaces dwell-time symptoms that justify Step 6 (queue); at that
+  point the dwell-target acceptance criteria below must be folded
+  into the queue spec before any implementation TODO ships.
