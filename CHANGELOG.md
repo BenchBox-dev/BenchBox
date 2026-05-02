@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `intrinsic_appx_median` renamed to `approx_quantile_groupby` (its
   prior `PERCENTILE_CONT` body was exact, not approximate). Cross-engine
   function reference: `docs/benchmarks/read-primitives-approximate-functions.md`.
+- **write_primitives** — add `sketch` category exercising DataSketches
+  Theta / KLL / Top-K persist + merge + requery on Databricks,
+  Snowflake, BigQuery, and DuckDB-with-extension. Three ★ headline
+  ops measure the millisecond-merge claim end-to-end with
+  tolerance-based scalar validation. Cross-engine reference:
+  `docs/benchmarks/write-primitives-sketch-functions.md`.
 
 ## [0.2.1] - 2026-04-26
 

@@ -202,7 +202,7 @@ work:
 - id: w9
   summary: "Add changelog entry under unreleased"
   needs: [w6, w7]
-  status: pending
+  status: done
   notes: |
     Terse user-facing bullet:
     "write_primitives: add `sketch` category exercising DataSketches
