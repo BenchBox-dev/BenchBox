@@ -37,6 +37,7 @@ function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRow
     display_geomean_ms: 12,
     query_count: 22,
     trust_label: "maintainer-run",
+    validation_status: "exact",
     tuning_mode: null,
     execution_mode: null,
     compliance_class: null,
@@ -184,5 +185,14 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(ssb.querySelector('[data-result-id="r-ssb-a"]')).toBeTruthy();
     expect(ssb.querySelector('[data-result-id="r-ssb-b"]')).toBeTruthy();
     expect(ssb.querySelector('[data-result-id="r-tpch-a"]')).toBeNull();
+  });
+
+  it("shows receipt links and validation status for each platform result", async () => {
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
+    expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r-tpch-fast#run-receipt");
+    expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
   });
 });

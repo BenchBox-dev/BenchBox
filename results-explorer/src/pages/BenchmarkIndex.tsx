@@ -9,7 +9,7 @@ import { useUrlState, stringSerde } from "@/lib/useUrlState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { TrustBadge } from "@/components/TrustBadge";
+import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
 import { RankTable } from "@/components/RankTable";
@@ -197,19 +197,34 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     );
   }
 
+  const resultMetadataById = new Map(benchmarkResults.map((result) => [result.result_id, result]));
+  const summaryWithResultMetadata: BenchmarkSummary | null = summary
+    ? {
+        ...summary,
+        platforms: summary.platforms.map((platform) => {
+          const metadata = resultMetadataById.get(platform.result_id);
+          return {
+            ...platform,
+            platform_version: platform.platform_version ?? metadata?.platform_version ?? null,
+            validation_status: platform.validation_status ?? metadata?.validation_status ?? null,
+          };
+        }),
+      }
+    : null;
+
   // Collect unique trust labels and tuning modes from the loaded summary.
-  const tuningModes = summary
-    ? [...new Set(summary.platforms.map((p) => p.tuning_mode).filter((m): m is string => m !== null))].sort()
+  const tuningModes = summaryWithResultMetadata
+    ? [...new Set(summaryWithResultMetadata.platforms.map((p) => p.tuning_mode).filter((m): m is string => m !== null))].sort()
     : [];
-  const trustLabels = summary
-    ? [...new Set(summary.platforms.map((p) => p.trust_label))].sort()
+  const trustLabels = summaryWithResultMetadata
+    ? [...new Set(summaryWithResultMetadata.platforms.map((p) => p.trust_label))].sort()
     : [];
 
   // Apply client-side filters (tuning + trust) to the summary platforms.
-  const filteredSummary: BenchmarkSummary | null = summary
+  const filteredSummary: BenchmarkSummary | null = summaryWithResultMetadata
     ? {
-        ...summary,
-        platforms: summary.platforms.filter((p) => {
+        ...summaryWithResultMetadata,
+        platforms: summaryWithResultMetadata.platforms.filter((p) => {
           if (tuningFilter !== "all" && p.tuning_mode !== tuningFilter) return false;
           if (trustFilter !== null && !trustFilter.has(p.trust_label)) return false;
           return true;
@@ -644,12 +659,13 @@ function BenchmarkRow({ entry }: { entry: ResultRow }) {
       <td class="table-td">
         <div class="flex flex-wrap gap-1">
           <TrustBadge trustLabel={entry.trust_label} compact />
+          <ValidationBadge validationStatus={entry.validation_status} showMissing />
           {entry.tuning_mode && <TuningBadge tuningMode={entry.tuning_mode} />}
         </div>
       </td>
       <td class="table-td text-right">
-        <a href={`/results/r/${entry.result_id}`} class="text-xs font-medium no-underline">
-          View →
+        <a href={`/results/r/${entry.result_id}#run-receipt`} class="text-xs font-medium no-underline">
+          Receipt →
         </a>
       </td>
     </tr>

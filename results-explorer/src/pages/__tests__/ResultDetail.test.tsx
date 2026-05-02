@@ -145,4 +145,29 @@ describe("ResultDetail - median-first contract", () => {
     expect(screen.getByText("Charts")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Query Histogram" })).toBeTruthy();
   });
+
+  it("renders the run receipt before charts and timing tables", async () => {
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    const chartsHeading = screen.getByText("Charts");
+    const timingsHeading = screen.getByRole("heading", { name: "Query Timings (2)" });
+
+    expect(receipt.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(receipt.compareDocumentPosition(timingsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(receipt).toHaveTextContent("Measurement samples");
+    expect(receipt).toHaveTextContent("Download bundle");
+  });
+
+  it("links captured execution plans without requiring a plan viewer route", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ has_plans: true }));
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    const planLinks = screen.getAllByRole("link", { name: "Download plans" }) as HTMLAnchorElement[];
+    expect(planLinks.length).toBeGreaterThanOrEqual(1);
+    expect(planLinks[0]?.getAttribute("href")).toBe("https://example.test/download/r1.plans.json");
+  });
 });

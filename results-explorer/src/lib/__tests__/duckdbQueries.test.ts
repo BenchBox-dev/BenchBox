@@ -82,6 +82,7 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(sql).toMatch(/LEFT JOIN bench\.benchmark_rankings br ON br\.result_id = r\.result_id/);
     expect(sql).toMatch(/COALESCE\(br\.phase, r\.test_type, 'power'\) AS phase/);
     expect(sql).toMatch(/br\.primary_metric/);
+    expect(sql).toMatch(/validation_status/);
     expect(sql).not.toMatch(/WHERE/);
     expect(params).toBeUndefined();
   });

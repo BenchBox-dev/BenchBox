@@ -7,7 +7,7 @@ import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { TrustBadge } from "@/components/TrustBadge";
+import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { TimeSeries } from "@/components/TimeSeries";
 import type { SortState } from "@/types";
@@ -349,12 +349,13 @@ function PlatformRow({ entry, checked, onToggle }: PlatformRowProps) {
       <td class="table-td">
         <div class="flex flex-wrap gap-1">
           <TrustBadge trustLabel={entry.trust_label} compact />
+          <ValidationBadge validationStatus={entry.validation_status} showMissing />
           {entry.tuning_mode && <TuningBadge tuningMode={entry.tuning_mode} />}
         </div>
       </td>
       <td class="table-td text-right">
-        <a href={`/results/r/${entry.result_id}`} class="text-xs font-medium no-underline">
-          View →
+        <a href={`/results/r/${entry.result_id}#run-receipt`} class="text-xs font-medium no-underline">
+          Receipt →
         </a>
       </td>
     </tr>
