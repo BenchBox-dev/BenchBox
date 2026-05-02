@@ -207,7 +207,7 @@ work:
 - id: w12
   summary: "Normalize Firebolt cloud metadata"
   needs: [w1, w5]
-  status: pending
+  status: done
   notes: |
     Map Firebolt requested config and observed metadata into the new contract:
     account/engine/database identifiers, endpoint class, deployment mode,

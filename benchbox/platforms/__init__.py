@@ -744,8 +744,10 @@ try:
     PlatformHookRegistry.register_option_specs(
         "firebolt",
         PlatformOptionSpec(
-            name="firebolt_mode",
+            name="deployment_mode",
+            aliases=("firebolt_mode",),
             help="Explicit Firebolt mode: 'core' for local Docker, 'cloud' for managed Firebolt",
+            choices=("core", "cloud"),
         ),
         PlatformOptionSpec(
             name="url",
@@ -772,6 +774,51 @@ try:
             name="api_endpoint",
             help="Firebolt Cloud API endpoint",
             default="api.app.firebolt.io",
+        ),
+        PlatformOptionSpec(
+            name="database",
+            help="Firebolt database name",
+        ),
+        PlatformOptionSpec(
+            name="region",
+            aliases=("cloud_region",),
+            help="Firebolt Cloud region when known",
+        ),
+        PlatformOptionSpec(
+            name="cloud_provider",
+            help="Firebolt Cloud provider when known",
+        ),
+        PlatformOptionSpec(
+            name="engine_type",
+            help="Firebolt Cloud engine type when known",
+        ),
+        PlatformOptionSpec(
+            name="engine_size",
+            help="Firebolt Cloud requested engine size when known",
+        ),
+        PlatformOptionSpec(
+            name="compute_size",
+            help="Firebolt Cloud requested compute size alias for engine size",
+        ),
+        PlatformOptionSpec(
+            name="s3_staging_url",
+            help="S3 URL for Firebolt Cloud data staging",
+        ),
+        PlatformOptionSpec(
+            name="s3_region",
+            help="AWS region for Firebolt S3 staging",
+        ),
+        PlatformOptionSpec(
+            name="disable_result_cache",
+            parser=parse_bool,
+            help="Disable Firebolt Cloud result cache during benchmark execution",
+            default=True,
+        ),
+        PlatformOptionSpec(
+            name="strict_validation",
+            parser=parse_bool,
+            help="Fail when Firebolt cache-control validation cannot prove expected state",
+            default=False,
         ),
     )
 
