@@ -235,6 +235,31 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
   });
 
+  it("caps rendered platform rows and expands them with Show more", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(
+      Array.from({ length: 205 }, (_, index) =>
+        makeRow({
+          result_id: `r-many-${index}`,
+          benchmark: "tpch",
+          geomean_ms: index + 1,
+          display_geomean_ms: index + 1,
+          run_date: `2026-04-${String((index % 28) + 1).padStart(2, "0")}`,
+        }),
+      ),
+    );
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    expect(screen.getByText("Showing 200 of 205 results")).toBeTruthy();
+    expect(getRowOrder(container)).toHaveLength(200);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show more results" }));
+
+    expect(getRowOrder(container)).toHaveLength(205);
+    expect(screen.getByText("Showing 205 of 205 results")).toBeTruthy();
+  });
+
   it("splits platform trend charts by comparable benchmark cohorts", async () => {
     vi.mocked(getPlatformIndexRows).mockResolvedValue([
       makeRow({

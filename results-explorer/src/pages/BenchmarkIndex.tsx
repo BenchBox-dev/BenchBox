@@ -23,6 +23,8 @@ interface BenchmarkIndexProps extends RoutableProps {
 
 type ViewMode = "matrix" | "ranks" | "list";
 type BenchmarkListSortKey = "platform" | "scale_factor" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
+const TABLE_RENDER_LIMIT = 200;
+const TABLE_RENDER_INCREMENT = 200;
 
 const TRUST_LABEL_ABBREV: Record<string, string> = {
   "maintainer-run": "Maintainer",
@@ -629,6 +631,7 @@ function ListTable({
     key: "display_geomean_ms",
     direction: "asc",
   });
+  const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
   const benchmarkResults = results.filter((r) => r.benchmark === benchmark);
 
   const byScale = benchmarkResults.filter((r) => String(r.scale_factor) === scaleFactor);
@@ -636,6 +639,28 @@ function ListTable({
   const filtered = byScale
     .filter((row) => matchesFacetFields(row, facets))
     .sort((a, b) => compareListRows(a, b, sort));
+  const visibleRows = filtered.slice(0, visibleLimit);
+
+  useEffect(() => {
+    setVisibleLimit(TABLE_RENDER_LIMIT);
+  }, [
+    benchmark,
+    scaleFactor,
+    facets.platform,
+    facets.execution_mode,
+    facets.tuning_mode,
+    facets.trust_tier,
+    facets.validation_status,
+    facets.deployment_class,
+    facets.cloud_provider,
+    facets.cloud_region,
+    facets.instance_or_warehouse,
+    facets.storage_format,
+    facets.cost_status,
+    facets.date_window,
+    sort.key,
+    sort.direction,
+  ]);
 
   function toggleSort(key: BenchmarkListSortKey) {
     setSort((prev) =>
@@ -674,6 +699,9 @@ function ListTable({
 
   return (
     <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+        Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} results for SF {scaleFactor}
+      </div>
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
@@ -737,11 +765,22 @@ function ListTable({
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 bg-white">
-          {filtered.map((r) => (
+          {visibleRows.map((r) => (
             <BenchmarkRow key={r.result_id} entry={r} />
           ))}
         </tbody>
       </table>
+      {visibleRows.length < filtered.length && (
+        <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            onClick={() => setVisibleLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
+          >
+            Show more results
+          </button>
+        </div>
+      )}
     </div>
   );
 }

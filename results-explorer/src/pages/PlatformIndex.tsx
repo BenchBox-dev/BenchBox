@@ -19,6 +19,8 @@ interface PlatformIndexProps extends RoutableProps {
 
 type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score" | "geomean_ms";
 type TrendMetric = "power_score" | "display_geomean_ms";
+const TABLE_RENDER_LIMIT = 200;
+const TABLE_RENDER_INCREMENT = 200;
 
 interface TrendCohort {
   key: string;
@@ -31,6 +33,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const [rows, setRows] = useState<PlatformIndexRowRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
   const { facets, setFacet } = useFacetState();
   const tuningFilter = singleFacetValue(facets.tuning_mode) ?? "all";
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
@@ -60,6 +63,28 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    setVisibleLimit(TABLE_RENDER_LIMIT);
+  }, [
+    platform,
+    facets.benchmark,
+    facets.scale_factor,
+    facets.phase,
+    facets.execution_mode,
+    facets.tuning_mode,
+    facets.trust_tier,
+    facets.validation_status,
+    facets.deployment_class,
+    facets.cloud_provider,
+    facets.cloud_region,
+    facets.instance_or_warehouse,
+    facets.storage_format,
+    facets.cost_status,
+    facets.date_window,
+    sort.key,
+    sort.direction,
+  ]);
 
   if (error) return <ErrorMessage message={error} />;
   if (!rows) return <LoadingSpinner message="Loading results..." />;
@@ -97,6 +122,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     if (bv === null) return -1;
     return dir * (av - bv);
   });
+  const visiblePlatformResults = platformResults.slice(0, visibleLimit);
 
   function toggleSort(key: PlatformSortKey) {
     setSort((prev) =>
@@ -186,6 +212,12 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         </p>
       ) : (
         <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+            <span>
+              Showing {visiblePlatformResults.length.toLocaleString()} of {platformResults.length.toLocaleString()} results
+            </span>
+            {selected.size > 0 && <span>{selected.size.toLocaleString()} selected for compare</span>}
+          </div>
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
@@ -252,7 +284,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 bg-white">
-              {platformResults.map((r) => (
+              {visiblePlatformResults.map((r) => (
                 <PlatformRow
                   key={r.result_id}
                   entry={r}
@@ -262,6 +294,17 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               ))}
             </tbody>
           </table>
+          {visiblePlatformResults.length < platformResults.length && (
+            <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                onClick={() => setVisibleLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
+              >
+                Show more results
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -309,7 +309,8 @@ describe("Query", () => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
     });
-    expect(screen.getByText("Showing all returned rows: 2")).toBeTruthy();
+    expect(screen.getByText("Showing 2 of 2 returned rows")).toBeTruthy();
+    expect(screen.getByText("Query limit: all")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /^Default$/ }));
 

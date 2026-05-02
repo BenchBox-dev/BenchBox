@@ -38,6 +38,8 @@ const DEFAULT_COLUMNS = [
   "geomean_ms",
   "trust_label",
 ];
+const TABLE_RENDER_LIMIT = 200;
+const TABLE_RENDER_INCREMENT = 200;
 
 export function Query(_: RoutableProps) {
   useDocumentTitle("Query · BenchBox Results");
@@ -73,6 +75,8 @@ export function Query(_: RoutableProps) {
   const [sqlRows, setSqlRows] = useState<ResultRow[]>([]);
   const [sqlError, setSqlError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [visibleResultLimit, setVisibleResultLimit] = useState(TABLE_RENDER_LIMIT);
+  const [visibleSqlLimit, setVisibleSqlLimit] = useState(TABLE_RENDER_LIMIT);
   const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
   const rowLimit = rowLimitMode === "all" ? UNLIMITED_ROW_LIMIT : DEFAULT_ROW_LIMIT;
 
@@ -117,6 +121,16 @@ export function Query(_: RoutableProps) {
     [visibleColumns],
   );
   const activeFilters = useMemo(() => applySchemaFilterSupport(filters, schema), [filters, schema]);
+  const visibleRows = rows.slice(0, visibleResultLimit);
+  const visibleSqlRows = sqlRows.slice(0, visibleSqlLimit);
+
+  useEffect(() => {
+    setVisibleResultLimit(TABLE_RENDER_LIMIT);
+  }, [activeFilters, queryColumns, rowLimit, sort]);
+
+  useEffect(() => {
+    setVisibleSqlLimit(TABLE_RENDER_LIMIT);
+  }, [sqlRows]);
 
   useEffect(() => {
     if (rowLimitRaw === "default" || rowLimitRaw === "all") return;
@@ -502,6 +516,12 @@ export function Query(_: RoutableProps) {
             <LoadingSpinner message="Querying results.duckdb..." />
           ) : (
             <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+                <span>
+                  Showing {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} returned rows
+                </span>
+                <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
+              </div>
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
@@ -515,7 +535,7 @@ export function Query(_: RoutableProps) {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white">
-                  {rows.map((row) => (
+                  {visibleRows.map((row) => (
                     <tr key={String(row.result_id)} class="hover:bg-gray-50">
                       {visibleColumns.map((column) => (
                         <td key={column} class="table-td">
@@ -530,16 +550,18 @@ export function Query(_: RoutableProps) {
                     </tr>
                   ))}
                 </tbody>
-                {rowLimitMode === "all" && (
-                  <tfoot class="border-t border-gray-200 bg-gray-50">
-                    <tr>
-                      <td class="table-td text-sm text-gray-500" colSpan={visibleColumns.length + 1}>
-                        Showing all returned rows: {rows.length.toLocaleString()}
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
               </table>
+              {visibleRows.length < rows.length && (
+                <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+                  <button
+                    type="button"
+                    class="btn btn-secondary"
+                    onClick={() => setVisibleResultLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
+                  >
+                    Show more results
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -560,6 +582,9 @@ export function Query(_: RoutableProps) {
               </div>
               {sqlRows.length > 0 && (
                 <div class="overflow-hidden rounded-lg border border-gray-200">
+                  <div class="border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+                    Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows
+                  </div>
                   <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                       <tr>
@@ -571,7 +596,7 @@ export function Query(_: RoutableProps) {
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 bg-white">
-                      {sqlRows.map((row, index) => (
+                      {visibleSqlRows.map((row, index) => (
                         <tr key={index}>
                           {sqlColumns.map((column) => (
                             <td key={column} class="table-td">
@@ -582,6 +607,17 @@ export function Query(_: RoutableProps) {
                       ))}
                     </tbody>
                   </table>
+                  {visibleSqlRows.length < sqlRows.length && (
+                    <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+                      <button
+                        type="button"
+                        class="btn btn-secondary"
+                        onClick={() => setVisibleSqlLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
+                      >
+                        Show more SQL rows
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -23,6 +23,7 @@ vi.mock("@/db", () => ({
 }));
 
 import { queryRows } from "@/db";
+import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
 import { BenchmarkIndex } from "@/pages/BenchmarkIndex";
 
 // ---------------------------------------------------------------------------
@@ -267,6 +268,7 @@ function defaultImpl(rows: typeof RESULT_ROWS, rankings: typeof RANKING_ROWS, ce
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearDuckdbQueryCachesForTests();
   window.history.replaceState(null, "", "/results/tpch/");
   vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS));
 });
@@ -391,6 +393,30 @@ describe("BenchmarkIndex", () => {
     expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
     fireEvent.click(screen.getByRole("button", { name: /Geomean/ }));
     expect(getRenderedResultOrder(container)).toEqual(["r2", "r1"]);
+  });
+
+  it("list view caps rendered rows and expands them with Show more", async () => {
+    const manyRows = Array.from({ length: 205 }, (_, index) => ({
+      ...RESULT_ROWS[0]!,
+      result_id: `r-list-${index}`,
+      platform: `DuckDB ${index}`,
+      platform_id: `duckdb-${index}`,
+      display_geomean_ms: index + 1,
+      geomean_ms: index + 1,
+    }));
+    vi.mocked(queryRows).mockImplementation(defaultImpl(manyRows, RANKING_ROWS, CELL_ROWS));
+
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+    fireEvent.click(screen.getByText("List"));
+
+    await waitFor(() => expect(screen.getByText("Showing 200 of 205 results for SF 0.1")).toBeTruthy());
+    expect(getRenderedResultOrder(container)).toHaveLength(200);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show more results" }));
+
+    expect(getRenderedResultOrder(container)).toHaveLength(205);
+    expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------

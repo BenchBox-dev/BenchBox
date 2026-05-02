@@ -173,7 +173,14 @@ work:
   - id: w11
     summary: "Add pagination/limit behavior for tables that can grow to thousands of rows"
     needs: [w2, w3, w4, w5]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/BenchmarkIndex.tsx"
+      - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      - "results-explorer/src/pages/PlatformIndex.tsx"
+      - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      - "results-explorer/src/pages/Query.tsx"
+      - "results-explorer/src/pages/__tests__/Query.test.tsx"
     notes: |
       Audit each migrated page's table renderer for unbounded row rendering.
       Add a default LIMIT (e.g. 200) plus "Show more" controls. Keep the result
