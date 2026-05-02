@@ -225,6 +225,35 @@ describe("ChartPanel", () => {
     expect(widths[1]!).toBeLessThan(widths[2]!);
   });
 
+  it("places performance labels away from cramped bar edges and keeps tooltip values", () => {
+    const { container } = render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            platforms: [
+              makePlatformRow({ result_id: "fast", platform: "FastDB", display_geomean_ms: 10 }),
+              makePlatformRow({ result_id: "slow", platform: "SlowDB", display_geomean_ms: 1000 }),
+            ],
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Performance Bar" }));
+
+    const valueLabels = Array.from(container.querySelectorAll("text[data-value-placement]"));
+    expect(valueLabels.map((label) => label.getAttribute("data-value-placement"))).toContain("outside");
+    expect(valueLabels.map((label) => label.getAttribute("data-value-placement"))).toContain("inside");
+    expect(
+      valueLabels.find((label) => label.textContent === "1000 ms")?.getAttribute("data-value-placement"),
+    ).toBe("inside");
+
+    const tooltips = Array.from(container.querySelectorAll("rect title")).map((title) => title.textContent);
+    expect(tooltips).toContain("FastDB: 10 ms");
+    expect(tooltips).toContain("SlowDB: 1000 ms");
+  });
+
   it("keeps the cost chart reachable so normalized-cost empty states are visible", () => {
     render(
       <ChartPanel

@@ -40,6 +40,13 @@ interface CompareQueryRow {
   timings: ({ ms: number; status: "pass" } | null)[];
 }
 
+interface ValueLabelPlacement {
+  x: number;
+  textAnchor: "start" | "end";
+  fill: string;
+  placement: "outside" | "inside" | "gutter";
+}
+
 export function ChartPanel({ context }: ChartPanelProps) {
   const charts = useMemo(() => applicableCharts(context), [context]);
   const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
@@ -362,8 +369,8 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   const rowHeight = 36;
   const axisHeight = 32;
   const topPadding = 8;
-  const valueWidth = 72;
-  const plotWidth = width - labelWidth - valueWidth;
+  const valueLabelGutter = 96;
+  const plotWidth = width - labelWidth - valueLabelGutter;
   const totalHeight = topPadding + rows.length * rowHeight + axisHeight;
   const scale = buildLatencyBarScale(rows.map((row) => row.display_geomean_ms));
   if (scale === null) return null;
@@ -389,6 +396,14 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
         {rows.map((row, index) => {
           const fraction = latencyScaleFraction(row.display_geomean_ms, scale) ?? 0;
           const barWidth = fraction * plotWidth;
+          const renderedBarWidth = Math.max(2, barWidth);
+          const valueLabel = fmtGeomean(row.display_geomean_ms);
+          const valueLabelPlacement = placePerformanceValueLabel({
+            barWidth: renderedBarWidth,
+            plotWidth,
+            labelWidth,
+            valueText: valueLabel,
+          });
           const y = topPadding + index * rowHeight;
           const midY = y + rowHeight * 0.5;
           const barHeight = rowHeight * 0.55;
@@ -405,7 +420,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
               <rect
                 x={labelWidth}
                 y={midY - barHeight / 2}
-                width={Math.max(2, barWidth)}
+                width={renderedBarWidth}
                 height={barHeight}
                 fill={row.color}
                 opacity={0.85}
@@ -413,12 +428,25 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
               >
                 <title>{`${row.platform}: ${fmtGeomean(row.display_geomean_ms)}`}</title>
               </rect>
+              {valueLabelPlacement.placement === "gutter" && (
+                <line
+                  x1={labelWidth + renderedBarWidth + 4}
+                  y1={midY}
+                  x2={valueLabelPlacement.x - 5}
+                  y2={midY}
+                  stroke="#d1d5db"
+                  strokeWidth={1}
+                  strokeDasharray="2 2"
+                />
+              )}
               <text
-                x={labelWidth + barWidth + 6}
+                x={valueLabelPlacement.x}
                 y={midY + 4}
-                style={{ fontSize: "11px", fill: "#374151" }}
+                textAnchor={valueLabelPlacement.textAnchor}
+                data-value-placement={valueLabelPlacement.placement}
+                style={{ fontSize: "11px", fill: valueLabelPlacement.fill }}
               >
-                {fmtGeomean(row.display_geomean_ms)}
+                {valueLabel}
               </text>
               {index < rows.length - 1 && (
                 <line
@@ -472,6 +500,49 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
       </svg>
     </div>
   );
+}
+
+function placePerformanceValueLabel({
+  barWidth,
+  plotWidth,
+  labelWidth,
+  valueText,
+}: {
+  barWidth: number;
+  plotWidth: number;
+  labelWidth: number;
+  valueText: string;
+}): ValueLabelPlacement {
+  const labelGap = 6;
+  const labelPx = valueText.length * 6.5;
+  const plotRight = labelWidth + plotWidth;
+  const outsideX = labelWidth + barWidth + labelGap;
+  const outsideFits = outsideX + labelPx <= plotRight - labelGap;
+  if (outsideFits) {
+    return {
+      x: outsideX,
+      textAnchor: "start",
+      fill: "#374151",
+      placement: "outside",
+    };
+  }
+
+  const insideFits = barWidth >= labelPx + labelGap * 2;
+  if (insideFits) {
+    return {
+      x: labelWidth + barWidth - labelGap,
+      textAnchor: "end",
+      fill: "#ffffff",
+      placement: "inside",
+    };
+  }
+
+  return {
+    x: plotRight + labelGap,
+    textAnchor: "start",
+    fill: "#374151",
+    placement: "gutter",
+  };
 }
 
 function SummaryBoxPanel({

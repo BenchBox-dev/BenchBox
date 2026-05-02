@@ -56,7 +56,10 @@ work:
   - id: w3
     summary: "Fix label overlap in SSB/star_schema performance bar charts"
     needs: [w2]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/ChartPanel.tsx"
+      - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
     notes: |
       The audited SSB Performance Bar showed labels crowding near the origin.
       Implement collision-aware label placement: outside labels when space is
