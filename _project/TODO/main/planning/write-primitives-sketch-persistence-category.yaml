@@ -154,7 +154,7 @@ work:
 - id: w6
   summary: "Run write_primitives unit tests and operation contract checks"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     `uv run -- python -m pytest tests/unit/write_primitives -q -m fast`
     must pass. Catalog loader must accept the new validation kind and
