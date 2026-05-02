@@ -516,6 +516,14 @@ queries:
           quantileTDigest(0.5)(l_quantity) as median_quantity
       FROM lineitem
       GROUP BY l_shipmode;
+    # DataFusion has no APPROX_QUANTILE; use approx_percentile_cont.
+    datafusion: |2
+
+      SELECT
+          l_shipmode,
+          approx_percentile_cont(l_quantity, 0.5) as median_quantity
+      FROM lineitem
+      GROUP BY l_shipmode;
     # Snowflake (APPROX_PERCENTILE) and Databricks (PERCENTILE_APPROX)
     # rewrites are handled by sqlglot.
   # Redshift's `APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)`
@@ -845,7 +853,8 @@ queries:
 
       SELECT topK(5)(l_shipmode) as top_shipmodes
       FROM lineitem;
-  skip_on: [redshift]
+  # Redshift has no top-K function family. DataFusion lacks approx_top_k.
+  skip_on: [redshift, datafusion]
 - id: window_growing_frame
   category: window
   sql: |2
@@ -1244,7 +1253,8 @@ queries:
       FROM lineitem
       GROUP BY l_returnflag, l_linestatus;
     # Databricks rewrite (PERCENTILE_APPROX with ARRAY(...)) handled by sqlglot.
-  skip_on: [redshift]
+  # DataFusion has no array-returning approximate-quantile aggregate.
+  skip_on: [redshift, datafusion]
 - id: statistical_variance_stddev
   category: statistical
   sql: |2

@@ -88,7 +88,7 @@ work:
 - id: w3
   summary: "Run cross-engine validation; tune skip_on lists empirically"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Run `benchbox run --platform <p> --benchmark read_primitives
     --queries approx_*` against duckdb, datafusion, clickhouse,
