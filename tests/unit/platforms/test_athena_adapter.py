@@ -283,6 +283,88 @@ class TestAthenaAdapter:
         assert info["connection_mode"] == "serverless"
         assert info["configuration"]["region"] == "us-west-2"
         assert info["configuration"]["workgroup"] == "analytics"
+        assert info["configuration"]["s3_bucket"] == "data-bucket"
+        assert info["configuration"]["s3_prefix"] == "benchbox-data"
+        assert info["configuration"]["default_format"] == "PARQUET"
+
+    def test_normalized_metadata_maps_requested_serverless_and_storage_config(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials
+    ):
+        """Requested Athena config is normalized into serverless/cloud/storage facets."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(
+            region="eu-west-1",
+            workgroup="analytics",
+            database="benchmark",
+            catalog="AwsDataCatalog",
+            s3_staging_dir="s3://data-bucket/benchbox/staging",
+            s3_output_location="s3://results-bucket/athena/results/",
+            data_format="text",
+            default_format="CSV",
+            compression="GZIP",
+            cleanup_staging=False,
+            query_timeout=300,
+            encryption="SSE-S3",
+        )
+
+        metadata = adapter.get_normalized_result_metadata()
+
+        assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "serverless"
+        assert metadata["platform_deployment"]["deployment_type"] == "serverless"
+        assert metadata["platform_deployment"]["workgroup"] == "analytics"
+        assert metadata["platform_deployment"]["catalog"] == "AwsDataCatalog"
+        assert metadata["platform_deployment"]["database"] == "benchmark"
+        assert metadata["platform_cloud"]["provider"] == "aws"
+        assert metadata["platform_cloud"]["region"] == "eu-west-1"
+        assert metadata["platform_compute"]["service_model"] == "serverless"
+        assert metadata["platform_compute"]["engine"] == "athena"
+        assert metadata["platform_compute"]["workgroup"] == "analytics"
+        assert metadata["platform_compute"]["query_timeout"] == 300
+        assert metadata["platform_storage"]["table_format"] == "CSV"
+        assert metadata["platform_storage"]["data_format"] == "text"
+        assert metadata["platform_storage"]["staging_location"] == "s3://data-bucket/benchbox/staging"
+        assert metadata["platform_storage"]["query_output_location"] == "s3://results-bucket/athena/results/"
+        assert metadata["platform_storage"]["bucket"] == "data-bucket"
+        assert metadata["platform_storage"]["prefix"] == "benchbox/staging"
+        assert metadata["platform_storage"]["compression"] == "GZIP"
+        assert metadata["platform_storage"]["cleanup_policy"] == "preserve_staging"
+        assert metadata["platform_storage"]["encryption"] == "SSE-S3"
+        assert metadata["platform_storage"]["query_output_location_status"] == "available"
+        assert metadata["platform_storage"]["staging_location_status"] == "available"
+        assert metadata["platform_storage"]["cleanup_policy_status"] == "available"
+        assert metadata["platform_storage"]["encryption_status"] == "available"
+
+    def test_normalized_metadata_marks_missing_optional_storage_fields_unavailable(
+        self, mock_boto3, mock_pyathena, mock_aws_credentials
+    ):
+        """Missing optional storage fields retain explicit unavailable status markers."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket")
+        platform_info = {
+            "platform_type": "athena",
+            "platform_name": "AWS Athena",
+            "connection_mode": "serverless",
+            "configuration": {
+                "region": "us-east-1",
+                "workgroup": "primary",
+                "database": "benchmark",
+                "catalog": "AwsDataCatalog",
+                "data_format": "parquet",
+                "default_format": "PARQUET",
+                "compression": "SNAPPY",
+            },
+        }
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=platform_info)
+
+        assert metadata["platform_storage"]["query_output_location_status"] == "unavailable"
+        assert metadata["platform_storage"]["staging_location_status"] == "unavailable"
+        assert metadata["platform_storage"]["cleanup_policy_status"] == "unavailable"
+        assert metadata["platform_storage"]["encryption_status"] == "unavailable"
+        assert "cleanup_policy" not in metadata["platform_storage"]
+        assert metadata["platform_storage"]["collection_status"] == "partial"
 
     def test_cost_tracking(self, mock_boto3, mock_pyathena, mock_aws_credentials):
         """Test cost summary calculation."""

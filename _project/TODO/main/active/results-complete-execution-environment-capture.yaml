@@ -172,7 +172,7 @@ work:
 - id: w9
   summary: "Normalize Athena cloud metadata"
   needs: [w1, w5]
-  status: pending
+  status: done
   notes: |
     Map Athena requested config into the new serverless contract: AWS
     provider, region, workgroup, catalog/database, S3 output location,
