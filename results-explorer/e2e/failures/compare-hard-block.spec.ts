@@ -1,38 +1,46 @@
 import { expect, test } from "@playwright/test";
-import { waitForShell } from "../support/fixtures";
+import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const TPCH_ID = "tpch-duckdb-sf0.01-20260403-010ee756";
-const STAR_SCHEMA_ID = "star_schema-duckdb-sf0.01-20260403-3cdeede0";
-const TPCH_SF01_ID = "tpch-duckdb-sf0.1-20260403-f88815c2";
+const TPCH_SHORT = "ba6a8c83";
+const STAR_SCHEMA_SHORT = "0f0add9f";
+const TPCH_SF01_SHORT = "0820b170";
 
 test.describe.configure({ mode: "serial" });
 
-test.describe("Compare hard blocks", () => {
-  test("mixing benchmarks blocks the compare render with an explicit error", async ({
+test.describe("Compare guardrails", () => {
+  test("mixing benchmarks renders guardrails without suppressing raw evidence", async ({
     page,
   }) => {
-    await page.goto(`/results/compare?ids=${TPCH_ID},${STAR_SCHEMA_ID}`);
+    await page.goto(`/results/compare?ids=${TPCH_SHORT},${STAR_SCHEMA_SHORT}`);
     await waitForShell(page);
+    await waitForDataLoaded(page, /Mixed Benchmark Comparison/);
 
-    // The error card is rendered by ErrorMessage under an explicit
-    // "Cannot compare" heading. We assert on both halves so a generic
-    // "error" string alone does not count as passing.
-    await expect(page.getByRole("heading", { name: /Cannot compare/i })).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(page.getByText(/different benchmarks/i)).toBeVisible();
+    const main = page.getByRole("main");
+    const receipt = main.getByRole("region", { name: "Comparability receipt" });
+    const summary = main.getByRole("region", { name: "Decision Summary" });
+    await expect(receipt).toContainText("Benchmark");
+    await expect(summary).toContainText("Not directly comparable: benchmarks differ");
+    await expect(summary).toContainText("Claims suppressed");
+    await expect(main.getByRole("heading", { name: "Query-Level Diff" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: /Cannot compare/i })).toHaveCount(0);
   });
 
-  test("mixing scale factors blocks the compare render with an explicit error", async ({
+  test("mixing scale factors renders guardrails without suppressing raw evidence", async ({
     page,
   }) => {
-    await page.goto(`/results/compare?ids=${TPCH_ID},${TPCH_SF01_ID}`);
+    await page.goto(`/results/compare?ids=${TPCH_SHORT},${TPCH_SF01_SHORT}`);
     await waitForShell(page);
+    await waitForDataLoaded(page, /TPC-H Comparison/);
 
-    await expect(page.getByRole("heading", { name: /Cannot compare/i })).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(page.getByText(/different scale factors/i)).toBeVisible();
+    const main = page.getByRole("main");
+    const receipt = main.getByRole("region", { name: "Comparability receipt" });
+    const summary = main.getByRole("region", { name: "Decision Summary" });
+    await expect(receipt).toContainText("Scale factor");
+    await expect(summary).toContainText("Not directly comparable: scale factors differ");
+    await expect(summary).toContainText("Claims suppressed");
+    await expect(main.getByRole("heading", { name: "Query-Level Diff" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: /Cannot compare/i })).toHaveCount(0);
   });
 
   test("a Compare URL that references an unknown result_id surfaces a removal-hint error", async ({

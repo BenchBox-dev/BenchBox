@@ -24,6 +24,7 @@ import { PlatformIndex } from "@/pages/PlatformIndex";
 function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRowRow {
   return {
     result_id: "r-base",
+    short_id: "base0001",
     benchmark: "tpch",
     scale_factor: 0.1,
     phase: "power",
@@ -60,6 +61,7 @@ function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRow
 const ROWS: PlatformIndexRowRow[] = [
   makeRow({
     result_id: "r-tpch-fast",
+    short_id: "aaaabbbb",
     benchmark: "tpch",
     run_date: "2026-04-03",
     power_score: 5000,
@@ -75,9 +77,9 @@ const ROWS: PlatformIndexRowRow[] = [
     warehouse_size: "MEDIUM",
     storage_format: "parquet",
   }),
-  makeRow({ result_id: "r-ssb-mid", benchmark: "star_schema", run_date: "2026-04-01", power_score: 3000, geomean_ms: 15 }),
-  makeRow({ result_id: "r-tpch-slow", benchmark: "tpch", run_date: "2026-04-02", power_score: 1000, geomean_ms: 50 }),
-  makeRow({ result_id: "r-null-geo", benchmark: "tpch", run_date: "2026-04-04", power_score: null, geomean_ms: null }),
+  makeRow({ result_id: "r-ssb-mid", short_id: "ccccdddd", benchmark: "star_schema", run_date: "2026-04-01", power_score: 3000, geomean_ms: 15 }),
+  makeRow({ result_id: "r-tpch-slow", short_id: "eeeeffff", benchmark: "tpch", run_date: "2026-04-02", power_score: 1000, geomean_ms: 50 }),
+  makeRow({ result_id: "r-null-geo", short_id: "11112222", benchmark: "tpch", run_date: "2026-04-04", power_score: null, geomean_ms: null }),
 ];
 
 function getRowOrder(container: ParentNode): string[] {
@@ -262,6 +264,27 @@ describe("PlatformIndex - sortable table headers", () => {
     const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r-tpch-fast#run-receipt");
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
+  });
+
+  it("compare tray shows selected metadata and uses short IDs in the compare URL", async () => {
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    fireEvent.click(screen.getByLabelText("Select r-tpch-fast for comparison"));
+    fireEvent.click(screen.getByLabelText("Select r-ssb-mid for comparison"));
+
+    const tpchRow = screen.getByTestId("compare-tray-row-r-tpch-fast");
+    const ssbRow = screen.getByTestId("compare-tray-row-r-ssb-mid");
+    expect(tpchRow.textContent).toContain("DuckDB");
+    expect(tpchRow.textContent).toContain("TPC-H");
+    expect(tpchRow.textContent).toContain("SF 0.1");
+    expect(tpchRow.textContent).toContain("power");
+    expect(tpchRow.textContent).toContain("2026-04-03");
+    expect(tpchRow.textContent).toContain("ID aaaabbbb");
+    expect(ssbRow.textContent).toContain("SSB");
+
+    const compareLink = screen.getByRole("link", { name: /Compare 2 selected/ }) as HTMLAnchorElement;
+    expect(compareLink.getAttribute("href")).toBe("/results/compare?ids=aaaabbbb,ccccdddd");
   });
 
   it("caps rendered platform rows and expands them with Show more", async () => {

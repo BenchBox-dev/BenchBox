@@ -311,6 +311,36 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
   });
 
+  it("uses a controlled compare baseline without rendering a second selector", () => {
+    render(
+      <ChartPanel
+        baselineIndex={1}
+        onBaselineIndexChange={() => undefined}
+        context={{
+          kind: "compare",
+          results: [
+            makeDetail(),
+            makeDetail({
+              result_id: "detail-2",
+              platform: "SQLite",
+              platform_id: "sqlite",
+              display_geomean_ms: 18,
+              geomean_ms: 18,
+              display_timings: [
+                { query_id: "Q1", display_ms: 18, sample_count: 3 },
+                { query_id: "Q2", display_ms: 22, sample_count: 3 },
+              ],
+            }),
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.queryByLabelText(/Baseline/i)).toBeNull();
+    expect(screen.getByText("Baseline:")).toBeTruthy();
+    expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
+  });
+
   it("preserves the compared run phase in compare-mode summary content", () => {
     render(
       <ChartPanel

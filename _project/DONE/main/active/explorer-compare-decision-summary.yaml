@@ -2,7 +2,7 @@ id: explorer-compare-decision-summary
 title: "Explorer: summary-led compare workflow with cohort guardrails"
 worktree: main
 priority: "Medium-High"
-status: "Not Started"
+status: "Completed"
 category: "Core Functionality"
 
 deps:
@@ -20,7 +20,14 @@ description: |
 work:
   - id: w1
     summary: "Add compare decision summary computed from selected results"
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/Compare.tsx"
+      - "results-explorer/src/components/CompareSummary.tsx"
+      - "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+      - "results-explorer/src/lib/compareSummary.ts"
+      - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
     notes: |
       At the top of Compare.tsx, render a compact summary:
         - winner by primary cohort metric
@@ -33,7 +40,12 @@ work:
   - id: w2
     summary: "Move diff table ahead of secondary charts"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/Compare.tsx"
+      - "results-explorer/src/components/QueryDiffTable.tsx"
+      - "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
     notes: |
       Add a dense query-level diff table immediately after the summary:
       query ID, baseline latency, candidate latency, ratio, absolute delta,
@@ -43,7 +55,14 @@ work:
   - id: w3
     summary: "Add explicit baseline controls for multi-result comparisons"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/Compare.tsx"
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      - "results-explorer/src/components/ChartPanel.tsx"
+      - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+      - "results-explorer/src/components/QueryDiffTable.tsx"
+      - "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
     notes: |
       Let the user choose baseline result from a segmented/select control.
       Default to the first URL id for backwards compatibility. Ratios and
@@ -52,7 +71,14 @@ work:
   - id: w4
     summary: "Render cohort guardrails before claims"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/Compare.tsx"
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      - "results-explorer/src/components/CompareSummary.tsx"
+      - "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+      - "results-explorer/src/lib/compareSummary.ts"
+      - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
     notes: |
       Consumes the ComparabilityReceipt component owned by
       `explorer-run-receipt-methodology-disclosure` w3 — this work unit does
@@ -66,7 +92,14 @@ work:
 
   - id: w5
     summary: "Improve compare tray metadata and URL shareability"
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/BenchmarkIndex.tsx"
+      - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      - "results-explorer/src/pages/PlatformIndex.tsx"
+      - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      - "results-explorer/src/lib/duckdbQueries.ts"
+      - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
     notes: |
       Sticky compare bars in BenchmarkIndex and PlatformIndex should show
       platform, benchmark, scale, phase, date, trust, and short id for selected
@@ -76,11 +109,25 @@ work:
   - id: w6
     summary: "Add tests for summary math, baseline selection, and guardrails"
     needs: [w1, w2, w3, w4, w5]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      - "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
+      - "results-explorer/e2e/routes/compare.spec.ts"
+      - "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "docs/development/dependency-compatibility.md"
+      - "docs/development/dependency-audit-raw.md"
+      - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+      - "tests/unit/core/explorer_pipeline/test_pipeline.py"
     notes: |
       Extend Compare.test.tsx with same-cohort, mismatched-cohort, missing-query,
       multi-result, and baseline-switch cases. Include no-cost and normalized
-      cost cases once cost fields are available.
+      cost cases once cost fields are available. Final browser verification also
+      pinned native DuckDB below 1.4 so generated results.duckdb snapshots remain
+      attachable by the current @duckdb/duckdb-wasm runtime.
 
 metadata:
   tags:
@@ -90,6 +137,7 @@ metadata:
     - guardrails
   estimated_effort: "Medium-Large (2-4 days)"
   created_date: "2026-05-01"
+  completed_date: "2026-05-02"
 
 impact:
   business_value: |
@@ -111,6 +159,14 @@ files_affected:
     - "results-explorer/src/components/ChartPanel.tsx"
     - "results-explorer/src/lib/duckdbQueries.ts"
     - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+    - "results-explorer/e2e/routes/compare.spec.ts"
+    - "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+    - "pyproject.toml"
+    - "uv.lock"
+    - "docs/development/dependency-compatibility.md"
+    - "docs/development/dependency-audit-raw.md"
+    - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+    - "tests/unit/core/explorer_pipeline/test_pipeline.py"
   added:
     - "results-explorer/src/components/CompareSummary.tsx"
     - "results-explorer/src/components/QueryDiffTable.tsx"
@@ -141,7 +197,7 @@ verification:
     expected_output: "Compare summary, guardrail, and baseline tests pass."
   - description: "Manual compare smoke."
     command: "cd results-explorer && npm run test:e2e:chromium -- --grep \"Compare\""
-    expected_output: "Chromium compare smoke verifies same-cohort compare routing and rendering; mismatched guardrails are covered by Compare unit tests."
+    expected_output: "Chromium compare smoke verifies same-cohort compare routing, rendering, and mismatched guardrails."
 
 scope_limit:
   only_modify:
@@ -160,3 +216,11 @@ scope_limit:
     - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
     - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
     - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+    - "results-explorer/e2e/routes/compare.spec.ts"
+    - "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+    - "pyproject.toml"
+    - "uv.lock"
+    - "docs/development/dependency-compatibility.md"
+    - "docs/development/dependency-audit-raw.md"
+    - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+    - "tests/unit/core/explorer_pipeline/test_pipeline.py"

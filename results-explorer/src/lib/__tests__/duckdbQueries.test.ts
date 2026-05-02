@@ -106,6 +106,8 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     await getPlatformIndexRows();
     const [sql, params] = mockedQueryRows.mock.calls[0]!;
     expect(sql).toMatch(/FROM bench\.results r/);
+    expect(sql).toMatch(/COALESCE\(si\.short_id, ''\) AS short_id/);
+    expect(sql).toMatch(/LEFT JOIN bench\.short_ids si ON si\.result_id = r\.result_id/);
     expect(sql).toMatch(/LEFT JOIN bench\.benchmark_rankings br ON br\.result_id = r\.result_id/);
     expect(sql).toMatch(/CASE WHEN br\.phase IS NOT NULL THEN br\.phase/);
     expect(sql).toMatch(/br\.primary_metric/);
@@ -115,7 +117,7 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(sql).toMatch(/cloud_provider/);
     expect(sql).toMatch(/instance_or_warehouse/);
     expect(sql).toMatch(/storage_format/);
-    expect(sql).not.toMatch(/COALESCE/);
+    expect(sql.match(/COALESCE\(/g)).toHaveLength(1);
     expect(sql).not.toMatch(/WHERE/);
     expect(params).toBeUndefined();
   });

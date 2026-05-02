@@ -129,6 +129,7 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
 
 export interface PlatformIndexRowRow extends CostDeploymentFields {
   result_id: string;
+  short_id: string;
   benchmark: string;
   scale_factor: number;
   phase: string;
@@ -509,6 +510,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
   const sql =
     "SELECT" +
     " r.result_id," +
+    " COALESCE(si.short_id, '') AS short_id," +
     " r.benchmark," +
     " r.scale_factor," +
     " CASE WHEN br.phase IS NOT NULL THEN br.phase WHEN r.test_type IS NOT NULL THEN r.test_type ELSE 'power' END AS phase," +
@@ -542,6 +544,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " CASE WHEN br.primary_metric IS NOT NULL THEN br.primary_metric WHEN r.power_score IS NOT NULL THEN 'power_score' ELSE 'display_geomean_ms' END" +
     " AS primary_metric" +
     " FROM bench.results r" +
+    " LEFT JOIN bench.short_ids si ON si.result_id = r.result_id" +
     " LEFT JOIN bench.benchmark_rankings br ON br.result_id = r.result_id";
   if (platformId === undefined) {
     return queryRows<PlatformIndexRowRow>(`${sql} ORDER BY r.run_date DESC`);

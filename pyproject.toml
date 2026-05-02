@@ -74,8 +74,9 @@ dev = [
     "pytest-cov>=4.1.0",
     "pytest-benchmark>=4.0.0",
     "pytest-xdist>=3.0.0",
-    # duckdb: tight integration with BenchBox SQL runner; cap <2 to catch v2 ABI/API breakage.
-    "duckdb>=1.0.0,<2.0.0",
+    # duckdb: tight integration with BenchBox SQL runner and browser snapshot writer.
+    # Cap <1.4 until @duckdb/duckdb-wasm can attach newer native DB files.
+    "duckdb>=1.0.0,<1.4.0",
     "tox>=4.13.0",
     "pyspark>=3.5.0",  # Aligned with pyspark extra
 ]
@@ -91,11 +92,12 @@ docs = [
     "ablog>=0.11.13 ; python_version >= '3.11'",  # uv source override pins to git main for unreleased Sphinx 9 fix
 ]
 viz = []
-explorer = ["duckdb>=1.0.0"]
+explorer = ["duckdb>=1.0.0,<1.4.0"]
 
 # Meta-groups for common scenarios
 all = [
-    "duckdb>=1.0.0",
+    # Keep browser-generated results.duckdb files readable by @duckdb/duckdb-wasm 1.32.x.
+    "duckdb>=1.0.0,<1.4.0",
     "clickhouse-connect>=0.10.0",
     "clickhouse-driver>=0.2.0",
     "databricks-sql-connector>=2.0.0",
@@ -146,7 +148,7 @@ cloud = [
 cloudstorage = ["cloudpathlib>=0.15.0"]
 
 # Individual platforms (for minimal installations)
-duckdb = ["duckdb>=1.0.0"]
+duckdb = ["duckdb>=1.0.0,<1.4.0"]
 clickhouse = ["clickhouse-driver>=0.2.0"]  # TCP binary protocol (clickhouse-server)
 clickhouse-server = ["clickhouse-driver>=0.2.0"]  # Canonical extra for clickhouse-server platform
 clickhouse-cloud = ["clickhouse-connect>=0.10.0"]  # HTTP protocol (ClickHouse Cloud)
@@ -467,7 +469,8 @@ dev = [
     "ty>=0.0.1a14",
     "ansi2html>=1.8.0",  # scripts/capture_chart_images.py - ANSI→HTML conversion for chart captures
     "pillow>=10.0.0",  # scripts/capture_chart_images.py - PIL.Image for chart PNG output
-    "duckdb>=1.0.0",
+    # Keep explorer fixture and deployment snapshots readable by @duckdb/duckdb-wasm 1.32.x.
+    "duckdb>=1.0.0,<1.4.0",
     "polars>=1.35.2",
     "clickhouse-connect>=0.10.0",
     "psycopg[binary]>=3.1",

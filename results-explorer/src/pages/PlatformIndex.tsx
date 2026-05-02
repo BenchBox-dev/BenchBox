@@ -101,6 +101,15 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
   const platformResultsRaw = allPlatformResults.filter((row) => matchesPlatformIndexFacets(row, facets));
   const trendCohorts = buildTrendCohorts(platformResultsRaw);
+  const rowsByResultId = new Map(allPlatformResults.map((row) => [row.result_id, row]));
+  const selectedRows = [...selected]
+    .map((resultId) => rowsByResultId.get(resultId))
+    .filter((row): row is PlatformIndexRowRow => row !== undefined);
+  const selectedCompareIds = [...selected].map((resultId) => {
+    const row = rowsByResultId.get(resultId);
+    return row ? compareIdForPlatformRow(row) : resultId;
+  });
+  const compareUrl = selected.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
 
   const platformResults = [...platformResultsRaw].sort((a, b) => {
     const dir = sort.direction === "asc" ? 1 : -1;
@@ -163,11 +172,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     });
   }
 
-  function handleCompare() {
-    const ids = [...selected].join(",");
-    window.location.href = `/results/compare?ids=${encodeURIComponent(ids)}`;
-  }
-
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: platformDisplayName }]} />
@@ -196,10 +200,10 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </select>
             </div>
           )}
-          {selected.size >= 2 && (
-            <button class="btn-primary" onClick={handleCompare}>
+          {compareUrl && (
+            <a class="btn btn-primary text-sm no-underline" href={compareUrl}>
               Compare {selected.size} results
-            </button>
+            </a>
           )}
         </div>
       </div>
@@ -310,6 +314,55 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
       {selected.size === 1 && <p class="mt-3 text-sm text-gray-500">Select at least one more result to compare.</p>}
 
+      {compareUrl && (
+        <div class="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white px-4 py-3 shadow-lg">
+          <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0 flex-1">
+              <div class="text-sm text-gray-700">
+                <strong>{selected.size}</strong> results selected for compare
+              </div>
+              <div
+                class="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1"
+                role="list"
+                aria-label="Selected compare results"
+              >
+                {selectedRows.map((row) => {
+                  const id = compareIdForPlatformRow(row);
+                  return (
+                    <div
+                      key={row.result_id}
+                      data-testid={`compare-tray-row-${row.result_id}`}
+                      role="listitem"
+                      class="flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-600"
+                    >
+                      <span class="font-medium text-gray-900">{row.platform}</span>
+                      <span>{humanizeBenchmark(row.benchmark)}</span>
+                      <span>SF {row.scale_factor}</span>
+                      <span>{row.phase}</span>
+                      <span>{row.run_date}</span>
+                      <TrustBadge trustLabel={row.trust_label} compact />
+                      <span class="font-mono text-gray-500">ID {displayCompareId(id)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div class="flex shrink-0 items-center gap-3">
+              <button
+                type="button"
+                class="text-sm text-gray-500 hover:text-gray-700"
+                onClick={() => setSelected(new Set())}
+              >
+                Clear
+              </button>
+              <a href={compareUrl} class="btn btn-primary text-sm no-underline">
+                Compare {selected.size} selected →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {platformResultsRaw.length >= 2 && (
         <section class="card mt-8" aria-label="Performance trends by comparable cohort">
           <h2 class="mb-2 text-base font-semibold text-gray-900">Performance Trends by Cohort</h2>
@@ -397,6 +450,18 @@ function rowDeploymentClass(row: PlatformIndexRowRow): string | null {
 
 function rowShape(row: PlatformIndexRowRow): string | null {
   return row.instance_or_warehouse ?? null;
+}
+
+function compareIdForPlatformRow(row: PlatformIndexRowRow): string {
+  return row.short_id || row.result_id;
+}
+
+function buildCompareUrl(ids: string[]): string {
+  return `/results/compare?ids=${ids.map(encodeURIComponent).join(",")}`;
+}
+
+function displayCompareId(id: string): string {
+  return id.length > 12 ? `${id.slice(0, 8)}...` : id;
 }
 
 function matchesDateWindow(runDate: string, windowValue: DateWindowFacet): boolean {

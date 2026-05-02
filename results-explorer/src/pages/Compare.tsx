@@ -10,8 +10,11 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
 import { ComparabilityReceipt } from "@/components/ComparabilityReceipt";
+import { CompareSummary } from "@/components/CompareSummary";
+import { QueryDiffTable } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
-import { perQuerySpeedup, vsSlowestRatio } from "@/lib/chartMath";
+import { vsSlowestRatio } from "@/lib/chartMath";
+import { buildCompareDecisionSummary } from "@/lib/compareSummary";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -29,9 +32,11 @@ export function Compare(_: RoutableProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [baselineIndex, setBaselineIndex] = useState(0);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const results = compareState?.results ?? EMPTY_RESULTS;
   const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
+  const normalizedBaselineIndex = results[baselineIndex] ? baselineIndex : 0;
   useDocumentTitle(
     results.length > 0 ? `Compare (${results.length}) · BenchBox Results` : "Compare · BenchBox Results",
   );
@@ -99,29 +104,9 @@ export function Compare(_: RoutableProps) {
         }
         const details = loaded as DetailResult[];
 
-        const benchmarkSet = new Set(details.map((r) => r.benchmark));
-        const scaleSet = new Set(details.map((r) => r.scale_factor));
-
-        if (benchmarkSet.size > 1) {
-          setError(
-            `Cannot compare results from different benchmarks: ${[...benchmarkSet].join(", ")}. ` +
-              "All results in a comparison must use the same benchmark.",
-          );
-          setLoading(false);
-          return;
-        }
-
-        if (scaleSet.size > 1) {
-          setError(
-            `Cannot compare results at different scale factors: ${[...scaleSet].join(", ")}. ` +
-              "All results in a comparison must use the same scale factor.",
-          );
-          setLoading(false);
-          return;
-        }
-
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
+        setBaselineIndex(0);
         setCompareState({ results: details, primaryMetric: metric });
         setLoading(false);
       })
@@ -171,25 +156,13 @@ export function Compare(_: RoutableProps) {
 
   const benchmark = results[0]?.benchmark ?? "";
   const scaleFactor = results[0]?.scale_factor ?? 0;
-  const benchmarkLabel = humanizeBenchmark(benchmark);
+  const severeMismatchReason = severeCohortMismatchReason(results);
+  const mixedBenchmark = new Set(results.map((result) => result.benchmark)).size > 1;
+  const benchmarkLabel = mixedBenchmark ? "Mixed Benchmark" : humanizeBenchmark(benchmark);
+  const scaleFactorLabel = new Set(results.map((result) => result.scale_factor)).size > 1
+    ? "Mixed scale factors"
+    : `SF ${scaleFactor}`;
   const rowCount = results.length;
-
-  // Union of query IDs in natural sort order.
-  const allQueryIds: string[] = [...new Set(results.flatMap((r) => r.display_timings.map((t) => t.query_id)))].sort(
-    (a, b) => a.localeCompare(b, undefined, { numeric: true }),
-  );
-
-  // Per-query timing data consumed by chart components (ms values). The
-  // pipeline pre-computes a median-of-passing-measurement-runs `display_ms`
-  // for every (result, query) pair and we read it verbatim - no TS-side
-  // reduction.
-  const queryTimingData = allQueryIds.map((queryId) => ({
-    queryId,
-    timings: results.map((r) => {
-      const ms = r.display_timings.find((t) => t.query_id === queryId)?.display_ms ?? null;
-      return ms !== null ? { ms, status: "pass" } : null;
-    }),
-  }));
 
   // Primary metric is loaded async from DuckDB in the effect above; default
   // stays `display_geomean_ms` until the query resolves (matches Python's
@@ -199,6 +172,10 @@ export function Compare(_: RoutableProps) {
   const primaries: (number | null)[] = results.map((r) =>
     primaryMetric === "power_score" ? r.power_score : r.display_geomean_ms,
   );
+  const decisionSummary = buildCompareDecisionSummary(results, primaryMetric, {
+    suppressWinnerClaims: severeMismatchReason !== null,
+    suppressionReason: severeMismatchReason ?? undefined,
+  });
 
   const validPrimaries = primaries.filter((v): v is number => v !== null);
   const fastestPrimary =
@@ -235,18 +212,22 @@ export function Compare(_: RoutableProps) {
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <Breadcrumb
-        crumbs={[
-          { label: "Results", href: "/results/" },
-          { label: benchmarkLabel, href: `/results/${benchmark}/` },
-          { label: "Compare" },
-        ]}
+        crumbs={
+          mixedBenchmark
+            ? [{ label: "Results", href: "/results/" }, { label: "Compare" }]
+            : [
+                { label: "Results", href: "/results/" },
+                { label: benchmarkLabel, href: `/results/${benchmark}/` },
+                { label: "Compare" },
+              ]
+        }
       />
 
       <div class="mt-6 mb-8 flex items-center justify-between">
         <div>
           <h1 class="text-3xl font-bold text-gray-900">{benchmarkLabel} Comparison</h1>
           <p class="mt-1 text-sm text-gray-500">
-            Scale factor: SF {scaleFactor} - {rowCount} platforms
+            Scale factor: {scaleFactorLabel} - {rowCount} platforms
           </p>
           {/* Trust tier diversity note - informational, not a warning */}
           {(() => {
@@ -262,6 +243,30 @@ export function Compare(_: RoutableProps) {
       </div>
 
       <ComparabilityReceipt results={results} />
+      <CompareSummary summary={decisionSummary} />
+      {results.length > 1 && (
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 shadow-sm">
+          <div>
+            <label class="text-sm font-medium text-gray-700" for="compare-baseline">
+              Baseline
+            </label>
+            <p class="text-xs text-gray-500">Ratios and deltas compare every candidate against this run.</p>
+          </div>
+          <select
+            id="compare-baseline"
+            class="rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 focus:outline-none"
+            value={String(normalizedBaselineIndex)}
+            onChange={(event) => setBaselineIndex(Number((event.target as HTMLSelectElement).value))}
+          >
+            {results.map((result, index) => (
+              <option key={result.result_id} value={String(index)}>
+                {result.platform}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <QueryDiffTable results={results} baselineIndex={normalizedBaselineIndex} />
 
       <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rowData.map((r, i) => {
@@ -275,7 +280,8 @@ export function Compare(_: RoutableProps) {
               : null
             : vsSlowestRatio(primary, slowestPrimary);
           const vsLabel = higherIsBetter ? "vs worst" : "vs slowest";
-          const isFastest = primary !== null && fastestPrimary !== null && primary === fastestPrimary;
+          const showPrimaryClaims = severeMismatchReason === null;
+          const isFastest = showPrimaryClaims && primary !== null && fastestPrimary !== null && primary === fastestPrimary;
 
           return (
             <div
@@ -320,7 +326,7 @@ export function Compare(_: RoutableProps) {
                     <dd class="font-mono text-gray-600">{r.totalDurationS.toFixed(2)}s</dd>
                   </div>
                 )}
-                {speedup !== null && (
+                {showPrimaryClaims && speedup !== null && (
                   <div class="flex justify-between">
                     <dt class="text-gray-500">{vsLabel}</dt>
                     <dd class="font-mono">{speedup.toFixed(2)}x</dd>
@@ -357,65 +363,24 @@ export function Compare(_: RoutableProps) {
 
       {rowCount > 0 && (
         <div class="mb-8">
-          <ChartPanel context={{ kind: "compare", results, primaryMetric }} />
+          <ChartPanel
+            context={{ kind: "compare", results, primaryMetric }}
+            baselineIndex={normalizedBaselineIndex}
+            onBaselineIndexChange={setBaselineIndex}
+          />
         </div>
       )}
-
-      <section class="card">
-        <h2 class="mb-4 text-base font-semibold text-gray-900">Query Breakdown</h2>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="table-th">Query</th>
-                {rowData.map((r) => (
-                  <th key={r.resultId} class="table-th">
-                    {r.label}
-                  </th>
-                ))}
-                <th class="table-th">Δ fastest</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 bg-white">
-              {queryTimingData.map(({ queryId, timings }) => {
-                const validMs = timings
-                  .filter((t): t is NonNullable<typeof t> => t !== null && t.ms > 0)
-                  .map((t) => t.ms);
-                const fastest = validMs.length > 0 ? Math.min(...validMs) : null;
-                const speedup = perQuerySpeedup(validMs);
-
-                return (
-                  <tr key={queryId} class="hover:bg-gray-50">
-                    <td class="table-td font-mono font-medium">{queryId}</td>
-                    {timings.map((t, i) => (
-                      <td key={rowData[i]!.resultId} class="table-td font-mono">
-                        {t === null ? (
-                          <span class="text-gray-400">-</span>
-                        ) : (
-                          <span
-                            class={
-                              t.status === "fail"
-                                ? "text-red-600"
-                                : t.ms === fastest
-                                  ? "font-semibold text-green-700"
-                                  : ""
-                            }
-                          >
-                            {t.ms.toFixed(1)}
-                          </span>
-                        )}
-                      </td>
-                    ))}
-                    <td class="table-td font-mono text-gray-500">
-                      {speedup !== null ? `${speedup.toFixed(2)}x` : "-"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   );
+}
+
+function severeCohortMismatchReason(results: DetailResult[]) {
+  const reasons: string[] = [];
+  if (new Set(results.map((result) => result.benchmark)).size > 1) {
+    reasons.push("benchmarks differ");
+  }
+  if (new Set(results.map((result) => result.scale_factor)).size > 1) {
+    reasons.push("scale factors differ");
+  }
+  return reasons.length > 0 ? reasons.join(" and ") : null;
 }

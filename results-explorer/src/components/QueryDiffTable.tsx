@@ -1,0 +1,141 @@
+import type { DetailResult } from "@/types";
+import { fmtMs } from "@/utils";
+
+export type QueryDiffStatus = "faster" | "slower" | "tie" | "missing";
+
+export interface QueryDiffRow {
+  queryId: string;
+  candidateResultId: string;
+  candidatePlatform: string;
+  baselineMs: number | null;
+  candidateMs: number | null;
+  ratio: number | null;
+  deltaMs: number | null;
+  status: QueryDiffStatus;
+}
+
+interface QueryDiffTableProps {
+  results: DetailResult[];
+  baselineIndex?: number;
+}
+
+export function QueryDiffTable({ results, baselineIndex = 0 }: QueryDiffTableProps) {
+  if (results.length < 2) return null;
+  const normalizedBaselineIndex = normalizeBaselineIndex(results, baselineIndex);
+  const baseline = results[normalizedBaselineIndex]!;
+  const rows = buildQueryDiffRows(results, normalizedBaselineIndex);
+
+  return (
+    <section class="card mb-8" aria-labelledby="query-diff-title">
+      <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="query-diff-title" class="text-base font-semibold text-gray-900">
+            Query-Level Diff
+          </h2>
+          <p class="mt-1 text-xs text-gray-500">
+            Baseline: <span class="font-medium text-gray-700">{baseline.platform}</span>. Negative deltas mean the
+            candidate is faster than baseline.
+          </p>
+        </div>
+        <span class="badge badge-gray">{rows.length} comparisons</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="table-th">Query</th>
+              <th class="table-th">Candidate</th>
+              <th class="table-th">Baseline latency</th>
+              <th class="table-th">Candidate latency</th>
+              <th class="table-th">Ratio</th>
+              <th class="table-th">Delta</th>
+              <th class="table-th">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 bg-white">
+            {rows.map((row) => (
+              <tr key={`${row.queryId}-${row.candidateResultId}`} class="hover:bg-gray-50">
+                <td class="table-td font-mono font-medium">{row.queryId}</td>
+                <td class="table-td">{row.candidatePlatform}</td>
+                <td class="table-td font-mono">{formatMsCell(row.baselineMs)}</td>
+                <td class="table-td font-mono">{formatMsCell(row.candidateMs)}</td>
+                <td class="table-td font-mono">{row.ratio !== null ? `${row.ratio.toFixed(2)}x` : "-"}</td>
+                <td class="table-td font-mono">{formatDelta(row.deltaMs)}</td>
+                <td class="table-td">
+                  <span class={`badge ${statusClass(row.status)}`}>{statusLabel(row.status)}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export function buildQueryDiffRows(results: DetailResult[], baselineIndex = 0): QueryDiffRow[] {
+  if (results.length < 2) return [];
+  const normalizedBaselineIndex = normalizeBaselineIndex(results, baselineIndex);
+  const baseline = results[normalizedBaselineIndex]!;
+  const candidates = results.filter((_, index) => index !== normalizedBaselineIndex);
+  const queryIds = [...new Set(results.flatMap((result) => result.display_timings.map((timing) => timing.query_id)))].sort(
+    (a, b) => a.localeCompare(b, undefined, { numeric: true }),
+  );
+
+  return queryIds.flatMap((queryId) => {
+    const baselineMs = displayMsForQuery(baseline, queryId);
+    return candidates.map((candidate) => {
+      const candidateMs = displayMsForQuery(candidate, queryId);
+      const deltaMs = baselineMs !== null && candidateMs !== null ? candidateMs - baselineMs : null;
+      return {
+        queryId,
+        candidateResultId: candidate.result_id,
+        candidatePlatform: candidate.platform,
+        baselineMs,
+        candidateMs,
+        ratio: baselineMs !== null && baselineMs > 0 && candidateMs !== null ? candidateMs / baselineMs : null,
+        deltaMs,
+        status: diffStatus(deltaMs),
+      };
+    });
+  });
+}
+
+function normalizeBaselineIndex(results: DetailResult[], baselineIndex: number) {
+  return results[baselineIndex] ? baselineIndex : 0;
+}
+
+function displayMsForQuery(result: DetailResult, queryId: string): number | null {
+  return result.display_timings.find((timing) => timing.query_id === queryId)?.display_ms ?? null;
+}
+
+function diffStatus(deltaMs: number | null): QueryDiffStatus {
+  if (deltaMs === null) return "missing";
+  if (Math.abs(deltaMs) < 1e-9) return "tie";
+  return deltaMs < 0 ? "faster" : "slower";
+}
+
+function formatMsCell(ms: number | null) {
+  return ms !== null ? fmtMs(ms) : <span class="text-gray-400">-</span>;
+}
+
+function formatDelta(deltaMs: number | null) {
+  if (deltaMs === null) return "-";
+  if (Math.abs(deltaMs) < 1e-9) return "0 ms";
+  return `${deltaMs > 0 ? "+" : "-"}${fmtMs(Math.abs(deltaMs))}`;
+}
+
+function statusLabel(status: QueryDiffStatus) {
+  if (status === "faster") return "Faster";
+  if (status === "slower") return "Slower";
+  if (status === "tie") return "Tie";
+  return "Missing";
+}
+
+function statusClass(status: QueryDiffStatus) {
+  if (status === "faster") return "badge-green";
+  if (status === "slower") return "badge-yellow";
+  if (status === "tie") return "badge-gray";
+  return "badge-red";
+}
