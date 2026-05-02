@@ -1,15 +1,15 @@
 ---
 id: 2026-05-02-163132-write-primitives-dataframe-execution-model-no-sketch-shape
 date: 2026-05-02
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "TODO write-primitives-sketch-pyspark-dataframe-surface w1 research spike"
 related_paths:
   - benchbox/core/write_primitives/dataframe_operations.py
   - benchbox/core/write_primitives/catalog/loader.py
   - benchbox/core/dataframe/maintenance_interface.py
-suggested_sweep: "Audit whether any future DataFrame-side benchmark op (sketch persistence, materialized view refresh, window-state checkpoint, etc.) fits the operation-typed CRUD model. If not, the next aggregate-style op surfaces the same gap. Likely sites for a structural extension: WriteOperationType enum, DataFrameWriteOperationsManager dispatch, catalog WriteOperation schema."
-todo_id: null
+suggested_sweep: "Audit whether any future DataFrame-side benchmark op (sketch persistence, materialized view refresh, window-state checkpoint, etc.) fits the operation-typed CRUD model. If not, the next aggregate-style op surfaces the same gap. Likely sites for a structural extension: WriteOperationType enum, DataFrameWriteOperationsManager dispatch, catalog WriteOperation schema, validation contracts, cleanup handling, and partition-aware durable state paths."
+todo_id: write-primitives-architecture-fixes
 ---
 
 # write_primitives DataFrame Execution Model Has No Sketch-Shaped Op Type
@@ -64,17 +64,20 @@ views, summary tables, ML feature stores, cube refresh).
 
 ## Suggested next steps
 
-- [ ] Promote to a fix-class TODO: design and implement an
-      aggregate-state op shape that fits the existing
+- [x] Promote to fix-class TODO `write-primitives-architecture-fixes`.
+- [ ] Design and implement an aggregate-state op shape that fits the existing
       `WriteOperationType` / `DataFrameWriteOperationsManager` /
       catalog-entry contract. Likely shape:
       `WriteOperationType.AGGREGATE_PERSIST` and
       `WriteOperationType.AGGREGATE_MERGE`, each with a build-fn
-      / merge-fn / extract-fn registration similar to read_primitives'
-      `expression_impl` / `pandas_impl`.
+      / merge-fn / extract-fn registration inspired by read_primitives'
+      `expression_impl` / `pandas_impl`. Do not copy that pattern
+      blindly: write_primitives also needs validation contracts, cleanup
+      phases, partition awareness, and durable intermediate-state paths.
+- [x] Add the dependency edge from
+      `write-primitives-sketch-pyspark-dataframe-surface` to the fix TODO.
 - [ ] Once the aggregate-op shape lands, unblock TODO
-      `write-primitives-sketch-pyspark-dataframe-surface` and re-add
-      a dependency edge from it to the new fix TODO.
+      `write-primitives-sketch-pyspark-dataframe-surface`.
 - [ ] Consider whether the SQL sketch ops (already merged in PR
       #112) should also re-target the aggregate-op shape rather
       than the current `write_sql` + `validation_query` shape — they

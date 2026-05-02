@@ -22,7 +22,8 @@ description: |
   Cross-platform research (see context section below) shows that two of
   the four skipped queries have **multi-platform sketch support** that we
   can light up today — `approx_count_distinct_*` covers Polars, PySpark,
-  DataFusion, and Dask natively. The remaining two (`approx_quantiles_array`,
+  and DataFusion natively, while Dask has a native HLL path only for the
+  single-value distinct query. The remaining two (`approx_quantiles_array`,
   `approx_top_k_lineitem`) are essentially PySpark-only at the DataFrame
   layer and stay deferred with explicit rationale.
 
@@ -41,7 +42,7 @@ context_sections:
     | Pandas     | only exact `nunique()`         | exact `quantile()`               | exact `quantile([...])`         | `value_counts().head(k)` exact |
     | Modin      | delegates to pandas (exact)    | exact                            | exact                           | exact            |
     | cuDF       | exact `nunique()`              | exact (libcudf TDIGEST not exposed in Python API) | exact          | exact            |
-    | Dask       | `nunique_approx()` (HLL)       | `quantile(method='tdigest')`     | `quantile([...], method='tdigest')` | none        |
+    | Dask       | `nunique_approx()` (HLL; Series only) | no groupby HLL API; exact fallback | no groupby T-Digest API; exact fallback | none        |
 
     Sketch persistence (Theta/KLL binary-portable artifacts) is
     PySpark-only at the DataFrame layer (`hll_sketch_agg`/`hll_union_agg`).
@@ -68,10 +69,9 @@ work:
           PySpark: `F.approx_count_distinct(F.col("x"))`.
           DataFusion: `from datafusion import functions as f; f.approx_distinct(col("x"))`.
         - pandas_impl: degrade to exact `.nunique()` for Pandas/Modin/cuDF
-          AND `.nunique_approx()` for Dask (Dask is in the pandas family
-          but does have a sketch path — branch on platform via ctx attr
-          if a clean way exists; otherwise leave as exact for the first
-          cut and revisit).
+          and for Dask groupby; use `.nunique_approx()` only for Dask's
+          single-value distinct query, where dask-expr exposes a native
+          HLL aggregate.
         - Each impl docstring must say explicitly: "approximate on
           {platforms}; exact fallback on {platforms} — see
           docs/benchmarks/read-primitives-approximate-functions.md".
@@ -98,8 +98,9 @@ work:
         - DataFusion: `f.approx_percentile_cont(col("l_quantity"), lit(0.5))`
         - Polars: keep exact `.quantile(0.5)` (no sketch alternative;
           docstring must note "exact fallback").
-        - Dask: `series.quantile(0.5, method='tdigest')` — applies in the
-          pandas_impl, conditional on platform ctx.
+        - Dask: exact fallback. Current dask-expr exposes Series-level
+          T-Digest quantile only with optional `crick`, and no groupby
+          quantile method matching this query shape.
         - Pandas / Modin / cuDF: keep exact `.median()` /
           `.quantile(0.5)` (no sketch).
       Don't introduce isinstance checks. The cleanest abstraction is
@@ -149,10 +150,11 @@ work:
     notes: |
       Terse user-facing bullet:
       "read_primitives DataFrame: add `approx_count_distinct_*` impls
-      (sketch on Polars/PySpark/DataFusion/Dask; exact on Pandas/Modin/
-      cuDF). `approx_quantile_groupby` now uses sketch-backed quantile
-      on PySpark/DataFusion/Dask (was exact). Cross-platform DataFrame
-      coverage matrix in docs."
+      (sketch on Polars/PySpark/DataFusion and Dask single-value
+      distinct; exact fallback on Pandas/Modin/cuDF and Dask groupby).
+      `approx_quantile_groupby` now uses sketch-backed quantile on
+      PySpark/DataFusion (was exact). Cross-platform DataFrame coverage
+      matrix in docs."
 
 deferred:
   - summary: "DataFrame impls for approx_quantiles_array and approx_top_k_lineitem"
@@ -184,18 +186,21 @@ metadata:
 impact:
   business_value: |
     Closes the DataFrame-side gap from PR #112: the new approximate-aggregate
-    queries are SQL-only today, leaving 4 of 7 DataFrame engines (Polars,
-    PySpark, DataFusion, Dask) unable to participate in the
+    queries are SQL-only today, leaving Polars, PySpark, DataFusion, and
+    Dask's single-value HLL path unable to participate in the
     approximate-vs-exact comparison story.
   user_impact: |
-    Users running BenchBox on Polars / PySpark / DataFusion / Dask see
-    the approximate path measured against the exact path, rather than
-    a "skipped" status. Pandas / Modin / cuDF users see the exact-fallback
-    behavior explicitly documented so they understand why their
-    "approximate" runs perform identically to their "exact" ones.
+    Users running BenchBox on Polars / PySpark / DataFusion, and Dask
+    single-value distinct, see the approximate path measured against the
+    exact path rather than a "skipped" status. Pandas / Modin / cuDF users,
+    plus Dask groupby queries, see the exact-fallback behavior explicitly
+    documented so they understand why their "approximate" runs perform
+    identically to their "exact" ones.
   technical_debt: |
     Removes the misleading "approximate" label on `approx_quantile_groupby`
-    where the impl is silently exact (PySpark / DataFusion / Dask).
+    where the impl is silently exact (PySpark / DataFusion). Documents
+    Dask groupby exact fallback as a platform limitation, not a hidden
+    approximation.
     Extends DataFrameContext (potentially) with sketch-aware helpers
     that future approximate-aggregate queries can reuse.
 
@@ -237,7 +242,7 @@ approach: |
   IDs; it just adds DataFrame impls for IDs that already exist.
 
 anti_patterns:
-  - "DO NOT silently substitute exact `nunique()` / `quantile()` for the approximate variant on Polars / PySpark / DataFusion / Dask — because the perf delta vs the exact path is the whole point of the benchmark — use the platform's native sketch fn explicitly."
+  - "DO NOT silently substitute exact `nunique()` / `quantile()` for the approximate variant where a platform has a native sketch API — because the perf delta vs the exact path is the whole point of the benchmark — use the native sketch fn explicitly, and document exact fallbacks where no matching API exists."
   - "DO NOT add DataFrame impls for `approx_quantiles_array` or `approx_top_k_lineitem` — because PySpark is the only platform with a native array-percentile or top-K accumulator, and emulating via a loop defeats the latency measurement — keep them in SKIP_FOR_DATAFRAME with the rationale comment from w4."
   - "DO NOT introduce platform-specific isinstance branching inside the expression_impl bodies — because the abstraction is supposed to be platform-agnostic — extend DataFrameContext with `approx_distinct` / `approx_quantile` helpers that each platform context implements with the right native fn."
   - "DO NOT update SKIP_FOR_DATAFRAME assertion to expect the wrong size — because we're DROPPING 2 entries (the distinct-count pair) without adding any new ones — the new shape is 5 entries (3 correlated + 2 PySpark-only), not 7."
@@ -283,8 +288,8 @@ scope_limit:
     - benchbox/core/write_primitives/
 
 success_metrics:
-  - "2 new DataFrame query impls (`approx_count_distinct_simple`, `approx_count_distinct_groupby`) execute end-to-end on Polars, PySpark, DataFusion, Dask with sketch-backed paths"
-  - "approx_quantile_groupby DataFrame impl uses sketch-backed quantile on PySpark, DataFusion, Dask (was exact on all platforms)"
+  - "2 new DataFrame query impls (`approx_count_distinct_simple`, `approx_count_distinct_groupby`) execute end-to-end on Polars, PySpark, and DataFusion with sketch-backed paths; Dask uses sketch-backed HLL for the single-value query only"
+  - "approx_quantile_groupby DataFrame impl uses sketch-backed quantile on PySpark and DataFusion (was exact on all platforms); Dask remains exact because current dask-expr lacks groupby T-Digest"
   - "Pandas / Modin / cuDF runs of the 3 queries execute via exact-fallback with explicit docstring + docs notes"
   - "Cross-platform DataFrame coverage matrix lands in docs/benchmarks/read-primitives-approximate-functions.md"
   - "SKIP_FOR_DATAFRAME shrinks from 7 to 5; both shape assertion tests updated"
@@ -293,6 +298,6 @@ success_metrics:
 
 open_questions:
   - "Does extending DataFrameContext with `approx_distinct(col)` / `approx_quantile(col, q)` helpers fit the existing protocol cleanly, or does it require a Liskov-violating per-platform branch? Investigate in w2."
-  - "Should Dask's `nunique_approx` be wired through the pandas_impl (where Dask lives in the family taxonomy) or the expression_impl? Dask DataFrame supports both eager and lazy patterns; need to confirm which BenchBox uses for Dask runs."
+  - "If Dask adds groupby HLL or groupby T-Digest APIs, should those be wired through pandas_impl platform detection or a context-level helper? Current implementation uses Dask Series `nunique_approx()` only for the single-value query."
   - "Should PySpark sketch persistence (write_primitives DataFrame surface) be a follow-up TODO now or wait for cross-engine sketch persistence to mature? Currently captured as a deferred item."
   - "Does extending DataFrameContext touch enough abstract APIs to risk Liskov violations across pandas-family adapters? Spike via a draft commit before committing to the protocol extension."

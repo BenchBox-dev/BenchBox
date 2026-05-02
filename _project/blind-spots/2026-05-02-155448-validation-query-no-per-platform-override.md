@@ -1,15 +1,15 @@
 ---
 id: 2026-05-02-155448-validation-query-no-per-platform-override
 date: 2026-05-02
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "TODO write-primitives-sketch-clickhouse-and-storage-metrics implementation attempt"
 related_paths:
   - benchbox/core/write_primitives/catalog/loader.py
   - benchbox/core/write_primitives/benchmark.py
   - benchbox/core/write_primitives/catalog/operations.yaml
-suggested_sweep: "Audit every write_primitives op whose validation_query uses dialect-specific syntax (datasketch_*, theta_sketch_*, KLL_QUANTILES.*, APPROX_TOP_K_*, HLL_COMBINE, etc.) — those validation_queries cannot succeed on engines other than the one whose syntax was used to author them. Likely false-PASS or hard-FAIL across the cloud overrides for the 8 sketch ops + any future ops that follow the same pattern."
-todo_id: null
+suggested_sweep: "Audit every write_primitives op whose validation_query uses dialect-specific syntax or engine-specific table metadata. The immediate hard-fail set is the sketch validation queries that call DuckDB-only datasketch_* functions after non-DuckDB write_sql overrides; count-only validations remain portable. Extend the schema before adding ClickHouse/cloud validation SQL, then document each platform-specific validation body inline."
+todo_id: write-primitives-architecture-fixes
 ---
 
 # Write-Primitives validation_query Has No Per-Platform Override
@@ -23,10 +23,12 @@ runner (`benchmark.py:_run_operation_validation`) does not call any dialect
 translator before executing.
 
 Meanwhile `WriteOperation.platform_overrides` *does* let `write_sql` differ
-per engine. So the existing 8 sketch ops have ClickHouse/Snowflake/Databricks/
-BigQuery `write_sql` variants but a single DuckDB-syntax `validation_query`.
-On every non-DuckDB engine, the validation step will raise an "unknown
-function" exception and mark the op FAILED.
+per engine. So the existing sketch ops can have ClickHouse/Snowflake/
+Databricks/BigQuery/Redshift `write_sql` variants but a single
+DuckDB-syntax `validation_query`. The count-only validations are portable,
+but the three scalar sketch validations that call `datasketch_*` functions
+will raise an "unknown function" exception on every non-DuckDB engine and
+mark the op FAILED.
 
 This is structurally invisible today because:
 
@@ -49,8 +51,8 @@ around:
 - `write-primitives-sketch-clickhouse-and-storage-metrics` (this finding's
   origin) — w3 + w5 cannot be implemented in operations.yaml alone.
 - `write-primitives-sketch-cloud-verification` — when Snowflake/BigQuery/
-  Databricks credentials become available, cloud runs will fail validation
-  even though the writes succeed.
+  Databricks/Redshift credentials become available, cloud runs will fail
+  sketch scalar validation even though the writes may succeed.
 - `write-primitives-sketch-pyspark-dataframe-surface` — DataFrame mode has
   its own validation contract path; SQL-mode equivalents would hit this
   same wall.
@@ -61,11 +63,14 @@ have silently returned wrong values).
 
 ## Suggested next steps
 
-- [ ] Promote to a fix-class TODO: extend `ValidationQuery` schema +
-      loader + runner to support `validation_query.platform_overrides`,
-      mirroring the existing `write_sql.platform_overrides` shape.
-- [ ] Once the override mechanism lands, unblock the four sketch TODOs
-      and add an explicit dependency edge from each to the new fix TODO.
+- [x] Promote to fix-class TODO `write-primitives-architecture-fixes`.
+- [ ] Implement the `ValidationQuery` schema + loader + runner extension
+      to support `validation_query.platform_overrides`, mirroring the
+      existing `write_sql.platform_overrides` shape.
+- [x] Add explicit dependency edges from affected sketch TODOs to
+      `write-primitives-architecture-fixes`.
+- [ ] Once the override mechanism lands, unblock the four implementation
+      TODOs whose remaining work depends on it.
 - [ ] Audit existing 8 sketch ops' validation_queries: confirm
       DuckDB-syntax-only assumption was intentional and document the
       cross-engine gap inline alongside the cloud platform_overrides.

@@ -52,6 +52,11 @@ class DataFrameContext(Protocol):
         ```
     """
 
+    @property
+    def platform(self) -> str:
+        """Return the platform name."""
+        ...
+
     def get_table(self, name: str) -> Any:
         """Get a registered table by name.
 

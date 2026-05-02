@@ -70,9 +70,11 @@ context_sections:
       - `write-primitives-sketch-duckdb-cpc-req-families`
       - `write-primitives-sketch-parameter-sweeps`
 
-    `write-primitives-sketch-cloud-verification` is intentionally not
-    included because its primary remaining blocker is cloud credential
-    access and per-engine runtime verification.
+    `write-primitives-sketch-cloud-verification` also depends on this
+    item for clean per-platform validation, but it is not part of the
+    four-TODO "restore to Not Started" work because it remains blocked
+    by cloud credential access and per-engine runtime verification even
+    after the architecture fix lands.
 
 work:
   - id: w1

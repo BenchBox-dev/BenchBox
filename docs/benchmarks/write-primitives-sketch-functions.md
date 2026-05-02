@@ -77,12 +77,11 @@ catalog persists on Redshift is `HLLSKETCH`. Coverage rolls up to:
   `sketch_query_topk_combine`) — **skipped**; no Redshift equivalent.
 
 `HLLSKETCH`-typed columns carry non-trivial DDL/query restrictions:
-cannot be `DISTKEY` / `SORTKEY` / `PRIMARY KEY` / `FOREIGN KEY`, cannot
-appear in `GROUP BY` / `ORDER BY` / `DISTINCT`, fixed `logm=15`
-(no precision tuning knob), not supported in Spectrum or Python UDFs,
-JDBC/ODBC drivers return them as VARCHAR JSON/Base64. Each Redshift
-override emits its DDL inline with `DISTSTYLE EVEN` to honor these
-restrictions, rather than activating the generic
+cannot be `DISTKEY` / `SORTKEY`, cannot appear in `GROUP BY` /
+`ORDER BY` / `DISTINCT`, fixed default `logm=15`, not supported in
+Spectrum or Python UDFs, JDBC/ODBC drivers return them as VARCHAR
+JSON/Base64. Each Redshift override emits its DDL inline with
+`DISTSTYLE EVEN` to honor these restrictions, rather than activating the generic
 `_BINARY_TYPE_BY_DIALECT[redshift] = HLLSKETCH` translator (the
 abstraction can't express the constraints safely; per-op explicit DDL
 is the chosen pattern).
@@ -151,7 +150,7 @@ empirically against DuckDB SF=0.01:
 
 | Op                                | Observation                              | Bounds            | Rationale                                       |
 |-----------------------------------|------------------------------------------|-------------------|--------------------------------------------------|
-| `sketch_query_theta_union_merge`  | 14836.89 (deterministic over 5 runs)     | [14000, 16000]    | True distinct = 15000; ~1% theta error         |
+| `sketch_query_theta_union_merge`  | 14836.89 (deterministic over 5 runs)     | [14500, 15500]    | True distinct = 15000; tightened after HLL logm=15 review |
 | `sketch_query_kll_quantiles_merge`| 34027.29 – 34361.75 (5 runs)             | [30000, 40000]    | Generous to tolerate SF=0.1 drift; catches no-op |
 | `sketch_query_topk_combine`       | 7 (deterministic; lineitem has 7 modes)  | [6, 8]            | Lower bound catches loss; upper catches false-positive |
 

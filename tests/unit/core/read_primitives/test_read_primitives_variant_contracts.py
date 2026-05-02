@@ -203,8 +203,10 @@ def test_actual_catalog_static_linter_reports_no_variant_contract_issues():
     uses APPROXIMATE PERCENTILE_DISC, which is correct Redshift syntax but
     sqlglot reports as variant_parse_error. The runtime path on the Redshift
     adapter sends the SQL as-is, so the parse failure does not block actual
-    execution — only the static linter. Allowed here pending an upstream
-    sqlglot fix.
+    execution — only the static linter. Upstream sqlglot PR #7585
+    (https://github.com/tobymao/sqlglot/pull/7585) adds Redshift
+    APPROXIMATE PERCENTILE_DISC parsing; keep this allowlist only until
+    BenchBox's sqlglot cap is bumped to a release containing that fix.
     """
     issues = collect_variant_contract_issues(load_primitives_catalog(), require_contracts=True)
     allowlisted = {

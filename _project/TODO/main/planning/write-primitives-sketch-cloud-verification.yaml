@@ -116,10 +116,11 @@ context_sections:
 
   "What Verification Looks Like": |
     For each cloud engine with creds:
-      1. Run all 8 sketch ops at SF=0.01 on a small warehouse / job /
-         cluster.
-      2. Confirm 8/8 pass (with the new runtime expected_value_min/max
-         bounds enforced).
+      1. Run the supported sketch-op set at SF=0.01 on a small warehouse
+         / job / cluster (8 for Snowflake/Databricks, 6 for BigQuery,
+         4 for Redshift).
+      2. Confirm the supported set passes with the new runtime
+         expected_value_min/max bounds enforced.
       3. Re-tune bounds if the engine produces meaningfully different
          estimates than DuckDB observed (HLL++ vs DataSketches Theta
          have different bias profiles; KLL t-digest vs Greenwald-
@@ -199,8 +200,33 @@ work:
           slower latency than the SQL claims would suggest.
 
   - id: w4
+    summary: "Redshift: live verification of 4 HLL-substitution sketch ops"
+    status: pending
+    notes: |
+      Run the 4 Redshift HLL-substitution ops added by PR #134:
+
+        - sketch_ddl_create_persistent_table
+        - sketch_insert_theta_per_partition
+        - sketch_query_theta_union_merge
+        - sketch_drop_persistent_table
+
+      Critical-path checks:
+        - HLL_CREATE_SKETCH returns HLLSKETCH values that persist to
+          table storage and merge via HLL_COMBINE.
+        - HLL_CARDINALITY(HLL_COMBINE(...)) lands inside the tightened
+          starting tolerance [14500, 15500] for SF=0.01's 15000
+          distinct l_orderkeys, or the bounds are re-tuned with
+          observed live values documented inline.
+        - HLLSKETCH columns are not used as DISTKEY / SORTKEY, and do
+          not appear in GROUP BY / ORDER BY / DISTINCT positions.
+
+      Output: Redshift runtime version, driver version, observed HLL
+      cardinality, and any DDL restriction drift documented in
+      operations.yaml comments and the cross-platform sketch doc.
+
+  - id: w5
     summary: "Update operations.yaml inline comments with verified-against-runtime-version notes"
-    needs: [w1, w2, w3]
+    needs: [w1, w2, w3, w4]
     status: pending
     notes: |
       For each engine that completed verification, append a one-line
@@ -212,9 +238,9 @@ work:
       after a Snowflake driver upgrade, the comment shows when it
       last worked.
 
-  - id: w5
+  - id: w6
     summary: "Update cross-platform sketch docs per-engine verification matrix"
-    needs: [w4]
+    needs: [w5]
     status: pending
     notes: |
       Replace the current "untested cloud overrides" footnote in
@@ -223,18 +249,19 @@ work:
       function-name discrepancies were corrected, which expected_value
       bounds were re-tuned per engine.
 
-  - id: w6
+  - id: w7
     summary: "Add changelog entry under unreleased"
-    needs: [w5]
+    needs: [w6]
     status: pending
     notes: |
       Terse user-facing bullet:
       "write_primitives sketch: verified against {Snowflake,
-      BigQuery, Databricks} in cloud — reconciled function-signature
+      BigQuery, Databricks, Redshift} in cloud — reconciled function-signature
       drift and re-tuned expected_value bounds per engine. See docs."
 
 deps:
-  needs: []
+  needs:
+    - write-primitives-architecture-fixes
 
 metadata:
   owners:
@@ -246,6 +273,7 @@ metadata:
     - snowflake
     - bigquery
     - databricks
+    - redshift
     - cloud
   estimated_effort: "1-2 days (per cloud engine; in parallel)"
   created_date: "2026-05-02"
@@ -283,7 +311,7 @@ must_preserve:
 approach: |
   Run each cloud verification in its own work unit / PR — failures on
   one engine shouldn't block the others. For each engine: get creds
-  set up, run the 8 sketch ops, observe results, reconcile any
+  set up, run the supported sketch-op set, observe results, reconcile any
   discrepancies, commit the corrected overrides and per-engine
   tolerance bounds.
 
@@ -313,6 +341,9 @@ verification:
   - description: "Databricks: 8 sketch ops execute end-to-end on a small DBR"
     command: "uv run -- benchbox run --platform databricks --benchmark write_primitives --scale 0.01 --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_insert_kll_per_partition,sketch_insert_topk_per_shard,sketch_query_theta_union_merge,sketch_query_kll_quantiles_merge,sketch_query_topk_combine,sketch_drop_persistent_table"
     expected_output: "8/8 pass (or topk ops skip cleanly if DBR < Spark 4.1)"
+  - description: "Redshift: 4 HLL-substitution sketch ops execute end-to-end"
+    command: "uv run -- benchbox run --platform redshift --benchmark write_primitives --scale 0.01 --queries sketch_ddl_create_persistent_table,sketch_insert_theta_per_partition,sketch_query_theta_union_merge,sketch_drop_persistent_table"
+    expected_output: "4/4 pass; merged HLL estimate within Redshift-tuned bounds"
 
 scope_limit:
   only_modify:
@@ -326,7 +357,7 @@ scope_limit:
     - benchbox/core/read_primitives/
 
 success_metrics:
-  - "All 8 sketch ops pass on at least one cloud engine (Snowflake OR BigQuery OR Databricks)"
+  - "Supported sketch-op set passes on at least one cloud engine (8 Snowflake/Databricks, 6 BigQuery, or 4 Redshift)"
   - "Inline operations.yaml comments document verified-against-runtime-version per engine"
   - "Cross-platform docs replace 'untested cloud overrides' footnote with per-engine status matrix"
   - "Per-engine expected_value tolerance bounds documented inline alongside DuckDB defaults"
