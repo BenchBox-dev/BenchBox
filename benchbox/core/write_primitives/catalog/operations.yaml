@@ -3093,7 +3093,35 @@ operations:
         FROM sketch_ops_daily_users;
       clickhouse: null
       datafusion: null
-      redshift: null
+      # Redshift HLL substitution: full persist+merge+requery cycle in
+      # one op, mirroring the DuckDB Theta path. HLL_COMBINE unions
+      # per-partition HLLSKETCH rows; HLL_CARDINALITY extracts the
+      # final BIGINT estimate. Family substitution documented in the
+      # cross-platform doc.
+      #
+      # Tolerance bounds for the merged distinct estimate are inherited
+      # from the operation-level validation_query [14000, 16000]. HLL++
+      # (Redshift's implementation) has typical ~0.8% bias at default
+      # logm=15; for SF=0.01's 15000 distinct l_orderkeys the merged
+      # estimate should land near 14880-15120. Bounds are wider than
+      # strict-HLL would need; they were authored against DataSketches
+      # Theta and re-tuning to Redshift-tighter bounds is deferred to
+      # write-primitives-sketch-cloud-verification when creds become
+      # available. The current bounds are loose enough to absorb HLL++
+      # bias.
+      redshift: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region VARCHAR(25),
+          user_sketch HLLSKETCH, rev_sketch HLLSKETCH
+        ) DISTSTYLE EVEN;
+        INSERT INTO sketch_ops_daily_users
+        SELECT l_shipdate, l_returnflag,
+               HLL_CREATE_SKETCH(l_orderkey),
+               HLL_CREATE_SKETCH(CAST(l_extendedprice AS BIGINT))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+        SELECT HLL_CARDINALITY(HLL_COMBINE(user_sketch)) AS distinct_orders
+        FROM sketch_ops_daily_users;
       sqlite: null
       starrocks: null
 
