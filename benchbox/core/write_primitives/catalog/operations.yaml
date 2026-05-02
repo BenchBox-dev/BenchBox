@@ -2891,7 +2891,23 @@ operations:
         FROM lineitem GROUP BY l_shipdate, l_returnflag;
       clickhouse: null
       datafusion: null
-      redshift: null
+      # Redshift HLL substitution: HLL_CREATE_SKETCH builds an HLLSKETCH
+      # per (date, region) partition. Same persist+merge+requery shape
+      # as DataSketches Theta, different sketch family (HLL only — see
+      # cross-platform doc). DISTSTYLE EVEN required (HLLSKETCH cannot
+      # be DISTKEY/SORTKEY); cast Decimal to BIGINT before HLL hashing.
+      redshift: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region VARCHAR(25),
+          user_sketch HLLSKETCH, rev_sketch HLLSKETCH
+        ) DISTSTYLE EVEN;
+        INSERT INTO sketch_ops_daily_users
+        SELECT l_shipdate, l_returnflag,
+               HLL_CREATE_SKETCH(l_orderkey),
+               HLL_CREATE_SKETCH(CAST(l_extendedprice AS BIGINT))
+        FROM lineitem
+        GROUP BY l_shipdate, l_returnflag;
       sqlite: null
       starrocks: null
 
