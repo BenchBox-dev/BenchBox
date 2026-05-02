@@ -105,7 +105,7 @@ work:
 - id: w3
   summary: "Extend validation contract with expected_value_min/max for approximate scalars"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Today validation queries assert `expected_rows`,
     `expected_rows_min/max`, or column counts. Sketch read queries

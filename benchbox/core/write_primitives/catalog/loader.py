@@ -31,6 +31,13 @@ class ValidationQuery:
     expected_rows_max: int | None = None
     expected_values: dict[str, Any] | None = None
     check_expression: str | None = None
+    # Tolerance-based scalar validation for approximate sketch reads. The
+    # validator asserts that the first column of the first row falls in
+    # [expected_value_min, expected_value_max]. Both fields must be set
+    # together; combining them with expected_rows*/expected_values is rejected
+    # at load time because they describe a different validation kind.
+    expected_value_min: float | None = None
+    expected_value_max: float | None = None
 
 
 @dataclass(frozen=True)
@@ -93,6 +100,7 @@ def _parse_validation_queries(operation_id: str, raw_validations: object) -> lis
             raise WritePrimitivesCatalogError(
                 f"Validation query '{val_id}' in operation '{operation_id}' missing 'sql'"
             )
+        expected_value_min, expected_value_max = _parse_expected_value_bounds(operation_id, val_id, val_entry)
         queries.append(
             ValidationQuery(
                 id=val_id.strip(),
@@ -102,9 +110,52 @@ def _parse_validation_queries(operation_id: str, raw_validations: object) -> lis
                 expected_rows_max=val_entry.get("expected_rows_max"),
                 expected_values=val_entry.get("expected_values"),
                 check_expression=val_entry.get("check_expression"),
+                expected_value_min=expected_value_min,
+                expected_value_max=expected_value_max,
             )
         )
     return queries
+
+
+def _parse_expected_value_bounds(
+    operation_id: str,
+    val_id: str,
+    val_entry: dict,
+) -> tuple[float | None, float | None]:
+    """Parse and validate expected_value_min/max for tolerance-based scalar checks."""
+    raw_min = val_entry.get("expected_value_min")
+    raw_max = val_entry.get("expected_value_max")
+    if raw_min is None and raw_max is None:
+        return None, None
+    if raw_min is None or raw_max is None:
+        raise WritePrimitivesCatalogError(
+            f"Validation query '{val_id}' in operation '{operation_id}' must set both "
+            "expected_value_min and expected_value_max together"
+        )
+    try:
+        bound_min = float(raw_min)
+        bound_max = float(raw_max)
+    except (TypeError, ValueError) as exc:
+        raise WritePrimitivesCatalogError(
+            f"Validation query '{val_id}' in operation '{operation_id}' expected_value_min/max must be numeric"
+        ) from exc
+    if bound_min > bound_max:
+        raise WritePrimitivesCatalogError(
+            f"Validation query '{val_id}' in operation '{operation_id}' expected_value_min "
+            f"({bound_min}) must be <= expected_value_max ({bound_max})"
+        )
+    if any(val_entry.get(k) is not None for k in ("expected_rows", "expected_rows_min", "expected_rows_max")):
+        raise WritePrimitivesCatalogError(
+            f"Validation query '{val_id}' in operation '{operation_id}' cannot combine "
+            "expected_value_min/max with expected_rows fields — they describe different "
+            "validation kinds"
+        )
+    if val_entry.get("expected_values") is not None:
+        raise WritePrimitivesCatalogError(
+            f"Validation query '{val_id}' in operation '{operation_id}' cannot combine "
+            "expected_value_min/max with expected_values"
+        )
+    return bound_min, bound_max
 
 
 def _parse_optional_scalars(operation_id: str, entry: dict) -> tuple[str | None, int | None]:
