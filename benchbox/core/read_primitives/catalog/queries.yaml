@@ -50,6 +50,45 @@ queries:
         COUNT(DISTINCT l_partkey) as unique_parts
     FROM lineitem
     GROUP BY l_returnflag, l_linestatus;
+- id: approx_count_distinct_simple
+  category: aggregation
+  sql: |2
+
+    -- Approximate distinct count (HLL) on a high-cardinality key
+    -- Companion to aggregation_distinct; tests one-shot approx-distinct latency.
+    -- Cross-dialect rewrites are handled by sqlglot:
+    --   ClickHouse: uniq(o_custkey)
+    --   Redshift:   APPROXIMATE COUNT(DISTINCT o_custkey)
+    SELECT APPROX_COUNT_DISTINCT(o_custkey) as unique_customers
+    FROM orders
+    WHERE o_orderdate >= DATE '1995-01-01';
+  result_contract:
+    capability: approximate_distinct_count
+    columns:
+      - unique_customers
+- id: approx_count_distinct_groupby
+  category: aggregation
+  sql: |2
+
+    -- Approximate distinct counts (HLL) per low-cardinality group
+    -- Companion to aggregation_distinct_groupby. Cross-dialect rewrites
+    -- (ClickHouse uniq, Redshift APPROXIMATE COUNT(DISTINCT)) are handled
+    -- by sqlglot.
+    SELECT
+        l_returnflag,
+        l_linestatus,
+        APPROX_COUNT_DISTINCT(l_orderkey) as unique_orders,
+        APPROX_COUNT_DISTINCT(l_partkey) as unique_parts
+    FROM lineitem
+    GROUP BY l_returnflag, l_linestatus;
+  result_contract:
+    capability: approximate_distinct_count
+    row_identity: [l_returnflag, l_linestatus]
+    columns:
+      - l_returnflag
+      - l_linestatus
+      - unique_orders
+      - unique_parts
 - id: aggregation_groupby_large
   category: aggregation
   sql: |2
@@ -439,17 +478,52 @@ queries:
         AVG(l_quantity) as avg_qty
     FROM lineitem
     GROUP BY l_discount;
-- id: intrinsic_appx_median
-  category: intrinsic
+- id: approx_quantile_groupby
+  category: statistical
   sql: |2
 
-    -- Approximate statistical function (PERCENTILE_CONT)
+    -- Approximate single-quantile per group (T-Digest / KLL family)
+    -- Hard rename of the prior intrinsic_appx_median entry, which used
+    -- exact PERCENTILE_CONT despite the "appx" name.
     SELECT
         l_shipmode,
-        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l_quantity) as median_quantity
+        APPROX_QUANTILE(l_quantity, 0.5) as median_quantity
     FROM lineitem
     GROUP BY l_shipmode;
-  skip_on: [clickhouse]
+  result_contract:
+    capability: approximate_quantile_groupby
+    row_identity: [l_shipmode]
+    columns:
+      - l_shipmode
+      - median_quantity
+  variants:
+    # sqlglot leaves APPROX_QUANTILE unchanged for BigQuery, but BigQuery
+    # has no APPROX_QUANTILE function — only APPROX_QUANTILES with array
+    # extraction. Provide an explicit variant.
+    bigquery: |2
+
+      SELECT
+          l_shipmode,
+          APPROX_QUANTILES(l_quantity, 100)[OFFSET(50)] as median_quantity
+      FROM lineitem
+      GROUP BY l_shipmode;
+    # sqlglot leaves APPROX_QUANTILE unchanged for ClickHouse; rewrite to
+    # the curried quantileTDigest form.
+    clickhouse: |2
+
+      SELECT
+          l_shipmode,
+          quantileTDigest(0.5)(l_quantity) as median_quantity
+      FROM lineitem
+      GROUP BY l_shipmode;
+    # Snowflake (APPROX_PERCENTILE) and Databricks (PERCENTILE_APPROX)
+    # rewrites are handled by sqlglot.
+  # Redshift's `APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)`
+  # syntax is not recognised by sqlglot's redshift dialect parser, which
+  # blocks the static variant-contract checker. Documented in the
+  # cross-platform doc; tracked separately for users who want Redshift
+  # coverage of approximate quantiles.
+  skip_on: [redshift]
 - id: intrinsic_to_date
   category: intrinsic
   sql: |2
@@ -749,6 +823,29 @@ queries:
     GROUP BY l_orderkey
     ORDER BY total_quantity DESC
     LIMIT 10;
+- id: approx_top_k_lineitem
+  category: topn
+  sql: |2
+
+    -- Approximate Top-K aggregate returning the most-frequent values as an array.
+    -- Result shapes diverge across engines: DuckDB / ClickHouse / Snowflake return
+    -- ARRAY of values; BigQuery's APPROX_TOP_COUNT returns ARRAY<STRUCT<value,count>>.
+    -- Validation enforces capability + array type_class, not deep equality.
+    SELECT APPROX_TOP_K(l_shipmode, 5) as top_shipmodes
+    FROM lineitem;
+  result_contract:
+    capability: approximate_top_k
+    columns:
+      - name: top_shipmodes
+        type_class: array
+  variants:
+    # ClickHouse uses the curried topK form. BigQuery (APPROX_TOP_COUNT),
+    # Snowflake/Databricks (APPROX_TOP_K) rewrites are handled by sqlglot.
+    clickhouse: |2
+
+      SELECT topK(5)(l_shipmode) as top_shipmodes
+      FROM lineitem;
+  skip_on: [redshift]
 - id: window_growing_frame
   category: window
   sql: |2
@@ -1083,6 +1180,71 @@ queries:
           PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l_extendedprice) OVER (PARTITION BY l_returnflag, l_linestatus) as price_p95
       FROM lineitem;
   skip_on: [clickhouse]
+- id: approx_quantiles_array
+  category: statistical
+  sql: |2
+
+    -- Approximate quantiles returned as a single array per group
+    -- Companion to statistical_percentiles, but exercises the
+    -- vector-quantile path (one sketch evaluation per group instead of
+    -- four PERCENTILE_CONT calls).
+    SELECT
+        l_returnflag,
+        l_linestatus,
+        APPROX_QUANTILE(l_quantity, [0.25, 0.5, 0.75, 0.95]) as quantity_quantiles
+    FROM lineitem
+    GROUP BY l_returnflag, l_linestatus;
+  result_contract:
+    capability: approximate_quantile_array
+    row_identity: [l_returnflag, l_linestatus]
+    columns:
+      - l_returnflag
+      - l_linestatus
+      - name: quantity_quantiles
+        type_class: array
+  variants:
+    # BigQuery has no APPROX_QUANTILE; APPROX_QUANTILES(x, n) returns n+1
+    # boundary values, so slice the requested percentiles into an array
+    # to match the cross-engine shape.
+    bigquery: |2
+
+      SELECT
+          l_returnflag,
+          l_linestatus,
+          [
+            APPROX_QUANTILES(l_quantity, 100)[OFFSET(25)],
+            APPROX_QUANTILES(l_quantity, 100)[OFFSET(50)],
+            APPROX_QUANTILES(l_quantity, 100)[OFFSET(75)],
+            APPROX_QUANTILES(l_quantity, 100)[OFFSET(95)]
+          ] as quantity_quantiles
+      FROM lineitem
+      GROUP BY l_returnflag, l_linestatus;
+    # ClickHouse uses curried quantilesTDigest with multiple quantile args.
+    clickhouse: |2
+
+      SELECT
+          l_returnflag,
+          l_linestatus,
+          quantilesTDigest(0.25, 0.5, 0.75, 0.95)(l_quantity) as quantity_quantiles
+      FROM lineitem
+      GROUP BY l_returnflag, l_linestatus;
+    # Snowflake's APPROX_PERCENTILE accepts only a scalar quantile;
+    # assemble the array from four single-quantile calls.
+    snowflake: |2
+
+      SELECT
+          l_returnflag,
+          l_linestatus,
+          ARRAY_CONSTRUCT(
+            APPROX_PERCENTILE(l_quantity, 0.25),
+            APPROX_PERCENTILE(l_quantity, 0.5),
+            APPROX_PERCENTILE(l_quantity, 0.75),
+            APPROX_PERCENTILE(l_quantity, 0.95)
+          ) as quantity_quantiles
+      FROM lineitem
+      GROUP BY l_returnflag, l_linestatus;
+    # Databricks rewrite (PERCENTILE_APPROX with ARRAY(...)) handled by sqlglot.
+  skip_on: [redshift]
 - id: statistical_variance_stddev
   category: statistical
   sql: |2
