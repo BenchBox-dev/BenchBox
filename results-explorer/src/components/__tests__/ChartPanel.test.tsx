@@ -195,6 +195,36 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
   });
 
+  it("uses log scale for performance bars when latency spans an order of magnitude", () => {
+    const { container } = render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            platforms: [
+              makePlatformRow({ result_id: "fast", platform: "FastDB", display_geomean_ms: 10 }),
+              makePlatformRow({ result_id: "middle", platform: "MidDB", display_geomean_ms: 100 }),
+              makePlatformRow({ result_id: "slow", platform: "SlowDB", display_geomean_ms: 1000 }),
+            ],
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Performance Bar" }));
+
+    expect(screen.getByRole("img", { name: "Geomean performance comparison (log scale)" })).toBeTruthy();
+    expect(screen.getByText("Geomean query time (log scale) - lower is faster")).toBeTruthy();
+
+    const widths = Array.from(
+      container.querySelectorAll('svg[aria-label="Geomean performance comparison (log scale)"] rect'),
+    ).map((rect) => Number(rect.getAttribute("width")));
+    expect(widths).toHaveLength(3);
+    expect(widths[0]).toBeGreaterThan(2);
+    expect(widths[0]).toBeLessThan(widths[1]!);
+    expect(widths[1]!).toBeLessThan(widths[2]!);
+  });
+
   it("keeps the cost chart reachable so normalized-cost empty states are visible", () => {
     render(
       <ChartPanel

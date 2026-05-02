@@ -41,7 +41,12 @@ work:
   - id: w2
     summary: "Use log-scale or ratio-based encoding for latency bars where values span orders of magnitude"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/chartMath.ts"
+      - "results-explorer/src/components/ChartPanel.tsx"
+      - "results-explorer/src/__tests__/chartMath.scale.test.ts"
+      - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
     notes: |
       Update PowerBar/ChartPanel latency views so linear bars do not compress
       faster engines against a slow outlier. Use log scale for latency magnitude

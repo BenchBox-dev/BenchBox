@@ -25,6 +25,11 @@ import { CDFChart } from "@/components/CDFChart";
 import { RankTable } from "@/components/RankTable";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { paletteColor } from "@/lib/chartTheme";
+import {
+  buildLatencyBarScale,
+  latencyScaleFraction,
+  latencyScaleTicks,
+} from "@/lib/chartMath";
 
 interface ChartPanelProps {
   context: ChartContext;
@@ -360,7 +365,14 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   const valueWidth = 72;
   const plotWidth = width - labelWidth - valueWidth;
   const totalHeight = topPadding + rows.length * rowHeight + axisHeight;
-  const maxValue = Math.max(...rows.map((row) => row.display_geomean_ms ?? 0));
+  const scale = buildLatencyBarScale(rows.map((row) => row.display_geomean_ms));
+  if (scale === null) return null;
+
+  const ticks = latencyScaleTicks(scale);
+  const scaleLabel =
+    scale.mode === "log"
+      ? "Geomean query time (log scale) - lower is faster"
+      : "Geomean query time (median-of-passing) - lower is faster";
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
@@ -368,10 +380,15 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
         width={width}
         height={totalHeight}
         role="img"
-        aria-label="Geomean performance comparison"
+        aria-label={
+          scale.mode === "log"
+            ? "Geomean performance comparison (log scale)"
+            : "Geomean performance comparison"
+        }
       >
         {rows.map((row, index) => {
-          const barWidth = ((row.display_geomean_ms ?? 0) / maxValue) * plotWidth;
+          const fraction = latencyScaleFraction(row.display_geomean_ms, scale) ?? 0;
+          const barWidth = fraction * plotWidth;
           const y = topPadding + index * rowHeight;
           const midY = y + rowHeight * 0.5;
           const barHeight = rowHeight * 0.55;
@@ -426,11 +443,11 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
             stroke="#d1d5db"
             strokeWidth={1}
           />
-          {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+          {ticks.map((value) => {
+            const fraction = latencyScaleFraction(value, scale) ?? 0;
             const x = labelWidth + fraction * plotWidth;
-            const value = fraction * maxValue;
             return (
-              <g key={fraction}>
+              <g key={value}>
                 <line x1={x} y1={0} x2={x} y2={4} stroke="#9ca3af" strokeWidth={1} />
                 <text
                   x={x}
@@ -449,7 +466,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
             textAnchor="middle"
             style={{ fontSize: "10px", fill: "#9ca3af" }}
           >
-            Geomean query time (median-of-passing) - lower is faster
+            {scaleLabel}
           </text>
         </g>
       </svg>
