@@ -49,6 +49,7 @@ def _result_with_sensitive_environment_metadata() -> BenchmarkResults:
                 "engine_host": "acct123.us-east-1.snowflakecomputing.com",
                 "collection_status": "partial",
                 "source": "requested",
+                "collection_error_message": "Docker socket /Users/alice/.docker/run/docker.sock was denied",
             },
             "container": {
                 "container_name": "benchbox-clickhouse-dev",
@@ -71,6 +72,7 @@ def _result_with_sensitive_environment_metadata() -> BenchmarkResults:
             "provider": "aws",
             "region": "us-east-1",
             "account": "acct123",
+            "organization": "acme-org",
             "project": "analytics-project",
             "workspace": "https://workspace.cloud.example.com",
             "collection_status": "partial",
@@ -138,6 +140,7 @@ def test_anonymized_json_export_hashes_infrastructure_identifiers_and_redacts_se
         "raw-machine-id",
         "raw-worker-machine",
         "acct123",
+        "acme-org",
         "analytics-project",
         "workspace.cloud.example.com",
         "RAW_WH",
@@ -160,9 +163,11 @@ def test_anonymized_json_export_hashes_infrastructure_identifiers_and_redacts_se
     assert payload["environment"]["client_host"]["hostname"].startswith("host_")
     assert payload["environment"]["client_host"]["username"].startswith("user_")
     assert payload["environment"]["platform_runtime"]["engine_host"].startswith("host_")
+    assert "path_" in payload["environment"]["platform_runtime"]["collection_error_message"]
     assert payload["environment"]["container"]["container_name"].startswith("container_")
     assert payload["environment"]["container"]["bind_mounts"][0]["source"].startswith("path_")
     assert payload["platform"]["cloud"]["account"].startswith("account_")
+    assert payload["platform"]["cloud"]["organization"].startswith("organization_")
     assert payload["platform"]["cloud"]["project"].startswith("project_")
     assert payload["platform"]["cloud"]["workspace"].startswith("workspace_")
     assert payload["platform"]["compute"]["warehouse"].startswith("warehouse_")
@@ -174,6 +179,32 @@ def test_anonymized_json_export_hashes_infrastructure_identifiers_and_redacts_se
     assert payload["platform"]["raw_config"]["credential_file"] == "<redacted>"
     assert payload["platform"]["raw_config"]["connection_string"] == "<redacted>"
     assert payload["config"]["platform_options"]["client_secret"] == "<redacted>"
+
+
+def test_anonymized_export_preserves_captured_client_host_profile(tmp_path) -> None:
+    result = _result_with_sensitive_environment_metadata()
+    result.execution_environment["client_host"].update(
+        {
+            "os": "RemoteOS 1.0",
+            "arch": "remote-arch",
+            "cpu_count": 64,
+            "memory_gb": 512,
+            "python": "3.11.9",
+        }
+    )
+    exporter = ResultExporter(output_dir=tmp_path, anonymize=True)
+
+    exported = exporter.export_result(result, formats=["json"])
+
+    with open(exported["json"], encoding="utf-8") as handle:
+        payload = json.load(handle)
+
+    client_host = payload["environment"]["client_host"]
+    assert client_host["os"] == "RemoteOS 1.0"
+    assert client_host["arch"] == "remote-arch"
+    assert client_host["cpu_count"] == 64
+    assert client_host["memory_gb"] == 512
+    assert client_host["python"] == "3.11.9"
 
 
 def test_private_export_preserves_raw_platform_metadata_behind_explicit_option(tmp_path) -> None:
