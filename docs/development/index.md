@@ -42,6 +42,7 @@ Documentation for contributors and developers working on BenchBox.
 
 ## Results & Validation
 
+- [Result Execution Environment Contract](result-execution-environment.md) - Normalized client host, platform runtime, cloud/compute/storage facets, and anonymization policy
 - [Result Integrity Validation](result-integrity-validation.md) - Three-tier validator: structural, completeness, and believability checks for result JSON files
 
 ## Reference
@@ -76,6 +77,7 @@ data-sharing
 dependency-compatibility
 db-api-2
 test-quality-guidelines
+result-execution-environment
 result-integrity-validation
 ../platform-config-audit
 ```

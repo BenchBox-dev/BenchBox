@@ -106,8 +106,16 @@ class OperationResult:
     skip_reason: Optional[str] = None
 
 
-def _check_validation_query(val_query: Any, actual_rows: int) -> bool:
-    """Check whether a validation query passes based on expected row criteria."""
+def _check_validation_query(val_query: Any, actual_rows: int, val_result: list | None = None) -> bool:
+    """Check whether a validation query passes based on expected row or scalar-value criteria.
+
+    Three validation modes (mutually exclusive at load time — see catalog loader):
+    - expected_rows: exact row-count match
+    - expected_rows_min/max: row-count range
+    - expected_value_min/max: scalar value from row[0][0] must fall in [min, max].
+      Used by approximate-aggregate sketch ops where a single tolerance-bounded
+      number certifies correctness without strict cross-engine equality.
+    """
     expected_rows = val_query.expected_rows
     if expected_rows is not None:
         return actual_rows == expected_rows
@@ -115,6 +123,17 @@ def _check_validation_query(val_query: Any, actual_rows: int) -> bool:
         min_val = val_query.expected_rows_min if val_query.expected_rows_min is not None else 0
         max_val = val_query.expected_rows_max if val_query.expected_rows_max is not None else float("inf")
         return min_val <= actual_rows <= max_val
+    if (
+        getattr(val_query, "expected_value_min", None) is not None
+        and getattr(val_query, "expected_value_max", None) is not None
+    ):
+        if not val_result or not val_result[0]:
+            return False
+        try:
+            scalar = float(val_result[0][0])
+        except (TypeError, ValueError):
+            return False
+        return val_query.expected_value_min <= scalar <= val_query.expected_value_max
     return True
 
 
@@ -911,7 +930,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             val_sql = self._replace_placeholders(val_query.sql)
             val_result = connection.execute(val_sql).fetchall()
             actual_rows = len(val_result)
-            passed = _check_validation_query(val_query, actual_rows)
+            passed = _check_validation_query(val_query, actual_rows, val_result)
             validation_passed = validation_passed and passed
 
             validation_results.append(

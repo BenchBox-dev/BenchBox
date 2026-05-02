@@ -214,7 +214,9 @@ def reconstruct_benchmark_results(
     tpc = _extract_tpc_metrics(summary_section)
     platform_info = _extract_platform_info(platform_section)
     tuning = _extract_tuning_info(platform_section, tuning_data)
-    system_profile = _extract_system_profile(data.get("environment", {}))
+    environment_section = data.get("environment", {})
+    system_profile = _extract_system_profile(environment_section)
+    execution_environment = _extract_execution_environment(environment_section)
     cost_summary = _extract_cost_summary(data.get("cost", {}))
     plans_captured, plan_failures = _extract_plans_info(plans_data)
 
@@ -250,6 +252,13 @@ def reconstruct_benchmark_results(
         geometric_mean_execution_time=tpc["geometric_mean_execution_time"],
         test_execution_type=benchmark_section.get("mode", "standard"),
         validation_status=summary_section.get("validation", "PASSED"),
+        execution_environment=execution_environment,
+        platform_deployment=platform_section.get("deployment"),
+        platform_cloud=platform_section.get("cloud"),
+        platform_compute=platform_section.get("compute"),
+        platform_storage=platform_section.get("storage"),
+        platform_raw_config=platform_section.get("raw_config"),
+        platform_raw_metadata=platform_section.get("raw_metadata"),
         system_profile=system_profile,
         query_subset=run_section.get("query_subset"),
         platform_info=platform_info,
@@ -344,6 +353,11 @@ def _extract_system_profile(environment_section: dict[str, Any]) -> dict[str, An
     if not environment_section:
         return profile
 
+    source = dict(environment_section)
+    client_host = environment_section.get("client_host")
+    if isinstance(client_host, dict):
+        source.update({key: value for key, value in client_host.items() if value is not None})
+
     _env_field_map = {
         "arch": "architecture",
         "cpu_count": "cpu_count",
@@ -352,16 +366,29 @@ def _extract_system_profile(environment_section: dict[str, Any]) -> dict[str, An
         "machine_id": "machine_id",
     }
 
-    if environment_section.get("os"):
-        os_parts = environment_section["os"].split(" ", 1)
+    if source.get("os"):
+        os_parts = source["os"].split(" ", 1)
         profile["os_type"] = os_parts[0]
         profile["os_release"] = os_parts[1] if len(os_parts) > 1 else ""
 
     for env_key, profile_key in _env_field_map.items():
-        if environment_section.get(env_key):
-            profile[profile_key] = environment_section[env_key]
+        if source.get(env_key):
+            profile[profile_key] = source[env_key]
 
     return profile
+
+
+def _extract_execution_environment(environment_section: dict[str, Any]) -> dict[str, Any] | None:
+    """Extract normalized execution-environment metadata from the environment section."""
+    if not isinstance(environment_section, dict):
+        return None
+
+    normalized = {
+        key: environment_section[key]
+        for key in ("client_host", "platform_runtime", "container")
+        if isinstance(environment_section.get(key), dict)
+    }
+    return normalized or None
 
 
 def _extract_cost_summary(cost_section: dict[str, Any]) -> dict[str, Any] | None:

@@ -20,11 +20,14 @@ from __future__ import annotations
 import logging
 import os
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
+from benchbox.platforms.base.runtime_metadata import build_default_normalized_result_metadata
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 logger = logging.getLogger(__name__)
@@ -86,6 +89,29 @@ def _resolve_firebolt_deployment_mode(
         return "cloud"
 
     return "core"
+
+
+def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
+
+
+def _endpoint_class_from_url(url: Any) -> str:
+    url_value = str(url or "").strip()
+    if not url_value:
+        return "unknown"
+    parsed = urlparse(url_value if "://" in url_value else f"//{url_value}")
+    host = (parsed.hostname or "").lower()
+    if host in {"localhost", "127.0.0.1", "::1"}:
+        return "localhost_port"
+    return "remote_host" if host else "unknown"
+
+
+def _host_from_url(url: Any) -> str | None:
+    url_value = str(url or "").strip()
+    if not url_value:
+        return None
+    parsed = urlparse(url_value if "://" in url_value else f"//{url_value}")
+    return parsed.hostname or url_value.split("/", 1)[0].split(":", 1)[0]
 
 
 def _validate_firebolt_mode_config(adapter: FireboltAdapter) -> None:
@@ -194,6 +220,10 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         self.api_endpoint = (
             config.get("api_endpoint") or os.environ.get("FIREBOLT_API_ENDPOINT") or "api.app.firebolt.io"
         )
+        self.region = config.get("region") or config.get("cloud_region") or os.environ.get("FIREBOLT_REGION")
+        self.cloud_provider = config.get("cloud_provider") or os.environ.get("FIREBOLT_CLOUD_PROVIDER")
+        self.engine_type = config.get("engine_type")
+        self.engine_size = config.get("engine_size") or config.get("compute_size")
 
         # Validate required fields per mode
         _validate_firebolt_mode_config(self)
@@ -332,6 +362,12 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             "account_name",
             "engine_name",
             "api_endpoint",
+            "region",
+            "cloud_region",
+            "cloud_provider",
+            "engine_type",
+            "engine_size",
+            "compute_size",
             "deployment_mode",
             "s3_staging_url",
             "s3_region",
@@ -364,15 +400,32 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             "connection_mode": self.deployment_mode,
             "configuration": {
                 "database": self.database,
+                "deployment_mode": self.deployment_mode,
+                "result_cache_enabled": not self.disable_result_cache,
+                "s3_staging_url": self.s3_staging_url,
+                "s3_region": self.s3_region,
             },
         }
 
         if self.deployment_mode == "core":
             platform_info["url"] = self.url
+            platform_info["configuration"]["url"] = self.url
         else:
             platform_info["account_name"] = self.account_name
             platform_info["engine_name"] = self.engine_name
             platform_info["api_endpoint"] = self.api_endpoint
+            platform_info["configuration"].update(
+                {
+                    "account_name": self.account_name,
+                    "engine_name": self.engine_name,
+                    "api_endpoint": self.api_endpoint,
+                    "region": self.region,
+                    "cloud_provider": self.cloud_provider,
+                    "engine_type": self.engine_type,
+                    "engine_size": self.engine_size,
+                    "auth_method": "client_credentials",
+                }
+            )
 
         # Get SDK version
         try:
@@ -393,6 +446,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 platform_info["platform_version"] = result[0] if result else None
                 platform_info["engine_version"] = platform_info["platform_version"]
                 platform_info["engine_version_source"] = "sql_query"
+                if self.deployment_mode == "cloud":
+                    self._collect_firebolt_cloud_engine_metadata(cursor, platform_info)
             except Exception as e:
                 self.logger.debug(f"Error collecting Firebolt platform info: {e}")
                 platform_info["platform_version"] = None
@@ -403,6 +458,181 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             platform_info["platform_version"] = None
 
         return platform_info
+
+    def _collect_firebolt_cloud_engine_metadata(self, cursor: Any, platform_info: dict[str, Any]) -> None:
+        try:
+            engine_name = str(self.engine_name or "").replace("'", "''")
+            cursor.execute(
+                "SELECT engine_name, engine_type, status "
+                "FROM information_schema.engines "
+                f"WHERE engine_name = '{engine_name}'"
+            )
+            engine_info = cursor.fetchone()
+            if not engine_info or len(engine_info) < 2:
+                platform_info["compute_configuration"] = {
+                    "engine_metadata_collection_status": "unavailable",
+                }
+                return
+
+            platform_info["compute_configuration"] = _compact_metadata(
+                {
+                    "engine_name": engine_info[0] if len(engine_info) > 0 else self.engine_name,
+                    "engine_type": engine_info[1] if len(engine_info) > 1 else None,
+                    "engine_status": engine_info[2] if len(engine_info) > 2 else None,
+                    "engine_metadata_collection_status": "available",
+                }
+            )
+        except Exception as e:
+            self.logger.debug(f"Could not fetch Firebolt engine details: {e}")
+            platform_info["compute_configuration"] = {
+                "engine_metadata_collection_status": "unavailable",
+                "engine_metadata_error_class": type(e).__name__,
+                "engine_metadata_error_message": str(e),
+            }
+
+    def get_normalized_result_metadata(
+        self,
+        *,
+        connection: Any | None = None,
+        platform_info: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return Firebolt-specific normalized Core and Cloud runtime metadata."""
+        info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
+        metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
+        config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
+        compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
+
+        metadata["execution_environment"] = self._firebolt_execution_environment(info, config)
+        metadata["platform_deployment"] = self._firebolt_deployment_metadata(info, config)
+        metadata["platform_cloud"] = self._firebolt_cloud_metadata(config)
+        metadata["platform_compute"] = self._firebolt_compute_metadata(config, compute)
+        metadata["platform_storage"] = self._firebolt_storage_metadata(config)
+        return metadata
+
+    @staticmethod
+    def _firebolt_execution_environment(info: Mapping[str, Any], config: Mapping[str, Any]) -> dict[str, Any]:
+        mode = str(config.get("deployment_mode") or info.get("connection_mode") or "core")
+        if mode == "cloud":
+            runtime = {
+                "runtime_type": "managed_cloud",
+                "collection_status": "partial",
+                "source": "requested",
+                "engine_host": config.get("api_endpoint"),
+            }
+        else:
+            url = config.get("url") or info.get("url")
+            runtime = {
+                "runtime_type": "remote_server",
+                "collection_status": "partial",
+                "source": "requested",
+                "engine_host": _host_from_url(url),
+            }
+        return _compact_metadata({"platform_runtime": runtime})
+
+    @staticmethod
+    def _firebolt_deployment_metadata(info: Mapping[str, Any], config: Mapping[str, Any]) -> dict[str, Any]:
+        mode = str(config.get("deployment_mode") or info.get("connection_mode") or "core")
+        is_cloud = mode == "cloud"
+        url = config.get("url") or info.get("url")
+        endpoint_class = "cloud_endpoint" if is_cloud else _endpoint_class_from_url(url)
+        return _compact_metadata(
+            {
+                "deployment_type": "managed_cloud" if is_cloud else "self_hosted",
+                "connection_mode": mode,
+                "endpoint_class": endpoint_class,
+                "metadata_source": "requested",
+                "collection_status": "partial",
+                "account": config.get("account_name") if is_cloud else None,
+                "engine": config.get("engine_name") if is_cloud else None,
+                "database": config.get("database"),
+                "api_endpoint": config.get("api_endpoint") if is_cloud else None,
+                "url": url if not is_cloud else None,
+                "auth_method": config.get("auth_method") if is_cloud else "firebolt_core",
+            }
+        )
+
+    @staticmethod
+    def _firebolt_cloud_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        is_cloud = config.get("deployment_mode") == "cloud"
+        provider = config.get("cloud_provider")
+        provider = str(provider).lower() if provider else None
+        region = config.get("region") or config.get("cloud_region")
+        has_cloud_metadata = bool(
+            is_cloud and (provider or region or config.get("account_name") or config.get("api_endpoint"))
+        )
+        return _compact_metadata(
+            {
+                "provider": provider,
+                "region": region,
+                "account": config.get("account_name") if is_cloud else None,
+                "service_endpoint": config.get("api_endpoint") if is_cloud else None,
+                "region_collection_status": "available" if region else "unavailable",
+                "source": "requested" if has_cloud_metadata else "unavailable",
+                "collection_status": "partial" if has_cloud_metadata else "unavailable",
+            }
+        )
+
+    @staticmethod
+    def _firebolt_compute_metadata(config: Mapping[str, Any], compute: Mapping[str, Any]) -> dict[str, Any]:
+        is_cloud = config.get("deployment_mode") == "cloud"
+        observed = compute.get("engine_metadata_collection_status") == "available"
+        has_compute_metadata = bool(
+            is_cloud
+            and (
+                observed
+                or config.get("engine_name")
+                or config.get("engine_type")
+                or config.get("engine_size")
+                or config.get("result_cache_enabled") is not None
+                or compute.get("engine_metadata_collection_status")
+            )
+        )
+        return _compact_metadata(
+            {
+                "service_model": "managed" if is_cloud else "core",
+                "engine": compute.get("engine_name") or config.get("engine_name"),
+                "engine_type": compute.get("engine_type") or config.get("engine_type"),
+                "engine_size": config.get("engine_size"),
+                "engine_status": compute.get("engine_status"),
+                "result_cache_enabled": config.get("result_cache_enabled") if is_cloud else None,
+                "engine_metadata_collection_status": compute.get("engine_metadata_collection_status"),
+                "engine_metadata_error_class": compute.get("engine_metadata_error_class"),
+                "engine_metadata_error_message": compute.get("engine_metadata_error_message"),
+                "source": "observed" if observed else "requested" if has_compute_metadata else "unavailable",
+                "collection_status": "available" if observed else "partial" if has_compute_metadata else "unavailable",
+            }
+        )
+
+    @classmethod
+    def _firebolt_storage_metadata(cls, config: Mapping[str, Any]) -> dict[str, Any]:
+        staging_url = config.get("s3_staging_url")
+        staging = cls._firebolt_s3_staging_metadata(staging_url)
+        if config.get("s3_region"):
+            staging["region"] = config.get("s3_region")
+        has_staging = bool(staging_url)
+        return _compact_metadata(
+            {
+                "table_format": "firebolt_engine_table",
+                "staging_location": staging_url,
+                "staging_url_type": "s3" if has_staging else None,
+                "staging_url_type_status": "available" if has_staging else "unavailable",
+                "bucket": staging.get("bucket"),
+                "prefix": staging.get("prefix"),
+                "region": staging.get("region"),
+                "source": "requested" if has_staging else "inferred",
+                "collection_status": "partial",
+            }
+        )
+
+    @staticmethod
+    def _firebolt_s3_staging_metadata(staging_url: Any) -> dict[str, Any]:
+        url = str(staging_url or "")
+        if not url.startswith("s3://"):
+            return {}
+        from benchbox.utils.cloud_urls import parse_s3_url
+
+        bucket, prefix = parse_s3_url(url)
+        return {"bucket": bucket, "prefix": prefix}
 
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect for Firebolt.
@@ -1422,9 +1652,18 @@ def _build_firebolt_config(
             "account_name",
             "engine_name",
             "api_endpoint",
+            "database",
+            "region",
+            "cloud_region",
+            "cloud_provider",
+            "engine_type",
+            "engine_size",
+            "compute_size",
             "deployment_mode",
             "s3_staging_url",
             "s3_region",
+            "disable_result_cache",
+            "strict_validation",
         ],
         options=options,
         overrides=overrides,

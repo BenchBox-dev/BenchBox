@@ -722,11 +722,20 @@ class TestCheckValidationQuery:
 
     pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
-    def _make_query(self, expected_rows=None, expected_rows_min=None, expected_rows_max=None):
+    def _make_query(
+        self,
+        expected_rows=None,
+        expected_rows_min=None,
+        expected_rows_max=None,
+        expected_value_min=None,
+        expected_value_max=None,
+    ):
         return SimpleNamespace(
             expected_rows=expected_rows,
             expected_rows_min=expected_rows_min,
             expected_rows_max=expected_rows_max,
+            expected_value_min=expected_value_min,
+            expected_value_max=expected_value_max,
         )
 
     def test_exact_match_passes(self):
@@ -774,6 +783,43 @@ class TestCheckValidationQuery:
 
         q = self._make_query()
         assert _check_validation_query(q, actual_rows=999) is True
+
+    def test_value_bounds_within_range_passes(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=14000, expected_value_max=16000)
+        assert _check_validation_query(q, actual_rows=1, val_result=[(14836.89,)]) is True
+
+    def test_value_bounds_below_range_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=14000, expected_value_max=16000)
+        assert _check_validation_query(q, actual_rows=1, val_result=[(0.0,)]) is False
+
+    def test_value_bounds_above_range_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=14000, expected_value_max=16000)
+        assert _check_validation_query(q, actual_rows=1, val_result=[(50000.0,)]) is False
+
+    def test_value_bounds_no_rows_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=14000, expected_value_max=16000)
+        assert _check_validation_query(q, actual_rows=0, val_result=[]) is False
+
+    def test_value_bounds_non_numeric_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=14000, expected_value_max=16000)
+        assert _check_validation_query(q, actual_rows=1, val_result=[("not a number",)]) is False
+
+    def test_value_bounds_integer_scalar_passes(self):
+        """Integer scalars (e.g. topk frequent_count = 7) coerce to float for the range check."""
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=6, expected_value_max=8)
+        assert _check_validation_query(q, actual_rows=1, val_result=[(7,)]) is True
 
 
 # ============================================================================

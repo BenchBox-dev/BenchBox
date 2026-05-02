@@ -32,6 +32,7 @@ import platform
 import random
 import statistics
 import time
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,7 @@ from benchbox.platforms.base.models import (
     ThroughputStream,
     ThroughputTestPhase,
 )
+from benchbox.platforms.base.runtime_metadata import build_default_normalized_result_metadata
 from benchbox.platforms.base.utils import is_non_interactive
 from benchbox.utils.clock import elapsed_seconds
 from benchbox.utils.printing import quiet_console
@@ -318,6 +320,24 @@ class ResultCaptureMixin:
         self.query_plans_captured = 0
         self.plan_capture_failures = 0
         self.plan_capture_errors: list[dict[str, Any]] = []
+
+    def get_normalized_result_metadata(
+        self,
+        *,
+        connection: Any | None = None,
+        platform_info: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return normalized runtime/deployment metadata for result construction.
+
+        Subclasses may override this optional hook to provide richer observed
+        metadata. The default maps legacy ``get_platform_info()`` output into
+        conservative normalized blocks.
+        """
+        return build_default_normalized_result_metadata(
+            self,
+            connection=connection,
+            platform_info=platform_info,
+        )
 
     def _collect_resource_utilization(self) -> dict[str, Any]:
         """Collect host and process resource utilization metrics when possible."""
@@ -1080,6 +1100,7 @@ class ResultCaptureMixin:
             platform_info = self.get_platform_info(None)  # Connection might be invalid
         except Exception:
             platform_info = {"error": "Could not retrieve platform info"}
+        normalized_metadata = self.get_normalized_result_metadata(platform_info=platform_info)
 
         # Create execution metadata
         execution_metadata = {
@@ -1112,6 +1133,7 @@ class ResultCaptureMixin:
             tuning_validation_status=tuning_validation_status,
             tuning_metadata_saved=tuning_metadata_saved,
             platform_info=platform_info,
+            **normalized_metadata,
             validation_status="FAILED",  # This is the key fix
             validation_details=validation_phase.validation_details,
         )
@@ -1470,6 +1492,7 @@ class ResultCaptureMixin:
                 "phases": run_config.get("phases"),
                 "query_subset": run_config.get("query_subset"),
                 "platform_options": run_config.get("platform_options"),
+                "platform_option_sources": run_config.get("platform_option_sources"),
                 "tuning_mode": run_config.get("tuning_mode"),
                 "tuning_config": run_config.get("tuning_config"),
                 "table_mode": self.table_mode if self.table_mode != "native" else None,

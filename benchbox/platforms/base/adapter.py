@@ -524,6 +524,10 @@ class PlatformAdapter(
             )
 
             platform_info = self.get_platform_info(connection)
+            normalized_metadata = self.get_normalized_result_metadata(
+                connection=connection,
+                platform_info=platform_info,
+            )
             execution_metadata, system_profile, anonymous_machine_id = self._build_execution_metadata(run_config)
 
             total_rows_loaded = sum(table_stats.values()) if table_stats else 0
@@ -570,6 +574,7 @@ class PlatformAdapter(
                 data_size_mb=data_size_mb,
                 table_statistics=table_stats or {},
                 platform_info=platform_info,
+                **normalized_metadata,
                 tunings_applied=tunings_applied_dict,
                 tuning_validation_status=tuning_validation_status,
                 tuning_metadata_saved=tuning_metadata_saved,

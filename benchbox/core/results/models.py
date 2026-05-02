@@ -11,6 +11,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from benchbox.core.results.environment import (
+    NormalizedExecutionEnvironment,
+    PlatformCloudMetadata,
+    PlatformComputeMetadata,
+    PlatformDeploymentMetadata,
+    PlatformStorageMetadata,
+)
+
 if TYPE_CHECKING:
     from benchbox.core.results.query_plan_models import QueryPlanDAG
 
@@ -292,6 +300,13 @@ class BenchmarkResults:
     # Validation and metadata
     validation_status: str = "PASSED"
     validation_details: dict[str, Any] | None = None
+    execution_environment: NormalizedExecutionEnvironment | dict[str, Any] | None = None
+    platform_deployment: PlatformDeploymentMetadata | dict[str, Any] | None = None
+    platform_cloud: PlatformCloudMetadata | dict[str, Any] | None = None
+    platform_compute: PlatformComputeMetadata | dict[str, Any] | None = None
+    platform_storage: PlatformStorageMetadata | dict[str, Any] | None = None
+    platform_raw_config: dict[str, Any] | None = None
+    platform_raw_metadata: dict[str, Any] | None = None
     platform_info: dict[str, Any] | None = None
     platform_metadata: dict[str, Any] | None = None
     tunings_applied: dict[str, Any] | None = None

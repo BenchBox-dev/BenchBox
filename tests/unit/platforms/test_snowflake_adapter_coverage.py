@@ -193,6 +193,76 @@ class TestGetPlatformInfoWithWarehouse:
         assert cc["warehouse_name"] == "MY_WH"
         assert cc["warehouse_size"] == "LARGE"
 
+    def test_normalized_metadata_maps_requested_and_observed_snowflake_fields(self):
+        adapter = _make_adapter(
+            warehouse="MY_WH",
+            database="BENCH_DB",
+            schema="BENCH_SCHEMA",
+            role="ANALYST",
+            warehouse_size="MEDIUM",
+            disable_result_cache=True,
+            file_format="PARQUET",
+            compression="ZSTD",
+            staging_root="s3://benchbox-stage/prefix",
+            multi_cluster_warehouse=True,
+        )
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        wh_row = ["MY_WH", "STARTED", "STANDARD", "LARGE"] + [None] * 27
+        wh_row[4] = 1
+        wh_row[5] = 3
+        wh_row[11] = 300
+        wh_row[12] = True
+        wh_row[21] = True
+        wh_row[22] = 8
+        wh_row[27] = "ECONOMY"
+
+        def _execute_side_effect(sql):
+            if "current_version" in sql.lower():
+                mock_cursor.fetchone.return_value = ("8.0.0",)
+            elif "current_region" in sql.lower():
+                mock_cursor.fetchone.return_value = ("AWS_US_EAST_1", "AWS")
+            elif "SHOW WAREHOUSES" in sql:
+                mock_cursor.fetchone.return_value = tuple(wh_row)
+            elif "current_account_name" in sql.lower():
+                mock_cursor.fetchone.return_value = ("acct", "org")
+            return mock_cursor
+
+        mock_cursor.execute = Mock(side_effect=_execute_side_effect)
+
+        platform_info = adapter.get_platform_info(connection=mock_conn)
+        metadata = adapter.get_normalized_result_metadata(platform_info=platform_info)
+
+        assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "managed_cloud"
+        assert metadata["platform_deployment"]["deployment_type"] == "managed_cloud"
+        assert metadata["platform_deployment"]["endpoint_class"] == "cloud_endpoint"
+        assert metadata["platform_deployment"]["role"] == "ANALYST"
+        assert metadata["platform_deployment"]["database"] == "BENCH_DB"
+        assert metadata["platform_deployment"]["schema"] == "BENCH_SCHEMA"
+        assert metadata["platform_cloud"]["provider"] == "aws"
+        assert metadata["platform_cloud"]["region"] == "AWS_US_EAST_1"
+        assert metadata["platform_cloud"]["account"] == "acct"
+        assert metadata["platform_cloud"]["organization"] == "org"
+        assert metadata["platform_compute"]["warehouse"] == "MY_WH"
+        assert metadata["platform_compute"]["warehouse_size"] == "LARGE"
+        assert metadata["platform_compute"]["warehouse_type"] == "STANDARD"
+        assert metadata["platform_compute"]["min_cluster_count"] == 1
+        assert metadata["platform_compute"]["max_cluster_count"] == 3
+        assert metadata["platform_compute"]["auto_suspend"] == 300
+        assert metadata["platform_compute"]["auto_resume"] is True
+        assert metadata["platform_compute"]["query_acceleration_enabled"] is True
+        assert metadata["platform_compute"]["query_acceleration_max_scale_factor"] == 8
+        assert metadata["platform_compute"]["scaling_policy"] == "ECONOMY"
+        assert metadata["platform_compute"]["result_cache_enabled"] is False
+        assert metadata["platform_compute"]["collection_status"] == "available"
+        assert metadata["platform_storage"]["table_format"] == "PARQUET"
+        assert metadata["platform_storage"]["staging_location"] == "s3://benchbox-stage/prefix"
+        assert metadata["platform_storage"]["compression"] == "ZSTD"
+        assert metadata["platform_raw_config"]["password"] == "<redacted>"
+
     def test_warehouse_show_exception_silenced(self):
         """Exception querying SHOW WAREHOUSES should not propagate."""
         adapter = _make_adapter()
@@ -217,7 +287,26 @@ class TestGetPlatformInfoWithWarehouse:
         result = adapter.get_platform_info(connection=mock_conn)
         # Should not raise; platform_version populated
         assert result["platform_version"] == "8.0.0"
-        assert "compute_configuration" not in result
+        assert result["compute_configuration"]["metadata_collection_status"] == "unavailable"
+        assert result["compute_configuration"]["collection_error_class"] == "RuntimeError"
+
+    def test_normalized_metadata_keeps_requested_compute_when_warehouse_metadata_unavailable(self):
+        adapter = _make_adapter(warehouse="MY_WH", warehouse_size="XLARGE")
+
+        platform_info = adapter.get_platform_info(connection=None)
+        platform_info["compute_configuration"] = {
+            "metadata_collection_status": "unavailable",
+            "collection_error_class": "ProgrammingError",
+            "collection_error_message": "permission denied",
+        }
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=platform_info)
+
+        assert metadata["platform_compute"]["warehouse"] == "MY_WH"
+        assert metadata["platform_compute"]["warehouse_size"] == "XLARGE"
+        assert metadata["platform_compute"]["collection_status"] == "partial"
+        assert metadata["platform_compute"]["collection_error_class"] == "ProgrammingError"
+        assert metadata["platform_compute"]["collection_error_message"] == "permission denied"
 
 
 # ---------------------------------------------------------------------------
@@ -429,6 +518,32 @@ class TestFromConfig:
             adapter = SnowflakeAdapter.from_config(config)
 
         assert adapter.disable_result_cache is False
+
+    def test_from_config_passes_storage_metadata_options(self):
+        with patch("benchbox.platforms.snowflake.check_platform_dependencies", return_value=(True, [])):
+            from benchbox.platforms.snowflake import SnowflakeAdapter
+
+            config = {
+                "account": "my_account",
+                "username": "user",
+                "password": "pass",
+                "warehouse": "WH",
+                "database": "DB",
+                "file_format": "PARQUET",
+                "compression": "ZSTD",
+                "staging_root": "s3://benchbox-stage/prefix",
+                "iceberg_external_volume": "iceberg_vol",
+                "iceberg_catalog": "SNOWFLAKE",
+                "delta_table_format": "DELTA",
+            }
+            adapter = SnowflakeAdapter.from_config(config)
+
+        assert adapter.file_format == "PARQUET"
+        assert adapter.compression == "ZSTD"
+        assert adapter.staging_root == "s3://benchbox-stage/prefix"
+        assert adapter.iceberg_external_volume == "iceberg_vol"
+        assert adapter.iceberg_catalog == "SNOWFLAKE"
+        assert adapter.delta_table_format == "DELTA"
 
 
 # ---------------------------------------------------------------------------

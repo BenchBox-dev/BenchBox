@@ -52,12 +52,24 @@ def test_from_config_maps_cloud_and_optional_fields() -> None:
                 "password": "p",
                 "username": "u",
                 "database": "d",
+                "region": "us-east-2",
+                "cloud_provider": "aws",
+                "service_id": "svc123",
+                "service_name": "prod",
+                "service_tier": "production",
+                "compute_size": "large",
                 "compression": "lz4",
                 "benchmark": "tpch",
             }
         )
 
     assert captured["host"] == "h"
+    assert captured["region"] == "us-east-2"
+    assert captured["cloud_provider"] == "aws"
+    assert captured["service_id"] == "svc123"
+    assert captured["service_name"] == "prod"
+    assert captured["service_tier"] == "production"
+    assert captured["compute_size"] == "large"
     assert captured["compression"] == "lz4"
     assert captured["benchmark"] == "tpch"
 
@@ -117,6 +129,9 @@ def test_get_platform_info_adds_cloud_metadata() -> None:
     assert info["connection_mode"] == "cloud"
     assert info["configuration"]["deployment"] == "managed"
     assert info["configuration"]["auth_method"] == "password"
+    assert info["configuration"]["host"] == "h"
+    assert info["configuration"]["port"] == 8443
+    assert info["configuration"]["secure"] is True
 
 
 def test_get_platform_info_oauth_auth_method() -> None:
@@ -133,7 +148,13 @@ def test_get_platform_info_oauth_auth_method() -> None:
 
 def test_get_platform_info_includes_staging_urls() -> None:
     """Platform info should include staging URLs when configured."""
-    adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://b/p/", gcs_staging_url="gs://b/p/")
+    adapter = ClickHouseCloudAdapter(
+        host="h",
+        password="p",
+        s3_staging_url="s3://b/p/",
+        s3_region="us-east-1",
+        gcs_staging_url="gs://b/p/",
+    )
 
     with patch(
         "benchbox.platforms.clickhouse_cloud.ClickHouseAdapter.get_platform_info", return_value={"configuration": {}}
@@ -141,7 +162,62 @@ def test_get_platform_info_includes_staging_urls() -> None:
         info = adapter.get_platform_info(connection=None)
 
     assert info["configuration"]["s3_staging_url"] == "s3://b/p/"
+    assert info["configuration"]["s3_region"] == "us-east-1"
     assert info["configuration"]["gcs_staging_url"] == "gs://b/p/"
+
+
+def test_normalized_metadata_maps_full_clickhouse_cloud_config() -> None:
+    adapter = ClickHouseCloudAdapter(
+        host="svc123.us-east-2.aws.clickhouse.cloud",
+        password="p",
+        database="bench",
+        service_id="configured-svc",
+        service_name="prod",
+        service_tier="production",
+        compute_size="large",
+        s3_staging_url="s3://bench-bucket/stage/",
+        s3_region="us-east-2",
+        disable_result_cache=False,
+    )
+    platform_info = adapter.get_platform_info(connection=None)
+    platform_info["compute_configuration"] = {"system_settings": {"max_threads": "12"}}
+
+    metadata = adapter.get_normalized_result_metadata(platform_info=platform_info)
+
+    assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "managed_cloud"
+    assert metadata["platform_deployment"]["deployment_type"] == "managed_cloud"
+    assert metadata["platform_deployment"]["service_endpoint"] == "svc123.us-east-2.aws.clickhouse.cloud"
+    assert metadata["platform_deployment"]["auth_method"] == "password"
+    assert metadata["platform_cloud"]["provider"] == "aws"
+    assert metadata["platform_cloud"]["region"] == "us-east-2"
+    assert metadata["platform_cloud"]["workspace"] == "configured-svc"
+    assert metadata["platform_cloud"]["region_collection_status"] == "available"
+    assert metadata["platform_compute"]["service_id"] == "configured-svc"
+    assert metadata["platform_compute"]["service_name"] == "prod"
+    assert metadata["platform_compute"]["service_tier"] == "production"
+    assert metadata["platform_compute"]["compute_size"] == "large"
+    assert metadata["platform_compute"]["result_cache_enabled"] is True
+    assert metadata["platform_compute"]["system_settings"] == {"max_threads": "12"}
+    assert metadata["platform_compute"]["collection_status"] == "available"
+    assert metadata["platform_storage"]["staging_url_type"] == "s3"
+    assert metadata["platform_storage"]["bucket"] == "bench-bucket"
+    assert metadata["platform_storage"]["prefix"] == "stage/"
+    assert metadata["platform_storage"]["region"] == "us-east-2"
+
+
+def test_normalized_metadata_marks_sparse_clickhouse_cloud_facets_unavailable() -> None:
+    adapter = ClickHouseCloudAdapter(host="svc.clickhouse.cloud", password="p")
+
+    metadata = adapter.get_normalized_result_metadata(platform_info=adapter.get_platform_info(connection=None))
+
+    assert "provider" not in metadata["platform_cloud"]
+    assert "region" not in metadata["platform_cloud"]
+    assert metadata["platform_cloud"]["region_collection_status"] == "unavailable"
+    assert metadata["platform_cloud"]["source"] == "requested"
+    assert metadata["platform_compute"]["collection_status"] == "partial"
+    assert metadata["platform_storage"]["table_format"] == "MergeTree"
+    assert metadata["platform_storage"]["staging_url_type_status"] == "unavailable"
+    assert metadata["platform_storage"]["collection_status"] == "partial"
 
 
 def test_build_clickhouse_cloud_config_merges_saved_options(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -174,6 +250,12 @@ def test_build_config_includes_oauth_and_staging() -> None:
             {
                 "host": "h",
                 "oauth_token": "tok",
+                "region": "us-west-2",
+                "cloud_provider": "aws",
+                "service_id": "svc123",
+                "service_name": "prod",
+                "service_tier": "production",
+                "compute_size": "large",
                 "s3_staging_url": "s3://b/",
                 "s3_region": "us-west-2",
                 "gcs_staging_url": "gs://b/",
@@ -183,6 +265,12 @@ def test_build_config_includes_oauth_and_staging() -> None:
         )
 
     assert config.options["oauth_token"] == "tok"
+    assert config.options["region"] == "us-west-2"
+    assert config.options["cloud_provider"] == "aws"
+    assert config.options["service_id"] == "svc123"
+    assert config.options["service_name"] == "prod"
+    assert config.options["service_tier"] == "production"
+    assert config.options["compute_size"] == "large"
     assert config.options["s3_staging_url"] == "s3://b/"
     assert config.options["s3_region"] == "us-west-2"
     assert config.options["gcs_staging_url"] == "gs://b/"

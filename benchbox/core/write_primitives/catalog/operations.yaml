@@ -2987,7 +2987,7 @@ operations:
         );
         INSERT INTO sketch_ops_topk
         SELECT MOD(l_orderkey, 8),
-               APPROX_TOP_K_ACCUMULATE(l_shipmode, 8)
+               APPROX_TOP_K_ACCUMULATE(l_shipmode, 1024)
         FROM lineitem GROUP BY MOD(l_orderkey, 8);
       bigquery: null  # No native top-K accumulator function
       clickhouse: null
@@ -2999,7 +2999,7 @@ operations:
   # ★ HEADLINE TEST — theta_union merge + estimate
   - id: sketch_query_theta_union_merge
     category: sketch
-    description: ★ Headline — populate theta sketches per partition, then merge across all partitions in a single query and emit an approximate distinct count (compare to aggregation_distinct in read_primitives)
+    description: ★ Headline — populate theta sketches per partition, then merge across all partitions in a single query and emit an approximate distinct count (compare to aggregation_distinct in read_primitives). BigQuery substitutes HLL_COUNT for Theta (no native Theta surface) — the persist + merge + requery shape is identical, but the underlying sketch family differs.
     requires_setup: false
     write_sql: |
       INSTALL datasketches FROM community;
@@ -3189,7 +3189,7 @@ operations:
         CREATE TABLE sketch_ops_topk (shard_id INTEGER, topk_sketch BINARY);
         INSERT INTO sketch_ops_topk
         SELECT MOD(l_orderkey, 8),
-               APPROX_TOP_K_ACCUMULATE(l_shipmode, 8)
+               APPROX_TOP_K_ACCUMULATE(l_shipmode, 1024)
         FROM lineitem GROUP BY MOD(l_orderkey, 8);
         SELECT ARRAY_SIZE(APPROX_TOP_K_ESTIMATE(APPROX_TOP_K_COMBINE(topk_sketch))) AS frequent_count
         FROM sketch_ops_topk;

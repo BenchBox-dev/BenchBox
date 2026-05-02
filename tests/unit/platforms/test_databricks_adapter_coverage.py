@@ -157,9 +157,10 @@ class TestGetPlatformInfoSdkPath:
         assert cc["warehouse_name"] == "My Warehouse"
         assert cc["warehouse_size"] == "Medium"
         assert cc["enable_photon"] is True
+        assert cc["warehouse_metadata_collection_status"] == "available"
 
     def test_platform_info_sdk_import_error_silenced(self):
-        """SDK ImportError is silenced; info returns without compute_configuration."""
+        """SDK ImportError is silenced and recorded as unavailable metadata."""
         adapter = _make_adapter()
 
         with (
@@ -169,10 +170,12 @@ class TestGetPlatformInfoSdkPath:
             info = adapter.get_platform_info(connection=None)
 
         assert info["platform_type"] == "databricks"
-        assert "compute_configuration" not in info
+        assert info["compute_configuration"]["warehouse_id"] == "abc123"
+        assert info["compute_configuration"]["warehouse_metadata_collection_status"] == "unavailable"
+        assert info["compute_configuration"]["warehouse_metadata_error_class"] in {"ImportError", "ModuleNotFoundError"}
 
     def test_platform_info_sdk_exception_silenced(self):
-        """SDK runtime exception does not propagate."""
+        """SDK runtime exception does not propagate and records unavailable metadata."""
         adapter = _make_adapter()
 
         mock_sdk = MagicMock()
@@ -185,7 +188,119 @@ class TestGetPlatformInfoSdkPath:
             info = adapter.get_platform_info(connection=None)
 
         assert info["platform_type"] == "databricks"
-        assert "compute_configuration" not in info
+        assert info["compute_configuration"]["warehouse_id"] == "abc123"
+        assert info["compute_configuration"]["warehouse_metadata_collection_status"] == "unavailable"
+        assert info["compute_configuration"]["warehouse_metadata_error_class"] == "RuntimeError"
+
+
+# ---------------------------------------------------------------------------
+# normalized result metadata
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizedResultMetadata:
+    """Test Databricks normalized workspace, warehouse, and storage facets."""
+
+    def test_sdk_observed_serverless_warehouse_maps_to_normalized_metadata(self):
+        adapter = _make_adapter(
+            http_path="/sql/1.0/warehouses/abc123",
+            catalog="main",
+            schema="bench",
+            staging_root="dbfs:/Volumes/main/bench/stage",
+            region="us-west-2",
+            disable_result_cache=False,
+        )
+
+        mock_warehouse = MagicMock()
+        mock_warehouse.id = "abc123"
+        mock_warehouse.name = "Serverless Warehouse"
+        mock_warehouse.cluster_size = "2X-Small"
+        mock_warehouse.auto_stop_mins = 10
+        mock_warehouse.min_num_clusters = 1
+        mock_warehouse.max_num_clusters = 3
+        mock_warehouse.enable_photon = True
+        mock_warehouse.enable_serverless_compute = True
+        mock_warehouse.warehouse_type = MagicMock()
+        mock_warehouse.warehouse_type.value = "PRO"
+        mock_warehouse.spot_instance_policy = MagicMock()
+        mock_warehouse.spot_instance_policy.value = "COST_OPTIMIZED"
+        mock_warehouse.channel = MagicMock()
+        mock_warehouse.channel.name.value = "CHANNEL_NAME"
+        mock_warehouse.channel.dbsql_version = "2024.15"
+        mock_warehouse.state = MagicMock()
+        mock_warehouse.state.value = "RUNNING"
+
+        mock_workspace = MagicMock()
+        mock_workspace.warehouses.get.return_value = mock_warehouse
+        mock_sdk = MagicMock()
+        mock_sdk.WorkspaceClient.return_value = mock_workspace
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": mock_sdk}),
+        ):
+            info = adapter.get_platform_info(connection=None)
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "serverless"
+        assert metadata["platform_deployment"]["deployment_type"] == "serverless"
+        assert metadata["platform_deployment"]["workspace_host"] == "test.cloud.databricks.com"
+        assert metadata["platform_deployment"]["warehouse_id"] == "abc123"
+        assert metadata["platform_cloud"]["provider"] == "aws"
+        assert metadata["platform_cloud"]["region"] == "us-west-2"
+        assert metadata["platform_cloud"]["region_collection_status"] == "available"
+        assert metadata["platform_cloud"]["workspace"] == "test.cloud.databricks.com"
+        assert metadata["platform_compute"]["warehouse"] == "Serverless Warehouse"
+        assert metadata["platform_compute"]["warehouse_id"] == "abc123"
+        assert metadata["platform_compute"]["warehouse_size"] == "2X-Small"
+        assert metadata["platform_compute"]["warehouse_type"] == "SERVERLESS"
+        assert metadata["platform_compute"]["serverless"] is True
+        assert metadata["platform_compute"]["photon_enabled"] is True
+        assert metadata["platform_compute"]["min_cluster_count"] == 1
+        assert metadata["platform_compute"]["max_cluster_count"] == 3
+        assert metadata["platform_compute"]["spot_instance_policy"] == "COST_OPTIMIZED"
+        assert metadata["platform_compute"]["result_cache_enabled"] is True
+        assert metadata["platform_compute"]["collection_status"] == "available"
+        assert metadata["platform_storage"]["table_format"] == "delta"
+        assert metadata["platform_storage"]["staging_location"] == "dbfs:/Volumes/main/bench/stage"
+
+    def test_requested_metadata_maps_when_sdk_unavailable(self):
+        adapter = _make_adapter(
+            http_path="/sql/1.0/warehouses/requested-wh",
+            catalog="main",
+            schema="bench",
+            uc_catalog="main",
+            uc_schema="bench",
+            uc_volume="stage",
+            cluster_size="Large",
+            auto_terminate_minutes=45,
+            disable_result_cache=True,
+        )
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=None)
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "managed_cloud"
+        assert metadata["platform_deployment"]["deployment_type"] == "managed_cloud"
+        assert metadata["platform_deployment"]["warehouse_id"] == "requested-wh"
+        assert metadata["platform_compute"]["warehouse_id"] == "requested-wh"
+        assert metadata["platform_compute"]["warehouse_size"] == "Large"
+        assert "serverless" not in metadata["platform_compute"]
+        assert metadata["platform_compute"]["auto_stop_mins"] == 45
+        assert metadata["platform_compute"]["result_cache_enabled"] is False
+        assert metadata["platform_compute"]["warehouse_metadata_collection_status"] == "unavailable"
+        assert metadata["platform_compute"]["collection_status"] == "partial"
+        assert metadata["platform_cloud"]["region_collection_status"] == "unavailable"
+        assert metadata["platform_storage"]["staging_location"] == "dbfs:/Volumes/main/bench/stage"
+        assert metadata["platform_storage"]["uc_catalog"] == "main"
+        assert metadata["platform_storage"]["uc_schema"] == "bench"
+        assert metadata["platform_storage"]["uc_volume"] == "stage"
 
 
 # ---------------------------------------------------------------------------
@@ -685,6 +800,31 @@ class TestFromConfig:
         # Schema should be auto-generated (not default "benchbox")
         assert adapter.schema is not None
         assert adapter.schema != ""
+
+    def test_passes_runtime_metadata_options_through(self):
+        from benchbox.platforms.databricks import DatabricksAdapter
+
+        config = {
+            "server_hostname": "real.cloud.databricks.com",
+            "http_path": "/sql/1.0/warehouses/abc",
+            "access_token": "tok",
+            "region": "us-west-2",
+            "cluster_size": "Large",
+            "auto_terminate_minutes": 45,
+            "disable_result_cache": False,
+            "enable_delta_optimization": False,
+            "delta_auto_optimize": False,
+            "delta_auto_compact": False,
+        }
+        adapter = DatabricksAdapter.from_config(config)
+
+        assert adapter.region == "us-west-2"
+        assert adapter.cluster_size == "Large"
+        assert adapter.auto_terminate_minutes == 45
+        assert adapter.disable_result_cache is False
+        assert adapter.enable_delta_optimization is False
+        assert adapter.delta_auto_optimize is False
+        assert adapter.delta_auto_compact is False
 
     def test_honors_explicit_non_default_schema(self):
         from benchbox.platforms.databricks import DatabricksAdapter
