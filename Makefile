@@ -994,20 +994,26 @@ worktree-claim:
 # Orchestrator: try once, then auto-sweep stale slots, then try again.
 # The auto-sweep means routine pool exhaustion (forgotten releases) is
 # self-healing without operator intervention.
+#
+# The whole recipe runs in ONE shell (line continuations + a single `@`).
+# Each `@`-prefixed make recipe line otherwise spawns its own subshell, so
+# `if ... ; then exit 0; fi` would only exit that line's subshell — make
+# would happily continue to the auto-sweep retry path even after a
+# successful first attempt, falsely reporting failure to the caller.
 worktree-claim-locked:
 	@if $(MAKE) -s worktree-claim-attempt BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; then \
 		exit 0; \
-	fi
-	@echo "No free pool worktree on first pass — auto-sweeping stale slots..." >&2
-	@$(MAKE) -s worktree-pool-sweep-stale-locked POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)" >&2 || true
-	@if $(MAKE) -s worktree-claim-attempt BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; then \
+	fi; \
+	echo "No free pool worktree on first pass — auto-sweeping stale slots..." >&2; \
+	$(MAKE) -s worktree-pool-sweep-stale-locked POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)" >&2 || true; \
+	if $(MAKE) -s worktree-claim-attempt BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; then \
 		exit 0; \
-	fi
-	@echo "Still no free pool worktree available after auto-sweep." >&2
-	@echo "Hint: dirty or claim-aborted slots are not auto-recovered (they may have valuable state)." >&2
-	@echo "      Run \`make worktree-pool-status\` to inspect, then \`make worktree-pool-reset POOL=NN\`" >&2
-	@echo "      as a last-resort manual escape hatch after reviewing what will be discarded." >&2
-	@exit 1
+	fi; \
+	echo "Still no free pool worktree available after auto-sweep." >&2; \
+	echo "Hint: dirty or claim-aborted slots are not auto-recovered (they may have valuable state)." >&2; \
+	echo "      Run \`make worktree-pool-status\` to inspect, then \`make worktree-pool-reset POOL=NN\`" >&2; \
+	echo "      as a last-resort manual escape hatch after reviewing what will be discarded." >&2; \
+	exit 1
 
 # Single-pass claim attempt. Iterates the pool once; on the first
 # detached, clean, non-claim-aborted slot, mutates it to the requested
