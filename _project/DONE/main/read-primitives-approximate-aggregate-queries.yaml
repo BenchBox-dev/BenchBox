@@ -2,7 +2,7 @@ id: read-primitives-approximate-aggregate-queries
 title: "Read Primitives: add approximate-aggregate query coverage (HLL distinct, KLL/T-Digest quantile, Top-K)"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
 category: "Core Functionality"
 
 description: |

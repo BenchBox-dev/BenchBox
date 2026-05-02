@@ -2,7 +2,7 @@ id: write-primitives-sketch-persistence-category
 title: "Write Primitives: add `sketch` category for persist/merge/requery DataSketches lifecycle"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
 category: "Core Functionality"
 
 description: |
