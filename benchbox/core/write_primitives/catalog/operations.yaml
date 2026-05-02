@@ -3298,6 +3298,12 @@ operations:
         DROP TABLE sketch_ops_daily_users;
       clickhouse: null
       datafusion: null
-      redshift: null
+      redshift: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region VARCHAR(25),
+          user_sketch HLLSKETCH, rev_sketch HLLSKETCH
+        ) DISTSTYLE EVEN;
+        DROP TABLE sketch_ops_daily_users;
       sqlite: null
       starrocks: null
