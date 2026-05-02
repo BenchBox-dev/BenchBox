@@ -6,6 +6,7 @@ vi.mock("@/db", () => ({
 
 import { queryRows } from "@/db";
 import {
+  clearDuckdbQueryCachesForTests,
   listResults,
   getResultDetailMetrics,
   getQueryDisplayTimings,
@@ -23,6 +24,7 @@ const mockedQueryRows = vi.mocked(queryRows);
 
 beforeEach(() => {
   mockedQueryRows.mockReset();
+  clearDuckdbQueryCachesForTests();
 });
 
 describe("duckdbQueries - SQL targets and parameters", () => {
@@ -124,6 +126,28 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     const [sql] = mockedQueryRows.mock.calls[0]!;
     expect(sql).toMatch(/FROM bench\.meta_leaderboard/);
     expect(sql).toMatch(/ORDER BY avg_rank NULLS LAST/);
+  });
+
+  it("memoizes stable metadata helper reads for the current snapshot", async () => {
+    const rows = [{ platform_id: "duckdb", platform: "DuckDB", avg_rank: 1, n_cohorts: 2 }];
+    mockedQueryRows.mockResolvedValueOnce(rows);
+
+    const first = await getMetaLeaderboard();
+    const second = await getMetaLeaderboard();
+
+    expect(first).toBe(second);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(1);
+  });
+
+  it("evicts failed metadata helper reads so a retry can recover", async () => {
+    mockedQueryRows.mockRejectedValueOnce(new Error("snapshot not ready"));
+    await expect(getMetaLeaderboard()).rejects.toThrow("snapshot not ready");
+
+    const rows = [{ platform_id: "duckdb", platform: "DuckDB", avg_rank: 1, n_cohorts: 2 }];
+    mockedQueryRows.mockResolvedValueOnce(rows);
+
+    await expect(getMetaLeaderboard()).resolves.toEqual(rows);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
   });
 });
 

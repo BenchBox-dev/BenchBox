@@ -160,7 +160,10 @@ work:
   - id: w10
     summary: "Audit duckdbQueries/queryFilters for expensive scans and add memoization"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/duckdbQueries.ts"
+      - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
     notes: |
       Review `results-explorer/src/lib/duckdbQueries.ts` and `queryFilters.ts`
       for full scans on every filter change and repeated COUNT/DISTINCT calls.
