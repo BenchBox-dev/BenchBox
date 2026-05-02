@@ -74,6 +74,21 @@ class TestG1SchemaContract:
             "test_type",
             "validation_status",
             "cost_usd",
+            "normalized_cost_usd",
+            "cost_model_version",
+            "cost_model_source",
+            "cost_scope",
+            "cost_status",
+            "billing_unit",
+            "pricing_region",
+            "cloud_provider",
+            "cloud_region",
+            "instance_type",
+            "warehouse_size",
+            "node_count",
+            "cluster_size",
+            "storage_format",
+            "storage_tier",
             "compliance_class",
             "is_ranking_eligible",
             "has_plans",
@@ -167,6 +182,21 @@ class TestG1SchemaContract:
             "test_type",
             "validation_status",
             "cost_usd",
+            "normalized_cost_usd",
+            "cost_model_version",
+            "cost_model_source",
+            "cost_scope",
+            "cost_status",
+            "billing_unit",
+            "pricing_region",
+            "cloud_provider",
+            "cloud_region",
+            "instance_type",
+            "warehouse_size",
+            "node_count",
+            "cluster_size",
+            "storage_format",
+            "storage_tier",
             "compliance_class",
             "has_plans",
             "has_tuning",
@@ -195,6 +225,21 @@ class TestG1SchemaContract:
             "execution_mode",
             "compliance_class",
             "cost_usd",
+            "normalized_cost_usd",
+            "cost_model_version",
+            "cost_model_source",
+            "cost_scope",
+            "cost_status",
+            "billing_unit",
+            "pricing_region",
+            "cloud_provider",
+            "cloud_region",
+            "instance_type",
+            "warehouse_size",
+            "node_count",
+            "cluster_size",
+            "storage_format",
+            "storage_tier",
         },
     }
 
@@ -272,6 +317,16 @@ class TestSourceFidelity:
         row = self._result_row(db_path)
         result_id = row["result_id"]
         assert row["bundle_download_url"] == f"/results/data/bundles/{result_id}.json"
+
+    def test_normalized_cost_defaults_to_unavailable(self, db_path: Path) -> None:
+        row = self._result_row(db_path)
+        assert row["cost_usd"] is None
+        assert row["normalized_cost_usd"] is None
+        assert row["cost_status"] == "unavailable"
+        assert row["cost_scope"] == "compute_only"
+        assert row["billing_unit"] == "unknown"
+        assert row["pricing_region"] == "unknown"
+        assert row["cloud_provider"] is None
 
     def test_query_executions_count(self, db_path: Path) -> None:
         with _connect(db_path) as con:

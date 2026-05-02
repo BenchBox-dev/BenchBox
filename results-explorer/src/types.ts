@@ -27,7 +27,25 @@ export interface QueryDisplayTiming {
   sample_count: number;
 }
 
-export interface DetailResult {
+export interface CostDeploymentFields {
+  normalized_cost_usd?: number | null;
+  cost_model_version?: string | null;
+  cost_model_source?: string | null;
+  cost_scope?: string | null;
+  cost_status?: string | null;
+  billing_unit?: string | null;
+  pricing_region?: string | null;
+  cloud_provider?: string | null;
+  cloud_region?: string | null;
+  instance_type?: string | null;
+  warehouse_size?: string | null;
+  node_count?: number | null;
+  cluster_size?: string | null;
+  storage_format?: string | null;
+  storage_tier?: string | null;
+}
+
+export interface DetailResult extends CostDeploymentFields {
   result_id: string;
   benchmark: string;
   scale_factor: number;
@@ -77,7 +95,7 @@ export interface PercentileStats {
   p99: number;
 }
 
-export interface PlatformRow {
+export interface PlatformRow extends CostDeploymentFields {
   result_id: string;
   /** 8+ hex-char sha256 prefix for compact Compare URLs; "" when the
    *  pipeline has no short-ID map for this row. */

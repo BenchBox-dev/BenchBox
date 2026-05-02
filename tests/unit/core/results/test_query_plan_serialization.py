@@ -559,6 +559,55 @@ class TestSchemaV2Validation:
         assert payload["summary"]["timing"]["avg_ms"] == 0
         assert payload["queries"] == []
 
+    def test_normalized_cost_exported_and_validated(self) -> None:
+        """Schema v2 payload carries the normalized cost block for explorer ingestion."""
+        results = make_benchmark_results(
+            benchmark_id="cost_test",
+            benchmark_name="Cost Test",
+            platform="snowflake",
+            scale_factor=1.0,
+            execution_id="cost-001",
+            timestamp=datetime(2025, 1, 1, 12, 0, 0),
+            duration_seconds=1.0,
+            total_queries=1,
+            successful_queries=1,
+            query_results=[{"query_id": "1", "execution_time_ms": 100, "rows_returned": 4, "status": "SUCCESS"}],
+            cost_summary={
+                "total_cost": 1.25,
+                "cost_model": "actual",
+                "normalized_cost": {
+                    "normalized_cost_usd": "1.25",
+                    "cost_usd": "1.25",
+                    "cost_model_version": "2026.05.0",
+                    "cost_model_source": "benchbox.core.cost.pricing",
+                    "cost_scope": "compute_only",
+                    "cost_status": "normalized",
+                    "billing_unit": "credit",
+                    "pricing_region": "us-east-1",
+                    "deployment": {
+                        "cloud_provider": "aws",
+                        "cloud_region": "us-east-1",
+                        "instance_type": None,
+                        "warehouse_size": "MEDIUM",
+                        "node_count": None,
+                        "cluster_size": None,
+                        "storage_format": None,
+                        "storage_tier": None,
+                    },
+                },
+            },
+        )
+
+        payload = build_result_payload(results)
+
+        assert payload["cost"]["total_usd"] == 1.25
+        assert payload["normalized_cost"]["cost_status"] == "normalized"
+        assert payload["normalized_cost"]["deployment"]["warehouse_size"] == "MEDIUM"
+
+        from benchbox.core.results.schema import SchemaV2Validator
+
+        SchemaV2Validator().validate(payload)
+
     def test_driver_metadata_exported(self) -> None:
         """Test that driver metadata is included in platform block."""
         results = make_benchmark_results(

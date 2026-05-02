@@ -12,6 +12,7 @@
 
 export type StarterQueryCategory =
   | "results"
+  | "cost_and_deployment"
   | "per_query_timings"
   | "cohort_comparisons"
   | "trust_and_tuning"
@@ -27,6 +28,7 @@ export interface StarterQuery {
 
 export const STARTER_QUERY_CATEGORIES: Record<StarterQueryCategory, string> = {
   results: "Results",
+  cost_and_deployment: "Cost & deployment",
   per_query_timings: "Per-query timings",
   cohort_comparisons: "Cohort comparisons",
   trust_and_tuning: "Trust & tuning",
@@ -56,6 +58,37 @@ FROM bench.results
 WHERE display_geomean_ms IS NOT NULL
 GROUP BY benchmark, scale_factor, platform
 ORDER BY benchmark, scale_factor, best_display_geomean_ms ASC;`,
+  },
+  {
+    id: "normalized_cost_leaderboard",
+    category: "cost_and_deployment",
+    label: "Normalized cost leaderboard",
+    description: "Comparable cloud rows ranked by BenchBox-computed normalized USD and deployment shape.",
+    sql: `SELECT benchmark, scale_factor, platform,
+       normalized_cost_usd, cost_status, cost_model_version,
+       cloud_provider, cloud_region, warehouse_size, instance_type, storage_format
+FROM bench.results
+WHERE cost_status = 'normalized'
+ORDER BY normalized_cost_usd ASC NULLS LAST
+LIMIT 50;`,
+  },
+  {
+    id: "cost_status_by_cloud",
+    category: "cost_and_deployment",
+    label: "Cost status by cloud and region",
+    description: "Counts normalized, local-not-applicable, and unavailable cost rows by emitted deployment facets.",
+    sql: `SELECT cost_status,
+       COALESCE(cloud_provider, 'unknown') AS cloud_provider,
+       COALESCE(cloud_region, pricing_region, 'unknown') AS region,
+       cost_model_version,
+       COUNT(*) AS runs
+FROM bench.results
+GROUP BY
+       cost_status,
+       COALESCE(cloud_provider, 'unknown'),
+       COALESCE(cloud_region, pricing_region, 'unknown'),
+       cost_model_version
+ORDER BY runs DESC, cost_status, cloud_provider, region;`,
   },
   {
     id: "slowest_queries_for_platform",
@@ -183,6 +216,7 @@ ORDER BY duration_s DESC;`,
 export function starterQueriesByCategory(): Record<StarterQueryCategory, StarterQuery[]> {
   const grouped: Record<StarterQueryCategory, StarterQuery[]> = {
     results: [],
+    cost_and_deployment: [],
     per_query_timings: [],
     cohort_comparisons: [],
     trust_and_tuning: [],

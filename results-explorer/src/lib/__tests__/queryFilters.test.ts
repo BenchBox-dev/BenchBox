@@ -15,6 +15,13 @@ const EMPTY_FILTERS: QueryFilterState = {
   tuningModes: [],
   trustTiers: [],
   validationStatuses: [],
+  costStatuses: [],
+  costModelVersions: [],
+  cloudProviders: [],
+  cloudRegions: [],
+  instanceTypes: [],
+  warehouseSizes: [],
+  storageFormats: [],
   hasCost: "all",
   dateWindow: "all",
 };
@@ -49,6 +56,56 @@ describe("buildSelectQuery LIMIT", () => {
   it("floors fractional limits", () => {
     const { sql } = buildSelectQuery(EMPTY_FILTERS, ["result_id"], DEFAULT_SORT, 123.9);
     expect(sql).toContain("LIMIT 123");
+  });
+
+  it("allows normalized cost and deployment columns in projections and sorting", () => {
+    const { sql } = buildSelectQuery(
+      EMPTY_FILTERS,
+      ["result_id", "normalized_cost_usd", "cost_status", "cloud_provider", "warehouse_size"],
+      { column: "normalized_cost_usd", direction: "asc" },
+      25,
+    );
+
+    expect(sql).toContain("SELECT result_id, normalized_cost_usd, cost_status, cloud_provider, warehouse_size");
+    expect(sql).toContain("ORDER BY normalized_cost_usd ASC");
+  });
+});
+
+describe("buildWhereClause - normalized cost/deployment facets", () => {
+  it("filters by normalized cost status and deployment metadata", () => {
+    const filters: QueryFilterState = {
+      ...EMPTY_FILTERS,
+      costStatuses: ["normalized"],
+      costModelVersions: ["2026.05.0"],
+      cloudProviders: ["aws"],
+      cloudRegions: ["us-east-1"],
+      warehouseSizes: ["MEDIUM"],
+      storageFormats: ["parquet"],
+    };
+
+    const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
+
+    expect(sql).toContain("cost_status IN (?)");
+    expect(sql).toContain("cost_model_version IN (?)");
+    expect(sql).toContain("cloud_provider IN (?)");
+    expect(sql).toContain("cloud_region IN (?)");
+    expect(sql).toContain("warehouse_size IN (?)");
+    expect(sql).toContain("storage_format IN (?)");
+    expect(params).toEqual(["normalized", "2026.05.0", "aws", "us-east-1", "MEDIUM", "parquet"]);
+  });
+
+  it("can exclude one deployment facet while preserving the others", () => {
+    const filters: QueryFilterState = {
+      ...EMPTY_FILTERS,
+      costStatuses: ["normalized"],
+      cloudProviders: ["aws"],
+    };
+
+    const { sql, params } = buildFacetCountQuery("cloud_provider", filters, { exclude: "cloudProviders" });
+
+    expect(sql).toContain("cost_status IN (?)");
+    expect(sql).not.toContain("cloud_provider IN (?)");
+    expect(params).toEqual(["normalized"]);
   });
 });
 

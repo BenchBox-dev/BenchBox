@@ -41,7 +41,7 @@ export interface DataRequirements {
   requiresSummary?: boolean;
   /** Needs ≥2 results (comparison-mode charts: diverging_bar, speedup, etc.). */
   requiresTwoResults?: boolean;
-  /** Needs cost_usd to be populated on ≥1 platform. */
+  /** Needs normalized_cost_usd to be populated on ≥1 normalized platform. */
   requiresCostData?: boolean;
   /** Needs power_score to be populated on ≥1 platform. */
   requiresPowerScore?: boolean;
@@ -109,8 +109,8 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "cost_scatter",
     title: "Cost vs Performance Scatter",
-    description: "Scatter plot of cost vs performance (requires cost data)",
-    requires: { requiresSummary: true, requiresCostData: true },
+    description: "Scatter plot of normalized cost vs performance with cost-status empty states",
+    requires: { requiresSummary: true },
     cli_equivalent: "cost_scatter",
   },
   {
@@ -265,6 +265,21 @@ function buildDetailSummary(
         display_geomean_ms: detail.display_geomean_ms,
         sample_geomean_ms: detail.geomean_ms,
         cost_usd: detail.cost_usd,
+        normalized_cost_usd: detail.normalized_cost_usd,
+        cost_model_version: detail.cost_model_version,
+        cost_model_source: detail.cost_model_source,
+        cost_scope: detail.cost_scope,
+        cost_status: detail.cost_status,
+        billing_unit: detail.billing_unit,
+        pricing_region: detail.pricing_region,
+        cloud_provider: detail.cloud_provider,
+        cloud_region: detail.cloud_region,
+        instance_type: detail.instance_type,
+        warehouse_size: detail.warehouse_size,
+        node_count: detail.node_count,
+        cluster_size: detail.cluster_size,
+        storage_format: detail.storage_format,
+        storage_tier: detail.storage_tier,
         compliance_class: detail.compliance_class,
         percentile_stats: null,
         phase_durations: null,
@@ -310,6 +325,21 @@ function buildCompareSummary(
       display_geomean_ms: result.display_geomean_ms,
       sample_geomean_ms: result.geomean_ms,
       cost_usd: result.cost_usd,
+      normalized_cost_usd: result.normalized_cost_usd,
+      cost_model_version: result.cost_model_version,
+      cost_model_source: result.cost_model_source,
+      cost_scope: result.cost_scope,
+      cost_status: result.cost_status,
+      billing_unit: result.billing_unit,
+      pricing_region: result.pricing_region,
+      cloud_provider: result.cloud_provider,
+      cloud_region: result.cloud_region,
+      instance_type: result.instance_type,
+      warehouse_size: result.warehouse_size,
+      node_count: result.node_count,
+      cluster_size: result.cluster_size,
+      storage_format: result.storage_format,
+      storage_tier: result.storage_tier,
       compliance_class: result.compliance_class,
       percentile_stats: null,
       phase_durations: null,
@@ -343,7 +373,10 @@ function getChartCapabilities(context: ChartContext): ChartCapabilities {
   return {
     hasSummary: summary !== null,
     hasTwoResults: context.kind === "compare" && context.results.length >= 2,
-    hasCostData: summary?.platforms.some((platform) => platform.cost_usd !== null) ?? false,
+    hasCostData:
+      summary?.platforms.some(
+        (platform) => platform.cost_status === "normalized" && platform.normalized_cost_usd != null,
+      ) ?? false,
     hasPowerScore: summary?.platforms.some((platform) => platform.power_score !== null) ?? false,
     hasPhaseDurations:
       summary?.platforms.some(

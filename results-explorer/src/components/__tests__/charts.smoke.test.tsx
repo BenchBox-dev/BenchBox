@@ -368,22 +368,58 @@ describe("TimeSeries", () => {
 // ---------------------------------------------------------------------------
 
 describe("CostScatter", () => {
-  it("shows a 'no cost data' message when cost_usd is null across the board", () => {
-    const { container } = render(<CostScatter summary={makeSummary()} />);
-    expect(container.textContent).toContain("No cost data");
-  });
-
-  it("renders points when cost_usd is populated", () => {
+  it("shows why normalized cost is unavailable when metadata is missing", () => {
     const summary = makeSummary({
       platforms: [
-        makePlatform({ result_id: "r1", platform: "A", cost_usd: 0.5 }),
-        makePlatform({ result_id: "r2", platform: "B", cost_usd: 1.25 }),
+        makePlatform({
+          cost_status: "unavailable",
+          normalized_cost_usd: null,
+          cloud_provider: null,
+          cloud_region: null,
+          pricing_region: null,
+          warehouse_size: null,
+        }),
+      ],
+    });
+    const { container } = render(<CostScatter summary={summary} />);
+    expect(container.textContent).toContain("No normalized cost data");
+    expect(container.textContent).toContain("cloud provider");
+    expect(container.textContent).toContain("region");
+  });
+
+  it("shows a legacy-schema message when normalized cost fields are absent", () => {
+    const { container } = render(<CostScatter summary={makeSummary()} />);
+    expect(container.textContent).toContain("predate the normalized_cost contract");
+  });
+
+  it("renders points when normalized cost is populated", () => {
+    const summary = makeSummary({
+      platforms: [
+        makePlatform({
+          result_id: "r1",
+          platform: "A",
+          cost_usd: 0.5,
+          normalized_cost_usd: 0.5,
+          cost_status: "normalized",
+          cost_scope: "compute_only",
+          cost_model_version: "2026.05.0",
+        }),
+        makePlatform({
+          result_id: "r2",
+          platform: "B",
+          cost_usd: 1.25,
+          normalized_cost_usd: 1.25,
+          cost_status: "normalized",
+          cost_scope: "compute_only",
+          cost_model_version: "2026.05.0",
+        }),
       ],
     });
     const { container } = render(<CostScatter summary={summary} />);
     expect(container.querySelector("svg")).not.toBeNull();
     const circles = container.querySelectorAll("circle");
     expect(circles.length).toBe(2);
+    expect(container.textContent).toContain("model 2026.05.0");
   });
 });
 
@@ -403,16 +439,26 @@ describe("SparklineTable", () => {
     expect(bodyRows.length).toBe(2);
   });
 
-  it("hides the Cost column when no cost data is present", () => {
+  it("hides the normalized cost column when no normalized cost data is present", () => {
     const { container } = render(<SparklineTable summary={makeSummary()} />);
-    expect(container.textContent).not.toContain("Cost");
+    expect(container.textContent).not.toContain("Normalized cost");
   });
 
-  it("shows the Cost column when cost data is present", () => {
+  it("shows the normalized cost column when normalized cost data is present", () => {
     const summary = makeSummary({
-      platforms: [makePlatform({ cost_usd: 0.5 }), makePlatform({ result_id: "r2", cost_usd: 1.0 })],
+      platforms: [
+        makePlatform({
+          cost_usd: 0.5,
+          normalized_cost_usd: 0.5,
+          cost_status: "normalized",
+          cost_scope: "compute_only",
+          cost_model_version: "2026.05.0",
+        }),
+        makePlatform({ result_id: "r2", cost_status: "unavailable", normalized_cost_usd: null }),
+      ],
     });
     const { container } = render(<SparklineTable summary={summary} />);
-    expect(container.textContent).toContain("Cost");
+    expect(container.textContent).toContain("Normalized cost");
+    expect(container.textContent).toContain("unavailable");
   });
 });

@@ -2,7 +2,7 @@
 
 import pytest
 
-from benchbox.core.cost.calculator import CostCalculator
+from benchbox.core.cost.calculator import CostCalculator, validate_resource_usage
 from benchbox.core.cost.models import QueryCost
 
 pytestmark = [
@@ -48,6 +48,29 @@ class TestCostCalculator:
         assert cost is not None
         assert cost.compute_cost == 5.0  # 1 TB * $5.00 per TB
         assert cost.pricing_details["price_per_tb"] == 5.0
+
+    def test_athena_cost_ignores_adapter_supplied_cost_usd(self):
+        """Athena cost is derived from bytes scanned, not adapter-supplied totals."""
+        calculator = CostCalculator()
+
+        resource_usage = {
+            "data_scanned_bytes": 1024**4,
+            "cost_usd": 999.0,
+        }
+
+        cost = calculator.calculate_query_cost("athena", resource_usage, {"region": "us-east-1"})
+
+        assert cost is not None
+        assert cost.compute_cost == 5.0
+        assert cost.pricing_details["data_scanned_bytes"] == 1024**4
+        assert "source" not in cost.pricing_details
+
+    def test_athena_resource_usage_requires_data_scanned_bytes(self):
+        """Athena validation rejects legacy cost_usd without measured scanned bytes."""
+        is_valid, warnings = validate_resource_usage("athena", {"cost_usd": 5.0})
+
+        assert is_valid is False
+        assert any("data_scanned_bytes" in warning for warning in warnings)
 
     def test_redshift_cost_calculation(self):
         """Test Redshift cost calculation with execution time."""
@@ -143,3 +166,59 @@ class TestCostCalculator:
         assert benchmark_cost.total_cost == 6.0
         assert len(benchmark_cost.phase_costs) == 2
         assert benchmark_cost.platform_details["platform"] == "snowflake"
+
+    def test_normalized_benchmark_cost_for_cloud_compute(self):
+        """Cloud compute costs become normalized cost with deployment metadata."""
+        calculator = CostCalculator()
+        phase_cost = calculator.calculate_phase_cost("power_test", [QueryCost(1.0, "USD")])
+        benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": "snowflake"})
+
+        normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost(
+            "snowflake",
+            benchmark_cost,
+            {"edition": "standard", "cloud": "aws", "region": "us-east-1", "warehouse_size": "MEDIUM"},
+        )
+
+        assert warnings == []
+        assert normalized_cost.cost_status == "normalized"
+        assert normalized_cost.normalized_cost_usd is not None
+        assert normalized_cost.to_dict()["normalized_cost_usd"] == "1.0"
+        assert normalized_cost.to_dict()["cost_usd"] == "1.0"
+        assert normalized_cost.deployment.cloud_provider == "aws"
+        assert normalized_cost.deployment.cloud_region == "us-east-1"
+        assert normalized_cost.deployment.warehouse_size == "MEDIUM"
+
+    def test_normalized_benchmark_cost_for_local_platform(self):
+        """Local runs are explicit not-applicable, not comparable zero-cost cloud rows."""
+        calculator = CostCalculator()
+        phase_cost = calculator.calculate_phase_cost("power_test", [QueryCost(0.0, "USD")])
+        benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": "duckdb"})
+
+        normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost("duckdb", benchmark_cost, {})
+
+        assert warnings == []
+        assert normalized_cost.cost_status == "not_applicable_local"
+        assert normalized_cost.normalized_cost_usd == 0
+        assert normalized_cost.cost_usd is None
+
+    def test_normalized_benchmark_cost_unavailable_when_metadata_defaulted(self):
+        """Cloud rows with defaulted pricing metadata do not become comparable normalized costs."""
+        calculator = CostCalculator()
+        phase_cost = calculator.calculate_phase_cost("power_test", [QueryCost(1.0, "USD")])
+        benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": "snowflake"})
+
+        normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost(
+            "snowflake",
+            benchmark_cost,
+            {
+                "edition": "standard",
+                "cloud": "aws",
+                "region": "us-east-1",
+                "warehouse_size": "MEDIUM",
+                "_defaulted_fields": ["region"],
+            },
+        )
+
+        assert normalized_cost.cost_status == "unavailable"
+        assert normalized_cost.normalized_cost_usd is None
+        assert any("region metadata was defaulted" in warning for warning in warnings)

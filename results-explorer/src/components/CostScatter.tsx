@@ -1,16 +1,17 @@
 // ---------------------------------------------------------------------------
-// CostScatter - scatter plot of cost_usd vs performance metric
+// CostScatter - scatter plot of normalized cost vs performance metric
 //
-// X axis: cost_usd (USD).  Y axis: power_score (higher=better) or
+// X axis: normalized_cost_usd (USD).  Y axis: power_score (higher=better) or
 // display_geomean_ms (lower=better) depending on the benchmark family.
-// One point per platform.  Section is hidden entirely when no cost data.
+// One point per platform with cost_status=normalized.
 //
-// Anti-pattern prevented: never renders when all cost_usd values are null.
+// Anti-pattern prevented: never plots legacy submitter-supplied cost_usd or
+// local not-applicable zeroes as comparable cloud cost.
 //
 // Python reference: textcharts.scatter_plot.ScatterPlot
 // ---------------------------------------------------------------------------
 
-import type { BenchmarkSummary } from "@/types";
+import type { BenchmarkSummary, PlatformRow } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 
@@ -24,6 +25,18 @@ interface Props {
   summary: BenchmarkSummary;
 }
 
+type ScatterPoint = {
+  result_id: string;
+  platform: string;
+  cost: number;
+  perf: number;
+  modelVersion: string | null | undefined;
+  scope: string | null | undefined;
+  provider: string | null | undefined;
+  region: string | null | undefined;
+  color: string;
+};
+
 export function CostScatter({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const w = Math.max(containerWidth, 400);
@@ -33,32 +46,29 @@ export function CostScatter({ summary }: Props) {
   const metric = summary.ranking?.primary_metric ?? "display_geomean_ms";
   const higherIsBetter = metric === "power_score";
 
-  type ScatterPoint = {
-    result_id: string;
-    platform: string;
-    cost: number;
-    perf: number;
-    color: string;
-  };
-
   const pts: ScatterPoint[] = summary.platforms
-    .map((p, i) => ({
-      result_id: p.result_id,
-      platform: p.platform,
-      cost: p.cost_usd,
-      perf: metric === "power_score" ? p.power_score : p.display_geomean_ms,
-      color: paletteColor(i),
-    }))
-    .filter(
-      (p): p is ScatterPoint =>
-        p.cost !== null && p.cost > 0 && p.perf !== null,
-    ) as ScatterPoint[];
+    .map((p, i) => {
+      const cost = normalizedCostValue(p);
+      return {
+        result_id: p.result_id,
+        platform: p.platform,
+        cost,
+        perf: metric === "power_score" ? p.power_score : p.display_geomean_ms,
+        modelVersion: p.cost_model_version,
+        scope: p.cost_scope,
+        provider: p.cloud_provider,
+        region: p.cloud_region ?? p.pricing_region,
+        color: paletteColor(i),
+      };
+    })
+    .filter((p): p is ScatterPoint => p.cost !== null && p.perf !== null) as ScatterPoint[];
 
   if (pts.length === 0) {
     return (
-      <p class="text-sm text-gray-400 italic">
-        No cost data available - cost_usd must be populated in the result bundle.
-      </p>
+      <div class="space-y-1 text-sm text-gray-400 italic">
+        <p>No normalized cost data available for this cohort.</p>
+        <p class="text-xs">{normalizedCostEmptyReason(summary.platforms)}</p>
+      </div>
     );
   }
 
@@ -93,6 +103,7 @@ export function CostScatter({ summary }: Props) {
   }
 
   const metricLabel = metric === "power_score" ? "Power@Size (↑ better)" : "Geomean ms (↓ better)";
+  const modelDisclosure = costModelDisclosure(pts);
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
@@ -100,7 +111,7 @@ export function CostScatter({ summary }: Props) {
         width={w}
         height={totalH}
         role="img"
-        aria-label={`Cost vs ${metricLabel} scatter plot`}
+        aria-label={`Normalized cost vs ${metricLabel} scatter plot (${modelDisclosure})`}
       >
         {/* Grid - label orientation flips with higherIsBetter so the top
             of the chart always shows the better-performance value. */}
@@ -140,10 +151,13 @@ export function CostScatter({ summary }: Props) {
           const cx = xFor(p.cost);
           const cy = yFor(p.perf);
           const shortLabel = p.platform.length > 10 ? `${p.platform.slice(0, 9)}…` : p.platform;
+          const regionLabel = [p.provider, p.region].filter(Boolean).join(" ");
           return (
             <g key={p.result_id}>
               <circle cx={cx} cy={cy} r={7} fill={p.color} fillOpacity={0.85}>
-                <title>{`${p.platform}: $${p.cost.toFixed(2)} / ${p.perf.toFixed(1)}`}</title>
+                <title>
+                  {`${p.platform}: normalized $${p.cost.toFixed(2)} / ${p.perf.toFixed(1)} (${p.modelVersion ?? "model unknown"}${regionLabel ? `, ${regionLabel}` : ""})`}
+                </title>
               </circle>
               <text
                 x={cx}
@@ -206,7 +220,7 @@ export function CostScatter({ summary }: Props) {
           textAnchor="middle"
           style={{ fontSize: "10px", fill: "#9ca3af" }}
         >
-          Cost (USD)
+          Normalized cost (USD)
         </text>
 
         {/* Y-axis label */}
@@ -220,6 +234,68 @@ export function CostScatter({ summary }: Props) {
           {metricLabel}
         </text>
       </svg>
+      <p class="mt-1 text-xs text-gray-400">
+        {modelDisclosure}. Only rows with <code class="rounded bg-gray-100 px-1">cost_status=normalized</code> are
+        plotted; local and unavailable cost rows are omitted.
+      </p>
     </div>
   );
+}
+
+function normalizedCostValue(row: PlatformRow): number | null {
+  if (row.cost_status !== "normalized") return null;
+  if (row.normalized_cost_usd === null || row.normalized_cost_usd === undefined) return null;
+  return Number.isFinite(row.normalized_cost_usd) ? row.normalized_cost_usd : null;
+}
+
+function costModelDisclosure(points: ScatterPoint[]): string {
+  const versions = uniqueNonEmpty(points.map((point) => point.modelVersion));
+  const scopes = uniqueNonEmpty(points.map((point) => point.scope).map(formatCostScope));
+  const versionText =
+    versions.length === 1
+      ? `model ${versions[0]}`
+      : versions.length > 1
+        ? `multiple models: ${versions.join(", ")}`
+        : "model unavailable";
+  const scopeText =
+    scopes.length === 1
+      ? scopes[0]
+      : scopes.length > 1
+        ? `mixed scopes: ${scopes.join(", ")}`
+        : "scope unavailable";
+  return `Normalized USD, ${scopeText}, ${versionText}`;
+}
+
+function normalizedCostEmptyReason(platforms: PlatformRow[]): string {
+  if (platforms.length === 0) return "No platforms are present in the selected cohort.";
+  if (platforms.every((platform) => platform.cost_status === undefined || platform.cost_status === null)) {
+    return "These rows predate the normalized_cost contract; rebuild the DuckDB snapshot to emit cost_status and model metadata.";
+  }
+  if (platforms.every((platform) => platform.cost_status === "not_applicable_local")) {
+    return "Only local or self-hosted rows are present; BenchBox marks those as not_applicable_local instead of comparable cloud cost.";
+  }
+
+  const missing = new Set<string>();
+  for (const platform of platforms) {
+    if (platform.cost_status !== "unavailable") continue;
+    if (!platform.cloud_provider) missing.add("cloud provider");
+    if (!platform.cloud_region && !platform.pricing_region) missing.add("region");
+    if (!platform.instance_type && !platform.warehouse_size && !platform.cluster_size) {
+      missing.add("instance, warehouse, or cluster shape");
+    }
+    if (!platform.cost_model_version) missing.add("cost model version");
+  }
+  if (missing.size > 0) {
+    return `Missing normalized-cost metadata: ${[...missing].join(", ")}.`;
+  }
+  return "No row has cost_status=normalized with a finite normalized_cost_usd value.";
+}
+
+function formatCostScope(scope: string | null | undefined): string | null {
+  if (!scope) return null;
+  return scope.split("_").join(" ");
+}
+
+function uniqueNonEmpty(values: Array<string | null | undefined>): string[] {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))];
 }
