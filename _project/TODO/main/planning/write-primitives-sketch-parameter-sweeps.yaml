@@ -2,10 +2,38 @@ id: write-primitives-sketch-parameter-sweeps
 title: "Write Primitives sketch: parameter-sweep variants for sketch tuning surface (lg_k, k, lg_max_map_size)"
 worktree: main
 priority: Low
-status: "Not Started"
+status: "Blocked"
 category: "Core Functionality"
 
 description: |
+  ## BLOCKED — transitively blocked via `write-primitives-sketch-clickhouse-and-storage-metrics`
+
+  The dep edge in `deps.needs:` points at the ClickHouse + storage-
+  metrics TODO. That TODO is itself Blocked (PR #133, 2026-05-02) on
+  two write_primitives architectural gaps:
+
+    - validation_query has no per-platform override mechanism
+      (`_project/blind-spots/2026-05-02-155448-validation-query-no-per-platform-override.md`)
+    - DuckDB community datasketches extension at the version BenchBox
+      installs has dropped the theta + frequent-items families
+      (`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`)
+
+  Parameter sweeps multiply the number of (op × engine × parameter)
+  cells that have to validate end-to-end. Until both upstream gaps
+  are resolved, the parameter-sweep variants would expand the
+  blast-radius of the existing failures rather than measure anything
+  useful — every cell that depends on a broken-extension function
+  name or a non-portable validation_query would fail in the same
+  way. The size of the sweep makes it especially worth waiting for
+  the underlying architecture to be solid before adding axes.
+
+  Resolution path: same fix-class TODO that unblocks
+  `write-primitives-sketch-clickhouse-and-storage-metrics` will
+  unblock this TODO too. Re-attempt after that lands; keep the
+  scope_limit and work[] block unchanged.
+
+  ## Original description
+
   The merged sketch ops use one default parameter value per sketch
   family — Theta lg_k=12 (4096 entries), KLL k=200, Top-K
   lg_max_map_size=8 (256 entries). These defaults trade size,

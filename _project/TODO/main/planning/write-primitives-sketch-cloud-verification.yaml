@@ -1,11 +1,62 @@
 id: write-primitives-sketch-cloud-verification
-title: "Write Primitives sketch: cloud verification of Snowflake / BigQuery / Databricks platform_overrides"
+title: "Write Primitives sketch: cloud verification of Snowflake / BigQuery / Databricks / Redshift platform_overrides"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Blocked"
 category: "Verification"
 
 description: |
+  ## BLOCKED — additional finding 2026-05-02 (PR #133, PR #134)
+
+  This TODO is blocked on TWO things, only one of which is the
+  originally-stated cloud-credential gap:
+
+  **(1) Cloud credentials still missing** — the original blocker.
+  Snowflake / BigQuery / Databricks / Redshift creds have not become
+  available locally yet.
+
+  **(2) validation_query no-per-platform-override architectural gap.**
+  Surfaced during the ClickHouse implementation attempt 2026-05-02:
+
+    - `_project/blind-spots/2026-05-02-155448-validation-query-no-per-platform-override.md`
+
+  The existing 3 ★ headline sketch ops use DuckDB-only `datasketch_*`
+  syntax in their `validation_query` bodies. Even when cloud creds
+  arrive, the cloud `write_sql` overrides will succeed on the cloud
+  engines — but the validation_query that runs immediately after will
+  raise an "unknown function" exception because the DuckDB sketch
+  function names don't exist on Snowflake / BigQuery / Databricks /
+  Redshift. The op will be marked FAILED despite the persist+merge
+  having actually worked. Cloud verification cannot give a clean
+  signal until validation_query supports per-platform overrides.
+
+  Per-engine scope additions also needed:
+
+    - **Redshift**: PR #134 added 4 HLL-substitution overrides for
+      Redshift (DDL, theta-style insert, theta-style merge, drop).
+      These weren't in the original cloud-verification scope but
+      should be picked up here when creds become available.
+      Tolerance bounds for the merged HLL distinct estimate were
+      authored against DataSketches Theta and may need re-tuning to
+      absorb HLL++ bias — see PR #134 description for the
+      conservative starting bounds.
+    - **ClickHouse Cloud / Snowflake**: same fix-class TODO that
+      unblocks the validation_query gap will also unblock the
+      ClickHouse-native `-State`/`-Merge` overrides (TODO
+      `write-primitives-sketch-clickhouse-and-storage-metrics`),
+      and that TODO's overrides should land before this one runs
+      end-to-end on ClickHouse Cloud.
+
+  Resolution path:
+    1. Fix-class TODO for validation_query.platform_overrides lands.
+    2. Cloud creds for at least one of the four cloud engines
+       become available.
+    3. This TODO runs on each available engine, expanding to cover
+       Redshift's new HLL ops and (once their TODO lands)
+       ClickHouse-native variants.
+
+  ## Original description
+
   The merged write_primitives sketch category shipped with
   `platform_overrides` for Snowflake, BigQuery, and Databricks
   written from documented function names but **never executed against
