@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -120,6 +121,24 @@ KNOWN_PLATFORMS = {
 # Sanity thresholds
 MAX_QUERY_DURATION_MS = 7_200_000  # 2 hours per query
 MAX_TOTAL_DURATION_MS = 86_400_000  # 24 hours total
+
+# Normalized cost provenance required before public leaderboard cost totals
+# are accepted. Keep this standalone so the published-results validator can run
+# without importing the full BenchBox package.
+NORMALIZED_COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
+NORMALIZED_COST_REQUIRED_KEYS = {
+    "normalized_cost_usd",
+    "cost_model_version",
+    "cost_model_source",
+    "cost_scope",
+    "cost_status",
+    "billing_unit",
+    "pricing_region",
+}
+NORMALIZED_COST_SCOPES = {"compute_only", "compute_plus_storage"}
+NORMALIZED_COST_STATUSES = {"normalized", "not_applicable_local", "unavailable"}
+DIRECT_COST_TOTAL_KEYS = ("total_usd", "total_cost")
+TOP_LEVEL_DIRECT_COST_KEYS = ("cost_usd",)
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +259,175 @@ def _validate_summary_section(summary: Any, vr: ValidationResult) -> None:
             vr.warn("summary.queries.total is 0 - empty result?")
 
 
+def _raw_normalized_cost_block(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Find normalized cost in current and transitional bundle shapes."""
+    raw = data.get("normalized_cost")
+    if isinstance(raw, dict):
+        return raw
+
+    cost = data.get("cost")
+    if not isinstance(cost, dict):
+        return None
+
+    for key in ("normalized_cost", "normalized"):
+        raw = cost.get(key)
+        if isinstance(raw, dict):
+            return raw
+
+    if NORMALIZED_COST_REQUIRED_KEYS.intersection(cost):
+        return cost
+
+    return None
+
+
+def _parse_decimal(value: Any, field_path: str, vr: ValidationResult) -> Decimal | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+        vr.error(f"{field_path} must be a finite decimal value; got {value!r}")
+        return None
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        vr.error(f"{field_path} must be a finite decimal value; got {value!r}")
+        return None
+    if not parsed.is_finite():
+        vr.error(f"{field_path} must be a finite decimal value; got {value!r}")
+        return None
+    return parsed
+
+
+def _validate_required_cost_string(raw: dict[str, Any], key: str, vr: ValidationResult) -> str | None:
+    value = raw.get(key)
+    if not isinstance(value, str) or not value:
+        vr.error(f"normalized_cost.{key} must be a non-empty string")
+        return None
+    return value
+
+
+def _validate_normalized_cost_block(
+    raw: dict[str, Any], vr: ValidationResult
+) -> tuple[bool, Decimal | None, str | None, str | None]:
+    """Validate BenchBox normalized cost provenance.
+
+    Returns ``(is_valid, normalized_cost_usd, cost_status, cost_scope)`` so the
+    legacy cost-total guard can check whether old fields are consistent with
+    the canonical normalized block.
+    """
+    error_count = len(vr.errors)
+    missing = NORMALIZED_COST_REQUIRED_KEYS - set(raw.keys())
+    if missing:
+        vr.error(f"normalized_cost missing required provenance fields: {sorted(missing)}")
+
+    cost_value = _parse_decimal(raw.get("normalized_cost_usd"), "normalized_cost.normalized_cost_usd", vr)
+    _validate_required_cost_string(raw, "cost_model_version", vr)
+    model_source = _validate_required_cost_string(raw, "cost_model_source", vr)
+    cost_scope = _validate_required_cost_string(raw, "cost_scope", vr)
+    cost_status = _validate_required_cost_string(raw, "cost_status", vr)
+    billing_unit = _validate_required_cost_string(raw, "billing_unit", vr)
+    pricing_region = _validate_required_cost_string(raw, "pricing_region", vr)
+
+    if model_source is not None and model_source != NORMALIZED_COST_MODEL_SOURCE:
+        vr.error(f"normalized_cost.cost_model_source must be {NORMALIZED_COST_MODEL_SOURCE!r}; got {model_source!r}")
+    if cost_scope is not None and cost_scope not in NORMALIZED_COST_SCOPES:
+        vr.error(f"normalized_cost.cost_scope must be one of {sorted(NORMALIZED_COST_SCOPES)}; got {cost_scope!r}")
+    if cost_status is not None and cost_status not in NORMALIZED_COST_STATUSES:
+        vr.error(f"normalized_cost.cost_status must be one of {sorted(NORMALIZED_COST_STATUSES)}; got {cost_status!r}")
+
+    if cost_value is not None and cost_value < 0:
+        vr.error(f"normalized_cost.normalized_cost_usd cannot be negative: {cost_value}")
+    if cost_status == "normalized" and cost_value is None:
+        vr.error("normalized_cost.cost_status 'normalized' requires normalized_cost_usd")
+    if cost_status == "not_applicable_local" and cost_value != Decimal("0"):
+        vr.error("normalized_cost.cost_status 'not_applicable_local' requires normalized_cost_usd of 0")
+    if cost_status == "unavailable" and cost_value is not None:
+        vr.error("normalized_cost.cost_status 'unavailable' must not include normalized_cost_usd")
+    if cost_status == "normalized" and billing_unit in {"unknown", "not_applicable"}:
+        vr.error("normalized_cost.cost_status 'normalized' requires a concrete billing_unit")
+    if cost_status == "normalized" and pricing_region in {"unknown", "not_applicable"}:
+        vr.error("normalized_cost.cost_status 'normalized' requires a concrete pricing_region")
+
+    deployment = raw.get("deployment")
+    if cost_status == "normalized" and not isinstance(deployment, dict):
+        vr.error("normalized_cost.cost_status 'normalized' requires deployment metadata")
+    elif deployment is not None and not isinstance(deployment, dict):
+        vr.error("normalized_cost.deployment must be an object when present")
+    elif isinstance(deployment, dict):
+        if cost_status == "normalized":
+            for key in ("cloud_provider", "cloud_region"):
+                value = deployment.get(key)
+                if not isinstance(value, str) or not value:
+                    vr.error(f"normalized_cost.deployment.{key} must be a non-empty string for normalized cost")
+        node_count = deployment.get("node_count")
+        if node_count is not None and (isinstance(node_count, bool) or not isinstance(node_count, int)):
+            vr.error(f"normalized_cost.deployment.node_count must be an integer when present; got {node_count!r}")
+
+    return len(vr.errors) == error_count, cost_value, cost_status, cost_scope
+
+
+def _direct_cost_total_fields(data: dict[str, Any]) -> list[tuple[str, Any]]:
+    direct_fields: list[tuple[str, Any]] = []
+    cost = data.get("cost")
+    if isinstance(cost, dict):
+        for key in DIRECT_COST_TOTAL_KEYS:
+            if key in cost:
+                direct_fields.append((f"cost.{key}", cost[key]))
+
+    for key in TOP_LEVEL_DIRECT_COST_KEYS:
+        if key in data:
+            direct_fields.append((key, data[key]))
+
+    return direct_fields
+
+
+def _validate_public_cost_section(data: dict[str, Any], vr: ValidationResult) -> None:
+    """Reject public leaderboard cost totals that lack BenchBox provenance."""
+    direct_fields = _direct_cost_total_fields(data)
+    raw_normalized = _raw_normalized_cost_block(data)
+
+    normalized_valid = True
+    normalized_value: Decimal | None = None
+    cost_status: str | None = None
+    cost_scope: str | None = None
+    if raw_normalized is not None:
+        normalized_valid, normalized_value, cost_status, cost_scope = _validate_normalized_cost_block(
+            raw_normalized, vr
+        )
+
+    if not direct_fields:
+        return
+
+    field_names = ", ".join(path for path, _value in direct_fields)
+    if raw_normalized is None or not normalized_valid:
+        vr.error(
+            "User-supplied public leaderboard cost totals are not accepted: "
+            f"{field_names} require BenchBox normalized_cost provenance"
+        )
+        return
+
+    if cost_status == "unavailable" or normalized_value is None:
+        vr.error(
+            "Public leaderboard cost totals require normalized cost availability: "
+            f"{field_names} cannot accompany cost_status {cost_status!r}"
+        )
+        return
+
+    for field_path, value in direct_fields:
+        direct_value = _parse_decimal(value, field_path, vr)
+        if direct_value is None:
+            continue
+        if direct_value < 0:
+            vr.error(f"{field_path} cannot be negative: {direct_value}")
+            continue
+        if field_path == "cost_usd" and (cost_status != "normalized" or cost_scope != "compute_only"):
+            vr.error("cost_usd is only accepted as a compute_only alias for normalized BenchBox cost")
+            continue
+        if direct_value != normalized_value:
+            vr.error(
+                f"{field_path} ({direct_value}) must match normalized_cost.normalized_cost_usd ({normalized_value})"
+            )
+
+
 def _validate_single_query(index: int, q: Any, vr: ValidationResult) -> bool:
     """Validate one queries[i] entry. Returns True if ms>0 was seen (non-zero signal)."""
     if not isinstance(q, dict):
@@ -297,6 +485,7 @@ def _validate_bundle(data: dict, vr: ValidationResult) -> None:
     _validate_benchmark_section(data.get("benchmark", {}), vr)
     _validate_platform_section(data.get("platform", {}), vr)
     _validate_summary_section(data.get("summary", {}), vr)
+    _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), vr)
 
 

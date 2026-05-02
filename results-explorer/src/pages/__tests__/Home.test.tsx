@@ -212,6 +212,35 @@ describe("Home", () => {
     expect(screen.queryByText("Cross-Benchmark Leaderboard")).toBeNull();
   });
 
+  it("shows normalized cost in recent results only when normalized cost metadata is present", async () => {
+    const rows = RESULT_ROWS.map((row, index) =>
+      index === 0
+        ? {
+            ...row,
+            normalized_cost_usd: 1.1,
+            cost_status: "normalized",
+            cost_scope: "compute_only",
+            cost_model_version: "2026.05.0",
+          }
+        : row,
+    );
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.startsWith("SELECT * FROM bench.results")) return rows;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return [];
+      }
+      if (s.startsWith("SELECT * FROM bench.cohort_metadata")) return [];
+      return [];
+    });
+
+    render(<Home />);
+
+    await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
+    expect(screen.getByText("Normalized cost")).toBeTruthy();
+    expect(screen.getByText("$1.10")).toBeTruthy();
+  });
+
   it("keeps the loading state while an empty result snapshot conflicts with leaderboard metadata", async () => {
     const metaRows = deferred<typeof META_LEADERBOARD_ROWS>();
     const cohortRows = deferred<typeof COHORT_ROWS>();

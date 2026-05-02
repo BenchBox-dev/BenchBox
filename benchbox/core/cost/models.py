@@ -5,7 +5,98 @@ levels of granularity: individual queries, benchmark phases, and complete benchm
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from decimal import Decimal
+from typing import Any, Literal, Optional
+
+CostScope = Literal["compute_only", "compute_plus_storage"]
+CostStatus = Literal["normalized", "not_applicable_local", "unavailable"]
+
+
+@dataclass(frozen=True)
+class DeploymentMetadata:
+    """Deployment context used to normalize and audit benchmark cost."""
+
+    cloud_provider: str | None = None
+    cloud_region: str | None = None
+    instance_type: str | None = None
+    warehouse_size: str | None = None
+    node_count: int | None = None
+    cluster_size: str | None = None
+    storage_format: str | None = None
+    storage_tier: str | None = None
+
+    def to_dict(self) -> dict[str, str | int | None]:
+        """Convert to a stable dictionary shape for result serialization."""
+        return {
+            "cloud_provider": self.cloud_provider,
+            "cloud_region": self.cloud_region,
+            "instance_type": self.instance_type,
+            "warehouse_size": self.warehouse_size,
+            "node_count": self.node_count,
+            "cluster_size": self.cluster_size,
+            "storage_format": self.storage_format,
+            "storage_tier": self.storage_tier,
+        }
+
+
+@dataclass(frozen=True)
+class NormalizedCost:
+    """BenchBox-normalized cost with explicit provenance and availability status.
+
+    `normalized_cost_usd` is `None` when `cost_status == "unavailable"` so
+    missing cloud pricing metadata cannot be misread as zero cost. Local or
+    self-hosted runs may use `cost_status == "not_applicable_local"` with
+    `normalized_cost_usd == Decimal("0")`, but consumers must still treat the
+    status as non-comparable with normalized cloud cost.
+
+    Compatibility: `cost_usd` remains available as a read-only deprecated alias
+    for legacy explorer consumers. The alias is populated only when
+    `cost_status == "normalized"` and `cost_scope == "compute_only"`; it is
+    `None` for storage-inclusive, local-not-applicable, and unavailable costs.
+    """
+
+    normalized_cost_usd: Decimal | None
+    cost_model_version: str
+    cost_model_source: str
+    cost_scope: CostScope
+    cost_status: CostStatus
+    billing_unit: str
+    pricing_region: str
+    deployment: DeploymentMetadata = field(default_factory=DeploymentMetadata)
+
+    def __post_init__(self) -> None:
+        if self.normalized_cost_usd is not None and not isinstance(self.normalized_cost_usd, Decimal):
+            object.__setattr__(self, "normalized_cost_usd", Decimal(str(self.normalized_cost_usd)))
+        if self.normalized_cost_usd is not None and self.normalized_cost_usd < 0:
+            raise ValueError("normalized cost cannot be negative")
+        if self.cost_status == "normalized" and self.normalized_cost_usd is None:
+            raise ValueError("normalized cost requires normalized_cost_usd")
+        if self.cost_status == "not_applicable_local" and self.normalized_cost_usd != Decimal("0"):
+            raise ValueError("local not-applicable cost must carry explicit zero normalized_cost_usd")
+        if self.cost_status == "unavailable" and self.normalized_cost_usd is not None:
+            raise ValueError("unavailable cost must not carry normalized_cost_usd")
+
+    @property
+    def cost_usd(self) -> Decimal | None:
+        """Deprecated compute-only alias for legacy explorer cost consumers."""
+        if self.cost_status == "normalized" and self.cost_scope == "compute_only":
+            return self.normalized_cost_usd
+        return None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to a serialization-ready dictionary without losing Decimal precision."""
+        cost_usd = self.cost_usd
+        return {
+            "normalized_cost_usd": str(self.normalized_cost_usd) if self.normalized_cost_usd is not None else None,
+            "cost_usd": str(cost_usd) if cost_usd is not None else None,
+            "cost_model_version": self.cost_model_version,
+            "cost_model_source": self.cost_model_source,
+            "cost_scope": self.cost_scope,
+            "cost_status": self.cost_status,
+            "billing_unit": self.billing_unit,
+            "pricing_region": self.pricing_region,
+            "deployment": self.deployment.to_dict(),
+        }
 
 
 @dataclass

@@ -130,9 +130,18 @@ def add_cost_estimation_to_results(
 
         _apply_cost_model_and_warnings(benchmark_cost, platform, platform_config)
         _add_storage_cost_estimate(benchmark_cost, results, platform, platform_config, platform_details)
+        normalized_cost, normalized_warnings = calculator.calculate_normalized_benchmark_cost(
+            platform=platform,
+            benchmark_cost=benchmark_cost,
+            platform_config=platform_config,
+        )
+        for warning in normalized_warnings:
+            logger.warning(warning)
+            benchmark_cost.warnings.append(warning)
 
         # Add cost_summary to results
         results.cost_summary = benchmark_cost.to_dict()
+        results.cost_summary["normalized_cost"] = normalized_cost.to_dict()
 
         logger.info(f"Cost estimation complete: ${benchmark_cost.total_cost:.4f} across {len(phase_costs)} phases")
 
@@ -271,25 +280,28 @@ def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str
 
     # Common fields
     config["platform_type"] = platform_type
+    defaulted_fields: list[str] = []
 
     # Platform-specific extraction
     if platform_type == "snowflake":
         config_section = platform_info.get("configuration", {})
-        config["edition"] = platform_info.get("edition", "standard")
-        config["cloud"] = platform_info.get("cloud_provider", "aws")
-        config["region"] = platform_info.get("region", "us-east-1")
+        config["edition"] = _value_or_default(platform_info, "edition", "standard", defaulted_fields)
+        config["cloud"] = _value_or_default(platform_info, "cloud_provider", "aws", defaulted_fields, alias="cloud")
+        config["region"] = _value_or_default(platform_info, "region", "us-east-1", defaulted_fields)
         config["warehouse_size"] = config_section.get("warehouse_size")
 
     elif platform_type == "bigquery":
         config_section = platform_info.get("configuration", {})
-        config["location"] = config_section.get("location", "us")
+        config["location"] = _value_or_default(config_section, "location", "us", defaulted_fields)
 
     elif platform_type == "redshift":
         config_section = platform_info.get("configuration", {})
         cluster_info = platform_info.get("cluster_info", {})
-        config["node_type"] = cluster_info.get("node_type", "dc2.large")
-        config["node_count"] = cluster_info.get("number_of_nodes", 1)
-        config["region"] = platform_info.get("region", "us-east-1")
+        config["node_type"] = _value_or_default(cluster_info, "node_type", "dc2.large", defaulted_fields)
+        config["node_count"] = _value_or_default(
+            cluster_info, "number_of_nodes", 1, defaulted_fields, alias="node_count"
+        )
+        config["region"] = _value_or_default(platform_info, "region", "us-east-1", defaulted_fields)
 
     elif platform_type == "databricks":
         config_section = platform_info.get("configuration", {})
@@ -303,6 +315,8 @@ def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str
             cloud = "gcp"
         else:
             cloud = "aws"
+            if not server_hostname:
+                defaulted_fields.append("cloud")
 
         config["cloud"] = cloud
         config["tier"] = platform_info.get("tier", "premium")
@@ -347,12 +361,31 @@ def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str
         else:
             # Fallback: Use conservative estimate
             config["cluster_size_dbu_per_hour"] = 2.0
+            defaulted_fields.append("cluster_size_dbu_per_hour")
             logger.warning(
                 "Databricks warehouse size not available in platform_info, using conservative estimate of 2.0 DBU/hour. "
                 "For accurate cost estimation, ensure databricks-sdk is installed."
             )
 
+    if defaulted_fields:
+        config["_defaulted_fields"] = sorted(set(defaulted_fields))
+
     return config
+
+
+def _value_or_default(
+    data: dict[str, Any],
+    key: str,
+    default: Any,
+    defaulted_fields: list[str],
+    *,
+    alias: str | None = None,
+) -> Any:
+    value = data.get(key)
+    if value is None:
+        defaulted_fields.append(alias or key)
+        return default
+    return value
 
 
 def _calculate_phase_costs(

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from pathlib import Path
 from typing import Any
 
@@ -35,10 +36,113 @@ _SummaryKey = tuple[str, float, str]
 # before writing - a missing key is an upstream bug, not a nullable field.
 _COHORT_PLATFORM_REQUIRED_KEYS = frozenset({"platform_id", "platform", "result_id", "short_id", "trust_label"})
 
+_NORMALIZED_COST_COLUMNS = [
+    ("normalized_cost_usd", "DOUBLE"),
+    ("cost_model_version", "VARCHAR"),
+    ("cost_model_source", "VARCHAR"),
+    ("cost_scope", "VARCHAR"),
+    ("cost_status", "VARCHAR"),
+    ("billing_unit", "VARCHAR"),
+    ("pricing_region", "VARCHAR"),
+    ("cloud_provider", "VARCHAR"),
+    ("cloud_region", "VARCHAR"),
+    ("instance_type", "VARCHAR"),
+    ("warehouse_size", "VARCHAR"),
+    ("node_count", "INTEGER"),
+    ("cluster_size", "VARCHAR"),
+    ("storage_format", "VARCHAR"),
+    ("storage_tier", "VARCHAR"),
+]
+
+_NORMALIZED_COST_KEYS = frozenset(
+    {
+        "normalized_cost_usd",
+        "cost_model_version",
+        "cost_model_source",
+        "cost_scope",
+        "cost_status",
+        "billing_unit",
+        "pricing_region",
+        "deployment",
+    }
+)
+_DEPLOYMENT_KEYS = frozenset(
+    {
+        "cloud_provider",
+        "cloud_region",
+        "instance_type",
+        "warehouse_size",
+        "node_count",
+        "cluster_size",
+        "storage_format",
+        "storage_tier",
+    }
+)
+_COST_SCOPES = frozenset({"compute_only", "compute_plus_storage"})
+_COST_STATUSES = frozenset({"normalized", "not_applicable_local", "unavailable"})
+
 # If this module grows further, consider splitting DDL (_create_schema,
 # _create_views) from the ten _populate_* helpers into sibling modules
 # ``duckdb_schema.py`` and ``duckdb_populate.py``. Kept cohesive for now so the
 # ten-table contract stays readable in a single file.
+
+
+def _finite_float_or_none(entry: ManifestEntry, key: str, value: Any) -> float | None:
+    if value is None:
+        return None
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"{entry.result_id}: normalized_cost.{key} must be finite; got {value!r}")
+    return parsed
+
+
+def _required_cost_string(entry: ManifestEntry, cost: dict[str, Any], key: str) -> str:
+    value = cost[key]
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{entry.result_id}: normalized_cost.{key} must be a non-empty string")
+    return value
+
+
+def _required_cost_choice(entry: ManifestEntry, cost: dict[str, Any], key: str, choices: frozenset[str]) -> str:
+    value = _required_cost_string(entry, cost, key)
+    if value not in choices:
+        raise ValueError(f"{entry.result_id}: normalized_cost.{key} must be one of {sorted(choices)}; got {value!r}")
+    return value
+
+
+def _normalized_cost_column_values(entry: ManifestEntry) -> tuple:
+    """Flatten entry.normalized_cost into the DuckDB column contract."""
+    cost = entry.normalized_cost
+    missing = _NORMALIZED_COST_KEYS - cost.keys()
+    if missing:
+        raise ValueError(f"{entry.result_id}: normalized_cost missing required keys {sorted(missing)}")
+
+    deployment = cost["deployment"]
+    if not isinstance(deployment, dict):
+        raise ValueError(f"{entry.result_id}: normalized_cost.deployment must be a dict")
+    deployment_missing = _DEPLOYMENT_KEYS - deployment.keys()
+    if deployment_missing:
+        raise ValueError(
+            f"{entry.result_id}: normalized_cost.deployment missing required keys {sorted(deployment_missing)}"
+        )
+
+    return (
+        _finite_float_or_none(entry, "normalized_cost_usd", cost["normalized_cost_usd"]),
+        _required_cost_string(entry, cost, "cost_model_version"),
+        _required_cost_string(entry, cost, "cost_model_source"),
+        _required_cost_choice(entry, cost, "cost_scope", _COST_SCOPES),
+        _required_cost_choice(entry, cost, "cost_status", _COST_STATUSES),
+        _required_cost_string(entry, cost, "billing_unit"),
+        _required_cost_string(entry, cost, "pricing_region"),
+        deployment["cloud_provider"],
+        deployment["cloud_region"],
+        deployment["instance_type"],
+        deployment["warehouse_size"],
+        deployment["node_count"],
+        deployment["cluster_size"],
+        deployment["storage_format"],
+        deployment["storage_tier"],
+    )
 
 
 class DuckDBSnapshotBuilder:
@@ -66,6 +170,7 @@ class DuckDBSnapshotBuilder:
         ("test_type", "VARCHAR"),
         ("validation_status", "VARCHAR"),
         ("cost_usd", "DOUBLE"),
+        *_NORMALIZED_COST_COLUMNS,
     ]
 
     def build(self, entries: list[ManifestEntry], output_path: Path) -> None:
@@ -146,7 +251,7 @@ class DuckDBSnapshotBuilder:
         Creates all tables and views defined in browser-duckdb-schema.sql and
         populates them from pipeline data in a single pass. Overwrites any
         existing file at *output_path*. The legacy build() method remains
-        available for callers that only need the 19-column results table.
+        available for callers that only need the flat results table.
 
         Args:
             entries: All ManifestEntry objects for this pipeline run.
@@ -232,6 +337,21 @@ class DuckDBSnapshotBuilder:
                 test_type            VARCHAR,
                 validation_status    VARCHAR,
                 cost_usd             DOUBLE,
+                normalized_cost_usd  DOUBLE,
+                cost_model_version   VARCHAR,
+                cost_model_source    VARCHAR,
+                cost_scope           VARCHAR,
+                cost_status          VARCHAR  NOT NULL,
+                billing_unit         VARCHAR,
+                pricing_region       VARCHAR,
+                cloud_provider       VARCHAR,
+                cloud_region         VARCHAR,
+                instance_type        VARCHAR,
+                warehouse_size       VARCHAR,
+                node_count           INTEGER,
+                cluster_size         VARCHAR,
+                storage_format       VARCHAR,
+                storage_tier         VARCHAR,
                 compliance_class     VARCHAR,
                 is_ranking_eligible  BOOLEAN  NOT NULL,
                 has_plans            BOOLEAN  NOT NULL,
@@ -263,6 +383,21 @@ class DuckDBSnapshotBuilder:
                 r.test_type,
                 r.validation_status,
                 r.cost_usd,
+                r.normalized_cost_usd,
+                r.cost_model_version,
+                r.cost_model_source,
+                r.cost_scope,
+                r.cost_status,
+                r.billing_unit,
+                r.pricing_region,
+                r.cloud_provider,
+                r.cloud_region,
+                r.instance_type,
+                r.warehouse_size,
+                r.node_count,
+                r.cluster_size,
+                r.storage_format,
+                r.storage_tier,
                 r.compliance_class,
                 r.has_plans,
                 r.has_tuning,
@@ -362,7 +497,22 @@ class DuckDBSnapshotBuilder:
                 tuning_mode,
                 execution_mode,
                 compliance_class,
-                cost_usd
+                cost_usd,
+                normalized_cost_usd,
+                cost_model_version,
+                cost_model_source,
+                cost_scope,
+                cost_status,
+                billing_unit,
+                pricing_region,
+                cloud_provider,
+                cloud_region,
+                instance_type,
+                warehouse_size,
+                node_count,
+                cluster_size,
+                storage_format,
+                storage_tier
             FROM results
         """)
         con.execute("""
@@ -477,6 +627,7 @@ class DuckDBSnapshotBuilder:
                     entry.test_type,
                     entry.validation_status,
                     entry.cost_usd,
+                    *_normalized_cost_column_values(entry),
                     entry.compliance_class,
                     is_ranking_eligible(entry),
                     has_plans,
@@ -724,6 +875,7 @@ class DuckDBSnapshotBuilder:
             entry.test_type,
             entry.validation_status,
             entry.cost_usd,
+            *_normalized_cost_column_values(entry),
         )
 
 
