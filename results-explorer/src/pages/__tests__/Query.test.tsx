@@ -7,6 +7,7 @@ vi.mock("@/db", () => ({
 }));
 
 import { getDb, queryRows } from "@/db";
+import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
 import { DEFAULT_ROW_LIMIT, UNLIMITED_ROW_LIMIT } from "@/lib/queryFilters";
 import { Query } from "@/pages/Query";
 
@@ -78,9 +79,17 @@ function isFacetCountSql(normalized: string, column: string): boolean {
   );
 }
 
+function facetCountCalls() {
+  return vi.mocked(queryRows).mock.calls.filter(([sql]) => {
+    const normalized = normalizeSql(String(sql));
+    return normalized.includes("COUNT(*) AS count") || normalized.includes("COUNT(*) FROM bench.results");
+  });
+}
+
 beforeEach(() => {
   vi.mocked(queryRows).mockReset();
   vi.mocked(getDb).mockReset();
+  clearDuckdbQueryCachesForTests();
   schemaColumns = BASE_SCHEMA_COLUMNS;
   window.history.replaceState(null, "", "/results/query");
   vi.stubGlobal(
@@ -209,6 +218,7 @@ describe("Query", () => {
   it("updates the select SQL when facet filters change and sort toggles", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByText("Platform")).toBeTruthy());
     const resultsTable = screen.getAllByRole("table")[0]!;
 
     fireEvent.click(screen.getByLabelText(/DuckDB/i));
@@ -222,6 +232,35 @@ describe("Query", () => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).toContain("ORDER BY benchmark ASC");
     });
+  });
+
+  it("does not refetch facet counts when result-only controls change", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+    await waitFor(() => expect(facetCountCalls().length).toBeGreaterThanOrEqual(15));
+    const initialFacetCallCount = facetCountCalls().length;
+    const resultsTable = screen.getAllByRole("table")[0]!;
+
+    fireEvent.click(within(resultsTable).getAllByText(/^benchmark(?:\s[↑↓])?$/)[0]!);
+    await waitFor(() => {
+      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
+      expect(selectCalls.at(-1)?.[0]).toContain("ORDER BY benchmark ASC");
+    });
+    expect(facetCountCalls()).toHaveLength(initialFacetCallCount);
+
+    fireEvent.click(screen.getByLabelText(/^geomean_ms$/));
+    await waitFor(() => {
+      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
+      expect(selectCalls.at(-1)?.[0]).not.toContain("geomean_ms");
+    });
+    expect(facetCountCalls()).toHaveLength(initialFacetCallCount);
+
+    fireEvent.click(screen.getByRole("button", { name: /^All$/ }));
+    await waitFor(() => {
+      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
+      expect(selectCalls.at(-1)?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
+    });
+    expect(facetCountCalls()).toHaveLength(initialFacetCallCount);
   });
 
   it("reads shared facet aliases and rewrites them to canonical query params", async () => {
@@ -271,6 +310,7 @@ describe("Query", () => {
   it("applies normalized cost and deployment facets to the generated query", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByText("Cost status")).toBeTruthy());
 
     const costStatus = screen.getByText("Cost status").closest("section")!;
     const deployment = screen.getByText("Deployment").closest("section")!;

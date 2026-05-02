@@ -17,6 +17,7 @@ import {
   getCohort,
   getMetaLeaderboard,
   getMetaLeaderboardData,
+  memoizedSnapshotQueryRows,
   resolveShortId,
   toShortIds,
 } from "@/lib/duckdbQueries";
@@ -43,6 +44,46 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     const [sql, params] = mockedQueryRows.mock.calls[0]!;
     expect(sql).toContain("WHERE benchmark IN (?)");
     expect(params).toEqual(["tpch"]);
+  });
+
+  it("memoizes listResults by WHERE clause and params for the current snapshot", async () => {
+    const rows = [{ result_id: "r1" }];
+    mockedQueryRows.mockResolvedValueOnce(rows);
+
+    const first = await listResults({ sql: "WHERE benchmark IN (?)", params: ["tpch"] });
+    const second = await listResults({ sql: "WHERE benchmark IN (?)", params: ["tpch"] });
+
+    expect(first).toBe(second);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(1);
+
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await listResults({ sql: "WHERE benchmark IN (?)", params: ["tpcds"] });
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not cache empty listResults responses so cold-load retries can recover", async () => {
+    const recoveredRows = [{ result_id: "r1" }];
+    mockedQueryRows.mockResolvedValueOnce([]);
+    mockedQueryRows.mockResolvedValueOnce(recoveredRows);
+
+    await expect(listResults()).resolves.toEqual([]);
+    await expect(listResults()).resolves.toBe(recoveredRows);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(2);
+  });
+
+  it("memoizes ad hoc snapshot row queries by caller key, SQL, and params", async () => {
+    const rows = [{ value: "tpch", count: 2 }];
+    const query = {
+      sql: "SELECT benchmark AS value, COUNT(*) AS count FROM bench.results WHERE platform = ? GROUP BY 1",
+      params: ["duckdb"],
+    };
+    mockedQueryRows.mockResolvedValueOnce(rows);
+
+    const first = await memoizedSnapshotQueryRows("query-facet:benchmark", query);
+    const second = await memoizedSnapshotQueryRows("query-facet:benchmark", query);
+
+    expect(first).toBe(second);
+    expect(mockedQueryRows).toHaveBeenCalledTimes(1);
   });
 
   it("getResultDetailMetrics returns the single matching row or null", async () => {

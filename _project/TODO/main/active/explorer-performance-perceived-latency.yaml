@@ -67,7 +67,12 @@ work:
 
 - id: w4
   summary: "Batch or cache facet/count queries that repeat across pages"
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/__tests__/Query.test.tsx"
   notes: |
     Review `duckdbQueries.ts`, `queryFilters.ts`, Home, BenchmarkIndex,
     PlatformIndex, and Query for repeated COUNT/DISTINCT queries. Cache stable
