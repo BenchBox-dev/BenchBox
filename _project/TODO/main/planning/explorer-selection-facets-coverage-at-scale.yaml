@@ -118,7 +118,13 @@ work:
   - id: w7
     summary: "Represent missing cohort coverage explicitly in MetaLeaderboard and benchmark matrices"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/MetaLeaderboard.tsx"
+      - "results-explorer/src/components/QueryHeatmap.tsx"
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
     notes: |
       In MetaLeaderboard, missing platform/cohort cells should render as a muted
       "No run" state with a tooltip explaining that missing coverage is not

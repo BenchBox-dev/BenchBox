@@ -386,7 +386,7 @@ export function QueryHeatmap({
                             ? `${fmtMs(ms)}, fastest in column`
                             : `${fmtMs(ms)}, ${ratio.toFixed(1)}× fastest in column`
                           : fmtMs(ms)
-                        : "no data";
+                        : `No published query run for ${row.platform} ${qid}`;
 
                     const isFocused = focusPos.row === rowIdx && focusPos.col === colIdx;
 
@@ -405,14 +405,15 @@ export function QueryHeatmap({
                         data-cell={`${rowIdx}-${colIdx}`}
                         tabIndex={isFocused ? 0 : -1}
                         class={`table-td whitespace-nowrap text-right font-mono focus:outline focus:outline-2 focus:outline-brand-500 ${
-                          hue !== null ? "heatmap-cell" : ms === null ? "text-gray-400" : ""
+                          hue !== null ? "heatmap-cell" : ms === null ? "bg-gray-50 text-gray-400" : ""
                         }`}
                         style={cellStyle}
                         aria-label={ariaLabel}
+                        title={ms === null ? "No published run for this query/platform cell." : undefined}
                         onKeyDown={(e) => handleCellKey(e as KeyboardEvent, rowIdx, colIdx)}
                         onFocus={() => setAnnouncement(`${qid}: ${ariaLabel}`)}
                       >
-                        {ms !== null ? fmtMs(ms) : "-"}
+                        {ms !== null ? fmtMs(ms) : "No run"}
                       </td>
                     );
                   })}

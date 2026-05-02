@@ -125,6 +125,91 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("loose")).toBeTruthy();
   });
 
+  it("shows coverage counts and can sort by covered cohort count", () => {
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [
+        DATA.cohorts[0]!,
+        {
+          ...DATA.cohorts[0]!,
+          key: "tpch-sf0.1-power",
+          benchmark: "tpch",
+          label: "TPC-H SF0.1",
+          href: "/results/tpch/",
+          platform_count: 2,
+          platforms: [
+            {
+              platform_id: "duckdb",
+              platform: "DuckDB",
+              result_id: "r3",
+              rank: 2,
+              metric_value: 30,
+              speedup_vs_best: 0.5,
+              primary_metric: "display_geomean_ms",
+              primary_order: "asc" as const,
+            },
+            {
+              platform_id: "polars",
+              platform: "Polars",
+              result_id: "r4",
+              rank: 1,
+              metric_value: 15,
+              speedup_vs_best: 1,
+              primary_metric: "display_geomean_ms",
+              primary_order: "asc" as const,
+            },
+          ],
+        },
+      ],
+      platforms: [
+        {
+          platform_id: "duckdb",
+          platform: "DuckDB",
+          ranks: {
+            ...DATA.platforms[0]!.ranks,
+            "tpch-sf0.1-power": {
+              rank: 2,
+              total: 2,
+              metric_value: 30,
+              speedup_vs_best: 0.5,
+            },
+          },
+          avg_rank: 1.5,
+          n_cohorts: 2,
+        },
+        DATA.platforms[1]!,
+        {
+          platform_id: "polars",
+          platform: "Polars",
+          ranks: {
+            "tpch-sf0.1-power": {
+              rank: 1,
+              total: 2,
+              metric_value: 15,
+              speedup_vs_best: 1,
+            },
+          },
+          avg_rank: 1,
+          n_cohorts: 1,
+        },
+      ],
+    };
+    const { container } = render(<MetaLeaderboard data={data} mode="ranks" onModeChange={vi.fn()} />);
+    const rowOrder = () =>
+      Array.from(container.querySelectorAll("tbody tr")).map((row) => row.textContent ?? "");
+
+    expect(screen.getByRole("button", { name: "Avg rank" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Best cohort" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Recent" })).toBeTruthy();
+    expect(rowOrder()[0]).toContain("Polars");
+
+    fireEvent.click(screen.getByRole("button", { name: "Coverage" }));
+
+    expect(screen.getByRole("button", { name: "Coverage" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("2/2 cohorts")).toBeTruthy();
+    expect(rowOrder()[0]).toContain("DuckDB");
+  });
+
 
   it("renders null when platforms list is empty", () => {
     const { container } = render(
@@ -139,7 +224,7 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("2/2")).toBeTruthy();
   });
 
-  it("shows em-dash for platform missing a cohort rank entry", () => {
+  it("shows explicit no-run copy for a platform missing a cohort rank entry", () => {
     const dataWithNa = {
       ...DATA,
       platforms: [
@@ -148,14 +233,18 @@ describe("MetaLeaderboard", () => {
           platform_id: "polars",
           platform: "Polars",
           ranks: {},
-          avg_rank: null as unknown as number,
+          avg_rank: null,
           n_cohorts: 0,
         },
       ],
     };
     render(<MetaLeaderboard data={dataWithNa} mode="ranks" onModeChange={vi.fn()} />);
-    const dashes = screen.getAllByText("-");
-    expect(dashes.length).toBeGreaterThan(0);
+    expect(screen.getByText("No run")).toBeTruthy();
+    expect(screen.getByText("0/1 cohorts")).toBeTruthy();
+    const missingCell = screen.getByRole("gridcell", {
+      name: /Polars has no published run for ClickBench SF0\.1\. Missing cohorts are not counted in average rank\./,
+    });
+    expect(missingCell.getAttribute("title")).toContain("Missing cohorts are not counted");
   });
 
   it("formats avg_rank with 2 decimal places", () => {
