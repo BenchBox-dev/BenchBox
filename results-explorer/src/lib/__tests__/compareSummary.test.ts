@@ -129,6 +129,41 @@ describe("buildCompareDecisionSummary", () => {
     });
   });
 
+  it("counts missing query evidence when winner or competitors lack timings", () => {
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult({
+          result_id: "winner",
+          platform: "WinnerDB",
+          display_timings: [
+            { query_id: "Q1", display_ms: 10, sample_count: 3 },
+            { query_id: "Q2", display_ms: 20, sample_count: 3 },
+          ],
+        }),
+        makeResult({
+          result_id: "candidate",
+          platform: "CandidateDB",
+          platform_id: "candidate",
+          power_score: 300,
+          display_timings: [
+            { query_id: "Q1", display_ms: 100, sample_count: 3 },
+            { query_id: "Q3", display_ms: 300, sample_count: 3 },
+          ],
+        }),
+      ],
+      "power_score",
+    );
+
+    expect(summary.queryRecord).toMatchObject({
+      totalQueries: 3,
+      comparableQueries: 1,
+      wins: 1,
+      losses: 0,
+      ties: 0,
+      missing: 2,
+    });
+  });
+
   it("suppresses winner claims when every selected result lacks the primary metric", () => {
     const summary = buildCompareDecisionSummary(
       [
@@ -168,6 +203,29 @@ describe("buildCompareDecisionSummary", () => {
       winnerCostUsd: 0.5,
       winnerCostPerformanceRatioVsWorst: 1,
     });
+  });
+
+  it("omits cost context when no selected rows have normalized cost", () => {
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult({
+          result_id: "duck",
+          normalized_cost_usd: null,
+          cost_status: "not_applicable_local",
+        }),
+        makeResult({
+          result_id: "sqlite",
+          platform: "SQLite",
+          platform_id: "sqlite",
+          power_score: 300,
+          normalized_cost_usd: null,
+          cost_status: "unavailable",
+        }),
+      ],
+      "power_score",
+    );
+
+    expect(summary.cost).toBeNull();
   });
 
   it("suppresses winner language when cohort guardrails mark the selection incomparable", () => {

@@ -96,6 +96,18 @@ const SQLITE = makeResult({
   ],
 });
 
+const POSTGRES = makeResult({
+  result_id: "r3",
+  platform: "PostgreSQL",
+  platform_id: "postgresql",
+  display_geomean_ms: 50,
+  power_score: 1000,
+  display_timings: [
+    { query_id: "Q1", display_ms: 50, sample_count: 3 },
+    { query_id: "Q2", display_ms: 80, sample_count: 3 },
+  ],
+});
+
 function setupUrl(ids: string[], extraParams: Record<string, string> = {}) {
   const params = new URLSearchParams({ ids: ids.join(","), ...extraParams });
   window.history.replaceState(null, "", `/results/compare?${params.toString()}`);
@@ -182,6 +194,75 @@ describe("Compare", () => {
     expect(summary.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(summary.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(queryDiffHeading.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("omits summary cost context when normalized costs are absent", async () => {
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+    });
+
+    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    expect(summary).not.toHaveTextContent("Cost/performance:");
+  });
+
+  it("renders normalized cost/performance context when cost fields are available", async () => {
+    const duckdb = makeResult({
+      result_id: "r1",
+      platform: "DuckDB",
+      normalized_cost_usd: 0.5,
+      cost_status: "normalized",
+    });
+    const sqlite = makeResult({
+      result_id: "r2",
+      platform: "SQLite",
+      platform_id: "sqlite",
+      power_score: 300,
+      display_timings: SQLITE.display_timings,
+      normalized_cost_usd: 1.5,
+      cost_status: "normalized",
+    });
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1" ? Promise.resolve(duckdb) : Promise.resolve(sqlite),
+    );
+
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+    });
+
+    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    expect(summary).toHaveTextContent("Cost/performance:");
+    expect(summary).toHaveTextContent("winner cost $0.50");
+    expect(summary).toHaveTextContent("30.00x cost/performance");
+  });
+
+  it("keeps missing query evidence visible in the summary and query diff table", async () => {
+    const missingSqlite = makeResult({
+      result_id: "r2",
+      platform: "SQLite",
+      platform_id: "sqlite",
+      power_score: 300,
+      display_timings: [
+        { query_id: "Q1", display_ms: 100, sample_count: 3 },
+        { query_id: "Q3", display_ms: 300, sample_count: 3 },
+      ],
+    });
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1" ? Promise.resolve(DUCKDB) : Promise.resolve(missingSqlite),
+    );
+
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+    });
+
+    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    expect(summary).toHaveTextContent("1/1 fastest");
+    expect(summary).toHaveTextContent("2 missing");
+    expect(queryDiff).toHaveTextContent("3 comparisons");
+    expect(queryDiff).toHaveTextContent("Missing");
   });
 
   it("summary card speedup and query diff ratio are consistent for 2-platform fixture", async () => {
@@ -335,6 +416,42 @@ describe("Compare", () => {
     expect(diffTable).toHaveTextContent("0.10x");
     expect(new URL(window.location.href).searchParams.get("ids")).toBe(beforeIds);
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
+  });
+
+  it("supports three-result compare and baseline switching without changing URL membership", async () => {
+    setupUrl(["r1", "r2", "r3"]);
+    vi.mocked(getDetailResult).mockImplementation((id) => {
+      if (id === "r1") return Promise.resolve(DUCKDB);
+      if (id === "r2") return Promise.resolve(SQLITE);
+      if (id === "r3") return Promise.resolve(POSTGRES);
+      return Promise.resolve(null);
+    });
+
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getAllByText("PostgreSQL").length).toBeGreaterThan(0);
+    });
+
+    await waitFor(() => expect(document.title).toBe("Compare (3) · BenchBox Results"));
+    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const select = screen.getByLabelText("Baseline") as HTMLSelectElement;
+    const options = Array.from(select.options).map((option) => option.text);
+    const beforeIds = new URL(window.location.href).searchParams.get("ids");
+
+    expect(summary).toHaveTextContent("DuckDB leads by 10.00x on power score.");
+    expect(options).toEqual(["DuckDB", "SQLite", "PostgreSQL"]);
+    expect(screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section")).toHaveTextContent(
+      "4 comparisons",
+    );
+
+    fireEvent.change(select, { target: { value: "2" } });
+
+    const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    expect(select.value).toBe("2");
+    expect(queryDiff).toHaveTextContent("Baseline: PostgreSQL");
+    expect(queryDiff).toHaveTextContent("DuckDB");
+    expect(queryDiff).toHaveTextContent("SQLite");
+    expect(new URL(window.location.href).searchParams.get("ids")).toBe(beforeIds);
   });
 
   it("renders severe cohort mismatches with guardrails and no winner claim", async () => {

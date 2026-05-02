@@ -109,7 +109,11 @@ work:
   - id: w6
     summary: "Add tests for summary math, baseline selection, and guardrails"
     needs: [w1, w2, w3, w4, w5]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+      - "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
     notes: |
       Extend Compare.test.tsx with same-cohort, mismatched-cohort, missing-query,
       multi-result, and baseline-switch cases. Include no-cost and normalized

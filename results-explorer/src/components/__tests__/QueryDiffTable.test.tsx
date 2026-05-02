@@ -113,6 +113,44 @@ describe("buildQueryDiffRows", () => {
     });
     expect(rows.some((row) => row.candidateResultId === "baseline")).toBe(false);
   });
+
+  it("builds one query row per non-baseline candidate for multi-result compares", () => {
+    const rows = buildQueryDiffRows([
+      makeResult({
+        result_id: "baseline",
+        display_timings: [
+          { query_id: "Q1", display_ms: 10, sample_count: 3 },
+          { query_id: "Q2", display_ms: 20, sample_count: 3 },
+        ],
+      }),
+      makeResult({
+        result_id: "candidate-a",
+        platform: "SQLite",
+        platform_id: "sqlite",
+        display_timings: [
+          { query_id: "Q1", display_ms: 20, sample_count: 3 },
+          { query_id: "Q2", display_ms: 40, sample_count: 3 },
+        ],
+      }),
+      makeResult({
+        result_id: "candidate-b",
+        platform: "PostgreSQL",
+        platform_id: "postgresql",
+        display_timings: [
+          { query_id: "Q1", display_ms: 5, sample_count: 3 },
+          { query_id: "Q2", display_ms: 10, sample_count: 3 },
+        ],
+      }),
+    ]);
+
+    expect(rows).toHaveLength(4);
+    expect(rows.map((row) => `${row.queryId}:${row.candidateResultId}`)).toEqual([
+      "Q1:candidate-a",
+      "Q1:candidate-b",
+      "Q2:candidate-a",
+      "Q2:candidate-b",
+    ]);
+  });
 });
 
 describe("QueryDiffTable", () => {
@@ -137,6 +175,7 @@ describe("QueryDiffTable", () => {
     const table = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
     expect(table).not.toBeNull();
     expect(table).toHaveTextContent("Baseline: DuckDB");
+    expect(table).toHaveTextContent("3 comparisons");
     expect(table).toHaveTextContent("Q1");
     expect(table).toHaveTextContent("SQLite");
     expect(table).toHaveTextContent("2.00x");
@@ -145,5 +184,6 @@ describe("QueryDiffTable", () => {
     expect(table).toHaveTextContent("0.50x");
     expect(table).toHaveTextContent("-10 ms");
     expect(table).toHaveTextContent("Faster");
+    expect(table).toHaveTextContent("Missing");
   });
 });
