@@ -196,7 +196,7 @@ work:
 - id: w11
   summary: "Normalize ClickHouse Cloud metadata"
   needs: [w1, w5]
-  status: pending
+  status: done
   notes: |
     Map ClickHouse Cloud requested config and any observed service metadata
     into the new contract: managed deployment, auth mode, service endpoint,

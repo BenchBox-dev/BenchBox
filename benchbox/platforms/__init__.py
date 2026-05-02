@@ -1347,6 +1347,30 @@ try:
             default="default",
         ),
         PlatformOptionSpec(
+            name="region",
+            help="ClickHouse Cloud service region when it cannot be inferred from the host",
+        ),
+        PlatformOptionSpec(
+            name="cloud_provider",
+            help="ClickHouse Cloud provider when it cannot be inferred from the host",
+        ),
+        PlatformOptionSpec(
+            name="service_id",
+            help="ClickHouse Cloud service identifier for result metadata",
+        ),
+        PlatformOptionSpec(
+            name="service_name",
+            help="ClickHouse Cloud service display name for result metadata",
+        ),
+        PlatformOptionSpec(
+            name="service_tier",
+            help="ClickHouse Cloud service tier for result metadata",
+        ),
+        PlatformOptionSpec(
+            name="compute_size",
+            help="ClickHouse Cloud requested compute size for result metadata",
+        ),
+        PlatformOptionSpec(
             name="oauth_token",
             help="OAuth token for keyless authentication (alternative to password)",
         ),
