@@ -110,6 +110,14 @@ const DATE_WINDOW_DAYS: Record<Exclude<DateWindowFacet, "all">, number> = {
   "365d": 365,
 };
 const LEGACY_ALL_SENTINEL_KEYS = new Set<FacetKey>(["phase", "tuning_mode", "trust_tier"]);
+const FACET_FILTER_COLUMNS = {
+  deployment_class: "deployment_class",
+  cloud_provider: "cloud_provider",
+  cloud_region: "cloud_region",
+  instance_or_warehouse: "instance_or_warehouse",
+  storage_format: "storage_format",
+  cost_status: "cost_status",
+} as const satisfies Partial<Record<FacetKey, string>>;
 
 const multiValueSerde: UrlSerde<string[]> = {
   encode: (values) => normalizeStringList(values).join(","),
@@ -287,17 +295,12 @@ export function facetsToWhereClause(
   addNullableSentinelClause("tuning_mode", facets.tuning_mode, "untuned", clauses, params);
   addListClause("trust_label", facets.trust_tier, clauses, params);
   addListClause("validation_status", facets.validation_status, clauses, params);
-  addDeploymentClause(facets.deployment_class, clauses, params);
-  addListClause("cloud_provider", facets.cloud_provider, clauses, params);
-  addListClause("cloud_region", facets.cloud_region, clauses, params);
-  addListClause(
-    "COALESCE(instance_type, warehouse_size, cluster_size)",
-    facets.instance_or_warehouse,
-    clauses,
-    params,
-  );
-  addListClause("storage_format", facets.storage_format, clauses, params);
-  addListClause("cost_status", facets.cost_status, clauses, params);
+  addListClause(FACET_FILTER_COLUMNS.deployment_class, facets.deployment_class, clauses, params);
+  addListClause(FACET_FILTER_COLUMNS.cloud_provider, facets.cloud_provider, clauses, params);
+  addListClause(FACET_FILTER_COLUMNS.cloud_region, facets.cloud_region, clauses, params);
+  addListClause(FACET_FILTER_COLUMNS.instance_or_warehouse, facets.instance_or_warehouse, clauses, params);
+  addListClause(FACET_FILTER_COLUMNS.storage_format, facets.storage_format, clauses, params);
+  addListClause(FACET_FILTER_COLUMNS.cost_status, facets.cost_status, clauses, params);
 
   const cutoff = dateWindowCutoffIso(facets.date_window, options.now);
   if (cutoff !== null) {
@@ -447,31 +450,6 @@ function addNullableSentinelClause(
     subclauses.push(`${column} IS NULL`);
   }
   if (subclauses.length > 0) clauses.push(`(${subclauses.join(" OR ")})`);
-}
-
-function addDeploymentClause(
-  values: readonly string[],
-  clauses: string[],
-  params: unknown[],
-) {
-  const deploymentClauses: string[] = [];
-  const deploymentParams: unknown[] = [];
-
-  for (const value of values) {
-    if (value === "cloud") {
-      deploymentClauses.push("cloud_provider IS NOT NULL");
-    } else if (value === "local") {
-      deploymentClauses.push("cost_status = ?");
-      deploymentParams.push("not_applicable_local");
-    } else if (value === "unavailable") {
-      deploymentClauses.push("cost_status = ?");
-      deploymentParams.push("unavailable");
-    }
-  }
-
-  if (deploymentClauses.length === 0) return;
-  clauses.push(`(${deploymentClauses.join(" OR ")})`);
-  params.push(...deploymentParams);
 }
 
 function dateWindowCutoffIso(value: DateWindowFacet, now = new Date()): string | null {

@@ -55,7 +55,7 @@ work:
 - id: w2
   summary: "Migrate facetModel.ts onto normalized contract fields"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Rewrite serializer/parser pairs and the `facetsToWhereClause` helper
     to read from normalized contract columns. Delete per-adapter fallback
