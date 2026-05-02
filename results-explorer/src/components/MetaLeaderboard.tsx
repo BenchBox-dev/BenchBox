@@ -7,6 +7,13 @@ import { fmtGeomean, fmtScore, humanizeBenchmark } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 
 export type MetaLeaderboardMode = "times" | "ranks" | "speedup";
+type MetaLeaderboardSort = "avg_rank" | "coverage" | "best_rank" | "recent_activity";
+
+interface MetaResultMetadata {
+  trust_label: string;
+  validation_status?: string | null;
+  run_date?: string | null;
+}
 
 interface MetaLeaderboardProps {
   data: MetaLeaderboardData;
@@ -14,7 +21,7 @@ interface MetaLeaderboardProps {
   onModeChange: (mode: MetaLeaderboardMode) => void;
   cohortHref?: (cohort: MetaCohort) => string;
   platformHref?: (platformId: string) => string;
-  resultMetadataById?: ReadonlyMap<string, { trust_label: string; validation_status?: string | null }>;
+  resultMetadataById?: ReadonlyMap<string, MetaResultMetadata>;
 }
 
 const MODE_LABELS: Record<MetaLeaderboardMode, string> = {
@@ -22,6 +29,15 @@ const MODE_LABELS: Record<MetaLeaderboardMode, string> = {
   ranks: "Ranks",
   speedup: "Speedup",
 };
+const AVG_RANK_LABEL = "Avg rank over covered cohorts";
+const COVERAGE_POLICY_COPY = "Missing cohorts are not scored; coverage is shown separately.";
+const SORT_LABELS: Record<MetaLeaderboardSort, string> = {
+  avg_rank: AVG_RANK_LABEL,
+  coverage: "Coverage",
+  best_rank: "Best cohort",
+  recent_activity: "Recent",
+};
+const MISSING_COHORT_TITLE = `No published run for this cohort. ${COVERAGE_POLICY_COPY}`;
 
 export function MetaLeaderboard({
   data,
@@ -35,6 +51,7 @@ export function MetaLeaderboard({
   const gridRef = useRef<HTMLTableElement>(null);
   const [focusPos, setFocusPos] = useState({ row: 0, col: 0 });
   const [announcement, setAnnouncement] = useState("");
+  const [sortKey, setSortKey] = useState<MetaLeaderboardSort>("avg_rank");
 
   const columnMins = useMemo(() => {
     const mins = new Map<string, number | null>();
@@ -46,6 +63,14 @@ export function MetaLeaderboard({
     }
     return mins;
   }, [cohorts, mode, platforms]);
+
+  const sortedPlatforms = useMemo(
+    () =>
+      [...platforms].sort((a, b) =>
+        comparePlatforms(a, b, sortKey, cohorts, resultMetadataById),
+      ),
+    [cohorts, platforms, resultMetadataById, sortKey],
+  );
 
   if (platforms.length === 0 || cohorts.length === 0) return null;
 
@@ -60,7 +85,7 @@ export function MetaLeaderboard({
         nextCol = Math.max(colIdx - 1, 0);
         break;
       case "ArrowDown":
-        nextRow = Math.min(rowIdx + 1, platforms.length - 1);
+        nextRow = Math.min(rowIdx + 1, sortedPlatforms.length - 1);
         break;
       case "ArrowUp":
         nextRow = Math.max(rowIdx - 1, 0);
@@ -75,7 +100,7 @@ export function MetaLeaderboard({
         nextRow = 0;
         break;
       case "PageDown":
-        nextRow = platforms.length - 1;
+        nextRow = sortedPlatforms.length - 1;
         break;
       case "Enter":
       case " ": {
@@ -83,7 +108,7 @@ export function MetaLeaderboard({
         // Activation matches the row's mouse-click target (platform page), so
         // keyboard and pointer paths navigate to the same destination. The
         // column's cohort link is reachable via Tab on the header row.
-        const platform = platforms[rowIdx];
+        const platform = sortedPlatforms[rowIdx];
         if (platform) route(platformHref(platform.platform_id));
         return;
       }
@@ -120,21 +145,49 @@ export function MetaLeaderboard({
             Absolute values, ranks, or speedup-vs-cohort-best across the visible cohorts.
           </p>
         </div>
-        <div class="flex overflow-hidden rounded-md border border-gray-300 text-sm">
-          {(["times", "ranks", "speedup"] as const).map((value) => (
-            <button
-              key={value}
-              class={`px-3 py-1.5 ${
-                mode === value
-                  ? "bg-brand-600 text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-              onClick={() => onModeChange(value)}
-              aria-pressed={mode === value}
-            >
-              {MODE_LABELS[value]}
-            </button>
-          ))}
+        <div class="flex flex-wrap items-center gap-2">
+          <div
+            role="group"
+            class="flex overflow-hidden rounded-md border border-gray-300 text-sm"
+            aria-label="Sort leaderboard"
+          >
+            {(Object.keys(SORT_LABELS) as MetaLeaderboardSort[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                class={`px-3 py-1.5 ${
+                  sortKey === value
+                    ? "bg-gray-900 text-white"
+                    : "bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+                onClick={() => setSortKey(value)}
+                aria-pressed={sortKey === value}
+              >
+                {SORT_LABELS[value]}
+              </button>
+            ))}
+          </div>
+          <div
+            role="group"
+            class="flex overflow-hidden rounded-md border border-gray-300 text-sm"
+            aria-label="Display mode"
+          >
+            {(["times", "ranks", "speedup"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                class={`px-3 py-1.5 ${
+                  mode === value
+                    ? "bg-brand-600 text-white"
+                    : "bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+                onClick={() => onModeChange(value)}
+                aria-pressed={mode === value}
+              >
+                {MODE_LABELS[value]}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -168,30 +221,39 @@ export function MetaLeaderboard({
               <th
                 scope="col"
                 class="table-th whitespace-nowrap text-gray-700"
-                title="Average rank across visible cohorts"
+                title={`Average rank over cohorts where the platform has a published run. ${COVERAGE_POLICY_COPY}`}
               >
-                Avg rank
+                {AVG_RANK_LABEL}
               </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            {platforms.map((platform, rowIdx) => (
+            {sortedPlatforms.map((platform, rowIdx) => (
               <tr
                 key={platform.platform_id}
                 class="cursor-pointer hover:bg-gray-50"
                 onClick={() => route(platformHref(platform.platform_id))}
               >
                 <td class="table-td sticky left-0 z-10 bg-white font-medium text-gray-900">
-                  <a
-                    href={platformHref(platform.platform_id)}
-                    class="no-underline hover:text-brand-600"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {platform.platform}
-                  </a>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <a
+                      href={platformHref(platform.platform_id)}
+                      class="no-underline hover:text-brand-600"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {platform.platform}
+                    </a>
+                    <span
+                      class="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[11px] font-medium text-gray-500"
+                      title={`Covered cohorts in the current leaderboard view. ${COVERAGE_POLICY_COPY}`}
+                    >
+                      {platform.n_cohorts}/{cohorts.length} cohorts
+                    </span>
+                  </div>
                 </td>
                 {cohorts.map((cohort, colIdx) => {
                   const rank = platform.ranks[cohort.key];
+                  const missing = rank === undefined;
                   const shadeMetric = cellShadeMetric(rank, mode, cohort);
                   const minInCol = columnMins.get(cohort.key) ?? null;
                   const hue = shadeMetric !== null ? colorForCell(shadeMetric, minInCol) : null;
@@ -215,8 +277,11 @@ export function MetaLeaderboard({
                       aria-colindex={colIdx + 1}
                       aria-rowindex={rowIdx + 1}
                       aria-label={text}
+                      title={missing ? MISSING_COHORT_TITLE : undefined}
                       class={`table-td text-center font-mono ${
                         hue !== null ? "meta-heatmap-cell" : ""
+                      } ${
+                        missing ? "bg-gray-50 text-gray-400" : ""
                       } ${active ? "ring-2 ring-brand-500 ring-inset" : ""}`}
                       style={cellStyle}
                       tabIndex={active ? 0 : -1}
@@ -248,8 +313,20 @@ export function MetaLeaderboard({
                     </td>
                   );
                 })}
-                <td class="table-td text-center font-mono font-semibold text-gray-700">
-                  {platform.avg_rank !== null ? platform.avg_rank.toFixed(1) : <span class="text-gray-300">-</span>}
+                <td
+                  class="table-td text-center font-mono font-semibold text-gray-700"
+                  title={`${AVG_RANK_LABEL}: ${platform.n_cohorts}/${cohorts.length}. ${COVERAGE_POLICY_COPY}`}
+                >
+                  {platform.avg_rank !== null ? (
+                    <>
+                      <span>{platform.avg_rank.toFixed(1)}</span>
+                      <span class="mt-0.5 block text-[11px] font-normal text-gray-400">
+                        over {platform.n_cohorts}/{cohorts.length}
+                      </span>
+                    </>
+                  ) : (
+                    <span class="text-gray-300">No score</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -268,7 +345,7 @@ export function MetaLeaderboard({
           </p>
           <p>
             <strong>Ranks</strong> keeps the original meta-leaderboard contract: 1 = best in the
-            cohort, and missing cohorts are excluded from average-rank math.
+            cohort. {COVERAGE_POLICY_COPY}
           </p>
           <p>
             <strong>Speedup</strong> normalizes every cell to the cohort best, where 1.00x is
@@ -296,7 +373,7 @@ function renderCellValue(
   cohort: MetaCohort,
   mode: MetaLeaderboardMode,
 ) {
-  if (!rank) return <span class="text-gray-300">-</span>;
+  if (!rank) return <span class="text-gray-400">No run</span>;
   const text = cellText(rank, cohort, mode);
   if (mode === "ranks") {
     return (
@@ -331,7 +408,93 @@ function describeCell(
   rank: MetaRank | undefined,
   mode: MetaLeaderboardMode,
 ): string {
-  if (!rank) return `${platform.platform} did not run ${cohort.label}`;
+  if (!rank) {
+    return `${platform.platform} has no published run for ${cohort.label}. ${COVERAGE_POLICY_COPY}`;
+  }
   const text = cellText(rank, cohort, mode);
   return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}`;
+}
+
+function comparePlatforms(
+  a: MetaPlatform,
+  b: MetaPlatform,
+  sortKey: MetaLeaderboardSort,
+  cohorts: MetaCohort[],
+  resultMetadataById?: ReadonlyMap<string, MetaResultMetadata>,
+): number {
+  const byName = () => a.platform.localeCompare(b.platform);
+
+  if (sortKey === "coverage") {
+    return (
+      b.n_cohorts - a.n_cohorts ||
+      compareNullableNumber(a.avg_rank, b.avg_rank, "asc") ||
+      byName()
+    );
+  }
+
+  if (sortKey === "best_rank") {
+    return (
+      compareNullableNumber(bestRank(a), bestRank(b), "asc") ||
+      compareNullableNumber(a.avg_rank, b.avg_rank, "asc") ||
+      byName()
+    );
+  }
+
+  if (sortKey === "recent_activity") {
+    const aDate = latestRunDate(a, cohorts, resultMetadataById);
+    const bDate = latestRunDate(b, cohorts, resultMetadataById);
+    return compareNullableString(aDate, bDate, "desc") || byName();
+  }
+
+  return compareNullableNumber(a.avg_rank, b.avg_rank, "asc") || byName();
+}
+
+function bestRank(platform: MetaPlatform): number | null {
+  const ranks = Object.values(platform.ranks)
+    .map((rank) => rank.rank)
+    .filter((rank): rank is number => Number.isFinite(rank));
+  return ranks.length > 0 ? Math.min(...ranks) : null;
+}
+
+function latestRunDate(
+  platform: MetaPlatform,
+  cohorts: MetaCohort[],
+  resultMetadataById?: ReadonlyMap<string, MetaResultMetadata>,
+): string | null {
+  if (!resultMetadataById) return null;
+
+  let latest: string | null = null;
+  for (const cohort of cohorts) {
+    for (const result of cohort.platforms ?? []) {
+      if (result.platform_id !== platform.platform_id) continue;
+      const runDate = resultMetadataById.get(result.result_id)?.run_date;
+      if (!runDate) continue;
+      if (latest === null || runDate.localeCompare(latest) > 0) {
+        latest = runDate;
+      }
+    }
+  }
+  return latest;
+}
+
+function compareNullableNumber(
+  a: number | null,
+  b: number | null,
+  direction: "asc" | "desc",
+): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return direction === "asc" ? a - b : b - a;
+}
+
+function compareNullableString(
+  a: string | null,
+  b: string | null,
+  direction: "asc" | "desc",
+): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return direction === "asc" ? a.localeCompare(b) : b.localeCompare(a);
 }

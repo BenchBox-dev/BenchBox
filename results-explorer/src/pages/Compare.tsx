@@ -147,7 +147,9 @@ export function Compare(_: RoutableProps) {
     if (!hasLongForm) return;
     toShortIds(ids)
       .then((shortIds) => {
-        history.replaceState(null, "", `/results/compare?ids=${shortIds.join(",")}`);
+        const params = new URLSearchParams(window.location.search);
+        params.set("ids", shortIds.join(","));
+        history.replaceState(null, "", `/results/compare?${params.toString()}`);
       })
       .catch(() => {
         /* silently skip - non-critical */

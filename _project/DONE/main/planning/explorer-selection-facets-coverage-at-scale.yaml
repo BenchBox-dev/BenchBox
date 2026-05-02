@@ -2,7 +2,8 @@ id: explorer-selection-facets-coverage-at-scale
 title: "Explorer: selection-oriented facets and coverage signals for large public corpus"
 worktree: main
 priority: High
-status: "Not Started"
+status: Completed
+completed_date: "2026-05-02"
 category: "Core Functionality"
 
 deps:
@@ -25,7 +26,10 @@ description: |
 work:
   - id: w1
     summary: "Define shared facet model and URL contract in lib/facetModel.ts"
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/facetModel.ts"
+      - "results-explorer/src/lib/__tests__/facetModel.test.ts"
     notes: |
       Add `results-explorer/src/lib/facetModel.ts` exporting:
         - a `FacetKey` union (benchmark, scale_factor, phase, platform,
@@ -41,7 +45,12 @@ work:
   - id: w2
     summary: "Migrate Home page to shared facet model"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/facetModel.ts"
+      - "results-explorer/src/lib/duckdbQueries.ts"
+      - "results-explorer/src/pages/Home.tsx"
+      - "results-explorer/src/pages/__tests__/Home.test.tsx"
     notes: |
       Replace Home-local filter state with `useFacetState()`. URL must round-trip
       benchmark, scale_factor, phase, platform, deployment_class, cost_status.
@@ -51,7 +60,10 @@ work:
   - id: w3
     summary: "Migrate BenchmarkIndex page to shared facet model"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/BenchmarkIndex.tsx"
+      - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
     notes: |
       Same migration shape as w2; restrict default facets to those meaningful
       for a single-benchmark page (scale_factor, phase, platform, tuning_mode,
@@ -61,7 +73,12 @@ work:
   - id: w4
     summary: "Migrate PlatformIndex page to shared facet model"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/duckdbQueries.ts"
+      - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+      - "results-explorer/src/pages/PlatformIndex.tsx"
+      - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
     notes: |
       Default facets: benchmark, scale_factor, phase, deployment_class,
       cloud_provider, cloud_region, cost_status, date_window. Preserve cohort
@@ -70,7 +87,16 @@ work:
   - id: w5
     summary: "Migrate Compare and Query pages to shared facet model"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/facetModel.ts"
+      - "results-explorer/src/lib/__tests__/facetModel.test.ts"
+      - "results-explorer/src/lib/queryFilters.ts"
+      - "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+      - "results-explorer/src/pages/Compare.tsx"
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      - "results-explorer/src/pages/Query.tsx"
+      - "results-explorer/src/pages/__tests__/Query.test.tsx"
     notes: |
       Compare uses facets to bound the candidate-result picker. Query Workbench
       surfaces facets as starter-query toggles plus a column picker hint.
@@ -78,7 +104,10 @@ work:
   - id: w6
     summary: "Add FacetRail desktop component and FacetDrawer mobile shell"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/FacetRail.tsx"
+      - "results-explorer/src/components/__tests__/FacetRail.test.tsx"
     notes: |
       THIS ITEM OWNS the FacetDrawer component. The downstream
       `explorer-mobile-density-responsive-tables` item styles the drawer for
@@ -90,7 +119,13 @@ work:
   - id: w7
     summary: "Represent missing cohort coverage explicitly in MetaLeaderboard and benchmark matrices"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/MetaLeaderboard.tsx"
+      - "results-explorer/src/components/QueryHeatmap.tsx"
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
     notes: |
       In MetaLeaderboard, missing platform/cohort cells should render as a muted
       "No run" state with a tooltip explaining that missing coverage is not
@@ -100,7 +135,10 @@ work:
   - id: w8
     summary: "Change aggregate labels to 'Avg rank over covered cohorts' and expose coverage denominator"
     needs: [w7]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/MetaLeaderboard.tsx"
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
     notes: |
       The label must make the no-penalty coverage policy explicit. Tooltips
       should say: "Missing cohorts are not scored; coverage is shown separately."
@@ -110,7 +148,10 @@ work:
   - id: w9
     summary: "Add coverage-aware empty states and reset affordances"
     needs: [w6, w7]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/Home.tsx"
+      - "results-explorer/src/pages/__tests__/Home.test.tsx"
     notes: |
       If a filter combination has no rows, show which facet combination removed
       all results and offer "Clear scale factor", "Clear platform", and
@@ -120,7 +161,10 @@ work:
   - id: w10
     summary: "Audit duckdbQueries/queryFilters for expensive scans and add memoization"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/duckdbQueries.ts"
+      - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
     notes: |
       Review `results-explorer/src/lib/duckdbQueries.ts` and `queryFilters.ts`
       for full scans on every filter change and repeated COUNT/DISTINCT calls.
@@ -130,7 +174,14 @@ work:
   - id: w11
     summary: "Add pagination/limit behavior for tables that can grow to thousands of rows"
     needs: [w2, w3, w4, w5]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/BenchmarkIndex.tsx"
+      - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+      - "results-explorer/src/pages/PlatformIndex.tsx"
+      - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+      - "results-explorer/src/pages/Query.tsx"
+      - "results-explorer/src/pages/__tests__/Query.test.tsx"
     notes: |
       Audit each migrated page's table renderer for unbounded row rendering.
       Add a default LIMIT (e.g. 200) plus "Show more" controls. Keep the result
@@ -140,7 +191,10 @@ work:
   - id: w12
     summary: "Add regression tests for URL persistence, coverage labels, and no-penalty ranking"
     needs: [w7, w8, w9, w10, w11]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      - "results-explorer/src/pages/__tests__/Home.test.tsx"
     notes: |
       Tests should cover:
         - URL state restores all primary facets.

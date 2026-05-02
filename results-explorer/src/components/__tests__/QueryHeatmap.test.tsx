@@ -3,7 +3,7 @@
  *
  * Cases:
  *   (a) Known timings produce stable color hue values
- *   (b) Null cells render "-" with aria-label="no data"
+ *   (b) Null cells render "No run" with an explicit missing-run aria-label
  *   (c) Single-platform matrix degrades gracefully (no heat coloring)
  *   (d) Empty platforms list shows empty-state message
  *
@@ -173,10 +173,10 @@ describe("QueryHeatmap rendering", () => {
   });
 
   // -----------------------------------------------------------------------
-  // (b) Null cells render "-"
+  // (b) Null cells render "No run"
   // -----------------------------------------------------------------------
 
-  it("null timing cell renders em-dash with no-data aria-label", () => {
+  it("null timing cell renders no-run copy with a missing-run aria-label", () => {
     const summary = makeSummary({
       platforms: [
         {
@@ -203,9 +203,10 @@ describe("QueryHeatmap rendering", () => {
       ],
     });
     const { container } = render(<QueryHeatmap summary={summary} />);
-    const cells = container.querySelectorAll('[aria-label="no data"]');
+    const cells = container.querySelectorAll('[aria-label="No published query run for DuckDB Q2"]');
     expect(cells.length).toBeGreaterThan(0);
-    expect(cells[0]?.textContent).toBe("-");
+    expect(cells[0]?.textContent).toBe("No run");
+    expect(cells[0]?.getAttribute("title")).toBe("No published run for this query/platform cell.");
   });
 
   // -----------------------------------------------------------------------

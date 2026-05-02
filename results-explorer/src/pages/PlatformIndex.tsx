@@ -1,8 +1,8 @@
 import { useEffect, useState } from "preact/hooks";
-import { useUrlState, stringSerde } from "@/lib/useUrlState";
 import type { RoutableProps } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 import { getPlatformIndexRows } from "@/lib/duckdbQueries";
+import { useFacetState, type DateWindowFacet, type FacetState } from "@/lib/facetModel";
 import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -19,6 +19,8 @@ interface PlatformIndexProps extends RoutableProps {
 
 type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score" | "geomean_ms";
 type TrendMetric = "power_score" | "display_geomean_ms";
+const TABLE_RENDER_LIMIT = 200;
+const TABLE_RENDER_INCREMENT = 200;
 
 interface TrendCohort {
   key: string;
@@ -31,7 +33,10 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const [rows, setRows] = useState<PlatformIndexRowRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [tuningFilter, setTuningFilter] = useUrlState<string>("tuning", "all", stringSerde);
+  const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
+  const { facets, setFacet } = useFacetState();
+  const tuningFilter = singleFacetValue(facets.tuning_mode) ?? "all";
+  const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
   // Default: geomean_ms ascending (fastest first), nulls last. The empty-state
   // ordering is observable behaviour — must_preserve in the parent TODO.
   const [sort, setSort] = useState<SortState<PlatformSortKey>>({
@@ -59,6 +64,28 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     };
   }, []);
 
+  useEffect(() => {
+    setVisibleLimit(TABLE_RENDER_LIMIT);
+  }, [
+    platform,
+    facets.benchmark,
+    facets.scale_factor,
+    facets.phase,
+    facets.execution_mode,
+    facets.tuning_mode,
+    facets.trust_tier,
+    facets.validation_status,
+    facets.deployment_class,
+    facets.cloud_provider,
+    facets.cloud_region,
+    facets.instance_or_warehouse,
+    facets.storage_format,
+    facets.cost_status,
+    facets.date_window,
+    sort.key,
+    sort.direction,
+  ]);
+
   if (error) return <ErrorMessage message={error} />;
   if (!rows) return <LoadingSpinner message="Loading results..." />;
 
@@ -72,8 +99,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     ...new Set(allPlatformResults.map((r) => r.tuning_mode).filter((m): m is string => m !== null)),
   ].sort();
 
-  const platformResultsRaw =
-    tuningFilter === "all" ? allPlatformResults : allPlatformResults.filter((r) => r.tuning_mode === tuningFilter);
+  const platformResultsRaw = allPlatformResults.filter((row) => matchesPlatformIndexFacets(row, facets));
   const trendCohorts = buildTrendCohorts(platformResultsRaw);
 
   const platformResults = [...platformResultsRaw].sort((a, b) => {
@@ -96,6 +122,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     if (bv === null) return -1;
     return dir * (av - bv);
   });
+  const visiblePlatformResults = platformResults.slice(0, visibleLimit);
 
   function toggleSort(key: PlatformSortKey) {
     setSort((prev) =>
@@ -178,9 +205,19 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       </div>
 
       {platformResults.length === 0 ? (
-        <p class="text-gray-500">No results found for platform: {platformDisplayName}.</p>
+        <p class="text-gray-500">
+          {allPlatformResults.length > 0 && hasActivePlatformResultFacets(facets)
+            ? `No results match the selected filters for platform: ${platformDisplayName}.`
+            : `No results found for platform: ${platformDisplayName}.`}
+        </p>
       ) : (
         <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+            <span>
+              Showing {visiblePlatformResults.length.toLocaleString()} of {platformResults.length.toLocaleString()} results
+            </span>
+            {selected.size > 0 && <span>{selected.size.toLocaleString()} selected for compare</span>}
+          </div>
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
@@ -247,7 +284,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 bg-white">
-              {platformResults.map((r) => (
+              {visiblePlatformResults.map((r) => (
                 <PlatformRow
                   key={r.result_id}
                   entry={r}
@@ -257,6 +294,17 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               ))}
             </tbody>
           </table>
+          {visiblePlatformResults.length < platformResults.length && (
+            <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                onClick={() => setVisibleLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
+              >
+                Show more results
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -283,6 +331,82 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       )}
     </div>
   );
+}
+
+function singleFacetValue(values: string[]): string | null {
+  return values.length === 1 ? (values[0] ?? null) : null;
+}
+
+function hasActivePlatformResultFacets(facets: FacetState): boolean {
+  return (
+    facets.benchmark.length > 0 ||
+    facets.scale_factor.length > 0 ||
+    facets.phase.length > 0 ||
+    facets.execution_mode.length > 0 ||
+    facets.tuning_mode.length > 0 ||
+    facets.trust_tier.length > 0 ||
+    facets.validation_status.length > 0 ||
+    facets.deployment_class.length > 0 ||
+    facets.cloud_provider.length > 0 ||
+    facets.cloud_region.length > 0 ||
+    facets.instance_or_warehouse.length > 0 ||
+    facets.storage_format.length > 0 ||
+    facets.cost_status.length > 0 ||
+    facets.date_window !== "all"
+  );
+}
+
+function matchesPlatformIndexFacets(row: PlatformIndexRowRow, facets: FacetState): boolean {
+  if (!matchesMultiFilter(row.benchmark, facets.benchmark)) return false;
+  if (!matchesMultiFilter(String(row.scale_factor), facets.scale_factor)) return false;
+  if (!matchesOptionalFilter(row.phase, facets.phase)) return false;
+  if (!matchesOptionalFilter(row.execution_mode, facets.execution_mode)) return false;
+  if (!matchesTuningFacet(row, facets.tuning_mode)) return false;
+  if (!matchesMultiFilter(row.trust_label, facets.trust_tier)) return false;
+  if (!matchesOptionalFilter(row.validation_status, facets.validation_status)) return false;
+  if (!matchesDeploymentFacet(row, facets.deployment_class)) return false;
+  if (!matchesOptionalFilter(row.cloud_provider, facets.cloud_provider)) return false;
+  if (!matchesOptionalFilter(row.cloud_region, facets.cloud_region)) return false;
+  if (!matchesOptionalFilter(rowShape(row), facets.instance_or_warehouse)) return false;
+  if (!matchesOptionalFilter(row.storage_format, facets.storage_format)) return false;
+  if (!matchesOptionalFilter(row.cost_status, facets.cost_status)) return false;
+  return matchesDateWindow(row.run_date, facets.date_window);
+}
+
+function matchesMultiFilter(value: string, selected: string[]): boolean {
+  return selected.length === 0 || selected.includes(value);
+}
+
+function matchesOptionalFilter(value: string | null | undefined, selected: string[]): boolean {
+  return selected.length === 0 || (value !== null && value !== undefined && selected.includes(value));
+}
+
+function matchesTuningFacet(row: PlatformIndexRowRow, selected: string[]): boolean {
+  return selected.length === 0 || selected.includes(row.tuning_mode ?? "untuned");
+}
+
+function matchesDeploymentFacet(row: PlatformIndexRowRow, selected: string[]): boolean {
+  if (selected.length === 0) return true;
+  const deployment = rowDeploymentClass(row);
+  return deployment !== null && selected.includes(deployment);
+}
+
+function rowDeploymentClass(row: PlatformIndexRowRow): string | null {
+  if (row.cloud_provider) return "cloud";
+  if (row.cost_status === "not_applicable_local") return "local";
+  if (row.cost_status === "unavailable") return "unavailable";
+  return null;
+}
+
+function rowShape(row: PlatformIndexRowRow): string | null {
+  return row.instance_type ?? row.warehouse_size ?? row.cluster_size ?? null;
+}
+
+function matchesDateWindow(runDate: string, windowValue: DateWindowFacet): boolean {
+  if (windowValue === "all") return true;
+  const days = Number(windowValue.replace("d", ""));
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return new Date(runDate).getTime() >= cutoff;
 }
 
 function buildTrendCohorts(rows: PlatformIndexRowRow[]): TrendCohort[] {

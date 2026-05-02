@@ -23,6 +23,7 @@ vi.mock("@/db", () => ({
 }));
 
 import { queryRows } from "@/db";
+import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
 import { BenchmarkIndex } from "@/pages/BenchmarkIndex";
 
 // ---------------------------------------------------------------------------
@@ -52,6 +53,14 @@ const RESULT_ROWS = [
     test_type: "power",
     validation_status: "exact",
     cost_usd: null,
+    normalized_cost_usd: 1.25,
+    cost_status: "normalized",
+    cost_scope: "compute_only",
+    cost_model_version: "2026.05.0",
+    cloud_provider: "aws",
+    cloud_region: "us-east-1",
+    warehouse_size: "MEDIUM",
+    storage_format: "parquet",
     compliance_class: null,
     is_ranking_eligible: true,
     has_plans: false,
@@ -80,6 +89,14 @@ const RESULT_ROWS = [
     test_type: "power",
     validation_status: "loose",
     cost_usd: null,
+    normalized_cost_usd: null,
+    cost_status: "not_applicable_local",
+    cost_scope: null,
+    cost_model_version: null,
+    cloud_provider: null,
+    cloud_region: null,
+    warehouse_size: null,
+    storage_format: null,
     compliance_class: null,
     is_ranking_eligible: false,
     has_plans: false,
@@ -108,6 +125,14 @@ const RANKING_ROWS = [
     display_geomean_ms: 10,
     sample_geomean_ms: 12,
     cost_usd: null,
+    normalized_cost_usd: 1.25,
+    cost_status: "normalized",
+    cost_scope: "compute_only",
+    cost_model_version: "2026.05.0",
+    cloud_provider: "aws",
+    cloud_region: "us-east-1",
+    warehouse_size: "MEDIUM",
+    storage_format: "parquet",
     primary_metric: "power_score",
     primary_order: "desc",
     rank: 1,
@@ -136,6 +161,14 @@ const RANKING_ROWS = [
     display_geomean_ms: 200,
     sample_geomean_ms: 220,
     cost_usd: null,
+    normalized_cost_usd: null,
+    cost_status: "not_applicable_local",
+    cost_scope: null,
+    cost_model_version: null,
+    cloud_provider: null,
+    cloud_region: null,
+    warehouse_size: null,
+    storage_format: null,
     primary_metric: "power_score",
     primary_order: "desc",
     rank: 2,
@@ -234,6 +267,8 @@ function defaultImpl(rows: typeof RESULT_ROWS, rankings: typeof RANKING_ROWS, ce
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  clearDuckdbQueryCachesForTests();
   window.history.replaceState(null, "", "/results/tpch/");
   vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS));
 });
@@ -300,6 +335,37 @@ describe("BenchmarkIndex", () => {
     expect(screen.getByText("loose")).toBeTruthy();
   });
 
+  it("restores benchmark URL facets without letting cohort facets block option recovery", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/results/tpch/?sf=0.1&phase=power&platform=duckdb&deployment=cloud&cost_status=normalized",
+    );
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+    expect(screen.queryByText("SQLite")).toBeNull();
+
+    const resultCall = vi
+      .mocked(queryRows)
+      .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT * FROM bench.results WHERE"));
+    const resultSql = String(resultCall?.[0]);
+    expect(resultSql).toContain("benchmark IN (?)");
+    expect(resultSql).toContain("(platform IN (?) OR platform_id IN (?))");
+    expect(resultSql).toContain("cloud_provider IS NOT NULL");
+    expect(resultSql).toContain("cost_status IN (?)");
+    expect(resultSql).not.toContain("scale_factor IN (?)");
+    expect(resultSql).not.toContain("test_type IN (?)");
+    expect(resultCall?.[1]).toEqual(["tpch", "duckdb", "duckdb", "normalized"]);
+
+    const rankingCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
+      String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
+    );
+    expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "power"]);
+  });
+
   // -----------------------------------------------------------------------
   // (c) List view toggle
   // -----------------------------------------------------------------------
@@ -327,6 +393,30 @@ describe("BenchmarkIndex", () => {
     expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
     fireEvent.click(screen.getByRole("button", { name: /Geomean/ }));
     expect(getRenderedResultOrder(container)).toEqual(["r2", "r1"]);
+  });
+
+  it("list view caps rendered rows and expands them with Show more", async () => {
+    const manyRows = Array.from({ length: 205 }, (_, index) => ({
+      ...RESULT_ROWS[0]!,
+      result_id: `r-list-${index}`,
+      platform: `DuckDB ${index}`,
+      platform_id: `duckdb-${index}`,
+      display_geomean_ms: index + 1,
+      geomean_ms: index + 1,
+    }));
+    vi.mocked(queryRows).mockImplementation(defaultImpl(manyRows, RANKING_ROWS, CELL_ROWS));
+
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+    fireEvent.click(screen.getByText("List"));
+
+    await waitFor(() => expect(screen.getByText("Showing 200 of 205 results for SF 0.1")).toBeTruthy());
+    expect(getRenderedResultOrder(container)).toHaveLength(200);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show more results" }));
+
+    expect(getRenderedResultOrder(container)).toHaveLength(205);
+    expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------

@@ -9,6 +9,7 @@
  */
 
 import { queryRows } from "@/db";
+import type { FacetWhereClause } from "@/lib/facetModel";
 import type {
   BenchmarkSummary,
   CostDeploymentFields,
@@ -181,8 +182,34 @@ export interface MetaLeaderboardRow {
 // Helpers
 // ---------------------------------------------------------------------------
 
-export async function listResults(): Promise<ResultRow[]> {
-  return queryRows<ResultRow>("SELECT * FROM bench.results ORDER BY run_date DESC");
+const RESULTS_SNAPSHOT_PATH = "/results/data/results.duckdb";
+const snapshotQueryCache = new Map<string, Promise<unknown>>();
+
+function currentSnapshotCacheKey(): string {
+  if (typeof window === "undefined") return RESULTS_SNAPSHOT_PATH;
+  return new URL(RESULTS_SNAPSHOT_PATH, window.location.origin).href;
+}
+
+function memoizedSnapshotQuery<T>(key: string, loader: () => Promise<T>): Promise<T> {
+  const cacheKey = `${currentSnapshotCacheKey()}\u0000${key}`;
+  const cached = snapshotQueryCache.get(cacheKey);
+  if (cached) return cached as Promise<T>;
+
+  const promise = loader().catch((error: unknown) => {
+    snapshotQueryCache.delete(cacheKey);
+    throw error;
+  });
+  snapshotQueryCache.set(cacheKey, promise);
+  return promise;
+}
+
+export function clearDuckdbQueryCachesForTests() {
+  snapshotQueryCache.clear();
+}
+
+export async function listResults(where: FacetWhereClause = { sql: "", params: [] }): Promise<ResultRow[]> {
+  const sql = `SELECT * FROM bench.results ${where.sql} ORDER BY run_date DESC`;
+  return where.params.length > 0 ? queryRows<ResultRow>(sql, where.params) : queryRows<ResultRow>(sql);
 }
 
 export async function getResultDetailMetrics(resultId: string): Promise<ResultDetailMetricsRow | null> {
@@ -369,6 +396,17 @@ export async function getBenchmarkSummaryFromDuckDB(
   scaleFactor: number,
   phase: string,
 ): Promise<BenchmarkSummary | null> {
+  return memoizedSnapshotQuery(
+    `benchmark-summary:${benchmark}\u0000${scaleFactor}\u0000${phase}`,
+    () => loadBenchmarkSummaryFromDuckDB(benchmark, scaleFactor, phase),
+  );
+}
+
+async function loadBenchmarkSummaryFromDuckDB(
+  benchmark: string,
+  scaleFactor: number,
+  phase: string,
+): Promise<BenchmarkSummary | null> {
   const [rankingRows, cellRows] = await Promise.all([
     getBenchmarkRanking(benchmark, scaleFactor, phase),
     getBenchmarkMatrixCells(benchmark, scaleFactor, phase),
@@ -462,6 +500,13 @@ export async function getBenchmarkSummaryFromDuckDB(
 }
 
 export async function getPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow[]> {
+  return memoizedSnapshotQuery(
+    `platform-index:${platformId ?? "*"}`,
+    () => loadPlatformIndexRows(platformId),
+  );
+}
+
+function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow[]> {
   const sql =
     "SELECT" +
     " r.result_id," +
@@ -483,6 +528,21 @@ export async function getPlatformIndexRows(platformId?: string): Promise<Platfor
     " r.execution_mode," +
     " r.compliance_class," +
     " r.cost_usd," +
+    " r.normalized_cost_usd," +
+    " r.cost_model_version," +
+    " r.cost_model_source," +
+    " r.cost_scope," +
+    " r.cost_status," +
+    " r.billing_unit," +
+    " r.pricing_region," +
+    " r.cloud_provider," +
+    " r.cloud_region," +
+    " r.instance_type," +
+    " r.warehouse_size," +
+    " r.node_count," +
+    " r.cluster_size," +
+    " r.storage_format," +
+    " r.storage_tier," +
     " COALESCE(br.primary_metric, CASE WHEN r.power_score IS NOT NULL THEN 'power_score' ELSE 'display_geomean_ms' END)" +
     " AS primary_metric" +
     " FROM bench.results r" +
@@ -490,26 +550,31 @@ export async function getPlatformIndexRows(platformId?: string): Promise<Platfor
   if (platformId === undefined) {
     return queryRows<PlatformIndexRowRow>(`${sql} ORDER BY r.run_date DESC`);
   }
-  return queryRows<PlatformIndexRowRow>(
-    `${sql} WHERE r.platform_id = ? ORDER BY r.run_date DESC`,
-    [platformId],
-  );
+  return queryRows<PlatformIndexRowRow>(`${sql} WHERE r.platform_id = ? ORDER BY r.run_date DESC`, [platformId]);
 }
 
 export async function getCohort(cohortKey: string): Promise<CohortMetadataRow[]> {
-  return queryRows<CohortMetadataRow>(
-    "SELECT * FROM bench.cohort_metadata" +
-      " WHERE cohort_key = ?" +
-      " ORDER BY rank NULLS LAST, platform_id, result_id",
-    [cohortKey],
+  return memoizedSnapshotQuery(
+    `cohort:${cohortKey}`,
+    () =>
+      queryRows<CohortMetadataRow>(
+        "SELECT * FROM bench.cohort_metadata" +
+          " WHERE cohort_key = ?" +
+          " ORDER BY rank NULLS LAST, platform_id, result_id",
+        [cohortKey],
+      ),
   );
 }
 
 export async function getMetaLeaderboard(): Promise<MetaLeaderboardRow[]> {
-  return queryRows<MetaLeaderboardRow>(
-    "SELECT platform_id, platform, avg_rank, n_cohorts" +
-      " FROM bench.meta_leaderboard" +
-      " ORDER BY avg_rank NULLS LAST, platform_id",
+  return memoizedSnapshotQuery(
+    "meta-leaderboard",
+    () =>
+      queryRows<MetaLeaderboardRow>(
+        "SELECT platform_id, platform, avg_rank, n_cohorts" +
+          " FROM bench.meta_leaderboard" +
+          " ORDER BY avg_rank NULLS LAST, platform_id",
+      ),
   );
 }
 
@@ -528,6 +593,10 @@ export async function getMetaLeaderboard(): Promise<MetaLeaderboardRow[]> {
  * stable regardless of variant ordering on disk.
  */
 export async function getMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
+  return memoizedSnapshotQuery("meta-leaderboard-data", loadMetaLeaderboardData);
+}
+
+async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
   const [platformRows, cohortRows] = await Promise.all([
     queryRows<MetaLeaderboardRow>(
       "SELECT platform_id, platform, avg_rank, n_cohorts" +

@@ -1,11 +1,11 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
-import type { BenchmarkSummary, SortDirection, SortState } from "@/types";
+import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getBenchmarkSummaryFromDuckDB, listResults } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
-import { useUrlState, stringSerde } from "@/lib/useUrlState";
+import { facetsToWhereClause, useFacetState, type DateWindowFacet, type FacetState } from "@/lib/facetModel";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -23,6 +23,8 @@ interface BenchmarkIndexProps extends RoutableProps {
 
 type ViewMode = "matrix" | "ranks" | "list";
 type BenchmarkListSortKey = "platform" | "scale_factor" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
+const TABLE_RENDER_LIMIT = 200;
+const TABLE_RENDER_INCREMENT = 200;
 
 const TRUST_LABEL_ABBREV: Record<string, string> = {
   "maintainer-run": "Maintainer",
@@ -44,13 +46,40 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Filter state - URL-synced so views are shareable.
-  const [_sfRaw, setSfRaw] = useUrlState<string>("sf", "", stringSerde);
-  const setScaleFilter = (v: string | null) => setSfRaw(v ?? "");
-  const [phaseFilter, setPhaseFilter] = useUrlState<string>("phase", "power", stringSerde);
-  const [tuningFilter, setTuningFilter] = useUrlState<string>("tuning", "all", stringSerde);
-  // Trust filter: null = "all tiers shown". When set, contains the set of
-  // trust_labels to include. Defaults to showing everything.
-  const [trustFilter, setTrustFilter] = useState<Set<string> | null>(null);
+  const { facets, setFacet } = useFacetState();
+  const requestedSf = singleFacetValue(facets.scale_factor);
+  const phaseFilter = singleFacetValue(facets.phase) ?? "power";
+  const tuningFilter = singleFacetValue(facets.tuning_mode) ?? "all";
+  const trustFilter = facets.trust_tier.length === 0 ? null : new Set(facets.trust_tier);
+  const benchmarkResultWhere = useMemo(
+    () =>
+      facetsToWhereClause({
+        ...facets,
+        benchmark: benchmark ? [benchmark] : [],
+        scale_factor: [],
+        phase: [],
+        tuning_mode: [],
+        trust_tier: [],
+      }),
+    [
+      benchmark,
+      facets.cloud_provider,
+      facets.cloud_region,
+      facets.cost_status,
+      facets.date_window,
+      facets.deployment_class,
+      facets.execution_mode,
+      facets.instance_or_warehouse,
+      facets.platform,
+      facets.storage_format,
+      facets.validation_status,
+    ],
+  );
+
+  const setScaleFilter = (value: string | null) => setFacet("scale_factor", value ? [value] : []);
+  const setPhaseFilter = (value: string) => setFacet("phase", value === "power" ? [] : [value]);
+  const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
+  const setTrustFilter = (value: Set<string> | null) => setFacet("trust_tier", value ? [...value].sort() : []);
 
   // View: matrix (default), ranks, or list
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
@@ -64,7 +93,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
   useEffect(() => {
     let cancelled = false;
-    listResults()
+    listResults(benchmarkResultWhere)
       .then((r) => {
         if (!cancelled) setResults(r);
       })
@@ -74,7 +103,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [benchmarkResultWhere]);
 
   // Derive available scale factors and phases from the loaded rows.
   const benchmarkResults = results?.filter((r) => r.benchmark === benchmark) ?? [];
@@ -86,15 +115,15 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   ].sort((a, b) => Number(a) - Number(b));
 
   const scaleFilter: string | null =
-    _sfRaw !== "" && scaleFactors.includes(_sfRaw) ? _sfRaw : null;
+    requestedSf !== null && scaleFactors.includes(requestedSf) ? requestedSf : null;
 
   // Set defaults once manifest loads.
   const effectiveSf = scaleFilter ?? scaleFactors[0] ?? "0.01";
 
   useEffect(() => {
-    if (!results || scaleFactors.length === 0 || _sfRaw === "" || _sfRaw === effectiveSf) return;
-    setSfRaw(effectiveSf);
-  }, [_sfRaw, effectiveSf, results, scaleFactors.length, setSfRaw]);
+    if (!results || scaleFactors.length === 0 || requestedSf === null || requestedSf === effectiveSf) return;
+    setScaleFilter(effectiveSf);
+  }, [effectiveSf, requestedSf, results, scaleFactors.length]);
 
   // Phases available for the *current* scale factor only - prevents requesting
   // a phase+SF combination that has no artifact (e.g. "power" for SF 0.01
@@ -180,6 +209,20 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         />
       );
     }
+    if (hasActiveBenchmarkResultFacets(facets)) {
+      return (
+        <div class="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
+          <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: humanizeBenchmark(benchmark) }]} />
+          <h1 class="mt-6 text-3xl font-bold text-gray-900">{humanizeBenchmark(benchmark)}</h1>
+          <p class="mt-4 text-lg text-gray-600">
+            No published results match the selected filters for {humanizeBenchmark(benchmark)}.
+          </p>
+          <a href={`/results/${benchmark}/`} class="mt-6 inline-block btn btn-primary no-underline">
+            Clear filters
+          </a>
+        </div>
+      );
+    }
     return (
       <div class="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
         <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: humanizeBenchmark(benchmark) }]} />
@@ -225,18 +268,14 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     ? {
         ...summaryWithResultMetadata,
         platforms: summaryWithResultMetadata.platforms.filter((p) => {
-          if (tuningFilter !== "all" && p.tuning_mode !== tuningFilter) return false;
-          if (trustFilter !== null && !trustFilter.has(p.trust_label)) return false;
-          return true;
+          return matchesFacetFields(p, facets);
         }),
       }
     : null;
   const historicalEntries = benchmarkResults.filter((result) => {
     if (String(result.scale_factor) !== effectiveSf) return false;
     if ((result.test_type ?? "power") !== effectivePhase) return false;
-    if (tuningFilter !== "all" && result.tuning_mode !== tuningFilter) return false;
-    if (trustFilter !== null && !trustFilter.has(result.trust_label)) return false;
-    return true;
+    return matchesFacetFields(result, facets);
   });
 
   // Build the Compare URL from selected result_ids.
@@ -455,7 +494,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
       {/* List view (mobile-friendly fallback) */}
       {viewMode === "list" && (
-        <ListTable benchmark={benchmark} results={results} scaleFactor={effectiveSf} tuningFilter={tuningFilter} trustFilter={trustFilter} />
+        <ListTable benchmark={benchmark} results={results} scaleFactor={effectiveSf} facets={facets} />
       )}
 
       {filteredSummary && viewMode !== "list" && (
@@ -496,6 +535,84 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Shared facet helpers for benchmark-scoped row and platform filtering.
+// ---------------------------------------------------------------------------
+
+function singleFacetValue(values: string[]): string | null {
+  return values.length === 1 ? (values[0] ?? null) : null;
+}
+
+function hasActiveBenchmarkResultFacets(facets: FacetState): boolean {
+  return (
+    facets.platform.length > 0 ||
+    facets.execution_mode.length > 0 ||
+    facets.validation_status.length > 0 ||
+    facets.deployment_class.length > 0 ||
+    facets.cloud_provider.length > 0 ||
+    facets.cloud_region.length > 0 ||
+    facets.instance_or_warehouse.length > 0 ||
+    facets.storage_format.length > 0 ||
+    facets.cost_status.length > 0 ||
+    facets.date_window !== "all"
+  );
+}
+
+function matchesFacetFields(row: ResultRow | PlatformRow, facets: FacetState): boolean {
+  if (!matchesPlatformFacet(row, facets.platform)) return false;
+  if (!matchesOptionalFilter(row.execution_mode, facets.execution_mode)) return false;
+  if (!matchesTuningFacet(row, facets.tuning_mode)) return false;
+  if (!matchesMultiFilter(row.trust_label, facets.trust_tier)) return false;
+  if (!matchesOptionalFilter(row.validation_status, facets.validation_status)) return false;
+  if (!matchesDeploymentFacet(row, facets.deployment_class)) return false;
+  if (!matchesOptionalFilter(row.cloud_provider, facets.cloud_provider)) return false;
+  if (!matchesOptionalFilter(row.cloud_region, facets.cloud_region)) return false;
+  if (!matchesOptionalFilter(rowShape(row), facets.instance_or_warehouse)) return false;
+  if (!matchesOptionalFilter(row.storage_format, facets.storage_format)) return false;
+  if (!matchesOptionalFilter(row.cost_status, facets.cost_status)) return false;
+  return matchesDateWindow(row.run_date, facets.date_window);
+}
+
+function matchesMultiFilter(value: string, selected: string[]): boolean {
+  return selected.length === 0 || selected.includes(value);
+}
+
+function matchesOptionalFilter(value: string | null | undefined, selected: string[]): boolean {
+  return selected.length === 0 || (value !== null && value !== undefined && selected.includes(value));
+}
+
+function matchesPlatformFacet(row: ResultRow | PlatformRow, selected: string[]): boolean {
+  return selected.length === 0 || selected.includes(row.platform) || selected.includes(row.platform_id);
+}
+
+function matchesTuningFacet(row: ResultRow | PlatformRow, selected: string[]): boolean {
+  return selected.length === 0 || selected.includes(row.tuning_mode ?? "untuned");
+}
+
+function matchesDeploymentFacet(row: ResultRow | PlatformRow, selected: string[]): boolean {
+  if (selected.length === 0) return true;
+  const deployment = rowDeploymentClass(row);
+  return deployment !== null && selected.includes(deployment);
+}
+
+function rowDeploymentClass(row: ResultRow | PlatformRow): string | null {
+  if (row.cloud_provider) return "cloud";
+  if (row.cost_status === "not_applicable_local") return "local";
+  if (row.cost_status === "unavailable") return "unavailable";
+  return null;
+}
+
+function rowShape(row: ResultRow | PlatformRow): string | null {
+  return row.instance_type ?? row.warehouse_size ?? row.cluster_size ?? null;
+}
+
+function matchesDateWindow(runDate: string, windowValue: DateWindowFacet): boolean {
+  if (windowValue === "all") return true;
+  const days = Number(windowValue.replace("d", ""));
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return new Date(runDate).getTime() >= cutoff;
+}
+
+// ---------------------------------------------------------------------------
 // List view - sorted table of all result rows for the benchmark
 // ---------------------------------------------------------------------------
 
@@ -503,30 +620,47 @@ function ListTable({
   benchmark,
   results,
   scaleFactor,
-  tuningFilter,
-  trustFilter,
+  facets,
 }: {
   benchmark: string;
   results: ResultRow[];
   scaleFactor: string;
-  tuningFilter: string;
-  trustFilter: Set<string> | null;
+  facets: FacetState;
 }) {
   const [sort, setSort] = useState<SortState<BenchmarkListSortKey>>({
     key: "display_geomean_ms",
     direction: "asc",
   });
+  const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
   const benchmarkResults = results.filter((r) => r.benchmark === benchmark);
 
   const byScale = benchmarkResults.filter((r) => String(r.scale_factor) === scaleFactor);
 
-  const tuningFiltered =
-    tuningFilter === "all" ? byScale : byScale.filter((r) => r.tuning_mode === tuningFilter);
+  const filtered = byScale
+    .filter((row) => matchesFacetFields(row, facets))
+    .sort((a, b) => compareListRows(a, b, sort));
+  const visibleRows = filtered.slice(0, visibleLimit);
 
-  const trustFiltered =
-    trustFilter === null ? tuningFiltered : tuningFiltered.filter((r) => trustFilter.has(r.trust_label));
-
-  const filtered = [...trustFiltered].sort((a, b) => compareListRows(a, b, sort));
+  useEffect(() => {
+    setVisibleLimit(TABLE_RENDER_LIMIT);
+  }, [
+    benchmark,
+    scaleFactor,
+    facets.platform,
+    facets.execution_mode,
+    facets.tuning_mode,
+    facets.trust_tier,
+    facets.validation_status,
+    facets.deployment_class,
+    facets.cloud_provider,
+    facets.cloud_region,
+    facets.instance_or_warehouse,
+    facets.storage_format,
+    facets.cost_status,
+    facets.date_window,
+    sort.key,
+    sort.direction,
+  ]);
 
   function toggleSort(key: BenchmarkListSortKey) {
     setSort((prev) =>
@@ -565,6 +699,9 @@ function ListTable({
 
   return (
     <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+        Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} results for SF {scaleFactor}
+      </div>
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
@@ -628,11 +765,22 @@ function ListTable({
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 bg-white">
-          {filtered.map((r) => (
+          {visibleRows.map((r) => (
             <BenchmarkRow key={r.result_id} entry={r} />
           ))}
         </tbody>
       </table>
+      {visibleRows.length < filtered.length && (
+        <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            onClick={() => setVisibleLimit((limit) => limit + TABLE_RENDER_INCREMENT)}
+          >
+            Show more results
+          </button>
+        </div>
+      )}
     </div>
   );
 }

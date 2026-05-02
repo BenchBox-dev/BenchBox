@@ -211,6 +211,30 @@ describe("Query", () => {
     });
   });
 
+  it("reads shared facet aliases and rewrites them to canonical query params", async () => {
+    window.history.replaceState(null, "", "/results/query?bm=clickbench&scale_factor=0.1&trust_tier=maintainer-run");
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    await waitFor(() => {
+      const params = new URL(window.location.href).searchParams;
+      expect(params.get("benchmark")).toBe("clickbench");
+      expect(params.get("sf")).toBe("0.1");
+      expect(params.get("trust")).toBe("maintainer-run");
+      expect(params.get("bm")).toBeNull();
+      expect(params.get("scale_factor")).toBeNull();
+      expect(params.get("trust_tier")).toBeNull();
+    });
+
+    const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
+    const latest = String(selectCalls.at(-1)?.[0]);
+    expect(latest).toContain("benchmark IN (?)");
+    expect(latest).toContain("scale_factor IN (?)");
+    expect(latest).toContain("trust_label IN (?)");
+    expect(selectCalls.at(-1)?.[1]).toEqual(["clickbench", 0.1, "maintainer-run"]);
+  });
+
   it("keeps hidden result IDs available for row actions without showing the column", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
@@ -285,7 +309,8 @@ describe("Query", () => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).toContain(`LIMIT ${UNLIMITED_ROW_LIMIT}`);
     });
-    expect(screen.getByText("Showing all returned rows: 2")).toBeTruthy();
+    expect(screen.getByText("Showing 2 of 2 returned rows")).toBeTruthy();
+    expect(screen.getByText("Query limit: all")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /^Default$/ }));
 
