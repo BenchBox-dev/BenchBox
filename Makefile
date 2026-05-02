@@ -18,7 +18,7 @@ POOL_MIN_FREE_KB ?= 5000000
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status dev-loop-metrics worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status dev-loop-metrics worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -748,7 +748,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status dev-loop-metrics worktree-pool-init worktree-pool-status worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status dev-loop-metrics worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -1183,6 +1183,64 @@ worktree-pool-status:
 		printf '  Check \`gh auth status\` and \`gh api rate_limit\` to recover.\n'; \
 	fi
 
+## worktree-pool-check: assert pool invariants and exit non-zero on drift.
+##
+## Fails if:
+##   - any slot directory is missing (count < POOL_SIZE)
+##   - extra `pool-NN` directories exist beyond POOL_SIZE in WORKTREE_POOL_PARENT
+##   - any slot is in `aborted` state (.benchbox/claim_in_progress survived)
+##
+## NOT a PR-CI gate. Intended use:
+##   - pre-release sanity check (catch drift before cutting a release)
+##   - periodic local cron / agent-loop hook
+##
+## Performance: avoids the gh PR lookup that worktree-pool-status uses, so
+## it is fast and safe to run frequently. Runs read-only — never mutates.
+##
+## See `_project/blind-spots/2026-04-30-214358-pool-size-not-codified-as-contract.md`.
+worktree-pool-check:
+	@POOL_REPO=$$($(POOL_REPO_CMD)); \
+	violations=""; \
+	missing_count=0; \
+	aborted_count=0; \
+	i=1; \
+	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
+		pool=$$(printf 'pool-%02d' "$$i"); \
+		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
+		if ! git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+			violations="$$violations  - $$pool: missing ($$wt is not a git worktree)\n"; \
+			missing_count=$$((missing_count + 1)); \
+		elif [ -f "$$wt/.benchbox/claim_in_progress" ]; then \
+			marker_age=$$(date -u -r "$$wt/.benchbox/claim_in_progress" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "?"); \
+			violations="$$violations  - $$pool: aborted (claim_in_progress marker present, mtime $$marker_age)\n"; \
+			aborted_count=$$((aborted_count + 1)); \
+		fi; \
+		i=$$((i + 1)); \
+	done; \
+	extras=""; \
+	for wt in "$(WORKTREE_POOL_PARENT)/$$POOL_REPO."pool-*; do \
+		[ -d "$$wt" ] || continue; \
+		base=$$(basename "$$wt"); \
+		num=$${base##*pool-}; \
+		case "$$num" in [0-9][0-9]) ;; *) continue ;; esac; \
+		num_dec=$$(expr "$$num" + 0); \
+		if [ "$$num_dec" -gt "$(POOL_SIZE)" ]; then \
+			extras="$$extras  - $$base (number > POOL_SIZE=$(POOL_SIZE))\n"; \
+		fi; \
+	done; \
+	if [ -n "$$extras" ]; then \
+		violations="$$violations  Extra pool slots beyond POOL_SIZE:\n$$extras"; \
+	fi; \
+	if [ -n "$$violations" ]; then \
+		printf 'Pool invariant check FAILED (POOL_SIZE=%s):\n' "$(POOL_SIZE)" >&2; \
+		printf '%b' "$$violations" >&2; \
+		printf 'Recover with `make worktree-pool-status` to inspect, then\n' >&2; \
+		printf '`make worktree-pool-reset POOL=NN` (last resort) or\n' >&2; \
+		printf '`make worktree-pool-init` to recreate missing slots.\n' >&2; \
+		exit 1; \
+	fi; \
+	printf 'Pool invariant check OK: %d slot(s), no aborted markers.\n' "$(POOL_SIZE)"
+
 worktree-pool-reset:
 	@test -n "$(POOL)" || { echo "Usage: make worktree-pool-reset POOL=NN"; exit 1; }
 	@case "$(POOL)" in [0-9][0-9]) ;; *) echo "POOL must be two digits, e.g. POOL=03"; exit 1 ;; esac
@@ -1470,6 +1528,7 @@ help:
 	@echo "  make worktree-claim BRANCH=name   Claim a free pool slot for a feature branch"
 	@echo "  make worktree-release             Inside a pool worktree: return to detached origin/develop after PR merges"
 	@echo "  make worktree-pool-status         Show pool slot state, venv health, and disk usage"
+	@echo "  make worktree-pool-check          Assert pool invariants (count, aborted slots) — exit non-zero on drift"
 	@echo "  make worktree-pool-sweep-stale    Auto-release pool slots whose PRs have merged"
 	@echo "  make worktree-pool-disk-clean     Drop pytest/mypy/ruff/coverage caches from pool slots (preserves .venv)"
 	@echo "  make worktree-pool-reset POOL=NN  Manual escape hatch for stuck pool slots"

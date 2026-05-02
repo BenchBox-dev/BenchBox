@@ -41,6 +41,7 @@ The minimum surface for routine work — start here.
 | Inside the slot, ship the work | `make pr-preflight && make pr-open` | Run the local lint + fast-test gate, push, open PR vs `develop`, enable squash auto-merge. Walk away — auto-merge lands it once CI is green. |
 | After the PR merges | `make worktree-release` | Detach the slot back to `origin/develop`, delete the local feature branch. Refuses unless the PR state is `MERGED` (use `FORCE=1` to escape — only when intentional). |
 | See pool state any time | `make worktree-pool-status` | Tabular: pool, path, branch, state, claim age, venv health, disk size. Read-only; safe to run during other operations. |
+| Assert pool invariants | `make worktree-pool-check` | Read-only; exits non-zero if any slot is missing, has a surviving `.benchbox/claim_in_progress` marker, or there are extra `pool-NN` directories beyond `POOL_SIZE`. Cheap (no `gh` calls); use as a pre-release sanity check or periodic local cron. |
 | Recover forgotten slots | `make worktree-pool-sweep-stale` | Auto-release every slot whose PR is `MERGED` and tree is clean. Idempotent; refuses dirty/claimed-no-PR/unknown slots. Auto-runs once before `worktree-claim` fails. |
 
 Pre-approved in Claude Code's user-global settings; agents can run them
@@ -160,6 +161,7 @@ local pre-push hook lock doesn't bottleneck it.
 | `make worktree-claim BRANCH=<type>/<slug>` | Claim a free slot atomically. `<type>` ∈ `chore\|fix\|feat\|docs`. |
 | `make worktree-release [FORCE=1]` | Release the current pool slot back to detached `origin/develop`. |
 | `make worktree-pool-status` | Read-only state listing for all slots. |
+| `make worktree-pool-check` | Read-only pool invariant assertion: exits non-zero on missing slots, surviving `.benchbox/claim_in_progress` markers, or extra slots beyond `POOL_SIZE`. No `gh` calls. |
 | `make worktree-pool-sweep-stale` | Auto-release MERGED-and-clean slots. |
 | `make worktree-pool-reset POOL=NN [FORCE=1]` | Per-slot manual escape hatch. |
 | `make worktree-pool-disk-clean` | Strip pytest/coverage/ruff caches across all slots. |
