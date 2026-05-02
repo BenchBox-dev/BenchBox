@@ -1,7 +1,7 @@
 ---
 id: 2026-04-29-143205-react-key-collision-class
 date: 2026-04-29
-status: open
+status: actioned
 finding_kind: bug-class
 review_context: "ultrareview B4 / dashboard chart key collisions"
 related_paths:
@@ -62,3 +62,4 @@ call-site of a generalizable defect.
   results-explorer/src/components/` returns ~30 hits including
   `key={queryId}` / `key={qid}` patterns whose uniqueness is not
   obvious without per-call analysis.
+- 2026-05-02: actioned — Sweep 2026-05-02: hardened the bug class at two data-boundary sites. (1) sortQueryIds now deduplicates input — protects RankTable, QueryHeatmap (header + cell-row column iterations), and QueryHistogram against duplicate query_ids in the prop. (2) NormalizedSpeedupChart row iteration now uses composite key '{queryId}-{rowIdx}' because its 'queries' prop is not deduped at the boundary like sortQueryIds. New tests: queryLabels.test.ts dedup contract, NormalizedSpeedupChart.test.tsx duplicate-queryId rendering. Other potential sites audited and left as-is: DivergingBarChart (uses Map.entries() so deduped by construction), TimeSeries / PercentileLadder (already mitigated by prior review), components keying on result_id (unique per run by data definition).

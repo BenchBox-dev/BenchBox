@@ -104,8 +104,12 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
           const barAreaW = drawWidth - LABEL_W - PADDING;
           const centerX = LABEL_W + toX(1, barAreaW);
 
+          // Composite key: the `queries` prop is not deduped at the boundary
+          // (unlike sortQueryIds), so a caller passing variant rows for the
+          // same queryId would collide on key={queryId}. The row index
+          // disambiguates within this iteration.
           return (
-            <g key={queryId} transform={`translate(0, ${y0})`}>
+            <g key={`${queryId}-${rowIdx}`} transform={`translate(0, ${y0})`}>
               <text
                 x={LABEL_W - 4}
                 y={rowHeight / 2 + 4}
