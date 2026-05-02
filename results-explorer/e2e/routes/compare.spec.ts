@@ -9,6 +9,8 @@ const LONG_DUCKDB = "tpch-duckdb-sf0.01-20260403-7fe93365";
 const LONG_DATAFUSION = "tpch-datafusion-sf0.01-20260403-c0d4f3d9";
 
 test.describe("Compare", () => {
+  test.describe.configure({ mode: "serial" });
+
   test("@smoke loads /results/compare?ids=<a>,<b> and renders both platform cards", async ({
     page,
   }) => {
@@ -21,13 +23,12 @@ test.describe("Compare", () => {
 
     const main = page.getByRole("main");
     // Both platforms must render as comparison cards. We search inside
-    // the main region to avoid the breadcrumb / header.
-    await expect(main.getByText("DuckDB", { exact: true }).first()).toBeVisible();
-    await expect(main.getByText("DataFusion", { exact: true }).first()).toBeVisible();
+    // the detail links to avoid matching hidden baseline <option> nodes.
+    await expect(main.locator(`a[href="/results/r/${LONG_DUCKDB}"]`)).toBeVisible();
+    await expect(main.locator(`a[href="/results/r/${LONG_DATAFUSION}"]`)).toBeVisible();
 
-    // Query Breakdown table is the stable landmark for the per-query
-    // comparison matrix.
-    await expect(main.getByRole("heading", { name: /Query Breakdown/ })).toBeVisible();
+    // Query-Level Diff is the stable landmark for the per-query evidence table.
+    await expect(main.getByRole("heading", { name: /Query-Level Diff/ })).toBeVisible();
   });
 
   test("the explicit trailing-slash compare route resolves the same comparison page", async ({
@@ -42,7 +43,9 @@ test.describe("Compare", () => {
   });
 
   test("long-form IDs in the URL get rewritten to short IDs after load", async ({ page }) => {
-    await page.goto(`/results/compare?ids=${LONG_DUCKDB},${LONG_DATAFUSION}`);
+    const ids = [LONG_DUCKDB, LONG_DATAFUSION].map(encodeURIComponent).join(",");
+    await page.goto(`/results/compare?ids=${ids}`);
+    await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Comparison/);
 
     // The Compare page canonicalizes the URL via history.replaceState
@@ -75,6 +78,7 @@ test.describe("Compare", () => {
     }
 
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
+    await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Comparison/);
 
     const shareButton = page.getByRole("button", { name: /Share URL/ });

@@ -98,7 +98,9 @@ def _duckdb_results(output: Path) -> list[dict]:
     """Return results rows as dicts for assertions."""
     with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
         rows = con.execute("SELECT * FROM results").fetchall()
-        cols = [d[0] for d in con.description]
+        description = con.description
+        assert description is not None
+        cols = [d[0] for d in description]
     return [dict(zip(cols, row)) for row in rows]
 
 

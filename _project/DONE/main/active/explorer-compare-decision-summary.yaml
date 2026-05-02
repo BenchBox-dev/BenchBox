@@ -2,7 +2,7 @@ id: explorer-compare-decision-summary
 title: "Explorer: summary-led compare workflow with cohort guardrails"
 worktree: main
 priority: "Medium-High"
-status: "In Progress"
+status: "Completed"
 category: "Core Functionality"
 
 deps:
@@ -114,10 +114,20 @@ work:
       - "results-explorer/src/pages/__tests__/Compare.test.tsx"
       - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
       - "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
+      - "results-explorer/e2e/routes/compare.spec.ts"
+      - "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "docs/development/dependency-compatibility.md"
+      - "docs/development/dependency-audit-raw.md"
+      - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+      - "tests/unit/core/explorer_pipeline/test_pipeline.py"
     notes: |
       Extend Compare.test.tsx with same-cohort, mismatched-cohort, missing-query,
       multi-result, and baseline-switch cases. Include no-cost and normalized
-      cost cases once cost fields are available.
+      cost cases once cost fields are available. Final browser verification also
+      pinned native DuckDB below 1.4 so generated results.duckdb snapshots remain
+      attachable by the current @duckdb/duckdb-wasm runtime.
 
 metadata:
   tags:
@@ -127,6 +137,7 @@ metadata:
     - guardrails
   estimated_effort: "Medium-Large (2-4 days)"
   created_date: "2026-05-01"
+  completed_date: "2026-05-02"
 
 impact:
   business_value: |
@@ -148,6 +159,14 @@ files_affected:
     - "results-explorer/src/components/ChartPanel.tsx"
     - "results-explorer/src/lib/duckdbQueries.ts"
     - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+    - "results-explorer/e2e/routes/compare.spec.ts"
+    - "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+    - "pyproject.toml"
+    - "uv.lock"
+    - "docs/development/dependency-compatibility.md"
+    - "docs/development/dependency-audit-raw.md"
+    - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+    - "tests/unit/core/explorer_pipeline/test_pipeline.py"
   added:
     - "results-explorer/src/components/CompareSummary.tsx"
     - "results-explorer/src/components/QueryDiffTable.tsx"
@@ -178,7 +197,7 @@ verification:
     expected_output: "Compare summary, guardrail, and baseline tests pass."
   - description: "Manual compare smoke."
     command: "cd results-explorer && npm run test:e2e:chromium -- --grep \"Compare\""
-    expected_output: "Chromium compare smoke verifies same-cohort compare routing and rendering; mismatched guardrails are covered by Compare unit tests."
+    expected_output: "Chromium compare smoke verifies same-cohort compare routing, rendering, and mismatched guardrails."
 
 scope_limit:
   only_modify:
@@ -197,3 +216,11 @@ scope_limit:
     - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
     - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
     - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+    - "results-explorer/e2e/routes/compare.spec.ts"
+    - "results-explorer/e2e/failures/compare-hard-block.spec.ts"
+    - "pyproject.toml"
+    - "uv.lock"
+    - "docs/development/dependency-compatibility.md"
+    - "docs/development/dependency-audit-raw.md"
+    - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
+    - "tests/unit/core/explorer_pipeline/test_pipeline.py"
