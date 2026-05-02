@@ -2,7 +2,7 @@ id: motherduck-cloud-features
 title: "MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control"
 worktree: platform-expansion
 priority: High
-status: In Progress
+status: Blocked
 category: Platform Expansion
 description: |
   Completes three deferred MotherDuck adapter features that were originally
@@ -38,6 +38,12 @@ metadata:
 
 deps:
   needs: []
+
+blockers:
+  - date: "2026-05-02"
+    work: [w2, w3]
+    reason: "This agent environment does not have MOTHERDUCK_TOKEN or a live MotherDuck account. W2 needs live cloud-load validation, and W3 needs live cache-behavior validation before implementation would be defensible."
+    unblock: "Run in an environment with MOTHERDUCK_TOKEN plus a test cloud object-store path, or provide a documented MotherDuck cache-control contract that can be implemented and tested offline."
 
 guardrails:
   verification:
