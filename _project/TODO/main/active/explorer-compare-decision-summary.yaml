@@ -71,7 +71,14 @@ work:
   - id: w4
     summary: "Render cohort guardrails before claims"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/Compare.tsx"
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      - "results-explorer/src/components/CompareSummary.tsx"
+      - "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+      - "results-explorer/src/lib/compareSummary.ts"
+      - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
     notes: |
       Consumes the ComparabilityReceipt component owned by
       `explorer-run-receipt-methodology-disclosure` w3 — this work unit does

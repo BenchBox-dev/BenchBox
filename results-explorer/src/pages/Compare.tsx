@@ -104,27 +104,6 @@ export function Compare(_: RoutableProps) {
         }
         const details = loaded as DetailResult[];
 
-        const benchmarkSet = new Set(details.map((r) => r.benchmark));
-        const scaleSet = new Set(details.map((r) => r.scale_factor));
-
-        if (benchmarkSet.size > 1) {
-          setError(
-            `Cannot compare results from different benchmarks: ${[...benchmarkSet].join(", ")}. ` +
-              "All results in a comparison must use the same benchmark.",
-          );
-          setLoading(false);
-          return;
-        }
-
-        if (scaleSet.size > 1) {
-          setError(
-            `Cannot compare results at different scale factors: ${[...scaleSet].join(", ")}. ` +
-              "All results in a comparison must use the same scale factor.",
-          );
-          setLoading(false);
-          return;
-        }
-
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
         setBaselineIndex(0);
@@ -177,7 +156,12 @@ export function Compare(_: RoutableProps) {
 
   const benchmark = results[0]?.benchmark ?? "";
   const scaleFactor = results[0]?.scale_factor ?? 0;
-  const benchmarkLabel = humanizeBenchmark(benchmark);
+  const severeMismatchReason = severeCohortMismatchReason(results);
+  const mixedBenchmark = new Set(results.map((result) => result.benchmark)).size > 1;
+  const benchmarkLabel = mixedBenchmark ? "Mixed Benchmark" : humanizeBenchmark(benchmark);
+  const scaleFactorLabel = new Set(results.map((result) => result.scale_factor)).size > 1
+    ? "Mixed scale factors"
+    : `SF ${scaleFactor}`;
   const rowCount = results.length;
 
   // Primary metric is loaded async from DuckDB in the effect above; default
@@ -188,7 +172,10 @@ export function Compare(_: RoutableProps) {
   const primaries: (number | null)[] = results.map((r) =>
     primaryMetric === "power_score" ? r.power_score : r.display_geomean_ms,
   );
-  const decisionSummary = buildCompareDecisionSummary(results, primaryMetric);
+  const decisionSummary = buildCompareDecisionSummary(results, primaryMetric, {
+    suppressWinnerClaims: severeMismatchReason !== null,
+    suppressionReason: severeMismatchReason ?? undefined,
+  });
 
   const validPrimaries = primaries.filter((v): v is number => v !== null);
   const fastestPrimary =
@@ -225,18 +212,22 @@ export function Compare(_: RoutableProps) {
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <Breadcrumb
-        crumbs={[
-          { label: "Results", href: "/results/" },
-          { label: benchmarkLabel, href: `/results/${benchmark}/` },
-          { label: "Compare" },
-        ]}
+        crumbs={
+          mixedBenchmark
+            ? [{ label: "Results", href: "/results/" }, { label: "Compare" }]
+            : [
+                { label: "Results", href: "/results/" },
+                { label: benchmarkLabel, href: `/results/${benchmark}/` },
+                { label: "Compare" },
+              ]
+        }
       />
 
       <div class="mt-6 mb-8 flex items-center justify-between">
         <div>
           <h1 class="text-3xl font-bold text-gray-900">{benchmarkLabel} Comparison</h1>
           <p class="mt-1 text-sm text-gray-500">
-            Scale factor: SF {scaleFactor} - {rowCount} platforms
+            Scale factor: {scaleFactorLabel} - {rowCount} platforms
           </p>
           {/* Trust tier diversity note - informational, not a warning */}
           {(() => {
@@ -289,7 +280,8 @@ export function Compare(_: RoutableProps) {
               : null
             : vsSlowestRatio(primary, slowestPrimary);
           const vsLabel = higherIsBetter ? "vs worst" : "vs slowest";
-          const isFastest = primary !== null && fastestPrimary !== null && primary === fastestPrimary;
+          const showPrimaryClaims = severeMismatchReason === null;
+          const isFastest = showPrimaryClaims && primary !== null && fastestPrimary !== null && primary === fastestPrimary;
 
           return (
             <div
@@ -334,7 +326,7 @@ export function Compare(_: RoutableProps) {
                     <dd class="font-mono text-gray-600">{r.totalDurationS.toFixed(2)}s</dd>
                   </div>
                 )}
-                {speedup !== null && (
+                {showPrimaryClaims && speedup !== null && (
                   <div class="flex justify-between">
                     <dt class="text-gray-500">{vsLabel}</dt>
                     <dd class="font-mono">{speedup.toFixed(2)}x</dd>
@@ -380,4 +372,15 @@ export function Compare(_: RoutableProps) {
       )}
     </div>
   );
+}
+
+function severeCohortMismatchReason(results: DetailResult[]) {
+  const reasons: string[] = [];
+  if (new Set(results.map((result) => result.benchmark)).size > 1) {
+    reasons.push("benchmarks differ");
+  }
+  if (new Set(results.map((result) => result.scale_factor)).size > 1) {
+    reasons.push("scale factors differ");
+  }
+  return reasons.length > 0 ? reasons.join(" and ") : null;
 }

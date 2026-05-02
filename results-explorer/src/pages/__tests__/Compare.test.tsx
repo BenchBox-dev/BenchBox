@@ -337,6 +337,41 @@ describe("Compare", () => {
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
   });
 
+  it("renders severe cohort mismatches with guardrails and no winner claim", async () => {
+    const clickbench = makeResult({
+      result_id: "r2",
+      benchmark: "clickbench",
+      scale_factor: 1,
+      platform: "SQLite",
+      platform_id: "sqlite",
+      power_score: 300,
+      display_timings: [
+        { query_id: "Q1", display_ms: 100, sample_count: 3 },
+        { query_id: "Q2", display_ms: 200, sample_count: 3 },
+      ],
+    });
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1" ? Promise.resolve(DUCKDB) : Promise.resolve(clickbench),
+    );
+
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+    });
+
+    expect(screen.queryByText(/Cannot compare results from different benchmarks/)).toBeNull();
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    expect(receipt).toHaveTextContent("Benchmark");
+    expect(receipt).toHaveTextContent("Scale factor");
+    expect(summary).toHaveTextContent("Not directly comparable: benchmarks differ and scale factors differ.");
+    expect(summary).toHaveTextContent("Claims suppressed");
+    expect(summary).not.toHaveTextContent("DuckDB leads by");
+    expect(summary).not.toHaveTextContent("fastest");
+    expect(screen.queryByText("vs worst")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Query-Level Diff" })).toBeTruthy();
+  });
+
   it("renders the comparability receipt before charts and query diff evidence", async () => {
     render(<Compare />);
     await waitFor(() => {

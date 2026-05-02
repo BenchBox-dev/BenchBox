@@ -169,4 +169,24 @@ describe("buildCompareDecisionSummary", () => {
       winnerCostPerformanceRatioVsWorst: 1,
     });
   });
+
+  it("suppresses winner language when cohort guardrails mark the selection incomparable", () => {
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult({ result_id: "duck", platform: "DuckDB" }),
+        makeResult({ result_id: "sqlite", platform: "SQLite", power_score: 300 }),
+      ],
+      "power_score",
+      {
+        suppressWinnerClaims: true,
+        suppressionReason: "benchmarks differ",
+      },
+    );
+
+    expect(summary.claimSuppressed).toBe(true);
+    expect(summary.winner).toBeNull();
+    expect(summary.headline).toBe(
+      "Not directly comparable: benchmarks differ. Winner language is suppressed; raw query evidence remains available.",
+    );
+  });
 });

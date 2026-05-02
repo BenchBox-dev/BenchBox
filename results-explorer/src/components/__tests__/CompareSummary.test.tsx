@@ -72,4 +72,31 @@ describe("CompareSummary", () => {
     expect(summaryRegion).toHaveTextContent("winner cost $0.50");
     expect(summaryRegion).toHaveTextContent("30.00x cost/performance");
   });
+
+  it("renders suppressed winner state for incomparable cohorts", () => {
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult(),
+        makeResult({
+          result_id: "r2",
+          platform: "SQLite",
+          platform_id: "sqlite",
+          power_score: 300,
+        }),
+      ],
+      "power_score",
+      {
+        suppressWinnerClaims: true,
+        suppressionReason: "benchmarks differ",
+      },
+    );
+
+    render(<CompareSummary summary={summary} />);
+
+    const summaryRegion = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    expect(summaryRegion).toHaveTextContent("Not directly comparable: benchmarks differ.");
+    expect(summaryRegion).toHaveTextContent("Claims suppressed");
+    expect(summaryRegion).toHaveTextContent("Not claimed");
+    expect(summaryRegion).toHaveTextContent("Winner claim suppressed");
+  });
 });

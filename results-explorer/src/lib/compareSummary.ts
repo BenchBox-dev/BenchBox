@@ -36,6 +36,8 @@ export interface CompareDecisionSummary {
   primaryMetric: ComparePrimaryMetric;
   primaryMetricLabel: string;
   higherIsBetter: boolean;
+  claimSuppressed: boolean;
+  claimSuppressionReason: string | null;
   winner: CompareResultMetric | null;
   comparison: CompareResultMetric | null;
   comparisonRatio: number | null;
@@ -46,9 +48,15 @@ export interface CompareDecisionSummary {
   cost: CompareCostSummary | null;
 }
 
+interface CompareDecisionSummaryOptions {
+  suppressWinnerClaims?: boolean;
+  suppressionReason?: string;
+}
+
 export function buildCompareDecisionSummary(
   results: DetailResult[],
   primaryMetric: ComparePrimaryMetric,
+  options: CompareDecisionSummaryOptions = {},
 ): CompareDecisionSummary {
   const higherIsBetter = primaryMetric === "power_score";
   const primaryMetricLabel = higherIsBetter ? "Power score" : "Geomean query time";
@@ -61,7 +69,9 @@ export function buildCompareDecisionSummary(
     .filter((metric): metric is CompareResultMetric & { value: number } => metric.value !== null)
     .sort((a, b) => (higherIsBetter ? b.value - a.value : a.value - b.value));
 
-  const winner = sortedMetrics[0] ?? null;
+  const metricWinner = sortedMetrics[0] ?? null;
+  const claimSuppressed = options.suppressWinnerClaims === true;
+  const winner = claimSuppressed ? null : metricWinner;
   const comparison = sortedMetrics.length > 1 ? sortedMetrics[sortedMetrics.length - 1]! : null;
   const comparisonRatio = winner && comparison ? metricRatio(winner.value, comparison.value, higherIsBetter) : null;
   const comparisonLabel = higherIsBetter ? "vs lowest selected" : "vs slowest selected";
@@ -73,11 +83,13 @@ export function buildCompareDecisionSummary(
     primaryMetric,
     primaryMetricLabel,
     higherIsBetter,
+    claimSuppressed,
+    claimSuppressionReason: options.suppressionReason ?? null,
     winner,
     comparison,
     comparisonRatio,
     comparisonLabel,
-    headline: buildHeadline(winner, comparisonRatio, primaryMetric),
+    headline: buildHeadline(winner, comparisonRatio, primaryMetric, options),
     queryRecord,
     percentiles,
     cost,
@@ -93,7 +105,12 @@ function buildHeadline(
   winner: CompareDecisionSummary["winner"],
   comparisonRatio: number | null,
   primaryMetric: ComparePrimaryMetric,
+  options: CompareDecisionSummaryOptions,
 ): string {
+  if (options.suppressWinnerClaims) {
+    const reason = options.suppressionReason ?? "selected runs are not from the same comparable cohort";
+    return `Not directly comparable: ${reason}. Winner language is suppressed; raw query evidence remains available.`;
+  }
   if (!winner) return "No winner claim: selected results are missing the primary metric.";
   if (comparisonRatio === null) return `${winner.platform} leads on the selected primary metric.`;
   if (primaryMetric === "power_score") {

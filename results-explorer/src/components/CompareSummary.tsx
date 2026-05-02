@@ -22,12 +22,16 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           </h2>
           <p class="mt-1 text-sm font-medium text-gray-800">{summary.headline}</p>
         </div>
-        <span class="badge badge-green">Computed from selected runs</span>
+        <span class={`badge ${summary.claimSuppressed ? "badge-yellow" : "badge-green"}`}>
+          {summary.claimSuppressed ? "Claims suppressed" : "Computed from selected runs"}
+        </span>
       </div>
 
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Winner">
-          {summary.winner ? (
+          {summary.claimSuppressed ? (
+            <p class="text-sm text-gray-500">Not claimed</p>
+          ) : summary.winner ? (
             <>
               <p class="text-sm font-semibold text-gray-900">{summary.winner.platform}</p>
               <p class="mt-1 font-mono text-xs text-gray-500">
@@ -53,13 +57,22 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
         </SummaryCard>
 
         <SummaryCard label="Query wins">
-          <p class="font-mono text-sm font-semibold text-gray-900">
-            {summary.queryRecord.wins}/{summary.queryRecord.comparableQueries} fastest
-          </p>
-          <p class="mt-1 text-xs text-gray-500">
-            {summary.queryRecord.losses} slower, {summary.queryRecord.ties} tied,{" "}
-            {summary.queryRecord.missing} missing
-          </p>
+          {summary.claimSuppressed ? (
+            <>
+              <p class="text-sm text-gray-500">Winner claim suppressed</p>
+              <p class="mt-1 text-xs text-gray-500">Use the query diff table for raw evidence.</p>
+            </>
+          ) : (
+            <>
+              <p class="font-mono text-sm font-semibold text-gray-900">
+                {summary.queryRecord.wins}/{summary.queryRecord.comparableQueries} fastest
+              </p>
+              <p class="mt-1 text-xs text-gray-500">
+                {summary.queryRecord.losses} slower, {summary.queryRecord.ties} tied,{" "}
+                {summary.queryRecord.missing} missing
+              </p>
+            </>
+          )}
         </SummaryCard>
 
         <SummaryCard label="Tail shape">
