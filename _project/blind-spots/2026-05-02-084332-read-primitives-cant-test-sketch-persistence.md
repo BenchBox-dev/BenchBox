@@ -1,7 +1,7 @@
 ---
 id: 2026-05-02-084332-read-primitives-cant-test-sketch-persistence
 date: 2026-05-02
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "ad-hoc research / Databricks sketch functions blog evaluation against read_primitives benchmark"
 related_paths:
@@ -9,7 +9,7 @@ related_paths:
   - benchbox/core/read_primitives/benchmark.py
   - benchbox/core/read_primitives/variant_contracts.py
 suggested_sweep: "before adding sketch queries, decide whether read_primitives is the right home for sketch persistence/merge tests or whether a new benchmark (or write_primitives extension) should own them"
-todo_id: null
+todo_id: write-primitives-sketch-persistence-category
 ---
 
 # read_primitives can score sketch *aggregates* but cannot exercise sketch *persistence*, which is the differentiated Databricks claim
@@ -59,3 +59,7 @@ extension of `write_primitives` — not `read_primitives`.
 - [ ] Decide explicitly whether `read_primitives` adds *aggregate-only* sketch queries (cheap; runs everywhere; doesn't test the claim) or stays out of sketches entirely until a persistence-capable benchmark exists.
 - [ ] If we want to test the persistence/merge claim, scope a new benchmark or `write_primitives` extension with a two-phase shape: phase 1 writes sketch columns to a table, phase 2 merges/queries them.
 - [ ] Audit other recent vendor announcements we've evaluated against `read_primitives` for the same single-query/persistent-artifact mismatch.
+
+## Triage log
+
+- 2026-05-02: promoted to TODO `write-primitives-sketch-persistence-category`. The companion TODO `read-primitives-approximate-aggregate-queries` is a contributing resolver — it scopes out persistence on the read side (one-shot aggregates only) and adds the cross-platform reference doc that the write-side TODO links from. The framework gap (review rubrics needing an "execution-model fit" axis for persistence-flavored vendor announcements) is partially mitigated, not eliminated; future similar announcements (vector indexes, materialized aggregates) should still trigger an explicit fit-check before parity-mapping function names.

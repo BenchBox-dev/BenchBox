@@ -189,7 +189,7 @@ work:
 - id: w8
   summary: "Promote blind-spot finding 2026-05-02-084332 to merged-to-todo"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Run:
     `uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py triage 2026-05-02-084332-read-primitives-cant-test-sketch-persistence --action promote --todo-id write-primitives-sketch-persistence-category`
