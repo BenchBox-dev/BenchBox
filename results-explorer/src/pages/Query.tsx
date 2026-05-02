@@ -55,10 +55,10 @@ export function Query(_: RoutableProps) {
     EMPTY_STRING_ARRAY,
     arraySerde,
   );
+  const [deploymentClasses, setDeploymentClasses] = useFacetField("deployment_class");
   const [cloudProviders, setCloudProviders] = useFacetField("cloud_provider");
   const [cloudRegions, setCloudRegions] = useFacetField("cloud_region");
-  const [instanceTypes, setInstanceTypes] = useUrlState<string[]>("instance_type", EMPTY_STRING_ARRAY, arraySerde);
-  const [warehouseSizes, setWarehouseSizes] = useUrlState<string[]>("warehouse_size", EMPTY_STRING_ARRAY, arraySerde);
+  const [instanceOrWarehouses, setInstanceOrWarehouses] = useFacetField("instance_or_warehouse");
   const [storageFormats, setStorageFormats] = useFacetField("storage_format");
   const [rowLimitRaw, setRowLimitRaw] = useUrlState<string>("limit", "default", stringSerde);
   const [hasCost, setHasCost] = useUrlState<string>("has_cost", "all", stringSerde);
@@ -90,10 +90,12 @@ export function Query(_: RoutableProps) {
       validationStatuses,
       costStatuses,
       costModelVersions,
+      deploymentClasses,
       cloudProviders,
       cloudRegions,
-      instanceTypes,
-      warehouseSizes,
+      instanceOrWarehouses,
+      instanceTypes: EMPTY_STRING_ARRAY,
+      warehouseSizes: EMPTY_STRING_ARRAY,
       storageFormats,
       hasCost: hasCost === "yes" || hasCost === "no" ? hasCost : "all",
       dateWindow,
@@ -105,15 +107,15 @@ export function Query(_: RoutableProps) {
       costModelVersions,
       costStatuses,
       dateWindow,
+      deploymentClasses,
       hasCost,
-      instanceTypes,
+      instanceOrWarehouses,
       platforms,
       scaleFactors,
       storageFormats,
       trustTiers,
       tuningModes,
       validationStatuses,
-      warehouseSizes,
     ],
   );
   const queryColumns = useMemo(
@@ -182,6 +184,11 @@ export function Query(_: RoutableProps) {
         exclude: "costModelVersions",
       });
     }
+    if (schemaColumns.has("deployment_class")) {
+      facetQueries.deployment_class = buildFacetCountQuery("deployment_class", activeFilters, {
+        exclude: "deploymentClasses",
+      });
+    }
     if (schemaColumns.has("cloud_provider")) {
       facetQueries.cloud_provider = buildFacetCountQuery("cloud_provider", activeFilters, {
         exclude: "cloudProviders",
@@ -190,12 +197,9 @@ export function Query(_: RoutableProps) {
     if (schemaColumns.has("cloud_region")) {
       facetQueries.cloud_region = buildFacetCountQuery("cloud_region", activeFilters, { exclude: "cloudRegions" });
     }
-    if (schemaColumns.has("instance_type")) {
-      facetQueries.instance_type = buildFacetCountQuery("instance_type", activeFilters, { exclude: "instanceTypes" });
-    }
-    if (schemaColumns.has("warehouse_size")) {
-      facetQueries.warehouse_size = buildFacetCountQuery("warehouse_size", activeFilters, {
-        exclude: "warehouseSizes",
+    if (schemaColumns.has("instance_or_warehouse")) {
+      facetQueries.instance_or_warehouse = buildFacetCountQuery("instance_or_warehouse", activeFilters, {
+        exclude: "instanceOrWarehouses",
       });
     }
     if (schemaColumns.has("storage_format")) {
@@ -401,6 +405,12 @@ export function Query(_: RoutableProps) {
             onToggle={(value) => toggleMulti(value, costModelVersions, setCostModelVersions)}
           />
           <FacetSection
+            label="Deployment"
+            buckets={facetCounts.deployment_class ?? []}
+            selected={deploymentClasses}
+            onToggle={(value) => toggleMulti(value, deploymentClasses, setDeploymentClasses)}
+          />
+          <FacetSection
             label="Cloud provider"
             buckets={facetCounts.cloud_provider ?? []}
             selected={cloudProviders}
@@ -413,16 +423,10 @@ export function Query(_: RoutableProps) {
             onToggle={(value) => toggleMulti(value, cloudRegions, setCloudRegions)}
           />
           <FacetSection
-            label="Instance"
-            buckets={facetCounts.instance_type ?? []}
-            selected={instanceTypes}
-            onToggle={(value) => toggleMulti(value, instanceTypes, setInstanceTypes)}
-          />
-          <FacetSection
-            label="Warehouse"
-            buckets={facetCounts.warehouse_size ?? []}
-            selected={warehouseSizes}
-            onToggle={(value) => toggleMulti(value, warehouseSizes, setWarehouseSizes)}
+            label="Instance / warehouse"
+            buckets={facetCounts.instance_or_warehouse ?? []}
+            selected={instanceOrWarehouses}
+            onToggle={(value) => toggleMulti(value, instanceOrWarehouses, setInstanceOrWarehouses)}
           />
           <FacetSection
             label="Storage"
@@ -712,10 +716,12 @@ function applySchemaFilterSupport(filters: QueryFilterState, schema: SchemaColum
     ...filters,
     costStatuses: columns.has("cost_status") ? filters.costStatuses : [],
     costModelVersions: columns.has("cost_model_version") ? filters.costModelVersions : [],
+    deploymentClasses: columns.has("deployment_class") ? filters.deploymentClasses : [],
     cloudProviders: columns.has("cloud_provider") ? filters.cloudProviders : [],
     cloudRegions: columns.has("cloud_region") ? filters.cloudRegions : [],
-    instanceTypes: columns.has("instance_type") ? filters.instanceTypes : [],
-    warehouseSizes: columns.has("warehouse_size") ? filters.warehouseSizes : [],
+    instanceOrWarehouses: columns.has("instance_or_warehouse") ? filters.instanceOrWarehouses : [],
+    instanceTypes: [],
+    warehouseSizes: [],
     storageFormats: columns.has("storage_format") ? filters.storageFormats : [],
   };
 }

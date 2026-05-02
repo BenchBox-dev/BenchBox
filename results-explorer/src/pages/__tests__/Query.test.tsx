@@ -25,10 +25,10 @@ const BASE_SCHEMA_COLUMNS = [
   { name: "normalized_cost_usd", type: "DOUBLE" },
   { name: "cost_model_version", type: "VARCHAR" },
   { name: "cost_status", type: "VARCHAR" },
+  { name: "deployment_class", type: "VARCHAR" },
   { name: "cloud_provider", type: "VARCHAR" },
   { name: "cloud_region", type: "VARCHAR" },
-  { name: "instance_type", type: "VARCHAR" },
-  { name: "warehouse_size", type: "VARCHAR" },
+  { name: "instance_or_warehouse", type: "VARCHAR" },
   { name: "storage_format", type: "VARCHAR" },
 ];
 let schemaColumns = BASE_SCHEMA_COLUMNS;
@@ -44,7 +44,9 @@ const BASE_ROWS = [
     geomean_ms: 10,
     trust_label: "maintainer-run",
     cost_status: "not_applicable_local",
+    deployment_class: "local",
     cloud_provider: null,
+    instance_or_warehouse: null,
   },
   {
     result_id: "r2",
@@ -56,7 +58,9 @@ const BASE_ROWS = [
     geomean_ms: 20,
     trust_label: "community-submission",
     cost_status: "normalized",
+    deployment_class: "cloud",
     cloud_provider: "aws",
+    instance_or_warehouse: "MEDIUM",
   },
 ];
 
@@ -66,6 +70,12 @@ function normalizeSql(sql: string): string {
 
 function isDefaultResultSelect(sql: unknown): boolean {
   return normalizeSql(String(sql)).startsWith("SELECT result_id, benchmark, platform, scale_factor");
+}
+
+function isFacetCountSql(normalized: string, column: string): boolean {
+  return normalized.includes(
+    `SELECT CASE WHEN ${column} IS NULL THEN 'unknown' ELSE CAST(${column} AS VARCHAR) END AS value`,
+  );
 }
 
 beforeEach(() => {
@@ -108,58 +118,61 @@ beforeEach(() => {
     if (normalized.includes("FROM duckdb_columns()")) {
       return schemaColumns;
     }
-    if (normalized.includes("SELECT COALESCE(CAST(benchmark AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "benchmark")) {
       return [{ value: "clickbench", count: 2 }];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(platform AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "platform")) {
       return [
         { value: "DuckDB", count: 1 },
         { value: "SQLite", count: 1 },
       ];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(scale_factor AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "scale_factor")) {
       return [{ value: "0.1", count: 2 }];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(tuning_mode AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "tuning_mode")) {
       return [
         { value: "tuned", count: 1 },
         { value: "auto", count: 1 },
       ];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(trust_label AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "trust_label")) {
       return [
         { value: "maintainer-run", count: 1 },
         { value: "community-submission", count: 1 },
       ];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(validation_status AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "validation_status")) {
       return [{ value: "exact", count: 2 }];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(cost_status AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "cost_status")) {
       return [
         { value: "normalized", count: 1 },
         { value: "not_applicable_local", count: 1 },
       ];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(cost_model_version AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "cost_model_version")) {
       return [{ value: "2026.05.0", count: 1 }];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(cloud_provider AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "deployment_class")) {
+      return [
+        { value: "cloud", count: 1 },
+        { value: "local", count: 1 },
+      ];
+    }
+    if (isFacetCountSql(normalized, "cloud_provider")) {
       return [
         { value: "aws", count: 1 },
         { value: "unknown", count: 1 },
       ];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(cloud_region AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "cloud_region")) {
       return [{ value: "us-east-1", count: 1 }];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(instance_type AS VARCHAR), 'unknown') AS value")) {
-      return [{ value: "r6i.xlarge", count: 1 }];
-    }
-    if (normalized.includes("SELECT COALESCE(CAST(warehouse_size AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "instance_or_warehouse")) {
       return [{ value: "MEDIUM", count: 1 }];
     }
-    if (normalized.includes("SELECT COALESCE(CAST(storage_format AS VARCHAR), 'unknown') AS value")) {
+    if (isFacetCountSql(normalized, "storage_format")) {
       return [{ value: "parquet", count: 1 }];
     }
     if (normalized.includes("SELECT CASE WHEN cost_usd IS NULL THEN 'no' ELSE 'yes' END AS value")) {
@@ -212,7 +225,11 @@ describe("Query", () => {
   });
 
   it("reads shared facet aliases and rewrites them to canonical query params", async () => {
-    window.history.replaceState(null, "", "/results/query?bm=clickbench&scale_factor=0.1&trust_tier=maintainer-run");
+    window.history.replaceState(
+      null,
+      "",
+      "/results/query?bm=clickbench&scale_factor=0.1&trust_tier=maintainer-run&instance_type=MEDIUM",
+    );
 
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
@@ -222,9 +239,11 @@ describe("Query", () => {
       expect(params.get("benchmark")).toBe("clickbench");
       expect(params.get("sf")).toBe("0.1");
       expect(params.get("trust")).toBe("maintainer-run");
+      expect(params.get("shape")).toBe("MEDIUM");
       expect(params.get("bm")).toBeNull();
       expect(params.get("scale_factor")).toBeNull();
       expect(params.get("trust_tier")).toBeNull();
+      expect(params.get("instance_type")).toBeNull();
     });
 
     const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
@@ -232,7 +251,8 @@ describe("Query", () => {
     expect(latest).toContain("benchmark IN (?)");
     expect(latest).toContain("scale_factor IN (?)");
     expect(latest).toContain("trust_label IN (?)");
-    expect(selectCalls.at(-1)?.[1]).toEqual(["clickbench", 0.1, "maintainer-run"]);
+    expect(latest).toContain("instance_or_warehouse IN (?)");
+    expect(selectCalls.at(-1)?.[1]).toEqual(["clickbench", 0.1, "maintainer-run", "MEDIUM"]);
   });
 
   it("keeps hidden result IDs available for row actions without showing the column", async () => {
@@ -253,33 +273,37 @@ describe("Query", () => {
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
     const costStatus = screen.getByText("Cost status").closest("section")!;
+    const deployment = screen.getByText("Deployment").closest("section")!;
     const cloudProvider = screen.getByText("Cloud provider").closest("section")!;
-    const warehouse = screen.getByText("Warehouse").closest("section")!;
+    const shape = screen.getByText("Instance / warehouse").closest("section")!;
     fireEvent.click(within(costStatus).getByLabelText(/normalized/i));
+    fireEvent.click(within(deployment).getByLabelText(/^cloud/i));
     fireEvent.click(within(cloudProvider).getByLabelText(/^aws/i));
-    fireEvent.click(within(warehouse).getByLabelText(/MEDIUM/i));
+    fireEvent.click(within(shape).getByLabelText(/MEDIUM/i));
 
     await waitFor(() => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       const latest = String(selectCalls.at(-1)?.[0]);
       expect(latest).toContain("cost_status IN (?)");
+      expect(latest).toContain("deployment_class IN (?)");
       expect(latest).toContain("cloud_provider IN (?)");
-      expect(latest).toContain("warehouse_size IN (?)");
+      expect(latest).toContain("instance_or_warehouse IN (?)");
     });
     const params = new URL(window.location.href).searchParams;
     expect(params.get("cost_status")).toBe("normalized");
+    expect(params.get("deployment")).toBe("cloud");
     expect(params.get("cloud_provider")).toBe("aws");
-    expect(params.get("warehouse_size")).toBe("MEDIUM");
+    expect(params.get("shape")).toBe("MEDIUM");
   });
 
   it("does not query normalized cost facets when an older DuckDB schema lacks those columns", async () => {
     schemaColumns = BASE_SCHEMA_COLUMNS.filter(
-      (column) => !["cost_status", "cloud_provider", "warehouse_size"].includes(column.name),
+      (column) => !["cost_status", "deployment_class", "cloud_provider", "instance_or_warehouse"].includes(column.name),
     );
     window.history.replaceState(
       null,
       "",
-      "/results/query?cost_status=normalized&cloud_provider=aws&warehouse_size=MEDIUM",
+      "/results/query?cost_status=normalized&deployment=cloud&cloud_provider=aws&shape=MEDIUM",
     );
 
     render(<Query />);
@@ -287,10 +311,12 @@ describe("Query", () => {
 
     const sqlCalls = vi.mocked(queryRows).mock.calls.map(([sql]) => String(sql));
     expect(sqlCalls.join("\n")).not.toContain("CAST(cost_status AS VARCHAR)");
+    expect(sqlCalls.join("\n")).not.toContain("CAST(deployment_class AS VARCHAR)");
     const selectCalls = sqlCalls.filter((sql) => isDefaultResultSelect(sql));
     expect(selectCalls.at(-1)).not.toContain("cost_status IN (?)");
+    expect(selectCalls.at(-1)).not.toContain("deployment_class IN (?)");
     expect(selectCalls.at(-1)).not.toContain("cloud_provider IN (?)");
-    expect(selectCalls.at(-1)).not.toContain("warehouse_size IN (?)");
+    expect(selectCalls.at(-1)).not.toContain("instance_or_warehouse IN (?)");
   });
 
   it("switches the result table row limit through URL state", async () => {

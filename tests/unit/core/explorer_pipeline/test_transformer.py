@@ -411,6 +411,77 @@ class TestExtendedManifestFields:
         assert entry.normalized_cost == normalized_cost.to_dict()
         assert detail.normalized_cost == normalized_cost.to_dict()
 
+    def test_environment_facets_extracted_from_normalized_contract(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["environment"]["platform_runtime"] = {
+            "runtime_type": "managed_cloud",
+            "collection_status": "partial",
+            "source": "requested",
+        }
+        data["platform"]["deployment"] = {
+            "deployment_type": "managed_cloud",
+            "endpoint_class": "cloud_endpoint",
+            "collection_status": "partial",
+        }
+        data["platform"]["cloud"] = {
+            "provider": "aws",
+            "region": "us-east-1",
+            "collection_status": "partial",
+        }
+        data["platform"]["compute"] = {
+            "warehouse_size": "XSMALL",
+            "warehouse": "warehouse_hash",
+            "collection_status": "partial",
+        }
+        data["platform"]["storage"] = {
+            "table_format": "parquet",
+            "collection_status": "partial",
+        }
+        bundle = tmp_path / "normalized_environment.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+
+        assert entry.deployment_class == "cloud"
+        assert entry.cloud_provider == "aws"
+        assert entry.cloud_region == "us-east-1"
+        assert entry.instance_or_warehouse == "XSMALL"
+        assert entry.storage_format == "parquet"
+
+    def test_environment_facets_do_not_fall_back_to_normalized_cost_deployment(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["environment"]["platform_runtime"] = {
+            "runtime_type": "unknown",
+            "collection_status": "unavailable",
+            "source": "unavailable",
+        }
+        data["normalized_cost"] = NormalizedCost(
+            normalized_cost_usd="1.23",
+            cost_model_version="2026.05.0",
+            cost_model_source="benchbox.core.cost.pricing",
+            cost_scope="compute_only",
+            cost_status="normalized",
+            billing_unit="instance_hour",
+            pricing_region="us-east-1",
+            deployment=DeploymentMetadata(
+                cloud_provider="aws",
+                cloud_region="us-east-1",
+                instance_type="r7i.4xlarge",
+                warehouse_size="LARGE",
+                storage_format="parquet",
+            ),
+        ).to_dict()
+        bundle = tmp_path / "cost_deployment_only.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+
+        assert entry.deployment_class == "unavailable"
+        assert entry.cloud_provider is None
+        assert entry.cloud_region is None
+        assert entry.instance_or_warehouse is None
+        assert entry.storage_format is None
+
     def test_partial_normalized_cost_rejected(self, tmp_path: Path) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["normalized_cost"] = {

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { waitForShell } from "../support/fixtures";
 
-const TPCH_TUNED_ID = "tpch-duckdb-sf0.01-20260403-78762750";
+const TPCH_TUNED_ID = "tpch-duckdb-sf0.01-20260403-a5eff54e";
 
 // Failure tests share the same DuckDB-WASM cold-boot cost as the happy
 // paths but add network interception. Run serially so three parallel

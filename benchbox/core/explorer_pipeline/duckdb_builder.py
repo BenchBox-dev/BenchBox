@@ -44,13 +44,21 @@ _NORMALIZED_COST_COLUMNS = [
     ("cost_status", "VARCHAR"),
     ("billing_unit", "VARCHAR"),
     ("pricing_region", "VARCHAR"),
+]
+
+_ENVIRONMENT_FACET_COLUMNS = [
+    ("deployment_class", "VARCHAR"),
     ("cloud_provider", "VARCHAR"),
     ("cloud_region", "VARCHAR"),
+    ("instance_or_warehouse", "VARCHAR"),
+    ("storage_format", "VARCHAR"),
+]
+
+_LEGACY_COST_DEPLOYMENT_COLUMNS = [
     ("instance_type", "VARCHAR"),
     ("warehouse_size", "VARCHAR"),
     ("node_count", "INTEGER"),
     ("cluster_size", "VARCHAR"),
-    ("storage_format", "VARCHAR"),
     ("storage_tier", "VARCHAR"),
 ]
 
@@ -111,7 +119,7 @@ def _required_cost_choice(entry: ManifestEntry, cost: dict[str, Any], key: str, 
 
 
 def _normalized_cost_column_values(entry: ManifestEntry) -> tuple:
-    """Flatten entry.normalized_cost into the DuckDB column contract."""
+    """Flatten entry.normalized_cost metadata into the DuckDB column contract."""
     cost = entry.normalized_cost
     missing = _NORMALIZED_COST_KEYS - cost.keys()
     if missing:
@@ -134,13 +142,29 @@ def _normalized_cost_column_values(entry: ManifestEntry) -> tuple:
         _required_cost_choice(entry, cost, "cost_status", _COST_STATUSES),
         _required_cost_string(entry, cost, "billing_unit"),
         _required_cost_string(entry, cost, "pricing_region"),
-        deployment["cloud_provider"],
-        deployment["cloud_region"],
+    )
+
+
+def _environment_facet_column_values(entry: ManifestEntry) -> tuple:
+    """Flatten normalized execution-environment facets into browser columns."""
+    return (
+        entry.deployment_class,
+        entry.cloud_provider,
+        entry.cloud_region,
+        entry.instance_or_warehouse,
+        entry.storage_format,
+    )
+
+
+def _legacy_cost_deployment_column_values(entry: ManifestEntry) -> tuple:
+    """Keep legacy cost-deployment shape columns for existing cost/chart surfaces."""
+    cost = entry.normalized_cost
+    deployment = cost["deployment"]
+    return (
         deployment["instance_type"],
         deployment["warehouse_size"],
         deployment["node_count"],
         deployment["cluster_size"],
-        deployment["storage_format"],
         deployment["storage_tier"],
     )
 
@@ -171,6 +195,8 @@ class DuckDBSnapshotBuilder:
         ("validation_status", "VARCHAR"),
         ("cost_usd", "DOUBLE"),
         *_NORMALIZED_COST_COLUMNS,
+        *_ENVIRONMENT_FACET_COLUMNS,
+        *_LEGACY_COST_DEPLOYMENT_COLUMNS,
     ]
 
     def build(self, entries: list[ManifestEntry], output_path: Path) -> None:
@@ -344,13 +370,15 @@ class DuckDBSnapshotBuilder:
                 cost_status          VARCHAR  NOT NULL,
                 billing_unit         VARCHAR,
                 pricing_region       VARCHAR,
+                deployment_class     VARCHAR,
                 cloud_provider       VARCHAR,
                 cloud_region         VARCHAR,
+                instance_or_warehouse VARCHAR,
+                storage_format       VARCHAR,
                 instance_type        VARCHAR,
                 warehouse_size       VARCHAR,
                 node_count           INTEGER,
                 cluster_size         VARCHAR,
-                storage_format       VARCHAR,
                 storage_tier         VARCHAR,
                 compliance_class     VARCHAR,
                 is_ranking_eligible  BOOLEAN  NOT NULL,
@@ -390,8 +418,10 @@ class DuckDBSnapshotBuilder:
                 r.cost_status,
                 r.billing_unit,
                 r.pricing_region,
+                r.deployment_class,
                 r.cloud_provider,
                 r.cloud_region,
+                r.instance_or_warehouse,
                 r.instance_type,
                 r.warehouse_size,
                 r.node_count,
@@ -505,8 +535,10 @@ class DuckDBSnapshotBuilder:
                 cost_status,
                 billing_unit,
                 pricing_region,
+                deployment_class,
                 cloud_provider,
                 cloud_region,
+                instance_or_warehouse,
                 instance_type,
                 warehouse_size,
                 node_count,
@@ -628,6 +660,8 @@ class DuckDBSnapshotBuilder:
                     entry.validation_status,
                     entry.cost_usd,
                     *_normalized_cost_column_values(entry),
+                    *_environment_facet_column_values(entry),
+                    *_legacy_cost_deployment_column_values(entry),
                     entry.compliance_class,
                     is_ranking_eligible(entry),
                     has_plans,
@@ -876,6 +910,8 @@ class DuckDBSnapshotBuilder:
             entry.validation_status,
             entry.cost_usd,
             *_normalized_cost_column_values(entry),
+            *_environment_facet_column_values(entry),
+            *_legacy_cost_deployment_column_values(entry),
         )
 
 

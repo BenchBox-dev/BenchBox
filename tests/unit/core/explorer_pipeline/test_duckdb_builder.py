@@ -78,8 +78,10 @@ class TestDuckDBSnapshotBuilder:
             "cost_status",
             "billing_unit",
             "pricing_region",
+            "deployment_class",
             "cloud_provider",
             "cloud_region",
+            "instance_or_warehouse",
             "instance_type",
             "warehouse_size",
             "node_count",
@@ -133,6 +135,11 @@ class TestDuckDBSnapshotBuilder:
             test_type="power",
             validation_status="passed",
             cost_usd=0.42,
+            deployment_class="cloud",
+            cloud_provider="aws",
+            cloud_region="us-east-1",
+            instance_or_warehouse="XSMALL",
+            storage_format="snowflake_native",
             normalized_cost=NormalizedCost(
                 normalized_cost_usd="0.42",
                 cost_model_version="2026.05.0",
@@ -142,13 +149,13 @@ class TestDuckDBSnapshotBuilder:
                 billing_unit="instance_hour",
                 pricing_region="us-east-1",
                 deployment=DeploymentMetadata(
-                    cloud_provider="aws",
-                    cloud_region="us-east-1",
+                    cloud_provider="cost-provider",
+                    cloud_region="cost-region",
                     instance_type="r7i.4xlarge",
                     warehouse_size="large",
                     node_count=2,
                     cluster_size="2x",
-                    storage_format="parquet",
+                    storage_format="cost-format",
                     storage_tier="s3-standard",
                 ),
             ).to_dict(),
@@ -163,8 +170,9 @@ class TestDuckDBSnapshotBuilder:
                 " tuning_hash, test_type, validation_status, cost_usd,"
                 " normalized_cost_usd, cost_model_version, cost_model_source,"
                 " cost_scope, cost_status, billing_unit, pricing_region,"
-                " cloud_provider, cloud_region, instance_type, warehouse_size,"
-                " node_count, cluster_size, storage_format, storage_tier FROM results"
+                " deployment_class, cloud_provider, cloud_region, instance_or_warehouse,"
+                " instance_type, warehouse_size, node_count, cluster_size,"
+                " storage_format, storage_tier FROM results"
             ).fetchone()
 
         assert row[0] == pytest.approx(5656.85)
@@ -182,14 +190,16 @@ class TestDuckDBSnapshotBuilder:
         assert row[12] == "normalized"
         assert row[13] == "instance_hour"
         assert row[14] == "us-east-1"
-        assert row[15] == "aws"
-        assert row[16] == "us-east-1"
-        assert row[17] == "r7i.4xlarge"
-        assert row[18] == "large"
-        assert row[19] == 2
-        assert row[20] == "2x"
-        assert row[21] == "parquet"
-        assert row[22] == "s3-standard"
+        assert row[15] == "cloud"
+        assert row[16] == "aws"
+        assert row[17] == "us-east-1"
+        assert row[18] == "XSMALL"
+        assert row[19] == "r7i.4xlarge"
+        assert row[20] == "large"
+        assert row[21] == 2
+        assert row[22] == "2x"
+        assert row[23] == "snowflake_native"
+        assert row[24] == "s3-standard"
 
     def test_extended_fields_null_when_absent(self, tmp_path: Path) -> None:
         """All extended columns store NULL when the entry has no value."""
@@ -217,8 +227,9 @@ class TestDuckDBSnapshotBuilder:
             row = con.execute(
                 "SELECT normalized_cost_usd, cost_model_version, cost_model_source,"
                 " cost_scope, cost_status, billing_unit, pricing_region,"
-                " cloud_provider, cloud_region, instance_type, warehouse_size,"
-                " node_count, cluster_size, storage_format, storage_tier FROM results"
+                " deployment_class, cloud_provider, cloud_region, instance_or_warehouse,"
+                " storage_format, instance_type, warehouse_size, node_count,"
+                " cluster_size, storage_tier FROM results"
             ).fetchone()
 
         assert row is not None
