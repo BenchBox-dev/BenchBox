@@ -1,0 +1,235 @@
+id: write-primitives-sketch-pyspark-dataframe-surface
+title: "Write Primitives sketch: add PySpark-only DataFrame surface for sketch persist + merge"
+worktree: main
+priority: Medium
+status: "Not Started"
+category: "Core Functionality"
+
+description: |
+  The merged write_primitives sketch category exposes the persist +
+  merge + requery loop only on the SQL surface (8 ops). PySpark is
+  the only DataFrame engine in BenchBox's matrix with a comparable
+  DataFrame-side sketch API:
+
+  - `pyspark.sql.functions.hll_sketch_agg(col)` (Spark 3.5+) — builds
+    DataSketches HLL state, returns BINARY column.
+  - `pyspark.sql.functions.hll_union_agg(col)` — merges HLL states.
+  - `pyspark.sql.functions.hll_sketch_estimate(col)` — extracts count.
+  - `pyspark.sql.functions.approx_top_k_accumulate(col)` (Spark 4.1+)
+    + `_combine` + `_estimate` — same triplet for top-K.
+  - `percentile_approx(col, p)` for KLL-equivalent (no separate
+    accumulate/combine triplet at the DataFrame layer).
+
+  This TODO adds a Spark-only DataFrame implementation of the sketch
+  ops, mirroring the SQL category's structure. It does NOT extend the
+  cross-engine matrix — Polars / DataFusion / Pandas / Modin / cuDF /
+  Dask have no DataFrame-layer sketch persistence today.
+
+  Captured as a deferred item from the post-merge expansion review and
+  the DataFrame approximate-aggregates research (TODO #121's deferred
+  list).
+
+context_sections:
+  "Why Single-Engine Showcase Is Worth Doing": |
+    The SQL sketch ops already work on PySpark via the Spark SQL
+    `theta_sketch_agg` / `hll_sketch_agg` UDAFs (assuming the
+    DataSketches UDAF library is loaded). Adding a DataFrame surface
+    is technically redundant for users who can write SQL. But:
+
+      - It demonstrates the BenchBox DataFrame execution-mode story
+        for sketches — currently zero DataFrame engines have any
+        sketch ops at all on the write side.
+      - It exercises the persist+merge claim in a different idiom
+        (DataFrame chaining vs SQL CTE) which has different
+        optimisation opportunities.
+      - PySpark Connect (and therefore Databricks Connect, Snowpark
+        Connect, etc.) inherits the surface — enabling future
+        cross-engine DataFrame comparisons if those engines ship the
+        equivalent DataSketches functions.
+
+  "Spark Version Floor Considerations": |
+    HLL sketches: Spark 3.5+. BenchBox's PySpark adapter currently
+    targets >= 3.5, so this is a soft floor.
+    Top-K accumulate/combine/estimate: Spark 4.1+. Many BenchBox-
+    supported PySpark deployments are on 3.5 / 4.0 — top-K ops must
+    guard with a runtime version check and skip cleanly on older
+    versions rather than failing.
+
+work:
+  - id: w1
+    summary: "Investigate write_primitives DataFrame execution model — confirm whether dataframe_operations.py has any prior art for sketch-style multi-step ops"
+    status: pending
+    notes: |
+      Read `benchbox/core/write_primitives/dataframe_operations.py` to
+      understand: (a) whether dataframe-mode write ops exist today;
+      (b) what the registration / dispatch pattern looks like; (c)
+      whether validation contracts are honored on the dataframe side
+      or only SQL. This is a research-first work unit — we may discover
+      that BenchBox's write_primitives DataFrame surface is structurally
+      different from read_primitives' (which uses the
+      DataFrameContext / expression_impl / pandas_impl pattern).
+
+      Output: a short doc note (in the TODO file or a scratch doc)
+      summarising what the implementation pattern needs to look like
+      for sketch ops.
+
+  - id: w2
+    summary: "Add PySpark dataframe_operations for HLL persist + merge (mirrors sketch_query_theta_union_merge)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Build a DataFrame-side equivalent of `sketch_query_theta_union_merge`:
+        - groupBy(date, region).agg(F.hll_sketch_agg("l_orderkey"))
+          to produce per-partition HLL sketches in a BINARY column.
+        - Persist (Delta or Parquet) — measure write latency.
+        - Read back, merge with F.hll_union_agg, estimate with
+          F.hll_sketch_estimate — measure merge+requery latency.
+      Include in the result_contract a tolerance-bounded distinct
+      count (re-tune empirically against PySpark; HLL++ vs DataSketches
+      HLL produce different bias).
+
+  - id: w3
+    summary: "Add PySpark dataframe_operations for top-K accumulate + combine (Spark 4.1+ guarded)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Mirror `sketch_query_topk_combine` using
+      F.approx_top_k_accumulate("l_shipmode") /
+      F.approx_top_k_combine(sketch) / F.approx_top_k_estimate(sketch).
+
+      Runtime guard: if PySpark version < 4.1, skip the op cleanly with
+      an informative log message (do NOT raise) — the SQL sibling
+      handles this via platform_overrides; the DataFrame side needs an
+      equivalent check at op load time or at first-call.
+
+  - id: w4
+    summary: "Document the PySpark-only DataFrame sketch surface in cross-platform docs"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Extend `docs/benchmarks/write-primitives-sketch-functions.md`
+      with a "DataFrame surface" section noting:
+        - Only PySpark has DataFrame-side sketch persistence today
+          (HLL ≥ Spark 3.5, top-K ≥ Spark 4.1).
+        - Cross-link to the SQL sibling ops so users can compare
+          DataFrame-mode vs SQL-mode latency on the same engine.
+        - Note that other DataFrame engines (Polars, DataFusion, Dask)
+          have no sketch persistence path — re-evaluate when they
+          ship native equivalents (link to upstream issues).
+
+  - id: w5
+    summary: "Add changelog entry under unreleased"
+    needs: [w4]
+    status: pending
+    notes: |
+      Terse user-facing bullet:
+      "write_primitives sketch (DataFrame): add PySpark-only HLL
+      persist+merge ops (Spark 3.5+) and top-K accumulate+combine
+      ops (Spark 4.1+). Other DataFrame engines have no comparable
+      surface today — see docs."
+
+deferred:
+  - summary: "PySpark KLL DataFrame surface (state-builder + merge)"
+    reason: "Spark exposes percentile_approx as a one-shot aggregate but no DataFrame-layer accumulate/combine/estimate triplet for KLL. Wait until kll_sketch_agg ships at the DataFrame layer (currently SQL-UDAF-only via DataSketches Spark integration)."
+  - summary: "DataFrame-side storage-size validation for sketch persistence"
+    reason: "Storage-size methodology is being added in `write-primitives-sketch-clickhouse-and-storage-metrics` for the SQL surface. Once that lands, mirror it for the DataFrame surface — but do that as a follow-up, not in this TODO."
+
+deps:
+  needs: []
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - write-primitives
+    - sketches
+    - pyspark
+    - dataframe
+    - benchmark-catalog
+  estimated_effort: "1-2 days"
+  created_date: "2026-05-02"
+  last_updated: "2026-05-02"
+
+impact:
+  business_value: |
+    Activates the BenchBox DataFrame execution mode for write-side
+    sketch persistence on PySpark — currently zero DataFrame engines
+    in BenchBox's matrix have any sketch ops at all. Demonstrates the
+    Spark-DataSketches DataFrame story for users who prefer DataFrame
+    APIs to SQL.
+  user_impact: |
+    PySpark / Databricks DataFrame users get a DataFrame-mode equivalent
+    of the SQL sketch ops, comparable head-to-head. Other DataFrame
+    engines see "—" rows in the docs explaining the gap.
+  technical_debt: |
+    Establishes a precedent for DataFrame-side sketch ops that future
+    engines (when they ship sketch APIs at the DataFrame layer) can
+    extend. Validates that BenchBox's DataFrame execution model can
+    handle multi-step persist + merge workflows, not just single-pass
+    aggregates.
+
+files_affected:
+  modified:
+    - benchbox/core/write_primitives/dataframe_operations.py
+    - docs/benchmarks/write-primitives-sketch-functions.md
+    - CHANGELOG.md
+  added:
+    - tests/unit/core/write_primitives/test_dataframe_sketch_ops.py
+
+must_preserve:
+  - "All existing 117 SQL write_primitives operations execute identically — DataFrame additions are net-new and do not touch the SQL catalog."
+  - "PySpark adapter remains usable on Spark < 4.1 (top-K ops skip cleanly)."
+
+approach: |
+  Start with w1 as a research spike — read dataframe_operations.py
+  before designing. The pattern may differ from read_primitives'
+  expression_impl / pandas_impl split because write ops have
+  validation_queries + cleanup_sql phases that don't map cleanly to
+  DataFrame fluent APIs. If the existing pattern requires significant
+  extension, that itself becomes a scope question to surface back to
+  the user before continuing.
+
+  HLL ops first (Spark 3.5+ stable surface). Top-K ops second with the
+  version guard. KLL is deferred — Spark doesn't ship a DataFrame-
+  layer accumulate/combine triplet for KLL today.
+
+anti_patterns:
+  - "DO NOT mirror the 8 SQL sketch ops 1-for-1 in DataFrame mode — because the DataFrame fluent-API idiom doesn't match the SQL CTE idiom (e.g. CREATE TABLE + INSERT + SELECT in one op) — express each persist+merge cycle as its own DataFrame chain and document the mapping in w4 docs, not in op IDs."
+  - "DO NOT crash on Spark < 4.1 when top-K ops are invoked — because the BenchBox PySpark adapter is documented to support Spark 3.5+ — runtime-guard with a version check and skip cleanly with a logged reason."
+  - "DO NOT add KLL DataFrame ops in this TODO — because Spark's KLL surface is SQL-UDAF-only today and a DataFrame chain would need to fall back to percentile_approx (which is one-shot, defeats the persist+merge story) — explicit deferred item."
+  - "DO NOT extend BenchBox's DataFrame execution model beyond what dataframe_operations.py already supports — because that's a structural change with broader scope implications — surface the need to the user before extending."
+
+verification:
+  - description: "PySpark unit tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/write_primitives -q"
+    expected_output: "all tests pass, including new test_dataframe_sketch_ops.py"
+  - description: "PySpark live: HLL persist+merge DataFrame ops execute end-to-end"
+    command: "uv run -- benchbox run --platform pyspark --benchmark write_primitives --scale 0.01 --queries sketch_df_hll_persist_merge"
+    expected_output: "op completes; merged distinct estimate within tolerance bounds"
+  - description: "Top-K ops skip cleanly on Spark < 4.1 (if local Spark is older)"
+    command: "uv run -- benchbox run --platform pyspark --benchmark write_primitives --scale 0.01 --queries sketch_df_topk_accumulate_combine"
+    expected_output: "either passes (Spark 4.1+) or skips with a clear 'requires Spark 4.1+' log message — no crash"
+
+scope_limit:
+  only_modify:
+    - benchbox/core/write_primitives/dataframe_operations.py
+    - docs/benchmarks/write-primitives-sketch-functions.md
+    - tests/unit/core/write_primitives/
+    - CHANGELOG.md
+  do_not_modify:
+    - benchbox/core/write_primitives/catalog/operations.yaml
+    - benchbox/core/write_primitives/schema.py
+    - benchbox/core/write_primitives/catalog/loader.py
+    - benchbox/core/write_primitives/benchmark.py
+    - benchbox/core/read_primitives/
+
+success_metrics:
+  - "PySpark DataFrame-mode sketch ops (HLL persist+merge; top-K accumulate+combine) execute end-to-end at SF=0.01 on a local Spark"
+  - "Top-K ops skip cleanly on Spark < 4.1 with a clear log message"
+  - "Cross-platform docs document PySpark as the only DataFrame engine with sketch persistence today, with cross-link to the SQL sibling"
+  - "Changelog entry under unreleased"
+
+open_questions:
+  - "What's the existing dataframe_operations.py pattern? w1 is a research spike — implementation design depends on it. May surface a need to extend BenchBox's DataFrame execution model before this TODO can proceed."
+  - "Should Databricks Connect / Snowpark Connect be tested too, or is local PySpark coverage sufficient? Lean: local PySpark only for this TODO; cross-engine Connect verification is its own scope."
+  - "Spark 4.1 hasn't shipped GA at the time of this TODO's creation (2026-05). If 4.1 GA is delayed, the top-K work unit (w3) may need to be deferred or guarded behind a Spark master/preview build. Re-evaluate at implementation time."
