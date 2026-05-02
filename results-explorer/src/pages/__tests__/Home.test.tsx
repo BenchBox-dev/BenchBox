@@ -6,6 +6,7 @@ vi.mock("@/db", () => ({
 }));
 
 import { queryRows } from "@/db";
+import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
 import { Home } from "@/pages/Home";
 
 /**
@@ -211,6 +212,7 @@ function expectDocumentOrder(first: Element, second: Element) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearDuckdbQueryCachesForTests();
   window.history.replaceState(null, "", "/results/");
   vi.mocked(queryRows).mockImplementation(async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
@@ -482,6 +484,32 @@ describe("Home", () => {
     expect(cohortLink.getAttribute("href")).toContain("platform=DuckDB");
     expect(cohortLink.getAttribute("href")).toContain("deployment=cloud");
     expect(cohortLink.getAttribute("href")).toContain("cost_status=normalized");
+  });
+
+  it("restores URL facet aliases while keeping coverage labels visible", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/results/?bm=clickbench&scale_factor=0.1&trust_tier=maintainer-run",
+    );
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    await waitFor(() => {
+      const params = new URL(window.location.href).searchParams;
+      expect(params.get("benchmark")).toBe("clickbench");
+      expect(params.get("sf")).toBe("0.1");
+      expect(params.get("trust")).toBe("maintainer-run");
+      expect(params.get("bm")).toBeNull();
+      expect(params.get("scale_factor")).toBeNull();
+      expect(params.get("trust_tier")).toBeNull();
+    });
+
+    const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
+    expect(within(grid).getByRole("columnheader", { name: "Avg rank over covered cohorts" })).toBeTruthy();
+    expect(within(grid).getByText("1/1 cohorts")).toBeTruthy();
+    expect(within(grid).getByText("over 1/1")).toBeTruthy();
   });
 
   it("surfaces leaderboard receipt links with trust and validation metadata", async () => {

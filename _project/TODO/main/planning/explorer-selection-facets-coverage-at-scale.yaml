@@ -190,7 +190,10 @@ work:
   - id: w12
     summary: "Add regression tests for URL persistence, coverage labels, and no-penalty ranking"
     needs: [w7, w8, w9, w10, w11]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      - "results-explorer/src/pages/__tests__/Home.test.tsx"
     notes: |
       Tests should cover:
         - URL state restores all primary facets.
