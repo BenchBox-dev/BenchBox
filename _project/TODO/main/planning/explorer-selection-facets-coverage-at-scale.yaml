@@ -59,7 +59,10 @@ work:
   - id: w3
     summary: "Migrate BenchmarkIndex page to shared facet model"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/BenchmarkIndex.tsx"
+      - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
     notes: |
       Same migration shape as w2; restrict default facets to those meaningful
       for a single-benchmark page (scale_factor, phase, platform, tuning_mode,
