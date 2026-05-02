@@ -33,31 +33,77 @@ let dbInstance: duckdb.AsyncDuckDB | null = null;
 let initPromise: Promise<duckdb.AsyncDuckDB> | null = null;
 let initFailures = 0;
 const INIT_FAILURE_LIMIT = 3;
-const SNAPSHOT_READY_ATTEMPTS = 5;
+const SNAPSHOT_READY_ATTEMPTS = 8;
 const SNAPSHOT_READY_DELAY_MS = 100;
+const QUERY_RETRY_ATTEMPTS = 3;
+const QUERY_RETRY_DELAY_MS = 100;
 let initError: Error | null = null;
 
 type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
 
-const SNAPSHOT_READY_SCAN_SQL = `
-  SELECT *
-  FROM bench.platform_index_rows
-  ORDER BY run_date DESC
-`;
+const SNAPSHOT_READY_SCANS = [
+  {
+    label: "results",
+    sql: "SELECT result_id FROM bench.results LIMIT 1",
+  },
+  {
+    label: "platform_index_rows",
+    sql: "SELECT result_id FROM bench.platform_index_rows LIMIT 1",
+  },
+  {
+    label: "benchmark_rankings",
+    sql: "SELECT result_id FROM bench.benchmark_rankings LIMIT 1",
+  },
+  {
+    label: "benchmark_matrix_cells",
+    sql: "SELECT result_id FROM bench.benchmark_matrix_cells LIMIT 1",
+  },
+  {
+    label: "result_detail_metrics",
+    sql: "SELECT result_id FROM bench.result_detail_metrics LIMIT 1",
+  },
+  {
+    label: "query_display_timings",
+    sql: "SELECT result_id FROM bench.query_display_timings LIMIT 1",
+  },
+  {
+    label: "query_executions",
+    sql: "SELECT result_id FROM bench.query_executions LIMIT 1",
+  },
+  {
+    label: "short_ids",
+    sql: "SELECT result_id FROM bench.short_ids LIMIT 1",
+  },
+] as const;
+
+const TRANSIENT_DUCKDB_SNAPSHOT_ERROR_PATTERNS = [
+  /offset is out of bounds/i,
+  /fieldsLength/i,
+];
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }
 
 async function waitForSnapshotRows(conn: DuckDBConnection): Promise<void> {
+  let lastError: unknown = null;
   for (let attempt = 1; attempt <= SNAPSHOT_READY_ATTEMPTS; attempt += 1) {
-    const result = await conn.query(SNAPSHOT_READY_SCAN_SQL);
-    const rowCount = result.toArray().length;
-    if (rowCount > 0 || attempt === SNAPSHOT_READY_ATTEMPTS) {
-      return;
+    try {
+      const counts: Array<readonly [string, number]> = [];
+      for (const scan of SNAPSHOT_READY_SCANS) {
+        const result = await conn.query(scan.sql);
+        counts.push([scan.label, result.toArray().length] as const);
+      }
+      const emptyScans = counts.filter(([, rowCount]) => rowCount === 0).map(([label]) => label);
+      if (emptyScans.length === 0) return;
+      lastError = new Error(`DuckDB snapshot readiness returned empty scan(s): ${emptyScans.join(", ")}`);
+    } catch (error: unknown) {
+      lastError = error;
+      if (!isTransientDuckDbSnapshotError(error)) throw error;
     }
     await sleep(SNAPSHOT_READY_DELAY_MS * attempt);
   }
+  throw lastError instanceof Error ? lastError : new Error("DuckDB snapshot did not become query-ready");
 }
 
 // Reset the retry counter when the browser reports a network recovery so a
@@ -146,6 +192,25 @@ export async function queryRows<T>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T[]> {
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= QUERY_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await queryRowsOnce<T>(sql, params);
+    } catch (error: unknown) {
+      lastError = error;
+      if (!isTransientDuckDbSnapshotError(error) || attempt === QUERY_RETRY_ATTEMPTS) {
+        throw error;
+      }
+      await sleep(QUERY_RETRY_DELAY_MS * attempt);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("DuckDB query failed");
+}
+
+async function queryRowsOnce<T>(
+  sql: string,
+  params: unknown[] = [],
+): Promise<T[]> {
   const db = await getDb();
   const conn = await db.connect();
   let statement: duckdb.AsyncPreparedStatement | null = null;
@@ -161,4 +226,9 @@ export async function queryRows<T>(
     }
     await conn.close();
   }
+}
+
+function isTransientDuckDbSnapshotError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return TRANSIENT_DUCKDB_SNAPSHOT_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 }

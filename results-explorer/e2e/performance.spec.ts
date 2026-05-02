@@ -1,8 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { waitForDataLoaded } from "./support/fixtures";
-
 const SAMPLE_COUNT = 10;
+const MAX_SAMPLE_ATTEMPTS = SAMPLE_COUNT + 3;
+const TRANSIENT_DUCKDB_WASM_INIT_ERROR =
+  /Cannot read properties of null \(reading 'fieldsLength'\)|offset is out of bounds/i;
 
 const MARKS = {
   DB_INIT_READY: "db-init-ready",
@@ -42,12 +43,26 @@ test.describe("Performance smoke @performance", () => {
 
     const homeSamples: HomePerformanceSample[] = [];
     const querySamples: QueryPerformanceSample[] = [];
+    const transientRetries: string[] = [];
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
-      for (let index = 0; index < SAMPLE_COUNT; index += 1) {
-        homeSamples.push(await collectHomePerformanceSample(page, index));
-        querySamples.push(await collectQueryPerformanceSample(page, index));
+      for (let attempt = 0; homeSamples.length < SAMPLE_COUNT && attempt < MAX_SAMPLE_ATTEMPTS; attempt += 1) {
+        try {
+          const sample = await collectPerformanceSample(page, attempt);
+          homeSamples.push(sample.home);
+          querySamples.push(sample.query);
+        } catch (error) {
+          if (!isTransientPerformanceSampleError(error)) throw error;
+          transientRetries.push(`attempt ${attempt}: ${error.message}`);
+          await resetAfterTransientSample(page);
+        }
+      }
+      if (homeSamples.length !== SAMPLE_COUNT || querySamples.length !== SAMPLE_COUNT) {
+        throw new Error(
+          `Collected ${homeSamples.length}/${SAMPLE_COUNT} successful performance samples after ` +
+            `${MAX_SAMPLE_ATTEMPTS} attempts; retries=${transientRetries.join("; ")}`,
+        );
       }
     } finally {
       await context.close();
@@ -80,6 +95,15 @@ test.describe("Performance smoke @performance", () => {
       contentType: "application/json",
       body: JSON.stringify(summaries, null, 2),
     });
+    if (transientRetries.length > 0) {
+      console.info(
+        `Retried ${transientRetries.length} transient DuckDB-WASM init failure(s): ${transientRetries.join("; ")}`,
+      );
+      await testInfo.attach("performance-retries.json", {
+        contentType: "application/json",
+        body: JSON.stringify(transientRetries, null, 2),
+      });
+    }
 
     for (const summary of summaries) {
       expect(
@@ -98,9 +122,18 @@ test.describe("Performance smoke @performance", () => {
   });
 });
 
+async function collectPerformanceSample(
+  page: Page,
+  attempt: number,
+): Promise<{ home: HomePerformanceSample; query: QueryPerformanceSample }> {
+  const home = await collectHomePerformanceSample(page, attempt);
+  const query = await collectQueryPerformanceSample(page, attempt);
+  return { home, query };
+}
+
 async function collectHomePerformanceSample(page: Page, index: number): Promise<HomePerformanceSample> {
   await page.goto(`/results/?bb_perf=1&perf_run=${index}`);
-  await waitForDataLoaded(page, /Recent Results/i);
+  await waitForPerformanceDataLoaded(page, /Recent Results/i);
   await waitForMeasure(page, MEASURES.DB_INIT);
   await waitForMeasure(page, MEASURES.LEADERBOARD_RENDER_AFTER_DATA);
 
@@ -127,7 +160,7 @@ async function collectHomePerformanceSample(page: Page, index: number): Promise<
 
 async function collectQueryPerformanceSample(page: Page, index: number): Promise<QueryPerformanceSample> {
   await page.goto(`/results/query?bb_perf=1&perf_run=${index}`);
-  await waitForDataLoaded(page, /matching result bundle/i);
+  await waitForPerformanceDataLoaded(page, /matching result bundle/i);
   await waitForMeasure(page, MEASURES.QUERY_WORKBENCH_RENDER_AFTER_DB);
 
   return page.evaluate(({ measures }) => ({
@@ -139,12 +172,45 @@ async function collectQueryPerformanceSample(page: Page, index: number): Promise
   }), { measures: MEASURES });
 }
 
+async function waitForPerformanceDataLoaded(page: Page, locator: string | RegExp): Promise<void> {
+  const dataLocator = typeof locator === "string"
+    ? page.locator(locator).first()
+    : page.getByText(locator).first();
+  const result = await Promise.race([
+    dataLocator.waitFor({ state: "visible", timeout: 30_000 }).then(() => "ready" as const),
+    page
+      .getByText(TRANSIENT_DUCKDB_WASM_INIT_ERROR)
+      .first()
+      .waitFor({ state: "visible", timeout: 30_000 })
+      .then(() => "transient-init-error" as const),
+  ]);
+  if (result === "transient-init-error") {
+    throw new TransientPerformanceSampleError("DuckDB-WASM returned a transient snapshot-read error during cold init");
+  }
+}
+
 async function waitForMeasure(page: Page, name: string): Promise<void> {
   await page.waitForFunction(
     (measureName) => performance.getEntriesByName(measureName, "measure").length > 0,
     name,
     { timeout: 30_000 },
   );
+}
+
+async function resetAfterTransientSample(page: Page): Promise<void> {
+  await page.goto("about:blank");
+  await page.waitForTimeout(250);
+}
+
+class TransientPerformanceSampleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TransientPerformanceSampleError";
+  }
+}
+
+function isTransientPerformanceSampleError(error: unknown): error is TransientPerformanceSampleError {
+  return error instanceof TransientPerformanceSampleError;
 }
 
 function summarizeBudget(
