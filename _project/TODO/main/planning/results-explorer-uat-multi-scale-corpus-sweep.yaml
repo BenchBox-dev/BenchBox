@@ -260,11 +260,11 @@ work:
       then prune. Do not check logs into the repo.
 
 verification:
-  - description: "Run logs directory exists with at least one log per attempted (platform, benchmark, scale) cell."
-    command: "ls ~/Developer/benchmark_runs/logs/uat_*/ 2>/dev/null | wc -l"
+  - description: "Run logs directory exists with at least one log per attempted (platform, benchmark, scale) cell. Drop a sentinel file at sweep start (`touch ~/Developer/benchmark_runs/logs/uat_$(date +%Y%m%d)/.sweep_start`) so later checks can use it as a `-newer` anchor."
+    command: "ls ~/Developer/benchmark_runs/logs/uat_$(date +%Y%m%d)/ 2>/dev/null | wc -l"
     expected_output: ">= number of attempted runs"
-  - description: "At least the smoke ladder for DuckDB succeeds and produces submittable result JSONs."
-    command: "find ~/Developer/benchmark_runs/results -name 'duckdb_*.json' -newer ~/Developer/benchmark_runs/logs/uat_* | head"
+  - description: "At least the smoke ladder for DuckDB succeeds and produces submittable result JSONs after the sweep started."
+    command: "find ~/Developer/benchmark_runs/results -name 'duckdb_*.json' -newer ~/Developer/benchmark_runs/logs/uat_$(date +%Y%m%d)/.sweep_start | head"
     expected_output: "result JSONs present for duckdb at SF=0.01/0.1/1.0 across the TPC and primitives benchmarks"
   - description: "Follow-up defect TODOs exist for every Explorer/Submission finding above 'nit' severity."
     command: "ls _project/TODO/main/planning/results-explorer-uat-defect-*.yaml 2>/dev/null"
@@ -295,6 +295,12 @@ approach: |
   deps are in fact Completed and update this approach if the dep set
   has shifted.
 
+  Before starting w5 (submission flow), resolve the cloud-platform
+  inclusion and publish-vs-draft questions with the user (see
+  `open_questions` Q2 and Q3). Both materially change the run matrix
+  and the risk profile of what lands in `published-results`; deciding
+  them after the corpus is generated forces rework.
+
 anti_patterns:
   - "DO NOT invoke `scripts/local_stress_test.sh` -- because this is a UAT of the BenchBox CLI itself, and using the script would skip the surface under test -- read the script for knowledge only and call `benchbox run` directly."
   - "DO NOT modify benchmark queries, dialect adapters, datagen code, or platform implementations to make failing runs pass -- because the corpus is only valuable if it reflects real platform behavior -- log the failure as deferred and move on."
@@ -305,6 +311,10 @@ anti_patterns:
   - "DO NOT silently kill processes the agent did not start during pre-flight -- because they may be the user's in-progress work -- surface them and ask first."
 
 scope_limit:
+  # Whole-directory `do_not_modify` entries are intentional here:
+  # the surfaces under test are exactly those directories, and the
+  # UAT loses its value if the agent edits them mid-sweep. Reviewers
+  # should not flag these as the usual "scope_limit too broad" smell.
   only_modify:
     - "_project/TODO/main/planning/results-explorer-uat-defect-*.yaml"
     - "_project/handoffs/results-explorer-uat-retrospective-*.md"
