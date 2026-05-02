@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-214358-pool-size-not-codified-as-contract
 date: 2026-04-30
-status: open
+status: actioned
 finding_kind: missed-axis
 review_context: "/docs review of dev-loop worktree pool / chore/worktree-pool-docs-review / PR #84"
 related_paths:
@@ -61,3 +61,4 @@ happens, instead of failing slow under load.
   reports state non-fatally (today's run shows `pool-01` dirty for
   26h, several `claimed` for hours; would not be flagged by a check
   target). The decision (codify vs document) is still owed.
+- 2026-05-02: actioned — Sweep 2026-05-02: added make worktree-pool-check target — exits non-zero on (a) any slot directory missing, (b) any slot with surviving .benchbox/claim_in_progress marker (aborted state), (c) any extra pool-NN slot beyond POOL_SIZE. Read-only, no gh calls so cheap; not a PR-CI gate. Documented as 'pre-release sanity check or periodic local cron' in the recipe header, in docs/operations/dev-loop-worktree-pool.md, and added to CLAUDE.md pre-approved read-only commands. Regression tests in tests/integration/worktree/test_worktree_pool_check.py cover the four contract clauses (healthy / missing / aborted / extras).
