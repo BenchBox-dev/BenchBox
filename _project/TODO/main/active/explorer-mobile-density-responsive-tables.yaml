@@ -113,7 +113,9 @@ work:
 - id: w8
   summary: "Add Playwright responsive assertions (not just screenshots) for DOM order, density, and overflow"
   needs: [w2, w4, w5, w6, w7]
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/e2e/responsive.spec.ts"
   notes: |
     Mechanical assertions, not screenshot-only smokes. For `/results/`,
     `/results/star_schema/?phase=standard`, `/results/query`, and
