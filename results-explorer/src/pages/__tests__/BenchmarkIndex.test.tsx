@@ -22,6 +22,32 @@ vi.mock("@/db", () => ({
   queryRows: vi.fn(),
 }));
 
+vi.mock("@/components/QueryHeatmap", async () => {
+  const actual = await vi.importActual<typeof import("@/components/QueryHeatmap")>("@/components/QueryHeatmap");
+  type QueryHeatmapProps = Parameters<typeof actual.QueryHeatmap>[0];
+
+  return {
+    ...actual,
+    QueryHeatmap: (props: QueryHeatmapProps) => {
+      const testWindow = window as Window & { __benchboxCompareSelectionTest?: boolean };
+      if (!testWindow.__benchboxCompareSelectionTest) {
+        return <actual.QueryHeatmap {...props} />;
+      }
+      return (
+        <div>
+          <actual.QueryHeatmap {...props} />
+          <button
+            type="button"
+            onClick={() => props.onSelectionChange?.(new Set(["aaaaaaaa", "bbbbbbbb"]))}
+          >
+            Select fixture compare rows
+          </button>
+        </div>
+      );
+    },
+  };
+});
+
 import { queryRows } from "@/db";
 import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
 import { BenchmarkIndex } from "@/pages/BenchmarkIndex";
@@ -113,7 +139,7 @@ const RANKING_ROWS = [
     result_id: "r1",
     platform_id: "duckdb",
     platform: "DuckDB",
-    short_id: "",
+    short_id: "aaaaaaaa",
     trust_label: "maintainer-run",
     tuning_mode: null,
     tuning_hash: null,
@@ -149,7 +175,7 @@ const RANKING_ROWS = [
     result_id: "r2",
     platform_id: "sqlite",
     platform: "SQLite",
-    short_id: "",
+    short_id: "bbbbbbbb",
     trust_label: "community-submission",
     tuning_mode: null,
     tuning_hash: null,
@@ -269,6 +295,7 @@ function defaultImpl(rows: typeof RESULT_ROWS, rankings: typeof RANKING_ROWS, ce
 beforeEach(() => {
   vi.clearAllMocks();
   clearDuckdbQueryCachesForTests();
+  delete (window as Window & { __benchboxCompareSelectionTest?: boolean }).__benchboxCompareSelectionTest;
   window.history.replaceState(null, "", "/results/tpch/");
   vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS));
 });
@@ -333,6 +360,28 @@ describe("BenchmarkIndex", () => {
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
     expect(screen.getByText("exact")).toBeTruthy();
     expect(screen.getByText("loose")).toBeTruthy();
+  });
+
+  it("compare tray shows selected metadata and links with short IDs", async () => {
+    (window as Window & { __benchboxCompareSelectionTest?: boolean }).__benchboxCompareSelectionTest = true;
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Select fixture compare rows" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Select fixture compare rows" }));
+
+    await waitFor(() => expect(screen.getByTestId("compare-tray-row-aaaaaaaa")).toBeTruthy());
+
+    const duckRow = screen.getByTestId("compare-tray-row-aaaaaaaa");
+    const sqliteRow = screen.getByTestId("compare-tray-row-bbbbbbbb");
+    expect(duckRow.textContent).toContain("DuckDB");
+    expect(duckRow.textContent).toContain("TPC-H");
+    expect(duckRow.textContent).toContain("SF 0.1");
+    expect(duckRow.textContent).toContain("power");
+    expect(duckRow.textContent).toContain("2026-04-01");
+    expect(duckRow.textContent).toContain("ID aaaaaaaa");
+    expect(sqliteRow.textContent).toContain("SQLite");
+
+    const compareLink = screen.getByRole("link", { name: /Compare 2 selected/ }) as HTMLAnchorElement;
+    expect(compareLink.getAttribute("href")).toBe("/results/compare?ids=aaaaaaaa,bbbbbbbb");
   });
 
   it("restores benchmark URL facets without letting cohort facets block option recovery", async () => {

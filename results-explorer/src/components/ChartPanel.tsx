@@ -33,6 +33,8 @@ import {
 
 interface ChartPanelProps {
   context: ChartContext;
+  baselineIndex?: number;
+  onBaselineIndexChange?: (baselineIndex: number) => void;
 }
 
 interface CompareQueryRow {
@@ -47,7 +49,7 @@ interface ValueLabelPlacement {
   placement: "outside" | "inside" | "gutter";
 }
 
-export function ChartPanel({ context }: ChartPanelProps) {
+export function ChartPanel({ context, baselineIndex, onBaselineIndexChange }: ChartPanelProps) {
   const charts = useMemo(() => applicableCharts(context), [context]);
   const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
   const summary = useMemo(() => buildRenderableSummary(context), [context]);
@@ -86,7 +88,13 @@ export function ChartPanel({ context }: ChartPanelProps) {
   }, [context, summary]);
   const preferredId = useMemo(() => preferredChartId(context, charts), [context, charts]);
   const [activeId, setActiveId] = useState<string>(preferredId);
-  const [baselineIdx, setBaselineIdx] = useState(0);
+  const [localBaselineIdx, setLocalBaselineIdx] = useState(0);
+  const isBaselineControlled = baselineIndex !== undefined;
+  const baselineIdx = normalizeBaselineIndex(
+    summary?.platforms.length ?? 0,
+    isBaselineControlled ? baselineIndex : localBaselineIdx,
+  );
+  const setBaselineIdx = onBaselineIndexChange ?? setLocalBaselineIdx;
 
   useEffect(() => {
     if (!charts.some((chart) => chart.id === activeId)) {
@@ -95,8 +103,8 @@ export function ChartPanel({ context }: ChartPanelProps) {
   }, [activeId, charts, preferredId]);
 
   useEffect(() => {
-    setBaselineIdx(0);
-  }, [context]);
+    if (!isBaselineControlled) setLocalBaselineIdx(0);
+  }, [context, isBaselineControlled]);
 
   if (charts.length === 0) return null;
 
@@ -105,7 +113,10 @@ export function ChartPanel({ context }: ChartPanelProps) {
     chartGroups.find((group) => group.charts.some((chart) => chart.id === activeChart.id)) ??
     chartGroups[0]!;
   const activeGroupCharts = activeGroup.charts;
-  const showBaseline = context.kind === "compare" && (activeId === "normalized_speedup" || activeId === "diverging_bar");
+  const showBaseline =
+    !isBaselineControlled &&
+    context.kind === "compare" &&
+    (activeId === "normalized_speedup" || activeId === "diverging_bar");
 
   const selectGroup = (group: (typeof chartGroups)[number]) => {
     const nextChart =
@@ -207,6 +218,10 @@ export function ChartPanel({ context }: ChartPanelProps) {
       </div>
     </section>
   );
+}
+
+function normalizeBaselineIndex(platformCount: number, baselineIndex: number) {
+  return baselineIndex >= 0 && baselineIndex < platformCount ? baselineIndex : 0;
 }
 
 function preferredChartId(

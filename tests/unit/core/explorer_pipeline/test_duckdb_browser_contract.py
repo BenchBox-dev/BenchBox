@@ -279,7 +279,10 @@ class TestSourceFidelity:
     def _result_row(self, db_path: Path) -> dict:
         with _connect(db_path) as con:
             row = con.execute("SELECT * FROM results LIMIT 1").fetchone()
-            cols = [d[0] for d in con.description]
+            description = con.description
+            assert description is not None
+            assert row is not None
+            cols = [d[0] for d in description]
         return dict(zip(cols, row))
 
     def test_benchmark_matches_bundle(self, db_path: Path) -> None:

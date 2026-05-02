@@ -37,7 +37,12 @@ future interpreter release needs bespoke packaging rules.
 | pydantic | `>=2.0.0` |
 | pyyaml | `>=6.0.0` |
 | packaging | `>=24.0` |
-| duckdb | `>=1.3.1` |
+| duckdb | `>=1.0.0,<1.4.0` |
+
+DuckDB is capped below 1.4.0 across the development, `all`, `duckdb`, and
+`explorer` dependency paths until the browser runtime moves beyond
+`@duckdb/duckdb-wasm` 1.32.x. Newer native DuckDB writers can emit
+`results.duckdb` snapshots that the current WASM reader fails to attach.
 
 ## Optional Extras
 
@@ -48,7 +53,7 @@ future interpreter release needs bespoke packaging rules.
 | clickhouse | `clickhouse-driver>=0.2.0` |
 | cloud | `databricks-sql-connector>=2.0.0`, `google-cloud-bigquery>=3.0.0`, `google-cloud-storage>=2.0.0`, `redshift-connector>=2.0.0`, `snowflake-connector-python>=3.0.0`, `boto3>=1.20.0`, `cloudpathlib>=0.15.0` |
 | databricks | `databricks-sql-connector>=2.0.0`, `cloudpathlib>=0.15.0` |
-| dev | `pytest>=8.0.0`, `pytest-cov>=4.1.0`, `pytest-benchmark>=4.0.0`, `pytest-xdist>=3.0.0`, `duckdb>=0.9.0`, `tox>=4.13.0` |
+| dev | `pytest>=8.0.0`, `pytest-cov>=4.1.0`, `pytest-benchmark>=4.0.0`, `pytest-xdist>=3.0.0`, `duckdb>=1.0.0,<1.4.0`, `tox>=4.13.0` |
 | docs | `sphinx>=7.2.0`, `sphinx-rtd-theme>=2.0.0`, `myst-parser>=2.0.0` |
 | redshift | `redshift-connector>=2.0.0`, `boto3>=1.20.0`, `cloudpathlib>=0.15.0` |
 | snowflake | `snowflake-connector-python>=3.0.0`, `cloudpathlib>=0.15.0` |

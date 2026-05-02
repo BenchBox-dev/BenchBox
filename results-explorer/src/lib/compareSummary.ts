@@ -1,0 +1,248 @@
+import type { DetailResult } from "@/types";
+
+export type ComparePrimaryMetric = "power_score" | "display_geomean_ms";
+
+export interface CompareResultMetric {
+  resultId: string;
+  platform: string;
+  value: number | null;
+}
+
+export interface WinnerQueryRecord {
+  totalQueries: number;
+  comparableQueries: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  missing: number;
+}
+
+export interface ComparePercentiles {
+  resultId: string;
+  platform: string;
+  p50: number | null;
+  p90: number | null;
+  p99: number | null;
+}
+
+export interface CompareCostSummary {
+  normalizedResultCount: number;
+  winnerCostUsd: number | null;
+  winnerCostPerformanceRatioVsWorst: number | null;
+  winnerIsBestCostPerformance: boolean;
+}
+
+export interface CompareDecisionSummary {
+  primaryMetric: ComparePrimaryMetric;
+  primaryMetricLabel: string;
+  higherIsBetter: boolean;
+  claimSuppressed: boolean;
+  claimSuppressionReason: string | null;
+  winner: CompareResultMetric | null;
+  comparison: CompareResultMetric | null;
+  comparisonRatio: number | null;
+  comparisonLabel: string;
+  headline: string;
+  queryRecord: WinnerQueryRecord;
+  percentiles: ComparePercentiles[];
+  cost: CompareCostSummary | null;
+}
+
+interface CompareDecisionSummaryOptions {
+  suppressWinnerClaims?: boolean;
+  suppressionReason?: string;
+}
+
+export function buildCompareDecisionSummary(
+  results: DetailResult[],
+  primaryMetric: ComparePrimaryMetric,
+  options: CompareDecisionSummaryOptions = {},
+): CompareDecisionSummary {
+  const higherIsBetter = primaryMetric === "power_score";
+  const primaryMetricLabel = higherIsBetter ? "Power score" : "Geomean query time";
+  const metrics = results.map((result) => ({
+    resultId: result.result_id,
+    platform: result.platform,
+    value: primaryMetric === "power_score" ? result.power_score : result.display_geomean_ms,
+  }));
+  const sortedMetrics = metrics
+    .filter((metric): metric is CompareResultMetric & { value: number } => metric.value !== null)
+    .sort((a, b) => (higherIsBetter ? b.value - a.value : a.value - b.value));
+
+  const metricWinner = sortedMetrics[0] ?? null;
+  const claimSuppressed = options.suppressWinnerClaims === true;
+  const winner = claimSuppressed ? null : metricWinner;
+  const comparison = sortedMetrics.length > 1 ? sortedMetrics[sortedMetrics.length - 1]! : null;
+  const comparisonRatio = winner && comparison ? metricRatio(winner.value, comparison.value, higherIsBetter) : null;
+  const comparisonLabel = higherIsBetter ? "vs lowest selected" : "vs slowest selected";
+  const queryRecord = buildWinnerQueryRecord(results, winner?.resultId ?? null);
+  const percentiles = results.map((result) => buildPercentiles(result));
+  const cost = buildCostSummary(results, winner, primaryMetric);
+
+  return {
+    primaryMetric,
+    primaryMetricLabel,
+    higherIsBetter,
+    claimSuppressed,
+    claimSuppressionReason: options.suppressionReason ?? null,
+    winner,
+    comparison,
+    comparisonRatio,
+    comparisonLabel,
+    headline: buildHeadline(winner, comparisonRatio, primaryMetric, options),
+    queryRecord,
+    percentiles,
+    cost,
+  };
+}
+
+function metricRatio(winnerValue: number, comparisonValue: number, higherIsBetter: boolean): number | null {
+  if (winnerValue <= 0 || comparisonValue <= 0) return null;
+  return higherIsBetter ? winnerValue / comparisonValue : comparisonValue / winnerValue;
+}
+
+function buildHeadline(
+  winner: CompareDecisionSummary["winner"],
+  comparisonRatio: number | null,
+  primaryMetric: ComparePrimaryMetric,
+  options: CompareDecisionSummaryOptions,
+): string {
+  if (options.suppressWinnerClaims) {
+    const reason = options.suppressionReason ?? "selected runs are not from the same comparable cohort";
+    return `Not directly comparable: ${reason}. Winner language is suppressed; raw query evidence remains available.`;
+  }
+  if (!winner) return "No winner claim: selected results are missing the primary metric.";
+  if (comparisonRatio === null) return `${winner.platform} leads on the selected primary metric.`;
+  if (primaryMetric === "power_score") {
+    return `${winner.platform} leads by ${formatRatio(comparisonRatio)} on power score.`;
+  }
+  return `${winner.platform} is ${formatRatio(comparisonRatio)} faster by geomean query time.`;
+}
+
+function buildWinnerQueryRecord(results: DetailResult[], winnerResultId: string | null): WinnerQueryRecord {
+  const queryIds = [...new Set(results.flatMap((result) => result.display_timings.map((timing) => timing.query_id)))];
+  if (!winnerResultId) {
+    return {
+      totalQueries: queryIds.length,
+      comparableQueries: 0,
+      wins: 0,
+      losses: 0,
+      ties: 0,
+      missing: queryIds.length,
+    };
+  }
+
+  let comparableQueries = 0;
+  let wins = 0;
+  let losses = 0;
+  let ties = 0;
+  let missing = 0;
+
+  for (const queryId of queryIds) {
+    const entries = results
+      .map((result) => ({
+        resultId: result.result_id,
+        value: result.display_timings.find((timing) => timing.query_id === queryId)?.display_ms ?? null,
+      }))
+      .filter((entry): entry is { resultId: string; value: number } => entry.value !== null && entry.value > 0);
+    const winnerEntry = entries.find((entry) => entry.resultId === winnerResultId);
+    const competitorCount = entries.filter((entry) => entry.resultId !== winnerResultId).length;
+    if (!winnerEntry || competitorCount === 0) {
+      missing += 1;
+      continue;
+    }
+    comparableQueries += 1;
+    const fastest = Math.min(...entries.map((entry) => entry.value));
+    const fastestCount = entries.filter((entry) => entry.value === fastest).length;
+    if (winnerEntry.value === fastest && fastestCount > 1) {
+      ties += 1;
+    } else if (winnerEntry.value === fastest) {
+      wins += 1;
+    } else {
+      losses += 1;
+    }
+  }
+
+  return {
+    totalQueries: queryIds.length,
+    comparableQueries,
+    wins,
+    losses,
+    ties,
+    missing,
+  };
+}
+
+function buildPercentiles(result: DetailResult): ComparePercentiles {
+  const values = result.display_timings
+    .map((timing) => timing.display_ms)
+    .filter((value): value is number => value !== null && value >= 0)
+    .sort((a, b) => a - b);
+  return {
+    resultId: result.result_id,
+    platform: result.platform,
+    p50: percentile(values, 50),
+    p90: percentile(values, 90),
+    p99: percentile(values, 99),
+  };
+}
+
+function percentile(sortedValues: number[], pct: number): number | null {
+  if (sortedValues.length === 0) return null;
+  if (sortedValues.length === 1) return sortedValues[0]!;
+  const position = (pct / 100) * (sortedValues.length - 1);
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  const lowerValue = sortedValues[lower]!;
+  const upperValue = sortedValues[upper]!;
+  return lowerValue + (upperValue - lowerValue) * (position - lower);
+}
+
+function buildCostSummary(
+  results: DetailResult[],
+  winner: (CompareResultMetric & { value: number }) | null,
+  primaryMetric: ComparePrimaryMetric,
+): CompareCostSummary | null {
+  const normalized = results
+    .map((result) => ({
+      resultId: result.result_id,
+      cost: result.normalized_cost_usd ?? null,
+      costStatus: result.cost_status ?? null,
+      primaryValue: primaryMetric === "power_score" ? result.power_score : result.display_geomean_ms,
+    }))
+    .filter(
+      (entry): entry is { resultId: string; cost: number; costStatus: string; primaryValue: number } =>
+        entry.costStatus === "normalized" &&
+        entry.cost !== null &&
+        entry.cost > 0 &&
+        entry.primaryValue !== null &&
+        entry.primaryValue > 0,
+    );
+
+  if (normalized.length === 0) return null;
+
+  const scored = normalized.map((entry) => ({
+    resultId: entry.resultId,
+    cost: entry.cost,
+    costPerformance:
+      primaryMetric === "power_score"
+        ? entry.primaryValue / entry.cost
+        : 1 / (entry.primaryValue * entry.cost),
+  }));
+  const winnerCost = winner ? scored.find((entry) => entry.resultId === winner.resultId) : undefined;
+  const sorted = [...scored].sort((a, b) => b.costPerformance - a.costPerformance);
+  const worst = sorted[sorted.length - 1];
+  const ratio =
+    winnerCost && worst && worst.costPerformance > 0 ? winnerCost.costPerformance / worst.costPerformance : null;
+
+  return {
+    normalizedResultCount: normalized.length,
+    winnerCostUsd: winnerCost?.cost ?? null,
+    winnerCostPerformanceRatioVsWorst: ratio,
+    winnerIsBestCostPerformance: Boolean(winnerCost && sorted[0]?.resultId === winnerCost.resultId),
+  };
+}
+
+export function formatRatio(value: number): string {
+  return `${value.toFixed(2)}x`;
+}
