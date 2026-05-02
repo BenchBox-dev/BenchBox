@@ -270,9 +270,13 @@ class ResultExporter:
             self.console.print(f"[dim]Exported tuning: {tuning_path}[/dim]")
 
     def _apply_anonymization(self, payload: dict[str, Any]) -> None:
-        """Apply anonymization to environment block."""
+        """Apply public-export anonymization to environment, platform, config, and execution metadata."""
         if not self.anonymization_manager:
             return
+
+        anonymized_payload = self.anonymization_manager.anonymize_result_payload(payload)
+        payload.clear()
+        payload.update(anonymized_payload)
 
         system_profile = self.anonymization_manager.anonymize_system_profile()
         if system_profile:

@@ -218,7 +218,7 @@ work:
 - id: w13
   summary: "Extend anonymization and redaction across platform, config, and execution metadata"
   needs: [w2, w6, w7, w8, w9, w10, w11, w12]
-  status: pending
+  status: done
   notes: |
     Current export anonymization focuses on host environment. Extend it to
     every field that can reveal infrastructure identity:
