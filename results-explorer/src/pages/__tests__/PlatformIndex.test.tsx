@@ -195,4 +195,62 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r-tpch-fast#run-receipt");
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
   });
+
+  it("splits platform trend charts by comparable benchmark cohorts", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({
+        result_id: "r-tpch-a",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        run_date: "2026-04-01",
+        geomean_ms: 10,
+        display_geomean_ms: 10,
+        phase: "power",
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
+        result_id: "r-tpch-b",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        run_date: "2026-04-02",
+        geomean_ms: 12,
+        display_geomean_ms: 12,
+        phase: "power",
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
+        result_id: "r-ssb-a",
+        benchmark: "star_schema",
+        scale_factor: 0.1,
+        run_date: "2026-04-01",
+        geomean_ms: 20,
+        display_geomean_ms: 20,
+        phase: "power",
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
+        result_id: "r-ssb-b",
+        benchmark: "star_schema",
+        scale_factor: 0.1,
+        run_date: "2026-04-02",
+        geomean_ms: 22,
+        display_geomean_ms: 22,
+        phase: "power",
+        primary_metric: "display_geomean_ms",
+      }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const tpchTrend = screen.getByTestId("trend-cohort-tpch-sf0.1-power-display_geomean_ms");
+    const ssbTrend = screen.getByTestId("trend-cohort-star_schema-sf0.1-power-display_geomean_ms");
+    expect(screen.getAllByRole("img", { name: "Geomean ms trend over time" })).toHaveLength(2);
+    expect(screen.getByText("TPC-H · SF 0.1 · power")).toBeTruthy();
+    expect(screen.getByText("SSB · SF 0.1 · power")).toBeTruthy();
+    expect(tpchTrend.querySelector('[data-result-id="r-tpch-a"]')).toBeTruthy();
+    expect(tpchTrend.querySelector('[data-result-id="r-ssb-a"]')).toBeNull();
+    expect(ssbTrend.querySelector('[data-result-id="r-ssb-a"]')).toBeTruthy();
+    expect(ssbTrend.querySelector('[data-result-id="r-tpch-a"]')).toBeNull();
+  });
 });

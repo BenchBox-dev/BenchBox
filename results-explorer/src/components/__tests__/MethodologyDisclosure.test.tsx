@@ -115,6 +115,28 @@ describe("MethodologyDisclosure", () => {
     expect(screen.queryByText("6 queries")).toBeNull();
   });
 
+  it("keeps logical query count separate from measurement samples", () => {
+    const detail = makeDetail({
+      queries: [
+        { query_id: "Q1", duration_ms: 10, status: "pass", run_type: null, iter: 1, stream: null },
+        { query_id: "Q1", duration_ms: 11, status: "pass", run_type: null, iter: 2, stream: null },
+        { query_id: "Q1", duration_ms: 12, status: "pass", run_type: null, iter: 3, stream: null },
+        { query_id: "Q2", duration_ms: 20, status: "pass", run_type: null, iter: 1, stream: null },
+        { query_id: "Q2", duration_ms: 21, status: "pass", run_type: null, iter: 2, stream: null },
+        { query_id: "Q2", duration_ms: 22, status: "pass", run_type: null, iter: 3, stream: null },
+      ],
+      display_timings: [
+        { query_id: "Q1", display_ms: 11, sample_count: 3 },
+        { query_id: "Q2", display_ms: 21, sample_count: 3 },
+      ],
+    });
+    render(<MethodologyDisclosure detail={detail} />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(screen.getByText("2 queries")).toBeTruthy();
+    expect(screen.getByText("6 measurement samples")).toBeTruthy();
+    expect(screen.queryByText("6 queries")).toBeNull();
+  });
+
   it("modeLabel returns expected strings for known modes", () => {
     expect(modeLabel("sql")).toBe("SQL (query engine)");
     expect(modeLabel("dataframe")).toBe("DataFrame (in-process)");
