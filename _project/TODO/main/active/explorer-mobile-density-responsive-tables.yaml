@@ -76,7 +76,11 @@ work:
 
 - id: w5
   summary: "Make benchmark matrices and heatmaps responsive without silent clipping"
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+  - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
   notes: |
     QueryHeatmap/benchmark matrices should use sticky row labels, stable cell
     dimensions, and an explicit horizontal overflow affordance. On very narrow
