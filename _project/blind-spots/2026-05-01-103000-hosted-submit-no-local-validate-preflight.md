@@ -60,3 +60,18 @@ Either:
    truth for `--service` validation and that develop's validator may
    diverge — and add a contract test that asserts the hosted mock and
    `validate_submission.py` accept/reject the same bundles.
+
+## Triage log
+
+- 2026-05-02: verified actionable; option (2) is partially landed,
+  contract test still owed. The "no local preflight" decision is now
+  recorded inline at `benchbox/cli/commands/submit.py:172-182` (the
+  `_dispatch_service_mode` docstring) with an explicit pointer back to
+  this finding. The path remains: contributors pay full upload latency
+  before the hosted service rejects a bad bundle. The contract test
+  asserting that the hosted mock and `validate_submission.py`
+  accept/reject the same bundles has NOT been written —
+  `tests/integration/` has no test joining
+  `test_hosted_submission.py` to `validate_submission.py`. Once that
+  contract test ships, fail-fast preflight (option 1) becomes the
+  obvious next move per the inline docstring.

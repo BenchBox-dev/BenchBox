@@ -39,8 +39,26 @@ call-site of a generalizable defect.
 
 - [ ] Add a "bug-class blast radius" check to the review framework, used
       when the finding is structural rather than behavioral.
-- [ ] Sweep all chart components for React keys derived from
-      non-uniqueness-guaranteed fields (platform name, query id, etc.)
-      and convert to composite or stable IDs.
+- [ ] Sweep all chart components under `results-explorer/src/components/`
+      for React keys derived from non-uniqueness-guaranteed fields
+      (platform name, query id, etc.) and convert to composite or stable
+      IDs. Live candidates: `DivergingBarChart` (`<g key={queryId}>`),
+      `RankTable` (`<tr key={qid}>`), `QueryHeatmap` (`<… key={qid}>` /
+      `<… key={row.result_id}>`), `StackedPhase`, `CostScatter`. Use
+      `git grep "key={" results-explorer/src/components/` as the seed.
 - [ ] When a sweep is done, link the resulting TODO/PR back here and
       flip `status:` to `merged-to-todo`.
+
+## Triage log
+
+- 2026-05-02: verified actionable. The reviewed components moved from
+  `benchbox/dashboard/charts/` to `results-explorer/src/components/`
+  (the `benchbox/dashboard/` tree no longer exists). The two cited
+  files now carry explicit comments warning against
+  `key={date}` (TimeSeries.tsx:36-37) and `key={platform}`
+  (PercentileLadder.tsx:23) collisions, so the *original* instances
+  are mitigated. The broader bug-class sweep across all chart
+  components has NOT been performed — `git grep "key={"
+  results-explorer/src/components/` returns ~30 hits including
+  `key={queryId}` / `key={qid}` patterns whose uniqueness is not
+  obvious without per-call analysis.
