@@ -1,0 +1,260 @@
+id: read-primitives-approximate-aggregate-queries
+title: "Read Primitives: add approximate-aggregate query coverage (HLL distinct, KLL/T-Digest quantile, Top-K)"
+worktree: main
+priority: Medium-High
+status: "Not Started"
+category: "Core Functionality"
+
+description: |
+  The `read_primitives` benchmark catalog (153 queries) has zero approximate-
+  aggregate coverage today. The two existing queries that gesture toward
+  approximation are misleading: `intrinsic_appx_median` is named "appx" but
+  uses exact `PERCENTILE_CONT(0.5)`, and `statistical_percentiles` is also
+  exact. There are no approximate distinct-count, approximate-quantile, or
+  top-K queries.
+
+  This TODO adds 4 new query IDs + 1 rename to give cross-engine coverage of
+  the one-shot approximate-aggregate path that every modern OLAP engine
+  exposes (Databricks `approx_*`, Snowflake `APPROX_*`, BigQuery `APPROX_*`
+  / `HLL_COUNT.*` / `KLL_QUANTILES.*`, DuckDB `approx_*`, ClickHouse
+  `uniq` / `quantileTDigest` / `topK`, Redshift `APPROXIMATE …`).
+
+  Scoped deliberately to *single-query* approximate aggregates. Sketch
+  persistence and merge across queries are NOT in scope here — see the
+  blind-spot finding referenced below and the companion
+  `write-primitives-sketch-persistence-category` TODO.
+
+context_sections:
+  "Background and Motivation": |
+    Triggered by evaluation of the Databricks "Approximate Answers, Exact
+    Decisions" blog post (2026-04-29) which announced KLL / Theta / Top-K /
+    Tuple sketch families. The function-by-function competitor parity
+    research showed broad cross-engine support for one-shot approximate
+    aggregates, so adding them to `read_primitives` is straightforward
+    catalog work.
+
+    The harder half of that announcement (sketch persistence, mergeable
+    artifacts across time/partitions) does NOT fit `read_primitives`'
+    single-query execution model — that gap is captured in the blind-spot
+    finding and addressed by a separate `write_primitives` TODO.
+
+  "Cross-Platform Function Reference": |
+    Captured in the documentation work unit (w5) — the table that maps
+    `approx_count_distinct` / `approx_percentile` / `approx_top_k` across
+    Databricks, Snowflake, BigQuery, DuckDB, ClickHouse, and Redshift, with
+    per-engine result-shape notes (e.g., BigQuery `APPROX_TOP_COUNT`
+    returns ARRAY<STRUCT> while others return ARRAY of values; Redshift
+    has no top-K).
+
+  "Blind-Spot Audit Reference": |
+    See `_project/blind-spots/2026-05-02-084332-read-primitives-cant-test-sketch-persistence.md`.
+    This TODO addresses the framework gap *by scoping out* — it commits to
+    aggregate-only queries so that sketch persistence is not silently
+    smuggled in. Triage promotion of the blind-spot finding will happen
+    when the companion `write-primitives-sketch-persistence-category`
+    TODO lands; this TODO is referenced as a contributing resolver.
+
+work:
+  - id: w1
+    summary: "Add 5 query catalog entries for approximate aggregates with per-dialect variants"
+    status: pending
+    notes: |
+      In `benchbox/core/read_primitives/catalog/queries.yaml`, add:
+        - `approx_count_distinct_simple` (companion to `aggregation_distinct`)
+        - `approx_count_distinct_groupby` (companion to `aggregation_distinct_groupby`)
+        - `approx_quantile_groupby` (REPLACES misnamed `intrinsic_appx_median`)
+        - `approx_quantiles_array` (companion to `statistical_percentiles`)
+        - `approx_top_k_lineitem` (new capability — top-K)
+      Each must declare `result_contract.capability` with an
+      `approximate_*` name so the cross-dialect comparator does not apply
+      strict value equality. Use existing `variants:` blocks per engine for
+      function-name divergence (e.g., ClickHouse `quantileTDigest(0.5)(x)`,
+      BigQuery `APPROX_QUANTILES(x, 100)[OFFSET(50)]`, Redshift
+      `APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)`).
+      `approx_top_k_lineitem` should `skip_on: [redshift]`.
+
+  - id: w2
+    summary: "Retire historical guard for renamed query in variant_contracts.py"
+    needs: [w1]
+    status: pending
+    notes: |
+      `benchbox/core/read_primitives/variant_contracts.py:48-51` has a
+      "historical guard" entry for `intrinsic_appx_median` in
+      `_HIGH_RISK_QUERY_IDS`. Once w1 renames that query to
+      `approx_quantile_groupby`, retire the guard entry (the new query is
+      already covered by being in the `statistical` category, which is in
+      `_HIGH_RISK_CATEGORIES`).
+
+  - id: w3
+    summary: "Run cross-engine validation; tune skip_on lists empirically"
+    needs: [w1, w2]
+    status: pending
+    notes: |
+      Run `benchbox run --platform <p> --benchmark read_primitives
+      --queries approx_*` against duckdb, datafusion, clickhouse,
+      and (where credentials available) snowflake/bigquery/databricks/
+      redshift. Where a query fails for an unfixable reason, add a tight
+      `skip_on:` rather than a per-platform variant. Document each skip
+      with a one-line comment in the YAML.
+
+  - id: w4
+    summary: "Run variant_contracts checker and pytest fast tests"
+    needs: [w3]
+    status: pending
+    notes: |
+      `uv run -- python -m pytest tests/unit/read_primitives -q -m fast`
+      and the static variant-contracts check
+      (`uv run -- python -m pytest tests/unit/read_primitives/test_variant_contracts.py -q`)
+      must both pass with the new entries. Result-contract column lists
+      must match between base SQL and every variant.
+
+  - id: w5
+    summary: "Write cross-platform comparison documentation in benchmark help-topic and README"
+    needs: [w3]
+    status: pending
+    notes: |
+      Capture the function-by-function cross-platform table from the
+      research in user-facing docs. Depends on w3 because the empirical
+      skip_on lists tuned in w3 must be reflected accurately in the docs.
+
+        - Add `docs/benchmarks/read-primitives-approximate-functions.md`
+          with the engine-by-function table (Databricks / Snowflake /
+          BigQuery / DuckDB / ClickHouse / Redshift columns × distinct /
+          percentile / top-K rows), result-shape divergences (BQ struct vs
+          array), and explicit "single-query only — not sketch persistence"
+          framing.
+        - Surface the doc from CLI help. The wiring depends on how
+          `--help-topic benchmarks` is composed today — start by reading
+          `benchbox/cli/help_topics.py` (or equivalent) and either: (a)
+          extend the benchmarks help-topic body with a "approximate
+          aggregate queries" section that references the doc path, or
+          (b) add a link from `read_primitives` benchmark help text.
+          DO NOT assume markdown files in `docs/benchmarks/` auto-surface.
+        - Cross-link to the companion `write_primitives` sketch
+          documentation when it exists.
+
+  - id: w6
+    summary: "Add changelog entry under unreleased"
+    needs: [w4, w5]
+    status: pending
+    notes: |
+      Terse user-facing bullet under unreleased:
+      "read_primitives: add approximate-aggregate query coverage
+      (`approx_count_distinct_*`, `approx_quantile*`, `approx_top_k_*`).
+      `intrinsic_appx_median` renamed to `approx_quantile_groupby`."
+
+deferred:
+  - summary: "Theta-sketch set algebra queries (union/intersect/difference across filtered streams)"
+    reason: "Engine support too thin (Databricks, Snowflake DataSketches UDAFs, ClickHouse uniqTheta only). Skip lists would be longer than the SQL."
+  - summary: "Tuple-sketch queries (distinct + metric aggregation)"
+    reason: "Databricks-native + Snowflake DataSketches UDAFs only. Not portable enough for a primitive."
+  - summary: "Accuracy validation (paired exact/approximate queries with tolerance)"
+    reason: "Out of scope: read_primitives measures latency, not approximation error. Belongs in a future approximation-quality benchmark if pursued."
+  - summary: "Sketch persistence / merge / requery"
+    reason: "Single-query benchmark cannot test cross-query persistence. Captured by the companion write-primitives-sketch-persistence-category TODO."
+
+deps:
+  needs: []
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - read-primitives
+    - approximate-aggregates
+    - benchmark-catalog
+    - sketches
+  estimated_effort: "1-2 days"
+  created_date: "2026-05-02"
+  last_updated: "2026-05-02"
+
+impact:
+  business_value: |
+    Closes a real gap in benchmark coverage: no engine in BenchBox today
+    has its approximate-aggregate path measured, even though every
+    benchmarked engine implements one and vendors compete on it.
+  user_impact: |
+    Users get cross-engine latency numbers for the approximate path that
+    is the realistic substitute for `COUNT(DISTINCT)` / `PERCENTILE_CONT`
+    on production-scale data. Documentation explains which functions map
+    where so users can interpret skips.
+  technical_debt: |
+    Retires a misleading query name (`intrinsic_appx_median` was exact,
+    not approximate) and the corresponding historical-guard entry in
+    variant_contracts.py.
+
+files_affected:
+  modified:
+    - benchbox/core/read_primitives/catalog/queries.yaml
+    - benchbox/core/read_primitives/variant_contracts.py
+    - CHANGELOG.md
+  added:
+    - docs/benchmarks/read-primitives-approximate-functions.md
+
+must_preserve:
+  - "All 153 existing read_primitives queries continue to load via ReadPrimitivesQueryManager and produce identical SQL output."
+  - "variant_contracts.collect_variant_contract_issues() returns zero issues for the full updated catalog."
+  - "Existing skip_on lists for unrelated queries are not modified."
+  - "result_contract loader continues to enforce column-name equality between base SQL and variants."
+
+approach: |
+  Pure catalog YAML work plus one Python guard removal. Each new query
+  declares result_contract.capability with an `approximate_*` name —
+  the cross-dialect validator already treats `capability` as the
+  correctness anchor, so approximate values won't false-fail value
+  equality.
+
+  For per-dialect divergence, prefer `variants:` blocks (existing
+  pattern in `statistical_correlation` etc.) over inline branching.
+  Where an engine truly lacks the function (Redshift top-K), use
+  `skip_on: [redshift]` — same pattern as the 12 existing skipped
+  queries.
+
+  The misnamed `intrinsic_appx_median` rename is intentionally a hard
+  rename, not an alias — the YAML id changes, the historical-guard
+  entry retires, and the changelog notes the breaking name change.
+
+anti_patterns:
+  - "DO NOT add sketch persistence / write-then-read patterns here — because read_primitives runs queries in isolation with no shared state — handled by the companion write-primitives-sketch-persistence-category TODO."
+  - "DO NOT use exact value equality in result_contract for approximate queries — because approximate aggregates are non-deterministic across engines and even across runs — declare capability with an `approximate_*` prefix so the validator skips strict equality."
+  - "DO NOT rename intrinsic_appx_median without retiring the historical_guard entry in variant_contracts.py:48-51 — because the guard was added precisely as a placeholder for this rename — leaving it stale defeats its purpose."
+  - "DO NOT introduce ClickHouse-specific function-name variants for approximate aggregates that are already covered by sqlglot dialect translation — because the existing translation pipeline handles common rewrites — only add an explicit variant when sqlglot demonstrably fails."
+  - "DO NOT silently broaden scope to add Theta/Tuple sketches — because cross-engine coverage is too thin and skip lists would dominate the YAML — explicitly deferred."
+
+verification:
+  - description: "All read_primitives unit tests pass with new catalog"
+    command: "uv run -- python -m pytest tests/unit/read_primitives -q"
+    expected_output: "all tests pass, no failures"
+  - description: "Static variant-contract checker reports no issues"
+    command: "uv run -- python -m pytest tests/unit/read_primitives/test_variant_contracts.py -q"
+    expected_output: "all tests pass"
+  - description: "DuckDB smoke run executes the new approximate queries"
+    command: "uv run -- benchbox run --platform duckdb --benchmark read_primitives --scale 0.01 --queries approx_count_distinct_simple,approx_count_distinct_groupby,approx_quantile_groupby,approx_quantiles_array,approx_top_k_lineitem"
+    expected_output: "all 5 queries complete with non-null results, no skips on duckdb"
+  - description: "Help-topic body references the new approximate-functions guidance (exact wiring chosen in w5)"
+    command: "uv run -- benchbox run --help-topic benchmarks 2>&1 | grep -iE 'approx|approximate-functions'"
+    expected_output: "output references the new approximate-aggregate guidance — either by inlining the section or linking to docs/benchmarks/read-primitives-approximate-functions.md"
+
+scope_limit:
+  only_modify:
+    - benchbox/core/read_primitives/catalog/queries.yaml
+    - benchbox/core/read_primitives/variant_contracts.py
+    - tests/unit/read_primitives/
+    - docs/benchmarks/read-primitives-approximate-functions.md
+    - CHANGELOG.md
+  do_not_modify:
+    - benchbox/core/read_primitives/benchmark.py
+    - benchbox/core/read_primitives/schema.py
+    - benchbox/core/read_primitives/generator.py
+    - benchbox/core/write_primitives/
+
+success_metrics:
+  - "5 new approximate-aggregate queries (4 added, 1 renamed) execute end-to-end on at least DuckDB and one cloud engine"
+  - "Zero variant_contracts violations across the updated catalog"
+  - "Cross-platform function reference doc landed and linked from help-topic"
+  - "Changelog entry under unreleased"
+  - "Blind-spot finding 2026-05-02-084332 explicitly references this TODO as a contributing resolver"
+
+open_questions:
+  - "Should we apply tolerance-based result equivalence even for approximate queries, or stick with capability-only validation? (Current proposal: capability-only.)"
+  - "Is `quantileTDigest` accurate enough on TPC-H lineitem at SF=0.01 to give stable cross-engine numbers, or do we need a higher floor SF for the approximate-quantile queries specifically?"
