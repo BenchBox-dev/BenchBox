@@ -531,12 +531,21 @@ queries:
       GROUP BY l_shipmode;
     # Snowflake (APPROX_PERCENTILE) and Databricks (PERCENTILE_APPROX)
     # rewrites are handled by sqlglot.
-  # Redshift's `APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)`
-  # syntax is not recognised by sqlglot's redshift dialect parser, which
-  # blocks the static variant-contract checker. Documented in the
-  # cross-platform doc; tracked separately for users who want Redshift
-  # coverage of approximate quantiles. SQLite has no APPROX_QUANTILE.
-  skip_on: [redshift, sqlite]
+    # Redshift uses APPROXIMATE PERCENTILE_DISC. sqlglot's Redshift dialect
+    # parser doesn't recognise the APPROXIMATE qualifier on aggregates
+    # other than COUNT(DISTINCT), so this variant is allowlisted in
+    # tests/unit/core/read_primitives/test_read_primitives_variant_contracts.py
+    # against the variant_parse_error path. l_shipmode has 7 distinct
+    # values, well under any per-node group cap.
+    redshift: |2
+
+      SELECT
+          l_shipmode,
+          APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY l_quantity) as median_quantity
+      FROM lineitem
+      GROUP BY l_shipmode;
+  # SQLite has no APPROX_QUANTILE.
+  skip_on: [sqlite]
 - id: intrinsic_to_date
   category: intrinsic
   sql: |2
