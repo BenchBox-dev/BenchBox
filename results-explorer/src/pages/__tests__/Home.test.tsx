@@ -424,6 +424,32 @@ describe("Home", () => {
     });
   });
 
+  it("shows active facet combination and targeted reset actions when filters remove all coverage", async () => {
+    window.history.replaceState(null, "", "/results/?sf=999&platform=duckdb");
+
+    render(<Home />);
+
+    const emptyState = await screen.findByRole("region", {
+      name: "No leaderboard cells match the current filters",
+    });
+    expect(within(emptyState).getByText("Scale factor")).toBeTruthy();
+    expect(within(emptyState).getByText("SF 999")).toBeTruthy();
+    expect(within(emptyState).getByText("Platform")).toBeTruthy();
+    expect(within(emptyState).getByText("DuckDB")).toBeTruthy();
+    expect(within(emptyState).getByRole("button", { name: "Clear scale factor" })).toBeTruthy();
+    expect(within(emptyState).getByRole("button", { name: "Clear platform" })).toBeTruthy();
+    expect(within(emptyState).getByRole("button", { name: "Reset all" })).toBeTruthy();
+
+    fireEvent.click(within(emptyState).getByRole("button", { name: "Clear scale factor" }));
+
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).get("sf")).toBeNull();
+      expect(screen.queryByRole("region", { name: "No leaderboard cells match the current filters" })).toBeNull();
+    });
+    expect(new URLSearchParams(window.location.search).get("platform")).toBe("duckdb");
+    expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy();
+  });
+
   it("restores canonical URL facets and applies them to the Home result query", async () => {
     window.history.replaceState(
       null,

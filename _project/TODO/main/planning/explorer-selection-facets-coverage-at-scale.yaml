@@ -147,7 +147,10 @@ work:
   - id: w9
     summary: "Add coverage-aware empty states and reset affordances"
     needs: [w6, w7]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/Home.tsx"
+      - "results-explorer/src/pages/__tests__/Home.test.tsx"
     notes: |
       If a filter combination has no rows, show which facet combination removed
       all results and offer "Clear scale factor", "Clear platform", and

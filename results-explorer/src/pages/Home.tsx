@@ -34,7 +34,7 @@ export function Home(_: RoutableProps) {
   const retriedEmptyResults = useRef(false);
   const [emptyResultsRetryFinished, setEmptyResultsRetryFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { facets, where: facetWhere, setFacet } = useFacetState();
+  const { facets, where: facetWhere, setFacet, resetFacets } = useFacetState();
   const [modeRaw, setModeRaw] = useUrlState<string>("mode", "times", stringSerde);
   const benchmarkFilters = facets.benchmark;
   const scaleFilters = facets.scale_factor;
@@ -210,8 +210,14 @@ export function Home(_: RoutableProps) {
   const mode: MetaLeaderboardMode =
     modeRaw === "ranks" || modeRaw === "speedup" ? modeRaw : "times";
   const benchmarks = [...new Set(results.map((result) => result.benchmark))].sort();
-  const platformIdToName = new Map(results.map((result) => [result.platform_id, result.platform]));
+  const platformIdToName = new Map(
+    (metaLeaderboard?.platforms ?? []).map((platform) => [platform.platform_id, platform.platform]),
+  );
+  for (const result of results) {
+    platformIdToName.set(result.platform_id, result.platform);
+  }
   const platformIds = [...new Set(results.map((result) => result.platform_id))].sort();
+  const activeFacetSummaries = summarizeActiveFacets(facets, platformIdToName);
   const benchmarkOptions = metaLeaderboard
     ? [...new Set(metaLeaderboard.cohorts.map((cohort) => cohort.benchmark))].sort()
     : [];
@@ -338,9 +344,14 @@ export function Home(_: RoutableProps) {
         )}
 
         {filteredMetaLeaderboard && filteredMetaLeaderboard.cohorts.length === 0 && (
-          <section class="mb-12 rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-400">
-            No leaderboard cells match the current filters.
-          </section>
+          <CoverageEmptyState
+            activeFacets={activeFacetSummaries}
+            canClearScale={scaleFilters.length > 0}
+            canClearPlatform={facets.platform.length > 0}
+            onClearScale={() => setFacet("scale_factor", [])}
+            onClearPlatform={() => setFacet("platform", [])}
+            onReset={resetFacets}
+          />
         )}
 
         {filteredMetaLeaderboard && <FlywheelStrip />}
@@ -507,6 +518,143 @@ function SkeletonSelect({ label }: { label: string }) {
       <SkeletonBlock className="h-9 w-full bb-skeleton-dark" />
     </div>
   );
+}
+
+interface ActiveFacetSummary {
+  key: FacetKey;
+  label: string;
+  value: string;
+}
+
+const FACET_LABELS: Record<FacetKey, string> = {
+  benchmark: "Benchmark",
+  scale_factor: "Scale factor",
+  phase: "Phase",
+  platform: "Platform",
+  execution_mode: "Execution",
+  tuning_mode: "Tuning",
+  trust_tier: "Trust",
+  validation_status: "Validation",
+  deployment_class: "Deployment",
+  cloud_provider: "Cloud provider",
+  cloud_region: "Cloud region",
+  instance_or_warehouse: "Instance / warehouse",
+  storage_format: "Storage format",
+  cost_status: "Cost status",
+  date_window: "Date window",
+};
+
+function CoverageEmptyState({
+  activeFacets,
+  canClearScale,
+  canClearPlatform,
+  onClearScale,
+  onClearPlatform,
+  onReset,
+}: {
+  activeFacets: ActiveFacetSummary[];
+  canClearScale: boolean;
+  canClearPlatform: boolean;
+  onClearScale: () => void;
+  onClearPlatform: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <section
+      aria-labelledby="coverage-empty-title"
+      class="mb-12 rounded-lg border border-dashed border-gray-300 bg-white p-8 text-gray-600"
+    >
+      <div class="mx-auto max-w-3xl text-center">
+        <h2 id="coverage-empty-title" class="text-lg font-semibold text-gray-900">
+          No leaderboard cells match the current filters
+        </h2>
+        <p class="mt-2 text-sm text-gray-500">
+          The current facet combination removed every published cohort cell.
+        </p>
+      </div>
+
+      {activeFacets.length > 0 ? (
+        <dl
+          aria-label="Active filters removing leaderboard cells"
+          class="mx-auto mt-5 grid max-w-3xl gap-2 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          {activeFacets.map((facet) => (
+            <div key={facet.key} class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-left">
+              <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{facet.label}</dt>
+              <dd class="mt-1 text-sm font-medium text-gray-700">{facet.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p class="mt-5 text-center text-sm text-gray-500">
+          No active facets are applied; the public corpus has no leaderboard cohorts for this view.
+        </p>
+      )}
+
+      <div class="mt-5 flex flex-wrap justify-center gap-2">
+        <button
+          type="button"
+          class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={onClearScale}
+          disabled={!canClearScale}
+        >
+          Clear scale factor
+        </button>
+        <button
+          type="button"
+          class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={onClearPlatform}
+          disabled={!canClearPlatform}
+        >
+          Clear platform
+        </button>
+        <button
+          type="button"
+          class="rounded-md border border-brand-600 bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          onClick={onReset}
+        >
+          Reset all
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function summarizeActiveFacets(
+  facets: FacetState,
+  platformIdToName: ReadonlyMap<string, string>,
+): ActiveFacetSummary[] {
+  const summaries: ActiveFacetSummary[] = [];
+  for (const key of FACET_KEYS) {
+    const value = facets[key];
+    if (Array.isArray(value)) {
+      if (value.length === 0) continue;
+      summaries.push({
+        key,
+        label: FACET_LABELS[key],
+        value: value.map((item) => formatFacetValue(key, item, platformIdToName)).join(", "),
+      });
+    } else if (value !== "all") {
+      summaries.push({
+        key,
+        label: FACET_LABELS[key],
+        value: formatFacetValue(key, value, platformIdToName),
+      });
+    }
+  }
+  return summaries;
+}
+
+function formatFacetValue(
+  key: FacetKey,
+  value: string,
+  platformIdToName: ReadonlyMap<string, string>,
+): string {
+  if (key === "benchmark") return humanizeBenchmark(value);
+  if (key === "scale_factor") return `SF ${value}`;
+  if (key === "platform") return platformIdToName.get(value) ?? value;
+  if (key === "date_window") return value === "all" ? "All time" : `Last ${value}`;
+  return value.split("_").join(" ");
 }
 
 function appendFacetParams(params: URLSearchParams, facets: FacetState, omit: ReadonlySet<FacetKey>) {
