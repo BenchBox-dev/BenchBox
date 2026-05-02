@@ -100,7 +100,7 @@ work:
 - id: w4
   summary: "Run variant_contracts checker and pytest fast tests"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     `uv run -- python -m pytest tests/unit/read_primitives -q -m fast`
     and the static variant-contracts check
