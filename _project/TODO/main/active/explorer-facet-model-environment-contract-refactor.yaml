@@ -76,7 +76,7 @@ work:
 - id: w4
   summary: "Reconcile FacetRail and CoverageBadge labels with normalized vocabulary"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Normalized contract may use canonical labels (e.g. AWS/GCP/Azure for
     cloud_provider) where the adapter-specific path used adapter-native
