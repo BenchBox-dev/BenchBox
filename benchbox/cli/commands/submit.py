@@ -175,10 +175,16 @@ def _dispatch_service_mode(
     develop-tip validator here would couple the Python CLI release cadence
     to the hosted API's accepted-schema set and create false rejections
     on legacy clients. The trade-off: contributors pay full upload latency
-    before the service tells them what's wrong. We accept that trade-off
-    until we have a hosted-vs-validator contract test that proves the two
-    accept the same bundles; once that exists, fail-fast preflight is the
-    obvious next move. See blind-spot
+    before the service tells them what's wrong.
+
+    The develop side of the contract is now guarded by
+    ``tests/integration/test_hosted_submit_validator_contract.py``: it
+    exercises the bundle layout this code path emits against
+    ``scripts/validate_submission.py`` and fails CI if hosted-submit and
+    develop-validator drift on schema or hash format. Fail-fast local
+    preflight (option 1 in the blind-spot's "suggested next steps") is
+    therefore unblocked but deliberately deferred until the legacy-client
+    cost is understood — see blind-spot
     ``_project/blind-spots/2026-05-01-103000-hosted-submit-no-local-validate-preflight.md``.
 
     Hash contract for the dry-run: the values printed are SHA-256 of the

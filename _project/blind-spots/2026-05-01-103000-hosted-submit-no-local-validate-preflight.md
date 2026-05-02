@@ -1,7 +1,7 @@
 ---
 id: 2026-05-01-103000-hosted-submit-no-local-validate-preflight
 date: 2026-05-01
-status: open
+status: actioned
 finding_kind: scope-creep
 review_context: "/code review of PRs #86–#93 (results-platform push)"
 related_paths:
@@ -75,3 +75,4 @@ Either:
   `test_hosted_submission.py` to `validate_submission.py`. Once that
   contract test ships, fail-fast preflight (option 1) becomes the
   obvious next move per the inline docstring.
+- 2026-05-02: actioned — Sweep 2026-05-02: implemented option (2) from the original suggested next steps — added tests/integration/test_hosted_submit_validator_contract.py with four contract tests (hosted bundle passes develop validator, corrupted hash rejected, missing schema-v2 key rejected, hosted vs PR-flow manifest key parity). The develop side of the contract is now guarded; hosted side remains a black box owned by the hosted deployment. submit.py docstring updated to point at the contract test and note that fail-fast local preflight (option 1) is unblocked but deliberately deferred until the legacy-client cost trade-off is understood.
