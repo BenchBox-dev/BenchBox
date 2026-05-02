@@ -1,0 +1,214 @@
+id: write-primitives-sketch-parameter-sweeps
+title: "Write Primitives sketch: parameter-sweep variants for sketch tuning surface (lg_k, k, lg_max_map_size)"
+worktree: main
+priority: Low
+status: "Not Started"
+category: "Core Functionality"
+
+description: |
+  The merged sketch ops use one default parameter value per sketch
+  family — Theta lg_k=12 (4096 entries), KLL k=200, Top-K
+  lg_max_map_size=8 (256 entries). These defaults trade size,
+  accuracy, and update speed in fixed proportions. Real users tune
+  these for their workload — bigger k = better accuracy + larger
+  storage + slower merge.
+
+  This TODO adds parameter-sweep variants of the existing sketch ops
+  so the benchmark surfaces the sketch-tuning tradeoff directly:
+  measure storage size, build latency, merge latency, and estimate
+  error across 3 parameter values per family.
+
+  Captured as a deferred item from the post-merge expansion review.
+  Lower priority because it's a tuning-analysis dimension rather than
+  a coverage gap — the existing default-parameter ops already
+  validate the persist+merge claim; sweeps just refine the analysis.
+
+context_sections:
+  "Parameter Ranges to Sweep": |
+    Theta (lg_k controls hash entries):
+      - lg_k=10 → 1024 entries  (~5KB serialized; ~3.1% RSE)
+      - lg_k=12 → 4096 entries  (~16KB; ~1.6% RSE) ← current default
+      - lg_k=14 → 16384 entries (~64KB; ~0.8% RSE)
+
+    KLL (k controls retained items):
+      - k=100  (~1.5KB; ~1.65% normalized rank error)
+      - k=200  (~3KB;   ~1.33%) ← current default
+      - k=1000 (~15KB;  ~0.59%)
+
+    Frequent Items (lg_max_map_size controls bucket count):
+      - lg_max_map_size=6  → 64 buckets   (~256B)
+      - lg_max_map_size=8  → 256 buckets  (~600B) ← current default
+      - lg_max_map_size=10 → 1024 buckets (~2KB)
+
+    Sweep adds 6 new ops total (3 per family × 2 non-default values).
+    Top-K only sweeps 2 because lg_max_map_size=6 is too small for
+    TPC-H lineitem's 7 distinct shipmodes (would saturate).
+
+  "Why DuckDB-First": |
+    DuckDB datasketches extension parameter signatures match the
+    Apache DataSketches C++ defaults exactly — sweeps are a 1-line
+    change per op. Snowflake / BigQuery / Databricks have similar
+    parameter knobs but with different defaults and signatures
+    (e.g. Snowflake APPROX_TOP_K's `counters` vs DataSketches'
+    lg_max_map_size). Cloud overrides for parameter sweeps are out of
+    scope — single-engine sweep on DuckDB is enough to demonstrate
+    the tradeoff; cloud users can tune at their end.
+
+work:
+  - id: w1
+    summary: "Add 2 sketch_query_theta_union_merge variants at lg_k=10 and lg_k=14"
+    status: pending
+    notes: |
+      Mirror the existing `sketch_query_theta_union_merge` with two
+      new ops: `sketch_query_theta_union_merge_lgk10` and `_lgk14`.
+      Each builds with the corresponding lg_k parameter, persists,
+      merges, validates the distinct count is in tolerance bounds.
+
+      The bounds at lg_k=10 will be wider (higher RSE → more variance)
+      and at lg_k=14 will be tighter — observe empirically and
+      document inline.
+
+  - id: w2
+    summary: "Add 2 sketch_query_kll_quantiles_merge variants at k=100 and k=1000"
+    needs: [w1]
+    status: pending
+    notes: |
+      Mirror `sketch_query_kll_quantiles_merge` with `_k100` and
+      `_k1000` variants. Bounds reflect the relative accuracy: k=100
+      median estimate may drift further from true; k=1000 should be
+      tighter.
+
+  - id: w3
+    summary: "Add 2 sketch_query_topk_combine variants at lg_max_map_size=8 and 10 (skip 6 — too small for TPC-H)"
+    needs: [w1]
+    status: pending
+    notes: |
+      Mirror `sketch_query_topk_combine` with `_lgmm8` (current
+      default; explicit variant for sweep symmetry) and `_lgmm10`.
+      Both should still report 7 frequent items deterministically
+      (lineitem has 7 distinct shipmodes); the difference shows up in
+      build/merge latency and storage size, not the estimate count.
+
+  - id: w4
+    summary: "Update cross-platform sketch docs with parameter-sweep methodology and observed numbers"
+    needs: [w1, w2, w3]
+    status: pending
+    notes: |
+      Add a "Parameter sweeps" section to
+      `docs/benchmarks/write-primitives-sketch-functions.md`:
+        - Why this dimension matters (the size / accuracy / latency
+          tradeoff is real and workload-dependent).
+        - Sweep parameter ranges per family with
+          DataSketches-recommended bounds.
+        - Observed numbers at SF=0.01 on DuckDB:
+          storage size, build latency, merge latency per parameter
+          value. Side-by-side bar charts (textcharts) optional.
+        - Cloud parameter mapping guidance: how to translate
+          DataSketches lg_k to Snowflake / Databricks equivalent
+          knobs (different defaults, different scales).
+
+  - id: w5
+    summary: "Add changelog entry under unreleased"
+    needs: [w4]
+    status: pending
+    notes: |
+      Terse user-facing bullet:
+      "write_primitives sketch: add parameter-sweep variants
+      (sketch_query_*_merge_{lgk10,lgk14,k100,k1000,lgmm8,lgmm10})
+      for tuning analysis on DuckDB. Cloud parameter-knob mapping
+      guidance in docs."
+
+deferred:
+  - summary: "Cloud-engine parameter-sweep overrides"
+    reason: "Each cloud engine has different parameter knobs and defaults; sweeping all 3 families × 3 values × 3 cloud engines = 27 new overrides per family. Out of proportion with the analytical value. DuckDB-only sweep is enough to demonstrate the tradeoff; cloud users tune at their end with vendor-specific knobs."
+
+deps:
+  needs:
+    - write-primitives-sketch-clickhouse-and-storage-metrics
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - write-primitives
+    - sketches
+    - tuning
+    - duckdb
+    - benchmark-catalog
+  estimated_effort: "0.5 day"
+  created_date: "2026-05-02"
+  last_updated: "2026-05-02"
+
+impact:
+  business_value: |
+    Surfaces sketch tuning as a benchmark dimension users can measure
+    rather than guess. The size/accuracy tradeoff is real and
+    workload-dependent — having BenchBox numbers for the trade
+    points lets users pick parameters confidently.
+  user_impact: |
+    Users can read the docs to see "lg_k=10 saves 11KB per partition
+    at the cost of 1.5x estimate error" and decide whether the saving
+    matters for their workload — without having to set up the sweep
+    themselves.
+  technical_debt: |
+    None. Pure additive ops with no schema or runtime changes. Reuses
+    the existing storage-size validation infrastructure (depends on
+    `write-primitives-sketch-clickhouse-and-storage-metrics` landing
+    first to inherit that methodology).
+
+files_affected:
+  modified:
+    - benchbox/core/write_primitives/catalog/operations.yaml
+    - docs/benchmarks/write-primitives-sketch-functions.md
+    - CHANGELOG.md
+
+must_preserve:
+  - "Existing sketch_query_theta_union_merge / _kll_quantiles_merge / _topk_combine ops execute identically — sweep variants are net-new ops with distinct IDs."
+  - "Validation contracts on sweep variants use the same expected_value_min/max + expected_storage_min/max shape as the default ops."
+
+approach: |
+  Pure operations.yaml work. For each new variant:
+    - Copy the default op's write_sql; change the parameter literal.
+    - Re-tune expected_value_min/max empirically against DuckDB
+      (RSE / accuracy is parameter-dependent).
+    - Re-tune storage-size bounds to match the new parameter value.
+    - Add a one-line description noting the parameter delta.
+  All non-DuckDB platform_overrides are `null` — sweeps are
+  DuckDB-only by design.
+
+anti_patterns:
+  - "DO NOT add cloud-engine overrides for sweep variants — because each cloud has its own parameter mapping (Snowflake counters vs DataSketches lg_max_map_size, etc.) and 27 new overrides are out of proportion with the value — DuckDB-only sweep, cloud guidance in docs only."
+  - "DO NOT sweep with extreme values that wouldn't be used in production (e.g. lg_k=4 = 16 entries) — because the resulting estimates would be useless and the bounds would be impossible to set meaningfully — stick to DataSketches-recommended ranges."
+  - "DO NOT collapse sweep variants into a single parameterised op — because BenchBox treats each op as a discrete measurement unit and parameterising would require runtime parameter-injection plumbing — separate ops per parameter value."
+
+verification:
+  - description: "All write_primitives unit tests pass with new sweep variants"
+    command: "uv run -- python -m pytest tests/unit/core/write_primitives -q"
+    expected_output: "all tests pass"
+  - description: "DuckDB end-to-end: theta lg_k sweep variants execute"
+    command: "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_query_theta_union_merge_lgk10,sketch_query_theta_union_merge_lgk14"
+    expected_output: "2/2 pass; storage size at lg_k=10 < default < lg_k=14 as observed"
+  - description: "DuckDB end-to-end: KLL k sweep variants execute"
+    command: "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_query_kll_quantiles_merge_k100,sketch_query_kll_quantiles_merge_k1000"
+    expected_output: "2/2 pass; storage size at k=100 < default < k=1000"
+
+scope_limit:
+  only_modify:
+    - benchbox/core/write_primitives/catalog/operations.yaml
+    - docs/benchmarks/write-primitives-sketch-functions.md
+    - CHANGELOG.md
+  do_not_modify:
+    - benchbox/core/write_primitives/schema.py
+    - benchbox/core/write_primitives/catalog/loader.py
+    - benchbox/core/write_primitives/benchmark.py
+    - benchbox/core/read_primitives/
+
+success_metrics:
+  - "6 new sketch parameter-sweep ops (2 theta + 2 KLL + 2 topk) execute end-to-end on DuckDB SF=0.01"
+  - "Cross-platform docs gain a Parameter sweeps section with observed storage / latency / accuracy numbers per parameter value"
+  - "Cloud parameter-knob mapping guidance documented (no new overrides)"
+  - "Changelog entry under unreleased"
+
+open_questions:
+  - "Is there a cleaner way to label sweep variants than `_lgk10` / `_lgk14` suffix? Lean: keep the suffix — explicit and grep-friendly. Reconsider if the catalog gets cluttered with dozens of sweep variants."
+  - "Should the storage-size bounds for sweep variants be tuned to a single observation or to the bound family (e.g., lg_k=10 should be ~25% of lg_k=12 size)? Lean: empirical per-variant bounds with inline rationale comments — same pattern as the default ops."
