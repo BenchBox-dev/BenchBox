@@ -85,6 +85,57 @@ value+count pairs. The catalog's `result_contract.capability` is set
 to `approximate_top_k` so the cross-dialect comparator skips strict
 value equality and validates capability + array `type_class` instead.
 
+## DataFrame platform coverage
+
+Three of the five approximate-aggregate queries run on the BenchBox
+DataFrame surface. The other two are PySpark-only at the DataFrame
+layer and stay in `SKIP_FOR_DATAFRAME`.
+
+| Query                            | Polars                       | PySpark                                   | DataFusion                                  | Pandas / Modin / cuDF | Dask |
+|----------------------------------|------------------------------|--------------------------------------------|---------------------------------------------|-----------------------|------|
+| `approx_count_distinct_simple`   | `approx_n_unique` (HLL)      | `approx_count_distinct` (HLL)             | `approx_distinct` (HLL)                     | `nunique` (exact)     | `nunique` (exact; `nunique_approx` available, follow-up) |
+| `approx_count_distinct_groupby`  | `approx_n_unique` (HLL)      | `approx_count_distinct` (HLL)             | `approx_distinct` (HLL)                     | `nunique` (exact)     | `nunique` (exact; `nunique_approx` available, follow-up) |
+| `approx_quantile_groupby`        | `quantile(0.5)` (exact)      | `percentile_approx(col, 0.5)` (KLL-equiv) | `approx_percentile_cont(col, 0.5)` (T-Digest) | `median` (exact)    | `median` (exact; `quantile(method='tdigest')` available, follow-up) |
+| `approx_quantiles_array`         | — (in `SKIP_FOR_DATAFRAME`)  | — (in `SKIP_FOR_DATAFRAME`)               | —                                           | —                     | — |
+| `approx_top_k_lineitem`          | — (in `SKIP_FOR_DATAFRAME`)  | — (in `SKIP_FOR_DATAFRAME`)               | —                                           | —                     | — |
+
+### Sketch vs exact-fallback interpretation
+
+When a row above says **(exact)**, the underlying engine has no
+sketch-backed surface for that aggregate at the DataFrame layer. The
+benchmark still runs and reports a number, but that number is the
+*exact* aggregate's latency — it is not directly comparable to the
+sketch-backed engines on the same row, because exact aggregates pay
+cardinality-proportional cost while sketches pay roughly constant
+cost. Cross-engine comparisons in this category are most informative
+within the sketch-backed column group.
+
+Pandas / Modin / cuDF have no native sketch surface at all. Dask
+exposes `nunique_approx()` (HLL) and `quantile(method='tdigest')`
+(T-Digest); current DataFrame impls fall back to exact rather than
+branching on the platform. A clean `ctx.approx_distinct(col)` /
+`ctx.approx_quantile(col, q)` extension to `DataFrameContext` would
+let Dask join the sketch column without per-platform isinstance
+branching in the impl bodies; deferred until cross-engine sketch
+mappings stabilize.
+
+### Why two queries stay PySpark-only
+
+- `approx_quantiles_array` — only PySpark's
+  `percentile_approx(col, array(...))` returns an array of quantiles
+  from a single sketch evaluation. Polars, DataFusion, and Dask
+  expose only single-quantile aggregates; emulating the array form
+  via a per-quantile loop on those engines defeats the latency
+  measurement that the benchmark is supposed to report.
+- `approx_top_k_lineitem` — only PySpark 4.1+ ships a native
+  `approx_top_k` accumulator. Polars' `top_k` is largest-by-sort-key
+  (different semantics — not frequency-based). A real top-K port for
+  the other DataFrame engines would land via the `write_primitives`
+  PySpark DataFrame surface follow-up
+  (`write-primitives-sketch-pyspark-dataframe-surface`) and could
+  motivate dropping the SKIP_FOR_DATAFRAME entries here once the
+  upstream engines ship equivalents.
+
 ## Single-query scope
 
 These queries exercise only the **aggregate latency** path — i.e., the
