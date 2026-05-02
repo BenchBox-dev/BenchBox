@@ -363,14 +363,57 @@ def _deployment_class_from_contract(data: dict[str, Any]) -> str | None:
     return None
 
 
-def _environment_facets(data: dict[str, Any]) -> dict[str, str | None]:
+def _has_normalized_environment_contract(data: dict[str, Any]) -> bool:
+    """Return true when the bundle carries normalized environment/platform facets."""
+    environment = _mapping_or_empty(data.get("environment"))
+    platform = _mapping_or_empty(data.get("platform"))
+    return any(isinstance(environment.get(key), dict) for key in ("platform_runtime", "container")) or any(
+        isinstance(platform.get(key), dict) for key in ("deployment", "cloud", "compute", "storage")
+    )
+
+
+def _legacy_environment_facets_from_cost(normalized_cost: NormalizedCost) -> dict[str, str | None]:
+    """Recover explorer facets from pre-environment-contract normalized cost metadata."""
+    deployment = normalized_cost.deployment
+    cloud_provider = _string_or_none(deployment.cloud_provider)
+    cloud_region = _string_or_none(deployment.cloud_region)
+    instance_or_warehouse = _first_string(
+        deployment.instance_type,
+        deployment.warehouse_size,
+        deployment.cluster_size,
+        deployment.node_count,
+    )
+    storage_format = _string_or_none(deployment.storage_format)
+
+    deployment_class: str | None = None
+    if normalized_cost.cost_status == "not_applicable_local":
+        deployment_class = "local"
+    elif cloud_provider or cloud_region:
+        deployment_class = "cloud"
+    elif normalized_cost.cost_status == "unavailable":
+        deployment_class = "unavailable"
+
+    return {
+        "deployment_class": deployment_class,
+        "cloud_provider": cloud_provider,
+        "cloud_region": cloud_region,
+        "instance_or_warehouse": instance_or_warehouse,
+        "storage_format": storage_format,
+    }
+
+
+def _environment_facets(
+    data: dict[str, Any],
+    *,
+    normalized_cost: NormalizedCost | None = None,
+) -> dict[str, str | None]:
     """Flatten normalized execution-environment facets for the browser store."""
     platform = _mapping_or_empty(data.get("platform"))
     cloud = _mapping_or_empty(platform.get("cloud"))
     compute = _mapping_or_empty(platform.get("compute"))
     storage = _mapping_or_empty(platform.get("storage"))
 
-    return {
+    facets = {
         "deployment_class": _deployment_class_from_contract(data),
         "cloud_provider": _string_or_none(cloud.get("provider")),
         "cloud_region": _first_string(cloud.get("region"), cloud.get("location")),
@@ -387,6 +430,9 @@ def _environment_facets(data: dict[str, Any]) -> dict[str, str | None]:
         ),
         "storage_format": _string_or_none(storage.get("table_format")),
     }
+    if _has_normalized_environment_contract(data) or normalized_cost is None:
+        return facets
+    return _legacy_environment_facets_from_cost(normalized_cost)
 
 
 def _compliance_class(data: dict[str, Any]) -> str | None:
@@ -627,7 +673,10 @@ class BundleTransformer:
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
         normalized_cost = _normalized_cost(bundle_data)
-        environment_facets = _environment_facets(bundle_data)
+        environment_facets = _environment_facets(
+            bundle_data,
+            normalized_cost=normalized_cost if _raw_normalized_cost_block(bundle_data) is not None else None,
+        )
         return ManifestEntry(
             result_id=rid,
             benchmark=benchmark,

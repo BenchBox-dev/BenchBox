@@ -147,7 +147,7 @@ def validate_motherduck_credentials(
 def _redact_token(message: str, token: str) -> str:
     """Remove MotherDuck token material from connection errors."""
     redacted = message.replace(token, "****") if token else message
-    return re.sub(r"motherduck_token=[^&\s]+", "motherduck_token=****", redacted)
+    return re.sub(r"(motherduck_token=)[^&\s,;)]*", r"\1****", redacted, flags=re.IGNORECASE)
 
 
 __all__ = [

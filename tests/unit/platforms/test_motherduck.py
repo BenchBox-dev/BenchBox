@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import logging
 import os
 from unittest.mock import Mock, patch
 
@@ -267,6 +268,26 @@ class TestMotherDuckCreateConnection:
 
         mock_duckdb.connect.assert_not_called()
         assert conn is mock_conn
+
+    def test_create_connection_redacts_token_from_error_and_log(self, caplog):
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="secret-token", database="benchbox")
+
+        with (
+            patch("benchbox.platforms.motherduck.duckdb") as mock_duckdb,
+            caplog.at_level(logging.ERROR, logger="benchbox.platforms.motherduck"),
+            pytest.raises(ConnectionError) as exc_info,
+        ):
+            mock_duckdb.connect.side_effect = RuntimeError(
+                "failed to connect to md:benchbox?motherduck_token=secret-token"
+            )
+            adapter.create_connection()
+
+        assert "secret-token" not in str(exc_info.value)
+        assert "secret-token" not in caplog.text
+        assert "motherduck_token=****" in str(exc_info.value)
+        assert "motherduck_token=****" in caplog.text
 
 
 class TestMotherDuckAddCliArguments:

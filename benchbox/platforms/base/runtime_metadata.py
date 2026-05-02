@@ -183,7 +183,12 @@ def collect_normalized_result_metadata(
         try:
             metadata = hook(connection=connection, platform_info=platform_info)
         except TypeError:
-            metadata = hook()
+            try:
+                metadata = hook()
+            except Exception as exc:
+                return _metadata_hook_failure(exc)
+        except Exception as exc:
+            return _metadata_hook_failure(exc)
         if isinstance(metadata, Mapping):
             return _compact_mapping(metadata)
 
@@ -193,6 +198,29 @@ def collect_normalized_result_metadata(
         platform_info=platform_info,
         platform_config=platform_config,
         execution_mode=execution_mode,
+    )
+
+
+def _metadata_hook_failure(exc: Exception) -> dict[str, Any]:
+    """Return explicit unavailable metadata when adapter runtime capture fails."""
+    return _compact_mapping(
+        {
+            "execution_environment": NormalizedExecutionEnvironment(
+                platform_runtime=PlatformRuntimeEnvironment(
+                    runtime_type="unknown",
+                    collection_status="unavailable",
+                    source="unavailable",
+                    collection_error_class=type(exc).__name__,
+                    collection_error_message=str(exc),
+                )
+            ).to_dict(),
+            "platform_deployment": PlatformDeploymentMetadata(
+                deployment_type="unknown",
+                endpoint_class="unknown",
+                metadata_source="unavailable",
+                collection_status="unavailable",
+            ).to_dict(),
+        }
     )
 
 

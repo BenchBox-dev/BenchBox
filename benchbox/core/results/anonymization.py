@@ -38,6 +38,12 @@ _IDENTIFIER_KEYS = {
     "account": "account",
     "accountid": "account",
     "accountname": "account",
+    "org": "organization",
+    "orgid": "organization",
+    "orgname": "organization",
+    "organization": "organization",
+    "organizationid": "organization",
+    "organizationname": "organization",
     "project": "project",
     "projectid": "project",
     "workspace": "workspace",
@@ -107,6 +113,25 @@ _PATH_KEYS = {
 _MOUNT_COLLECTION_KEYS = {"bindmounts", "volumes", "mounts"}
 _MOUNT_PATH_KEYS = {"source", "destination", "target"}
 _LOCAL_ENDPOINT_VALUES = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "[::1]"}
+_MESSAGE_KEYS = {
+    "message",
+    "errormessage",
+    "collectionerrormessage",
+    "exception",
+    "stderr",
+    "stdout",
+}
+_MESSAGE_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9_])("
+    r"(?:~|/Users|/home|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+    r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
+    r")"
+)
+_MESSAGE_URL_RE = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s'\",;)]*", flags=re.IGNORECASE)
+_MESSAGE_SECRET_ASSIGNMENT_RE = re.compile(
+    r"\b([a-z0-9_]*(?:token|password|secret|access_key|private_key)[a-z0-9_]*)=[^&\s,;)]*",
+    flags=re.IGNORECASE,
+)
 
 
 def _compact_key(key: str) -> str:
@@ -395,6 +420,9 @@ class AnonymizationManager:
         if isinstance(value, str) and self._looks_like_connection_string(value):
             return PUBLIC_REDACTED_VALUE
 
+        if isinstance(value, str) and self._is_message_metadata_key(key_path):
+            return self._sanitize_public_message(value)
+
         prefix = self._identifier_prefix_for_key_path(key_path)
         if prefix is not None:
             if prefix == "host" and isinstance(value, str) and self._is_local_endpoint_value(value):
@@ -409,6 +437,10 @@ class AnonymizationManager:
     def _is_secret_metadata_key(self, key_path: tuple[str, ...]) -> bool:
         key = _compact_key(key_path[-1]) if key_path else ""
         return any(part in key for part in _SECRET_KEY_PARTS)
+
+    def _is_message_metadata_key(self, key_path: tuple[str, ...]) -> bool:
+        key = _compact_key(key_path[-1]) if key_path else ""
+        return key in _MESSAGE_KEYS or key.endswith("message") or key.endswith("error") or key.endswith("errors")
 
     def _identifier_prefix_for_key_path(self, key_path: tuple[str, ...]) -> str | None:
         if not key_path:
@@ -451,7 +483,20 @@ class AnonymizationManager:
     def _looks_like_connection_string(value: str) -> bool:
         if re.search(r"://[^/@\s:]+:[^/@\s]+@", value):
             return True
-        return bool(re.search(r"\b(password|token|secret|access_key|private_key)=", value, flags=re.IGNORECASE))
+        return bool(
+            re.search(
+                r"\b[a-z0-9_]*(?:password|token|secret|access_key|private_key)[a-z0-9_]*=",
+                value,
+                flags=re.IGNORECASE,
+            )
+        )
+
+    def _sanitize_public_message(self, value: str) -> str:
+        cleaned = self.remove_pii(value)
+        cleaned = _MESSAGE_SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}={PUBLIC_REDACTED_VALUE}", cleaned)
+        cleaned = _MESSAGE_URL_RE.sub(lambda match: self._hash_public_identifier(match.group(0), "endpoint"), cleaned)
+        cleaned = _MESSAGE_PATH_RE.sub(lambda match: self._hash_public_identifier(match.group(0), "path"), cleaned)
+        return cleaned
 
     def anonymize_system_profile(self) -> dict[str, Any]:
         """Generate anonymized system profile information.

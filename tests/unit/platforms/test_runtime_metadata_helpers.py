@@ -221,6 +221,23 @@ def test_adapter_hook_can_supply_normalized_metadata_without_required_abstract_m
     assert metadata["execution_environment"]["platform_runtime"]["collection_status"] == "available"
 
 
+def test_adapter_hook_failure_returns_unavailable_metadata() -> None:
+    class HookAdapter:
+        def get_normalized_result_metadata(self, **_: Any) -> dict[str, Any]:
+            raise RuntimeError("optional metadata API unavailable")
+
+    metadata = collect_normalized_result_metadata(HookAdapter())
+    runtime = metadata["execution_environment"]["platform_runtime"]
+    deployment = metadata["platform_deployment"]
+
+    assert runtime["runtime_type"] == "unknown"
+    assert runtime["collection_status"] == "unavailable"
+    assert runtime["collection_error_class"] == "RuntimeError"
+    assert runtime["collection_error_message"] == "optional metadata API unavailable"
+    assert deployment["deployment_type"] == "unknown"
+    assert deployment["collection_status"] == "unavailable"
+
+
 def test_result_merge_replaces_unknown_defaults_but_preserves_explicit_values() -> None:
     result = _minimal_result(
         execution_environment={
