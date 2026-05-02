@@ -88,6 +88,19 @@ describe("FacetDrawer", () => {
         onOpenChange={onOpenChange}
       />,
     );
-    expect(screen.getByRole("dialog", { name: "Filter results" })).toBeTruthy();
+    const dialog = screen.getByRole("dialog", { name: "Filter results" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("tabindex", "-1");
+    expect(dialog.className).toContain("fixed inset-0");
+
+    dialog.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "Done" })).toHaveFocus();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close filters" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

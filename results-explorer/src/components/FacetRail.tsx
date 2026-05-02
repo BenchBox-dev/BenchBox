@@ -1,4 +1,4 @@
-import { useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
 export interface FacetOption {
   value: string;
@@ -35,6 +35,15 @@ export interface FacetDrawerProps extends FacetRailProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const FOCUSABLE_DRAWER_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(", ");
+
 export function FacetRail({ groups, resultCount, activeChips = [], onToggle, onReset }: FacetRailProps) {
   return (
     <aside class="space-y-3" aria-label="Result facets">
@@ -55,6 +64,52 @@ export function FacetDrawer({
   open,
   onOpenChange,
 }: FacetDrawerProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onOpenChange(false);
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(FOCUSABLE_DRAWER_SELECTOR),
+      ).filter((element) => element.tabIndex >= 0 && !element.getAttribute("aria-hidden"));
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0]!;
+      const last = focusable.at(-1)!;
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === dialog) {
+        event.preventDefault();
+        first.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [open, onOpenChange]);
+
   return (
     <div class="space-y-3" aria-label="Mobile result facets">
       <button
@@ -70,19 +125,40 @@ export function FacetDrawer({
         <ActiveChipStrip activeChips={activeChips} onReset={onReset} compact />
       )}
       {open && (
-        <div
-          role="dialog"
-          aria-label="Filter results"
-          class="rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
-        >
-          <FacetRail
-            groups={groups}
-            resultCount={resultCount}
-            activeChips={activeChips}
-            onToggle={onToggle}
-            onReset={onReset}
+        <>
+          <button
+            type="button"
+            aria-label="Close filters"
+            class="fixed inset-0 z-40 bg-gray-900/40 sm:hidden"
+            onClick={() => onOpenChange(false)}
           />
-        </div>
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Filter results"
+            tabIndex={-1}
+            class="fixed inset-0 z-50 overflow-y-auto bg-white p-3 shadow-2xl outline-none sm:static sm:rounded-lg sm:border sm:border-gray-200 sm:shadow-lg"
+          >
+            <div class="mb-3 flex items-center justify-between gap-3 border-b border-gray-200 pb-3 sm:hidden">
+              <h2 class="text-sm font-semibold text-gray-900">Filters</h2>
+              <button
+                type="button"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700"
+                onClick={() => onOpenChange(false)}
+              >
+                Done
+              </button>
+            </div>
+            <FacetRail
+              groups={groups}
+              resultCount={resultCount}
+              activeChips={activeChips}
+              onToggle={onToggle}
+              onReset={onReset}
+            />
+          </div>
+        </>
       )}
     </div>
   );

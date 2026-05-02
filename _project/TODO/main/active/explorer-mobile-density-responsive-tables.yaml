@@ -51,7 +51,10 @@ work:
 
 - id: w3
   summary: "Style the FacetDrawer for narrow widths"
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/src/components/FacetRail.tsx"
+  - "results-explorer/src/components/__tests__/FacetRail.test.tsx"
   notes: |
     The FacetDrawer COMPONENT is owned by `explorer-selection-facets-
     coverage-at-scale` w6. This work unit ONLY adds narrow-width styling
@@ -194,8 +197,10 @@ scope_limit:
   - "results-explorer/src/components/MetaLeaderboard.tsx"
   - "results-explorer/src/components/QueryHeatmap.tsx"
   - "results-explorer/src/components/ChartPanel.tsx"
+  - "results-explorer/src/components/FacetRail.tsx"
   - "results-explorer/src/components/MobileFilterDrawer.tsx"
   - "results-explorer/src/components/ResponsiveDataTable.tsx"
+  - "results-explorer/src/components/__tests__/FacetRail.test.tsx"
   - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
   - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
   - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
