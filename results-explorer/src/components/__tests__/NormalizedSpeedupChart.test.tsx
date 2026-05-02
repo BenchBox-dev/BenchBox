@@ -87,4 +87,29 @@ describe("NormalizedSpeedupChart", () => {
     // em-dash rendered for the null timing slot
     expect(screen.getByText("-")).toBeTruthy();
   });
+
+  // -----------------------------------------------------------------------
+  // Duplicate-queryId guard (blind-spot
+  //   _project/blind-spots/2026-04-29-143205-react-key-collision-class.md)
+  //
+  // The `queries` prop is not deduped at the boundary, so a caller passing
+  // variant rows for the same queryId could collide on key={queryId}. The
+  // composite key `${queryId}-${rowIdx}` keeps reconciliation stable.
+  // -----------------------------------------------------------------------
+
+  it("renders both rows when two queries share the same queryId", () => {
+    const queriesWithDuplicate = [
+      { queryId: "Q1", timings: [{ ms: 100, status: "pass" }, { ms: 50, status: "pass" }] },
+      { queryId: "Q1", timings: [{ ms: 200, status: "pass" }, { ms: 100, status: "pass" }] },
+    ];
+    const { container } = render(
+      <NormalizedSpeedupChart queries={queriesWithDuplicate} results={RESULTS} baselineIdx={0} />,
+    );
+    // Two distinct row groups should render — both Q1 entries plus the
+    // grid axis group. Per-row count: 2 query rows.
+    const queryRows = Array.from(container.querySelectorAll("text")).filter(
+      (el) => el.textContent === "Q1",
+    );
+    expect(queryRows.length).toBe(2);
+  });
 });
