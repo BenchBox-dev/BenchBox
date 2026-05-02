@@ -1,7 +1,7 @@
 ---
 id: 2026-05-01-130000-codex-followups-todo-misses-coverage-downgrades
 date: 2026-05-01
-status: open
+status: actioned
 finding_kind: framework-gap
 review_context: "/todo review of codex-pr-review-followups-week-2026-05-01"
 related_paths:
@@ -101,3 +101,4 @@ never flagged the test downgrade in the first place.
   template — there is no `_project/templates/` directory and no
   weekly-sweep template to amend. Verified actionable for the
   framework-gap dimension only.
+- 2026-05-02: actioned — Sweep 2026-05-02: created _project/audits/codex-weekly-sweep-template.md with all five required scope axes. Axis 2 (in-window blind-spot cross-check) and Axis 3 (tests weakened in the window — with concrete grep patterns for assertion-loosening like toHaveCount->count>0, fixture-DB polling replacing strict mocks, etc.) were the gaps the original frame missed. Future weekly Codex sweeps copy from this template and skip an axis only with an explicit out-of-scope citation. The 2026-05-01 sweep already executed Axis 2 manually (cold-load coverage cross-link in must_not_do); template now codifies the practice. (Note: `_project/prompts/` is gitignored, so the template lives in `_project/audits/` alongside the per-week rescan files.)
