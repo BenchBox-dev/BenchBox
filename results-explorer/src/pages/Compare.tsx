@@ -32,9 +32,11 @@ export function Compare(_: RoutableProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [baselineIndex, setBaselineIndex] = useState(0);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const results = compareState?.results ?? EMPTY_RESULTS;
   const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
+  const normalizedBaselineIndex = results[baselineIndex] ? baselineIndex : 0;
   useDocumentTitle(
     results.length > 0 ? `Compare (${results.length}) · BenchBox Results` : "Compare · BenchBox Results",
   );
@@ -125,6 +127,7 @@ export function Compare(_: RoutableProps) {
 
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
+        setBaselineIndex(0);
         setCompareState({ results: details, primaryMetric: metric });
         setLoading(false);
       })
@@ -250,7 +253,29 @@ export function Compare(_: RoutableProps) {
 
       <ComparabilityReceipt results={results} />
       <CompareSummary summary={decisionSummary} />
-      <QueryDiffTable results={results} />
+      {results.length > 1 && (
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 shadow-sm">
+          <div>
+            <label class="text-sm font-medium text-gray-700" for="compare-baseline">
+              Baseline
+            </label>
+            <p class="text-xs text-gray-500">Ratios and deltas compare every candidate against this run.</p>
+          </div>
+          <select
+            id="compare-baseline"
+            class="rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 focus:outline-none"
+            value={String(normalizedBaselineIndex)}
+            onChange={(event) => setBaselineIndex(Number((event.target as HTMLSelectElement).value))}
+          >
+            {results.map((result, index) => (
+              <option key={result.result_id} value={String(index)}>
+                {result.platform}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <QueryDiffTable results={results} baselineIndex={normalizedBaselineIndex} />
 
       <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rowData.map((r, i) => {
@@ -346,7 +371,11 @@ export function Compare(_: RoutableProps) {
 
       {rowCount > 0 && (
         <div class="mb-8">
-          <ChartPanel context={{ kind: "compare", results, primaryMetric }} />
+          <ChartPanel
+            context={{ kind: "compare", results, primaryMetric }}
+            baselineIndex={normalizedBaselineIndex}
+            onBaselineIndexChange={setBaselineIndex}
+          />
         </div>
       )}
     </div>

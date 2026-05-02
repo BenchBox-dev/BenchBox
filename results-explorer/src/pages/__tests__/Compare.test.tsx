@@ -318,6 +318,25 @@ describe("Compare", () => {
     expect(select.options[0]!.text).toBe("DuckDB");
   });
 
+  it("baseline selector updates query diffs and chart baseline without changing compare URL membership", async () => {
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+    });
+
+    const beforeIds = new URL(window.location.href).searchParams.get("ids");
+    const select = screen.getByLabelText("Baseline") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "1" } });
+
+    const diffTable = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    expect(select.value).toBe("1");
+    expect(diffTable).toHaveTextContent("Baseline: SQLite");
+    expect(diffTable).toHaveTextContent("DuckDB");
+    expect(diffTable).toHaveTextContent("0.10x");
+    expect(new URL(window.location.href).searchParams.get("ids")).toBe(beforeIds);
+    expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
+  });
+
   it("renders the comparability receipt before charts and query diff evidence", async () => {
     render(<Compare />);
     await waitFor(() => {
