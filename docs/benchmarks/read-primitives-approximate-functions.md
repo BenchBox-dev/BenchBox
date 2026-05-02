@@ -50,10 +50,16 @@ sqlglot leaves the SQL non-functional.
 | Databricks | `PERCENTILE_APPROX(x, 0.5)`                                  | sqlglot rewrite  |
 | ClickHouse | `quantileTDigest(0.5)(x)`                                    | YAML variant     |
 | DataFusion | `approx_percentile_cont(x, 0.5)`                             | YAML variant     |
-| Redshift   | `APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)` | (skipped)        |
+| Redshift   | `APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)` | YAML variant     |
 
 Redshift's `APPROXIMATE PERCENTILE_DISC` syntax is rejected by
-sqlglot's redshift parser, so quantile queries skip on Redshift.
+sqlglot's redshift parser, so the variant is hand-written rather than
+sqlglot-rewritten and the static linter has an explicit allowlist for
+its `variant_parse_error`. Runtime execution sends the SQL as-is to
+the Redshift adapter, so the parse-time gap doesn't block actual runs.
+Note: the per-node GROUP BY result-set cap applies; for grouping
+columns with cardinality near or above the cap, fall back to exact
+`PERCENTILE_CONT`.
 
 ### Vector quantiles (one sketch eval per group)
 
