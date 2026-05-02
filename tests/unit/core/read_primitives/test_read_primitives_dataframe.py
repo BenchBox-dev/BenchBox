@@ -1167,6 +1167,8 @@ CORE_EXPRESSION_QUERIES = [
     # Advanced sweeps that execute cleanly across both families
     "aggregation_distinct_groupby",
     "aggregation_groupby_large",
+    "approx_count_distinct_simple",
+    "approx_count_distinct_groupby",
     "any_value_simple",
     "any_value_with_filter",
     "array_agg_distinct",
