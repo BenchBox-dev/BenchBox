@@ -2968,7 +2968,7 @@ operations:
         FROM lineitem GROUP BY l_shipdate, l_returnflag;
       clickhouse: null
       datafusion: null
-      redshift: null
+      redshift: null  # Redshift has no KLL or T-Digest sketch family
       sqlite: null
       starrocks: null
 
@@ -3020,7 +3020,7 @@ operations:
       bigquery: null  # No native top-K accumulator function
       clickhouse: null
       datafusion: null
-      redshift: null
+      redshift: null  # Redshift has no top-K function family
       sqlite: null
       starrocks: null
 
@@ -3191,7 +3191,7 @@ operations:
         FROM sketch_ops_kll_partitions;
       clickhouse: null
       datafusion: null
-      redshift: null
+      redshift: null  # Redshift has no KLL or T-Digest sketch family
       sqlite: null
       starrocks: null
 
@@ -3252,7 +3252,7 @@ operations:
       bigquery: null  # No native top-K accumulator
       clickhouse: null
       datafusion: null
-      redshift: null
+      redshift: null  # Redshift has no top-K function family
       sqlite: null
       starrocks: null
 
