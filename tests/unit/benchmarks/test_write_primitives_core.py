@@ -132,8 +132,9 @@ class TestWritePrimitivesCatalog:
         for operation in catalog.operations.values():
             categories.add(operation.category)
 
-        # Should have all 6 categories (transaction category removed)
-        expected_categories = {"insert", "update", "delete", "bulk_load", "merge", "ddl"}
+        # Should have all 7 categories (transaction removed; sketch added for
+        # the DataSketches persist+merge+requery lifecycle).
+        expected_categories = {"insert", "update", "delete", "bulk_load", "merge", "ddl", "sketch"}
         assert categories == expected_categories
 
     def test_catalog_operation_count(self):

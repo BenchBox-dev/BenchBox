@@ -75,6 +75,14 @@ SKIP_FOR_DATAFRAME = [
     # SQL: SELECT (SELECT MAX(x) FROM t2 WHERE t2.key = t1.key) FROM t1
     # No DataFrame equivalent - requires per-row subquery execution
     "optimizer_scalar_subquery_flattening",
+    # Approximate-aggregate queries — engine-side sketch APIs (HLL, KLL,
+    # frequent-items) have no first-class DataFrame equivalent. Polars'
+    # approx_n_unique covers approx_count_distinct partially; a full
+    # DataFrame port belongs in a follow-up TODO if pursued.
+    "approx_count_distinct_simple",
+    "approx_count_distinct_groupby",
+    "approx_quantiles_array",
+    "approx_top_k_lineitem",
 ]
 
 # NOTE: EXPRESSION_FAMILY_ONLY list has been removed.
@@ -3254,7 +3262,7 @@ def window_unbounded_frame_pandas_impl(ctx: DataFrameContext) -> Any:
 # =============================================================================
 
 
-def intrinsic_appx_median_expression_impl(ctx: DataFrameContext) -> Any:
+def approx_quantile_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     """Approximate median calculation per group using quantile(0.5)."""
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
@@ -3264,7 +3272,7 @@ def intrinsic_appx_median_expression_impl(ctx: DataFrameContext) -> Any:
     return result
 
 
-def intrinsic_appx_median_pandas_impl(ctx: DataFrameContext) -> Any:
+def approx_quantile_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     """Approximate median calculation per group using quantile(0.5)."""
     lineitem = ctx.get_table("lineitem")
 
@@ -6244,12 +6252,12 @@ _QUERIES = [
     ),
     # Intrinsic queries
     DataFrameQuery(
-        query_id="intrinsic_appx_median",
+        query_id="approx_quantile_groupby",
         query_name="Approximate Median",
         description="Approximate statistical function (PERCENTILE_CONT for median)",
         categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=intrinsic_appx_median_expression_impl,
-        pandas_impl=intrinsic_appx_median_pandas_impl,
+        expression_impl=approx_quantile_groupby_expression_impl,
+        pandas_impl=approx_quantile_groupby_pandas_impl,
     ),
     DataFrameQuery(
         query_id="intrinsic_to_date",

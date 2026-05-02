@@ -1187,7 +1187,7 @@ CORE_EXPRESSION_QUERIES = [
     "fulltext_phrase_search",
     "fulltext_simple_search",
     "groupby_all_simple",
-    "intrinsic_appx_median",
+    "approx_quantile_groupby",
     "intrinsic_to_date",
     "json_aggregates",
     "json_extract_nested",

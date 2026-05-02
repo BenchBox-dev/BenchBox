@@ -2,8 +2,8 @@
 # Copyright 2026 Joe Harris / BenchBox Project
 # Licensed under the MIT License
 #
-# Total operations: 109
-# Categories: INSERT (12), UPDATE (15), DELETE (14), BULK_LOAD (36), MERGE (20), DDL (12)
+# Total operations: 117
+# Categories: INSERT (12), UPDATE (15), DELETE (14), BULK_LOAD (36), MERGE (20), DDL (12), SKETCH (8)
 #
 # Note: Transaction operations have been moved to the Transaction Primitives benchmark.
 # Write Primitives v2 focuses on non-transactional write operations with explicit cleanup.
@@ -2742,3 +2742,506 @@ operations:
         expected_rows: 1
     cleanup_sql: null  # Table is already dropped
     expected_rows_affected: null
+
+  # ============================================================================
+  # SKETCH OPERATIONS (8 operations) — DataSketches persist + merge + requery
+  # ============================================================================
+  #
+  # Lifecycle: build sketches into a BINARY column with one query, then merge
+  # them across partitions in a later query and extract a scalar estimate.
+  # Each op is fully self-contained (CREATE, populate, query, DROP) — no
+  # cross-op dependency. Sketch tables are NOT in STAGING_TABLES; this avoids
+  # adding BINARY-column DDL to the bootstrap loop on dialects without a
+  # binary type (DataFusion/SQLite).
+  #
+  # First-pass support: DuckDB (datasketches community extension), with
+  # Databricks / Snowflake / BigQuery platform_overrides written from
+  # documented function names but not locally verifiable. ClickHouse,
+  # DataFusion, Redshift, SQLite, and Starrocks skip via null overrides.
+  # ClickHouse-native -State/-Merge variants are explicitly deferred
+  # (see TODO `deferred:` block).
+
+  - id: sketch_ddl_create_persistent_table
+    category: sketch
+    description: Tests CREATE/DROP overhead for a sketch persistence table with BINARY columns
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_daily_users;
+      CREATE TABLE sketch_ops_daily_users (
+        activity_date DATE,
+        region VARCHAR(25),
+        user_sketch BLOB,
+        rev_sketch BLOB
+      );
+    validation_queries:
+      - id: table_exists
+        sql: |
+          SELECT COUNT(*) as cnt
+          FROM information_schema.tables
+          WHERE table_name = 'sketch_ops_daily_users'
+        expected_rows: 1
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_daily_users
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE,
+          region STRING,
+          user_sketch BINARY,
+          rev_sketch BINARY
+        ) USING DELTA;
+      snowflake: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE,
+          region VARCHAR(25),
+          user_sketch BINARY,
+          rev_sketch BINARY
+        );
+      bigquery: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE,
+          region STRING,
+          user_sketch BYTES,
+          rev_sketch BYTES
+        );
+      clickhouse: null  # Uses -State/-Merge with non-portable serialization (deferred)
+      datafusion: null  # No DML
+      redshift: null    # HLLSKETCH only covers HLL family, not theta+kll
+      sqlite: null      # No BINARY type useful for sketches
+      starrocks: null   # Defer pending DataSketches UDAF support
+
+  - id: sketch_insert_theta_per_partition
+    category: sketch
+    description: Builds per-partition Theta sketches over l_orderkey + l_extendedprice and persists them
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_daily_users;
+      CREATE TABLE sketch_ops_daily_users (
+        activity_date DATE,
+        region VARCHAR(25),
+        user_sketch BLOB,
+        rev_sketch BLOB
+      );
+      INSERT INTO sketch_ops_daily_users
+      SELECT
+        l_shipdate AS activity_date,
+        l_returnflag AS region,
+        datasketch_theta(l_orderkey) AS user_sketch,
+        datasketch_theta(CAST(l_extendedprice AS INTEGER)) AS rev_sketch
+      FROM lineitem
+      GROUP BY l_shipdate, l_returnflag;
+    validation_queries:
+      - id: rows_persisted
+        sql: |
+          SELECT COUNT(*) as partitions FROM sketch_ops_daily_users
+        expected_rows_min: 1
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_daily_users
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region STRING, user_sketch BINARY, rev_sketch BINARY
+        ) USING DELTA;
+        INSERT INTO sketch_ops_daily_users
+        SELECT l_shipdate, l_returnflag,
+               theta_sketch_agg(l_orderkey),
+               theta_sketch_agg(CAST(l_extendedprice AS INT))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      snowflake: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region VARCHAR(25), user_sketch BINARY, rev_sketch BINARY
+        );
+        INSERT INTO sketch_ops_daily_users
+        SELECT l_shipdate, l_returnflag,
+               DATASKETCHES_THETA_ACCUMULATE(l_orderkey),
+               DATASKETCHES_THETA_ACCUMULATE(CAST(l_extendedprice AS INTEGER))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      bigquery: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region STRING, user_sketch BYTES, rev_sketch BYTES
+        );
+        INSERT INTO sketch_ops_daily_users
+        SELECT l_shipdate, l_returnflag,
+               HLL_COUNT.INIT(l_orderkey),
+               HLL_COUNT.INIT(CAST(l_extendedprice AS INT64))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_insert_kll_per_partition
+    category: sketch
+    description: Builds per-partition KLL quantile sketches over l_extendedprice
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+      CREATE TABLE sketch_ops_kll_partitions (
+        activity_date DATE,
+        region VARCHAR(25),
+        price_sketch BLOB
+      );
+      INSERT INTO sketch_ops_kll_partitions
+      SELECT
+        l_shipdate,
+        l_returnflag,
+        datasketch_kll(200, l_extendedprice)
+      FROM lineitem
+      GROUP BY l_shipdate, l_returnflag;
+    validation_queries:
+      - id: kll_partitions_persisted
+        sql: |
+          SELECT COUNT(*) as partitions FROM sketch_ops_kll_partitions
+        expected_rows_min: 1
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_kll_partitions
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: |
+        DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+        CREATE TABLE sketch_ops_kll_partitions (
+          activity_date DATE, region STRING, price_sketch BINARY
+        ) USING DELTA;
+        INSERT INTO sketch_ops_kll_partitions
+        SELECT l_shipdate, l_returnflag, kll_sketch_agg(l_extendedprice)
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      snowflake: |
+        DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+        CREATE TABLE sketch_ops_kll_partitions (
+          activity_date DATE, region VARCHAR(25), price_sketch BINARY
+        );
+        INSERT INTO sketch_ops_kll_partitions
+        SELECT l_shipdate, l_returnflag,
+               DATASKETCHES_KLL_ACCUMULATE(CAST(l_extendedprice AS DOUBLE))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      bigquery: |
+        DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+        CREATE TABLE sketch_ops_kll_partitions (
+          activity_date DATE, region STRING, price_sketch BYTES
+        );
+        INSERT INTO sketch_ops_kll_partitions
+        SELECT l_shipdate, l_returnflag,
+               KLL_QUANTILES.INIT_INT64(CAST(l_extendedprice AS INT64))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_insert_topk_per_shard
+    category: sketch
+    description: Builds per-shard frequent-items (Top-K accumulator) sketches over l_shipmode
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_topk;
+      CREATE TABLE sketch_ops_topk (
+        shard_id INTEGER,
+        topk_sketch BLOB
+      );
+      INSERT INTO sketch_ops_topk
+      SELECT
+        CAST(l_orderkey % 8 AS INTEGER) AS shard_id,
+        datasketch_frequent_items(8, l_shipmode) AS topk_sketch
+      FROM lineitem
+      GROUP BY l_orderkey % 8;
+    validation_queries:
+      - id: topk_shards_persisted
+        sql: |
+          SELECT COUNT(*) as shards FROM sketch_ops_topk
+        expected_rows_min: 1
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_topk
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: |
+        DROP TABLE IF EXISTS sketch_ops_topk;
+        CREATE TABLE sketch_ops_topk (
+          shard_id INT, topk_sketch BINARY
+        ) USING DELTA;
+        INSERT INTO sketch_ops_topk
+        SELECT CAST(l_orderkey % 8 AS INT),
+               approx_top_k_accumulate(l_shipmode)
+        FROM lineitem GROUP BY l_orderkey % 8;
+      snowflake: |
+        DROP TABLE IF EXISTS sketch_ops_topk;
+        CREATE TABLE sketch_ops_topk (
+          shard_id INTEGER, topk_sketch BINARY
+        );
+        INSERT INTO sketch_ops_topk
+        SELECT MOD(l_orderkey, 8),
+               APPROX_TOP_K_ACCUMULATE(l_shipmode, 8)
+        FROM lineitem GROUP BY MOD(l_orderkey, 8);
+      bigquery: null  # No native top-K accumulator function
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  # ★ HEADLINE TEST — theta_union merge + estimate
+  - id: sketch_query_theta_union_merge
+    category: sketch
+    description: ★ Headline — populate theta sketches per partition, then merge across all partitions in a single query and emit an approximate distinct count (compare to aggregation_distinct in read_primitives)
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_daily_users;
+      CREATE TABLE sketch_ops_daily_users (
+        activity_date DATE, region VARCHAR(25), user_sketch BLOB, rev_sketch BLOB
+      );
+      INSERT INTO sketch_ops_daily_users
+      SELECT l_shipdate, l_returnflag,
+             datasketch_theta(l_orderkey),
+             datasketch_theta(CAST(l_extendedprice AS INTEGER))
+      FROM lineitem
+      GROUP BY l_shipdate, l_returnflag;
+      SELECT datasketch_theta_estimate(datasketch_theta(user_sketch)) AS distinct_orders
+      FROM sketch_ops_daily_users;
+    validation_queries:
+      - id: theta_estimate_in_range
+        sql: |
+          SELECT datasketch_theta_estimate(datasketch_theta(user_sketch)) AS distinct_orders
+          FROM sketch_ops_daily_users
+        # SF=0.01: lineitem has 15000 distinct l_orderkeys; theta merge
+        # observed at 14836.89 (deterministic over 5 runs). Bounds catch
+        # a regression to a no-op (0) or gross overestimate.
+        expected_value_min: 14000
+        expected_value_max: 16000
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_daily_users
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region STRING, user_sketch BINARY, rev_sketch BINARY
+        ) USING DELTA;
+        INSERT INTO sketch_ops_daily_users
+        SELECT l_shipdate, l_returnflag, theta_sketch_agg(l_orderkey),
+               theta_sketch_agg(CAST(l_extendedprice AS INT))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+        SELECT theta_sketch_estimate(theta_union_agg(user_sketch)) AS distinct_orders
+        FROM sketch_ops_daily_users;
+      snowflake: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region VARCHAR(25), user_sketch BINARY, rev_sketch BINARY
+        );
+        INSERT INTO sketch_ops_daily_users
+        SELECT l_shipdate, l_returnflag, DATASKETCHES_THETA_ACCUMULATE(l_orderkey),
+               DATASKETCHES_THETA_ACCUMULATE(CAST(l_extendedprice AS INTEGER))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+        SELECT DATASKETCHES_THETA_ESTIMATE(DATASKETCHES_THETA_COMBINE(user_sketch)) AS distinct_orders
+        FROM sketch_ops_daily_users;
+      bigquery: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region STRING, user_sketch BYTES, rev_sketch BYTES
+        );
+        INSERT INTO sketch_ops_daily_users
+        SELECT l_shipdate, l_returnflag, HLL_COUNT.INIT(l_orderkey),
+               HLL_COUNT.INIT(CAST(l_extendedprice AS INT64))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+        SELECT HLL_COUNT.MERGE(user_sketch) AS distinct_orders
+        FROM sketch_ops_daily_users;
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  # ★ HEADLINE TEST — kll merge + get_quantile
+  - id: sketch_query_kll_quantiles_merge
+    category: sketch
+    description: ★ Headline — populate KLL sketches per partition, merge across partitions, extract median price (compare to statistical_percentiles in read_primitives)
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+      CREATE TABLE sketch_ops_kll_partitions (
+        activity_date DATE, region VARCHAR(25), price_sketch BLOB
+      );
+      INSERT INTO sketch_ops_kll_partitions
+      SELECT l_shipdate, l_returnflag, datasketch_kll(200, l_extendedprice)
+      FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      SELECT datasketch_kll_quantile(datasketch_kll(200, price_sketch::sketch_kll_double), 0.5::DOUBLE, true) AS median_price
+      FROM sketch_ops_kll_partitions;
+    validation_queries:
+      - id: kll_median_in_range
+        sql: |
+          SELECT datasketch_kll_quantile(datasketch_kll(200, price_sketch::sketch_kll_double), 0.5::DOUBLE, true) AS median_price
+          FROM sketch_ops_kll_partitions
+        # SF=0.01: median l_extendedprice merged across partitions
+        # observed at 34027–34362 over 5 runs (varies with merge order).
+        # [30000, 40000] is generous and tolerant of SF=0.1 drift while
+        # still catching a sketch regressing to 0 or a wildly off median.
+        expected_value_min: 30000
+        expected_value_max: 40000
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_kll_partitions
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: |
+        DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+        CREATE TABLE sketch_ops_kll_partitions (
+          activity_date DATE, region STRING, price_sketch BINARY
+        ) USING DELTA;
+        INSERT INTO sketch_ops_kll_partitions
+        SELECT l_shipdate, l_returnflag, kll_sketch_agg(l_extendedprice)
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+        SELECT kll_sketch_estimate_quantile(kll_sketch_agg(price_sketch), 0.5) AS median_price
+        FROM sketch_ops_kll_partitions;
+      snowflake: |
+        DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+        CREATE TABLE sketch_ops_kll_partitions (
+          activity_date DATE, region VARCHAR(25), price_sketch BINARY
+        );
+        INSERT INTO sketch_ops_kll_partitions
+        SELECT l_shipdate, l_returnflag,
+               DATASKETCHES_KLL_ACCUMULATE(CAST(l_extendedprice AS DOUBLE))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+        SELECT DATASKETCHES_KLL_GET_QUANTILE(DATASKETCHES_KLL_COMBINE(price_sketch), 0.5) AS median_price
+        FROM sketch_ops_kll_partitions;
+      bigquery: |
+        DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+        CREATE TABLE sketch_ops_kll_partitions (
+          activity_date DATE, region STRING, price_sketch BYTES
+        );
+        INSERT INTO sketch_ops_kll_partitions
+        SELECT l_shipdate, l_returnflag,
+               KLL_QUANTILES.INIT_INT64(CAST(l_extendedprice AS INT64))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+        SELECT KLL_QUANTILES.MERGE_POINT_INT64(price_sketch, 0.5) AS median_price
+        FROM sketch_ops_kll_partitions;
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  # ★ HEADLINE TEST — frequent-items combine + estimate
+  - id: sketch_query_topk_combine
+    category: sketch
+    description: ★ Headline — populate per-shard frequent-items sketches, combine across shards, count the frequent items (cross-reference approx_top_k_lineitem latency in read_primitives)
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_topk;
+      CREATE TABLE sketch_ops_topk (shard_id INTEGER, topk_sketch BLOB);
+      INSERT INTO sketch_ops_topk
+      SELECT CAST(l_orderkey % 8 AS INTEGER),
+             datasketch_frequent_items(8, l_shipmode)
+      FROM lineitem GROUP BY l_orderkey % 8;
+      SELECT LENGTH(datasketch_frequent_items_get_frequent(
+        datasketch_frequent_items(8, topk_sketch), 'NO_FALSE_POSITIVES'
+      )) AS frequent_count
+      FROM sketch_ops_topk;
+    validation_queries:
+      - id: topk_frequent_count_in_range
+        sql: |
+          SELECT LENGTH(datasketch_frequent_items_get_frequent(
+            datasketch_frequent_items(8, topk_sketch), 'NO_FALSE_POSITIVES'
+          )) AS frequent_count
+          FROM sketch_ops_topk
+        # SF=0.01: lineitem has exactly 7 distinct l_shipmode values; the
+        # frequent-items merge reports all 7 deterministically across runs.
+        # Lower bound at 6 catches a sketch losing one mode; upper at 8
+        # would flag a frequent-items false-positive (NO_FALSE_POSITIVES
+        # mode should not return more than 7).
+        expected_value_min: 6
+        expected_value_max: 8
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_topk
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: |
+        DROP TABLE IF EXISTS sketch_ops_topk;
+        CREATE TABLE sketch_ops_topk (shard_id INT, topk_sketch BINARY) USING DELTA;
+        INSERT INTO sketch_ops_topk
+        SELECT CAST(l_orderkey % 8 AS INT),
+               approx_top_k_accumulate(l_shipmode)
+        FROM lineitem GROUP BY l_orderkey % 8;
+        SELECT SIZE(approx_top_k_estimate(approx_top_k_combine(topk_sketch))) AS frequent_count
+        FROM sketch_ops_topk;
+      snowflake: |
+        DROP TABLE IF EXISTS sketch_ops_topk;
+        CREATE TABLE sketch_ops_topk (shard_id INTEGER, topk_sketch BINARY);
+        INSERT INTO sketch_ops_topk
+        SELECT MOD(l_orderkey, 8),
+               APPROX_TOP_K_ACCUMULATE(l_shipmode, 8)
+        FROM lineitem GROUP BY MOD(l_orderkey, 8);
+        SELECT ARRAY_SIZE(APPROX_TOP_K_ESTIMATE(APPROX_TOP_K_COMBINE(topk_sketch))) AS frequent_count
+        FROM sketch_ops_topk;
+      bigquery: null  # No native top-K accumulator
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_drop_persistent_table
+    category: sketch
+    description: Tests DROP TABLE on a sketch-bearing BINARY-column table to measure cleanup overhead
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_daily_users;
+      CREATE TABLE sketch_ops_daily_users (
+        activity_date DATE, region VARCHAR(25), user_sketch BLOB, rev_sketch BLOB
+      );
+      DROP TABLE sketch_ops_daily_users;
+    validation_queries:
+      - id: table_dropped
+        sql: |
+          SELECT COUNT(*) as cnt
+          FROM information_schema.tables
+          WHERE table_name = 'sketch_ops_daily_users'
+        expected_rows: 1
+    cleanup_sql: null  # Table is already dropped
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region STRING, user_sketch BINARY, rev_sketch BINARY
+        ) USING DELTA;
+        DROP TABLE sketch_ops_daily_users;
+      snowflake: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region VARCHAR(25), user_sketch BINARY, rev_sketch BINARY
+        );
+        DROP TABLE sketch_ops_daily_users;
+      bigquery: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE, region STRING, user_sketch BYTES, rev_sketch BYTES
+        );
+        DROP TABLE sketch_ops_daily_users;
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null

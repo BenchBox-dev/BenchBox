@@ -24,8 +24,8 @@ Following the **primitives benchmark pattern**, this benchmark:
 
 ## Benchmark Statistics
 
-- **Total Operations**: 113 (fully implemented)
-- **Categories**: 7 (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL, TRANSACTION)
+- **Total Operations**: 117 (113 baseline + 8 sketch — TRANSACTION ops moved to transaction_primitives)
+- **Categories**: 7 (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL, SKETCH)
 - **Data Formats**: CSV, Parquet (uncompressed, gzip, zstd, snappy, bzip2)
 - **Scale Factors**: Flexible (0.01 to 10.0+)
 - **Platform Support**: All platforms via dialect translation + platform-specific overrides
@@ -108,6 +108,58 @@ Tests transaction control and isolation levels:
 - ROLLBACK (small/3 writes, medium/100 writes)
 - Nested SAVEPOINTs with partial rollback
 - Isolation levels (READ COMMITTED, SERIALIZABLE)
+
+### Sketch persistence operations (8 operations)
+
+Tests the **persist + merge + requery** lifecycle for Apache DataSketches
+sketch artifacts — the differentiated half of the modern approximate-
+analytics story (vendors compete on millisecond-merge across partitioned
+sketch columns, not on one-shot aggregate latency).
+
+- `sketch_ddl_create_persistent_table` — CREATE/DROP overhead for a
+  BINARY-column persistence table
+- `sketch_insert_theta_per_partition` — build per-partition Theta sketches
+- `sketch_insert_kll_per_partition` — build per-partition KLL quantile sketches
+- `sketch_insert_topk_per_shard` — build per-shard frequent-items sketches
+- ★ `sketch_query_theta_union_merge` — merge thetas across partitions and
+  emit an approximate distinct count (cross-reference `aggregation_distinct`
+  in read_primitives for the exact baseline)
+- ★ `sketch_query_kll_quantiles_merge` — merge KLLs and extract a median
+  (cross-reference `statistical_percentiles` in read_primitives)
+- ★ `sketch_query_topk_combine` — combine frequent-items sketches across
+  shards and count the merged frequent items (cross-reference
+  `approx_top_k_lineitem` in read_primitives)
+- `sketch_drop_persistent_table` — DROP overhead for a sketch-bearing table
+
+The three ★ ops are the **headline tests** that validate the
+"millisecond merge" claim. Validation contracts use tolerance-based
+`expected_value_min/max` because sketch outputs are non-deterministic
+across engines and runs.
+
+| Sketch family   | DataSketches binary-portable engines              | Native-but-distinct engines                    | No support       |
+|-----------------|---------------------------------------------------|-----------------------------------------------|------------------|
+| Theta (distinct)| Databricks, Snowflake, BigQuery (HLL), DuckDB ext | ClickHouse (-State combinators)               | DataFusion       |
+| KLL (quantile)  | Databricks, Snowflake, BigQuery, DuckDB ext       | ClickHouse (quantileTDigestState)             | Redshift, DataFusion |
+| Top-K (frequent)| Databricks, Snowflake, DuckDB ext                 | ClickHouse (topKState), Redshift (HLL only)   | BigQuery, DataFusion |
+
+Per-engine column-type mapping for sketch storage:
+
+| Engine     | Type alias |
+|------------|------------|
+| Databricks | `BINARY`   |
+| Snowflake  | `BINARY`   |
+| BigQuery   | `BYTES`    |
+| DuckDB     | `BLOB` (with `datasketches` community extension)|
+| ClickHouse | `String` (or `AggregateFunction(...)` natively) |
+| Redshift   | `HLLSKETCH` (HLL family only) |
+
+DataSketches binary format is portable across Databricks / Snowflake /
+BigQuery / DuckDB-with-extension (all share the C++/Java/WASM core).
+ClickHouse uses its own `-State`/`-Merge` combinator serialization;
+ClickHouse-native variants are deferred to a follow-up.
+
+Full cross-platform reference:
+[docs/benchmarks/write-primitives-sketch-functions.md](../../../docs/benchmarks/write-primitives-sketch-functions.md).
 
 ## Schema Design
 

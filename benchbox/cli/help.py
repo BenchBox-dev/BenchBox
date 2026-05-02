@@ -443,6 +443,29 @@ class BenchBoxCommand(click.Command):
             color=ctx.color,
         )
 
+        click.echo(
+            click.style("\nApproximate aggregate guidance:\n", bold=True),
+            color=ctx.color,
+        )
+        click.echo(
+            "  read_primitives covers one-shot approximate aggregates "
+            "(approx_count_distinct_*, approx_quantile*, approx_top_k_*).",
+            color=ctx.color,
+        )
+        click.echo(
+            "  Cross-engine function reference: docs/benchmarks/read-primitives-approximate-functions.md",
+            color=ctx.color,
+        )
+        click.echo(
+            "  write_primitives sketch category covers persist + merge + requery "
+            "for DataSketches Theta / KLL / Top-K (sketch_query_*_merge / _combine).",
+            color=ctx.color,
+        )
+        click.echo(
+            "  Cross-engine sketch reference: docs/benchmarks/write-primitives-sketch-functions.md",
+            color=ctx.color,
+        )
+
     def _show_examples(self, ctx: click.Context) -> None:
         """Display categorized usage examples."""
         cmd_name = self.name or "run"
