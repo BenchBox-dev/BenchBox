@@ -11,8 +11,9 @@ import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
 import { ComparabilityReceipt } from "@/components/ComparabilityReceipt";
 import { CompareSummary } from "@/components/CompareSummary";
+import { QueryDiffTable } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
-import { perQuerySpeedup, vsSlowestRatio } from "@/lib/chartMath";
+import { vsSlowestRatio } from "@/lib/chartMath";
 import { buildCompareDecisionSummary } from "@/lib/compareSummary";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
@@ -176,23 +177,6 @@ export function Compare(_: RoutableProps) {
   const benchmarkLabel = humanizeBenchmark(benchmark);
   const rowCount = results.length;
 
-  // Union of query IDs in natural sort order.
-  const allQueryIds: string[] = [...new Set(results.flatMap((r) => r.display_timings.map((t) => t.query_id)))].sort(
-    (a, b) => a.localeCompare(b, undefined, { numeric: true }),
-  );
-
-  // Per-query timing data consumed by chart components (ms values). The
-  // pipeline pre-computes a median-of-passing-measurement-runs `display_ms`
-  // for every (result, query) pair and we read it verbatim - no TS-side
-  // reduction.
-  const queryTimingData = allQueryIds.map((queryId) => ({
-    queryId,
-    timings: results.map((r) => {
-      const ms = r.display_timings.find((t) => t.query_id === queryId)?.display_ms ?? null;
-      return ms !== null ? { ms, status: "pass" } : null;
-    }),
-  }));
-
   // Primary metric is loaded async from DuckDB in the effect above; default
   // stays `display_geomean_ms` until the query resolves (matches Python's
   // `_DEFAULT_RANKING`).
@@ -266,6 +250,7 @@ export function Compare(_: RoutableProps) {
 
       <ComparabilityReceipt results={results} />
       <CompareSummary summary={decisionSummary} />
+      <QueryDiffTable results={results} />
 
       <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rowData.map((r, i) => {
@@ -364,62 +349,6 @@ export function Compare(_: RoutableProps) {
           <ChartPanel context={{ kind: "compare", results, primaryMetric }} />
         </div>
       )}
-
-      <section class="card">
-        <h2 class="mb-4 text-base font-semibold text-gray-900">Query Breakdown</h2>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="table-th">Query</th>
-                {rowData.map((r) => (
-                  <th key={r.resultId} class="table-th">
-                    {r.label}
-                  </th>
-                ))}
-                <th class="table-th">Δ fastest</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 bg-white">
-              {queryTimingData.map(({ queryId, timings }) => {
-                const validMs = timings
-                  .filter((t): t is NonNullable<typeof t> => t !== null && t.ms > 0)
-                  .map((t) => t.ms);
-                const fastest = validMs.length > 0 ? Math.min(...validMs) : null;
-                const speedup = perQuerySpeedup(validMs);
-
-                return (
-                  <tr key={queryId} class="hover:bg-gray-50">
-                    <td class="table-td font-mono font-medium">{queryId}</td>
-                    {timings.map((t, i) => (
-                      <td key={rowData[i]!.resultId} class="table-td font-mono">
-                        {t === null ? (
-                          <span class="text-gray-400">-</span>
-                        ) : (
-                          <span
-                            class={
-                              t.status === "fail"
-                                ? "text-red-600"
-                                : t.ms === fastest
-                                  ? "font-semibold text-green-700"
-                                  : ""
-                            }
-                          >
-                            {t.ms.toFixed(1)}
-                          </span>
-                        )}
-                      </td>
-                    ))}
-                    <td class="table-td font-mono text-gray-500">
-                      {speedup !== null ? `${speedup.toFixed(2)}x` : "-"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   );
 }

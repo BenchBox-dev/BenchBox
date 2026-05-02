@@ -2,7 +2,7 @@
  * Tests for Compare page.
  *
  * Cases:
- *   (a) Summary cards and breakdown table "vs slowest" values agree for the same row
+ *   (a) Summary cards and query diff table values agree for the same row
  *   (b) For a tpch benchmark (power_score primary), Compare shows power_score,
  *       not geomean_ms, as the primary metric label
  *   (c) For a clickbench benchmark (display_geomean_ms primary), Compare shows
@@ -112,7 +112,7 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// (a) Summary card "vs worst" value agrees with breakdown table Δ fastest
+// (a) Summary card "vs worst" value agrees with query diff evidence
 // ---------------------------------------------------------------------------
 
 describe("Compare", () => {
@@ -175,22 +175,23 @@ describe("Compare", () => {
 
     const summary = screen.getByRole("heading", { name: "Decision Summary" });
     const chartsHeading = screen.getByText("Charts");
-    const queryBreakdownHeading = screen.getByRole("heading", { name: "Query Breakdown" });
+    const queryDiffHeading = screen.getByRole("heading", { name: "Query-Level Diff" });
 
     expect(summary.closest("section")).toHaveTextContent("DuckDB leads by 10.00x on power score.");
     expect(summary.closest("section")).toHaveTextContent("2/2 fastest");
     expect(summary.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(summary.compareDocumentPosition(queryBreakdownHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(summary.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(queryDiffHeading.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("summary card speedup and breakdown table Δ fastest are consistent for 2-platform fixture", async () => {
-    // DUCKDB Q1=10ms, Q2=20ms; SQLITE Q1=100ms, Q2=200ms → per-query Δ fastest = 10.00x for both
+  it("summary card speedup and query diff ratio are consistent for 2-platform fixture", async () => {
+    // DUCKDB Q1=10ms, Q2=20ms; SQLITE Q1=100ms, Q2=200ms -> per-query ratio = 10.00x for both
     // DuckDB summary card: power_score 3000 vs worst 300 → 10.00x
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
-    // Both the summary card and breakdown table show 10.00x - count must be ≥2
+    // Both the summary card and query diff table show 10.00x.
     const cells = screen.getAllByText("10.00x");
     expect(cells.length).toBeGreaterThanOrEqual(2);
   });
@@ -317,7 +318,7 @@ describe("Compare", () => {
     expect(select.options[0]!.text).toBe("DuckDB");
   });
 
-  it("renders the comparability receipt before charts and query breakdown", async () => {
+  it("renders the comparability receipt before charts and query diff evidence", async () => {
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
@@ -325,13 +326,13 @@ describe("Compare", () => {
 
     const receipt = screen.getByRole("region", { name: "Comparability receipt" });
     const chartsHeading = screen.getByText("Charts");
-    const queryBreakdownHeading = screen.getByRole("heading", { name: "Query Breakdown" });
+    const queryDiffHeading = screen.getByRole("heading", { name: "Query-Level Diff" });
 
     expect(receipt).toHaveTextContent("Benchmark");
     expect(receipt).toHaveTextContent("Query scope");
     expect(receipt).toHaveTextContent("Cost metadata not published");
     expect(receipt.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(receipt.compareDocumentPosition(queryBreakdownHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(receipt.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows compare receipt warnings for tuning and environment differences", async () => {

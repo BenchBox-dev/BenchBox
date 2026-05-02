@@ -40,7 +40,12 @@ work:
   - id: w2
     summary: "Move diff table ahead of secondary charts"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/pages/Compare.tsx"
+      - "results-explorer/src/components/QueryDiffTable.tsx"
+      - "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
     notes: |
       Add a dense query-level diff table immediately after the summary:
       query ID, baseline latency, candidate latency, ratio, absolute delta,
