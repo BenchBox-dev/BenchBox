@@ -785,6 +785,10 @@ pr-content-guard:
 	fi; \
 	if [ -s "$(PATH_LISTS)/todo.txt" ]; then \
 		while IFS= read -r todo_path; do \
+			if [ ! -e "$$todo_path" ]; then \
+				echo "Skipping deleted TODO/DONE path: $$todo_path"; \
+				continue; \
+			fi; \
 			uv run --project _project/scripts -- python _project/scripts/validate_todo.py "$$todo_path"; \
 		done < "$(PATH_LISTS)/todo.txt"; \
 		uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph; \
