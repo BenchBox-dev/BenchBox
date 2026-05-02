@@ -72,9 +72,13 @@ describe("FacetDrawer", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /Filters/ })).toHaveAttribute("aria-expanded", "false");
+    const trigger = screen.getByRole("button", { name: /Filters/ });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveAttribute("data-result-count", "16");
+    expect(within(trigger).getByText("TPC-H")).toBeTruthy();
+    expect(within(trigger).getByText("16 results")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: "Filter results" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
+    fireEvent.click(trigger);
     expect(onOpenChange).toHaveBeenCalledWith(true);
 
     rerender(

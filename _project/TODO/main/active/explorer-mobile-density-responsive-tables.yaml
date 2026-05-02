@@ -64,7 +64,10 @@ work:
 - id: w4
   summary: "Add closed-state summary chip strip and live result count to drawer trigger"
   needs: [w3]
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/src/components/FacetRail.tsx"
+  - "results-explorer/src/components/__tests__/FacetRail.test.tsx"
   notes: |
     The drawer trigger button shows active filter chips and live result
     count BEFORE the user opens it. Result count comes from the same

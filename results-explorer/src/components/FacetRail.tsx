@@ -114,12 +114,16 @@ export function FacetDrawer({
     <div class="space-y-3" aria-label="Mobile result facets">
       <button
         type="button"
-        class="flex w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm shadow-sm"
+        class="flex w-full items-center justify-between gap-3 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm shadow-sm"
         aria-expanded={open}
+        data-result-count={resultCount}
         onClick={() => onOpenChange(!open)}
       >
-        <span class="font-medium text-gray-900">Filters</span>
-        <span class="text-xs text-gray-500">{resultCount.toLocaleString()} results</span>
+        <span class="min-w-0">
+          <span class="font-medium text-gray-900">Filters</span>
+          {activeChips.length > 0 && <ActiveChipPreview activeChips={activeChips} />}
+        </span>
+        <span class="shrink-0 text-xs text-gray-500">{resultCount.toLocaleString()} results</span>
       </button>
       {activeChips.length > 0 && (
         <ActiveChipStrip activeChips={activeChips} onReset={onReset} compact />
@@ -161,6 +165,21 @@ export function FacetDrawer({
         </>
       )}
     </div>
+  );
+}
+
+function ActiveChipPreview({ activeChips }: { activeChips: ActiveFacetChip[] }) {
+  return (
+    <span class="mt-1 flex flex-wrap gap-1">
+      {activeChips.map((chip) => (
+        <span
+          key={chip.key}
+          class="max-w-32 truncate rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700"
+        >
+          {chip.label}
+        </span>
+      ))}
+    </span>
   );
 }
 
