@@ -24,8 +24,8 @@ Following the **primitives benchmark pattern**, this benchmark:
 
 ## Benchmark Statistics
 
-- **Total Operations**: 117 (113 baseline + 8 sketch — TRANSACTION ops moved to transaction_primitives)
-- **Categories**: 7 (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL, SKETCH)
+- **Total Operations**: 117 (109 baseline + 8 sketch — TRANSACTION ops moved to transaction_primitives)
+- **Categories**: 7 (INSERT 12, UPDATE 15, DELETE 14, BULK_LOAD 36, MERGE 20, DDL 12, SKETCH 8)
 - **Data Formats**: CSV, Parquet (uncompressed, gzip, zstd, snappy, bzip2)
 - **Scale Factors**: Flexible (0.01 to 10.0+)
 - **Platform Support**: All platforms via dialect translation + platform-specific overrides
