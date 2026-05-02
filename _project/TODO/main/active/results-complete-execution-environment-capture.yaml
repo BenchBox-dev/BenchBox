@@ -101,7 +101,7 @@ work:
 - id: w4
   summary: "Add Docker runtime discovery for local container-backed platforms"
   needs: [w1, w3]
-  status: pending
+  status: done
   notes: |
     Add a small Docker metadata collector that is optional, best-effort, and
     unit-testable without a live daemon. It should discover BenchBox-managed
