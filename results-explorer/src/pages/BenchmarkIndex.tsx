@@ -6,7 +6,7 @@ import type { ResultRow } from "@/lib/duckdbQueries";
 import { getBenchmarkSummaryFromDuckDB, listResults } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
 import { facetsToWhereClause, useFacetState, type DateWindowFacet, type FacetState } from "@/lib/facetModel";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { BenchmarkMatrixSkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
@@ -182,7 +182,13 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   }, [results, benchmark, effectiveSf, effectivePhase]);
 
   if (error) return <ErrorMessage message={error} />;
-  if (!results) return <LoadingSpinner message="Loading results..." />;
+  if (!results) {
+    return (
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <BenchmarkMatrixSkeleton message="Loading results..." />
+      </div>
+    );
+  }
 
   // preact-router's `:benchmark/` slug matches any single segment, so an
   // unknown slug like /results/does-not-exist/ would otherwise render an
@@ -454,7 +460,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               Could not load benchmark matrix: {summaryError}
             </div>
           ) : summaryLoading ? (
-            <LoadingSpinner message="Loading matrix..." />
+            <BenchmarkMatrixSkeleton message="Loading matrix..." />
           ) : !filteredSummary ? (
             <div class="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-400">
               <p class="font-medium">
@@ -480,7 +486,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               Could not load rank data: {summaryError}
             </div>
           ) : summaryLoading ? (
-            <LoadingSpinner message="Loading ranks..." />
+            <BenchmarkMatrixSkeleton message="Loading ranks..." />
           ) : !filteredSummary ? (
             <div class="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-400">
               <p class="font-medium">

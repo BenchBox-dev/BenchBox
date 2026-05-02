@@ -7,6 +7,11 @@ vi.mock("@/db", () => ({
 
 import { queryRows } from "@/db";
 import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
+import {
+  EXPLORER_PERFORMANCE_MARKS,
+  EXPLORER_PERFORMANCE_MEASURES,
+  clearExplorerPerformanceEntriesForTests,
+} from "@/lib/performanceMarks";
 import { Home } from "@/pages/Home";
 
 /**
@@ -219,6 +224,7 @@ function expectDocumentOrder(first: Element, second: Element) {
 beforeEach(() => {
   vi.clearAllMocks();
   clearDuckdbQueryCachesForTests();
+  clearExplorerPerformanceEntriesForTests();
   window.history.replaceState(null, "", "/results/");
   vi.mocked(queryRows).mockImplementation(async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
@@ -402,6 +408,22 @@ describe("Home", () => {
     expectDocumentOrder(leaderboard, selector);
     expectDocumentOrder(leaderboard, workflow);
     expectDocumentOrder(leaderboard, recentHeading);
+  });
+
+  it("records first leaderboard data and render performance entries", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    await waitFor(() => {
+      expect(performance.getEntriesByName(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY, "mark"))
+        .toHaveLength(1);
+      expect(performance.getEntriesByName(EXPLORER_PERFORMANCE_MARKS.LEADERBOARD_RENDERED, "mark"))
+        .toHaveLength(1);
+      expect(performance.getEntriesByName(EXPLORER_PERFORMANCE_MEASURES.HOME_LEADERBOARD_DATA, "measure"))
+        .toHaveLength(1);
+      expect(performance.getEntriesByName(EXPLORER_PERFORMANCE_MEASURES.LEADERBOARD_RENDER_AFTER_DATA, "measure"))
+        .toHaveLength(1);
+    });
   });
 
   it("renders a compact run-compare-submit workflow near the leaderboard", async () => {

@@ -4,7 +4,7 @@ import type { RoutableProps } from "preact-router";
 import type { DetailResult } from "@/types";
 import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId, toShortIds } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
@@ -141,7 +141,7 @@ export function Compare(_: RoutableProps) {
       });
   }, [results]);
 
-  if (loading) return <LoadingSpinner message="Loading results for comparison..." />;
+  if (loading) return <CompareSummarySkeleton message="Loading results for comparison..." />;
   if (error)
     return (
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

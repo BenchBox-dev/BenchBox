@@ -344,6 +344,55 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("1.5")).toBeTruthy();
   });
 
+  it("caps rendered platform rows and expands them with Show more", () => {
+    const platforms = Array.from({ length: 205 }).map((_, index) => ({
+      platform_id: `platform-${index}`,
+      platform: `Platform ${index}`,
+      ranks: {
+        "clickbench-sf0.1-power": {
+          rank: index + 1,
+          total: 205,
+          metric_value: index + 1,
+          speedup_vs_best: 1 / (index + 1),
+        },
+      },
+      avg_rank: index + 1,
+      n_cohorts: 1,
+    }));
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [
+        {
+          ...DATA.cohorts[0]!,
+          platform_count: 205,
+          platforms: platforms.map((platform, index) => ({
+            platform_id: platform.platform_id,
+            platform: platform.platform,
+            result_id: `result-${index}`,
+            rank: index + 1,
+            metric_value: index + 1,
+            speedup_vs_best: 1 / (index + 1),
+            primary_metric: "display_geomean_ms",
+            primary_order: "asc" as const,
+          })),
+        },
+      ],
+      platforms,
+    };
+
+    const { container } = render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
+
+    expect(screen.getByText("Showing 200 of 205 platforms")).toBeTruthy();
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(200);
+    expect(screen.queryByText("Platform 204")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show more platforms" }));
+
+    expect(screen.getByText("Showing 205 of 205 platforms")).toBeTruthy();
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(205);
+    expect(screen.getByText("Platform 204")).toBeTruthy();
+  });
+
   it("Enter and Space on a focused cell navigate to the row's platform page", () => {
     render(
       <MetaLeaderboard

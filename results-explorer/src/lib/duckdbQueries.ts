@@ -186,20 +186,44 @@ export interface MetaLeaderboardRow {
 const RESULTS_SNAPSHOT_PATH = "/results/data/results.duckdb";
 const snapshotQueryCache = new Map<string, Promise<unknown>>();
 
+interface SnapshotRowsQuery {
+  sql: string;
+  params?: readonly unknown[];
+}
+
+interface SnapshotQueryCacheOptions<T> {
+  cacheResult?: (result: T) => boolean;
+}
+
+interface SnapshotRowsCacheOptions {
+  cacheEmpty?: boolean;
+}
+
 function currentSnapshotCacheKey(): string {
   if (typeof window === "undefined") return RESULTS_SNAPSHOT_PATH;
   return new URL(RESULTS_SNAPSHOT_PATH, window.location.origin).href;
 }
 
-function memoizedSnapshotQuery<T>(key: string, loader: () => Promise<T>): Promise<T> {
+function memoizedSnapshotQuery<T>(
+  key: string,
+  loader: () => Promise<T>,
+  options: SnapshotQueryCacheOptions<T> = {},
+): Promise<T> {
   const cacheKey = `${currentSnapshotCacheKey()}\u0000${key}`;
   const cached = snapshotQueryCache.get(cacheKey);
   if (cached) return cached as Promise<T>;
 
-  const promise = loader().catch((error: unknown) => {
-    snapshotQueryCache.delete(cacheKey);
-    throw error;
-  });
+  const promise = loader()
+    .then((result) => {
+      if (options.cacheResult && !options.cacheResult(result)) {
+        snapshotQueryCache.delete(cacheKey);
+      }
+      return result;
+    })
+    .catch((error: unknown) => {
+      snapshotQueryCache.delete(cacheKey);
+      throw error;
+    });
   snapshotQueryCache.set(cacheKey, promise);
   return promise;
 }
@@ -208,9 +232,27 @@ export function clearDuckdbQueryCachesForTests() {
   snapshotQueryCache.clear();
 }
 
+export function memoizedSnapshotQueryRows<T>(
+  key: string,
+  query: SnapshotRowsQuery,
+  options: SnapshotRowsCacheOptions = {},
+): Promise<T[]> {
+  const params = query.params ?? [];
+  return memoizedSnapshotQuery(
+    `rows:${key}\u0000${query.sql}\u0000${JSON.stringify(params)}`,
+    () => (params.length > 0 ? queryRows<T>(query.sql, [...params]) : queryRows<T>(query.sql)),
+    {
+      cacheResult:
+        options.cacheEmpty === false
+          ? (rows) => rows.length > 0
+          : undefined,
+    },
+  );
+}
+
 export async function listResults(where: FacetWhereClause = { sql: "", params: [] }): Promise<ResultRow[]> {
   const sql = `SELECT * FROM bench.results ${where.sql} ORDER BY run_date DESC`;
-  return where.params.length > 0 ? queryRows<ResultRow>(sql, where.params) : queryRows<ResultRow>(sql);
+  return memoizedSnapshotQueryRows<ResultRow>("list-results", { sql, params: where.params }, { cacheEmpty: false });
 }
 
 export async function getResultDetailMetrics(resultId: string): Promise<ResultDetailMetricsRow | null> {
@@ -503,6 +545,7 @@ export async function getPlatformIndexRows(platformId?: string): Promise<Platfor
   return memoizedSnapshotQuery(
     `platform-index:${platformId ?? "*"}`,
     () => loadPlatformIndexRows(platformId),
+    { cacheResult: (rows) => rows.length > 0 },
   );
 }
 

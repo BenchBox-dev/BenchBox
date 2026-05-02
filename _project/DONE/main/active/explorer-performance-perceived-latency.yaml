@@ -1,0 +1,214 @@
+id: explorer-performance-perceived-latency
+title: "Explorer: DuckDB-WASM load performance and perceived-latency hardening"
+worktree: main
+priority: "Medium-High"
+status: Completed
+category: "Performance"
+completed_date: "2026-05-02"
+
+deps:
+  needs:
+  - explorer-leaderboard-first-identity-unification
+  - explorer-selection-facets-coverage-at-scale
+
+description: |
+  Improve the performance feel of the static DuckDB-WASM explorer as the corpus
+  grows. The audit called out cold-load, query response, loading skeletons, and
+  pagination behavior as risks. This item focuses on perceived latency and
+  runtime cost, not visual redesign: initialize predictably, avoid avoidable
+  repeated scans, keep table rendering bounded, and instrument the expensive
+  paths so regressions are visible.
+
+work:
+- id: w1
+  summary: "Measure DuckDB-WASM cold load and first meaningful leaderboard render"
+  status: done
+  owned_files:
+  - "results-explorer/src/db.ts"
+  - "results-explorer/src/lib/performanceMarks.ts"
+  - "results-explorer/src/lib/__tests__/performanceMarks.test.ts"
+  - "results-explorer/src/pages/Home.tsx"
+  - "results-explorer/src/pages/__tests__/Home.test.tsx"
+  - "results-explorer/src/components/MetaLeaderboard.tsx"
+  notes: |
+    Add lightweight browser performance marks around DB initialization in
+    `results-explorer/src/db.ts`, first Home leaderboard data resolution, and
+    first rendered table/chart. Log only in development or expose a debug panel
+    behind an explicit flag so production UI stays clean.
+
+- id: w2
+  summary: "Apply identity-owned skeletons to MetaLeaderboard, BenchmarkIndex, Query, and Compare"
+  status: done
+  owned_files:
+  - "results-explorer/src/components/LoadingSpinner.tsx"
+  - "results-explorer/src/components/__tests__/LoadingSpinner.test.tsx"
+  - "results-explorer/src/pages/Home.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+  notes: |
+    Skeleton TOKENS and the Home/Layout skeleton treatment are owned by
+    `explorer-leaderboard-first-identity-unification` w6. This work unit
+    only consumes those tokens to reserve final-geometry skeletons for
+    MetaLeaderboard, benchmark matrices, Query Workbench rows, and Compare
+    summary. Do not redefine skeleton primitives here; if a new skeleton
+    shape is needed, add it to the upstream identity work and consume it.
+
+- id: w3
+  summary: "Bound large table rendering with pagination, limits, or virtualization"
+  status: done
+  owned_files:
+  - "results-explorer/src/components/MetaLeaderboard.tsx"
+  - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+  notes: |
+    Query Workbench already has default/unlimited row limit. Audit all table
+    surfaces for unbounded rendering and add explicit limits where corpus
+    growth can create thousands of rows. Show visible result counts and
+    "show more" affordances rather than rendering everything by default.
+
+- id: w4
+  summary: "Batch or cache facet/count queries that repeat across pages"
+  status: done
+  owned_files:
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/__tests__/Query.test.tsx"
+  notes: |
+    Review `duckdbQueries.ts`, `queryFilters.ts`, Home, BenchmarkIndex,
+    PlatformIndex, and Query for repeated COUNT/DISTINCT queries. Cache stable
+    metadata for the lifetime of the loaded DuckDB snapshot and invalidate
+    only when filters change.
+
+- id: w5
+  summary: "Add Playwright performance smoke with concrete budgets"
+  needs: [w1, w3, w4]
+  status: done
+  owned_files:
+  - "results-explorer/package.json"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+  - "results-explorer/src/lib/performanceMarks.ts"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/e2e/performance.spec.ts"
+  notes: |
+    Provisional budgets, measured against the generated fixture corpus on a
+    GitHub Actions Ubuntu runner with the project's standard Chromium build:
+      - DuckDB-WASM cold init (`db-init` performance mark): P50 < 4000 ms,
+        P95 < 6000 ms
+      - First Home leaderboard data resolved (`leaderboard-data-ready`):
+        P50 < 1500 ms after `db-init`, P95 < 2500 ms
+      - First leaderboard render (`leaderboard-rendered`):
+        P50 < 500 ms after `leaderboard-data-ready`, P95 < 1000 ms
+      - First Query Workbench paint with default DEFAULT_COLUMNS:
+        P50 < 600 ms, P95 < 1200 ms after `db-init`
+    Run the smoke 10 times, fail on the P95 threshold, surface the P50 in
+    the test report. Tolerance is built into the gap between P50 and P95;
+    no extra slack. If a budget is genuinely wrong the fix is to revise it
+    in this file with rationale, not to widen tolerance silently.
+
+- id: w6
+  summary: "Add fixture determinism guard"
+  needs: [w5]
+  status: done
+  owned_files:
+  - "results-explorer/scripts/verify-browser-fixtures.mjs"
+  notes: |
+    `npm run test:e2e:fixtures` already generates fixtures. Add a check
+    that re-running fixture generation produces byte-identical output (or
+    a documented allow-list of timestamp fields). `data/results.duckdb`
+    is an allowed binary-container exception only if its logical table
+    digest is identical, so the perf smoke is not measuring regenerated
+    fixtures with shifting row counts.
+
+metadata:
+  tags:
+  - explorer
+  - performance
+  - duckdb-wasm
+  - perceived-latency
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-05-01"
+
+impact:
+  business_value: |
+    Keeps the public explorer feeling credible and responsive as public result
+    bundles scale from dozens to hundreds or thousands.
+  user_impact: |
+    Users see useful structure quickly during cold load and avoid browser jank
+    while filtering or opening large result tables.
+  technical_debt: |
+    Adds performance instrumentation and bounded rendering patterns before
+    large-corpus behavior becomes a production incident.
+
+files_affected:
+  modified:
+  - "results-explorer/src/db.ts"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/queryFilters.ts"
+  - "results-explorer/src/components/LoadingSpinner.tsx"
+  - "results-explorer/src/pages/Home.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/PlatformIndex.tsx"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+  added:
+  - "results-explorer/src/lib/performanceMarks.ts"
+  - "results-explorer/e2e/performance.spec.ts"
+
+must_preserve:
+- "DuckDB-WASM remains loaded client-side from the static explorer bundle."
+- "Production UI does not show debug timing unless explicitly enabled."
+- "Query Workbench retains an intentional unlimited mode for users who request it."
+- "Generated browser fixtures remain deterministic."
+
+approach: |
+  Measure first, then optimize the specific hot paths. Prefer simple memoization,
+  query batching, and bounded rendering before adding complex virtualization.
+  Use skeletons to improve perceived performance even when cold-load time cannot
+  be eliminated.
+
+anti_patterns:
+- "DO NOT optimize by removing methodology/trust data from the first page - because trust context is part of the product -
+  optimize queries and rendering instead."
+- "DO NOT render every row by default just because DuckDB can return it - because DOM rendering is the likely bottleneck -
+  use limits and explicit expansion."
+- "DO NOT add noisy production console timing - because public visitors should not see debug instrumentation - gate it."
+
+verification:
+- description: "Frontend typecheck, tests, fixture generation, and build pass."
+  command: "cd results-explorer && npm run typecheck && npm test && npm run test:e2e:fixtures && npm run build"
+  expected_output: "All commands pass with performance instrumentation and bounded rendering."
+- description: "Performance smoke passes within budgets defined in w5."
+  command: "cd results-explorer && npm run test:e2e:chromium"
+  expected_output: "Chromium performance smoke passes; P95 budgets in w5 are met or exceeded with margin. Test output reports
+    both P50 and P95 for each mark."
+- description: "Fixture generation is deterministic across two consecutive runs."
+  command: "cd results-explorer && npm run test:e2e:fixtures"
+  expected_output: "Fixture invariant and determinism checks pass; output includes the documented DuckDB logical digest allow-list."
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/db.ts"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/queryFilters.ts"
+  - "results-explorer/src/lib/performanceMarks.ts"
+  - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+  - "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+  - "results-explorer/src/components/LoadingSpinner.tsx"
+  - "results-explorer/src/components/MetaLeaderboard.tsx"
+  - "results-explorer/src/components/__tests__/LoadingSpinner.test.tsx"
+  - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+  - "results-explorer/src/pages/Home.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/PlatformIndex.tsx"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/pages/__tests__/Home.test.tsx"
+  - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+  - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+  - "results-explorer/src/pages/__tests__/Query.test.tsx"
+  - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+  - "results-explorer/e2e/performance.spec.ts"
+  - "results-explorer/scripts/generate-browser-fixtures.mjs"
+  - "results-explorer/scripts/verify-browser-fixtures.mjs"

@@ -3,7 +3,7 @@ import type { RoutableProps } from "preact-router";
 import { getDb, queryRows } from "@/db";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { FacetDrawer, type ActiveFacetChip, type FacetGroup } from "@/components/FacetRail";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { QueryRowsSkeleton } from "@/components/LoadingSpinner";
 import { arraySerde, stringSerde, useUrlState } from "@/lib/useUrlState";
 import {
   buildFacetCountQuery,
@@ -19,6 +19,13 @@ import { getTableSchema, type SchemaColumn } from "@/lib/duckdbSchema";
 import { useFacetField, type DateWindowFacet } from "@/lib/facetModel";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { memoizedSnapshotQueryRows } from "@/lib/duckdbQueries";
+import {
+  EXPLORER_PERFORMANCE_MARKS,
+  EXPLORER_PERFORMANCE_MEASURES,
+  markExplorerPerformance,
+  measureExplorerPerformance,
+} from "@/lib/performanceMarks";
 
 const EMPTY_STRING_ARRAY: string[] = [];
 
@@ -125,6 +132,17 @@ export function Query(_: RoutableProps) {
     [visibleColumns],
   );
   const activeFilters = useMemo(() => applySchemaFilterSupport(filters, schema), [filters, schema]);
+  const facetQueries = useMemo(
+    () => (schema.length === 0 ? null : buildQueryFacetCountQueries(activeFilters, schema)),
+    [activeFilters, schema],
+  );
+  const selectQuery = useMemo(
+    () =>
+      visibleColumns.length === 0
+        ? null
+        : buildSelectQuery(activeFilters, queryColumns, sort, rowLimit),
+    [activeFilters, queryColumns, rowLimit, sort, visibleColumns.length],
+  );
   const visibleRows = rows.slice(0, visibleResultLimit);
   const visibleSqlRows = sqlRows.slice(0, visibleSqlLimit);
 
@@ -162,68 +180,39 @@ export function Query(_: RoutableProps) {
   }, []);
 
   useEffect(() => {
-    if (schema.length === 0 || visibleColumns.length === 0) return;
+    if (facetQueries === null) return;
+    let cancelled = false;
+    setError(null);
+
+    Promise.all(
+      Object.entries(facetQueries).map(async ([key, query]) => [
+        key,
+        await memoizedSnapshotQueryRows<FacetBucket>(`query-facet:${key}`, query),
+      ]),
+    )
+      .then((facetEntries) => {
+        if (cancelled) return;
+        setFacetCounts(Object.fromEntries(facetEntries));
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "DuckDB query failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [facetQueries]);
+
+  useEffect(() => {
+    if (selectQuery === null) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
 
-    const schemaColumns = new Set(schema.map((column) => column.name));
-    const facetQueries: Record<string, BuiltQuery> = {
-      benchmark: buildFacetCountQuery("benchmark", activeFilters, { exclude: "benchmarks" }),
-      platform: buildFacetCountQuery("platform", activeFilters, { exclude: "platforms" }),
-      scale_factor: buildFacetCountQuery("scale_factor", activeFilters, { exclude: "scaleFactors" }),
-      tuning_mode: buildFacetCountQuery("tuning_mode", activeFilters, { exclude: "tuningModes" }),
-      trust_label: buildFacetCountQuery("trust_label", activeFilters, { exclude: "trustTiers" }),
-      validation_status: buildFacetCountQuery("validation_status", activeFilters, { exclude: "validationStatuses" }),
-      has_cost: buildFacetCountQuery("cost_usd", activeFilters, { exclude: "hasCost", derived: "has_cost" }),
-      date_window: buildFacetCountQuery("run_date", activeFilters, { exclude: "dateWindow", derived: "date_window" }),
-    };
-    if (schemaColumns.has("cost_status")) {
-      facetQueries.cost_status = buildFacetCountQuery("cost_status", activeFilters, { exclude: "costStatuses" });
-    }
-    if (schemaColumns.has("cost_model_version")) {
-      facetQueries.cost_model_version = buildFacetCountQuery("cost_model_version", activeFilters, {
-        exclude: "costModelVersions",
-      });
-    }
-    if (schemaColumns.has("deployment_class")) {
-      facetQueries.deployment_class = buildFacetCountQuery("deployment_class", activeFilters, {
-        exclude: "deploymentClasses",
-      });
-    }
-    if (schemaColumns.has("cloud_provider")) {
-      facetQueries.cloud_provider = buildFacetCountQuery("cloud_provider", activeFilters, {
-        exclude: "cloudProviders",
-      });
-    }
-    if (schemaColumns.has("cloud_region")) {
-      facetQueries.cloud_region = buildFacetCountQuery("cloud_region", activeFilters, { exclude: "cloudRegions" });
-    }
-    if (schemaColumns.has("instance_or_warehouse")) {
-      facetQueries.instance_or_warehouse = buildFacetCountQuery("instance_or_warehouse", activeFilters, {
-        exclude: "instanceOrWarehouses",
-      });
-    }
-    if (schemaColumns.has("storage_format")) {
-      facetQueries.storage_format = buildFacetCountQuery("storage_format", activeFilters, {
-        exclude: "storageFormats",
-      });
-    }
-    const selectQuery = buildSelectQuery(activeFilters, queryColumns, sort, rowLimit);
-
-    Promise.all([
-      queryRows<ResultRow>(selectQuery.sql, selectQuery.params),
-      Promise.all(
-        Object.entries(facetQueries).map(async ([key, query]) => [
-          key,
-          await queryRows<FacetBucket>(query.sql, query.params),
-        ]),
-      ),
-    ])
-      .then(([nextRows, facetEntries]) => {
+    queryRows<ResultRow>(selectQuery.sql, selectQuery.params)
+      .then((nextRows) => {
         if (cancelled) return;
         setRows(nextRows);
-        setFacetCounts(Object.fromEntries(facetEntries));
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -231,12 +220,35 @@ export function Query(_: RoutableProps) {
         setError(err instanceof Error ? err.message : "DuckDB query failed");
         setLoading(false);
       });
-  }, [activeFilters, queryColumns, rowLimit, schema, sort, visibleColumns]);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectQuery]);
+
+  useEffect(() => {
+    if (loading || rows.length === 0 || visibleColumns.length === 0) return;
+    markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.QUERY_WORKBENCH_RENDERED, {
+      once: true,
+      detail: { rowCount: rows.length, columnCount: visibleColumns.length },
+    });
+    measureExplorerPerformance(
+      EXPLORER_PERFORMANCE_MEASURES.QUERY_WORKBENCH_RENDER_AFTER_DB,
+      EXPLORER_PERFORMANCE_MARKS.DB_INIT_READY,
+      EXPLORER_PERFORMANCE_MARKS.QUERY_WORKBENCH_RENDERED,
+      { once: true },
+    );
+  }, [loading, rows.length, visibleColumns.length]);
 
   const sqlColumns = useMemo(() => [...new Set(sqlRows.flatMap((row) => Object.keys(row)))], [sqlRows]);
 
   if (error) return <ErrorMessage message={error} />;
-  if (schema.length === 0 && loading) return <LoadingSpinner message="Loading query workbench..." />;
+  if (schema.length === 0 && loading) {
+    return (
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <QueryRowsSkeleton message="Loading query workbench..." />
+      </div>
+    );
+  }
 
   const columnNames = schema.map((column) => column.name);
   const mobileFacetGroups: FacetGroup[] = [
@@ -553,7 +565,10 @@ export function Query(_: RoutableProps) {
 
           <div data-testid="query-results-panel" class="order-3">
             {loading ? (
-              <LoadingSpinner message="Querying results.duckdb..." />
+              <QueryRowsSkeleton
+                message="Querying results.duckdb..."
+                columns={visibleColumns.length || DEFAULT_COLUMNS.length}
+              />
             ) : (
               <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
@@ -912,6 +927,55 @@ function formatCell(value: unknown): string {
 
 function projectVisibleRow(row: ResultRow, visibleColumns: string[]): ResultRow {
   return Object.fromEntries(visibleColumns.map((column) => [column, row[column]]));
+}
+
+function buildQueryFacetCountQueries(
+  activeFilters: QueryFilterState,
+  schema: SchemaColumn[],
+): Record<string, BuiltQuery> {
+  const schemaColumns = new Set(schema.map((column) => column.name));
+  const facetQueries: Record<string, BuiltQuery> = {
+    benchmark: buildFacetCountQuery("benchmark", activeFilters, { exclude: "benchmarks" }),
+    platform: buildFacetCountQuery("platform", activeFilters, { exclude: "platforms" }),
+    scale_factor: buildFacetCountQuery("scale_factor", activeFilters, { exclude: "scaleFactors" }),
+    tuning_mode: buildFacetCountQuery("tuning_mode", activeFilters, { exclude: "tuningModes" }),
+    trust_label: buildFacetCountQuery("trust_label", activeFilters, { exclude: "trustTiers" }),
+    validation_status: buildFacetCountQuery("validation_status", activeFilters, { exclude: "validationStatuses" }),
+    has_cost: buildFacetCountQuery("cost_usd", activeFilters, { exclude: "hasCost", derived: "has_cost" }),
+    date_window: buildFacetCountQuery("run_date", activeFilters, { exclude: "dateWindow", derived: "date_window" }),
+  };
+  if (schemaColumns.has("cost_status")) {
+    facetQueries.cost_status = buildFacetCountQuery("cost_status", activeFilters, { exclude: "costStatuses" });
+  }
+  if (schemaColumns.has("cost_model_version")) {
+    facetQueries.cost_model_version = buildFacetCountQuery("cost_model_version", activeFilters, {
+      exclude: "costModelVersions",
+    });
+  }
+  if (schemaColumns.has("deployment_class")) {
+    facetQueries.deployment_class = buildFacetCountQuery("deployment_class", activeFilters, {
+      exclude: "deploymentClasses",
+    });
+  }
+  if (schemaColumns.has("cloud_provider")) {
+    facetQueries.cloud_provider = buildFacetCountQuery("cloud_provider", activeFilters, {
+      exclude: "cloudProviders",
+    });
+  }
+  if (schemaColumns.has("cloud_region")) {
+    facetQueries.cloud_region = buildFacetCountQuery("cloud_region", activeFilters, { exclude: "cloudRegions" });
+  }
+  if (schemaColumns.has("instance_or_warehouse")) {
+    facetQueries.instance_or_warehouse = buildFacetCountQuery("instance_or_warehouse", activeFilters, {
+      exclude: "instanceOrWarehouses",
+    });
+  }
+  if (schemaColumns.has("storage_format")) {
+    facetQueries.storage_format = buildFacetCountQuery("storage_format", activeFilters, {
+      exclude: "storageFormats",
+    });
+  }
+  return facetQueries;
 }
 
 function applySchemaFilterSupport(filters: QueryFilterState, schema: SchemaColumn[]): QueryFilterState {

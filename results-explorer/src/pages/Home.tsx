@@ -9,7 +9,7 @@ import type {
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getMetaLeaderboardData, listResults } from "@/lib/duckdbQueries";
 import { BENCHMARK_LABELS, humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
-import { SkeletonBlock } from "@/components/LoadingSpinner";
+import { MetaLeaderboardSkeleton, SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
@@ -23,6 +23,12 @@ import {
 } from "@/lib/facetModel";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import {
+  EXPLORER_PERFORMANCE_MARKS,
+  EXPLORER_PERFORMANCE_MEASURES,
+  markExplorerPerformance,
+  measureExplorerPerformance,
+} from "@/lib/performanceMarks";
 
 const SUPPORTED_BENCHMARK_COUNT = new Set(Object.values(BENCHMARK_LABELS)).size;
 
@@ -59,9 +65,20 @@ export function Home(_: RoutableProps) {
 
   useEffect(() => {
     let cancelled = false;
+    markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_START, { once: true });
     getMetaLeaderboardData()
       .then((data) => {
         if (!cancelled) {
+          markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY, {
+            once: true,
+            detail: { cohortCount: data?.cohorts.length ?? 0 },
+          });
+          measureExplorerPerformance(
+            EXPLORER_PERFORMANCE_MEASURES.HOME_LEADERBOARD_DATA,
+            EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_START,
+            EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY,
+            { once: true },
+          );
           setMetaLeaderboard(data);
           setMetaLeaderboardLoaded(true);
         }
@@ -471,50 +488,7 @@ function HomeLoadingSkeleton() {
       </section>
 
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section
-          aria-label="Cross-benchmark leaderboard loading"
-          aria-busy="true"
-          class="mb-12"
-        >
-          <p role="status" aria-live="polite" class="mb-4 text-sm font-medium text-gray-500">
-            Initializing static DuckDB snapshot...
-          </p>
-          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div class="space-y-2">
-              <SkeletonBlock className="h-5 w-64" />
-              <SkeletonBlock className="h-3 w-80" />
-            </div>
-            <div class="flex gap-2">
-              <SkeletonBlock className="h-8 w-16" />
-              <SkeletonBlock className="h-8 w-16" />
-              <SkeletonBlock className="h-8 w-20" />
-            </div>
-          </div>
-          <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-            <table aria-hidden="true" class="min-w-full text-sm">
-              <thead class="bg-gray-50">
-                <tr>
-                  {Array.from({ length: 6 }).map((_, column) => (
-                    <th key={column} class="px-4 py-3">
-                      <SkeletonBlock className="h-3 w-24" />
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                {Array.from({ length: 5 }).map((_, row) => (
-                  <tr key={row} class="bb-skeleton-row">
-                    {Array.from({ length: 6 }).map((__, column) => (
-                      <td key={column} class="px-4 py-3">
-                        <SkeletonBlock className={column === 0 ? "h-4 w-28" : "h-4 w-20"} />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <MetaLeaderboardSkeleton />
       </div>
     </div>
   );

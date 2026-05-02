@@ -1,8 +1,8 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { waitForDataLoaded, waitForShell } from "./support/fixtures";
 
-const SHORT_DUCKDB = "a556e716";
-const SHORT_DATAFUSION = "4af35f65";
+const SHORT_DUCKDB = "ba6a8c83";
+const SHORT_DATAFUSION = "5e6c5eba";
 
 const VIEWPORTS = [
   { name: "mobile", width: 390, height: 900, maxY: 1200 },
