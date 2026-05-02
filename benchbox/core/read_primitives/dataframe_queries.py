@@ -3340,7 +3340,19 @@ def window_unbounded_frame_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def approx_quantile_groupby_expression_impl(ctx: DataFrameContext) -> Any:
-    """Approximate median calculation per group using quantile(0.5)."""
+    """Approximate median per group via UnifiedExpr.quantile(0.5).
+
+    `UnifiedExpr.quantile()` dispatches to the platform's sketch-backed
+    aggregate where one exists:
+
+    - PySpark: `F.percentile_approx(col, 0.5)` (KLL-equivalent).
+    - DataFusion: `df_f.approx_percentile_cont(col, 0.5)` (T-Digest).
+    - Polars: `.quantile(0.5)` (exact — no sketch alternative; the
+      benchmark surface degrades to exact on Polars).
+
+    See `docs/benchmarks/read-primitives-approximate-functions.md` for
+    the cross-platform DataFrame coverage matrix.
+    """
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
@@ -3350,7 +3362,14 @@ def approx_quantile_groupby_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def approx_quantile_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Approximate median calculation per group using quantile(0.5)."""
+    """Approximate median per group — exact fallback for the pandas family.
+
+    Pandas / Modin / cuDF have no sketch-backed quantile at the
+    DataFrame layer, so this implementation returns the exact median.
+    Dask exposes `series.quantile(0.5, method='tdigest')` (T-Digest);
+    wiring it requires per-platform context detection inside the impl
+    body, captured as a follow-up note in this module's docstring.
+    """
     lineitem = ctx.get_table("lineitem")
 
     result = lineitem.groupby("l_shipmode", as_index=False).agg(median_quantity=("l_quantity", "median"))
