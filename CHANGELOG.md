@@ -25,12 +25,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PySpark-only at the DataFrame layer with explicit rationale.
   Cross-platform DataFrame coverage matrix in
   `docs/benchmarks/read-primitives-approximate-functions.md`.
+- **read_primitives** — add Redshift variant for `approx_quantile_groupby`
+  using `APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)`.
+  Was previously skipped because sqlglot's Redshift dialect parser
+  rejects the syntax; the static catalog linter now allowlists this
+  specific parse failure while runtime execution sends the SQL as-is.
 - **write_primitives** — add `sketch` category exercising DataSketches
   Theta / KLL / Top-K persist + merge + requery on Databricks,
   Snowflake, BigQuery, and DuckDB-with-extension. Three ★ headline
   ops measure the millisecond-merge claim end-to-end with
   tolerance-based scalar validation. Cross-engine reference:
   `docs/benchmarks/write-primitives-sketch-functions.md`.
+- **write_primitives sketch** — add Redshift HLL coverage on the four
+  HLL-applicable sketch ops (DDL, theta-style insert, theta-style
+  merge, drop) using `HLL_CREATE_SKETCH` / `HLL_COMBINE` /
+  `HLL_CARDINALITY` and `HLLSKETCH`-typed columns with `DISTSTYLE EVEN`.
+  KLL and Top-K ops stay skipped — Redshift has no equivalent. Activates
+  the previously-unused `_BINARY_TYPE_BY_DIALECT[redshift] = HLLSKETCH`
+  path. Cloud verification deferred to the
+  `write-primitives-sketch-cloud-verification` follow-up.
 
 ## [0.2.1] - 2026-04-26
 

@@ -35,19 +35,19 @@ based) because sketch outputs are non-deterministic across engines and
 runs. Cross-reference their latency to the matching `read_primitives`
 exact-counterpart queries:
 
-| Headline op                       | Exact counterpart in read_primitives |
-|-----------------------------------|---------------------------------------|
-| `sketch_query_theta_union_merge`  | `aggregation_distinct`                |
-| `sketch_query_kll_quantiles_merge`| `statistical_percentiles`             |
-| `sketch_query_topk_combine`       | `approx_top_k_lineitem`               |
+| Headline op                       | Exact counterpart in read_primitives | Engine coverage notes                                                            |
+|-----------------------------------|---------------------------------------|----------------------------------------------------------------------------------|
+| `sketch_query_theta_union_merge`  | `aggregation_distinct`                | DataSketches Theta on DuckDB / Databricks / Snowflake; HLL substitution on BigQuery and Redshift |
+| `sketch_query_kll_quantiles_merge`| `statistical_percentiles`             | DataSketches KLL on DuckDB / Databricks / Snowflake / BigQuery; skipped on Redshift (no equivalent) |
+| `sketch_query_topk_combine`       | `approx_top_k_lineitem`               | Frequent-items on DuckDB / Databricks / Snowflake; skipped on BigQuery and Redshift |
 
 ## Sketch family × engine support matrix
 
-| Sketch family   | DataSketches binary-portable engines                | Native-but-distinct engines                    | No support           |
-|-----------------|------------------------------------------------------|-----------------------------------------------|----------------------|
-| Theta (distinct)| Databricks, Snowflake, BigQuery (HLL), DuckDB ext   | ClickHouse (`-State`/`-Merge` combinators)    | DataFusion           |
-| KLL (quantile)  | Databricks, Snowflake, BigQuery, DuckDB ext         | ClickHouse (`quantileTDigestState`)           | Redshift, DataFusion |
-| Top-K (frequent)| Databricks, Snowflake, DuckDB ext                    | ClickHouse (`topKState`), Redshift (HLL only) | BigQuery, DataFusion |
+| Sketch family   | DataSketches binary-portable engines                | Native-but-distinct engines                                       | No support              |
+|-----------------|------------------------------------------------------|--------------------------------------------------------------------|-------------------------|
+| Theta (distinct)| Databricks, Snowflake, BigQuery (HLL), DuckDB ext   | ClickHouse (`-State`/`-Merge` combinators), Redshift (HLL substitution) | DataFusion         |
+| KLL (quantile)  | Databricks, Snowflake, BigQuery, DuckDB ext         | ClickHouse (`quantileTDigestState`)                                | Redshift, DataFusion    |
+| Top-K (frequent)| Databricks, Snowflake, DuckDB ext                    | ClickHouse (`topKState`)                                           | Redshift, BigQuery, DataFusion |
 
 DataSketches binary format is portable across Databricks / Snowflake /
 BigQuery / DuckDB-with-extension (all built on the same C++/Java/WASM
@@ -56,8 +56,40 @@ serialization, which is comparable algorithmically but **not**
 binary-compatible. ClickHouse-native variants are deferred to a follow-up
 to keep this benchmark scoped to the cross-engine portability story.
 
-Redshift's `HLLSKETCH` covers only the HLL family; KLL and Top-K skip
-on Redshift.
+### Redshift HLL-only ceiling
+
+Redshift's approximate-aggregate surface is fundamentally HLL-only —
+no Theta, no KLL, no T-Digest, no Top-K. The only sketch type the
+catalog persists on Redshift is `HLLSKETCH`. Coverage rolls up to:
+
+- `sketch_ddl_create_persistent_table` — runs (HLLSKETCH-typed table).
+- `sketch_insert_theta_per_partition` — runs as **HLL substitution**:
+  `HLL_CREATE_SKETCH` per partition, persisted in HLLSKETCH columns.
+  The op ID retains "theta" to keep cross-engine measurement keys
+  comparable; the per-engine substitution is documented inline.
+- `sketch_query_theta_union_merge` — runs as **HLL substitution**:
+  `HLL_CARDINALITY(HLL_COMBINE(...))` for the merge+requery cycle.
+- `sketch_drop_persistent_table` — runs (HLLSKETCH-typed DROP).
+- KLL ops (`sketch_insert_kll_per_partition`,
+  `sketch_query_kll_quantiles_merge`) — **skipped**; no Redshift
+  equivalent.
+- Top-K ops (`sketch_insert_topk_per_shard`,
+  `sketch_query_topk_combine`) — **skipped**; no Redshift equivalent.
+
+`HLLSKETCH`-typed columns carry non-trivial DDL/query restrictions:
+cannot be `DISTKEY` / `SORTKEY` / `PRIMARY KEY` / `FOREIGN KEY`, cannot
+appear in `GROUP BY` / `ORDER BY` / `DISTINCT`, fixed `logm=15`
+(no precision tuning knob), not supported in Spectrum or Python UDFs,
+JDBC/ODBC drivers return them as VARCHAR JSON/Base64. Each Redshift
+override emits its DDL inline with `DISTSTYLE EVEN` to honor these
+restrictions, rather than activating the generic
+`_BINARY_TYPE_BY_DIALECT[redshift] = HLLSKETCH` translator (the
+abstraction can't express the constraints safely; per-op explicit DDL
+is the chosen pattern).
+
+UDF emulation of the missing families would measure UDF dispatch
+overhead, not sketch performance, so KLL / Top-K stay skipped on
+Redshift with explicit rationale comments.
 
 ## Per-engine column type for sketch storage
 
@@ -68,7 +100,7 @@ on Redshift.
 | BigQuery   | `BINARY`     | `BYTES`                                        |
 | DuckDB     | `BINARY`     | `BLOB` (round-trip cast back to `sketch_kll_*` for KLL merge) |
 | ClickHouse | `BINARY`     | `String` (or `AggregateFunction(...)` natively)|
-| Redshift   | `BINARY`     | `HLLSKETCH` (HLL only)                         |
+| Redshift   | `BINARY`     | `HLLSKETCH` (HLL only; per-op DDL emits inline with `DISTSTYLE EVEN`) |
 | DataFusion | `BINARY`     | — (skipped)                                    |
 | SQLite     | `BINARY`     | — (skipped)                                    |
 
@@ -77,6 +109,10 @@ The `translate_column_type` helper in
 `BINARY` type per dialect. Tables that declare `BINARY` columns must be
 filtered out of `STAGING_TABLES` for unsupported dialects — the sketch
 ops do this implicitly by managing their own DDL inside `write_sql`.
+On Redshift, the `_BINARY_TYPE_BY_DIALECT` translator stays in place as
+documentation but is not activated by any op — `HLLSKETCH` semantics
+(no `DISTKEY` / `SORTKEY` / `GROUP BY`) don't fit the generic abstraction
+safely, so each Redshift override emits its DDL inline.
 
 ## Per-engine function-name reference
 
@@ -87,6 +123,7 @@ ops do this implicitly by managing their own DDL inside `write_sql`.
 | Databricks | `theta_sketch_agg(x)`                   | `theta_union_agg(sketch)`                  | `theta_sketch_estimate(sketch)`          |
 | Snowflake  | `DATASKETCHES_THETA_ACCUMULATE(x)`      | `DATASKETCHES_THETA_COMBINE(sketch)`       | `DATASKETCHES_THETA_ESTIMATE(sketch)`    |
 | BigQuery   | `HLL_COUNT.INIT(x)` (HLL, not Theta)    | `HLL_COUNT.MERGE(sketch)`                  | (merge returns count directly)           |
+| Redshift   | `HLL_CREATE_SKETCH(x)` (HLL, not Theta) | `HLL_COMBINE(sketch)`                      | `HLL_CARDINALITY(sketch)`                |
 | DuckDB ext | `datasketch_theta(x)`                   | `datasketch_theta(sketch)`                 | `datasketch_theta_estimate(sketch)`      |
 
 ### KLL (quantile)

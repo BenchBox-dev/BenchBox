@@ -2,7 +2,8 @@ id: redshift-maximum-approximate-coverage
 title: "Redshift: bring approximate-aggregate + sketch coverage to the natural HLL-only ceiling"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-02"
 category: "Core Functionality"
 
 description: |
@@ -108,7 +109,7 @@ context_sections:
 work:
   - id: w1
     summary: "Add hand-written redshift: variant for approx_quantile_groupby using APPROXIMATE PERCENTILE_DISC"
-    status: pending
+    status: done
     notes: |
       In `benchbox/core/read_primitives/catalog/queries.yaml`,
       add a `redshift:` entry under the existing `variants:` block of
@@ -137,7 +138,7 @@ work:
 
   - id: w2
     summary: "Add Redshift HLL DDL override for sketch_ddl_create_persistent_table"
-    status: pending
+    status: done
     notes: |
       In `benchbox/core/write_primitives/catalog/operations.yaml`,
       replace the `redshift: null` for `sketch_ddl_create_persistent_table`
@@ -165,7 +166,7 @@ work:
   - id: w3
     summary: "Add Redshift HLL insert override for sketch_insert_theta_per_partition (replaces theta with HLL)"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Replace `redshift: null` with:
 
@@ -195,7 +196,7 @@ work:
   - id: w4
     summary: "Add Redshift HLL merge override for sketch_query_theta_union_merge ★ headline op"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       Replace `redshift: null` with the HLL persist+merge+requery
       lifecycle:
@@ -229,7 +230,7 @@ work:
   - id: w5
     summary: "Add Redshift DROP override for sketch_drop_persistent_table"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Trivial mirror of w2 with explicit DROP at the end:
 
@@ -244,7 +245,7 @@ work:
   - id: w6
     summary: "Tighten skip-rationale comments on the 4 ops that legitimately stay null on Redshift"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       For these ops, replace bare `redshift: null` with an explicit
       rationale comment:
@@ -264,7 +265,7 @@ work:
   - id: w7
     summary: "Update cross-platform sketch docs with Redshift HLL coverage and HLL-only ceiling"
     needs: [w4, w6]
-    status: pending
+    status: done
     notes: |
       Two docs touched:
 
@@ -292,7 +293,7 @@ work:
   - id: w8
     summary: "Add changelog entry under unreleased"
     needs: [w7]
-    status: pending
+    status: done
     notes: |
       Two terse user-facing bullets:
       "read_primitives: add Redshift variant for approx_quantile_groupby
