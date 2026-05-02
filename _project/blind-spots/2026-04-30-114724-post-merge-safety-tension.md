@@ -22,3 +22,16 @@ If the post-merge workflow is the real protection layer, adding a queue may dupl
 ## Suggested next steps
 - [ ] In Step 4, define the exact failure that post-merge auto-revert handles.
 - [ ] Do not add a queue unless Step 5 metrics show a separate pre-merge ordering problem.
+
+## Triage log
+
+- 2026-05-02: verified actionable (architectural rule still load-bearing).
+  Step 4 is Done — `.github/workflows/develop-post-merge.yml` is the
+  declared safety net (revert PR labeled `incident:develop-red`, or
+  `incident:develop-red-revert-conflict` issue on conflict). Step 5
+  measurement is `Blocked`/in-progress (30-day window after Step 3a +
+  Step 4 merge), and Step 6 queue gate is explicitly blocked on Step 5.
+  The "do not add a queue unless Step 5 metrics show a pre-merge ordering
+  problem" rule is currently being respected by the planning DAG rather
+  than by enforcement; revisit after Step 5 publishes the go/no-go
+  decision record.

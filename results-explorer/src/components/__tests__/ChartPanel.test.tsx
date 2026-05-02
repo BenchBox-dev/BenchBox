@@ -195,6 +195,40 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
   });
 
+  it("uses responsive segmented chart controls with short visible labels", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary(),
+          historical: [
+            makeHistoricalEntry(),
+            makeHistoricalEntry({ result_id: "hist-2", run_date: "2026-04-18T12:00:00Z" }),
+          ],
+        }}
+      />,
+    );
+
+    const groupTabs = screen.getByRole("tablist", { name: "Chart question groups" });
+    expect(groupTabs.className).toContain("grid");
+    expect(groupTabs.className).toContain("grid-cols-2");
+    expect(screen.getByRole("tab", { name: "Per-query" }).className).toContain("min-h-9");
+
+    const chartControls = screen.getByRole("group", { name: "Overview charts" });
+    expect(chartControls.className).toContain("grid");
+    expect(chartControls.className).toContain("grid-cols-2");
+
+    const sparkline = screen.getByRole("button", { name: "Sparkline Table" });
+    const stacked = screen.getByRole("button", { name: "Stacked Phase Breakdown" });
+    expect(sparkline.textContent).toBe("Sparklines");
+    expect(stacked.textContent).toBe("Phases");
+    expect(sparkline.className).toContain("min-h-9");
+    expect(stacked.className).toContain("min-h-9");
+
+    fireEvent.click(screen.getByRole("button", { name: "Performance Bar" }));
+    expect(screen.getByRole("button", { name: "Performance Bar" }).className).toContain("min-h-9");
+  });
+
   it("uses log scale for performance bars when latency spans an order of magnitude", () => {
     const { container } = render(
       <ChartPanel

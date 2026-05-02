@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
@@ -44,6 +45,14 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import TuningColumn
 
 logger = logging.getLogger(__name__)
+
+_MOTHERDUCK_TOKEN_RE = re.compile(r"(motherduck_token=)[^&\s,;)]*", flags=re.IGNORECASE)
+
+
+def _redact_motherduck_token(message: str, token: str | None = None) -> str:
+    """Remove MotherDuck token material from adapter errors."""
+    redacted = message.replace(token, "****") if token else message
+    return _MOTHERDUCK_TOKEN_RE.sub(r"\1****", redacted)
 
 
 class MotherDuckAdapter(PlatformAdapter):
@@ -181,9 +190,10 @@ class MotherDuckAdapter(PlatformAdapter):
             return self.connection
 
         except Exception as e:
-            logger.error(f"Failed to connect to MotherDuck: {e}")
+            safe_error = _redact_motherduck_token(str(e), self.token)
+            logger.error(f"Failed to connect to MotherDuck: {safe_error}")
             raise ConnectionError(
-                f"Failed to connect to MotherDuck: {e}\nCheck your MOTHERDUCK_TOKEN and network connection."
+                f"Failed to connect to MotherDuck: {safe_error}\nCheck your MOTHERDUCK_TOKEN and network connection."
             ) from e
 
     def close_connection(self, connection=None):

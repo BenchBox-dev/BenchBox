@@ -1,7 +1,7 @@
 ---
 id: 2026-05-01-103002-explorer-cold-load-test-coverage-weakened
 date: 2026-05-01
-status: open
+status: actioned
 finding_kind: bug-class
 review_context: "/code review of PR #86 (Results Explorer QA pass 2)"
 related_paths:
@@ -62,3 +62,7 @@ Either:
    record the *test simplification rationale* — why the team decided
    the fixture-DB assertion is sufficient — so the next reviewer can
    tell loose-on-purpose from loose-by-accident.
+
+## Triage log
+
+- 2026-05-02: actioned — Sweep 2026-05-02: results-explorer/e2e/failures/platform-index-cold-load.spec.ts now uses toHaveCount(EXPECTED_ROWS_BY_PLATFORM[platform]) (duckdb=5, polars=1) via expectExactPlatformRows(). The file's leading comment explicitly cites this blind-spot's failure mode ('PARTIAL rows... A count > 0 assertion would silently pass that regression'). Restored in PR #86 follow-up commit d362529f2 per codex-thread-rescan-week-2026-05-01.md.

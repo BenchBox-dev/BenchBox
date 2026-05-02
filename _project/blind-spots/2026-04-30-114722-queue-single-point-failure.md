@@ -22,3 +22,15 @@ Replacing decentralized auto-merge with a queue can make one local process or wo
 ## Suggested next steps
 - [ ] Require an explicit failure-mode analysis before adding a steward queue.
 - [ ] Prefer native GitHub features if they become available and meet the repository's ownership constraints.
+
+## Triage log
+
+- 2026-05-02: verified actionable (advice still load-bearing). The
+  decentralized auto-merge model is live (`auto-merge-on-open.yml` +
+  `develop-post-merge.yml` are both shipped). The queue itself is
+  intentionally NOT built — `dev-loop-step-6-queue-decision-gate.yaml`
+  is `Blocked` on `dev-loop-step-5-measurement-window`, with explicit
+  Path A (native MQ) vs Path B (steward) handoff. If Step 5 returns
+  BUILD QUEUE, this finding's failure-mode-analysis requirement is
+  the gate that must clear before any steward implementation TODO
+  unblocks.

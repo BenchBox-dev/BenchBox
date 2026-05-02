@@ -393,10 +393,19 @@ describe("Home", () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
+    const headline = screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" });
+    const activeSummary = screen.getByRole("region", { name: "Active leaderboard filters" });
     const leaderboard = screen.getByRole("region", { name: "Cross-Benchmark Leaderboard" });
+    const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
     const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
     const recentHeading = screen.getByRole("heading", { name: "Recent Results" });
 
+    expect(within(activeSummary).getByText("All benchmarks")).toBeTruthy();
+    expect(within(activeSummary).getByText("All scales")).toBeTruthy();
+    expect(within(activeSummary).getByText("All phases")).toBeTruthy();
+    expectDocumentOrder(headline, activeSummary);
+    expectDocumentOrder(activeSummary, leaderboard);
+    expectDocumentOrder(leaderboard, selector);
     expectDocumentOrder(leaderboard, workflow);
     expectDocumentOrder(leaderboard, recentHeading);
   });

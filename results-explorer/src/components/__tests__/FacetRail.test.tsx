@@ -110,9 +110,13 @@ describe("FacetDrawer", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /Filters/ })).toHaveAttribute("aria-expanded", "false");
+    const trigger = screen.getByRole("button", { name: /Filters/ });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveAttribute("data-result-count", "16");
+    expect(within(trigger).getByText("TPC-H")).toBeTruthy();
+    expect(within(trigger).getByText("16 results")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: "Filter results" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
+    fireEvent.click(trigger);
     expect(onOpenChange).toHaveBeenCalledWith(true);
 
     rerender(
@@ -126,6 +130,19 @@ describe("FacetDrawer", () => {
         onOpenChange={onOpenChange}
       />,
     );
-    expect(screen.getByRole("dialog", { name: "Filter results" })).toBeTruthy();
+    const dialog = screen.getByRole("dialog", { name: "Filter results" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("tabindex", "-1");
+    expect(dialog.className).toContain("fixed inset-0");
+
+    dialog.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "Done" })).toHaveFocus();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close filters" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

@@ -482,6 +482,35 @@ class TestExtendedManifestFields:
         assert entry.instance_or_warehouse is None
         assert entry.storage_format is None
 
+    def test_legacy_environment_facets_fall_back_to_normalized_cost_deployment(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["normalized_cost"] = NormalizedCost(
+            normalized_cost_usd="1.23",
+            cost_model_version="2026.05.0",
+            cost_model_source="benchbox.core.cost.pricing",
+            cost_scope="compute_only",
+            cost_status="normalized",
+            billing_unit="instance_hour",
+            pricing_region="us-east-1",
+            deployment=DeploymentMetadata(
+                cloud_provider="aws",
+                cloud_region="us-east-1",
+                instance_type="r7i.4xlarge",
+                warehouse_size="LARGE",
+                storage_format="parquet",
+            ),
+        ).to_dict()
+        bundle = tmp_path / "legacy_cost_deployment.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+
+        assert entry.deployment_class == "cloud"
+        assert entry.cloud_provider == "aws"
+        assert entry.cloud_region == "us-east-1"
+        assert entry.instance_or_warehouse == "r7i.4xlarge"
+        assert entry.storage_format == "parquet"
+
     def test_partial_normalized_cost_rejected(self, tmp_path: Path) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["normalized_cost"] = {

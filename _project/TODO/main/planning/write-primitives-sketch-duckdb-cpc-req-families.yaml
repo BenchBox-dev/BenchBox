@@ -1,0 +1,211 @@
+id: write-primitives-sketch-duckdb-cpc-req-families
+title: "Write Primitives sketch: add DuckDB-only CPC and REQ sketch families"
+worktree: main
+priority: Medium
+status: "Not Started"
+category: "Core Functionality"
+
+description: |
+  The DuckDB `datasketches` community extension exposes additional
+  sketch families beyond the Theta / KLL / Frequent-Items trio that
+  the merged write_primitives sketch category covers:
+
+  - **CPC** (Compressed Probabilistic Counting): an HLL-family
+    alternative with **smaller serialized size** at the cost of
+    slower update/merge. Functions: `datasketch_cpc(x)`,
+    `datasketch_cpc_estimate(sk)`, `datasketch_cpc_union(s1, s2)`,
+    `datasketch_cpc_lower_bound`, `datasketch_cpc_upper_bound`.
+  - **REQ** (Relative Error Quantile): an alternative quantile sketch
+    with **relative-error guarantees** (vs KLL's normalised-rank
+    error). Functions: `datasketch_req(k, x)`, `datasketch_req_quantile`,
+    `datasketch_req_rank`, `datasketch_req_cdf`, etc.
+
+  Both are DuckDB-only at the SQL surface today — no other engine in
+  BenchBox's matrix exposes them. This TODO adds DuckDB-scoped sketch
+  ops for each family so users can compare CPC vs Theta storage cost
+  and REQ vs KLL accuracy/latency in a single benchmark run.
+
+  Captured as a deferred item from the post-merge expansion review
+  (sibling to `write-primitives-sketch-clickhouse-and-storage-metrics`).
+  Lower priority because it's single-engine — does not extend the
+  cross-vendor matrix.
+
+context_sections:
+  "Why DuckDB-Only Is OK Here": |
+    The merged sketch ops shipped with BigQuery / Snowflake / Databricks
+    overrides only because those engines all share the DataSketches
+    binary format (CPC and REQ are part of the same Apache DataSketches
+    library, so they would also share the format if any cloud engine
+    surfaces them via UDFs). Today none do. Adding DuckDB-only ops
+    documents the local-extension story without misrepresenting the
+    cross-vendor support — every other engine gets a `null` override
+    and skips cleanly.
+
+  "Storage-Cost Story": |
+    The interesting CPC vs Theta comparison is **storage size**, not
+    estimate accuracy (both are HLL-family with similar error). If
+    `write-primitives-sketch-clickhouse-and-storage-metrics` lands first,
+    this TODO inherits the storage-size validation methodology and adds
+    side-by-side CPC vs Theta storage numbers in the docs.
+
+work:
+  - id: w1
+    summary: "Add 4 sketch_cpc_* ops (DDL, insert, query merge, drop) following the existing theta-op pattern"
+    status: pending
+    notes: |
+      Mirror the structure of the theta op family:
+        sketch_cpc_create_persistent_table  (BLOB column, like the
+                                             theta DDL but a separate
+                                             table to avoid mixing)
+        sketch_cpc_insert_per_partition     (datasketch_cpc(x) per partition)
+        sketch_cpc_query_union_merge        (datasketch_cpc_estimate(
+                                             datasketch_cpc(sk))) — but
+                                             note datasketch_cpc_union is
+                                             scalar, not aggregate; verify
+                                             whether a fold-aggregate exists
+                                             or use the same trick that
+                                             worked for theta (passing
+                                             sketch column to the build agg)
+        sketch_cpc_drop_persistent_table
+
+      All other engines: `clickhouse: null`, `datafusion: null`, etc.
+      Snowflake / BigQuery / Databricks have no native CPC surface.
+
+  - id: w2
+    summary: "Add 4 sketch_req_* ops following the KLL-op pattern"
+    needs: [w1]
+    status: pending
+    notes: |
+      Mirror the structure of the KLL op family:
+        sketch_req_create_persistent_table
+        sketch_req_insert_per_partition     (datasketch_req(k, x))
+        sketch_req_query_quantile_merge     (datasketch_req_quantile)
+        sketch_req_drop_persistent_table
+
+      Verify the merge pattern works the same way as KLL — the
+      `datasketch_req` aggregate may or may not accept its own sketch
+      type as input for fold-merge. If not, document the limitation
+      and emit a comment in the op explaining the workaround.
+
+      Validation bounds on the merge ★ op should be empirically
+      observed at SF=0.01 (same methodology as the existing KLL op).
+
+  - id: w3
+    summary: "Update cross-platform sketch docs with CPC and REQ family rows"
+    needs: [w2]
+    status: pending
+    notes: |
+      Extend `docs/benchmarks/write-primitives-sketch-functions.md`:
+        - Add CPC and REQ rows to the family × engine support matrix.
+          All cloud engines and ClickHouse / DataFusion / Redshift
+          show "—" for these — only DuckDB ext supports.
+        - Add a side-by-side storage-size row comparing Theta vs CPC
+          (both HLL-family) and KLL vs REQ (both quantile-family) on
+          DuckDB SF=0.01.
+        - Note explicitly that CPC and REQ are part of Apache
+          DataSketches — they're "binary-portable in principle" but
+          no cloud engine surfaces them today.
+
+  - id: w4
+    summary: "Add changelog entry under unreleased"
+    needs: [w3]
+    status: pending
+    notes: |
+      Terse user-facing bullet:
+      "write_primitives sketch: add DuckDB-only CPC (alternative HLL,
+      smaller serialized size) and REQ (relative-error quantile)
+      sketch families. Other engines skip — see docs."
+
+deferred:
+  - summary: "Tuple sketches (distinct + metric aggregation)"
+    reason: "Databricks-native + Snowflake DataSketches UDAFs only. Same portability calculus as the merged TODO's deferred Tuple item — no DuckDB-extension support today."
+
+deps:
+  needs:
+    - write-primitives-sketch-clickhouse-and-storage-metrics
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - write-primitives
+    - sketches
+    - duckdb
+    - cpc
+    - req
+    - benchmark-catalog
+  estimated_effort: "0.5-1 day"
+  created_date: "2026-05-02"
+  last_updated: "2026-05-02"
+
+impact:
+  business_value: |
+    Surfaces sketch-family choice as a benchmark dimension users can
+    measure: CPC vs Theta storage tradeoff, REQ vs KLL accuracy/latency
+    tradeoff. Both are real production decisions (CPC is recommended
+    when sketch-storage cost dominates; REQ when relative error matters
+    more than rank error).
+  user_impact: |
+    Users running BenchBox on DuckDB get a richer sketch-tuning surface
+    without any other engine being affected. Cloud users see "—" rows
+    in the docs explaining the gap.
+  technical_debt: |
+    Demonstrates the per-engine sketch-family expansion path for future
+    work (e.g. when ClickHouse adds Theta UDAFs natively, or when
+    cloud engines surface CPC/REQ).
+
+files_affected:
+  modified:
+    - benchbox/core/write_primitives/catalog/operations.yaml
+    - docs/benchmarks/write-primitives-sketch-functions.md
+    - CHANGELOG.md
+
+must_preserve:
+  - "All existing 117 write_primitives operations (including the 8 sketch ops) execute identically — no behavior changes to existing entries."
+  - "New CPC / REQ ops are additive; their validation contracts use the same expected_value_min/max shape introduced in PR #112."
+
+approach: |
+  Pure operations.yaml work. Mirror the theta and KLL op families one
+  for one. All non-DuckDB platform_overrides are `null` (no cloud
+  surface today). Validation tolerances are empirically observed
+  during w1/w2 against DuckDB SF=0.01.
+
+  If `write-primitives-sketch-clickhouse-and-storage-metrics` has
+  landed first, reuse its octet_length storage-size validation pattern
+  for the CPC vs Theta comparison story in w3 docs.
+
+anti_patterns:
+  - "DO NOT write Snowflake / BigQuery / Databricks overrides for CPC or REQ — because no cloud engine surfaces these families today — leave as `null` and document the gap."
+  - "DO NOT mix CPC ops into the existing theta-op family (e.g. as variants of the same op id) — because they have different storage / merge characteristics and benchmarking them as the same op would obscure the comparison — separate `sketch_cpc_*` op family."
+
+verification:
+  - description: "All write_primitives unit tests pass with new ops"
+    command: "uv run -- python -m pytest tests/unit/core/write_primitives -q"
+    expected_output: "all tests pass"
+  - description: "DuckDB end-to-end: new CPC ops execute"
+    command: "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_cpc_create_persistent_table,sketch_cpc_insert_per_partition,sketch_cpc_query_union_merge,sketch_cpc_drop_persistent_table"
+    expected_output: "4/4 pass; merge query value within tuned bounds"
+  - description: "DuckDB end-to-end: new REQ ops execute"
+    command: "uv run -- benchbox run --platform duckdb --benchmark write_primitives --scale 0.01 --queries sketch_req_create_persistent_table,sketch_req_insert_per_partition,sketch_req_query_quantile_merge,sketch_req_drop_persistent_table"
+    expected_output: "4/4 pass; merge quantile value within tuned bounds"
+
+scope_limit:
+  only_modify:
+    - benchbox/core/write_primitives/catalog/operations.yaml
+    - docs/benchmarks/write-primitives-sketch-functions.md
+    - CHANGELOG.md
+  do_not_modify:
+    - benchbox/core/write_primitives/schema.py
+    - benchbox/core/write_primitives/catalog/loader.py
+    - benchbox/core/write_primitives/benchmark.py
+    - benchbox/core/read_primitives/
+
+success_metrics:
+  - "8 new DuckDB-only sketch ops (4 CPC + 4 REQ) execute end-to-end at SF=0.01"
+  - "Cross-platform docs add CPC and REQ family rows with explicit DuckDB-only annotation"
+  - "Side-by-side storage-size comparison Theta vs CPC documented (depends on storage-metrics TODO landing first)"
+  - "Changelog entry under unreleased"
+
+open_questions:
+  - "Does `datasketch_cpc` aggregate accept its own sketch type as a fold-merge input (like datasketch_theta does)? Verify in w1 — affects how the union ★ op is structured."
+  - "Should CPC and REQ ops use a shared persistent table with theta/KLL (one mega-sketch table) or separate tables per family (current design)? Lean separate — keeps ops self-contained and makes per-family DROP cleanup obvious."

@@ -49,6 +49,25 @@ interface ValueLabelPlacement {
   placement: "outside" | "inside" | "gutter";
 }
 
+const CHART_BUTTON_LABELS: Record<string, string> = {
+  performance_bar: "Performance",
+  power_bar: "Power",
+  distribution_box: "Box Plot",
+  query_heatmap: "Heatmap",
+  query_histogram: "Histogram",
+  cost_scatter: "Cost",
+  time_series: "Trend",
+  comparison_bar: "Compare",
+  diverging_bar: "Diverging",
+  summary_box: "Summary",
+  percentile_ladder: "Percentiles",
+  normalized_speedup: "Speedup",
+  stacked_phase: "Phases",
+  sparkline_table: "Sparklines",
+  cdf_chart: "CDF",
+  rank_table: "Ranks",
+};
+
 export function ChartPanel({ context, baselineIndex, onBaselineIndexChange }: ChartPanelProps) {
   const charts = useMemo(() => applicableCharts(context), [context]);
   const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
@@ -128,12 +147,12 @@ export function ChartPanel({ context, baselineIndex, onBaselineIndexChange }: Ch
 
   return (
     <section class="card">
-      <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <h2 class="text-base font-semibold text-gray-900">Charts</h2>
-        <div class="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+        <div class="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:items-end">
           {chartGroups.length > 1 && (
             <div
-              class="flex flex-wrap gap-1 rounded-md border border-gray-200 bg-gray-50 p-1"
+              class="grid w-full grid-cols-2 gap-1 rounded-md border border-gray-200 bg-gray-50 p-1 sm:flex sm:w-auto sm:flex-wrap sm:justify-end"
               role="tablist"
               aria-label="Chart question groups"
             >
@@ -146,7 +165,8 @@ export function ChartPanel({ context, baselineIndex, onBaselineIndexChange }: Ch
                     type="button"
                     aria-selected={selected}
                     aria-controls="chart-panel-chart"
-                    class={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                    aria-label={group.label}
+                    class={`min-h-9 min-w-0 rounded px-2 py-1.5 text-center text-xs font-medium transition-colors sm:px-3 ${
                       selected
                         ? "bg-white text-gray-900 shadow-sm"
                         : "text-gray-600 hover:bg-white hover:text-gray-900"
@@ -161,13 +181,13 @@ export function ChartPanel({ context, baselineIndex, onBaselineIndexChange }: Ch
             </div>
           )}
           {showBaseline && summary && summary.platforms.length > 1 && (
-            <div class="flex items-center gap-2">
+            <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
               <label class="text-xs text-gray-500" for="chart-panel-baseline">
                 Baseline:
               </label>
               <select
                 id="chart-panel-baseline"
-                class="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none"
+                class="min-w-0 max-w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none"
                 value={String(baselineIdx)}
                 onChange={(event) => setBaselineIdx(Number((event.target as HTMLSelectElement).value))}
               >
@@ -181,7 +201,7 @@ export function ChartPanel({ context, baselineIndex, onBaselineIndexChange }: Ch
           )}
           {activeGroupCharts.length > 1 && (
             <div
-              class="flex flex-wrap justify-end gap-1"
+              class="grid w-full grid-cols-2 gap-1 rounded-md border border-gray-200 bg-gray-50 p-1 sm:flex sm:w-auto sm:flex-wrap sm:justify-end"
               role="group"
               aria-label={`${activeGroup.label} charts`}
             >
@@ -189,16 +209,17 @@ export function ChartPanel({ context, baselineIndex, onBaselineIndexChange }: Ch
                 <button
                   key={chart.id}
                   type="button"
-                  class={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                  class={`min-h-9 min-w-0 rounded px-2 py-1.5 text-center text-xs font-medium transition-colors sm:px-3 ${
                     activeChart.id === chart.id
                       ? "bg-brand-600 text-white"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                   onClick={() => setActiveId(chart.id)}
                   aria-pressed={activeChart.id === chart.id}
+                  aria-label={chart.title}
                   title={chart.description}
                 >
-                  {chart.title}
+                  {chartButtonLabel(chart)}
                 </button>
               ))}
             </div>
@@ -218,6 +239,10 @@ export function ChartPanel({ context, baselineIndex, onBaselineIndexChange }: Ch
       </div>
     </section>
   );
+}
+
+function chartButtonLabel(chart: ChartRegistryEntry): string {
+  return CHART_BUTTON_LABELS[chart.id] ?? chart.title;
 }
 
 function normalizeBaselineIndex(platformCount: number, baselineIndex: number) {

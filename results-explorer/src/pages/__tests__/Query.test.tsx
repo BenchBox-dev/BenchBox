@@ -73,6 +73,10 @@ function isDefaultResultSelect(sql: unknown): boolean {
   return normalizeSql(String(sql)).startsWith("SELECT result_id, benchmark, platform, scale_factor");
 }
 
+function appearsBefore(first: Element, second: Element): boolean {
+  return Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+}
+
 function isFacetCountSql(normalized: string, column: string): boolean {
   return normalized.includes(
     `SELECT CASE WHEN ${column} IS NULL THEN 'unknown' ELSE CAST(${column} AS VARCHAR) END AS value`,
@@ -190,6 +194,13 @@ beforeEach(() => {
         { value: "no", count: 1 },
       ];
     }
+    if (normalized.includes("SELECT '30d' AS value") && normalized.includes("UNION ALL")) {
+      return [
+        { value: "30d", count: 1 },
+        { value: "90d", count: 2 },
+        { value: "365d", count: 2 },
+      ];
+    }
     if (normalized.startsWith("CREATE TABLE")) {
       throw new Error("read-only connection");
     }
@@ -213,6 +224,55 @@ describe("Query", () => {
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
     expect(within(resultsTable).getAllByText("clickbench").length).toBeGreaterThan(0);
     expect(within(resultsTable).getByText("maintainer-run")).toBeTruthy();
+  });
+
+  it("orders mobile query controls so results appear before deep filters", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const heading = screen.getByRole("heading", { name: "Results Query Workbench" });
+    const resultSummary = screen.getByTestId("query-result-summary");
+    const mobileDrawer = screen.getByTestId("query-mobile-filter-drawer");
+    const resultsPanel = screen.getByTestId("query-results-panel");
+    const advancedSql = screen.getByText("Advanced SQL").closest("details")!;
+    const visibleColumns = screen.getByTestId("query-visible-columns");
+    const desktopFilters = screen.getByTestId("query-desktop-filters");
+
+    expect(appearsBefore(heading, resultSummary)).toBe(true);
+    expect(appearsBefore(resultSummary, mobileDrawer)).toBe(true);
+    expect(appearsBefore(mobileDrawer, resultsPanel)).toBe(true);
+    expect(appearsBefore(resultsPanel, advancedSql)).toBe(true);
+    expect(appearsBefore(resultsPanel, visibleColumns)).toBe(true);
+    expect(appearsBefore(resultsPanel, desktopFilters)).toBe(true);
+    expect(mobileDrawer.className).toContain("lg:hidden");
+    expect(desktopFilters.className).toContain("hidden");
+  });
+
+  it("opens full query facets from the mobile drawer trigger", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const mobileDrawer = screen.getByTestId("query-mobile-filter-drawer");
+    const trigger = within(mobileDrawer).getByRole("button", { name: /Filters/ });
+    expect(trigger.getAttribute("data-result-count")).toBe("2");
+
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole("dialog", { name: "Filter results" });
+    expect(within(dialog).getByText("Benchmark")).toBeTruthy();
+    expect(within(dialog).getByLabelText("clickbench")).toBeTruthy();
+    expect(within(dialog).getAllByText("Has cost").length).toBeGreaterThan(0);
+  });
+
+  it("shows active URL filters in the closed mobile drawer trigger", async () => {
+    window.history.replaceState(null, "", "/results/query?platform=DuckDB&has_cost=yes");
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const mobileDrawer = screen.getByTestId("query-mobile-filter-drawer");
+    expect(within(mobileDrawer).getAllByText("Platform: DuckDB").length).toBeGreaterThan(0);
+    expect(within(mobileDrawer).getAllByText("Has cost: Has cost").length).toBeGreaterThan(0);
   });
 
   it("updates the select SQL when facet filters change and sort toggles", async () => {

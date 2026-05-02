@@ -284,66 +284,12 @@ export function Home(_: RoutableProps) {
           </div>
 
           {filteredMetaLeaderboard && (
-            <section
-              aria-label="Leaderboard cohort selector"
-              class="mt-5 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
-            >
-              <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <MultiSelectFilter
-                  label="Benchmark"
-                  allLabel="All benchmarks"
-                  options={benchmarkOptions}
-                  current={benchmarkFilters}
-                  onSelect={(value) => setFacet("benchmark", value === "all" ? [] : [value])}
-                  format={(value) => humanizeBenchmark(value)}
-                />
-                <MultiSelectFilter
-                  label="Scale factor"
-                  allLabel="All scales"
-                  options={scaleOptions}
-                  current={scaleFilters}
-                  onSelect={(value) => setFacet("scale_factor", value === "all" ? [] : [value])}
-                  format={(value) => `SF ${value}`}
-                />
-                <SelectFilter
-                  label="Phase"
-                  options={["all", ...phaseOptions]}
-                  current={phaseFilter}
-                  onSelect={(value) => setFacet("phase", value === "all" ? [] : [value])}
-                  format={(value) => (value === "all" ? "All phases" : value)}
-                />
-                <CoverageSummary />
-              </div>
-
-              <details class="mt-3 border-t border-[var(--bb-border-default)] pt-3">
-                <summary class="cursor-pointer text-sm font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
-                  Advanced filters
-                </summary>
-                <div class="mt-3 grid gap-3 md:grid-cols-3">
-                  <SingleFilterGroup
-                    label="Tuning"
-                    options={tuningOptions}
-                    current={tuningFilter}
-                    onSelect={(value) => setFacet("tuning_mode", value === "all" ? [] : [value])}
-                    format={(value) => (value === "all" ? "All tuning" : value)}
-                  />
-                  <SingleFilterGroup
-                    label="Trust"
-                    options={trustOptions}
-                    current={trustFilter}
-                    onSelect={(value) => setFacet("trust_tier", value === "all" ? [] : [value])}
-                    format={(value) => (value === "all" ? "All trust tiers" : value)}
-                  />
-                  <SingleFilterGroup
-                    label="Date window"
-                    options={["all", "30d", "90d", "365d"]}
-                    current={dateWindow}
-                    onSelect={(value) => setFacet("date_window", toDateWindowFacet(value))}
-                    format={(value) => (value === "all" ? "All time" : `Last ${value}`)}
-                  />
-                </div>
-              </details>
-            </section>
+            <ActiveLeaderboardSummary
+              benchmark={summarizeSelection(benchmarkFilters, "All benchmarks", humanizeBenchmark)}
+              scaleFactor={summarizeSelection(scaleFilters, "All scales", (value) => `SF ${value}`)}
+              phase={phaseFilter === "all" ? "All phases" : phaseFilter}
+              activeFacets={activeFacetSummaries}
+            />
           )}
         </div>
       </section>
@@ -369,6 +315,69 @@ export function Home(_: RoutableProps) {
             onClearPlatform={() => setFacet("platform", [])}
             onReset={resetFacets}
           />
+        )}
+
+        {filteredMetaLeaderboard && (
+          <section
+            aria-label="Leaderboard cohort selector"
+            class="mb-8 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+          >
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <MultiSelectFilter
+                label="Benchmark"
+                allLabel="All benchmarks"
+                options={benchmarkOptions}
+                current={benchmarkFilters}
+                onSelect={(value) => setFacet("benchmark", value === "all" ? [] : [value])}
+                format={(value) => humanizeBenchmark(value)}
+              />
+              <MultiSelectFilter
+                label="Scale factor"
+                allLabel="All scales"
+                options={scaleOptions}
+                current={scaleFilters}
+                onSelect={(value) => setFacet("scale_factor", value === "all" ? [] : [value])}
+                format={(value) => `SF ${value}`}
+              />
+              <SelectFilter
+                label="Phase"
+                options={["all", ...phaseOptions]}
+                current={phaseFilter}
+                onSelect={(value) => setFacet("phase", value === "all" ? [] : [value])}
+                format={(value) => (value === "all" ? "All phases" : value)}
+              />
+              <CoverageSummary />
+            </div>
+
+            <details class="mt-3 border-t border-[var(--bb-border-default)] pt-3">
+              <summary class="cursor-pointer text-sm font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
+                Advanced filters
+              </summary>
+              <div class="mt-3 grid gap-3 md:grid-cols-3">
+                <SingleFilterGroup
+                  label="Tuning"
+                  options={tuningOptions}
+                  current={tuningFilter}
+                  onSelect={(value) => setFacet("tuning_mode", value === "all" ? [] : [value])}
+                  format={(value) => (value === "all" ? "All tuning" : value)}
+                />
+                <SingleFilterGroup
+                  label="Trust"
+                  options={trustOptions}
+                  current={trustFilter}
+                  onSelect={(value) => setFacet("trust_tier", value === "all" ? [] : [value])}
+                  format={(value) => (value === "all" ? "All trust tiers" : value)}
+                />
+                <SingleFilterGroup
+                  label="Date window"
+                  options={["all", "30d", "90d", "365d"]}
+                  current={dateWindow}
+                  onSelect={(value) => setFacet("date_window", toDateWindowFacet(value))}
+                  format={(value) => (value === "all" ? "All time" : `Last ${value}`)}
+                />
+              </div>
+            </details>
+          </section>
         )}
 
         {filteredMetaLeaderboard && <FlywheelStrip />}
@@ -518,6 +527,57 @@ const FACET_LABELS: Record<FacetKey, string> = {
   date_window: "Date window",
 };
 
+function ActiveLeaderboardSummary({
+  benchmark,
+  scaleFactor,
+  phase,
+  activeFacets,
+}: {
+  benchmark: string;
+  scaleFactor: string;
+  phase: string;
+  activeFacets: ActiveFacetSummary[];
+}) {
+  const items = [
+    { label: "Benchmark", value: benchmark },
+    { label: "Scale", value: scaleFactor },
+    { label: "Phase", value: phase },
+  ];
+
+  return (
+    <section
+      aria-label="Active leaderboard filters"
+      class="mt-5 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+    >
+      <div class="grid gap-2 sm:grid-cols-3">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            class="rounded-md border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-primary)] px-3 py-2"
+          >
+            <div class="text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">
+              {item.label}
+            </div>
+            <div class="mt-1 text-sm font-medium text-[var(--bb-fg-primary)]">{item.value}</div>
+          </div>
+        ))}
+      </div>
+      {activeFacets.length > 0 && (
+        <div aria-label="Active filter chips" class="mt-3 flex flex-wrap gap-2">
+          {activeFacets.map((facet) => (
+            <span
+              key={facet.key}
+              class="rounded-full bg-[var(--bb-bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-muted)]"
+            >
+              {facet.label}: {facet.value}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function CoverageEmptyState({
   activeFacets,
   canClearScale,
@@ -592,6 +652,16 @@ function CoverageEmptyState({
       </div>
     </section>
   );
+}
+
+function summarizeSelection(
+  values: string[],
+  allLabel: string,
+  format: (value: string) => string,
+): string {
+  if (values.length === 0) return allLabel;
+  if (values.length === 1) return format(values[0] ?? "");
+  return `${values.length} selected`;
 }
 
 function summarizeActiveFacets(

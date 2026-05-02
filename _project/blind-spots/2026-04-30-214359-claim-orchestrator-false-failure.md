@@ -70,3 +70,16 @@ dispatches a sub-make and inspects only the exit code (e.g.
       contract is "WORKTREE_PATH=… printed → claim succeeded → exit 0".
 - [ ] Add a regression test that asserts `make worktree-claim BRANCH=…`
       exits 0 on a fresh free pool.
+
+## Triage log
+
+- 2026-05-02: reproduced during this very sweep. `make -s
+  worktree-claim BRANCH=chore/blind-spot-sweep` printed
+  `WORKTREE_PATH=/Users/joe/Developer/BenchBox.pool-10`, then ran the
+  auto-sweep retry path ("No free pool worktree on first pass —
+  auto-sweeping stale slots..."), `Swept 0 pool slot(s)`, and exited
+  the make target with `Error 1` / `Error 2` (`worktree-claim-attempt`
+  → `worktree-claim-locked` → `worktree-claim`). Final state was
+  correct: pool-10 cleanly claimed on the requested branch, working
+  tree clean. The bug class — orchestrator misreads child make
+  target's success — is still live. Verified actionable.

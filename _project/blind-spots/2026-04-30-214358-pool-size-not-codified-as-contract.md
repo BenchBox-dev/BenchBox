@@ -51,3 +51,13 @@ happens, instead of failing slow under load.
 - [ ] If no: write a one-line note in the operations doc that the count
       is "by convention, run `pool-status` to inspect" — so future
       readers don't assume it's enforced.
+
+## Triage log
+
+- 2026-05-02: verified actionable. `make worktree-pool-check` does NOT
+  exist in the current Makefile (`grep -n worktree-pool Makefile`
+  shows `init`, `status`, `claim*`, `release*`, `reset*`,
+  `sweep-stale*`, `disk-clean` — no `check`). `worktree-pool-status`
+  reports state non-fatally (today's run shows `pool-01` dirty for
+  26h, several `claimed` for hours; would not be flagged by a check
+  target). The decision (codify vs document) is still owed.
