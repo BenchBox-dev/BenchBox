@@ -36,6 +36,8 @@ from benchbox.core.results.environment import (
     PlatformComputeMetadata,
     PlatformDeploymentMetadata,
     PlatformStorageMetadata,
+    build_environment_payload,
+    build_platform_metadata_payload,
 )
 from benchbox.core.results.metrics import (
     TimingStatsCalculator,
@@ -589,6 +591,8 @@ class ResultBuilder:
 
         # Build platform info dict
         platform_info = self._build_platform_info_dict()
+        execution_environment = self._build_execution_environment_metadata()
+        platform_environment = self._build_platform_environment_metadata(platform_info)
 
         # Determine validation status based on failures
         validation_status = self._validation_status
@@ -635,13 +639,31 @@ class ResultBuilder:
             # Validation
             validation_status=validation_status,
             validation_details=self._validation_details,
-            execution_environment=self._execution_environment,
-            platform_deployment=self._platform_deployment,
-            platform_cloud=self._platform_cloud,
-            platform_compute=self._platform_compute,
-            platform_storage=self._platform_storage,
-            platform_raw_config=self._platform_raw_config,
-            platform_raw_metadata=self._platform_raw_metadata,
+            execution_environment=execution_environment,
+            platform_deployment=(
+                self._platform_deployment
+                if self._platform_deployment is not None
+                else platform_environment.get("deployment")
+            ),
+            platform_cloud=self._platform_cloud
+            if self._platform_cloud is not None
+            else platform_environment.get("cloud"),
+            platform_compute=(
+                self._platform_compute if self._platform_compute is not None else platform_environment.get("compute")
+            ),
+            platform_storage=(
+                self._platform_storage if self._platform_storage is not None else platform_environment.get("storage")
+            ),
+            platform_raw_config=(
+                self._platform_raw_config
+                if self._platform_raw_config is not None
+                else platform_environment.get("raw_config")
+            ),
+            platform_raw_metadata=(
+                self._platform_raw_metadata
+                if self._platform_raw_metadata is not None
+                else platform_environment.get("raw_metadata")
+            ),
             # Platform info
             platform_info=platform_info,
             # Execution metadata
@@ -983,6 +1005,34 @@ class ResultBuilder:
             info["engine_version_source"] = self._platform.engine_version_source
 
         return info
+
+    def _build_execution_environment_metadata(self) -> dict[str, Any]:
+        """Build normalized execution-environment metadata carried by BenchmarkResults."""
+        payload = build_environment_payload(
+            system_profile=self._system_profile,
+            execution_environment=self._execution_environment,
+        )
+        return {
+            key: payload[key]
+            for key in ("client_host", "platform_runtime", "container")
+            if isinstance(payload.get(key), dict)
+        }
+
+    def _build_platform_environment_metadata(self, platform_info: dict[str, Any]) -> dict[str, Any]:
+        """Build normalized platform metadata carried by BenchmarkResults."""
+        platform_config = (
+            platform_info.get("configuration") if isinstance(platform_info.get("configuration"), dict) else {}
+        )
+        return build_platform_metadata_payload(
+            platform_info=platform_info,
+            platform_config=platform_config,
+            deployment=self._platform_deployment,
+            cloud=self._platform_cloud,
+            compute=self._platform_compute,
+            storage=self._platform_storage,
+            raw_config=self._platform_raw_config if self._platform_raw_config is not None else platform_config,
+            raw_metadata=self._platform_raw_metadata,
+        )
 
     def _build_execution_metadata(self) -> dict[str, Any]:
         """Build execution metadata dictionary."""

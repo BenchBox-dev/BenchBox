@@ -6,6 +6,7 @@ from datetime import datetime
 
 import pytest
 
+from benchbox.core.results.builder import BenchmarkInfoInput, ResultBuilder
 from benchbox.core.results.environment import (
     ContainerEnvironment,
     NormalizedExecutionEnvironment,
@@ -18,6 +19,8 @@ from benchbox.core.results.environment import (
 from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.loader import reconstruct_benchmark_results
 from benchbox.core.results.models import BenchmarkResults
+from benchbox.core.results.platform_info import PlatformInfoInput
+from benchbox.core.results.query_normalizer import normalize_query_result
 from benchbox.core.results.schema import build_result_payload
 
 pytestmark = [
@@ -49,6 +52,68 @@ def _minimal_result(**overrides):
     }
     defaults.update(overrides)
     return BenchmarkResults(**defaults)
+
+
+def _builder_result(platform: PlatformInfoInput | None = None, system_profile: dict[str, object] | None = None):
+    builder = ResultBuilder(
+        benchmark=BenchmarkInfoInput(name="TPC-H", scale_factor=0.01, benchmark_id="tpch"),
+        platform=platform or PlatformInfoInput(name="DuckDB", platform_version="1.0.0", client_library_version="1.0.0"),
+        execution_id="builder-env-test",
+    )
+    if system_profile is not None:
+        builder.set_system_profile(system_profile)
+    builder.add_query_result(
+        normalize_query_result(
+            {
+                "query_id": "Q1",
+                "execution_time_seconds": 0.1,
+                "rows_returned": 1,
+                "status": "SUCCESS",
+                "run_type": "measurement",
+            }
+        )
+    )
+    return builder.build()
+
+
+def test_builder_carries_client_host_and_default_platform_runtime_on_result_object() -> None:
+    result = _builder_result(
+        system_profile={
+            "os_type": "Darwin",
+            "os_release": "24.4.0",
+            "architecture": "arm64",
+            "cpu_count": 12,
+        }
+    )
+
+    assert result.execution_environment["client_host"]["os"] == "Darwin 24.4.0"
+    assert result.execution_environment["client_host"]["arch"] == "arm64"
+    assert result.execution_environment["platform_runtime"] == {
+        "runtime_type": "unknown",
+        "collection_status": "unavailable",
+        "source": "unavailable",
+    }
+
+    payload = build_result_payload(result)
+    assert payload["environment"]["client_host"]["os"] == "Darwin 24.4.0"
+    assert payload["environment"]["platform_runtime"]["runtime_type"] == "unknown"
+
+
+def test_builder_carries_conservative_platform_deployment_from_legacy_platform_info() -> None:
+    result = _builder_result(
+        platform=PlatformInfoInput(
+            name="ClickHouse Server",
+            platform_version="24.1",
+            client_library_version="0.8",
+            connection_mode="server",
+            config={"host": "localhost", "port": 8123},
+        )
+    )
+
+    assert result.platform_deployment["deployment_type"] == "unknown"
+    assert result.platform_deployment["endpoint_class"] == "localhost_port"
+    assert result.platform_deployment["metadata_source"] == "inferred"
+    assert result.platform_raw_config == {"host": "localhost", "port": 8123}
 
 
 def test_environment_block_keeps_legacy_host_keys_and_adds_normalized_client_host() -> None:

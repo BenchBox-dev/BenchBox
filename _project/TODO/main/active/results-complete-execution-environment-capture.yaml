@@ -87,7 +87,7 @@ work:
 - id: w3
   summary: "Refactor result builder/exporter to emit client host vs platform runtime"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Touch `BenchmarkResults`, `ResultBuilder`, `result_factory`, and
     `schema.build_result_payload` so the result object carries both the
