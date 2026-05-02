@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { waitForShell } from "../support/fixtures";
 
-const TPCH_ID = "tpch-duckdb-sf0.01-20260403-7fe93365";
-const STAR_SCHEMA_ID = "star_schema-duckdb-sf0.01-20260403-ac3ed9a9";
-const TPCH_SF01_ID = "tpch-duckdb-sf0.1-20260403-59d8cc27";
+const TPCH_ID = "tpch-duckdb-sf0.01-20260403-010ee756";
+const STAR_SCHEMA_ID = "star_schema-duckdb-sf0.01-20260403-3cdeede0";
+const TPCH_SF01_ID = "tpch-duckdb-sf0.1-20260403-f88815c2";
 
 test.describe.configure({ mode: "serial" });
 

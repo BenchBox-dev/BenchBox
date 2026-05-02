@@ -2,8 +2,9 @@ id: explorer-facet-model-environment-contract-refactor
 title: "Explorer: refactor facet model onto normalized execution-environment contract"
 worktree: main
 priority: "Medium-High"
-status: "In Progress"
+status: "Completed"
 category: "Core Functionality"
+completed_date: "2026-05-02"
 
 deps:
   needs:
@@ -110,7 +111,7 @@ work:
 - id: w7
   summary: "Cross-corpus verification: every result bundle facets through the normalized path"
   needs: [w5, w6]
-  status: pending
+  status: done
   notes: |
     Run the explorer fixtures end-to-end against the public-corpus shape
     that `results-complete-execution-environment-capture` w14 establishes.
