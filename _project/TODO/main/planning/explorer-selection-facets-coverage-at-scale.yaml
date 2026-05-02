@@ -103,7 +103,10 @@ work:
   - id: w6
     summary: "Add FacetRail desktop component and FacetDrawer mobile shell"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/FacetRail.tsx"
+      - "results-explorer/src/components/__tests__/FacetRail.test.tsx"
     notes: |
       THIS ITEM OWNS the FacetDrawer component. The downstream
       `explorer-mobile-density-responsive-tables` item styles the drawer for
