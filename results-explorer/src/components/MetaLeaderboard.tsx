@@ -1,10 +1,16 @@
 import type { JSX } from "preact";
-import { useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
 import type { MetaCohort, MetaLeaderboard as MetaLeaderboardData, MetaPlatform, MetaRank } from "@/types";
 import { colorForCell, lightnessForCell } from "@/lib/chartMath";
 import { fmtGeomean, fmtScore, humanizeBenchmark } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
+import {
+  EXPLORER_PERFORMANCE_MARKS,
+  EXPLORER_PERFORMANCE_MEASURES,
+  markExplorerPerformance,
+  measureExplorerPerformance,
+} from "@/lib/performanceMarks";
 
 export type MetaLeaderboardMode = "times" | "ranks" | "speedup";
 type MetaLeaderboardSort = "avg_rank" | "coverage" | "best_rank" | "recent_activity";
@@ -71,6 +77,20 @@ export function MetaLeaderboard({
       ),
     [cohorts, platforms, resultMetadataById, sortKey],
   );
+
+  useEffect(() => {
+    if (platforms.length === 0 || cohorts.length === 0) return;
+    markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.LEADERBOARD_RENDERED, {
+      once: true,
+      detail: { cohortCount: cohorts.length, platformCount: platforms.length },
+    });
+    measureExplorerPerformance(
+      EXPLORER_PERFORMANCE_MEASURES.LEADERBOARD_RENDER_AFTER_DATA,
+      EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY,
+      EXPLORER_PERFORMANCE_MARKS.LEADERBOARD_RENDERED,
+      { once: true },
+    );
+  }, [cohorts.length, platforms.length]);
 
   if (platforms.length === 0 || cohorts.length === 0) return null;
 

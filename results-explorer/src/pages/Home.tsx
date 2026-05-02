@@ -23,6 +23,12 @@ import {
 } from "@/lib/facetModel";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import {
+  EXPLORER_PERFORMANCE_MARKS,
+  EXPLORER_PERFORMANCE_MEASURES,
+  markExplorerPerformance,
+  measureExplorerPerformance,
+} from "@/lib/performanceMarks";
 
 const SUPPORTED_BENCHMARK_COUNT = new Set(Object.values(BENCHMARK_LABELS)).size;
 
@@ -59,9 +65,20 @@ export function Home(_: RoutableProps) {
 
   useEffect(() => {
     let cancelled = false;
+    markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_START, { once: true });
     getMetaLeaderboardData()
       .then((data) => {
         if (!cancelled) {
+          markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY, {
+            once: true,
+            detail: { cohortCount: data?.cohorts.length ?? 0 },
+          });
+          measureExplorerPerformance(
+            EXPLORER_PERFORMANCE_MEASURES.HOME_LEADERBOARD_DATA,
+            EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_START,
+            EXPLORER_PERFORMANCE_MARKS.HOME_LEADERBOARD_DATA_READY,
+            { once: true },
+          );
           setMetaLeaderboard(data);
           setMetaLeaderboardLoaded(true);
         }

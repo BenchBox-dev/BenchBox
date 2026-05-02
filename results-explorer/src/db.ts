@@ -22,6 +22,12 @@
 import * as duckdb from "@duckdb/duckdb-wasm";
 
 import { LOCAL_DUCKDB_BUNDLES } from "@/lib/duckdbBundles";
+import {
+  EXPLORER_PERFORMANCE_MARKS,
+  EXPLORER_PERFORMANCE_MEASURES,
+  markExplorerPerformance,
+  measureExplorerPerformance,
+} from "@/lib/performanceMarks";
 
 let dbInstance: duckdb.AsyncDuckDB | null = null;
 let initPromise: Promise<duckdb.AsyncDuckDB> | null = null;
@@ -80,6 +86,7 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
   }
 
   initPromise = (async () => {
+    markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.DB_INIT_START, { once: true });
     const bundle = await duckdb.selectBundle(LOCAL_DUCKDB_BUNDLES);
     const worker = new Worker(bundle.mainWorker!);
     const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING);
@@ -113,6 +120,13 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
     }
 
     dbInstance = db;
+    markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.DB_INIT_READY, { once: true });
+    measureExplorerPerformance(
+      EXPLORER_PERFORMANCE_MEASURES.DB_INIT,
+      EXPLORER_PERFORMANCE_MARKS.DB_INIT_START,
+      EXPLORER_PERFORMANCE_MARKS.DB_INIT_READY,
+      { once: true },
+    );
     return db;
   })().catch((error: unknown) => {
     initPromise = null;
