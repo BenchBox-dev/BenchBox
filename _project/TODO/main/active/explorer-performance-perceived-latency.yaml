@@ -109,12 +109,16 @@ work:
 - id: w6
   summary: "Add fixture determinism guard"
   needs: [w5]
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/scripts/verify-browser-fixtures.mjs"
   notes: |
     `npm run test:e2e:fixtures` already generates fixtures. Add a check
     that re-running fixture generation produces byte-identical output (or
-    a documented allow-list of timestamp fields), so the perf smoke is
-    not measuring regenerated fixtures with shifting row counts.
+    a documented allow-list of timestamp fields). `data/results.duckdb`
+    is an allowed binary-container exception only if its logical table
+    digest is identical, so the perf smoke is not measuring regenerated
+    fixtures with shifting row counts.
 
 metadata:
   tags:
@@ -179,9 +183,8 @@ verification:
   expected_output: "Chromium performance smoke passes; P95 budgets in w5 are met or exceeded with margin. Test output reports
     both P50 and P95 for each mark."
 - description: "Fixture generation is deterministic across two consecutive runs."
-  command: "cd results-explorer && npm run test:e2e:fixtures && cp -r dist-fixtures dist-fixtures.first && npm run test:e2e:fixtures
-    && diff -r dist-fixtures dist-fixtures.first"
-  expected_output: "No diff (or diff limited to a documented allow-list of timestamp fields)."
+  command: "cd results-explorer && npm run test:e2e:fixtures"
+  expected_output: "Fixture invariant and determinism checks pass; output includes the documented DuckDB logical digest allow-list."
 
 scope_limit:
   only_modify:
