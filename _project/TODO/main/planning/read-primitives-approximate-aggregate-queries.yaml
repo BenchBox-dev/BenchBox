@@ -111,7 +111,7 @@ work:
 - id: w5
   summary: "Write cross-platform comparison documentation in benchmark help-topic and README"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Capture the function-by-function cross-platform table from the
     research in user-facing docs. Depends on w3 because the empirical

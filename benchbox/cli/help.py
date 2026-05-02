@@ -443,6 +443,20 @@ class BenchBoxCommand(click.Command):
             color=ctx.color,
         )
 
+        click.echo(
+            click.style("\nApproximate aggregate guidance:\n", bold=True),
+            color=ctx.color,
+        )
+        click.echo(
+            "  read_primitives covers one-shot approximate aggregates "
+            "(approx_count_distinct_*, approx_quantile*, approx_top_k_*).",
+            color=ctx.color,
+        )
+        click.echo(
+            "  Cross-engine function reference: docs/benchmarks/read-primitives-approximate-functions.md",
+            color=ctx.color,
+        )
+
     def _show_examples(self, ctx: click.Context) -> None:
         """Display categorized usage examples."""
         cmd_name = self.name or "run"
