@@ -198,15 +198,17 @@ describe("MetaLeaderboard", () => {
     const rowOrder = () =>
       Array.from(container.querySelectorAll("tbody tr")).map((row) => row.textContent ?? "");
 
-    expect(screen.getByRole("button", { name: "Avg rank" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Avg rank over covered cohorts" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: "Best cohort" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Recent" })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Avg rank over covered cohorts" })).toBeTruthy();
     expect(rowOrder()[0]).toContain("Polars");
 
     fireEvent.click(screen.getByRole("button", { name: "Coverage" }));
 
     expect(screen.getByRole("button", { name: "Coverage" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("2/2 cohorts")).toBeTruthy();
+    expect(screen.getByText("over 2/2")).toBeTruthy();
     expect(rowOrder()[0]).toContain("DuckDB");
   });
 
@@ -241,10 +243,11 @@ describe("MetaLeaderboard", () => {
     render(<MetaLeaderboard data={dataWithNa} mode="ranks" onModeChange={vi.fn()} />);
     expect(screen.getByText("No run")).toBeTruthy();
     expect(screen.getByText("0/1 cohorts")).toBeTruthy();
+    expect(screen.getByText("No score")).toBeTruthy();
     const missingCell = screen.getByRole("gridcell", {
-      name: /Polars has no published run for ClickBench SF0\.1\. Missing cohorts are not counted in average rank\./,
+      name: /Polars has no published run for ClickBench SF0\.1\. Missing cohorts are not scored; coverage is shown separately\./,
     });
-    expect(missingCell.getAttribute("title")).toContain("Missing cohorts are not counted");
+    expect(missingCell.getAttribute("title")).toContain("Missing cohorts are not scored");
   });
 
   it("formats avg_rank with 2 decimal places", () => {

@@ -28,14 +28,15 @@ const MODE_LABELS: Record<MetaLeaderboardMode, string> = {
   ranks: "Ranks",
   speedup: "Speedup",
 };
+const AVG_RANK_LABEL = "Avg rank over covered cohorts";
+const COVERAGE_POLICY_COPY = "Missing cohorts are not scored; coverage is shown separately.";
 const SORT_LABELS: Record<MetaLeaderboardSort, string> = {
-  avg_rank: "Avg rank",
+  avg_rank: AVG_RANK_LABEL,
   coverage: "Coverage",
   best_rank: "Best cohort",
   recent_activity: "Recent",
 };
-const MISSING_COHORT_TITLE =
-  "No published run for this cohort. Missing cohorts are not counted in average rank.";
+const MISSING_COHORT_TITLE = `No published run for this cohort. ${COVERAGE_POLICY_COPY}`;
 
 export function MetaLeaderboard({
   data,
@@ -219,9 +220,9 @@ export function MetaLeaderboard({
               <th
                 scope="col"
                 class="table-th whitespace-nowrap text-gray-700"
-                title="Average rank across visible cohorts"
+                title={`Average rank over cohorts where the platform has a published run. ${COVERAGE_POLICY_COPY}`}
               >
-                Avg rank
+                {AVG_RANK_LABEL}
               </th>
             </tr>
           </thead>
@@ -243,7 +244,7 @@ export function MetaLeaderboard({
                     </a>
                     <span
                       class="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[11px] font-medium text-gray-500"
-                      title="Covered cohorts in the current leaderboard view"
+                      title={`Covered cohorts in the current leaderboard view. ${COVERAGE_POLICY_COPY}`}
                     >
                       {platform.n_cohorts}/{cohorts.length} cohorts
                     </span>
@@ -303,8 +304,20 @@ export function MetaLeaderboard({
                     </td>
                   );
                 })}
-                <td class="table-td text-center font-mono font-semibold text-gray-700">
-                  {platform.avg_rank !== null ? platform.avg_rank.toFixed(1) : <span class="text-gray-300">-</span>}
+                <td
+                  class="table-td text-center font-mono font-semibold text-gray-700"
+                  title={`${AVG_RANK_LABEL}: ${platform.n_cohorts}/${cohorts.length}. ${COVERAGE_POLICY_COPY}`}
+                >
+                  {platform.avg_rank !== null ? (
+                    <>
+                      <span>{platform.avg_rank.toFixed(1)}</span>
+                      <span class="mt-0.5 block text-[11px] font-normal text-gray-400">
+                        over {platform.n_cohorts}/{cohorts.length}
+                      </span>
+                    </>
+                  ) : (
+                    <span class="text-gray-300">No score</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -323,7 +336,7 @@ export function MetaLeaderboard({
           </p>
           <p>
             <strong>Ranks</strong> keeps the original meta-leaderboard contract: 1 = best in the
-            cohort, and missing cohorts are excluded from average-rank math.
+            cohort. {COVERAGE_POLICY_COPY}
           </p>
           <p>
             <strong>Speedup</strong> normalizes every cell to the cohort best, where 1.00x is
@@ -387,7 +400,7 @@ function describeCell(
   mode: MetaLeaderboardMode,
 ): string {
   if (!rank) {
-    return `${platform.platform} has no published run for ${cohort.label}. Missing cohorts are not counted in average rank.`;
+    return `${platform.platform} has no published run for ${cohort.label}. ${COVERAGE_POLICY_COPY}`;
   }
   const text = cellText(rank, cohort, mode);
   return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}`;

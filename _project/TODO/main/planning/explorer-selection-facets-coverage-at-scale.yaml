@@ -134,7 +134,10 @@ work:
   - id: w8
     summary: "Change aggregate labels to 'Avg rank over covered cohorts' and expose coverage denominator"
     needs: [w7]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/MetaLeaderboard.tsx"
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
     notes: |
       The label must make the no-penalty coverage policy explicit. Tooltips
       should say: "Missing cohorts are not scored; coverage is shown separately."
