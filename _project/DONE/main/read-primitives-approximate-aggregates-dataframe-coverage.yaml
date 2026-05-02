@@ -2,7 +2,8 @@ id: read-primitives-approximate-aggregates-dataframe-coverage
 title: "Read Primitives: extend DataFrame coverage of new approximate-aggregate queries (HLL distinct + sketch-backed quantiles)"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-02"
 category: "Core Functionality"
 
 description: |
@@ -57,7 +58,7 @@ context_sections:
 work:
   - id: w1
     summary: "Add expression_impl + pandas_impl for approx_count_distinct_simple and approx_count_distinct_groupby"
-    status: pending
+    status: done
     notes: |
       In `benchbox/core/read_primitives/dataframe_queries.py`:
         - Implement and register `approx_count_distinct_simple_*_impl` and
@@ -87,7 +88,7 @@ work:
   - id: w2
     summary: "Replace approx_quantile_groupby exact .quantile() with sketch-backed paths where supported"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       `approx_quantile_groupby_expression_impl` (line ~3257) currently
       calls `.quantile(0.5)` on the column expression — exact on every
@@ -111,7 +112,7 @@ work:
   - id: w3
     summary: "Document the cross-platform DataFrame support matrix in the existing read-primitives doc"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       Extend `docs/benchmarks/read-primitives-approximate-functions.md`
       with a new "DataFrame platform coverage" section:
@@ -126,7 +127,7 @@ work:
   - id: w4
     summary: "Document why approx_quantiles_array and approx_top_k_lineitem remain in SKIP_FOR_DATAFRAME"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       In `benchbox/core/read_primitives/dataframe_queries.py`, expand the
       `SKIP_FOR_DATAFRAME` inline comments for these two entries to say
@@ -144,7 +145,7 @@ work:
   - id: w5
     summary: "Add changelog entry under unreleased"
     needs: [w3, w4]
-    status: pending
+    status: done
     notes: |
       Terse user-facing bullet:
       "read_primitives DataFrame: add `approx_count_distinct_*` impls
