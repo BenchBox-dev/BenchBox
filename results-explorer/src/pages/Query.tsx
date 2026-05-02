@@ -15,6 +15,7 @@ import {
   type QuerySort,
 } from "@/lib/queryFilters";
 import { getTableSchema, type SchemaColumn } from "@/lib/duckdbSchema";
+import { useFacetField, type DateWindowFacet } from "@/lib/facetModel";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -40,34 +41,27 @@ const DEFAULT_COLUMNS = [
 
 export function Query(_: RoutableProps) {
   useDocumentTitle("Query · BenchBox Results");
-  const [benchmarks, setBenchmarks] = useUrlState<string[]>("benchmark", EMPTY_STRING_ARRAY, arraySerde);
-  const [platforms, setPlatforms] = useUrlState<string[]>("platform", EMPTY_STRING_ARRAY, arraySerde);
-  const [scaleFactors, setScaleFactors] = useUrlState<string[]>("sf", EMPTY_STRING_ARRAY, arraySerde);
-  const [tuningModes, setTuningModes] = useUrlState<string[]>("tuning", EMPTY_STRING_ARRAY, arraySerde);
-  const [trustTiers, setTrustTiers] = useUrlState<string[]>("trust", EMPTY_STRING_ARRAY, arraySerde);
-  const [validationStatuses, setValidationStatuses] = useUrlState<string[]>(
-    "validation",
-    EMPTY_STRING_ARRAY,
-    arraySerde,
-  );
-  const [costStatuses, setCostStatuses] = useUrlState<string[]>("cost_status", EMPTY_STRING_ARRAY, arraySerde);
+  const [benchmarks, setBenchmarks] = useFacetField("benchmark");
+  const [platforms, setPlatforms] = useFacetField("platform");
+  const [scaleFactors, setScaleFactors] = useFacetField("scale_factor");
+  const [tuningModes, setTuningModes] = useFacetField("tuning_mode");
+  const [trustTiers, setTrustTiers] = useFacetField("trust_tier");
+  const [validationStatuses, setValidationStatuses] = useFacetField("validation_status");
+  const [costStatuses, setCostStatuses] = useFacetField("cost_status");
   const [costModelVersions, setCostModelVersions] = useUrlState<string[]>(
     "cost_model",
     EMPTY_STRING_ARRAY,
     arraySerde,
   );
-  const [cloudProviders, setCloudProviders] = useUrlState<string[]>(
-    "cloud_provider",
-    EMPTY_STRING_ARRAY,
-    arraySerde,
-  );
-  const [cloudRegions, setCloudRegions] = useUrlState<string[]>("cloud_region", EMPTY_STRING_ARRAY, arraySerde);
+  const [cloudProviders, setCloudProviders] = useFacetField("cloud_provider");
+  const [cloudRegions, setCloudRegions] = useFacetField("cloud_region");
   const [instanceTypes, setInstanceTypes] = useUrlState<string[]>("instance_type", EMPTY_STRING_ARRAY, arraySerde);
   const [warehouseSizes, setWarehouseSizes] = useUrlState<string[]>("warehouse_size", EMPTY_STRING_ARRAY, arraySerde);
-  const [storageFormats, setStorageFormats] = useUrlState<string[]>("storage_format", EMPTY_STRING_ARRAY, arraySerde);
+  const [storageFormats, setStorageFormats] = useFacetField("storage_format");
   const [rowLimitRaw, setRowLimitRaw] = useUrlState<string>("limit", "default", stringSerde);
   const [hasCost, setHasCost] = useUrlState<string>("has_cost", "all", stringSerde);
-  const [dateWindow, setDateWindow] = useUrlState<string>("window", "all", stringSerde);
+  const [dateWindow, setDateWindowFacet] = useFacetField("date_window");
+  const setDateWindow = (value: string) => setDateWindowFacet(toDateWindowFacet(value));
   const [schema, setSchema] = useState<SchemaColumn[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [rows, setRows] = useState<ResultRow[]>([]);
@@ -98,7 +92,7 @@ export function Query(_: RoutableProps) {
       warehouseSizes,
       storageFormats,
       hasCost: hasCost === "yes" || hasCost === "no" ? hasCost : "all",
-      dateWindow: dateWindow === "30d" || dateWindow === "90d" || dateWindow === "365d" ? dateWindow : "all",
+      dateWindow,
     }),
     [
       benchmarks,
@@ -688,6 +682,11 @@ function applySchemaFilterSupport(filters: QueryFilterState, schema: SchemaColum
     warehouseSizes: columns.has("warehouse_size") ? filters.warehouseSizes : [],
     storageFormats: columns.has("storage_format") ? filters.storageFormats : [],
   };
+}
+
+function toDateWindowFacet(value: string): DateWindowFacet {
+  if (value === "30d" || value === "90d" || value === "365d") return value;
+  return "all";
 }
 
 function StarterQueries({ onSelect }: { onSelect: (sql: string) => void }) {

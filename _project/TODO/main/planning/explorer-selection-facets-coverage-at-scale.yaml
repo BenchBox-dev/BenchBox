@@ -86,7 +86,16 @@ work:
   - id: w5
     summary: "Migrate Compare and Query pages to shared facet model"
     needs: [w1]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/lib/facetModel.ts"
+      - "results-explorer/src/lib/__tests__/facetModel.test.ts"
+      - "results-explorer/src/lib/queryFilters.ts"
+      - "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+      - "results-explorer/src/pages/Compare.tsx"
+      - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+      - "results-explorer/src/pages/Query.tsx"
+      - "results-explorer/src/pages/__tests__/Query.test.tsx"
     notes: |
       Compare uses facets to bound the candidate-result picker. Query Workbench
       surfaces facets as starter-query toggles plus a column picker hint.

@@ -7,6 +7,7 @@ import {
   FACET_URL_SERDES,
   facetsToWhereClause,
   readFacetParam,
+  useFacetField,
   type FacetKey,
   type FacetState,
 } from "@/lib/facetModel";
@@ -97,6 +98,14 @@ describe("facet URL contract", () => {
     expect(readFacetParam(params, "phase")).toEqual([]);
     expect(readFacetParam(params, "tuning_mode")).toEqual([]);
     expect(readFacetParam(params, "trust_tier")).toEqual([]);
+  });
+
+  it("can mount one shared facet without canonicalizing unrelated aliases", () => {
+    window.history.replaceState(null, "", "/?warehouse_size=MEDIUM");
+
+    const { result } = renderHook(() => useFacetField("benchmark"));
+    expect(result.current[0]).toEqual([]);
+    expect(new URL(window.location.href).searchParams.get("warehouse_size")).toBe("MEDIUM");
   });
 });
 

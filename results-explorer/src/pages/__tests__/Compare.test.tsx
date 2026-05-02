@@ -34,7 +34,7 @@ vi.mock("@/lib/duckdbQueries", async () => {
   };
 });
 
-import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId } from "@/lib/duckdbQueries";
+import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId, toShortIds } from "@/lib/duckdbQueries";
 import { Compare } from "@/pages/Compare";
 
 // ---------------------------------------------------------------------------
@@ -206,6 +206,26 @@ describe("Compare", () => {
     expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch");
     const labels = screen.getAllByText(/Power score/i);
     expect(labels.length).toBeGreaterThan(0);
+  });
+
+  it("preserves facet URL params when canonicalizing long compare IDs", async () => {
+    setupUrl(["tpch-duckdb-long-id", "tpch-sqlite-long-id"], {
+      benchmark: "tpch",
+      cost_status: "normalized",
+    });
+    vi.mocked(resolveShortId).mockImplementation((id) =>
+      Promise.resolve(id.includes("duckdb") ? "r1" : "r2"),
+    );
+    vi.mocked(toShortIds).mockResolvedValue(["short1", "short2"]);
+
+    render(<Compare />);
+
+    await waitFor(() =>
+      expect(new URL(window.location.href).searchParams.get("ids")).toBe("short1,short2"),
+    );
+    const params = new URL(window.location.href).searchParams;
+    expect(params.get("benchmark")).toBe("tpch");
+    expect(params.get("cost_status")).toBe("normalized");
   });
 
   it("shows a secondary Geomean row when power_score is primary", async () => {

@@ -267,6 +267,10 @@ export function useFacetState(): UseFacetStateResult {
   return { facets, where, setFacet, resetFacets };
 }
 
+export function useFacetField<K extends FacetKey>(key: K): [FacetState[K], (value: FacetState[K]) => void] {
+  return useFacetUrlState(key);
+}
+
 export function facetsToWhereClause(
   input: PartialFacetState = {},
   options: { now?: Date } = {},
