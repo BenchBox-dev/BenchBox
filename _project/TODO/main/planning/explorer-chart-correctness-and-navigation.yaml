@@ -2,7 +2,7 @@ id: explorer-chart-correctness-and-navigation
 title: "Explorer: chart correctness, log-scale latency encoding, and chart navigation"
 worktree: main
 priority: High
-status: "Not Started"
+status: "In Progress"
 category: "Data Visualization"
 
 deps:
@@ -101,7 +101,14 @@ work:
   - id: w6
     summary: "Add high-contrast and reduced-color paths for heatmaps"
     needs: [w5]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/MetaLeaderboard.tsx"
+      - "results-explorer/src/components/QueryHeatmap.tsx"
+      - "results-explorer/src/index.css"
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+      - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+      - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
     notes: |
       MetaLeaderboard and QueryHeatmap should have text/value labels sufficient
       for interpretation without relying only on color. Add or preserve
@@ -141,17 +148,21 @@ files_affected:
   modified:
     - "results-explorer/src/lib/chartRegistry.ts"
     - "results-explorer/src/lib/chartMath.ts"
+    - "results-explorer/src/lib/queryLabels.ts"
     - "results-explorer/src/components/ChartPanel.tsx"
     - "results-explorer/src/components/PowerBar.tsx"
     - "results-explorer/src/components/TimeSeries.tsx"
     - "results-explorer/src/components/QueryHeatmap.tsx"
     - "results-explorer/src/components/MetaLeaderboard.tsx"
+    - "results-explorer/src/index.css"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/pages/PlatformIndex.tsx"
     - "results-explorer/src/__tests__/chartRegistry.meta.test.ts"
     - "results-explorer/src/__tests__/chartTheme.test.ts"
     - "results-explorer/src/__tests__/parity/chartMath.parity.test.ts"
     - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+    - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
     - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
 
 must_preserve:
@@ -187,6 +198,7 @@ scope_limit:
     - "results-explorer/src/lib/chartMath.ts"
     - "results-explorer/src/lib/queryLabels.ts"
     - "results-explorer/src/components/"
+    - "results-explorer/src/index.css"
     - "results-explorer/src/pages/BenchmarkIndex.tsx"
     - "results-explorer/src/pages/PlatformIndex.tsx"
     - "results-explorer/src/__tests__/"

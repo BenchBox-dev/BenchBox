@@ -3,7 +3,9 @@
  *
  * Renders a BenchmarkSummary as a heat-colored table where each cell shows
  * the canonical display_ms value for (platform, query), colored per column
- * using a log10(ratio-to-fastest) scale clamped at 10× (green → red).
+ * using a log10(ratio-to-fastest) scale clamped at 10×. The default CSS path
+ * uses a single-hue sequential palette, with grayscale lightness for reduced
+ * color / high-contrast contexts.
  *
  * Accessibility:
  *   - role="grid" on the table; role="gridcell" on data cells.

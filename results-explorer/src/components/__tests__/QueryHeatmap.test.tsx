@@ -144,14 +144,21 @@ describe("QueryHeatmap rendering", () => {
     expect(rowOrder()).toEqual(["r2", "r1"]);
   });
 
-  it("heatmap cells have --cell-hue style set for multi-platform summaries", () => {
+  it("heatmap cells keep visible values and color variables for multi-platform summaries", () => {
     const { container } = render(<QueryHeatmap summary={makeSummary()} />);
     const heatCells = container.querySelectorAll(".heatmap-cell");
     // DuckDB Q1 (fastest) and SQLite Q1 (10× slower) = 2 cells; Q2 similarly
     expect(heatCells.length).toBeGreaterThan(0);
     for (const cell of Array.from(heatCells)) {
       expect((cell as HTMLElement).style.getPropertyValue("--cell-hue")).toBeTruthy();
+      expect((cell as HTMLElement).style.getPropertyValue("--cell-lightness")).toBeTruthy();
+      expect(cell.textContent).not.toBe("");
     }
+  });
+
+  it("activates reduced-color class when high contrast is requested", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} highContrast />);
+    expect(container.firstElementChild?.className).toContain("heatmap-reduced-color");
   });
 
   // -----------------------------------------------------------------------

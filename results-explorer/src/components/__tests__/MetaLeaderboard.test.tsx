@@ -96,6 +96,20 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("0.50x")).toBeTruthy();
   });
 
+  it("renders interpretable heatmap cells without relying only on color", () => {
+    const { container } = render(
+      <MetaLeaderboard data={DATA} mode="times" onModeChange={vi.fn()} />,
+    );
+
+    const cells = container.querySelectorAll<HTMLElement>("[data-cell]");
+    expect(cells).toHaveLength(2);
+    expect(cells[0]?.textContent).toContain("10 ms");
+    expect(cells[0]?.getAttribute("aria-label")).toBe("DuckDB times for ClickBench SF0.1: 10 ms");
+    expect(cells[0]?.className).toContain("meta-heatmap-cell");
+    expect(cells[0]?.style.getPropertyValue("--cell-hue")).toBeTruthy();
+    expect(cells[0]?.style.getPropertyValue("--cell-lightness")).toBeTruthy();
+  });
+
   it("fires render-mode changes through the toggle buttons", () => {
     const onModeChange = vi.fn();
     render(<MetaLeaderboard data={DATA} mode="times" onModeChange={onModeChange} />);
@@ -124,7 +138,6 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("exact")).toBeTruthy();
     expect(screen.getByText("loose")).toBeTruthy();
   });
-
 
   it("renders null when platforms list is empty", () => {
     const { container } = render(
