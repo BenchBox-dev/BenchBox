@@ -8,8 +8,8 @@ import type {
 } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getMetaLeaderboardData, listResults } from "@/lib/duckdbQueries";
-import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { BENCHMARK_LABELS, humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
+import { SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
@@ -17,6 +17,7 @@ import { arraySerde, stringSerde, useUrlState } from "@/lib/useUrlState";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 const EMPTY_STRING_ARRAY: string[] = [];
+const SUPPORTED_BENCHMARK_COUNT = new Set(Object.values(BENCHMARK_LABELS)).size;
 
 export function Home(_: RoutableProps) {
   useDocumentTitle("Results · BenchBox");
@@ -189,7 +190,7 @@ export function Home(_: RoutableProps) {
     );
   }
   if (!results || !metaLeaderboardLoaded || hasInconsistentEmptySnapshot) {
-    return <LoadingSpinner message="Loading results..." />;
+    return <HomeLoadingSkeleton />;
   }
 
   const mode: MetaLeaderboardMode =
@@ -239,96 +240,83 @@ export function Home(_: RoutableProps) {
   }
 
   return (
-    <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div class="mb-12 text-center">
-        <h1 class="mb-4 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
-          BenchBox Results
-        </h1>
-        <p class="mx-auto max-w-2xl text-lg text-gray-600">
-          Browse, compare, and analyze public benchmark results across SQL engines and
-          DataFrame libraries. The current public corpus is maintainer-curated, and new
-          submissions go through PR validation plus maintainer review before they appear here.
-          Every result remains reproducible with{" "}
-          <code class="rounded bg-gray-100 px-1.5 py-0.5 text-sm font-mono">
-            benchbox run
-          </code>
-          .
-        </p>
-      </div>
-
-      <div class="mb-12 grid grid-cols-3 gap-6 text-center">
-        <StatCard value={results.length} label="Results" />
-        <StatCard value={benchmarks.length} label="Benchmarks" />
-        <StatCard value={platformIds.length} label="Platforms" />
-      </div>
-
-      <section class="mb-12 rounded-xl border border-brand-200 bg-brand-50 p-6 shadow-sm">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 class="text-xl font-semibold text-gray-900">
-              Run BenchBox on your platform and submit your results
-            </h2>
-            <p class="mt-2 max-w-2xl text-sm text-gray-600">
-              The Phase 2 workflow is simple: run a benchmark, package it with{" "}
-              <code class="rounded bg-white px-1 py-0.5 text-xs">benchbox submit</code>, then
-              open a PR against the public corpus.
+    <div>
+      <section class="border-b border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] text-[var(--bb-fg-primary)]">
+        <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+          <div class="max-w-4xl">
+            <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
+            <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
+              Reproducible OLAP benchmark rankings by workload, scale, deployment, and normalized cost.
             </p>
           </div>
-          <a href="/docs/contributing-results.html" class="btn-primary text-sm text-center">
-            Submit a Result
-          </a>
+
+          {filteredMetaLeaderboard && (
+            <section
+              aria-label="Leaderboard cohort selector"
+              class="mt-5 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+            >
+              <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <MultiSelectFilter
+                  label="Benchmark"
+                  allLabel="All benchmarks"
+                  options={benchmarkOptions}
+                  current={benchmarkFilters}
+                  onSelect={(value) => setBenchmarkFilters(value === "all" ? [] : [value])}
+                  format={(value) => humanizeBenchmark(value)}
+                />
+                <MultiSelectFilter
+                  label="Scale factor"
+                  allLabel="All scales"
+                  options={scaleOptions}
+                  current={scaleFilters}
+                  onSelect={(value) => setScaleFilters(value === "all" ? [] : [value])}
+                  format={(value) => `SF ${value}`}
+                />
+                <SelectFilter
+                  label="Phase"
+                  options={["all", ...phaseOptions]}
+                  current={phaseFilter}
+                  onSelect={setPhaseFilter}
+                  format={(value) => (value === "all" ? "All phases" : value)}
+                />
+                <CoverageSummary />
+              </div>
+
+              <details class="mt-3 border-t border-[var(--bb-border-default)] pt-3">
+                <summary class="cursor-pointer text-sm font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
+                  Advanced filters
+                </summary>
+                <div class="mt-3 grid gap-3 md:grid-cols-3">
+                  <SingleFilterGroup
+                    label="Tuning"
+                    options={tuningOptions}
+                    current={tuningFilter}
+                    onSelect={setTuningFilter}
+                    format={(value) => (value === "all" ? "All tuning" : value)}
+                  />
+                  <SingleFilterGroup
+                    label="Trust"
+                    options={trustOptions}
+                    current={trustFilter}
+                    onSelect={setTrustFilter}
+                    format={(value) => (value === "all" ? "All trust tiers" : value)}
+                  />
+                  <SingleFilterGroup
+                    label="Date window"
+                    options={["all", "30d", "90d", "365d"]}
+                    current={dateWindow}
+                    onSelect={setDateWindow}
+                    format={(value) => (value === "all" ? "All time" : `Last ${value}`)}
+                  />
+                </div>
+              </details>
+            </section>
+          )}
         </div>
       </section>
 
-      {filteredMetaLeaderboard && (
-        <>
-          <section class="sticky top-0 z-20 mb-6 rounded-xl border border-gray-200 bg-white/95 p-4 shadow-sm backdrop-blur">
-            <div class="grid gap-4 lg:grid-cols-2">
-              <FilterGroup
-                label="Benchmark"
-                options={benchmarkOptions}
-                current={benchmarkFilters}
-                onToggle={(value) => toggleMultiValue(value, benchmarkFilters, setBenchmarkFilters, benchmarkOptions)}
-                format={(value) => humanizeBenchmark(value)}
-              />
-              <FilterGroup
-                label="Scale"
-                options={scaleOptions}
-                current={scaleFilters}
-                onToggle={(value) => toggleMultiValue(value, scaleFilters, setScaleFilters, scaleOptions)}
-                format={(value) => `SF ${value}`}
-              />
-              <SingleFilterGroup
-                label="Phase"
-                options={["all", ...phaseOptions]}
-                current={phaseFilter}
-                onSelect={setPhaseFilter}
-                format={(value) => (value === "all" ? "All phases" : value)}
-              />
-              <SingleFilterGroup
-                label="Tuning"
-                options={tuningOptions}
-                current={tuningFilter}
-                onSelect={setTuningFilter}
-                format={(value) => (value === "all" ? "All tuning" : value)}
-              />
-              <SingleFilterGroup
-                label="Trust"
-                options={trustOptions}
-                current={trustFilter}
-                onSelect={setTrustFilter}
-                format={(value) => (value === "all" ? "All trust tiers" : value)}
-              />
-              <SingleFilterGroup
-                label="Date window"
-                options={["all", "30d", "90d", "365d"]}
-                current={dateWindow}
-                onSelect={setDateWindow}
-                format={(value) => (value === "all" ? "All time" : `Last ${value}`)}
-              />
-            </div>
-          </section>
-
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {filteredMetaLeaderboard && (
           <MetaLeaderboard
             data={filteredMetaLeaderboard}
             mode={mode}
@@ -337,66 +325,176 @@ export function Home(_: RoutableProps) {
             platformHref={buildPlatformHref}
             resultMetadataById={resultById}
           />
-        </>
-      )}
+        )}
 
-      {filteredMetaLeaderboard && filteredMetaLeaderboard.cohorts.length === 0 && (
-        <section class="mb-12 rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-400">
-          No leaderboard cells match the current filters.
+        {filteredMetaLeaderboard && filteredMetaLeaderboard.cohorts.length === 0 && (
+          <section class="mb-12 rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-400">
+            No leaderboard cells match the current filters.
+          </section>
+        )}
+
+        {filteredMetaLeaderboard && <FlywheelStrip />}
+
+        <section aria-label="Corpus summary" class="mb-12 grid grid-cols-2 gap-4 text-center lg:grid-cols-4">
+          <StatCard
+            value={SUPPORTED_BENCHMARK_COUNT}
+            label="supported benchmarks"
+            detail={`${benchmarks.length} with public results`}
+          />
+          <StatCard
+            value={results.length}
+            label="public result bundles"
+            detail="maintainer-curated corpus"
+          />
+          <StatCard
+            value={platformIds.length}
+            label="platforms with public results"
+            detail="published platform IDs"
+          />
+          <StatCard
+            value="PR"
+            label="PR-validated corpus"
+            detail="bundles reviewed before publication"
+          />
         </section>
-      )}
 
-      <section class="mb-12">
-        <h2 class="mb-4 text-xl font-semibold text-gray-900">Recent Results</h2>
-        <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="table-th">Benchmark</th>
-                <th class="table-th">Platform</th>
-                <th class="table-th">Scale</th>
-                <th class="table-th">Date</th>
-                <th class="table-th">Power Score</th>
-                <th
-                  class="table-th"
-                  title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
-                >
-                  Geomean (ms)
-                </th>
-                {showRecentCost && (
+        <section class="mb-12">
+          <h2 class="mb-4 text-xl font-semibold text-gray-900">Recent Results</h2>
+          <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="table-th">Benchmark</th>
+                  <th class="table-th">Platform</th>
+                  <th class="table-th">Scale</th>
+                  <th class="table-th">Date</th>
+                  <th class="table-th">Power Score</th>
                   <th
                     class="table-th"
-                    title="BenchBox normalized USD from emitted normalized_cost metadata. Local and unavailable rows are not comparable cloud cost."
+                    title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
                   >
-                    Normalized cost
+                    Geomean (ms)
                   </th>
-                )}
-                <th class="table-th" />
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 bg-white">
-              {recent.map((result) => (
-                <RecentRow key={result.result_id} entry={result} showCost={showRecentCost} />
-              ))}
-            </tbody>
-          </table>
+                  {showRecentCost && (
+                    <th
+                      class="table-th"
+                      title="BenchBox normalized USD from emitted normalized_cost metadata. Local and unavailable rows are not comparable cloud cost."
+                    >
+                      Normalized cost
+                    </th>
+                  )}
+                  <th class="table-th" />
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 bg-white">
+                {recent.map((result) => (
+                  <RecentRow key={result.result_id} entry={result} showCost={showRecentCost} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
+          <BrowseSection
+            title="Browse by Benchmark"
+            items={benchmarks}
+            hrefFn={(benchmark) => `/results/${benchmark}/`}
+            labelFn={humanizeBenchmark}
+          />
+          <BrowseSection
+            title="Browse by Platform"
+            items={platformIds}
+            hrefFn={(platformId) => `/results/p/${platformId}/`}
+            labelFn={(platformId) => platformIdToName.get(platformId) ?? platformId}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HomeLoadingSkeleton() {
+  return (
+    <div>
+      <section class="border-b border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] text-[var(--bb-fg-primary)]">
+        <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+          <div class="max-w-4xl">
+            <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
+            <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
+              Reproducible OLAP benchmark rankings by workload, scale, deployment, and normalized cost.
+            </p>
+          </div>
+
+          <section
+            aria-label="Leaderboard cohort selector"
+            class="mt-5 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+          >
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <SkeletonSelect label="Benchmark" />
+              <SkeletonSelect label="Scale factor" />
+              <SkeletonSelect label="Phase" />
+              <CoverageSummary />
+            </div>
+          </section>
         </div>
       </section>
 
-      <div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
-        <BrowseSection
-          title="Browse by Benchmark"
-          items={benchmarks}
-          hrefFn={(benchmark) => `/results/${benchmark}/`}
-          labelFn={humanizeBenchmark}
-        />
-        <BrowseSection
-          title="Browse by Platform"
-          items={platformIds}
-          hrefFn={(platformId) => `/results/p/${platformId}/`}
-          labelFn={(platformId) => platformIdToName.get(platformId) ?? platformId}
-        />
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section
+          aria-label="Cross-benchmark leaderboard loading"
+          aria-busy="true"
+          class="mb-12"
+        >
+          <p role="status" aria-live="polite" class="mb-4 text-sm font-medium text-gray-500">
+            Initializing static DuckDB snapshot...
+          </p>
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div class="space-y-2">
+              <SkeletonBlock className="h-5 w-64" />
+              <SkeletonBlock className="h-3 w-80" />
+            </div>
+            <div class="flex gap-2">
+              <SkeletonBlock className="h-8 w-16" />
+              <SkeletonBlock className="h-8 w-16" />
+              <SkeletonBlock className="h-8 w-20" />
+            </div>
+          </div>
+          <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table aria-hidden="true" class="min-w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  {Array.from({ length: 6 }).map((_, column) => (
+                    <th key={column} class="px-4 py-3">
+                      <SkeletonBlock className="h-3 w-24" />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                {Array.from({ length: 5 }).map((_, row) => (
+                  <tr key={row} class="bb-skeleton-row">
+                    {Array.from({ length: 6 }).map((__, column) => (
+                      <td key={column} class="px-4 py-3">
+                        <SkeletonBlock className={column === 0 ? "h-4 w-28" : "h-4 w-20"} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
+    </div>
+  );
+}
+
+function SkeletonSelect({ label }: { label: string }) {
+  return (
+    <div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <SkeletonBlock className="h-9 w-full bb-skeleton-dark" />
     </div>
   );
 }
@@ -438,78 +536,139 @@ function normalizedCostLabel(entry: ResultRow): string {
   return "-";
 }
 
-function toggleMultiValue(
-  value: string,
-  current: string[],
-  setCurrent: (values: string[]) => void,
-  allValues: string[],
-) {
-  if (current.length === 0) {
-    setCurrent([value]);
-    return;
-  }
-
-  const base = new Set(current);
-  if (base.has(value)) {
-    base.delete(value);
-  } else {
-    base.add(value);
-  }
-
-  if (base.size === 0 || base.size === allValues.length) {
-    setCurrent([]);
-    return;
-  }
-
-  setCurrent(allValues.filter((candidate) => base.has(candidate)));
-}
-
-function StatCard({ value, label }: { value: number; label: string }) {
+function StatCard({
+  value,
+  label,
+  detail,
+}: {
+  value: number | string;
+  label: string;
+  detail?: string;
+}) {
   return (
     <div class="card">
       <div class="text-3xl font-bold text-brand-600">{value}</div>
       <div class="mt-1 text-sm font-medium text-gray-500">{label}</div>
+      {detail && <div class="mt-2 text-xs text-gray-400">{detail}</div>}
     </div>
   );
 }
 
-function FilterGroup({
+function MultiSelectFilter({
+  label,
+  allLabel,
+  options,
+  current,
+  onSelect,
+  format,
+}: {
+  label: string;
+  allLabel: string;
+  options: string[];
+  current: string[];
+  onSelect: (value: string) => void;
+  format: (value: string) => string;
+}) {
+  if (options.length === 0) return null;
+  const value = current.length === 0 ? "all" : current.length === 1 ? current[0] : "__multiple";
+
+  return (
+    <label class="block">
+      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+      <select
+        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-white px-3 text-sm font-medium text-gray-900"
+        value={value}
+        onChange={(event) => onSelect((event.currentTarget as HTMLSelectElement).value)}
+      >
+        <option value="all">{allLabel}</option>
+        {current.length > 1 && (
+          <option value="__multiple" disabled>
+            Multiple selected
+          </option>
+        )}
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {format(option)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SelectFilter({
   label,
   options,
   current,
-  onToggle,
+  onSelect,
   format,
 }: {
   label: string;
   options: string[];
-  current: string[];
-  onToggle: (value: string) => void;
+  current: string;
+  onSelect: (value: string) => void;
   format: (value: string) => string;
 }) {
   if (options.length === 0) return null;
   return (
+    <label class="block">
+      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+      <select
+        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-white px-3 text-sm font-medium text-gray-900"
+        value={current}
+        onChange={(event) => onSelect((event.currentTarget as HTMLSelectElement).value)}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {format(option)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function CoverageSummary() {
+  return (
     <div>
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Deployment / cost</div>
       <div class="flex flex-wrap gap-2">
-        {options.map((value) => {
-          const active = current.length === 0 || current.includes(value);
-          return (
-            <button
-              key={value}
-              class={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                active
-                  ? "bg-brand-600 text-white"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
-              onClick={() => onToggle(value)}
-              aria-pressed={active}
-            >
-              {format(value)}
-            </button>
-          );
-        })}
+        <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500">
+          All public coverage
+        </span>
       </div>
     </div>
+  );
+}
+
+const FLYWHEEL_STEPS = [
+  { label: "Run a benchmark", href: "/docs/usage/installation.html" },
+  { label: "Compare your result", href: "/results/compare" },
+  { label: "Submit a bundle", href: "/docs/contributing-results.html" },
+];
+
+function FlywheelStrip() {
+  return (
+    <section class="mb-12 border-y border-gray-200 py-3">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-sm font-semibold text-gray-700">Run -&gt; Compare -&gt; Submit</p>
+        <nav aria-label="Result contribution workflow" class="flex flex-wrap gap-2">
+          {FLYWHEEL_STEPS.map((step, index) => (
+            <a
+              key={step.href}
+              href={step.href}
+              aria-label={step.label}
+              class="inline-flex h-9 items-center gap-2 rounded-md border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 no-underline hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+            >
+              <span class="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-500">
+                {index + 1}
+              </span>
+              {step.label}
+            </a>
+          ))}
+        </nav>
+      </div>
+    </section>
   );
 }
 

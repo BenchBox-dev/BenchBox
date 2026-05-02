@@ -2,23 +2,26 @@ import { expect, test } from "@playwright/test";
 import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 test.describe("Home", () => {
-  test("@smoke renders the header, counts, and recent-results table", async ({ page }) => {
+  test("@smoke renders the leaderboard-first header, corpus summary, and recent-results table", async ({ page }) => {
     await page.goto("/results/");
     await waitForShell(page);
 
-    await expect(page.getByRole("heading", { name: "BenchBox Results" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "BenchBox Database Leaderboards" })).toBeVisible();
 
     // Recent Results table header - a stable landmark that only renders
     // once the DuckDB snapshot has attached and listResults() resolves.
     await waitForDataLoaded(page, /Recent Results/i);
 
-    // Stat cards show counts derived from the fixture corpus. We scope
-    // to the main area so we don't collide with header links like
-    // "BenchBox Results" which also contain the literal "Results".
-    const main = page.getByRole("main");
-    for (const label of ["Results", "Benchmarks", "Platforms"]) {
-      await expect(main.getByText(label, { exact: true })).toBeVisible();
+    const summary = page.getByRole("region", { name: "Corpus summary" });
+    for (const label of [
+      "supported benchmarks",
+      "public result bundles",
+      "platforms with public results",
+      "PR-validated corpus",
+    ]) {
+      await expect(summary.getByText(label, { exact: true })).toBeVisible();
     }
+    await expect(summary.getByText("Benchmarks", { exact: true })).toHaveCount(0);
   });
 
   test("browse-by-benchmark link deep-links to the benchmark index under /results/", async ({

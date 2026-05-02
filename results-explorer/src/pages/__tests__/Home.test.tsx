@@ -181,6 +181,10 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function expectDocumentOrder(first: Element, second: Element) {
+  expect(Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+}
+
 beforeEach(() => {
   window.history.replaceState(null, "", "/results/");
   vi.mocked(queryRows).mockImplementation(async (sql: string) => {
@@ -208,7 +212,7 @@ describe("Home", () => {
 
     await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
     expect(document.title).toBe("Results · BenchBox");
-    expect(screen.queryByText("Loading results...")).toBeNull();
+    expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
     expect(screen.queryByText("Cross-Benchmark Leaderboard")).toBeNull();
   });
 
@@ -265,7 +269,12 @@ describe("Home", () => {
     render(<Home />);
 
     await waitFor(() => expect(resultCalls).toBe(1));
-    await waitFor(() => expect(screen.getByText("Loading results...")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy());
+    expect(screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
     expect(screen.queryByText("Recent Results")).toBeNull();
     expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
 
@@ -273,14 +282,14 @@ describe("Home", () => {
     cohortRows.resolve(COHORT_ROWS);
 
     await waitFor(() => expect(resultCalls).toBe(2));
-    expect(screen.getByText("Loading results...")).toBeTruthy();
+    expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy();
     expect(screen.queryByText("Recent Results")).toBeNull();
     expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
 
     retryRows.resolve(RESULT_ROWS);
 
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
-    expect(screen.queryByText("Loading results...")).toBeNull();
+    expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
     expect(screen.queryByText("No leaderboard cells match the current filters.")).toBeNull();
   });
 
@@ -307,11 +316,74 @@ describe("Home", () => {
     await waitFor(() => expect(resultCalls).toBe(2));
     expect(screen.getByText("Results snapshot incomplete")).toBeTruthy();
     expect(screen.getByText(/Reload the page to retry the DuckDB snapshot load/)).toBeTruthy();
-    expect(screen.queryByText("Loading results...")).toBeNull();
+    expect(screen.queryByText("Initializing static DuckDB snapshot...")).toBeNull();
     expect(screen.queryByText("Recent Results")).toBeNull();
   });
 
-  it("treats a benchmark chip click as isolate-not-exclude from the default all state", async () => {
+  it("renders the leaderboard-first product identity and dense cohort controls", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    expect(screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" })).toBeTruthy();
+    expect(
+      screen.getByText("Reproducible OLAP benchmark rankings by workload, scale, deployment, and normalized cost."),
+    ).toBeTruthy();
+
+    const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
+    expect(within(selector).getByLabelText("Benchmark")).toBeTruthy();
+    expect(within(selector).getByLabelText("Scale factor")).toBeTruthy();
+    expect(within(selector).getByLabelText("Phase")).toBeTruthy();
+    expect(within(selector).getByText("Deployment / cost")).toBeTruthy();
+    expect(within(selector).getByText("All public coverage")).toBeTruthy();
+  });
+
+  it("distinguishes supported benchmark coverage from published public corpus counts", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const summary = screen.getByRole("region", { name: "Corpus summary" });
+    expect(within(summary).getByText("supported benchmarks")).toBeTruthy();
+    expect(within(summary).getByText("2 with public results")).toBeTruthy();
+    expect(within(summary).getByText("public result bundles")).toBeTruthy();
+    expect(within(summary).getByText("platforms with public results")).toBeTruthy();
+    expect(within(summary).getByText("PR-validated corpus")).toBeTruthy();
+    expect(within(summary).queryByText(/^Benchmarks$/)).toBeNull();
+  });
+
+  it("keeps the leaderboard region before secondary workflow and recent-result sections", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const leaderboard = screen.getByRole("region", { name: "Cross-Benchmark Leaderboard" });
+    const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
+    const recentHeading = screen.getByRole("heading", { name: "Recent Results" });
+
+    expectDocumentOrder(leaderboard, workflow);
+    expectDocumentOrder(leaderboard, recentHeading);
+  });
+
+  it("renders a compact run-compare-submit workflow near the leaderboard", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    expect(screen.getByText("Run -> Compare -> Submit")).toBeTruthy();
+    const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
+    expect(within(workflow).getByRole("link", { name: "Run a benchmark" })).toHaveAttribute(
+      "href",
+      "/docs/usage/installation.html",
+    );
+    expect(within(workflow).getByRole("link", { name: "Compare your result" })).toHaveAttribute(
+      "href",
+      "/results/compare",
+    );
+    expect(within(workflow).getByRole("link", { name: "Submit a bundle" })).toHaveAttribute(
+      "href",
+      "/docs/contributing-results.html",
+    );
+    expect(screen.queryByText("Run BenchBox on your platform and submit your results")).toBeNull();
+  });
+
+  it("treats a benchmark selector change as isolate-not-exclude from the default all state", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
@@ -319,7 +391,7 @@ describe("Home", () => {
     expect(within(grid).getByRole("link", { name: "ClickBench SF0.1" })).toBeTruthy();
     expect(within(grid).getByRole("link", { name: "TPC-H SF1" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "ClickBench" }));
+    fireEvent.change(screen.getByLabelText("Benchmark"), { target: { value: "clickbench" } });
 
     await waitFor(() => {
       expect(within(grid).getByRole("link", { name: "ClickBench SF0.1" })).toBeTruthy();
@@ -349,6 +421,7 @@ describe("Home", () => {
     expect(within(grid).getByText("DuckDB")).toBeTruthy();
     expect(within(grid).getByText("SQLite")).toBeTruthy();
 
+    fireEvent.click(screen.getByText("Advanced filters"));
     fireEvent.click(screen.getByRole("button", { name: "auto" }));
     fireEvent.click(screen.getByRole("button", { name: "community-submission" }));
 
