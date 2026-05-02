@@ -1,11 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
-// Stable full-form result IDs from the generated fixture corpus. The
-// generator is deterministic: these IDs are the canonical names of the
-// source bundles copied into `.generated/source/bundles/` per run.
-const TPCH_DUCKDB_ID = "tpch-duckdb-sf0.01-20260403-7fe93365";
-const TPCH_DATAFUSION_ID = "tpch-datafusion-sf0.01-20260403-c0d4f3d9";
+// Stable full-form result IDs from the deterministic generated fixture corpus.
+const TPCH_DUCKDB_ID = "tpch-duckdb-sf0.01-20260403-010ee756";
+const TPCH_DATAFUSION_ID = "tpch-datafusion-sf0.01-20260403-a6bb8a70";
 
 test.describe("ResultDetail", () => {
   test("@smoke loads /results/r/<id> and renders the run header, badges, and timings table", async ({ page }) => {

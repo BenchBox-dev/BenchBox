@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { formatFacetDisplayValue } from "@/lib/facetDisplay";
 
 export interface FacetOption {
   value: string;
@@ -19,6 +20,8 @@ export interface FacetGroup {
 export interface ActiveFacetChip {
   key: string;
   label: string;
+  facetKey?: string;
+  value?: string;
   onClear?: () => void;
 }
 
@@ -226,7 +229,9 @@ function ActiveChipStrip({
           class="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100"
           onClick={chip.onClear ?? onReset}
         >
-          {chip.label}
+          {chip.value === undefined
+            ? chip.label
+            : formatFacetDisplayValue(chip.facetKey ?? facetKeyFromChipKey(chip.key), chip.value, chip.label)}
         </button>
       ))}
     </div>
@@ -243,10 +248,14 @@ function FacetGroupSection({
   const [search, setSearch] = useState("");
   const options = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    if (needle === "") return group.options;
-    return group.options.filter(
+    const labelled = group.options.map((option) => ({
+      ...option,
+      displayLabel: formatFacetDisplayValue(group.key, option.value, option.label),
+    }));
+    if (needle === "") return labelled;
+    return labelled.filter(
       (option) =>
-        option.label.toLowerCase().includes(needle) || option.value.toLowerCase().includes(needle),
+        option.displayLabel.toLowerCase().includes(needle) || option.value.toLowerCase().includes(needle),
     );
   }, [group.options, search]);
 
@@ -283,12 +292,12 @@ function FacetGroupSection({
                 <span class="inline-flex min-w-0 items-center gap-2">
                   <input
                     type="checkbox"
-                    aria-label={option.label}
+                    aria-label={option.displayLabel}
                     checked={checked}
                     disabled={option.disabled}
                     onChange={() => onToggle(group.key, option.value)}
                   />
-                  <span class="truncate">{option.label}</span>
+                  <span class="truncate">{option.displayLabel}</span>
                 </span>
                 {option.count !== undefined && (
                   <span class="shrink-0 text-xs text-gray-400">{option.count.toLocaleString()}</span>
@@ -300,4 +309,8 @@ function FacetGroupSection({
       )}
     </section>
   );
+}
+
+function facetKeyFromChipKey(key: string): string {
+  return key.split(":", 1)[0] ?? key;
 }

@@ -24,6 +24,19 @@ const GROUPS: FacetGroup[] = [
   },
 ];
 
+const ENVIRONMENT_GROUPS: FacetGroup[] = [
+  {
+    key: "cloud_provider",
+    label: "Cloud provider",
+    selected: ["aws"],
+    searchable: true,
+    options: [
+      { value: "aws", label: "aws", count: 7 },
+      { value: "gcp", label: "gcp", count: 4 },
+    ],
+  },
+];
+
 describe("FacetRail", () => {
   it("renders active chips, counts, searchable groups, and reset", () => {
     const onToggle = vi.fn();
@@ -53,6 +66,31 @@ describe("FacetRail", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(onReset).toHaveBeenCalledTimes(2);
+  });
+
+  it("renders canonical environment facet values with stable display labels", () => {
+    const onToggle = vi.fn();
+
+    render(
+      <FacetRail
+        groups={ENVIRONMENT_GROUPS}
+        resultCount={11}
+        activeChips={[
+          { key: "cloud_provider:gcp", facetKey: "cloud_provider", value: "gcp", label: "gcp" },
+        ]}
+        onToggle={onToggle}
+        onReset={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "GCP" })).toBeTruthy();
+
+    const providerSection = screen.getByRole("heading", { name: "Cloud provider" }).closest("section")!;
+    expect(within(providerSection).getByRole("checkbox", { name: "AWS" })).toBeChecked();
+
+    fireEvent.input(within(providerSection).getByRole("searchbox"), { target: { value: "gcp" } });
+    fireEvent.click(within(providerSection).getByRole("checkbox", { name: "GCP" }));
+    expect(onToggle).toHaveBeenCalledWith("cloud_provider", "gcp");
   });
 });
 

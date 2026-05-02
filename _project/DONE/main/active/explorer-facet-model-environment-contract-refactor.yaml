@@ -1,0 +1,209 @@
+id: explorer-facet-model-environment-contract-refactor
+title: "Explorer: refactor facet model onto normalized execution-environment contract"
+worktree: main
+priority: "Medium-High"
+status: "Completed"
+category: "Core Functionality"
+completed_date: "2026-05-02"
+
+deps:
+  needs:
+  - explorer-selection-facets-coverage-at-scale
+  - results-complete-execution-environment-capture
+
+description: |
+  `explorer-selection-facets-coverage-at-scale` ships the explorer facet model
+  (`results-explorer/src/lib/facetModel.ts`) against current adapter fields
+  because the normalized execution-environment contract from
+  `results-complete-execution-environment-capture` is not yet available. That
+  is the right sequencing call for shipping speed, but it leaves behind a
+  known refactor: facet keys like `deployment_class`, `cloud_provider`,
+  `cloud_region`, `instance_or_warehouse`, `storage_format`, and `cost_status`
+  must currently be sourced from adapter-specific raw config fields with
+  per-adapter fallbacks. Once `results-complete-execution-environment-capture`
+  lands, those fields will be emitted as a stable normalized contract on
+  every result artifact.
+
+  This item is the loop-back: migrate the facet model and its consumers off
+  the per-adapter fallbacks and onto the normalized execution-environment
+  contract. The product surface should not change — same facet rail, same
+  URL contract, same coverage signals — but the data path becomes uniform
+  across adapters and the fallback scraping code goes away.
+
+  Scope is intentionally narrow: facet model + DuckDB queries + immediate
+  consumers (FacetRail labels, CoverageBadge grouping). Anything outside
+  the scope_limit is a separate item.
+
+work:
+- id: w1
+  summary: "Audit fallback paths in facetModel.ts and document field-by-field migration"
+  status: done
+  notes: |
+    Walk every `FacetKey` in `results-explorer/src/lib/facetModel.ts` and
+    its serializer/parser pairs. For each key sourced from adapter-specific
+    raw config (deployment_class, cloud_provider, cloud_region,
+    instance_or_warehouse, storage_format, cost_status), record:
+      - current source field(s) and per-adapter quirks;
+      - target field on the normalized execution-environment contract
+        (cross-reference `results-complete-execution-environment-capture`
+        w1 schema);
+      - any value-domain shifts (e.g. cloud_provider casing, region
+        aliases).
+    Output: a short migration table committed to
+    `results-explorer/docs/facet-environment-migration.md`. No code edits
+    in this unit; downstream units consume the table.
+
+- id: w2
+  summary: "Migrate facetModel.ts onto normalized contract fields"
+  needs: [w1]
+  status: done
+  notes: |
+    Rewrite serializer/parser pairs and the `facetsToWhereClause` helper
+    to read from normalized contract columns. Delete per-adapter fallback
+    branches. Preserve URL round-trip for every existing facet key — URLs
+    shipped against the pre-refactor model must still parse.
+
+- id: w3
+  summary: "Update DuckDB queries to read normalized contract columns"
+  needs: [w2]
+  status: done
+  notes: |
+    Update `results-explorer/src/lib/queryFilters.ts` and
+    `results-explorer/src/lib/duckdbQueries.ts` so leaderboard, benchmark,
+    and platform queries reference normalized columns. Remove `COALESCE`
+    and adapter-name-conditional expressions added as fallbacks during
+    the original facet rollout.
+
+- id: w4
+  summary: "Reconcile FacetRail and CoverageBadge labels with normalized vocabulary"
+  needs: [w2]
+  status: done
+  notes: |
+    Normalized contract may use canonical labels (e.g. AWS/GCP/Azure for
+    cloud_provider) where the adapter-specific path used adapter-native
+    strings. Update FacetRail chip rendering and CoverageBadge grouping
+    so labels remain stable for users (no chip text churn) while consuming
+    the canonical values. Add a small label-mapping module if needed; do
+    not embed mappings inline in components.
+
+- id: w5
+  summary: "Re-validate coverage signals against the normalized contract"
+  needs: [w3, w4]
+  status: done
+  notes: |
+    Coverage badges, missing-cell rendering, and "average rank over
+    covered cohorts" must continue to behave correctly when cohort
+    membership is computed from normalized fields. Confirm: missing
+    coverage still does not penalize average rank; coverage badges
+    still render accurately for the public corpus fixtures.
+
+- id: w6
+  summary: "Update tests to assert against normalized contract"
+  needs: [w2, w3]
+  status: done
+  notes: |
+    Update `lib/__tests__/facetModel.test.ts` and
+    `lib/__tests__/queryFilters.test.ts` to assert canonical field names
+    and value domains. Add a regression test that pre-refactor URLs still
+    round-trip cleanly. Remove tests that exercised adapter-fallback
+    branches.
+
+- id: w7
+  summary: "Cross-corpus verification: every result bundle facets through the normalized path"
+  needs: [w5, w6]
+  status: done
+  notes: |
+    Run the explorer fixtures end-to-end against the public-corpus shape
+    that `results-complete-execution-environment-capture` w14 establishes.
+    Confirm: no facet key falls through to a fallback path; no console
+    warnings about missing normalized fields; coverage and rank surfaces
+    match the pre-refactor explorer for identical inputs.
+
+metadata:
+  tags:
+  - explorer
+  - faceting
+  - results-contract
+  - tech-debt
+  - refactor
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-05-02"
+
+impact:
+  business_value: |
+    Eliminates a known divergence path in the explorer facet model so the
+    public leaderboard renders consistently across adapters as the corpus
+    grows.
+  user_impact: |
+    No visible product change; users see identical facets and coverage
+    signals, but with consistent labelling across cloud and local platforms.
+  technical_debt: |
+    Removes adapter-name-conditional code paths in facetModel.ts,
+    queryFilters.ts, and duckdbQueries.ts that were accepted as a known
+    debt during the original facet rollout.
+
+files_affected:
+  modified:
+  - "results-explorer/src/lib/facetModel.ts"
+  - "results-explorer/src/lib/queryFilters.ts"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/__tests__/facetModel.test.ts"
+  - "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+  - "results-explorer/src/components/FacetRail.tsx"
+  - "results-explorer/src/components/CoverageBadge.tsx"
+  added:
+  - "results-explorer/docs/facet-environment-migration.md"
+
+must_preserve:
+- "Existing explorer URLs (shipped pre-refactor) round-trip identically through useUrlState."
+- "Missing coverage continues to not penalize a platform's average rank."
+- "FacetRail chip labels stay user-stable (no surprise renames mid-session)."
+- "Coverage badges and missing-cell rendering continue to match the pre-refactor explorer for identical inputs."
+
+approach: |
+  Sequence as: audit → model migration → query migration → label reconciliation
+  → coverage re-validation → test update → cross-corpus check. Treat the
+  migration table from w1 as the contract for w2-w4; do not let label
+  decisions leak into the model layer. Use the normalized field names from
+  `results-complete-execution-environment-capture` w1 as the authoritative
+  vocabulary; the explorer is a consumer, not a co-designer of the contract.
+
+anti_patterns:
+- "DO NOT change visible facet behavior or labels - because this is a refactor, not a redesign - keep product surface identical."
+- "DO NOT keep adapter-name-conditional fallbacks 'just in case' - because the whole point of the normalized contract is to
+  remove them - delete dead branches."
+- "DO NOT block this item on cosmetic facet improvements - because scope creep is how refactors stall - file follow-up items
+  instead."
+- "DO NOT reshape the normalized contract from the explorer side - because the contract is owned by results-complete-execution-environment-capture
+  - raise issues against that item if a field is missing or wrong."
+
+verification:
+- description: "Frontend typecheck and tests pass."
+  command: "cd results-explorer && npm run typecheck && npm test"
+  expected_output: "All facet/coverage tests pass; pre-refactor URL round-trip regression test passes."
+- description: "Browser build succeeds against the post-environment-capture corpus fixtures."
+  command: "cd results-explorer && npm run test:e2e:fixtures && npm run build"
+  expected_output: "Fixture generation, fixture verification, and Vite build complete without errors."
+- description: "No fallback-scraping code remains in the facet path."
+  command: "rg -n 'COALESCE|adapter ===|platform ===' results-explorer/src/lib/facetModel.ts results-explorer/src/lib/queryFilters.ts
+    results-explorer/src/lib/duckdbQueries.ts || true"
+  expected_output: "No matches in facet-path files (matches in unrelated files are acceptable)."
+- description: "Visible metrics parity remains canonical with Python."
+  command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline/test_visible_metrics_registry.py -q"
+  expected_output: "Registry parity test passes."
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/lib/facetModel.ts"
+  - "results-explorer/src/lib/queryFilters.ts"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/__tests__/facetModel.test.ts"
+  - "results-explorer/src/lib/__tests__/queryFilters.test.ts"
+  - "results-explorer/src/components/FacetRail.tsx"
+  - "results-explorer/src/components/CoverageBadge.tsx"
+  - "results-explorer/docs/facet-environment-migration.md"
+  out_of_scope:
+  - "New facet keys or coverage metrics beyond what selection-facets-coverage-at-scale shipped."
+  - "Changes to the normalized contract schema itself (owned by results-complete-execution-environment-capture)."
+  - "Page-level layout, density, or mobile drawer changes (separate explorer items)."
+  - "Backfilling normalized fields onto pre-refactor result artifacts (a results-pipeline concern, not explorer)."

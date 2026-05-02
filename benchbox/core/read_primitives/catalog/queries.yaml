@@ -66,6 +66,8 @@ queries:
     capability: approximate_distinct_count
     columns:
       - unique_customers
+  # SQLite has no APPROX_COUNT_DISTINCT (or rewrite target) — skip.
+  skip_on: [sqlite]
 - id: approx_count_distinct_groupby
   category: aggregation
   sql: |2
@@ -89,6 +91,7 @@ queries:
       - l_linestatus
       - unique_orders
       - unique_parts
+  skip_on: [sqlite]
 - id: aggregation_groupby_large
   category: aggregation
   sql: |2
@@ -508,12 +511,14 @@ queries:
       FROM lineitem
       GROUP BY l_shipmode;
     # sqlglot leaves APPROX_QUANTILE unchanged for ClickHouse; rewrite to
-    # the curried quantileTDigest form.
+    # the curried quantileTDigest form. ClickHouse rejects Decimal args
+    # for quantileTDigest (ILLEGAL_TYPE_OF_ARGUMENT), so cast to Float64
+    # — same pattern as the statistical_correlation ClickHouse variant.
     clickhouse: |2
 
       SELECT
           l_shipmode,
-          quantileTDigest(0.5)(l_quantity) as median_quantity
+          quantileTDigest(0.5)(toFloat64(l_quantity)) as median_quantity
       FROM lineitem
       GROUP BY l_shipmode;
     # DataFusion has no APPROX_QUANTILE; use approx_percentile_cont.
@@ -530,8 +535,8 @@ queries:
   # syntax is not recognised by sqlglot's redshift dialect parser, which
   # blocks the static variant-contract checker. Documented in the
   # cross-platform doc; tracked separately for users who want Redshift
-  # coverage of approximate quantiles.
-  skip_on: [redshift]
+  # coverage of approximate quantiles. SQLite has no APPROX_QUANTILE.
+  skip_on: [redshift, sqlite]
 - id: intrinsic_to_date
   category: intrinsic
   sql: |2
@@ -854,7 +859,8 @@ queries:
       SELECT topK(5)(l_shipmode) as top_shipmodes
       FROM lineitem;
   # Redshift has no top-K function family. DataFusion lacks approx_top_k.
-  skip_on: [redshift, datafusion]
+  # SQLite has no APPROX_TOP_K function.
+  skip_on: [redshift, datafusion, sqlite]
 - id: window_growing_frame
   category: window
   sql: |2
@@ -1228,13 +1234,14 @@ queries:
           ] as quantity_quantiles
       FROM lineitem
       GROUP BY l_returnflag, l_linestatus;
-    # ClickHouse uses curried quantilesTDigest with multiple quantile args.
+    # ClickHouse uses curried quantilesTDigest with multiple quantile args;
+    # cast Decimal to Float64 (rejects Decimal args, same as quantileTDigest).
     clickhouse: |2
 
       SELECT
           l_returnflag,
           l_linestatus,
-          quantilesTDigest(0.25, 0.5, 0.75, 0.95)(l_quantity) as quantity_quantiles
+          quantilesTDigest(0.25, 0.5, 0.75, 0.95)(toFloat64(l_quantity)) as quantity_quantiles
       FROM lineitem
       GROUP BY l_returnflag, l_linestatus;
     # Snowflake's APPROX_PERCENTILE accepts only a scalar quantile;
@@ -1254,7 +1261,8 @@ queries:
       GROUP BY l_returnflag, l_linestatus;
     # Databricks rewrite (PERCENTILE_APPROX with ARRAY(...)) handled by sqlglot.
   # DataFusion has no array-returning approximate-quantile aggregate.
-  skip_on: [redshift, datafusion]
+  # SQLite has no ARRAY type or APPROX_QUANTILE function.
+  skip_on: [redshift, datafusion, sqlite]
 - id: statistical_variance_stddev
   category: statistical
   sql: |2

@@ -445,14 +445,11 @@ function matchesDeploymentFacet(row: PlatformIndexRowRow, selected: string[]): b
 }
 
 function rowDeploymentClass(row: PlatformIndexRowRow): string | null {
-  if (row.cloud_provider) return "cloud";
-  if (row.cost_status === "not_applicable_local") return "local";
-  if (row.cost_status === "unavailable") return "unavailable";
-  return null;
+  return row.deployment_class ?? null;
 }
 
 function rowShape(row: PlatformIndexRowRow): string | null {
-  return row.instance_type ?? row.warehouse_size ?? row.cluster_size ?? null;
+  return row.instance_or_warehouse ?? null;
 }
 
 function compareIdForPlatformRow(row: PlatformIndexRowRow): string {
