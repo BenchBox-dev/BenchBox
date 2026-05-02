@@ -2,7 +2,7 @@ id: motherduck-cloud-features
 title: "MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control"
 worktree: platform-expansion
 priority: High
-status: Not Started
+status: In Progress
 category: Platform Expansion
 description: |
   Completes three deferred MotherDuck adapter features that were originally
@@ -41,8 +41,8 @@ deps:
 
 guardrails:
   verification:
-    command: "uv run -- python -m pytest tests/unit/platforms/test_motherduck_adapter.py -v --tb=short"
-    expected: "All existing MotherDuck unit tests pass; new tests added for each feature"
+    command: "uv run -- python -m pytest tests/unit/platforms/credentials/test_motherduck_credentials.py tests/unit/cli/test_cli_setup.py tests/unit/platforms/test_motherduck.py -q"
+    expected: "Existing MotherDuck adapter tests and new setup wizard tests pass"
   must_preserve:
     - "Existing MotherDuck adapter connection and query execution paths"
     - "Offline-mode functionality - adapter must continue to work without MOTHERDUCK_TOKEN for unit tests"
@@ -63,7 +63,7 @@ guardrails:
 work:
   - id: w1
     summary: "Credential setup wizard - interactive flow to configure MOTHERDUCK_TOKEN"
-    status: pending
+    status: done
     notes: |
       Interactive CLI flow: check env var → prompt for token → validate by
       attempting connection → print success/failure. Should be invocable via
