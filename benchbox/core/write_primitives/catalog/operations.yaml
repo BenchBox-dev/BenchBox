@@ -2812,7 +2812,19 @@ operations:
         );
       clickhouse: null  # Uses -State/-Merge with non-portable serialization (deferred)
       datafusion: null  # No DML
-      redshift: null    # HLLSKETCH only covers HLL family, not theta+kll
+      # Redshift's HLLSKETCH covers HLL only — no Theta / KLL / Top-K
+      # equivalents. DDL must use DISTSTYLE EVEN (HLLSKETCH cannot be
+      # DISTKEY/SORTKEY/PK/FK) and queries must group by a non-sketch
+      # column (HLLSKETCH is rejected in GROUP BY/ORDER BY/DISTINCT).
+      redshift: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date DATE,
+          region VARCHAR(25),
+          user_sketch HLLSKETCH,
+          rev_sketch HLLSKETCH
+        )
+        DISTSTYLE EVEN;
       sqlite: null      # No BINARY type useful for sketches
       starrocks: null   # Defer pending DataSketches UDAF support
 
