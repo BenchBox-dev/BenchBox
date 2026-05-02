@@ -1360,6 +1360,27 @@ class UnifiedExpr:
             return UnifiedExpr(df_f.count(self._expr, distinct=True))
         return UnifiedExpr(self._expr.n_unique())
 
+    def approx_n_unique(self) -> UnifiedExpr:
+        """Approximate count distinct (HLL sketch).
+
+        Provides unified sketch-backed distinct count:
+        - Polars: Uses .approx_n_unique() (HLL).
+        - PySpark: Uses F.approx_count_distinct() (HLL).
+        - DataFusion: Uses functions.approx_distinct() (HLL).
+
+        Returns:
+            UnifiedExpr with the HLL-estimated count of distinct values.
+        """
+        if self._is_pyspark:
+            from pyspark.sql import functions as F  # noqa: N812
+
+            return UnifiedExpr(F.approx_count_distinct(self._expr))
+        if self._is_datafusion:
+            from datafusion import functions as df_f
+
+            return UnifiedExpr(df_f.approx_distinct(self._expr))
+        return UnifiedExpr(self._expr.approx_n_unique())
+
     # =========================================================================
     # Conditional Aggregation
     # =========================================================================

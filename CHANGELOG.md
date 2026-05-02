@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `intrinsic_appx_median` renamed to `approx_quantile_groupby` (its
   prior `PERCENTILE_CONT` body was exact, not approximate). Cross-engine
   function reference: `docs/benchmarks/read-primitives-approximate-functions.md`.
+- **read_primitives DataFrame** — add `approx_count_distinct_*` impls
+  (sketch-backed on Polars / PySpark / DataFusion; exact fallback on
+  Pandas / Modin / cuDF / Dask). `approx_quantile_groupby` now uses
+  sketch-backed quantile on PySpark (`percentile_approx`) and
+  DataFusion (`approx_percentile_cont`) via the existing
+  `UnifiedExpr.quantile()` dispatch (was unintentionally exact-via-
+  fallback before). `SKIP_FOR_DATAFRAME` shrinks from 7 to 5;
+  `approx_quantiles_array` and `approx_top_k_lineitem` remain
+  PySpark-only at the DataFrame layer with explicit rationale.
+  Cross-platform DataFrame coverage matrix in
+  `docs/benchmarks/read-primitives-approximate-functions.md`.
 - **read_primitives** — add Redshift variant for `approx_quantile_groupby`
   using `APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)`.
   Was previously skipped because sqlglot's Redshift dialect parser

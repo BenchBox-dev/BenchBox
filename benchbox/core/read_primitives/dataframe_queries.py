@@ -75,13 +75,17 @@ SKIP_FOR_DATAFRAME = [
     # SQL: SELECT (SELECT MAX(x) FROM t2 WHERE t2.key = t1.key) FROM t1
     # No DataFrame equivalent - requires per-row subquery execution
     "optimizer_scalar_subquery_flattening",
-    # Approximate-aggregate queries — engine-side sketch APIs (HLL, KLL,
-    # frequent-items) have no first-class DataFrame equivalent. Polars'
-    # approx_n_unique covers approx_count_distinct partially; a full
-    # DataFrame port belongs in a follow-up TODO if pursued.
-    "approx_count_distinct_simple",
-    "approx_count_distinct_groupby",
+    # PySpark is the only DataFrame engine with a native array-returning
+    # approximate-quantile aggregate (`percentile_approx(col, array(...))`);
+    # emulating via a per-quantile loop on Polars/DataFusion/pandas defeats
+    # the latency measurement that the benchmark is supposed to report.
     "approx_quantiles_array",
+    # PySpark 4.1+ is the only DataFrame engine with a native
+    # `approx_top_k` accumulator. Polars' `top_k` returns largest-by-sort-key
+    # (different semantics — not frequency-based). A real top-K port for
+    # Polars/DataFusion/pandas is a deferred follow-up; see TODO
+    # `write-primitives-sketch-pyspark-dataframe-surface` for the
+    # PySpark-only DataFrame story this would slot into.
     "approx_top_k_lineitem",
 ]
 
@@ -145,6 +149,44 @@ def aggregation_distinct_expression_impl(ctx: DataFrameContext) -> Any:
 
     result = orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1))).select(
         col("o_custkey").n_unique().alias("unique_customers")
+    )
+
+    return result
+
+
+def approx_count_distinct_simple_expression_impl(ctx: DataFrameContext) -> Any:
+    """Approximate distinct count (HLL) on a large table.
+
+    Sketch-backed on Polars (`approx_n_unique`), PySpark
+    (`approx_count_distinct`), and DataFusion (`approx_distinct`); see
+    `docs/benchmarks/read-primitives-approximate-functions.md` for the
+    cross-platform DataFrame coverage matrix.
+    """
+    orders = ctx.get_table("orders")
+    col = ctx.col
+    lit = ctx.lit
+
+    result = orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1))).select(
+        col("o_custkey").approx_n_unique().alias("unique_customers")
+    )
+
+    return result
+
+
+def approx_count_distinct_groupby_expression_impl(ctx: DataFrameContext) -> Any:
+    """Approximate distinct count (HLL) per low-cardinality group.
+
+    Sketch-backed on Polars (`approx_n_unique`), PySpark
+    (`approx_count_distinct`), and DataFusion (`approx_distinct`); see
+    `docs/benchmarks/read-primitives-approximate-functions.md` for the
+    cross-platform DataFrame coverage matrix.
+    """
+    lineitem = ctx.get_table("lineitem")
+    col = ctx.col
+
+    result = lineitem.group_by("l_returnflag", "l_linestatus").agg(
+        col("l_orderkey").approx_n_unique().alias("unique_orders"),
+        col("l_partkey").approx_n_unique().alias("unique_parts"),
     )
 
     return result
@@ -1413,6 +1455,41 @@ def aggregation_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
 
 def aggregation_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     """Distinct count of high cardinality keys in low cardinality groups."""
+    return aggregation_groupby_impl(
+        ctx,
+        table_name="lineitem",
+        group_cols=("l_returnflag", "l_linestatus"),
+        agg_specs=(
+            ("l_orderkey", "nunique", "unique_orders"),
+            ("l_partkey", "nunique", "unique_parts"),
+        ),
+    )
+
+
+def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Approximate distinct count fallback for the pandas family.
+
+    Pandas, Modin, and cuDF expose only exact `.nunique()` at the API
+    surface, so the "approximate" label degrades to exact on those
+    platforms. Dask offers `nunique_approx()` (HLL) but adding the
+    branch requires per-platform context detection — captured as a
+    follow-up; current Dask coverage is exact via the same fallback.
+    """
+    orders = ctx.get_table("orders")
+
+    filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
+    result = filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
+
+    return result
+
+
+def approx_count_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Approximate distinct count groupby fallback for the pandas family.
+
+    Pandas, Modin, and cuDF expose only exact `.nunique()`. Dask's
+    `nunique_approx()` could replace this once a clean platform-aware
+    branch lands; current Dask coverage is exact via the same fallback.
+    """
     return aggregation_groupby_impl(
         ctx,
         table_name="lineitem",
@@ -3263,7 +3340,19 @@ def window_unbounded_frame_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def approx_quantile_groupby_expression_impl(ctx: DataFrameContext) -> Any:
-    """Approximate median calculation per group using quantile(0.5)."""
+    """Approximate median per group via UnifiedExpr.quantile(0.5).
+
+    `UnifiedExpr.quantile()` dispatches to the platform's sketch-backed
+    aggregate where one exists:
+
+    - PySpark: `F.percentile_approx(col, 0.5)` (KLL-equivalent).
+    - DataFusion: `df_f.approx_percentile_cont(col, 0.5)` (T-Digest).
+    - Polars: `.quantile(0.5)` (exact — no sketch alternative; the
+      benchmark surface degrades to exact on Polars).
+
+    See `docs/benchmarks/read-primitives-approximate-functions.md` for
+    the cross-platform DataFrame coverage matrix.
+    """
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
@@ -3273,7 +3362,14 @@ def approx_quantile_groupby_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def approx_quantile_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Approximate median calculation per group using quantile(0.5)."""
+    """Approximate median per group — exact fallback for the pandas family.
+
+    Pandas / Modin / cuDF have no sketch-backed quantile at the
+    DataFrame layer, so this implementation returns the exact median.
+    Dask exposes `series.quantile(0.5, method='tdigest')` (T-Digest);
+    wiring it requires per-platform context detection inside the impl
+    body, captured as a follow-up note in this module's docstring.
+    """
     lineitem = ctx.get_table("lineitem")
 
     result = lineitem.groupby("l_shipmode", as_index=False).agg(median_quantity=("l_quantity", "median"))
@@ -5409,6 +5505,23 @@ _QUERIES = [
         categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
         expression_impl=aggregation_distinct_groupby_expression_impl,
         pandas_impl=aggregation_distinct_groupby_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="approx_count_distinct_simple",
+        query_name="Approximate Distinct Count",
+        description="HLL distinct count on a high-cardinality key (sketch on Polars/PySpark/DataFusion; exact on Pandas/Modin/cuDF/Dask)",
+        categories=[QueryCategory.AGGREGATE],
+        expression_impl=approx_count_distinct_simple_expression_impl,
+        pandas_impl=approx_count_distinct_simple_pandas_impl,
+        sql_equivalent="SELECT APPROX_COUNT_DISTINCT(o_custkey) FROM orders WHERE o_orderdate >= DATE '1995-01-01'",
+    ),
+    DataFrameQuery(
+        query_id="approx_count_distinct_groupby",
+        query_name="Approximate Distinct Count with Group By",
+        description="HLL distinct counts per low-cardinality group (sketch on Polars/PySpark/DataFusion; exact on Pandas/Modin/cuDF/Dask)",
+        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
+        expression_impl=approx_count_distinct_groupby_expression_impl,
+        pandas_impl=approx_count_distinct_groupby_pandas_impl,
     ),
     DataFrameQuery(
         query_id="aggregation_groupby_large",
