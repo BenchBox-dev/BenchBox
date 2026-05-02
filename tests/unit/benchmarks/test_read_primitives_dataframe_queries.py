@@ -64,19 +64,24 @@ class TestSkipLists:
     """Test the skip/exclusion lists."""
 
     def test_skip_for_dataframe_contains_correlated_subqueries(self):
-        """SKIP_FOR_DATAFRAME should only contain correlated subquery queries."""
-        # Only 3 queries are truly SQL-only: correlated subqueries have no DataFrame equivalent
-        assert len(SKIP_FOR_DATAFRAME) == 3, f"Should have 3 correlated-subquery queries, got {len(SKIP_FOR_DATAFRAME)}"
+        """SKIP_FOR_DATAFRAME contains the correlated-subquery + approximate-aggregate skip set."""
+        # 3 correlated-subquery queries + 4 approximate-aggregate queries
+        # (sketch APIs lack first-class DataFrame equivalents).
+        assert len(SKIP_FOR_DATAFRAME) == 7, f"Should have 7 skip entries, got {len(SKIP_FOR_DATAFRAME)}"
 
     def test_skip_for_dataframe_has_expected_queries(self):
-        """SKIP_FOR_DATAFRAME should contain only the correlated subquery optimizer queries."""
+        """SKIP_FOR_DATAFRAME contains correlated subqueries and approximate-aggregate queries."""
         expected = {
             "optimizer_exists_to_semijoin",  # Correlated EXISTS
             "optimizer_in_to_exists",  # Correlated IN
             "optimizer_scalar_subquery_flattening",  # Correlated scalar subquery
+            "approx_count_distinct_simple",
+            "approx_count_distinct_groupby",
+            "approx_quantiles_array",
+            "approx_top_k_lineitem",
         }
         assert set(SKIP_FOR_DATAFRAME) == expected, (
-            f"Skip list should only contain correlated subquery queries. "
+            f"Skip list should contain correlated-subquery + approximate-aggregate queries. "
             f"Expected: {expected}, got: {set(SKIP_FOR_DATAFRAME)}"
         )
 
@@ -148,8 +153,8 @@ class TestBenchmarkIntegration:
         benchmark = ReadPrimitivesBenchmark(scale_factor=0.01)
         skip_list = benchmark.get_dataframe_skip_queries()
         assert isinstance(skip_list, list)
-        # Only 3 queries skipped: correlated subquery queries with no DataFrame equivalent
-        assert len(skip_list) == 3
+        # 3 correlated-subquery queries + 4 approximate-aggregate queries
+        assert len(skip_list) == 7
 
     def test_benchmark_has_get_expression_family_skip_queries_method(self):
         """ReadPrimitivesBenchmark should have get_expression_family_skip_queries method."""
