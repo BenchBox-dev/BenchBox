@@ -118,11 +118,18 @@ work:
   - id: w7
     summary: "Add chart math and rendering tests for scale, sorting, and labels"
     needs: [w2, w3, w4, w5, w6]
-    status: pending
+    status: done
+    owned_files:
+      - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
     notes: |
       Extend chartMath and component tests for log-scale mapping, label
       collision behavior, cohort-split trend data, natural query sort, and
       heatmap accessible names/values.
+
+      Existing W2-W6 commits cover log-scale chart math, ChartPanel log-scale
+      rendering, collision-aware value label placement, cohort-split trend
+      rendering, natural query sort, and MetaLeaderboard heatmap values. W7
+      closes the remaining exact accessible-name assertion for QueryHeatmap.
 
 metadata:
   tags:

@@ -156,6 +156,17 @@ describe("QueryHeatmap rendering", () => {
     }
   });
 
+  it("exposes exact timing and relative-to-fastest accessible names", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+    const fastest = container.querySelector<HTMLElement>('[data-cell="0-0"]');
+    const slowest = container.querySelector<HTMLElement>('[data-cell="1-0"]');
+
+    expect(fastest?.textContent).toBe("10 ms");
+    expect(fastest?.getAttribute("aria-label")).toBe("10 ms, fastest in column");
+    expect(slowest?.textContent).toBe("100 ms");
+    expect(slowest?.getAttribute("aria-label")).toBe("100 ms, 10.0× fastest in column");
+  });
+
   it("activates reduced-color class when high contrast is requested", () => {
     const { container } = render(<QueryHeatmap summary={makeSummary()} highContrast />);
     expect(container.firstElementChild?.className).toContain("heatmap-reduced-color");
