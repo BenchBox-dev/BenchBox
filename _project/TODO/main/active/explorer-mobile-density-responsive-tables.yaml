@@ -101,7 +101,10 @@ work:
 
 - id: w7
   summary: "Make chart controls wrap into stable segmented controls at small widths"
-  status: pending
+  status: done
+  owned_files:
+  - "results-explorer/src/components/ChartPanel.tsx"
+  - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
   notes: |
     Chart group controls should remain tappable and not overflow. Use icon or
     short labels where necessary, with accessible names. Do not let chart chips
