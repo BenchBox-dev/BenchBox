@@ -148,7 +148,7 @@ work:
 - id: w7
   summary: "Normalize BigQuery cloud metadata"
   needs: [w1, w5]
-  status: pending
+  status: done
   notes: |
     Map existing BigQuery requested config and observed metadata into the new
     contract: provider, project, dataset, location, storage bucket/prefix,
