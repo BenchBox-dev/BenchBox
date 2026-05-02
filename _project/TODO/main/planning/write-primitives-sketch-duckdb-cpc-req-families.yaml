@@ -2,10 +2,36 @@ id: write-primitives-sketch-duckdb-cpc-req-families
 title: "Write Primitives sketch: add DuckDB-only CPC and REQ sketch families"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Blocked"
 category: "Core Functionality"
 
 description: |
+  ## BLOCKED — transitively blocked via `write-primitives-sketch-clickhouse-and-storage-metrics`
+
+  The dep edge in `deps.needs:` points at the ClickHouse + storage-
+  metrics TODO. That TODO is itself Blocked (PR #133, 2026-05-02) on
+  two write_primitives architectural gaps:
+
+    - validation_query has no per-platform override mechanism
+      (`_project/blind-spots/2026-05-02-155448-validation-query-no-per-platform-override.md`)
+    - DuckDB community datasketches extension at the version BenchBox
+      installs has dropped the theta + frequent-items families
+      (`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`)
+
+  This TODO additionally hits the second blocker directly: the
+  CPC/REQ family ops here would call `datasketch_cpc` and
+  `datasketch_req` against a community extension build that we
+  cannot reliably resolve via `INSTALL datasketches FROM community`
+  today. Both gaps need a fix-class TODO before any sketch work in
+  the matrix can land cross-engine.
+
+  Resolution path: same fix-class TODO that unblocks
+  `write-primitives-sketch-clickhouse-and-storage-metrics` will
+  unblock this TODO too. Re-attempt after that lands; keep the
+  scope_limit and work[] block unchanged.
+
+  ## Original description
+
   The DuckDB `datasketches` community extension exposes additional
   sketch families beyond the Theta / KLL / Frequent-Items trio that
   the merged write_primitives sketch category covers:
