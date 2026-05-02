@@ -2,8 +2,9 @@ id: explorer-performance-perceived-latency
 title: "Explorer: DuckDB-WASM load performance and perceived-latency hardening"
 worktree: main
 priority: "Medium-High"
-status: In Progress
+status: Completed
 category: "Performance"
+completed_date: "2026-05-02"
 
 deps:
   needs:
