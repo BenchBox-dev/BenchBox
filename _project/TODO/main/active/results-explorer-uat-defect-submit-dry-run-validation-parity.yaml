@@ -72,12 +72,27 @@ work:
 - id: w3
   summary: "Add CLI regression coverage for dry-run validation parity"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Owned files for tests: `tests/unit/cli/commands/test_submit.py`, plus this
     TODO file for status/verification notes. Add targeted CLI coverage for both
     PR-package dry-run and hosted dry-run rejecting a bundle that
     `scripts.validate_submission` rejects.
+    Implementation 2026-05-03:
+    - Added targeted CLI regression tests for PR-package and hosted dry-run
+      validation failures using a schema-v2 bundle with `cost.total_usd`
+      alongside unavailable normalized cost provenance.
+    - Tests assert the shared validator error is printed and dry-run
+      preview/upload text is not printed after validation failure.
+    - Verification passed: ruff check/format for the test file, ty check for
+      the test file, `uv run -- python -m pytest
+      tests/unit/cli/commands/test_submit.py -q`, `uv run -- python -m pytest
+      tests -k 'submit and dry_run and validation' -q`, and `uv run -- python
+      scripts/validate_submission.py results-data/bundles`.
+    - Database cleanup checkpoint: no database artifacts were created and no
+      removable database outputs were present. Reusable datagen was left
+      untouched; rounded `df -h` reported 39 GiB free, above the 5 GB hard-stop
+      threshold.
 
 verification:
 - description: "Dry-run rejects a known invalid bundle with the same validator error class."

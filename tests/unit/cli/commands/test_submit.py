@@ -28,24 +28,44 @@ def _fake_result() -> SimpleNamespace:
     )
 
 
+def _valid_submission_bundle() -> dict:
+    return {
+        "version": "2.1",
+        "run": {
+            "id": "abc123",
+            "timestamp": "2026-05-03T00:00:00",
+            "total_duration_ms": 500,
+        },
+        "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01},
+        "platform": {"name": "duckdb", "version": "1.3.0"},
+        "summary": {"queries": {"total": 1, "passed": 1, "failed": 0}},
+        "queries": [{"id": "Q1", "ms": 123, "status": "pass"}],
+    }
+
+
 def _write_valid_submission_bundle(path: Path) -> None:
-    path.write_text(
-        json.dumps(
-            {
-                "version": "2.1",
-                "run": {
-                    "id": "abc123",
-                    "timestamp": "2026-05-03T00:00:00",
-                    "total_duration_ms": 500,
-                },
-                "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01},
-                "platform": {"name": "duckdb", "version": "1.3.0"},
-                "summary": {"queries": {"total": 1, "passed": 1, "failed": 0}},
-                "queries": [{"id": "Q1", "ms": 123, "status": "pass"}],
-            }
-        ),
-        encoding="utf-8",
-    )
+    path.write_text(json.dumps(_valid_submission_bundle()), encoding="utf-8")
+
+
+def _write_unavailable_cost_total_bundle(path: Path) -> None:
+    bundle = _valid_submission_bundle()
+    bundle["normalized_cost"] = {
+        "normalized_cost_usd": None,
+        "cost_model_version": "2026.05.0",
+        "cost_model_source": "benchbox.core.cost.pricing",
+        "cost_scope": "compute_only",
+        "cost_status": "unavailable",
+        "billing_unit": "not_applicable",
+        "pricing_region": "not_applicable",
+        "deployment": {
+            "cloud_provider": None,
+            "cloud_region": None,
+            "instance_type": None,
+            "node_count": None,
+        },
+    }
+    bundle["cost"] = {"total_usd": 0, "model": "estimated"}
+    path.write_text(json.dumps(bundle), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +233,21 @@ def test_submit_dry_run_matches_real_run_shape(monkeypatch: pytest.MonkeyPatch, 
         "(dry run; no files written)",
     ):
         assert required in result.output, f"missing {required!r} in dry-run output"
+
+
+def test_submit_dry_run_validation_rejects_pr_package_errors(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / "tpch_duckdb_invalid_cost.json"
+    _write_unavailable_cost_total_bundle(src)
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--dry-run", "--output", str(out_dir)])
+
+    assert result.exit_code == 1
+    assert "Submission validation failed" in result.output
+    assert "cannot accompany cost_status 'unavailable'" in result.output
+    assert "Dry-run preview" not in result.output
+    assert not out_dir.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -383,6 +418,27 @@ def test_submit_service_dry_run_no_creds_required(monkeypatch: pytest.MonkeyPatc
     assert "Dry-run - would upload" in result.output
     assert "Service URL:" in result.output
     assert "Visibility:" in result.output
+    assert not (tmp_path / "submission").exists()
+
+
+def test_submit_service_dry_run_validation_rejects_bundle_errors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    src = tmp_path / "tpch_duckdb_invalid_cost.json"
+    _write_unavailable_cost_total_bundle(src)
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    monkeypatch.setattr(
+        sub,
+        "resolve_submission_token",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("dry-run must not resolve auth")),
+    )
+
+    result = CliRunner().invoke(sub.submit, [str(src), "--service", "--dry-run"])
+
+    assert result.exit_code == 1
+    assert "Submission validation failed" in result.output
+    assert "cannot accompany cost_status 'unavailable'" in result.output
+    assert "Dry-run - would upload" not in result.output
     assert not (tmp_path / "submission").exists()
 
 
