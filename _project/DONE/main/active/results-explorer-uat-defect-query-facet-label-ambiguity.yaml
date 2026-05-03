@@ -2,7 +2,8 @@ id: results-explorer-uat-defect-query-facet-label-ambiguity
 title: "UAT defect: Query facet labels are ambiguous across environment and cost facets"
 worktree: main
 priority: "Medium"
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-05-03"
 category: "User Experience"
 
 description: |
@@ -47,6 +48,8 @@ work:
   notes: |
     Work-unit-owned files before editing:
     - `results-explorer/e2e/routes/query.spec.ts`
+    - `results-explorer/src/components/__tests__/FacetRail.test.tsx` (update existing shared facet selectors affected
+      by accessible-name changes)
 
 approach: |
   Add group-qualified accessible names to Query facet controls while preserving compact visible text. Desktop Query
@@ -65,6 +68,7 @@ scope_limit:
   - "results-explorer/src/pages/Query.tsx"
   - "results-explorer/src/components/FacetRail.tsx"
   - "results-explorer/src/pages/__tests__/Query.test.tsx"
+  - "results-explorer/src/components/__tests__/FacetRail.test.tsx"
   - "results-explorer/e2e/routes/query.spec.ts"
   - "_project/TODO/main/active/results-explorer-uat-defect-query-facet-label-ambiguity.yaml"
 
