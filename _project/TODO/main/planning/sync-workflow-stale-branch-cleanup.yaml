@@ -1,0 +1,94 @@
+id: sync-workflow-stale-branch-cleanup
+title: "Clean up stale auto-mirror branches/PRs after sync workflow runs in prod"
+worktree: main
+priority: "Low"
+status: "Not Started"
+category: "Operations"
+
+deps:
+  needs:
+  - published-results-slim-down-and-corpus-mirror
+
+description: |
+  The `sync-results-data-to-published.yml` workflow that landed in W4 of
+  `published-results-slim-down-and-corpus-mirror` opens a fresh draft PR
+  named `auto/results-mirror-<develop-SHA8>` for every develop push that
+  changes corpus paths. Old auto-mirror PRs and branches accumulate over
+  time — the workflow has no cleanup mechanism today.
+
+  Wait for the workflow to run in production for one or two months, then
+  decide what cleanup looks like based on actual cadence and PR volume.
+
+work:
+- id: w1
+  summary: "Audit auto-mirror PR/branch accumulation after first prod month"
+  status: pending
+  notes: |
+    `gh pr list --base published-results --state all --search "head:auto/results-mirror-"`
+    after a month of workflow runtime. Count PRs by status (open/draft,
+    merged, closed-without-merge). Decide whether cleanup is needed
+    based on observed cadence.
+
+- id: w2
+  summary: "Implement cleanup if needed"
+  needs: [w1]
+  status: pending
+  notes: |
+    If audit surfaces meaningful accumulation, extend the sync workflow
+    (or add a sibling scheduled workflow) to:
+      - Close stale auto-mirror draft PRs older than N days where a newer
+        auto-mirror PR exists for the same series.
+      - Delete the corresponding auto-named branch.
+    Skip merged or human-edited (label `needs-review` or non-draft) PRs.
+
+verification:
+- description: "Auto-mirror branch count on origin returns to baseline after cleanup."
+  command: "git ls-remote origin | grep -c 'auto/results-mirror-' || true"
+  expected_output: "Count consistent with the cleanup window's expectations (defined in W2 implementation)."
+
+must_preserve:
+- "Auto-mirror PRs that a maintainer has flipped from draft to ready-for-review must NOT be auto-closed."
+- "Auto-mirror PRs labelled by a maintainer (e.g. `keep`, `needs-review`) must NOT be auto-closed."
+
+approach: |
+  Defer the implementation until production cadence is known. The
+  workflow's draft-only design means stale PRs are visible but
+  non-blocking; cleanup is a quality-of-life improvement, not a
+  correctness requirement.
+
+anti_patterns:
+- "DO NOT auto-close auto-mirror PRs that have been opened for less than the configured staleness window -- because the maintainer may be in the middle of reviewing -- gate cleanup on age + draft status + presence of a newer mirror PR for the same series."
+
+scope_limit:
+  only_modify:
+  - ".github/workflows/sync-results-data-to-published.yml"
+  - ".github/workflows/sync-stale-mirror-cleanup.yml"
+  - "_project/TODO/main/planning/sync-workflow-stale-branch-cleanup.yaml"
+  do_not_modify:
+  - "results-data/"
+  - "scripts/validate_submission.py"
+  - "scripts/generate_corpus_inventory.py"
+
+success_metrics:
+- "Auto-mirror draft PR backlog stays under a reasonable threshold (defined per audit) without manual intervention."
+
+deferred:
+- summary: "Cleanup of pre-W4 manual mirror branches"
+  reason: "Pre-W4 there were no auto-mirror branches to clean up; this TODO scope is bounded to branches the workflow itself creates."
+
+metadata:
+  tags:
+  - operations
+  - sync-workflow
+  - published-results
+  estimated_effort: "Small (1 session) once audit data is in hand"
+  created_date: "2026-05-03"
+
+impact:
+  business_value: |
+    Reduces visual noise in the GitHub PR list against `published-results`,
+    making it easier for maintainers to spot real contributor PRs.
+  user_impact: |
+    Indirect — keeps the contributor experience clean.
+  technical_debt: |
+    Without cleanup, the workflow's open-PR list grows unbounded.

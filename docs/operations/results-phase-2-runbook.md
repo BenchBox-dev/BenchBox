@@ -9,13 +9,42 @@ static explorer rebuild, and no hosted API is involved.
 
 ## 1. Submission Lifecycle
 
+### 1.1 Community submission (Phase 2)
+
 1. Contributor runs `benchbox run ...` and `benchbox submit --output ./submission`.
 2. Contributor copies the bundle files plus the generated `<result>.manifest.json` into `results-data/bundles/`.
 3. Contributor regenerates `results-data/corpus-inventory.json`.
 4. Contributor opens a PR against `published-results`.
 5. `Validate Submission` checks schema, hash integrity, timing sanity, and inventory drift.
 6. Maintainer reviews, requests fixes if needed, and merges.
-7. The documentation workflow rebuilds the explorer from `results-data/`.
+
+### 1.2 Maintainer-run additions (sync from develop)
+
+Maintainer-side corpus changes — the `seed-corpus.yml` workflow's quarterly
+refresh, ad-hoc UAT integrations like PR #164, validator updates — land on
+`develop` first because that is where the project's tooling and tests live.
+The
+[`sync-results-data-to-published.yml`](../../.github/workflows/sync-results-data-to-published.yml)
+workflow watches `develop` for changes under the slim-branch allowlist
+paths (`results-data/bundles/`, the corpus docs, the two vendored
+validators, plus `corpus-inventory.json`) and opens a **draft** PR against
+`published-results` mirroring those changes. The mirror PR never
+auto-merges — a maintainer reviews and flips it ready when the develop-side
+change is ready to surface on the public corpus branch.
+
+If the workflow's heuristics ever miss a path (or a one-off mirror is
+needed outside the trigger conditions), trigger it manually via
+`workflow_dispatch` from the Actions tab.
+
+### 1.3 Explorer publish path
+
+The static explorer at `benchbox.dev/results/` is built from `main` via
+[`docs.yml`](../../.github/workflows/docs.yml) on every push and pull
+request to that branch. `published-results` is **not** the explorer's
+build source — it is the corpus-archive branch that contributor PRs
+target and that mirrors develop's `results-data/`. The explorer
+publishes from `main`'s view of `results-data/`, which is what eventually
+reaches `main` via the develop → main release flow.
 
 ## 2. Maintainer Review Checklist
 
@@ -97,6 +126,13 @@ Use `workflow_dispatch` only after confirming there is no newer push already reb
 
 The explorer pipeline treats sidecar presence as the trust-label contract for community
 submissions.
+
+`published-results` is a slim, corpus-only branch by design. The exact allowlist of
+paths that may live on it (and the matching exclusion list applied at the slim-down)
+is documented in
+[`docs/development/adr/adr-published-results-slim-corpus-branch.md`](../development/adr/adr-published-results-slim-corpus-branch.md).
+A submission PR that adds files outside the allowlist should be redirected to
+`develop` instead.
 
 ## 8. Code Locations
 
