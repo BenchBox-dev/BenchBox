@@ -2,7 +2,7 @@ id: results-explorer-uat-defect-duckdb-clickbench-load
 title: "UAT defect: DuckDB ClickBench Referer NOT NULL load failure"
 worktree: main
 priority: "Medium"
-status: "In Progress"
+status: "Completed"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -102,3 +102,4 @@ scope_limit:
 metadata:
   tags: [uat, duckdb, clickbench]
   created_date: "2026-05-03"
+completed_date: "2026-05-03"
