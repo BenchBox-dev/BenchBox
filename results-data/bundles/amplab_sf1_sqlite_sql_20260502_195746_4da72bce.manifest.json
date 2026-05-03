@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:46:58.509316+00:00",
+  "bundle_file": "amplab_sf1_sqlite_sql_20260502_195746_4da72bce.json",
+  "bundle_hash": "e90b5c9b12562881ce1f4e4b871d8df5eba1defe33c1e502236935ccd685baf9",
+  "companion_hashes": {},
+  "benchmark": "AMPLab Big Data",
+  "platform": "SQLite",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

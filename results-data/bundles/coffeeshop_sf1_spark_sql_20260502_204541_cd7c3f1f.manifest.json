@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:31.888707+00:00",
+  "bundle_file": "coffeeshop_sf1_spark_sql_20260502_204541_cd7c3f1f.json",
+  "bundle_hash": "22d8c04923417f7d84ae1e1609bdac51753ce3df22e98e49ca7bd8d704f30d82",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "Spark",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

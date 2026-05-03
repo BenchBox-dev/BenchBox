@@ -85,7 +85,7 @@ work:
 - id: w3
   summary: "Stage the reviewed bundles into a results-data working tree"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Copy the reviewed bundles into `results-data/bundles/` preserving the
     per-bundle manifest layout introduced by PR #95

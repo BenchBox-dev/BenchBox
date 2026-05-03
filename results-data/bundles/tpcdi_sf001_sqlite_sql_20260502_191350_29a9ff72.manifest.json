@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:28.473487+00:00",
+  "bundle_file": "tpcdi_sf001_sqlite_sql_20260502_191350_29a9ff72.json",
+  "bundle_hash": "fcb141607cafeef54153072a652ced8c6160b847dfb5d461b703d32a00baee9a",
+  "companion_hashes": {},
+  "benchmark": "TPC-DI",
+  "platform": "SQLite",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

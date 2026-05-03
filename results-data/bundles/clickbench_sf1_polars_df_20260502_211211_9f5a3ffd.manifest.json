@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:04.273454+00:00",
+  "bundle_file": "clickbench_sf1_polars_df_20260502_211211_9f5a3ffd.json",
+  "bundle_hash": "f6b42d5fb75d68b3cd1b38cfd71ebcb2585e7afe5bbe1a90205ae1673c55161e",
+  "companion_hashes": {},
+  "benchmark": "ClickBench",
+  "platform": "Polars",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

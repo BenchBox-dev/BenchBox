@@ -1,0 +1,910 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "61527823",
+    "timestamp": "2026-05-02T20:00:33.384199",
+    "total_duration_ms": 62963,
+    "query_time_ms": 6259,
+    "iterations": 3,
+    "streams": 3
+  },
+  "benchmark": {
+    "id": "tsbs_devops",
+    "name": "TSBS DevOps",
+    "scale_factor": 1.0,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "SQLite",
+    "version": "3.50.4",
+    "client_version": "builtin",
+    "config": {
+      "execution_mode": "sql",
+      "connection_mode": "file",
+      "database_path": "path_cc9bc0d43c74",
+      "timeout": 30.0,
+      "check_same_thread": false,
+      "driver_runtime_strategy": "current-process"
+    },
+    "deployment": {
+      "deployment_type": "embedded",
+      "connection_mode": "file",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "database_path": "path_cc9bc0d43c74",
+      "timeout": 30.0,
+      "check_same_thread": false,
+      "force_recreate": false,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})"
+    },
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "platform_options": {
+      "timeout": "30.0",
+      "check_same_thread": "false",
+      "database_name": "database_5d7b725135a6",
+      "force_recreate": false,
+      "show_query_plans": false,
+      "force_upload": false
+    },
+    "platform_option_sources": {
+      "timeout": "registered_default",
+      "check_same_thread": "registered_default",
+      "database_name": "database_46d2cdc497af",
+      "force_recreate": "saved_config",
+      "show_query_plans": "saved_config",
+      "force_upload": "saved_config"
+    },
+    "mode": "sql"
+  },
+  "summary": {
+    "queries": {
+      "total": 54,
+      "passed": 45,
+      "failed": 9
+    },
+    "timing": {
+      "total_ms": 6259,
+      "avg_ms": 139.1,
+      "min_ms": 3,
+      "max_ms": 880,
+      "geometric_mean_ms": 74.3,
+      "stdev_ms": 167.4,
+      "p90_ms": 317,
+      "p95_ms": 484,
+      "p99_ms": 880
+    },
+    "data": {
+      "rows_loaded": 10368105,
+      "load_time_ms": 53066.4
+    },
+    "validation": "partial"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "SUCCESS",
+      "duration_ms": 0
+    },
+    "schema_creation": {
+      "status": "SUCCESS",
+      "duration_ms": 10
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 53066
+    },
+    "validation": {
+      "status": "PASSED",
+      "duration_ms": 50
+    },
+    "power_test": {
+      "status": "COMPLETED",
+      "duration_ms": 9854
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [
+    {
+      "id": "single-host-12-hr",
+      "ms": 312,
+      "rows": 4320,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "single-host-1-hr",
+      "ms": 4,
+      "rows": 360,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "cpu-max-all-1-hr",
+      "ms": 84,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "cpu-max-all-8-hr",
+      "ms": 581,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "double-groupby-1-hr",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "double-groupby-5-min",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "high-cpu-1-hr",
+      "ms": 62,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "high-cpu-12-hr",
+      "ms": 618,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "mem-by-host-1-hr",
+      "ms": 72,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "low-memory-hosts",
+      "ms": 61,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "disk-iops-1-hr",
+      "ms": 167,
+      "rows": 200,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "disk-latency",
+      "ms": 167,
+      "rows": 200,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "net-throughput-1-hr",
+      "ms": 85,
+      "rows": 200,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "net-errors",
+      "ms": 95,
+      "rows": 178,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "resource-utilization",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "lastpoint",
+      "ms": 1177,
+      "rows": 101,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "by-region",
+      "ms": 24,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "by-service",
+      "ms": 58,
+      "rows": 6,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "single-host-12-hr",
+      "ms": 48,
+      "rows": 4320,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "single-host-1-hr",
+      "ms": 3,
+      "rows": 360,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "cpu-max-all-1-hr",
+      "ms": 34,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "cpu-max-all-8-hr",
+      "ms": 315,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "double-groupby-1-hr",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "double-groupby-5-min",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "high-cpu-1-hr",
+      "ms": 42,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "high-cpu-12-hr",
+      "ms": 246,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "mem-by-host-1-hr",
+      "ms": 72,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "low-memory-hosts",
+      "ms": 67,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "disk-iops-1-hr",
+      "ms": 149,
+      "rows": 200,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "disk-latency",
+      "ms": 162,
+      "rows": 200,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "net-throughput-1-hr",
+      "ms": 121,
+      "rows": 200,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "net-errors",
+      "ms": 129,
+      "rows": 177,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "resource-utilization",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "lastpoint",
+      "ms": 543,
+      "rows": 101,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "by-region",
+      "ms": 19,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "by-service",
+      "ms": 48,
+      "rows": 6,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "single-host-12-hr",
+      "ms": 52,
+      "rows": 4320,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "single-host-1-hr",
+      "ms": 4,
+      "rows": 360,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "cpu-max-all-1-hr",
+      "ms": 49,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "cpu-max-all-8-hr",
+      "ms": 319,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "double-groupby-1-hr",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "double-groupby-5-min",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "high-cpu-1-hr",
+      "ms": 20,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "high-cpu-12-hr",
+      "ms": 302,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "mem-by-host-1-hr",
+      "ms": 69,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "low-memory-hosts",
+      "ms": 31,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "disk-iops-1-hr",
+      "ms": 163,
+      "rows": 200,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "disk-latency",
+      "ms": 97,
+      "rows": 200,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "net-throughput-1-hr",
+      "ms": 150,
+      "rows": 200,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "net-errors",
+      "ms": 138,
+      "rows": 176,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "resource-utilization",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "lastpoint",
+      "ms": 880,
+      "rows": 101,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "by-region",
+      "ms": 20,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "by-service",
+      "ms": 47,
+      "rows": 6,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "single-host-12-hr",
+      "ms": 48,
+      "rows": 4320,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "single-host-1-hr",
+      "ms": 4,
+      "rows": 360,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "cpu-max-all-1-hr",
+      "ms": 42,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "cpu-max-all-8-hr",
+      "ms": 317,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "double-groupby-1-hr",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "double-groupby-5-min",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "high-cpu-1-hr",
+      "ms": 20,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "high-cpu-12-hr",
+      "ms": 249,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "mem-by-host-1-hr",
+      "ms": 63,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "low-memory-hosts",
+      "ms": 68,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "disk-iops-1-hr",
+      "ms": 150,
+      "rows": 200,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "disk-latency",
+      "ms": 167,
+      "rows": 200,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "net-throughput-1-hr",
+      "ms": 93,
+      "rows": 200,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "net-errors",
+      "ms": 145,
+      "rows": 167,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "resource-utilization",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "lastpoint",
+      "ms": 484,
+      "rows": 101,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "by-region",
+      "ms": 23,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "by-service",
+      "ms": 47,
+      "rows": 6,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    }
+  ],
+  "tables": {
+    "cpu": {
+      "rows": 1728001
+    },
+    "disk": {
+      "rows": 3456001
+    },
+    "mem": {
+      "rows": 1728001
+    },
+    "net": {
+      "rows": 3456001
+    },
+    "tags": {
+      "rows": 101
+    }
+  },
+  "cost": {
+    "total_usd": 0,
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-02T19:59:30.380533",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_runtime_strategy": "current-process",
+    "non_interactive": true
+  },
+  "environment": {
+    "os": "Darwin",
+    "arch": "arm64",
+    "python": "3.12.11",
+    "client_host": {
+      "os": "Darwin",
+      "arch": "arm64",
+      "python": "3.12.11",
+      "machine_id": "machine_45d1a3ef31a1728d"
+    },
+    "platform_runtime": {
+      "runtime_type": "local_process",
+      "collection_status": "partial",
+      "source": "inferred",
+      "engine_host": "host_fd92d8e3e85f"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d"
+  },
+  "errors": [
+    {
+      "phase": "query",
+      "query_id": "double-groupby-1-hr",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "double-groupby-1-hr",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "double-groupby-1-hr",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "double-groupby-1-hr",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "double-groupby-5-min",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "double-groupby-5-min",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "double-groupby-5-min",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "double-groupby-5-min",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "resource-utilization",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "resource-utilization",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "resource-utilization",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    },
+    {
+      "phase": "query",
+      "query_id": "resource-utilization",
+      "type": "no such function",
+      "message": "no such function: DATE_TRUNC"
+    }
+  ],
+  "export": {
+    "timestamp": "2026-05-02T20:00:33.472156",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:37.692412+00:00",
+  "bundle_file": "datavault_sf001_datafusion_sql_20260502_183815_c622cc95.json",
+  "bundle_hash": "42300db187ebea828afa740ddc5ac4294e30f8cb006e8964934842f124141ab3",
+  "companion_hashes": {},
+  "benchmark": "Data Vault",
+  "platform": "DataFusion",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

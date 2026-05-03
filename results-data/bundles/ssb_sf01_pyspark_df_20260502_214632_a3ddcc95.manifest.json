@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:06.133124+00:00",
+  "bundle_file": "ssb_sf01_pyspark_df_20260502_214632_a3ddcc95.json",
+  "bundle_hash": "a68f7b8248a97cd79f51af16dafb79ff6b23ad3aa19076281ac9b8c1b0a89aae",
+  "companion_hashes": {},
+  "benchmark": "SSB",
+  "platform": "PySpark",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

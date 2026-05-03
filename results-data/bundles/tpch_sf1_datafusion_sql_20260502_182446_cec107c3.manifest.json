@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:51:46.052795+00:00",
+  "bundle_file": "tpch_sf1_datafusion_sql_20260502_182446_cec107c3.json",
+  "bundle_hash": "41fe30dcae4141631ce2da97506a6b39d4bf379c01c4b0f5240688064cc1fdaa",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "DataFusion",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

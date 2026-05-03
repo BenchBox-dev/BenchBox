@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:48:25.359099+00:00",
+  "bundle_file": "h2odb_sf001_spark_sql_20260502_204021_d0f32fe6.json",
+  "bundle_hash": "15a3d36126367fb029e0e21146d28e30d9e701551afc5d882568550cf240edeb",
+  "companion_hashes": {},
+  "benchmark": "H2O Database",
+  "platform": "Spark",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

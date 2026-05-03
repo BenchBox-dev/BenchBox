@@ -1,0 +1,2029 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "9f5a3ffd",
+    "timestamp": "2026-05-02T21:12:06.669214",
+    "total_duration_ms": 5247,
+    "query_time_ms": 2543,
+    "iterations": 3,
+    "streams": 3
+  },
+  "benchmark": {
+    "id": "clickbench",
+    "name": "ClickBench",
+    "scale_factor": 1.0,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "Polars",
+    "version": "1.40.0",
+    "client_version": "unknown",
+    "config": {
+      "execution_mode": "dataframe",
+      "family": "expression",
+      "streaming": false,
+      "rechunk": true,
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/clickbench_sf1",
+      "driver_package": "polars",
+      "driver_version_resolved": "1.40.0",
+      "driver_version_actual": "1.40.0",
+      "driver_runtime_strategy": "current-process",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3"
+    },
+    "deployment": {
+      "deployment_type": "dataframe",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "streaming": false,
+      "rechunk": true,
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/clickbench_sf1",
+      "options": {
+        "streaming": "false",
+        "rechunk": "true",
+        "verbose_level": 0,
+        "verbose_enabled": false,
+        "very_verbose": false,
+        "quiet": false,
+        "verbose": false,
+        "force_recreate": false,
+        "show_query_plans": false,
+        "tuning_enabled": false,
+        "force_upload": false,
+        "capture_plans": false,
+        "strict_plan_capture": false,
+        "execution_mode": "dataframe",
+        "unified_tuning_configuration": {
+          "primary_keys": {
+            "enabled": false,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
+          "foreign_keys": {
+            "enabled": false,
+            "enforce_referential_integrity": true,
+            "on_delete_action": "RESTRICT",
+            "on_update_action": "RESTRICT"
+          },
+          "unique_constraints": {
+            "enabled": false,
+            "ignore_nulls": false
+          },
+          "check_constraints": {
+            "enabled": false,
+            "enforce_on_insert": true,
+            "enforce_on_update": true
+          },
+          "platform_optimizations": {
+            "z_ordering_enabled": false,
+            "liquid_clustering_enabled": false,
+            "databricks_clustering_strategy": "z_order",
+            "sorted_ingestion_mode": "off",
+            "sorted_ingestion_method": "auto",
+            "auto_optimize_enabled": false,
+            "auto_compact_enabled": false,
+            "bloom_filters_enabled": false,
+            "materialized_views_enabled": false
+          }
+        }
+      },
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "execution_mode": "dataframe",
+      "benchmark": "clickbench",
+      "scale_factor": 1.0,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "memory_limit": "12GB",
+      "thread_limit": 8
+    },
+    "raw_metadata": {
+      "driver_package": "polars",
+      "driver_version_resolved": "1.40.0",
+      "driver_version_actual": "1.40.0",
+      "driver_runtime_strategy": "current-process",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3"
+    },
+    "driver_actual_version": "1.40.0",
+    "driver_package": "polars",
+    "driver_resolved_version": "1.40.0",
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "mode": "dataframe"
+  },
+  "summary": {
+    "queries": {
+      "total": 129,
+      "passed": 93,
+      "failed": 36
+    },
+    "timing": {
+      "total_ms": 2543,
+      "avg_ms": 27.3,
+      "min_ms": 0,
+      "max_ms": 64,
+      "stdev_ms": 16.8,
+      "p90_ms": 49,
+      "p95_ms": 55,
+      "p99_ms": 64
+    },
+    "data": {
+      "rows_loaded": 1000000,
+      "load_time_ms": 1763.6
+    },
+    "validation": "partial"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 1763
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    },
+    "power_test": {
+      "status": "COMPLETED",
+      "duration_ms": 3410
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [
+    {
+      "id": "1",
+      "ms": 8,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "10",
+      "ms": 18,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "11",
+      "ms": 29,
+      "rows": 9,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "12",
+      "ms": 30,
+      "rows": 9,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 26,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 35,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "15",
+      "ms": 27,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "16",
+      "ms": 25,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 55,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "18",
+      "ms": 46,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "19",
+      "ms": 67,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 12,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "20",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "21",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "22",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "23",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "24",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "25",
+      "ms": 35,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "26",
+      "ms": 27,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "27",
+      "ms": 37,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "28",
+      "ms": 53,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "29",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "3",
+      "ms": 2,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "30",
+      "ms": 17,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "31",
+      "ms": 38,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "32",
+      "ms": 46,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "33",
+      "ms": 40,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "34",
+      "ms": 48,
+      "rows": 8,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "35",
+      "ms": 49,
+      "rows": 8,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "36",
+      "ms": 28,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "37",
+      "ms": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "38",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "39",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "4",
+      "ms": 9,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "40",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "41",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "42",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "43",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "5",
+      "ms": 13,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 27,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "7",
+      "ms": 0,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "8",
+      "ms": 6,
+      "rows": 20,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "9",
+      "ms": 13,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 8,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "10",
+      "ms": 17,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "11",
+      "ms": 29,
+      "rows": 9,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "12",
+      "ms": 29,
+      "rows": 9,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 25,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 35,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "15",
+      "ms": 26,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "16",
+      "ms": 24,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 55,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "18",
+      "ms": 44,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "19",
+      "ms": 64,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 12,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "20",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "21",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "22",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "23",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "24",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "25",
+      "ms": 35,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "26",
+      "ms": 27,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "27",
+      "ms": 37,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "28",
+      "ms": 51,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "29",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "3",
+      "ms": 2,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "30",
+      "ms": 17,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "31",
+      "ms": 38,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "32",
+      "ms": 46,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "33",
+      "ms": 38,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "34",
+      "ms": 46,
+      "rows": 8,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "35",
+      "ms": 49,
+      "rows": 8,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "36",
+      "ms": 29,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "37",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "38",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "39",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "4",
+      "ms": 9,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "40",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "41",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "42",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "43",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "5",
+      "ms": 13,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 26,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "7",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "8",
+      "ms": 6,
+      "rows": 20,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "9",
+      "ms": 13,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 8,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "10",
+      "ms": 17,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "11",
+      "ms": 28,
+      "rows": 9,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "12",
+      "ms": 29,
+      "rows": 9,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 25,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 35,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "15",
+      "ms": 26,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "16",
+      "ms": 24,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 54,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "18",
+      "ms": 45,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "19",
+      "ms": 63,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 12,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "20",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "21",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "22",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "23",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "24",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "25",
+      "ms": 34,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "26",
+      "ms": 27,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "27",
+      "ms": 37,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "28",
+      "ms": 51,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "29",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "3",
+      "ms": 2,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "30",
+      "ms": 17,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "31",
+      "ms": 38,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "32",
+      "ms": 46,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "33",
+      "ms": 39,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "34",
+      "ms": 46,
+      "rows": 8,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "35",
+      "ms": 48,
+      "rows": 8,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "36",
+      "ms": 27,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "37",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "38",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "39",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "4",
+      "ms": 9,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "40",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "41",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "42",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "43",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "5",
+      "ms": 13,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 27,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "7",
+      "ms": 0,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "8",
+      "ms": 6,
+      "rows": 20,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "9",
+      "ms": 13,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 8,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "10",
+      "ms": 16,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "11",
+      "ms": 28,
+      "rows": 9,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "12",
+      "ms": 29,
+      "rows": 9,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 25,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 34,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "15",
+      "ms": 26,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "16",
+      "ms": 24,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 55,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "18",
+      "ms": 45,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "19",
+      "ms": 64,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 12,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "20",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "21",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "22",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "23",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "24",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "25",
+      "ms": 35,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "26",
+      "ms": 27,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "27",
+      "ms": 37,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "28",
+      "ms": 51,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "29",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "3",
+      "ms": 2,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "30",
+      "ms": 17,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "31",
+      "ms": 38,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "32",
+      "ms": 45,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "33",
+      "ms": 38,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "34",
+      "ms": 46,
+      "rows": 8,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "35",
+      "ms": 49,
+      "rows": 8,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "36",
+      "ms": 29,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "37",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "38",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "39",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "4",
+      "ms": 9,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "40",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "41",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "42",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "43",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "5",
+      "ms": 13,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 26,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "7",
+      "ms": 0,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "8",
+      "ms": 6,
+      "rows": 20,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "9",
+      "ms": 13,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    }
+  ],
+  "tables": {
+    "hits": {
+      "rows": 1000000,
+      "load_ms": 10
+    }
+  },
+  "cost": {
+    "total_usd": 0,
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-02T21:12:06.662700",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_package": "polars",
+    "driver_version_resolved": "1.40.0",
+    "driver_version_actual": "1.40.0",
+    "driver_runtime_strategy": "current-process",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3",
+    "non_interactive": true
+  },
+  "environment": {
+    "platform_runtime": {
+      "runtime_type": "dataframe_process",
+      "collection_status": "partial",
+      "source": "inferred",
+      "engine_host": "host_c99c12bbf816"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "client_host": {
+      "machine_id": "machine_45d1a3ef31a1728d"
+    }
+  },
+  "errors": [
+    {
+      "phase": "query",
+      "query_id": "21",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "21",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "21",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "21",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "22",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "22",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "22",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "22",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "23",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "23",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "23",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "23",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "24",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "24",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "24",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "24",
+      "type": "cannot create expression literal for value of type UnifiedExpr.\n\nHint",
+      "message": "cannot create expression literal for value of type UnifiedExpr.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object."
+    },
+    {
+      "phase": "query",
+      "query_id": "29",
+      "type": "'UnifiedStrExpr' object has no attribute 'replace'",
+      "message": "'UnifiedStrExpr' object has no attribute 'replace'"
+    },
+    {
+      "phase": "query",
+      "query_id": "29",
+      "type": "'UnifiedStrExpr' object has no attribute 'replace'",
+      "message": "'UnifiedStrExpr' object has no attribute 'replace'"
+    },
+    {
+      "phase": "query",
+      "query_id": "29",
+      "type": "'UnifiedStrExpr' object has no attribute 'replace'",
+      "message": "'UnifiedStrExpr' object has no attribute 'replace'"
+    },
+    {
+      "phase": "query",
+      "query_id": "29",
+      "type": "'UnifiedStrExpr' object has no attribute 'replace'",
+      "message": "'UnifiedStrExpr' object has no attribute 'replace'"
+    },
+    {
+      "phase": "query",
+      "query_id": "37",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'slice' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-01\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'group_by'\n\t[3] 'select'\n\t[4] 'slice'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "37",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'slice' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-01\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'group_by'\n\t[3] 'select'\n\t[4] 'slice'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "37",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'slice' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-01\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'group_by'\n\t[3] 'select'\n\t[4] 'slice'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "37",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'slice' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-01\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'group_by'\n\t[3] 'select'\n\t[4] 'slice'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "38",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'slice' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-01\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'group_by'\n\t[3] 'select'\n\t[4] 'slice'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "38",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'slice' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-01\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'group_by'\n\t[3] 'select'\n\t[4] 'slice'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "38",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'slice' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-01\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'group_by'\n\t[3] 'select'\n\t[4] 'slice'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "38",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'slice' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-01\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'group_by'\n\t[3] 'select'\n\t[4] 'slice'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "39",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "39",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "39",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "39",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "40",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "40",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "40",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "40",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "41",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "41",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "41",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "41",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "42",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "42",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "42",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "42",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "phase": "query",
+      "query_id": "43",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-14\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'with_columns'\n\t[3] 'group_by'\n\t[4] 'select'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "43",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-14\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'with_columns'\n\t[3] 'group_by'\n\t[4] 'select'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "43",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-14\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'with_columns'\n\t[3] 'group_by'\n\t[4] 'select'\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "43",
+      "type": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure",
+      "message": "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\nFILTER [(col(\"EventDate\")) >= (\"2013-07-14\")]\nFROM\n  FILTER [(col(\"CounterID\")) == (62)]\n  FROM\n     WITH_COLUMNS:\n     [col(\"Title\").strict_cast(String), col(\"URL\").strict_cast(String), col(\"Referer\").strict_cast(String), col(\"MobilePhoneModel\").strict_cast(String), col(\"SearchPhrase\").strict_cast(String), col(\"PageCharset\").strict_cast(String), col(\"OriginalURL\").strict_cast(String), col(\"HitColor\").strict_cast(String), col(\"BrowserLanguage\").strict_cast(String), col(\"BrowserCountry\").strict_cast(String), col(\"ParamCurrency\").strict_cast(String)] \n      Parquet SCAN [path_f0b8ffd95cfb\n      PROJECT */105 COLUMNS\n      ESTIMATED ROWS: 1000000\n\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'with_columns'\n\t[3] 'group_by'\n\t[4] 'select'\n"
+    }
+  ],
+  "export": {
+    "timestamp": "2026-05-02T21:12:11.944633",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

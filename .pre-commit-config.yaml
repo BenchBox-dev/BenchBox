@@ -105,10 +105,13 @@ repos:
         stages: [pre-commit]
       - id: end-of-file-fixer
         stages: [pre-commit]
-        exclude: ^(_sources/|_binaries/.*EULA\.txt)  # vendored upstream sources; preserve byte-for-byte
+        # _sources/ + _binaries/EULA: vendored upstream sources, byte-for-byte.
+        # results-data/bundles/*.json + *.manifest.json: hash-pinned by per-bundle
+        # manifests; whitespace normalization would break the bundle_hash contract.
+        exclude: ^(_sources/|_binaries/.*EULA\.txt|results-data/bundles/.*\.json$)
       - id: trailing-whitespace
         stages: [pre-commit]
-        exclude: ^(_sources/|_binaries/.*EULA\.txt)  # vendored upstream sources; preserve byte-for-byte
+        exclude: ^(_sources/|_binaries/.*EULA\.txt|results-data/bundles/.*\.json$)
       - id: check-added-large-files
         args: [--maxkb=1000]
         stages: [pre-commit]

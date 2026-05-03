@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:26.052305+00:00",
+  "bundle_file": "tpchavoc_sf001_datafusion_df_20260502_223402_ce19d6b3.json",
+  "bundle_hash": "2a9f2995446849d04a1f0e86019c43a4e9e52cc7b888a35691f52d906bd46196",
+  "companion_hashes": {},
+  "benchmark": "TPC-Havoc",
+  "platform": "DataFusion",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

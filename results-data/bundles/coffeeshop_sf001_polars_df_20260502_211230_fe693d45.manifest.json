@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:14.623729+00:00",
+  "bundle_file": "coffeeshop_sf001_polars_df_20260502_211230_fe693d45.json",
+  "bundle_hash": "4c2cd976f73e4dc15333d3bd9b4a4e6bc494c902763a00a3526153e210cdd3b8",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "Polars",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

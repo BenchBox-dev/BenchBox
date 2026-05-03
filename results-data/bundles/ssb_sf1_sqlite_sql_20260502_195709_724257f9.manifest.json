@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:17.888754+00:00",
+  "bundle_file": "ssb_sf1_sqlite_sql_20260502_195709_724257f9.json",
+  "bundle_hash": "3b1f985d5b54798d12c16a7c14a31eac2d6af3a591c45ebdf83c09d0197e4ab8",
+  "companion_hashes": {},
+  "benchmark": "Star Schema",
+  "platform": "SQLite",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

@@ -244,6 +244,32 @@ will resolve the trust label correctly without any manual labelling.**
 5. Record the final include count, exclusion list, and validator outputs in
    this handoff doc under a "Staging log" section.
 
+## Staging log (W3)
+
+Executed 2026-05-03 against the worktree `BenchBox.pool-04`.
+
+- Source: `~/Developer/benchmark_runs/submissions/uat_20260502_valid/bundle/` (205 bundles).
+- Excluded 17 bundles across 9 blocked cohorts (matrix above).
+- Staged 188 `<stem>.json` + 188 `<stem>.manifest.json` pairs into
+  `results-data/bundles/`. No collisions with the 12 existing curated stems.
+- Regenerated `results-data/corpus-inventory.json` via
+  `scripts/generate_corpus_inventory.py --write`.
+
+Validator outputs:
+
+| Validator | Result |
+| --- | --- |
+| `uv run -- python scripts/validate_submission.py results-data/bundles/` | `Validated 200 bundle(s): 0 error(s), 120 warning(s)` (warnings are the empty-`queries[]` cluster from DataFrame-mode captures, expected and accepted) |
+| `uv run -- python results-data/validate_corpus.py` | `All 44 cohort(s) meet the >=3-platform depth criterion.` |
+| `uv run -- python scripts/generate_corpus_inventory.py --check` | `OK: corpus-inventory.json is up-to-date (200 bundles)` |
+
+Inventory summary after staging:
+
+- 200 bundles total (12 maintainer-run + 188 community-submission).
+- 18 distinct benchmarks (was 6 in the prior curated set).
+- 44 cohorts (was 8), with `tpch SF=0.01/0.1` and `tpch_skew SF=0.01/0.1` both
+  reaching 5–6 platforms — the strongest cross-scale cells in the new corpus.
+
 ## Success-metric tracking
 
 - "≥80% of validator-clean bundles land via merged PR" — target 164/205

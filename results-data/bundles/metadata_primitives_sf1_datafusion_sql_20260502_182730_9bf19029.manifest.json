@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:48:56.828185+00:00",
+  "bundle_file": "metadata_primitives_sf1_datafusion_sql_20260502_182730_9bf19029.json",
+  "bundle_hash": "7fb6efbbd7d9cfeedf21a1592a0015c2073b1b8f74ec152807a5cabaacc7b25a",
+  "companion_hashes": {},
+  "benchmark": "Metadata Primitives",
+  "platform": "DataFusion",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}
