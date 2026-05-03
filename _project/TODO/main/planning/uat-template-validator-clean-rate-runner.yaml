@@ -45,7 +45,7 @@ work:
 - id: w2
   summary: "Implement the helper and TSV format"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Inputs: sweep results dir (e.g.,
     `~/Developer/benchmark_runs/results/`) plus optional sweep window
