@@ -56,7 +56,7 @@ work:
 - id: w3
   summary: "Verify unreachable/missing-runtime paths are classified as environment skips"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Work-unit-owned files before editing:
     - `tests/unit/cli/test_platform_readiness.py` (new targeted readiness unit coverage)
