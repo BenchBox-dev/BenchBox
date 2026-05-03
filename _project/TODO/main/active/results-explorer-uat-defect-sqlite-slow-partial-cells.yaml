@@ -63,13 +63,22 @@ work:
 - id: w3
   summary: "Add SQLite-specific regression or skip classification coverage"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Work-unit-owned files before editing:
     - `tests/unit/platforms/test_sqlite_adapter.py`
     - `tests/unit/platforms/test_sqlite_real_connection.py`
     - `tests/unit/adapters/test_manifest_fallback_sqlite.py`
     - a narrower CLI or integration test file only if W2 changes CLI-visible SQLite classification behavior
+
+    W3 result (2026-05-03):
+    - Added fast real-connection regression coverage in `tests/unit/platforms/test_sqlite_real_connection.py`.
+    - Covered that minimal TPC-H tables receive the four helper indexes.
+    - Covered that non-TPC-H benchmarks do not receive those TPC-H-specific indexes.
+    - W3 review found and fixed one formatting issue. During W3 smoke, a W2 follow-up removed the SQLite `ANALYZE`
+      side effect so database reuse does not warn about `sqlite_stat1`.
+    - Verification passed: targeted SQLite tests (45 passed), exact SQLite smoke (66/66 query executions passed),
+      and fast suite (21,545 passed, 5 skipped).
 
 approach: |
   Treat the shared partial-success leak as closed by
