@@ -2,7 +2,7 @@ id: results-explorer-uat-defect-normalized-cost-unavailable-bundles
 title: "UAT defect: submitted bundles emit cost totals with unavailable cost status"
 worktree: main
 priority: "High"
-status: "Not Started"
+status: "In Progress"
 category: "Core Functionality"
 
 description: |
@@ -14,7 +14,29 @@ description: |
 work:
 - id: w1
   summary: "Trace normalized-cost emission for local and unavailable-cost results"
-  status: pending
+  status: done
+  notes: |
+    W1 trace result (2026-05-03):
+      - Cost calculation is already producing the correct unavailable
+        normalized-cost payload. `CostCalculator.calculate_normalized_benchmark_cost`
+        returns `cost_status="unavailable"` and omits
+        `normalized_cost_usd` when cloud pricing metadata is defaulted or
+        missing; this is covered in
+        `tests/unit/core/cost/test_calculator.py` and
+        `tests/unit/core/cost/test_integration.py`.
+      - The incompatible direct total is added during schema-v2 export.
+        `benchbox/core/results/schema.py::_add_cost_section()` copies
+        `result.cost_summary["total_cost"]` into `payload["cost"]["total_usd"]`
+        without checking normalized-cost availability. The hosted
+        validator rejects that shape when `normalized_cost.cost_status`
+        is `unavailable`.
+      - W2 owned implementation file:
+        `benchbox/core/results/schema.py`.
+      - W3 owned test file:
+        `tests/unit/test_results_exporter.py`.
+      - Validator behavior should remain unchanged in
+        `scripts/validate_submission.py`; it is correctly rejecting the
+        invalid shape and is not owned by this fix.
 - id: w2
   summary: "Align bundle export with the hosted-results cost contract"
   needs: [w1]
@@ -37,7 +59,8 @@ must_preserve:
 - "Local results remain visibly cost-unavailable rather than pretending to be zero-cost cloud runs."
 
 anti_patterns:
-- "DO NOT set unavailable costs to 0 USD -- because that creates false leaderboard semantics -- omit totals or mark them using the explicit unavailable payload."
+- "DO NOT set unavailable costs to 0 USD -- because that creates false leaderboard semantics -- omit totals or mark them using
+  the explicit unavailable payload."
 
 metadata:
   tags: [uat, submission, normalized-cost]
