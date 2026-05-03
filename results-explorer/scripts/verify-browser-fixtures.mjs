@@ -12,6 +12,8 @@
  *     cohort source)
  *   - both `maintainer-run` and `community-submission` trust labels are
  *     represented (trust-badge coverage)
+ *   - environment facets include fixture-only cloud/provider/region/shape
+ *     coverage plus a normalized container runtime source
  *   - a second generator run produces the same fixture tree. JSON files
  *     must be byte-identical. `data/results.duckdb` is the only allowed
  *     byte-level exception because DuckDB container bytes include storage
@@ -35,6 +37,7 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "..");
 const genRoot = join(projectRoot, "test-fixtures", ".generated");
+const genBundlesDir = join(genRoot, "source", "bundles");
 const dbRelativePath = "data/results.duckdb";
 const dbPath = join(genRoot, ...dbRelativePath.split("/"));
 const generatorPath = join(projectRoot, "scripts", "generate-browser-fixtures.mjs");
@@ -67,11 +70,57 @@ benchmarks = [row[0] for row in con.execute(
 trust_labels = {row[0] for row in con.execute(
     "SELECT DISTINCT trust_label FROM results"
 ).fetchall()}
+environment_values = {}
+for column in (
+    "deployment_class",
+    "cloud_provider",
+    "cloud_region",
+    "instance_or_warehouse",
+    "storage_format",
+):
+    environment_values[column] = [
+        row[0]
+        for row in con.execute(
+            f"SELECT DISTINCT {column} FROM results WHERE {column} IS NOT NULL ORDER BY 1"
+        ).fetchall()
+    ]
+cloud_rows = con.execute(
+    """
+    SELECT
+        result_id,
+        platform,
+        cloud_provider,
+        cloud_region,
+        instance_or_warehouse,
+        storage_format,
+        trust_label
+    FROM results
+    WHERE deployment_class = 'cloud'
+    ORDER BY result_id
+    """
+).fetchall()
+container_rows = con.execute(
+    """
+    SELECT
+        result_id,
+        platform,
+        deployment_class,
+        instance_or_warehouse,
+        storage_format,
+        trust_label
+    FROM results
+    WHERE platform = 'Fixture Container SQL'
+    ORDER BY result_id
+    """
+).fetchall()
 
 result = {
     "platforms_per_cohort": platforms_per_cohort,
     "benchmarks": benchmarks,
     "trust_labels": sorted(trust_labels),
+    "environment_values": environment_values,
+    "cloud_rows": cloud_rows,
+    "container_rows": container_rows,
 }
 print(json.dumps(result))
 `.trim();
@@ -141,6 +190,7 @@ function verifyFixtureInvariants() {
       errors.push(`trust_label="${required}" missing from corpus`);
     }
   }
+  verifyEnvironmentCoverage(data, errors);
 
   if (errors.length) {
     console.error("[verify-browser-fixtures] fixture corpus invariants failed:");
@@ -150,6 +200,63 @@ function verifyFixtureInvariants() {
   }
 
   console.log("[verify-browser-fixtures] OK", JSON.stringify(data));
+}
+
+function verifyEnvironmentCoverage(data, errors) {
+  const values = data.environment_values ?? {};
+  const requiredValues = {
+    deployment_class: ["cloud", "local"],
+    cloud_provider: ["aws", "gcp"],
+    cloud_region: ["us-east-1", "us-central1"],
+    instance_or_warehouse: ["m6i.large", "serverless-slots-4"],
+    storage_format: ["duckdb_native", "parquet"],
+  };
+  for (const [facet, required] of Object.entries(requiredValues)) {
+    const observed = new Set(values[facet] ?? []);
+    for (const value of required) {
+      if (!observed.has(value)) {
+        errors.push(`environment facet ${facet} missing ${value}`);
+      }
+    }
+  }
+
+  const cloudRows = data.cloud_rows ?? [];
+  if (cloudRows.length < 2) {
+    errors.push(`expected at least two fixture cloud rows, observed ${cloudRows.length}`);
+  }
+  const nonCommunityCloudRows = cloudRows.filter(([, , , , , , trustLabel]) => trustLabel !== "community-submission");
+  if (nonCommunityCloudRows.length) {
+    errors.push("synthetic cloud fixture rows must be marked trust_label=community-submission");
+  }
+
+  const containerRows = data.container_rows ?? [];
+  const hasContainerSnapshotRow = containerRows.some(
+    ([, , deploymentClass, shape, storageFormat]) =>
+      deploymentClass === "local" && shape === "container-cpu-10" && storageFormat === "duckdb_native",
+  );
+  if (!hasContainerSnapshotRow) {
+    errors.push("container runtime fixture did not survive into the snapshot as a local container row");
+  }
+
+  const generatedBundles = generatedBundlePayloads();
+  const runtimeTypes = new Set(
+    generatedBundles.map((bundle) => bundle.environment?.platform_runtime?.runtime_type).filter(Boolean),
+  );
+  if (!runtimeTypes.has("docker_container")) {
+    errors.push("generated source bundles lack a docker_container runtime fixture");
+  }
+
+  if (!errors.length) {
+    console.log(
+      "[verify-browser-fixtures] environment coverage OK",
+      JSON.stringify({
+        environment_values: values,
+        cloud_rows: cloudRows.length,
+        container_rows: containerRows.length,
+        runtime_types: [...runtimeTypes].sort(),
+      }),
+    );
+  }
 }
 
 function verifyFixtureDeterminism() {
@@ -218,6 +325,22 @@ function compareFixtureTrees(firstRoot, secondRoot) {
     }
   }
   return errors;
+}
+
+function generatedBundlePayloads() {
+  return listFiles(genBundlesDir)
+    .filter((file) => isResultBundleJson(file))
+    .map((file) => JSON.parse(readFileSync(join(genBundlesDir, ...file.split("/")), "utf8")));
+}
+
+function isResultBundleJson(file) {
+  const name = file.split("/").pop() ?? "";
+  return (
+    name.endsWith(".json") &&
+    name !== "submission-manifest.json" &&
+    !name.endsWith(".manifest.json") &&
+    !name.endsWith(".tuning.json")
+  );
 }
 
 function listFiles(root) {

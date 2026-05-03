@@ -1,0 +1,82 @@
+id: results-explorer-uat-defect-environment-facet-cloud-coverage
+title: "UAT defect: local corpus cannot validate cloud and runtime environment facets"
+worktree: main
+priority: "Medium"
+status: "Completed"
+category: "Testing and Quality Assurance"
+
+description: |
+  W6 validated environment facet rendering/filtering mechanics, but the local
+  validator-clean corpus had 205 `deployment_class=local` rows and
+  `unknown`-only cloud provider, cloud region, and instance/warehouse facets.
+  That means the Results Explorer still lacks UAT coverage for true cloud,
+  container, embedded, region, and compute-shape differentiation.
+
+work:
+- id: w1
+  summary: "Define the minimal cloud/provisioned-local corpus needed for environment facet UAT"
+  status: done
+  notes: |
+    W1 baseline evidence:
+    - `benchbox explorer build --data-dir results-data --output /tmp/benchbox-explorer-facet-w1` currently produces 12
+      rows with `deployment_class=local` only, and `cloud_provider`, `cloud_region`, `instance_or_warehouse`, and
+      `storage_format` all NULL.
+    - `cd results-explorer && npm run test:e2e:fixtures` currently produces seven browser-fixture rows with
+      `deployment_class=local` only, cloud/provider/region/shape all NULL, and storage limited to `duckdb_native` and
+      `parquet`.
+
+    Minimal safe corpus for W2 is fixture-only, not public `results-data`: add deterministic variants in
+    `results-explorer/scripts/generate-browser-fixtures.mjs` so generated browser fixtures include:
+    - one cloud AWS row with `deployment_class=cloud`, `cloud_provider=aws`, `cloud_region=us-east-1`,
+      `instance_or_warehouse=m6i.large`, and `storage_format=parquet`;
+    - one managed/serverless row with a second provider/region/shape, such as `cloud_provider=gcp`,
+      `cloud_region=us-central1`, and `instance_or_warehouse=serverless-slots-4`;
+    - one provisioned-local/container-source row carrying `platform_runtime.runtime_type=docker_container`, while
+      preserving the current flattened `deployment_class=local` contract until the snapshot exposes a dedicated runtime
+      facet.
+
+    These rows must remain synthetic browser-test fixtures. If a sidecar is needed to exercise trust labeling, use a
+    fixture-local `submission-manifest.json` and synthetic contributor text; do not add fake cloud rows to
+    `results-data/bundles/` as maintainer-curated records.
+- id: w2
+  summary: "Generate or stage safe fixture rows covering cloud/container/runtime facets"
+  needs: [w1]
+  status: done
+- id: w3
+  summary: "Run terminating Explorer browser smoke against the facet-coverage corpus"
+  needs: [w2]
+  status: done
+
+verification:
+- description: "Generated browser fixture snapshot contains non-unknown environment facet values."
+  command: "cd results-explorer && npm run test:e2e:fixtures"
+  expected_output: "fixture verification passes and reports cloud/provider/region/shape coverage"
+- description: "Browser smoke validates environment facet filtering without npm dev server."
+  command: "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm exec -- playwright test --project=chromium
+    --workers=1 e2e/routes/query.spec.ts"
+  expected_output: "Query/environment facet browser coverage passes"
+
+must_preserve:
+- "No live cloud run is started without explicit approval and cost awareness."
+- "Trust labels distinguish synthetic fixtures, community submissions, and maintainer runs."
+
+anti_patterns:
+- "DO NOT fake public cloud results as maintainer-curated benchmark records -- because that corrupts corpus trust -- use fixture-only
+  rows or clearly labeled submissions."
+
+scope_limit:
+  only_modify:
+  - "_project/TODO/main/active/results-explorer-uat-defect-environment-facet-cloud-coverage.yaml"
+  - "_project/DONE/main/active/results-explorer-uat-defect-environment-facet-cloud-coverage.yaml"
+  - "results-explorer/scripts/generate-browser-fixtures.mjs"
+  - "results-explorer/scripts/verify-browser-fixtures.mjs"
+  - "results-explorer/e2e/routes/query.spec.ts"
+  do_not_modify:
+  - "results-data/bundles/"
+  - "results-data/corpus-inventory.json"
+  - "results-explorer/public/data/"
+
+metadata:
+  tags: [uat, results-explorer, environment-facets, cloud]
+  created_date: "2026-05-03"
+  completed_date: "2026-05-03"

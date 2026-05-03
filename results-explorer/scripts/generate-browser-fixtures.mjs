@@ -126,6 +126,142 @@ const VARIANTS = [
       return mutated;
     },
   },
+  {
+    // Synthetic AWS managed-cloud variant: fixture-only coverage for the
+    // environment facets flattened into the browser snapshot. This never
+    // touches the public corpus.
+    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    subdir: "environment/aws-cloud",
+    derived: "tpch-fixture-aws-sf0.01-20260403-environment.json",
+    sidecars: {
+      "submission-manifest.json": {
+        version: "1",
+        bundle: "tpch-fixture-aws-sf0.01-20260403-environment.json",
+        submitted_at: "2026-05-03T00:00:00Z",
+        contributor: "browser-functional-test-fixture",
+        note:
+          "Synthetic AWS environment-facet variant produced by the browser-test fixture generator. " +
+          "Do not treat as a real cloud benchmark result.",
+      },
+    },
+    mutate: (bundle) =>
+      withEnvironmentFacetVariant(bundle, {
+        runSuffix: "env-aws-cloud",
+        platformName: "Fixture AWS SQL",
+        runtimeType: "managed_cloud",
+        deployment: {
+          deployment_type: "managed_cloud",
+          connection_mode: "cloud_endpoint",
+          endpoint_class: "cloud_endpoint",
+          metadata_source: "fixture",
+          collection_status: "available",
+        },
+        cloud: {
+          provider: "aws",
+          region: "us-east-1",
+          source: "fixture",
+          collection_status: "available",
+        },
+        compute: {
+          node_type: "m6i.large",
+          source: "fixture",
+          collection_status: "available",
+        },
+        storage: {
+          table_format: "parquet",
+          source: "fixture",
+          collection_status: "available",
+        },
+      }),
+  },
+  {
+    // Synthetic GCP serverless variant: exercises a second cloud provider,
+    // region, and compute-shape source path.
+    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    subdir: "environment/gcp-serverless",
+    derived: "tpch-fixture-gcp-sf0.01-20260403-environment.json",
+    sidecars: {
+      "submission-manifest.json": {
+        version: "1",
+        bundle: "tpch-fixture-gcp-sf0.01-20260403-environment.json",
+        submitted_at: "2026-05-03T00:00:00Z",
+        contributor: "browser-functional-test-fixture",
+        note:
+          "Synthetic GCP serverless environment-facet variant produced by the browser-test fixture generator. " +
+          "Do not treat as a real cloud benchmark result.",
+      },
+    },
+    mutate: (bundle) =>
+      withEnvironmentFacetVariant(bundle, {
+        runSuffix: "env-gcp-serverless",
+        platformName: "Fixture GCP Serverless",
+        runtimeType: "serverless",
+        deployment: {
+          deployment_type: "serverless",
+          connection_mode: "cloud_endpoint",
+          endpoint_class: "cloud_endpoint",
+          metadata_source: "fixture",
+          collection_status: "available",
+        },
+        cloud: {
+          provider: "gcp",
+          region: "us-central1",
+          source: "fixture",
+          collection_status: "available",
+        },
+        compute: {
+          serverless_slots: "serverless-slots-4",
+          source: "fixture",
+          collection_status: "available",
+        },
+        storage: {
+          table_format: "parquet",
+          source: "fixture",
+          collection_status: "available",
+        },
+      }),
+  },
+  {
+    // Synthetic provisioned-local/container-source variant: this remains
+    // `deployment_class=local` under the current flattened contract while
+    // carrying normalized runtime metadata for future runtime facets.
+    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    subdir: "environment/container-local",
+    derived: "tpch-fixture-container-sf0.01-20260403-environment.json",
+    mutate: (bundle) =>
+      withEnvironmentFacetVariant(bundle, {
+        runSuffix: "env-container-local",
+        platformName: "Fixture Container SQL",
+        runtimeType: "docker_container",
+        deployment: {
+          deployment_type: "embedded",
+          connection_mode: "localhost",
+          endpoint_class: "localhost_port",
+          metadata_source: "fixture",
+          collection_status: "available",
+        },
+        cloud: {
+          source: "unavailable",
+          collection_status: "unavailable",
+        },
+        compute: {
+          node_type: "container-cpu-10",
+          source: "fixture",
+          collection_status: "available",
+        },
+        storage: {
+          table_format: "duckdb_native",
+          source: "fixture",
+          collection_status: "available",
+        },
+        container: {
+          image: "benchbox/results-explorer-fixture:local",
+          runtime: "docker",
+          source: "fixture",
+          collection_status: "available",
+        },
+      }),
+  },
 ];
 
 const log = (...args) => console.log("[generate-browser-fixtures]", ...args);
@@ -196,6 +332,35 @@ const clientHostFromLegacy = (environment) => {
     machine_id: environment.machine_id,
   };
   return Object.fromEntries(Object.entries(clientHost).filter(([, value]) => value !== undefined && value !== null));
+};
+
+const withEnvironmentFacetVariant = (bundle, options) => {
+  const mutated = structuredClone(bundle);
+  const environment = mutated.environment && typeof mutated.environment === "object" ? mutated.environment : {};
+  const platform = mutated.platform && typeof mutated.platform === "object" ? mutated.platform : {};
+
+  mutated.run = {
+    ...(mutated.run ?? {}),
+    id: `${mutated.run?.id ?? "run"}-${options.runSuffix}`,
+  };
+  mutated.platform = {
+    ...platform,
+    name: options.platformName,
+    deployment: options.deployment,
+    cloud: options.cloud,
+    compute: options.compute,
+    storage: options.storage,
+  };
+  mutated.environment = {
+    ...environment,
+    platform_runtime: {
+      runtime_type: options.runtimeType,
+      collection_status: "available",
+      source: "fixture",
+    },
+    ...(options.container ? { container: options.container } : {}),
+  };
+  return mutated;
 };
 
 const withNormalizedEnvironment = (bundle) => {
