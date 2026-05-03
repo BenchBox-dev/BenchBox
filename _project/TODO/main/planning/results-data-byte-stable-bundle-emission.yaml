@@ -1,0 +1,135 @@
+id: results-data-byte-stable-bundle-emission
+title: "Make bundle JSON emission byte-stable so manifest hashes survive normalizers"
+worktree: main
+priority: "Medium"
+status: "Not Started"
+category: "Core Functionality"
+
+description: |
+  The bundle emitter (`benchbox/core/results/exporter.py` or wherever the
+  per-bundle JSON is serialized to disk) writes JSON without a canonical
+  trailing-newline / whitespace policy. Tools that round-trip the file —
+  pre-commit's `end-of-file-fixer` and `trailing-whitespace` hooks, GitHub's
+  rich JSON viewer, editors that auto-save with a final newline — change
+  bytes the manifest's `bundle_hash` SHA-256 was computed against.
+
+  The W3 corpus-integration PR
+  (`results-explorer-uat-corpus-integrate-validated-bundles`) hit this when
+  staging 188 community-submission bundles into `results-data/bundles/`: the
+  EOF-fixer added trailing newlines and broke every hash. The PR landed by
+  excluding `results-data/bundles/*.json` from those hooks
+  (`.pre-commit-config.yaml:106-115`). That fix is correct but it is a
+  band-aid: any future submitter running a different tool, GitHub PR review
+  flow, or editor that touches the bytes will hit the same wall, and the
+  exclusion does not protect them.
+
+  The durable fix is to emit bundles in a canonical byte-stable form (single
+  serializer with a fixed trailing-newline policy and stable key ordering)
+  AND compute `bundle_hash` against that canonical form, so EOF-fixing /
+  pretty-printing within the canonical form is a no-op.
+
+  Originating blind-spot finding:
+  `_project/blind-spots/2026-05-03-090105-mixed-tooling-data-pr-review-gap.md`.
+
+work:
+- id: w1
+  summary: "Survey current bundle serialization sites and define canonical form"
+  status: pending
+  notes: |
+    Search for `json.dump`/`json.dumps` calls that emit bundles or manifests:
+    `grep -rn "json\.dump" benchbox/core/results/ benchbox/cli/commands/`.
+    Decide a single canonical form (probable: `json.dumps(d, indent=2,
+    sort_keys=True, ensure_ascii=False) + "\n"`). Document the chosen form
+    and the rationale (why indent/sort_keys/trailing-newline). Do not make
+    code changes in this work unit.
+
+- id: w2
+  summary: "Adopt the canonical form in the bundle writer and align the manifest hash"
+  needs: [w1]
+  status: pending
+  notes: |
+    Update the bundle writer to serialize via the canonical form. Update the
+    manifest writer to compute `bundle_hash` against the same canonical form
+    (i.e. hash the bytes that hit disk, byte-for-byte). Add a unit test that
+    round-trips a bundle through `end-of-file-fixer` (or the equivalent
+    `bytes.rstrip(b"\n") + b"\n"` transform) and asserts the hash is
+    unchanged.
+
+- id: w3
+  summary: "Remove the pre-commit `results-data/bundles/*.json` exclusion"
+  needs: [w2]
+  status: pending
+  notes: |
+    Once W2 lands, the exclusion in `.pre-commit-config.yaml:106-115`
+    becomes unnecessary. Remove it and verify by re-staging a known-clean
+    bundle through pre-commit: `pre-commit run --files
+    results-data/bundles/<some>.json` should pass without modifying bytes.
+    Re-running `validate_submission.py` against the directory after the
+    pre-commit dry-run must still report zero errors.
+
+verification:
+- description: "Bundle hash survives a no-op normalization round-trip."
+  command: "uv run -- python -m pytest tests/unit/test_results_exporter.py -k canonical_bundle -v"
+  expected_output: "All canonical-bundle hash-stability tests pass."
+- description: "Pre-commit no longer needs the bundles exclusion."
+  command: "pre-commit run --all-files"
+  expected_output: "No `results-data/bundles/*.json` files modified by EOF or trailing-whitespace hooks."
+
+must_preserve:
+- "All currently checked-in bundles in `results-data/bundles/` continue to validate against `validate_submission.py` before and after the canonicalization rollout."
+- "Per-bundle manifest schema (PR #95) is not changed — only the hash-input bytes change."
+
+approach: |
+  Treat bundle files as a binary contract. The `bundle_hash` field commits
+  the writer to byte-stable output; honour that by emitting through a
+  single canonical serializer and hashing the post-serialization bytes.
+  Land in two PRs: the writer/canonicalization change first (W1+W2), then
+  the pre-commit exclusion removal (W3) once the writer is in place and
+  any in-flight bundles have been re-emitted or grandfathered.
+
+anti_patterns:
+- "DO NOT just restore the pre-commit exclusion as 'good enough' -- because every future tool that touches bundle bytes will re-trip the hash mismatch -- the durable fix is byte-stable emission."
+- "DO NOT change the manifest's hash function or schema -- because external submitters may already have manifests on disk -- only change the writer side, then keep the same SHA-256 contract."
+- "DO NOT canonicalize already-checked-in bundles in this TODO -- because that would break manifest hashes for currently-shipping bundles -- canonicalization applies to NEW emissions only; old bundles are grandfathered."
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/results/"
+  - "benchbox/cli/commands/results*.py"
+  - "tests/unit/test_results_exporter.py"
+  - ".pre-commit-config.yaml"
+  - "_project/TODO/main/planning/results-data-byte-stable-bundle-emission.yaml"
+  do_not_modify:
+  - "results-data/bundles/"
+  - "results-explorer/"
+  - "scripts/validate_submission.py"
+
+success_metrics:
+- "EOF-fixer / trailing-whitespace pre-commit hooks no longer need to skip `results-data/bundles/`."
+- "A new unit test demonstrates that the canonical bundle form survives a no-op whitespace normalization round-trip with hash unchanged."
+- "All currently checked-in bundles validate cleanly against `validate_submission.py` after the writer change (existing bundles are grandfathered, not rewritten)."
+
+deferred:
+- summary: "Backfill canonicalization for the existing 200 checked-in bundles"
+  reason: "Rewriting checked-in bundles changes their hashes and breaks the audit trail tying them to specific submission events. Grandfather-only."
+
+metadata:
+  tags:
+  - results-data
+  - bundle-format
+  - submission-flow
+  - tooling
+  estimated_effort: "Small (1 session)"
+  created_date: "2026-05-03"
+
+impact:
+  business_value: |
+    Removes a recurring trip-hazard in the submission flow — every future
+    contributor PR avoids the W3 hash-mismatch detour.
+  user_impact: |
+    External submitters get a more forgiving submission flow that doesn't
+    require maintainers to advise on byte-preservation tools.
+  technical_debt: |
+    Eliminates the `.pre-commit-config.yaml` exclusion as a permanent
+    band-aid; reduces the surface where EOF normalization differs between
+    submitter and reviewer environments.
