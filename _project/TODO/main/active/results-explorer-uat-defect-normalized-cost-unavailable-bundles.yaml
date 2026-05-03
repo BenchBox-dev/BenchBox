@@ -40,7 +40,15 @@ work:
 - id: w2
   summary: "Align bundle export with the hosted-results cost contract"
   needs: [w1]
-  status: pending
+  status: done
+  notes: |
+    Implemented in `benchbox/core/results/schema.py`.
+    `_add_cost_section()` now emits the legacy direct `cost.total_usd`
+    only when normalized-cost metadata has an available value and an
+    accepted status (`normalized` or `not_applicable_local`). Bundles
+    with `normalized_cost.cost_status="unavailable"` retain the explicit
+    unavailable normalized-cost block but no longer emit an incompatible
+    direct cost total.
 - id: w3
   summary: "Add export/submission validation regression coverage"
   needs: [w2]
