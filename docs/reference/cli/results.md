@@ -105,9 +105,14 @@ Display exported benchmark results and execution history.
 - `--paths`: Print copyable primary result JSON paths for use with
   `benchbox submit`, `benchbox export`, or `benchbox results show-cli`
 
-`--paths` lists the primary schema-v2 result JSON files returned by the result
-history and excludes companion files such as `.plans.json`, `.tuning.json`, and
-hosted `.submission.json` sidecars.
+`--paths` writes one path per line to stdout (no Rich formatting, no preamble)
+so the output is safe to pipe into `xargs` or save with `tee`. Hint text and
+overflow notices are written to stderr. The list contains only primary
+schema-v2 result JSON files — companion files such as `.plans.json`,
+`.tuning.json`, and hosted `.submission.json` sidecars are excluded.
+
+`--paths` and `--submitted` are mutually exclusive: hosted submission history
+is a separate sidecar surface from local result discovery.
 
 ### Usage Examples
 
@@ -118,8 +123,11 @@ benchbox results
 # Show more results
 benchbox results --limit 25
 
-# Show exact result file paths accepted by submit/export
+# Show exact result file paths accepted by submit/export (one per line, pipeable)
 benchbox results --paths
+
+# Pipe into submit to package each result in turn
+benchbox results --paths --limit 100 | xargs -n1 -I{} benchbox submit {} --output ./submissions
 
 # Show hosted submissions and public URLs
 benchbox results --submitted

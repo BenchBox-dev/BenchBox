@@ -48,6 +48,17 @@ approach: |
   --output DIR` unchanged, and keep hosted submission behind explicit
   `--service`.
 
+outcome: |
+  Delivered exact-path discovery only via `benchbox results --paths`. Batch
+  hosted submission was deferred by design — hosted upload still requires an
+  explicit `--service` flag and one bundle at a time. The initial cut (PR #154)
+  emitted paths through the Rich console alongside the summary table, which
+  follow-up review flagged as not actually pipeable; addressed in
+  `fix/results-paths-pipeable-affordance` by writing paths as plain stdout
+  (one per line) with hint/overflow text on stderr, and by making `--paths`
+  mutually exclusive with `--submitted`. If batch hosted submission is wanted,
+  open a new TODO rather than reopening this one.
+
 scope_limit:
   only_modify:
   - "benchbox/cli/commands/results.py"

@@ -86,7 +86,11 @@ def _reconstruct_cli_command(
 @click.group("results", invoke_without_command=True)
 @click.option("--limit", type=int, default=10, help="Number of results to show")
 @click.option("--submitted", is_flag=True, help="Show hosted submission history")
-@click.option("--paths", is_flag=True, help="Print copyable result JSON paths for use with submit/export")
+@click.option(
+    "--paths",
+    is_flag=True,
+    help="Print copyable result JSON paths to stdout (suitable for piping to xargs)",
+)
 @click.pass_context
 def results(ctx, limit, submitted, paths):
     """Show exported benchmark results and execution history.
@@ -100,15 +104,17 @@ def results(ctx, limit, submitted, paths):
         benchbox results --paths      # Print exact result paths for benchbox submit
         benchbox results show-cli <file>  # Show CLI command to reproduce a run
     """
-    # If no subcommand is invoked, show results summary
-    if ctx.invoked_subcommand is None:
-        exporter = ResultExporter()
-        if submitted:
-            _show_submitted_results(exporter, limit=limit)
-        else:
-            exporter.show_results_summary()
-            if paths:
-                _show_result_paths(exporter, limit=limit)
+    if ctx.invoked_subcommand is not None:
+        return
+    if submitted and paths:
+        raise click.UsageError("--submitted and --paths are mutually exclusive")
+    exporter = ResultExporter()
+    if submitted:
+        _show_submitted_results(exporter, limit=limit)
+    elif paths:
+        _show_result_paths(exporter, limit=limit)
+    else:
+        exporter.show_results_summary()
 
 
 def _show_result_paths(exporter: ResultExporter, *, limit: int) -> None:
@@ -117,12 +123,19 @@ def _show_result_paths(exporter: ResultExporter, *, limit: int) -> None:
         return
 
     shown = records[:limit]
-    console.print(f"\n[bold]Result Paths ({len(shown)} shown)[/bold]")
     for record in shown:
         path = record.get("file")
         if path is not None:
-            console.print(str(path))
-    console.print("[dim]Use with: benchbox submit <path> --output ./submission[/dim]")
+            click.echo(str(path))
+    if len(records) > limit:
+        click.echo(
+            f"# Showing {len(shown)} of {len(records)}; use --limit to widen.",
+            err=True,
+        )
+    click.echo(
+        "# Use with: benchbox submit <path> --output ./submission",
+        err=True,
+    )
 
 
 def _show_submitted_results(exporter: ResultExporter, *, limit: int) -> None:
