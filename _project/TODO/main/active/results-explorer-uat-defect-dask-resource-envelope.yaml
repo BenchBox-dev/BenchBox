@@ -47,7 +47,7 @@ work:
 - id: w3
   summary: "Add targeted coverage for Dask resource-limit reporting"
   needs: [w2]
-  status: pending
+  status: done
 
 verification:
 - description: "Dask local smoke either passes or reports a clear resource-envelope failure."
