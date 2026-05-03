@@ -1,0 +1,99 @@
+id: results-explorer-uat-defect-sqlite-slow-partial-cells
+title: "UAT defect: SQLite slow cells and partial-result handling"
+worktree: main
+priority: "Medium"
+status: "In Progress"
+category: "Testing and Quality Assurance"
+
+deps:
+  needs:
+  - results-explorer-uat-defect-partial-success-exit-contract
+
+description: |
+  SQLite had several UAT failures and timeouts in TPC-H-source workloads, TPC-DS
+  OBT exited 137, and some cells returned passed status while query-level
+  failures were present. This should be separated from the shared partial-success
+  status contract because SQLite also has platform-specific performance and
+  compatibility behavior to classify.
+
+work:
+- id: w1
+  summary: "Separate SQLite platform defects from the shared partial-success contract"
+  status: done
+  notes: |
+    W1 split and ownership inventory (2026-05-03):
+    - The shared partial-success publication/ranking contract was completed in
+      `_project/DONE/main/active/results-explorer-uat-defect-partial-success-exit-contract.yaml`.
+      That item owns `benchbox/core/results/status.py`, `benchbox/cli/commands/run.py`,
+      `benchbox/cli/commands/submit.py`, `benchbox/cli/commands/publish.py`, and the shared
+      Explorer ranking transformer/model paths. This SQLite TODO must not reopen that surface.
+    - This TODO is limited to SQLite platform behavior seen in UAT: local SQLite load/power execution,
+      platform-specific query compatibility/timeouts, and whether SQLite failures are classified honestly
+      once the shared status contract receives them.
+    - Current SQLite adapter surface is `benchbox/platforms/sqlite.py`: connection configuration, schema creation,
+      `DataLoader`-based loading, and per-query execution that returns `SUCCESS` or `FAILED` dictionaries.
+    - Existing SQLite coverage is concentrated in `tests/unit/platforms/test_sqlite_adapter.py`,
+      `tests/unit/platforms/test_sqlite_real_connection.py`, and
+      `tests/unit/adapters/test_manifest_fallback_sqlite.py`. W3 should add coverage there unless W2
+      proves the regression belongs in a narrower CLI smoke test.
+    - Disk check before W1 edits: 34GiB free; `/Users/joe/Developer/benchmark_runs/databases` was 0B and
+      `/Users/joe/Developer/benchmark_runs/datagen` was 15G. Preserve datagen for reuse across TPC-H and
+      read-primitives-style workloads; clean loaded database artifacts only when present.
+- id: w2
+  summary: "Fix or document the highest-impact SQLite-specific timeout/partial cluster"
+  needs: [w1]
+  status: pending
+  notes: |
+    Work-unit-owned files before editing:
+    - `benchbox/platforms/sqlite.py`
+    - `docs/platforms/sqlite.md` (only if the highest-impact finding is a documented SQLite limitation)
+- id: w3
+  summary: "Add SQLite-specific regression or skip classification coverage"
+  needs: [w2]
+  status: pending
+  notes: |
+    Work-unit-owned files before editing:
+    - `tests/unit/platforms/test_sqlite_adapter.py`
+    - `tests/unit/platforms/test_sqlite_real_connection.py`
+    - `tests/unit/adapters/test_manifest_fallback_sqlite.py`
+    - a narrower CLI or integration test file only if W2 changes CLI-visible SQLite classification behavior
+
+approach: |
+  Treat the shared partial-success leak as closed by
+  `results-explorer-uat-defect-partial-success-exit-contract`. For this TODO, reproduce the SQLite-local smoke,
+  identify the first high-impact SQLite-specific failure cluster, then either fix the adapter behavior or document an
+  explicit SQLite limitation when the behavior is inherent to SQLite. Keep all changes out of shared result-status,
+  publication, submit, and Explorer ranking code unless a SQLite-only regression cannot be expressed without that surface.
+
+  Process cleanup: check free space before and after SQLite smoke verification. If available space is below 40GB,
+  remove loaded local database artifacts under `/Users/joe/Developer/benchmark_runs/databases/` when present, but
+  preserve reusable generated data under `/Users/joe/Developer/benchmark_runs/datagen/` because TPC-H and derived
+  workloads can reuse it. Continue working above 5GB free; stop only if available space falls below 5GB.
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/sqlite.py"
+  - "docs/platforms/sqlite.md"
+  - "tests/unit/platforms/test_sqlite_adapter.py"
+  - "tests/unit/platforms/test_sqlite_real_connection.py"
+  - "tests/unit/adapters/test_manifest_fallback_sqlite.py"
+  - "_project/TODO/main/active/results-explorer-uat-defect-sqlite-slow-partial-cells.yaml"
+
+verification:
+- description: "SQLite smoke terminates with correct pass/fail/skip classification."
+  command: "uv run -- benchbox run --platform sqlite --benchmark tpch --scale 0.01 --phases load,power --non-interactive"
+  expected_output: "completed result or explicit classified failure"
+- description: "Fast tests remain green."
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all selected tests pass"
+
+must_preserve:
+- "SQLite adapter remains dependency-light and local-only."
+- "Shared status-contract fixes are not duplicated in SQLite-specific code."
+
+anti_patterns:
+- "DO NOT mask SQLite query failures as successful benchmark cells -- because Explorer publication depends on honest status."
+
+metadata:
+  tags: [uat, sqlite, partial-results]
+  created_date: "2026-05-03"
