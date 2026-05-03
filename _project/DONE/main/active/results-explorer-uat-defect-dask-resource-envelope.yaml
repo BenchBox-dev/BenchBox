@@ -2,8 +2,9 @@ id: results-explorer-uat-defect-dask-resource-envelope
 title: "UAT defect: Dask DataFrame resource envelope and exit-137 reporting"
 worktree: main
 priority: "Medium-High"
-status: "In Progress"
+status: "Completed"
 category: "Testing and Quality Assurance"
+completed_date: "2026-05-03"
 
 description: |
   Dask DataFrame produced repeated exit-137/resource-spike failures in the UAT
