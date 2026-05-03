@@ -164,6 +164,14 @@ def _normalize_query_result(qr: Any) -> dict[str, Any]:
     return result
 
 
+def _round_duration_ms_for_export(value: float) -> float:
+    """Round milliseconds for schema-v2 export without erasing measured sub-ms durations."""
+    rounded = round(value, 1)
+    if value <= 0 or rounded > 0:
+        return rounded
+    return float(f"{value:.6g}")
+
+
 class SchemaV2ValidationError(ValueError):
     """Raised when schema v2.0 validation fails."""
 
@@ -398,7 +406,7 @@ def _build_query_results_section(
 
         entry: dict[str, Any] = {"id": str(query_id)}
         if exec_time_ms is not None:
-            entry["ms"] = round(exec_time_ms, 1)
+            entry["ms"] = _round_duration_ms_for_export(float(exec_time_ms))
         if rows is not None:
             entry["rows"] = rows
         entry["iter"] = iteration
@@ -1113,17 +1121,17 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
     max_ms = max(times_ms)
 
     stats: dict[str, Any] = {
-        "total_ms": round(total_ms, 1),
-        "avg_ms": round(avg_ms, 1),
-        "min_ms": round(min_ms, 1),
-        "max_ms": round(max_ms, 1),
+        "total_ms": _round_duration_ms_for_export(total_ms),
+        "avg_ms": _round_duration_ms_for_export(avg_ms),
+        "min_ms": _round_duration_ms_for_export(min_ms),
+        "max_ms": _round_duration_ms_for_export(max_ms),
     }
 
     # Compute geometric mean
     if all(t > 0 for t in times_ms):
         try:
             geo_mean = statistics.geometric_mean(times_ms)
-            stats["geometric_mean_ms"] = round(geo_mean, 1)
+            stats["geometric_mean_ms"] = _round_duration_ms_for_export(geo_mean)
         except (statistics.StatisticsError, ValueError):
             pass
 
@@ -1131,7 +1139,7 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
     if len(times_ms) >= 3:
         try:
             stdev = statistics.stdev(times_ms)
-            stats["stdev_ms"] = round(stdev, 1)
+            stats["stdev_ms"] = _round_duration_ms_for_export(stdev)
         except statistics.StatisticsError:
             pass
 
@@ -1141,15 +1149,15 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
 
         # p90
         p90_idx = int(n * 0.90)
-        stats["p90_ms"] = round(sorted_times[min(p90_idx, n - 1)], 1)
+        stats["p90_ms"] = _round_duration_ms_for_export(sorted_times[min(p90_idx, n - 1)])
 
         # p95
         p95_idx = int(n * 0.95)
-        stats["p95_ms"] = round(sorted_times[min(p95_idx, n - 1)], 1)
+        stats["p95_ms"] = _round_duration_ms_for_export(sorted_times[min(p95_idx, n - 1)])
 
         # p99
         p99_idx = int(n * 0.99)
-        stats["p99_ms"] = round(sorted_times[min(p99_idx, n - 1)], 1)
+        stats["p99_ms"] = _round_duration_ms_for_export(sorted_times[min(p99_idx, n - 1)])
 
     return stats
 

@@ -61,7 +61,14 @@ work:
 - id: w2
   summary: "Fix timing export or classify zero-timing results as non-publishable"
   needs: [w1]
-  status: pending
+  status: done
+  notes: |
+    Implemented in `benchbox/core/results/schema.py`.
+    Schema-v2 query and summary timing export now preserves genuinely
+    measured positive sub-millisecond durations instead of rounding them
+    down to `0.0ms`. True zero-duration rows still export as zero, so the
+    submission validator continues to reject non-measured all-zero bundles
+    instead of accepting fabricated timings.
 - id: w3
   summary: "Add regression coverage for zero-timing rejection"
   needs: [w2]
