@@ -30,7 +30,7 @@ We did not set out to build SQL infrastructure. Each layer below got added becau
 
 **Layer 1: `sqlglot.transpile()` directly.** Handles the obvious 80%: joins, CTEs, window functions, most aggregates, basic types, identifier quoting, `LIMIT` to `TOP N`, `EXTRACT` to `DATE_PART`, dialect function renames. The easy cases are by far the largest population of cases.
 
-**Layer 2: A centralized wrapper** at `benchbox/utils/dialect_utils.py`. Once we hit the second post-generation fixup, we centralized. This layer normalizes 8 dialects with no SQLGlot entry to their nearest peer (mostly `postgres`) and applies four generic post-generation fixups.
+**Layer 2: A centralized wrapper** at `benchbox/utils/dialect_utils.py`. Once we hit the second post-generation fixup, we centralized. This layer normalizes five dialects with no SQLGlot entry to their nearest peer (mostly `postgres`) and applies three generic post-generation fixups.
 
 **Layer 3: Per-platform query transformers.** For platform-specific quirks: a ClickHouse transformer for case folding and division safety, a dedicated QuestDB rewriter for syntax gaps, a DataFusion transformer for engine-semantic rewrites.
 
@@ -46,7 +46,7 @@ SQLGlot's headline metric is "supports 34 SQL dialects." Accurate as a count of 
 
 ### 2. Post-generation fixups
 
-SQLGlot emits standard SQL. Sometimes the standard form fails on the target engine. We carry four fixes that affect everyday TPC-H and TPC-DS expressions:
+SQLGlot emits standard SQL. Sometimes the standard form fails on the target engine. We carry three fixes that affect everyday TPC-H and TPC-DS expressions:
 
 | Fix | What SQLGlot emits | What the engine accepts | Affects |
 |-----|---------------------|--------------------------|---------|
@@ -112,7 +112,7 @@ MYSQL_Q9_SQL      = "...verbatim ANSI WITHIN GROUP, bypasses SQLGlot..."
 
 ### 7. SQL to DataFrame translation
 
-Half of BenchBox's targets are DataFrame engines: Polars, Pandas, DataFusion-Python, PySpark, Dask, Modin, cuDF, LakeSail. SQLGlot translates SQL into more SQL; that's a different problem. Our `platforms/dataframe/unified_frame.py` is the SQL-shaped facade over per-engine DataFrame APIs (about 4,200 lines, the largest single file in our cross-platform layer), with bespoke parsing of DataFusion's expression AST for aggregate arithmetic. Polars' own SQL frontend was tried and removed earlier ("fundamental limitations" in our notes). This is not a SQLGlot gap; it is the boundary of what a SQL transpiler is for.
+Alongside the SQL platforms, BenchBox targets eight DataFrame engines: Polars, Pandas, DataFusion-Python, PySpark, Dask, Modin, cuDF, LakeSail. SQLGlot translates SQL into more SQL; that is a different problem. Our `platforms/dataframe/unified_frame.py` is the SQL-shaped facade over per-engine DataFrame APIs (about 4,200 lines, the largest single file in our cross-platform layer), with bespoke parsing of DataFusion's expression AST for aggregate arithmetic. Polars' own SQL frontend was tried and removed earlier ("fundamental limitations" in our notes). This is not a SQLGlot gap; it is the boundary of what a SQL transpiler is for.
 
 ## What we learned
 
@@ -164,7 +164,7 @@ We would love to hear about gaps you have hit in your own SQLGlot-based projects
 - QuestDB 9.3.4
 - Doris 2.1.x
 
-The 19 DDL rewrite modules under `benchbox/sql_compat/rules/ddl_optimize/` and the dialect coverage gap (8 platforms with no SQLGlot entry, normalized by `dialect_utils.normalize_dialect_for_sqlglot`) are verifiable in the listed paths. The DataFusion silent-corruption queries (Q11, Q16, Q18, Q20) are documented in `datafusion_query_transformer.py` with the rewrite recipes inline.
+The 19 DDL rewrite modules under `benchbox/sql_compat/rules/ddl_optimize/` and the dialect coverage gap (five dialects with no SQLGlot entry, normalized by `dialect_utils.normalize_dialect_for_sqlglot`) are verifiable in the listed paths. The DataFusion silent-corruption queries (Q11, Q16, Q18, Q20) are documented in `datafusion_query_transformer.py` with the rewrite recipes inline.
 
 ## Limitations
 

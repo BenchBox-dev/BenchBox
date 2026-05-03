@@ -37,7 +37,7 @@ Frame: 36 SQL platforms + DataFrame engines, 18+ benchmarks, thousands of (query
 **Thesis**: Each layer added because the previous left an observable gap.
 
 - Layer 1: `sqlglot.transpile()` directly, the obvious 80%
-- Layer 2: Centralized wrapper at `benchbox/utils/dialect_utils.py`, 8 dialect normalizations + 4 generic post-fixups
+- Layer 2: Centralized wrapper at `benchbox/utils/dialect_utils.py`, 5 dialect normalizations + 3 generic post-fixups
 - Layer 3: Per-platform query transformers, ClickHouse, QuestDB, DataFusion
 - Layer 4: `benchbox/sql_compat/` registry, `ddl_optimize/`, `query_source/`, `query_adapter/`, `schema_emit/`, `benchmark_gate/`, plus `inventory.py` and `registry.py`
 
@@ -45,7 +45,7 @@ Frame: 36 SQL platforms + DataFrame engines, 18+ benchmarks, thousands of (query
 
 Center of gravity. Each category gets one paragraph: what SQLGlot does, what's left, file path, concrete example.
 
-1. **Dialect normalization**: 8 dialects (Netezza, Greenplum, Vertica, DataFusion, ANSI, Standard, …) mapped to nearest peer (`postgres`).
+1. **Dialect normalization**: 5 dialects (Netezza, Greenplum, Vertica, DataFusion, raw ANSI) mapped to nearest peer (`postgres`).
 2. **Post-generation fixups**: Table of three fixes (DuckDB `GROUP BY ALL`, SQLite date/EXTRACT, Postgres date arithmetic).
 3. **Per-platform query transformers**: ClickHouse (case folding, division safety, Q23/Q87 session policy), QuestDB (comma joins, INTERVAL, SUBSTRING, CTE column lists). DataFusion handled in #4.
 4. **Engine-semantic gaps (silent ones)**: DataFusion TPC-H Q11/Q16/Q18/Q20. Steelman + rebuttal.
