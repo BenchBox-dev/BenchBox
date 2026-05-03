@@ -61,7 +61,7 @@ work:
 - id: w2
   summary: "Slim published-results down to the intended subtree"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Fresh-orphan-branch approach: build a new commit on top of the
     decided subtree, then force-push (with explicit user authorization)
