@@ -43,7 +43,7 @@ work:
 - id: w3
   summary: "Add browser or component coverage for ambiguous facet labels"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Work-unit-owned files before editing:
     - `results-explorer/e2e/routes/query.spec.ts`
@@ -73,7 +73,8 @@ verification:
   command: "cd results-explorer && npm run test"
   expected_output: "vitest suite passes"
 - description: "Targeted browser smoke can select Deployment local without strict-mode ambiguity."
-  command: "cd results-explorer && npm run test:e2e:chromium -- --grep Query"
+  command: "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --workers=1
+    e2e/routes/query.spec.ts"
   expected_output: "Query browser coverage passes"
 
 must_preserve:

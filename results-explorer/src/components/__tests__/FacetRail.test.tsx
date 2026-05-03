@@ -86,10 +86,10 @@ describe("FacetRail", () => {
     expect(screen.getByRole("button", { name: "GCP" })).toBeTruthy();
 
     const providerSection = screen.getByRole("heading", { name: "Cloud provider" }).closest("section")!;
-    expect(within(providerSection).getByRole("checkbox", { name: "AWS" })).toBeChecked();
+    expect(within(providerSection).getByRole("checkbox", { name: "Cloud provider: AWS (7)" })).toBeChecked();
 
     fireEvent.input(within(providerSection).getByRole("searchbox"), { target: { value: "gcp" } });
-    fireEvent.click(within(providerSection).getByRole("checkbox", { name: "GCP" }));
+    fireEvent.click(within(providerSection).getByRole("checkbox", { name: "Cloud provider: GCP (4)" }));
     expect(onToggle).toHaveBeenCalledWith("cloud_provider", "gcp");
   });
 });
