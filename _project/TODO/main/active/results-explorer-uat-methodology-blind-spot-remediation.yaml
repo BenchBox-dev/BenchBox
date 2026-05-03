@@ -94,7 +94,7 @@ work:
 - id: w4
   summary: "Compile the design document and route to user for approval"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Output file:
       `_project/specs/uat-methodology-blind-spot-remediation.md`
