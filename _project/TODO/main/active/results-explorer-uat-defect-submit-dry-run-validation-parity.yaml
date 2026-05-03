@@ -44,13 +44,31 @@ work:
 - id: w2
   summary: "Make dry-run fail on the same publish-blocking bundle errors"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
-    Owned files for implementation: `benchbox/cli/commands/submit.py` and this
-    TODO file. Reuse/call `scripts.validate_submission.validate_bundles` and
-    `format_summary`; do not move or fork `scripts/validate_submission.py`
-    because `tests/integration/test_cross_branch_validator_contract.py` expects
+    Owned files for implementation: `benchbox/cli/commands/submit.py`, this
+    TODO file, and `tests/unit/cli/commands/test_submit.py` only for updating
+    existing dry-run fixtures to valid schema-v2 bundle JSON if the new
+    validator call makes those fixtures unrealistic. Reuse/call
+    `scripts.validate_submission.validate_bundles` and `format_summary`; do not
+    move or fork `scripts/validate_submission.py` because
+    `tests/integration/test_cross_branch_validator_contract.py` expects
     byte-identical validator code and fixture sync.
+    Implementation 2026-05-03:
+    - `benchbox submit --dry-run --output` and `benchbox submit --dry-run
+      --service` now run `scripts/validate_submission.py` rules before printing
+      success previews.
+    - Code review found module-name import failed through the console entry
+      point; fixed by loading the validator from `scripts/validate_submission.py`
+      by source-checkout file path.
+    - Verification passed: ruff check/format on touched files, ty check on
+      touched files, `uv run -- python -m pytest
+      tests/unit/cli/commands/test_submit.py -q`, invalid UAT bundle fails both
+      dry-run modes with the normalized-cost validator error, valid committed
+      bundle still previews in both dry-run modes without writing files.
+    - Database cleanup checkpoint: no database artifacts were created; dry-run
+      output paths remained absent and the reusable datagen tree was left
+      untouched.
 - id: w3
   summary: "Add CLI regression coverage for dry-run validation parity"
   needs: [w2]

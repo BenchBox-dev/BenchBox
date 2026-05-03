@@ -28,6 +28,26 @@ def _fake_result() -> SimpleNamespace:
     )
 
 
+def _write_valid_submission_bundle(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "version": "2.1",
+                "run": {
+                    "id": "abc123",
+                    "timestamp": "2026-05-03T00:00:00",
+                    "total_duration_ms": 500,
+                },
+                "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01},
+                "platform": {"name": "duckdb", "version": "1.3.0"},
+                "summary": {"queries": {"total": 1, "passed": 1, "failed": 0}},
+                "queries": [{"id": "Q1", "ms": 123, "status": "pass"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 # ---------------------------------------------------------------------------
 # 1. No args - explains usage, exit 1
 # ---------------------------------------------------------------------------
@@ -58,7 +78,7 @@ def test_submit_last_no_results(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_submit_dry_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
 
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
@@ -176,7 +196,7 @@ def test_submit_dry_run_matches_real_run_shape(monkeypatch: pytest.MonkeyPatch, 
     """W6: dry-run output prints the same file/manifest/next-steps shape
     as a real submit, plus a "(dry run; no files written)" footer."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
 
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
@@ -350,7 +370,7 @@ def test_submit_generic_exception(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 def test_submit_service_dry_run_no_creds_required(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """--service --dry-run must work without any auth setup."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
     monkeypatch.setattr(
         sub,
@@ -369,7 +389,7 @@ def test_submit_service_dry_run_no_creds_required(monkeypatch: pytest.MonkeyPatc
 def test_submit_service_default_url(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """--service without an explicit URL must use the documented default."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
     result = CliRunner().invoke(sub.submit, [str(src), "--service", "--dry-run"])
@@ -380,7 +400,7 @@ def test_submit_service_default_url(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 def test_submit_service_custom_url_passed_through(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Explicit --service URL flows into the dry-run output unchanged."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
     custom = "https://staging.benchbox.dev/v1"
@@ -392,7 +412,7 @@ def test_submit_service_custom_url_passed_through(monkeypatch: pytest.MonkeyPatc
 def test_submit_service_visibility_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """--visibility unlisted is reflected in the dry-run output."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
     result = CliRunner().invoke(sub.submit, [str(src), "--service", "--dry-run", "--visibility", "unlisted"])
@@ -414,7 +434,7 @@ def test_submit_service_visibility_rejects_unknown(monkeypatch: pytest.MonkeyPat
 def test_submit_service_idempotency_key_passthrough(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Caller-supplied --idempotency-key surfaces in the dry-run output."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
     key = "11111111-2222-3333-4444-555555555555"
