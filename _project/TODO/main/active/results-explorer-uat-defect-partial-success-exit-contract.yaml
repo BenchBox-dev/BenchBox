@@ -68,7 +68,7 @@ work:
 - id: w2
   summary: "Make partial query failures explicit and non-clean-pass"
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Add regression coverage for mixed pass/fail query outcomes"
   needs: [w2]
@@ -87,8 +87,10 @@ must_preserve:
 - "Query-level failure diagnostics remain visible in logs and result artifacts."
 
 anti_patterns:
-- "DO NOT silently drop failed query rows -- because users need failure evidence -- preserve diagnostics while changing pass/fail eligibility."
-- "DO NOT widen this into benchmark-specific fixes -- because the bug is the status contract -- fix the shared result/status path."
+- "DO NOT silently drop failed query rows -- because users need failure evidence -- preserve diagnostics while changing pass/fail
+  eligibility."
+- "DO NOT widen this into benchmark-specific fixes -- because the bug is the status contract -- fix the shared result/status
+  path."
 
 metadata:
   tags: [uat, results-explorer, result-contract]

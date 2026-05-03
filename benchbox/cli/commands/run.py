@@ -1485,7 +1485,10 @@ def _direct_handle_result(
     benchmark_config: BenchmarkConfig,
 ) -> None:
     """Export results and perform post-run actions for the direct branch."""
+    from benchbox.core.results.status import result_non_clean_reason
+
     ctx = s.ctx
+    non_clean_reason = result_non_clean_reason(result)
     if result.validation_status not in ["FAILED", "INTERRUPTED"]:
         if not s.quiet:
             console.print("\n[bold]Exporting results...[/bold]")
@@ -1505,15 +1508,23 @@ def _direct_handle_result(
             for _format_name, filepath in exported_files.items():
                 click.echo(filepath)
         else:
-            console.print(f"\n[green]✅ Benchmark completed: {result.validation_status}[/green]")
+            if non_clean_reason:
+                console.print(
+                    f"\n[yellow]⚠ Benchmark completed with non-clean status: {result.validation_status}[/yellow]"
+                )
+                console.print(f"[yellow]Reason:[/yellow] {non_clean_reason}")
+            else:
+                console.print(f"\n[green]✅ Benchmark completed: {result.validation_status}[/green]")
             for format_name, filepath in exported_files.items():
                 console.print(f"{format_name.upper()}: [dim]{filepath}[/dim]")
 
         _render_post_run_charts(result, console, s.quiet)
 
         if s.publish:
-            json_bundle = exported_files.get("json")
-            if json_bundle:
+            if non_clean_reason:
+                if not s.quiet:
+                    console.print(f"[yellow]Skipping publish:[/yellow] result is not a clean pass ({non_clean_reason})")
+            elif json_bundle := exported_files.get("json"):
                 from benchbox.cli.commands.publish import publish_bundle
 
                 if not s.quiet:
@@ -1542,6 +1553,8 @@ def _direct_handle_result(
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
+        if non_clean_reason:
+            ctx.exit(1)
     else:
         console.print(f"\n[red]❌ Benchmark failed: {result.validation_status}[/red]")
         ctx.exit(1)
