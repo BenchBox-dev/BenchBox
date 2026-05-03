@@ -2,8 +2,9 @@ id: results-explorer-uat-defect-submit-dry-run-validation-parity
 title: "UAT defect: submit dry-run misses hosted submission validation errors"
 worktree: main
 priority: "Medium-High"
-status: "In Progress"
+status: "Completed"
 category: "Developer Experience"
+completed_date: "2026-05-03"
 
 description: |
   `benchbox submit --dry-run` exited 0 for
