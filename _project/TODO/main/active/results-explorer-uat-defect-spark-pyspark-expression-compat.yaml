@@ -60,7 +60,7 @@ work:
 - id: w3
   summary: "Add regression coverage for the fixed cluster"
   needs: [w2]
-  status: pending
+  status: done
 
 verification:
 - description: "Representative Spark/PySpark smoke for the fixed cluster passes."
