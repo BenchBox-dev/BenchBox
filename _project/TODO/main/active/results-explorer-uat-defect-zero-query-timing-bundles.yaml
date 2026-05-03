@@ -72,7 +72,13 @@ work:
 - id: w3
   summary: "Add regression coverage for zero-timing rejection"
   needs: [w2]
-  status: pending
+  status: done
+  notes: |
+    Added focused regression coverage in
+    `tests/unit/core/results/test_schema_timing_contract.py` for positive
+    sub-millisecond schema export and in
+    `tests/unit/scripts/test_validate_submission.py` for true all-zero
+    failed/skipped bundle rejection plus positive sub-ms validator acceptance.
 
 verification:
 - description: "Submission validation rejects or repairs all-zero timing bundles deterministically."
