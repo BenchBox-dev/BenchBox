@@ -2,7 +2,8 @@ id: results-explorer-uat-defect-sqlite-slow-partial-cells
 title: "UAT defect: SQLite slow cells and partial-result handling"
 worktree: main
 priority: "Medium"
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-05-03"
 category: "Testing and Quality Assurance"
 
 deps:
