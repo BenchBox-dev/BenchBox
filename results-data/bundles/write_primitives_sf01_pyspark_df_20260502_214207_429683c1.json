@@ -1,0 +1,4937 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "429683c1",
+    "timestamp": "2026-05-02T21:41:41.585004",
+    "total_duration_ms": 25490,
+    "query_time_ms": 11138,
+    "iterations": 3,
+    "streams": 0
+  },
+  "benchmark": {
+    "id": "write_primitives",
+    "name": "Write Primitives",
+    "scale_factor": 0.1,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "PySpark",
+    "version": "4.1.1",
+    "client_version": "unknown",
+    "config": {
+      "execution_mode": "dataframe",
+      "family": "expression",
+      "master": "local[*]",
+      "driver_memory": "4g",
+      "shuffle_partitions": 10,
+      "aqe_enabled": true,
+      "working_dir": "/Users/joe/Developer/BenchBox.pool-03",
+      "driver_runtime_strategy": "current-process"
+    },
+    "deployment": {
+      "deployment_type": "dataframe",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "master": "local[*]",
+      "driver_memory": "4g",
+      "shuffle_partitions": 10,
+      "aqe_enabled": true,
+      "working_dir": "/Users/joe/Developer/BenchBox.pool-03",
+      "options": {
+        "verbose_level": 0,
+        "verbose_enabled": false,
+        "very_verbose": false,
+        "quiet": false,
+        "verbose": false,
+        "force_recreate": false,
+        "show_query_plans": false,
+        "tuning_enabled": false,
+        "force_upload": false,
+        "capture_plans": false,
+        "strict_plan_capture": false,
+        "execution_mode": "dataframe",
+        "unified_tuning_configuration": {
+          "primary_keys": {
+            "enabled": false,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
+          "foreign_keys": {
+            "enabled": false,
+            "enforce_referential_integrity": true,
+            "on_delete_action": "RESTRICT",
+            "on_update_action": "RESTRICT"
+          },
+          "unique_constraints": {
+            "enabled": false,
+            "ignore_nulls": false
+          },
+          "check_constraints": {
+            "enabled": false,
+            "enforce_on_insert": true,
+            "enforce_on_update": true
+          },
+          "platform_optimizations": {
+            "z_ordering_enabled": false,
+            "liquid_clustering_enabled": false,
+            "databricks_clustering_strategy": "z_order",
+            "sorted_ingestion_mode": "off",
+            "sorted_ingestion_method": "auto",
+            "auto_optimize_enabled": false,
+            "auto_compact_enabled": false,
+            "bloom_filters_enabled": false,
+            "materialized_views_enabled": false
+          }
+        }
+      },
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "execution_mode": "dataframe",
+      "benchmark": "tpch",
+      "scale_factor": 0.1,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "memory_limit": "12GB",
+      "thread_limit": 8
+    },
+    "raw_metadata": {
+      "driver_runtime_strategy": "current-process"
+    },
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "mode": "dataframe"
+  },
+  "summary": {
+    "queries": {
+      "total": 351,
+      "passed": 276,
+      "failed": 75
+    },
+    "timing": {
+      "total_ms": 11138,
+      "avg_ms": 40.4,
+      "min_ms": 0,
+      "max_ms": 967,
+      "stdev_ms": 110.9,
+      "p90_ms": 111,
+      "p95_ms": 180,
+      "p99_ms": 960
+    },
+    "validation": "partial"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "status": "SKIPPED"
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    },
+    "power_test": {
+      "status": "COMPLETED",
+      "duration_ms": 14948
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [
+    {
+      "id": "insert_single_row",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_10",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_100",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_1000",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_with_join",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_aggregated",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_from_multiple",
+      "ms": 1,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_with_default_values",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_union",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_on_conflict_ignore",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_returning_clause",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_single_row_pk",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_selective_10pct",
+      "ms": 2,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_subquery",
+      "ms": 1,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_bulk_50pct",
+      "ms": 7,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_bulk_all",
+      "ms": 13,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_join",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_from_select",
+      "ms": 7,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_set_multiple_columns",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_case_expression",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_computed_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_string_manipulation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_date_arithmetic",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_conditional_multi_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_aggregate",
+      "ms": 1,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_returning",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_single_row_pk",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_selective_10pct",
+      "ms": 13,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_subquery",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_join",
+      "ms": 3,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_25pct",
+      "ms": 28,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_50pct",
+      "ms": 42,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_75pct",
+      "ms": 32,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_not_exists",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_aggregation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_returning",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_cascade_simulation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_all_truncate_comparison",
+      "ms": 964,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_uncompressed",
+      "ms": 9,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_gzip",
+      "ms": 10,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_zstd",
+      "ms": 9,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_bzip2",
+      "ms": 8,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_uncompressed",
+      "ms": 74,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_gzip",
+      "ms": 183,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_zstd",
+      "ms": 97,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_bzip2",
+      "ms": 179,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_uncompressed",
+      "ms": 128,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_gzip",
+      "ms": 207,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_zstd",
+      "ms": 172,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_bzip2",
+      "ms": 222,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_uncompressed",
+      "ms": 2,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_snappy",
+      "ms": 1,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_gzip",
+      "ms": 1,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_zstd",
+      "ms": 1,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_uncompressed",
+      "ms": 46,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_snappy",
+      "ms": 103,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_gzip",
+      "ms": 58,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_zstd",
+      "ms": 109,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_uncompressed",
+      "ms": 100,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_snappy",
+      "ms": 101,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_gzip",
+      "ms": 118,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_zstd",
+      "ms": 122,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_column_subset",
+      "ms": 60,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_with_transformation",
+      "ms": 15,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_error_handling_skip_bad_rows",
+      "ms": 4,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parallel_multi_file",
+      "ms": 194,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_upsert_mode",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "bulk_load_append_mode",
+      "ms": 8,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_replace_mode",
+      "ms": 70,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_delimited_custom",
+      "ms": 22,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_quoted_fields",
+      "ms": 3,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_null_handling",
+      "ms": 8,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_encoding_utf8",
+      "ms": 8,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_date_format_custom",
+      "ms": 7,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "merge_simple_upsert_small",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_upsert_with_delete",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_10pct",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_50pct",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_90pct",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_no_overlap_all_insert",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_full_overlap_all_update",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_with_join_condition",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_from_subquery_aggregated",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_conditional_update",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_conditional_insert",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_multi_column_update",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_computed_values",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_string_operations",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_date_arithmetic",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_with_cte_source",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_returning_clause",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_error_handling",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "delete_gdpr_suppliers_1pct",
+      "ms": 15,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_gdpr_suppliers_5pct",
+      "ms": 49,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "merge_etl_aggregation_pattern",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_deduplication_window_function",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "ddl_create_table_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_truncate_table_small",
+      "ms": 127,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_as_select_simple",
+      "ms": 8,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_with_constraints",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_with_index",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_add_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_drop_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_rename_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_index_on_existing",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_drop_index",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_view_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_drop_table",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_ddl_create_persistent_table",
+      "ms": 8,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_insert_theta_per_partition",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_insert_kll_per_partition",
+      "ms": 13,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_insert_topk_per_shard",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_query_theta_union_merge",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_query_kll_quantiles_merge",
+      "ms": 17,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_query_topk_combine",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_drop_persistent_table",
+      "ms": 0,
+      "rows": -1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_single_row",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_10",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_100",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_1000",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_with_join",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_aggregated",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_from_multiple",
+      "ms": 1,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_with_default_values",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_union",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_on_conflict_ignore",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_returning_clause",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_single_row_pk",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_selective_10pct",
+      "ms": 2,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_subquery",
+      "ms": 1,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_bulk_50pct",
+      "ms": 7,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_bulk_all",
+      "ms": 13,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_join",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_from_select",
+      "ms": 7,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_set_multiple_columns",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_case_expression",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_computed_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_string_manipulation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_date_arithmetic",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_conditional_multi_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_aggregate",
+      "ms": 1,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_returning",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_single_row_pk",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_selective_10pct",
+      "ms": 13,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_subquery",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_join",
+      "ms": 3,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_25pct",
+      "ms": 28,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_50pct",
+      "ms": 41,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_75pct",
+      "ms": 32,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_not_exists",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_aggregation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_returning",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_cascade_simulation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_all_truncate_comparison",
+      "ms": 960,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_uncompressed",
+      "ms": 8,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_gzip",
+      "ms": 9,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_zstd",
+      "ms": 8,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_bzip2",
+      "ms": 9,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_uncompressed",
+      "ms": 70,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_gzip",
+      "ms": 180,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_zstd",
+      "ms": 96,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_bzip2",
+      "ms": 180,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_uncompressed",
+      "ms": 122,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_gzip",
+      "ms": 210,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_zstd",
+      "ms": 172,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_bzip2",
+      "ms": 221,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_uncompressed",
+      "ms": 1,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_snappy",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_gzip",
+      "ms": 1,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_zstd",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_uncompressed",
+      "ms": 41,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_snappy",
+      "ms": 98,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_gzip",
+      "ms": 54,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_zstd",
+      "ms": 104,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_uncompressed",
+      "ms": 90,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_snappy",
+      "ms": 97,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_gzip",
+      "ms": 111,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_zstd",
+      "ms": 109,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_column_subset",
+      "ms": 60,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_with_transformation",
+      "ms": 15,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_error_handling_skip_bad_rows",
+      "ms": 3,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parallel_multi_file",
+      "ms": 188,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_upsert_mode",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "bulk_load_append_mode",
+      "ms": 8,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_replace_mode",
+      "ms": 71,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_delimited_custom",
+      "ms": 21,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_quoted_fields",
+      "ms": 3,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_null_handling",
+      "ms": 8,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_encoding_utf8",
+      "ms": 8,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_date_format_custom",
+      "ms": 7,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "merge_simple_upsert_small",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_upsert_with_delete",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_10pct",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_50pct",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_90pct",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_no_overlap_all_insert",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_full_overlap_all_update",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_with_join_condition",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_from_subquery_aggregated",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_conditional_update",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_conditional_insert",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_multi_column_update",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_computed_values",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_string_operations",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_date_arithmetic",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_with_cte_source",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_returning_clause",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_error_handling",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delete_gdpr_suppliers_1pct",
+      "ms": 15,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_gdpr_suppliers_5pct",
+      "ms": 49,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "merge_etl_aggregation_pattern",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_deduplication_window_function",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ddl_create_table_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_truncate_table_small",
+      "ms": 127,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_as_select_simple",
+      "ms": 7,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_with_constraints",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_with_index",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_add_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_drop_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_rename_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_index_on_existing",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_drop_index",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_view_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_drop_table",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_ddl_create_persistent_table",
+      "ms": 6,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_insert_theta_per_partition",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_insert_kll_per_partition",
+      "ms": 7,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_insert_topk_per_shard",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_query_theta_union_merge",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_query_kll_quantiles_merge",
+      "ms": 15,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_query_topk_combine",
+      "ms": 0,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_drop_persistent_table",
+      "ms": 0,
+      "rows": -1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_single_row",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_10",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_100",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_1000",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_with_join",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_aggregated",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_from_multiple",
+      "ms": 1,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_with_default_values",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_union",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_on_conflict_ignore",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_returning_clause",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_single_row_pk",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_selective_10pct",
+      "ms": 2,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_subquery",
+      "ms": 1,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_bulk_50pct",
+      "ms": 7,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_bulk_all",
+      "ms": 13,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_join",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_from_select",
+      "ms": 7,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_set_multiple_columns",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_case_expression",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_computed_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_string_manipulation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_date_arithmetic",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_conditional_multi_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_aggregate",
+      "ms": 1,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_returning",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_single_row_pk",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_selective_10pct",
+      "ms": 13,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_subquery",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_join",
+      "ms": 3,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_25pct",
+      "ms": 28,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_50pct",
+      "ms": 42,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_75pct",
+      "ms": 32,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_not_exists",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_aggregation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_returning",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_cascade_simulation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_all_truncate_comparison",
+      "ms": 967,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_uncompressed",
+      "ms": 8,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_gzip",
+      "ms": 8,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_zstd",
+      "ms": 8,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_bzip2",
+      "ms": 8,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_uncompressed",
+      "ms": 70,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_gzip",
+      "ms": 179,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_zstd",
+      "ms": 96,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_bzip2",
+      "ms": 178,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_uncompressed",
+      "ms": 122,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_gzip",
+      "ms": 208,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_zstd",
+      "ms": 172,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_bzip2",
+      "ms": 220,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_uncompressed",
+      "ms": 1,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_snappy",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_gzip",
+      "ms": 1,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_zstd",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_uncompressed",
+      "ms": 40,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_snappy",
+      "ms": 96,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_gzip",
+      "ms": 54,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_zstd",
+      "ms": 104,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_uncompressed",
+      "ms": 90,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_snappy",
+      "ms": 93,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_gzip",
+      "ms": 110,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_zstd",
+      "ms": 110,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_column_subset",
+      "ms": 59,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_with_transformation",
+      "ms": 15,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_error_handling_skip_bad_rows",
+      "ms": 3,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parallel_multi_file",
+      "ms": 188,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_upsert_mode",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "bulk_load_append_mode",
+      "ms": 8,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_replace_mode",
+      "ms": 70,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_delimited_custom",
+      "ms": 21,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_quoted_fields",
+      "ms": 3,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_null_handling",
+      "ms": 8,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_encoding_utf8",
+      "ms": 7,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_date_format_custom",
+      "ms": 7,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "merge_simple_upsert_small",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_upsert_with_delete",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_10pct",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_50pct",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_90pct",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_no_overlap_all_insert",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_full_overlap_all_update",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_with_join_condition",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_from_subquery_aggregated",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_conditional_update",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_conditional_insert",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_multi_column_update",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_computed_values",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_string_operations",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_date_arithmetic",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_with_cte_source",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_returning_clause",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_error_handling",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delete_gdpr_suppliers_1pct",
+      "ms": 15,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_gdpr_suppliers_5pct",
+      "ms": 49,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "merge_etl_aggregation_pattern",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_deduplication_window_function",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ddl_create_table_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_truncate_table_small",
+      "ms": 128,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_as_select_simple",
+      "ms": 7,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_with_constraints",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_with_index",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_add_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_drop_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_rename_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_index_on_existing",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_drop_index",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_view_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_drop_table",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_ddl_create_persistent_table",
+      "ms": 6,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_insert_theta_per_partition",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_insert_kll_per_partition",
+      "ms": 7,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_insert_topk_per_shard",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_query_theta_union_merge",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_query_kll_quantiles_merge",
+      "ms": 15,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_query_topk_combine",
+      "ms": 0,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_drop_persistent_table",
+      "ms": 0,
+      "rows": -1,
+      "iter": 2,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_single_row",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_10",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_100",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_batch_values_1000",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_with_join",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_aggregated",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_from_multiple",
+      "ms": 1,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_with_default_values",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_select_union",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_on_conflict_ignore",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "insert_returning_clause",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_single_row_pk",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_selective_10pct",
+      "ms": 2,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_subquery",
+      "ms": 1,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_bulk_50pct",
+      "ms": 7,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_bulk_all",
+      "ms": 13,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_join",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_from_select",
+      "ms": 7,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_set_multiple_columns",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_case_expression",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_computed_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_string_manipulation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_date_arithmetic",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_conditional_multi_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_with_aggregate",
+      "ms": 1,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "update_returning",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_single_row_pk",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_selective_10pct",
+      "ms": 13,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_subquery",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_join",
+      "ms": 3,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_25pct",
+      "ms": 28,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_50pct",
+      "ms": 42,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_bulk_75pct",
+      "ms": 32,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_not_exists",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_with_aggregation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_returning",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_cascade_simulation",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_all_truncate_comparison",
+      "ms": 961,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_uncompressed",
+      "ms": 8,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_gzip",
+      "ms": 8,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_zstd",
+      "ms": 8,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_small_bzip2",
+      "ms": 8,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_uncompressed",
+      "ms": 70,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_gzip",
+      "ms": 179,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_zstd",
+      "ms": 95,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_medium_bzip2",
+      "ms": 180,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_uncompressed",
+      "ms": 122,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_gzip",
+      "ms": 208,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_zstd",
+      "ms": 171,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_csv_large_bzip2",
+      "ms": 221,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_uncompressed",
+      "ms": 1,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_snappy",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_gzip",
+      "ms": 1,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_small_zstd",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_uncompressed",
+      "ms": 40,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_snappy",
+      "ms": 98,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_gzip",
+      "ms": 54,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_medium_zstd",
+      "ms": 104,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_uncompressed",
+      "ms": 90,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_snappy",
+      "ms": 93,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_gzip",
+      "ms": 109,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parquet_large_zstd",
+      "ms": 110,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_column_subset",
+      "ms": 60,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_with_transformation",
+      "ms": 15,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_error_handling_skip_bad_rows",
+      "ms": 3,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_parallel_multi_file",
+      "ms": 191,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_upsert_mode",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "bulk_load_append_mode",
+      "ms": 8,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_replace_mode",
+      "ms": 70,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_delimited_custom",
+      "ms": 21,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_quoted_fields",
+      "ms": 3,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_null_handling",
+      "ms": 8,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_encoding_utf8",
+      "ms": 7,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "bulk_load_date_format_custom",
+      "ms": 7,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "merge_simple_upsert_small",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_upsert_with_delete",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_10pct",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_50pct",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_overlap_90pct",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_no_overlap_all_insert",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_full_overlap_all_update",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_with_join_condition",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_from_subquery_aggregated",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_conditional_update",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_conditional_insert",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_multi_column_update",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_computed_values",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_string_operations",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_date_arithmetic",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_with_cte_source",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_returning_clause",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_error_handling",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delete_gdpr_suppliers_1pct",
+      "ms": 15,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "delete_gdpr_suppliers_5pct",
+      "ms": 49,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "merge_etl_aggregation_pattern",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "merge_deduplication_window_function",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ddl_create_table_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_truncate_table_small",
+      "ms": 127,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_as_select_simple",
+      "ms": 8,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_with_constraints",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_table_with_index",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_add_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_drop_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_alter_table_rename_column",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_index_on_existing",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_drop_index",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_create_view_simple",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ddl_drop_table",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_ddl_create_persistent_table",
+      "ms": 6,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_insert_theta_per_partition",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_insert_kll_per_partition",
+      "ms": 7,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_insert_topk_per_shard",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_query_theta_union_merge",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_query_kll_quantiles_merge",
+      "ms": 17,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "sketch_query_topk_combine",
+      "ms": 0,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "sketch_drop_persistent_table",
+      "ms": 0,
+      "rows": -1,
+      "iter": 3,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    }
+  ],
+  "cost": {
+    "total_usd": 0,
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-02T21:41:41.531803",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_runtime_strategy": "current-process",
+    "non_interactive": true
+  },
+  "environment": {
+    "platform_runtime": {
+      "runtime_type": "dataframe_process",
+      "collection_status": "partial",
+      "source": "inferred",
+      "engine_host": "host_0a57d94f05f4"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "client_host": {
+      "machine_id": "machine_45d1a3ef31a1728d"
+    }
+  },
+  "errors": [
+    {
+      "phase": "query",
+      "query_id": "bulk_load_upsert_mode",
+      "type": "Operation bulk_load_upsert_mode failed",
+      "message": "Operation bulk_load_upsert_mode failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "bulk_load_upsert_mode",
+      "type": "Operation bulk_load_upsert_mode failed",
+      "message": "Operation bulk_load_upsert_mode failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "bulk_load_upsert_mode",
+      "type": "Operation bulk_load_upsert_mode failed",
+      "message": "Operation bulk_load_upsert_mode failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "bulk_load_upsert_mode",
+      "type": "Operation bulk_load_upsert_mode failed",
+      "message": "Operation bulk_load_upsert_mode failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_computed_values",
+      "type": "Operation merge_computed_values failed",
+      "message": "Operation merge_computed_values failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_computed_values",
+      "type": "Operation merge_computed_values failed",
+      "message": "Operation merge_computed_values failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_computed_values",
+      "type": "Operation merge_computed_values failed",
+      "message": "Operation merge_computed_values failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_computed_values",
+      "type": "Operation merge_computed_values failed",
+      "message": "Operation merge_computed_values failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_conditional_insert",
+      "type": "Operation merge_conditional_insert failed",
+      "message": "Operation merge_conditional_insert failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_conditional_insert",
+      "type": "Operation merge_conditional_insert failed",
+      "message": "Operation merge_conditional_insert failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_conditional_insert",
+      "type": "Operation merge_conditional_insert failed",
+      "message": "Operation merge_conditional_insert failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_conditional_insert",
+      "type": "Operation merge_conditional_insert failed",
+      "message": "Operation merge_conditional_insert failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_conditional_update",
+      "type": "Operation merge_conditional_update failed",
+      "message": "Operation merge_conditional_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_conditional_update",
+      "type": "Operation merge_conditional_update failed",
+      "message": "Operation merge_conditional_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_conditional_update",
+      "type": "Operation merge_conditional_update failed",
+      "message": "Operation merge_conditional_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_conditional_update",
+      "type": "Operation merge_conditional_update failed",
+      "message": "Operation merge_conditional_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_date_arithmetic",
+      "type": "Operation merge_date_arithmetic failed",
+      "message": "Operation merge_date_arithmetic failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_date_arithmetic",
+      "type": "Operation merge_date_arithmetic failed",
+      "message": "Operation merge_date_arithmetic failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_date_arithmetic",
+      "type": "Operation merge_date_arithmetic failed",
+      "message": "Operation merge_date_arithmetic failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_date_arithmetic",
+      "type": "Operation merge_date_arithmetic failed",
+      "message": "Operation merge_date_arithmetic failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_deduplication_window_function",
+      "type": "Operation merge_deduplication_window_function failed",
+      "message": "Operation merge_deduplication_window_function failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_deduplication_window_function",
+      "type": "Operation merge_deduplication_window_function failed",
+      "message": "Operation merge_deduplication_window_function failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_deduplication_window_function",
+      "type": "Operation merge_deduplication_window_function failed",
+      "message": "Operation merge_deduplication_window_function failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_deduplication_window_function",
+      "type": "Operation merge_deduplication_window_function failed",
+      "message": "Operation merge_deduplication_window_function failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_error_handling",
+      "type": "Operation merge_error_handling failed",
+      "message": "Operation merge_error_handling failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_error_handling",
+      "type": "Operation merge_error_handling failed",
+      "message": "Operation merge_error_handling failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_error_handling",
+      "type": "Operation merge_error_handling failed",
+      "message": "Operation merge_error_handling failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_error_handling",
+      "type": "Operation merge_error_handling failed",
+      "message": "Operation merge_error_handling failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_etl_aggregation_pattern",
+      "type": "Operation merge_etl_aggregation_pattern failed",
+      "message": "Operation merge_etl_aggregation_pattern failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_etl_aggregation_pattern",
+      "type": "Operation merge_etl_aggregation_pattern failed",
+      "message": "Operation merge_etl_aggregation_pattern failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_etl_aggregation_pattern",
+      "type": "Operation merge_etl_aggregation_pattern failed",
+      "message": "Operation merge_etl_aggregation_pattern failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_etl_aggregation_pattern",
+      "type": "Operation merge_etl_aggregation_pattern failed",
+      "message": "Operation merge_etl_aggregation_pattern failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_from_subquery_aggregated",
+      "type": "Operation merge_from_subquery_aggregated failed",
+      "message": "Operation merge_from_subquery_aggregated failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_from_subquery_aggregated",
+      "type": "Operation merge_from_subquery_aggregated failed",
+      "message": "Operation merge_from_subquery_aggregated failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_from_subquery_aggregated",
+      "type": "Operation merge_from_subquery_aggregated failed",
+      "message": "Operation merge_from_subquery_aggregated failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_from_subquery_aggregated",
+      "type": "Operation merge_from_subquery_aggregated failed",
+      "message": "Operation merge_from_subquery_aggregated failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_full_overlap_all_update",
+      "type": "Operation merge_full_overlap_all_update failed",
+      "message": "Operation merge_full_overlap_all_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_full_overlap_all_update",
+      "type": "Operation merge_full_overlap_all_update failed",
+      "message": "Operation merge_full_overlap_all_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_full_overlap_all_update",
+      "type": "Operation merge_full_overlap_all_update failed",
+      "message": "Operation merge_full_overlap_all_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_full_overlap_all_update",
+      "type": "Operation merge_full_overlap_all_update failed",
+      "message": "Operation merge_full_overlap_all_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_multi_column_update",
+      "type": "Operation merge_multi_column_update failed",
+      "message": "Operation merge_multi_column_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_multi_column_update",
+      "type": "Operation merge_multi_column_update failed",
+      "message": "Operation merge_multi_column_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_multi_column_update",
+      "type": "Operation merge_multi_column_update failed",
+      "message": "Operation merge_multi_column_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_multi_column_update",
+      "type": "Operation merge_multi_column_update failed",
+      "message": "Operation merge_multi_column_update failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_no_overlap_all_insert",
+      "type": "Operation merge_no_overlap_all_insert failed",
+      "message": "Operation merge_no_overlap_all_insert failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_no_overlap_all_insert",
+      "type": "Operation merge_no_overlap_all_insert failed",
+      "message": "Operation merge_no_overlap_all_insert failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_no_overlap_all_insert",
+      "type": "Operation merge_no_overlap_all_insert failed",
+      "message": "Operation merge_no_overlap_all_insert failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_no_overlap_all_insert",
+      "type": "Operation merge_no_overlap_all_insert failed",
+      "message": "Operation merge_no_overlap_all_insert failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_10pct",
+      "type": "Operation merge_overlap_10pct failed",
+      "message": "Operation merge_overlap_10pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_10pct",
+      "type": "Operation merge_overlap_10pct failed",
+      "message": "Operation merge_overlap_10pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_10pct",
+      "type": "Operation merge_overlap_10pct failed",
+      "message": "Operation merge_overlap_10pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_10pct",
+      "type": "Operation merge_overlap_10pct failed",
+      "message": "Operation merge_overlap_10pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_50pct",
+      "type": "Operation merge_overlap_50pct failed",
+      "message": "Operation merge_overlap_50pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_50pct",
+      "type": "Operation merge_overlap_50pct failed",
+      "message": "Operation merge_overlap_50pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_50pct",
+      "type": "Operation merge_overlap_50pct failed",
+      "message": "Operation merge_overlap_50pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_50pct",
+      "type": "Operation merge_overlap_50pct failed",
+      "message": "Operation merge_overlap_50pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_90pct",
+      "type": "Operation merge_overlap_90pct failed",
+      "message": "Operation merge_overlap_90pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_90pct",
+      "type": "Operation merge_overlap_90pct failed",
+      "message": "Operation merge_overlap_90pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_90pct",
+      "type": "Operation merge_overlap_90pct failed",
+      "message": "Operation merge_overlap_90pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_overlap_90pct",
+      "type": "Operation merge_overlap_90pct failed",
+      "message": "Operation merge_overlap_90pct failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_returning_clause",
+      "type": "Operation merge_returning_clause failed",
+      "message": "Operation merge_returning_clause failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_returning_clause",
+      "type": "Operation merge_returning_clause failed",
+      "message": "Operation merge_returning_clause failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_returning_clause",
+      "type": "Operation merge_returning_clause failed",
+      "message": "Operation merge_returning_clause failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_returning_clause",
+      "type": "Operation merge_returning_clause failed",
+      "message": "Operation merge_returning_clause failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_simple_upsert_small",
+      "type": "Operation merge_simple_upsert_small failed",
+      "message": "Operation merge_simple_upsert_small failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_simple_upsert_small",
+      "type": "Operation merge_simple_upsert_small failed",
+      "message": "Operation merge_simple_upsert_small failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_simple_upsert_small",
+      "type": "Operation merge_simple_upsert_small failed",
+      "message": "Operation merge_simple_upsert_small failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_simple_upsert_small",
+      "type": "Operation merge_simple_upsert_small failed",
+      "message": "Operation merge_simple_upsert_small failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_string_operations",
+      "type": "Operation merge_string_operations failed",
+      "message": "Operation merge_string_operations failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_string_operations",
+      "type": "Operation merge_string_operations failed",
+      "message": "Operation merge_string_operations failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_string_operations",
+      "type": "Operation merge_string_operations failed",
+      "message": "Operation merge_string_operations failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_string_operations",
+      "type": "Operation merge_string_operations failed",
+      "message": "Operation merge_string_operations failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_upsert_with_delete",
+      "type": "Operation merge_upsert_with_delete failed",
+      "message": "Operation merge_upsert_with_delete failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_upsert_with_delete",
+      "type": "Operation merge_upsert_with_delete failed",
+      "message": "Operation merge_upsert_with_delete failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_upsert_with_delete",
+      "type": "Operation merge_upsert_with_delete failed",
+      "message": "Operation merge_upsert_with_delete failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_upsert_with_delete",
+      "type": "Operation merge_upsert_with_delete failed",
+      "message": "Operation merge_upsert_with_delete failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_with_cte_source",
+      "type": "Operation merge_with_cte_source failed",
+      "message": "Operation merge_with_cte_source failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_with_cte_source",
+      "type": "Operation merge_with_cte_source failed",
+      "message": "Operation merge_with_cte_source failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_with_cte_source",
+      "type": "Operation merge_with_cte_source failed",
+      "message": "Operation merge_with_cte_source failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_with_cte_source",
+      "type": "Operation merge_with_cte_source failed",
+      "message": "Operation merge_with_cte_source failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_with_join_condition",
+      "type": "Operation merge_with_join_condition failed",
+      "message": "Operation merge_with_join_condition failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_with_join_condition",
+      "type": "Operation merge_with_join_condition failed",
+      "message": "Operation merge_with_join_condition failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_with_join_condition",
+      "type": "Operation merge_with_join_condition failed",
+      "message": "Operation merge_with_join_condition failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "merge_with_join_condition",
+      "type": "Operation merge_with_join_condition failed",
+      "message": "Operation merge_with_join_condition failed: Parser Error: syntax error at or near \"MERGE\""
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_insert_theta_per_partition",
+      "type": "Operation sketch_insert_theta_per_partition failed",
+      "message": "Operation sketch_insert_theta_per_partition failed: Catalog Error: Scalar Function with name datasketch_theta does not exist!\nDid you mean \"datasketch_tdigest\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_insert_theta_per_partition",
+      "type": "Operation sketch_insert_theta_per_partition failed",
+      "message": "Operation sketch_insert_theta_per_partition failed: Catalog Error: Scalar Function with name datasketch_theta does not exist!\nDid you mean \"datasketch_tdigest\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_insert_theta_per_partition",
+      "type": "Operation sketch_insert_theta_per_partition failed",
+      "message": "Operation sketch_insert_theta_per_partition failed: Catalog Error: Scalar Function with name datasketch_theta does not exist!\nDid you mean \"datasketch_tdigest\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_insert_theta_per_partition",
+      "type": "Operation sketch_insert_theta_per_partition failed",
+      "message": "Operation sketch_insert_theta_per_partition failed: Catalog Error: Scalar Function with name datasketch_theta does not exist!\nDid you mean \"datasketch_tdigest\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_insert_topk_per_shard",
+      "type": "Operation sketch_insert_topk_per_shard failed",
+      "message": "Operation sketch_insert_topk_per_shard failed: Catalog Error: Scalar Function with name datasketch_frequent_items does not exist!\nDid you mean \"datasketch_req_n\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_insert_topk_per_shard",
+      "type": "Operation sketch_insert_topk_per_shard failed",
+      "message": "Operation sketch_insert_topk_per_shard failed: Catalog Error: Scalar Function with name datasketch_frequent_items does not exist!\nDid you mean \"datasketch_req_n\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_insert_topk_per_shard",
+      "type": "Operation sketch_insert_topk_per_shard failed",
+      "message": "Operation sketch_insert_topk_per_shard failed: Catalog Error: Scalar Function with name datasketch_frequent_items does not exist!\nDid you mean \"datasketch_req_n\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_insert_topk_per_shard",
+      "type": "Operation sketch_insert_topk_per_shard failed",
+      "message": "Operation sketch_insert_topk_per_shard failed: Catalog Error: Scalar Function with name datasketch_frequent_items does not exist!\nDid you mean \"datasketch_req_n\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_query_theta_union_merge",
+      "type": "Operation sketch_query_theta_union_merge failed",
+      "message": "Operation sketch_query_theta_union_merge failed: Catalog Error: Scalar Function with name datasketch_theta does not exist!\nDid you mean \"datasketch_tdigest\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_query_theta_union_merge",
+      "type": "Operation sketch_query_theta_union_merge failed",
+      "message": "Operation sketch_query_theta_union_merge failed: Catalog Error: Scalar Function with name datasketch_theta does not exist!\nDid you mean \"datasketch_tdigest\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_query_theta_union_merge",
+      "type": "Operation sketch_query_theta_union_merge failed",
+      "message": "Operation sketch_query_theta_union_merge failed: Catalog Error: Scalar Function with name datasketch_theta does not exist!\nDid you mean \"datasketch_tdigest\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_query_theta_union_merge",
+      "type": "Operation sketch_query_theta_union_merge failed",
+      "message": "Operation sketch_query_theta_union_merge failed: Catalog Error: Scalar Function with name datasketch_theta does not exist!\nDid you mean \"datasketch_tdigest\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_query_topk_combine",
+      "type": "Operation sketch_query_topk_combine failed",
+      "message": "Operation sketch_query_topk_combine failed: Catalog Error: Scalar Function with name datasketch_frequent_items does not exist!\nDid you mean \"datasketch_req_n\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_query_topk_combine",
+      "type": "Operation sketch_query_topk_combine failed",
+      "message": "Operation sketch_query_topk_combine failed: Catalog Error: Scalar Function with name datasketch_frequent_items does not exist!\nDid you mean \"datasketch_req_n\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_query_topk_combine",
+      "type": "Operation sketch_query_topk_combine failed",
+      "message": "Operation sketch_query_topk_combine failed: Catalog Error: Scalar Function with name datasketch_frequent_items does not exist!\nDid you mean \"datasketch_req_n\"?"
+    },
+    {
+      "phase": "query",
+      "query_id": "sketch_query_topk_combine",
+      "type": "Operation sketch_query_topk_combine failed",
+      "message": "Operation sketch_query_topk_combine failed: Catalog Error: Scalar Function with name datasketch_frequent_items does not exist!\nDid you mean \"datasketch_req_n\"?"
+    }
+  ],
+  "export": {
+    "timestamp": "2026-05-02T21:42:07.111283",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

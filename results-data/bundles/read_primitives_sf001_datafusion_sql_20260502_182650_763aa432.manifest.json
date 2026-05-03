@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:49:30.723310+00:00",
+  "bundle_file": "read_primitives_sf001_datafusion_sql_20260502_182650_763aa432.json",
+  "bundle_hash": "e68145338076db236cddb4cb85642490cf5a9805c83bc3d190d1d47a8fe5f658",
+  "companion_hashes": {},
+  "benchmark": "Read Primitives",
+  "platform": "DataFusion",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

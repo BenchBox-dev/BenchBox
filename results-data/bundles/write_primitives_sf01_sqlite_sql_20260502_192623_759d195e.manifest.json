@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:53:50.953856+00:00",
+  "bundle_file": "write_primitives_sf01_sqlite_sql_20260502_192623_759d195e.json",
+  "bundle_hash": "054ff361223c94e3274acf0f36756b4ce8795e9d349b7590ff04f2f8dd0db26c",
+  "companion_hashes": {},
+  "benchmark": "Write Primitives",
+  "platform": "SQLite",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

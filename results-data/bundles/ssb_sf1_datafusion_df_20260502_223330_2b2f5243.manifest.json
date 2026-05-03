@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:12.018175+00:00",
+  "bundle_file": "ssb_sf1_datafusion_df_20260502_223330_2b2f5243.json",
+  "bundle_hash": "848b45829f79ac9c467bd7bbb71284d024e18ccee5933c1993ec19ffb1bc8e77",
+  "companion_hashes": {},
+  "benchmark": "SSB",
+  "platform": "DataFusion",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

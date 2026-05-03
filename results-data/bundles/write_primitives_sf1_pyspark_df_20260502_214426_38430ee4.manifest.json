@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:53:59.226964+00:00",
+  "bundle_file": "write_primitives_sf1_pyspark_df_20260502_214426_38430ee4.json",
+  "bundle_hash": "9c5c1e142c4aaf0db812a9a89585452230e531d5526a074fbd7e8b16c99d4218",
+  "companion_hashes": {},
+  "benchmark": "Write Primitives",
+  "platform": "PySpark",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

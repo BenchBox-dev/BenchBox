@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:53:39.175275+00:00",
+  "bundle_file": "write_primitives_sf001_polars_df_20260502_210917_f2787858.json",
+  "bundle_hash": "2aed2a05ee2c19ba30503191efc2c791a61437166bedab553b84d6484ec4606c",
+  "companion_hashes": {},
+  "benchmark": "Write Primitives",
+  "platform": "Polars",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

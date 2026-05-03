@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:46:57.354725+00:00",
+  "bundle_file": "amplab_sf1_spark_sql_20260502_204735_381b7586.json",
+  "bundle_hash": "96530ca97865eb5186a28cf55f0fa57a6ce969f8fc558d131ba35c96f5f3aec5",
+  "companion_hashes": {},
+  "benchmark": "AMPLab Big Data",
+  "platform": "Spark",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

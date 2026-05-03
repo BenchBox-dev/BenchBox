@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:46:34.533186+00:00",
+  "bundle_file": "amplab_sf001_datafusion_sql_20260502_182815_88aab2ac.json",
+  "bundle_hash": "a276dae05d07c35dcc9fc4217726cdf5bffe721ccdbd15697d45ac7a67e581e0",
+  "companion_hashes": {},
+  "benchmark": "AMPLab Big Data",
+  "platform": "DataFusion",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:53:19.108453+00:00",
+  "bundle_file": "tsbs_devops_sf01_sqlite_sql_20260502_195928_0615e41b.json",
+  "bundle_hash": "cf78cc337f99afe017f81763c8a42f52bda83134fe7dab877f643a9a43f0655f",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "SQLite",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

@@ -1,0 +1,256 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "e75f78eb",
+    "timestamp": "2026-05-02T21:58:28.796386",
+    "total_duration_ms": 3823,
+    "query_time_ms": 0,
+    "iterations": 1,
+    "streams": 1
+  },
+  "benchmark": {
+    "id": "tpch_skew",
+    "name": "TPC-H Skew",
+    "scale_factor": 0.01,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "PySpark",
+    "version": "4.1.1",
+    "client_version": "unknown",
+    "config": {
+      "execution_mode": "dataframe",
+      "family": "expression",
+      "master": "local[*]",
+      "driver_memory": "4g",
+      "shuffle_partitions": 10,
+      "aqe_enabled": true,
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/tpch_skew_sf001",
+      "driver_runtime_strategy": "current-process"
+    },
+    "deployment": {
+      "deployment_type": "dataframe",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "master": "local[*]",
+      "driver_memory": "4g",
+      "shuffle_partitions": 10,
+      "aqe_enabled": true,
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/tpch_skew_sf001",
+      "options": {
+        "verbose_level": 0,
+        "verbose_enabled": false,
+        "very_verbose": false,
+        "quiet": false,
+        "verbose": false,
+        "force_recreate": false,
+        "show_query_plans": false,
+        "tuning_enabled": false,
+        "force_upload": false,
+        "capture_plans": false,
+        "strict_plan_capture": false,
+        "execution_mode": "dataframe",
+        "unified_tuning_configuration": {
+          "primary_keys": {
+            "enabled": false,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
+          "foreign_keys": {
+            "enabled": false,
+            "enforce_referential_integrity": true,
+            "on_delete_action": "RESTRICT",
+            "on_update_action": "RESTRICT"
+          },
+          "unique_constraints": {
+            "enabled": false,
+            "ignore_nulls": false
+          },
+          "check_constraints": {
+            "enabled": false,
+            "enforce_on_insert": true,
+            "enforce_on_update": true
+          },
+          "platform_optimizations": {
+            "z_ordering_enabled": false,
+            "liquid_clustering_enabled": false,
+            "databricks_clustering_strategy": "z_order",
+            "sorted_ingestion_mode": "off",
+            "sorted_ingestion_method": "auto",
+            "auto_optimize_enabled": false,
+            "auto_compact_enabled": false,
+            "bloom_filters_enabled": false,
+            "materialized_views_enabled": false
+          }
+        }
+      },
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "execution_mode": "dataframe",
+      "benchmark": "tpch_skew",
+      "scale_factor": 0.01,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "memory_limit": "12GB",
+      "thread_limit": 8
+    },
+    "raw_metadata": {
+      "driver_runtime_strategy": "current-process"
+    },
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "mode": "dataframe"
+  },
+  "summary": {
+    "queries": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    "timing": {
+      "total_ms": 0,
+      "avg_ms": 0,
+      "min_ms": 0,
+      "max_ms": 0
+    },
+    "data": {
+      "rows_loaded": 86805,
+      "load_time_ms": 3822.5
+    },
+    "validation": "passed"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 3822
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    },
+    "power_test": {
+      "status": "COMPLETED"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [],
+  "tables": {
+    "customer": {
+      "rows": 1500,
+      "load_ms": 3336
+    },
+    "lineitem": {
+      "rows": 60175,
+      "load_ms": 85
+    },
+    "nation": {
+      "rows": 25,
+      "load_ms": 70
+    },
+    "orders": {
+      "rows": 15000,
+      "load_ms": 69
+    },
+    "part": {
+      "rows": 2000,
+      "load_ms": 68
+    },
+    "partsupp": {
+      "rows": 8000,
+      "load_ms": 66
+    },
+    "region": {
+      "rows": 5,
+      "load_ms": 61
+    },
+    "supplier": {
+      "rows": 100,
+      "load_ms": 63
+    }
+  },
+  "cost": {
+    "total_usd": 0,
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-02T21:58:28.792768",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_runtime_strategy": "current-process",
+    "non_interactive": true
+  },
+  "environment": {
+    "platform_runtime": {
+      "runtime_type": "dataframe_process",
+      "collection_status": "partial",
+      "source": "inferred",
+      "engine_host": "host_0a57d94f05f4"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "client_host": {
+      "machine_id": "machine_45d1a3ef31a1728d"
+    }
+  },
+  "export": {
+    "timestamp": "2026-05-02T21:58:32.635775",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

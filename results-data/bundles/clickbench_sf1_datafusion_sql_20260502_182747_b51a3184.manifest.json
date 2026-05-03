@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:01.957851+00:00",
+  "bundle_file": "clickbench_sf1_datafusion_sql_20260502_182747_b51a3184.json",
+  "bundle_hash": "99859d295f161be600abaa80701eed608d69a9b9635fb537b3511d5480cbd1d4",
+  "companion_hashes": {},
+  "benchmark": "ClickBench",
+  "platform": "DataFusion",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

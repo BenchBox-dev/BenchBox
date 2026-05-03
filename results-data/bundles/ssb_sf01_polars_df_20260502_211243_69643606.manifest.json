@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:04.958399+00:00",
+  "bundle_file": "ssb_sf01_polars_df_20260502_211243_69643606.json",
+  "bundle_hash": "faa7678d53f4962506ede58bfd256dc80876c52de0bb1fab67202c8026941865",
+  "companion_hashes": {},
+  "benchmark": "SSB",
+  "platform": "Polars",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}
