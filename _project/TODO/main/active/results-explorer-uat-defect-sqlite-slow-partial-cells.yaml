@@ -42,11 +42,24 @@ work:
 - id: w2
   summary: "Fix or document the highest-impact SQLite-specific timeout/partial cluster"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Work-unit-owned files before editing:
     - `benchbox/platforms/sqlite.py`
     - `docs/platforms/sqlite.md` (only if the highest-impact finding is a documented SQLite limitation)
+
+    W2 result (2026-05-03):
+    - Reproduced the TODO smoke before the fix. Current `develop` no longer showed a partial-status leak:
+      `summary.validation=passed`, 66/66 query executions passed, and zero failed queries.
+    - The highest-impact SQLite-specific cluster was TPC-H Q21 latency. Without persistent SQLite indexes,
+      Q21 took about 68-70s per run because correlated subqueries repeatedly scanned `lineitem`.
+    - Added post-load TPC-H helper indexes in `benchbox/platforms/sqlite.py` for the `lineitem`, `orders`,
+      `supplier`, and `nation` access paths used by Q21. The indexes are created after bulk load and included
+      in load timing.
+    - Documented the helper indexes and database cleanup/reuse behavior in `docs/platforms/sqlite.md`.
+    - Fresh exact smoke after deleting the generated SQLite DB passed with 66/66 query executions; Q21 dropped
+      to about 29-31ms and measurement runs completed in about 12s.
+    - W2 code review found no required fixes. W3 still owns focused regression coverage for helper index creation.
 - id: w3
   summary: "Add SQLite-specific regression or skip classification coverage"
   needs: [w2]
