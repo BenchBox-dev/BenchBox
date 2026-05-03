@@ -56,7 +56,7 @@ work:
 - id: w2
   summary: "Draft remediation proposals for each of the three findings"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     For each finding, produce:
       a. Root cause: what specifically in the UAT TODO format failed.
