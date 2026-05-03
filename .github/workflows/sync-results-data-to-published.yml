@@ -1,0 +1,193 @@
+name: Sync results-data to published-results
+
+# When `results-data/` changes on develop (e.g. a maintainer-run seed corpus
+# refresh from `seed-corpus.yml`, or a UAT integration PR like #164), open a
+# draft PR vs `published-results` mirroring the changed corpus content. The
+# `published-results` branch is intentionally slim (corpus + a small set of
+# vendored validators) per
+# `docs/development/adr/adr-published-results-slim-corpus-branch.md`, so this
+# workflow keeps it in sync with develop's authoritative `results-data/`
+# without forcing maintainers to mirror by hand.
+#
+# The mirror PR is intentionally a draft — it never auto-merges. Maintainers
+# review and flip ready when the develop-side change is ready to be visible
+# on the public corpus branch.
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "results-data/bundles/**"
+      - "results-data/corpus-inventory.json"
+      - "results-data/CORPUS_NOTES.md"
+      - "results-data/SEED_CORPUS_SPEC.md"
+      - "results-data/README.md"
+      - "results-data/validate_corpus.py"
+      - "scripts/validate_submission.py"
+      - "scripts/generate_corpus_inventory.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-results-to-published-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0  # full history so we can switch branches and diff
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "benchbox-bot"
+          git config user.email "benchbox-bot@users.noreply.github.com"
+
+      - name: Detect drift between develop and published-results
+        id: drift
+        run: |
+          git fetch origin published-results
+
+          # Compare develop's view of the slim-branch allowlist subset
+          # against published-results. Use `git diff --name-only` to surface
+          # paths that differ; if empty, exit early.
+          mapfile -t DIFFED < <(git diff --name-only origin/published-results...origin/develop -- \
+            'results-data/bundles' 'results-data/corpus-inventory.json' \
+            'results-data/CORPUS_NOTES.md' 'results-data/SEED_CORPUS_SPEC.md' \
+            'results-data/README.md' 'results-data/validate_corpus.py' \
+            'scripts/validate_submission.py' 'scripts/generate_corpus_inventory.py')
+
+          if [[ ${#DIFFED[@]} -eq 0 ]]; then
+            echo "No drift between develop and published-results in mirrored paths."
+            echo "has_drift=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Drift detected in ${#DIFFED[@]} path(s):"
+          printf '  %s\n' "${DIFFED[@]}"
+          echo "has_drift=true" >> "$GITHUB_OUTPUT"
+
+          # Capture file count for the PR body
+          {
+            echo "diff_count=${#DIFFED[@]}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build mirror branch
+        if: steps.drift.outputs.has_drift == 'true'
+        id: build
+        run: |
+          # Branch name is deterministic per develop SHA so re-runs on the
+          # same commit replace rather than accumulate.
+          MIRROR_BRANCH="auto/results-mirror-${GITHUB_SHA::8}"
+          echo "mirror_branch=${MIRROR_BRANCH}" >> "$GITHUB_OUTPUT"
+
+          # Start from current published-results
+          git switch --force-create "${MIRROR_BRANCH}" origin/published-results
+
+          # Apply develop's content for each mirrored path
+          for path in \
+            'results-data/bundles' \
+            'results-data/corpus-inventory.json' \
+            'results-data/CORPUS_NOTES.md' \
+            'results-data/SEED_CORPUS_SPEC.md' \
+            'results-data/README.md' \
+            'results-data/validate_corpus.py' \
+            'scripts/validate_submission.py' \
+            'scripts/generate_corpus_inventory.py'
+          do
+            # `git checkout` here imports the develop-side blob/tree at this
+            # path into the working tree on the mirror branch.
+            if git cat-file -e "origin/develop:${path}" 2>/dev/null; then
+              git checkout origin/develop -- "${path}"
+            else
+              # Path was deleted on develop; mirror the deletion.
+              git rm -rf --quiet "${path}" || true
+            fi
+          done
+
+          if git diff --staged --quiet && git diff --quiet; then
+            echo "After applying develop content, mirror branch matches"
+            echo "published-results — nothing to commit."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git add results-data scripts || true
+
+          MSG_FILE=$(mktemp)
+          cat > "${MSG_FILE}" <<MSG
+          chore(corpus): mirror results-data changes from develop@${GITHUB_SHA::8}
+
+          This is an auto-generated mirror PR. The develop-side push at
+          ${GITHUB_SHA} changed paths under the slim-branch allowlist. This
+          commit replays those changes against published-results so the slim
+          branch tracks develop's authoritative results-data/.
+
+          Maintainer review the diff and flip the PR ready to merge.
+          MSG
+          # Strip the leading-whitespace indentation that the YAML block scalar
+          # forced into the heredoc body so the commit message is clean.
+          sed -i 's/^          //' "${MSG_FILE}"
+          git commit -F "${MSG_FILE}"
+          rm -f "${MSG_FILE}"
+
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+          # Push the mirror branch (force is OK — branch is auto-named per
+          # develop SHA and only ever managed by this workflow).
+          PRE_COMMIT_ALLOW_NO_CONFIG=1 git push --force origin "${MIRROR_BRANCH}"
+
+      - name: Open or update draft PR
+        if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MIRROR_BRANCH: ${{ steps.build.outputs.mirror_branch }}
+          DIFF_COUNT: ${{ steps.drift.outputs.diff_count }}
+        run: |
+          # Reuse an existing PR opened by this workflow against the same
+          # mirror branch; otherwise open a new draft PR.
+          EXISTING=$(gh pr list \
+            --base published-results \
+            --head "${MIRROR_BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          BODY=$(cat <<EOF | sed 's/^          //'
+          Auto-mirror of develop's \`results-data/\` changes onto the slim
+          \`published-results\` branch. Triggered by develop@\`${GITHUB_SHA::8}\`.
+
+          **${DIFF_COUNT}** path(s) changed. Review the diff and flip the PR
+          ready to merge when the develop-side change is ready to surface
+          on the public corpus branch. This PR will not auto-merge.
+
+          See [\`docs/development/adr/adr-published-results-slim-corpus-branch.md\`](https://github.com/${{ github.repository }}/blob/develop/docs/development/adr/adr-published-results-slim-corpus-branch.md)
+          for the slim-branch design and
+          [\`docs/operations/results-phase-2-runbook.md\`](https://github.com/${{ github.repository }}/blob/develop/docs/operations/results-phase-2-runbook.md)
+          for the operating model.
+          EOF
+          )
+
+          if [[ -z "${EXISTING}" ]]; then
+            gh pr create \
+              --draft \
+              --base published-results \
+              --head "${MIRROR_BRANCH}" \
+              --title "chore(corpus): mirror results-data changes from develop@${GITHUB_SHA::8}" \
+              --body "${BODY}"
+          else
+            echo "PR #${EXISTING} already open for ${MIRROR_BRANCH}; updating body."
+            gh pr edit "${EXISTING}" --body "${BODY}"
+          fi
+
+      - name: No-op summary
+        if: steps.drift.outputs.has_drift != 'true' || steps.build.outputs.has_changes != 'true'
+        run: echo "No mirror PR needed — develop and published-results are already in sync for the mirrored paths."

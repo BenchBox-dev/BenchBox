@@ -2,9 +2,12 @@
 
 ## Status
 
-Proposed (2026-05-03). Acceptance is gated on the W2 force-push of
-`published-results` documented under
-`_project/TODO/main/active/published-results-slim-down-and-corpus-mirror.yaml`.
+Accepted (2026-05-03). The W2 force-push of `published-results` to the slim
+orphan commit `00260bd46` has shipped (pre-slim tip preserved as
+`refs/backups/published-results-pre-slim-20260503` on origin). The W3 mirror
+PR #166 is open as draft against `published-results`. The W4 sync workflow
+(`.github/workflows/sync-results-data-to-published.yml`) lands together
+with this ADR update.
 
 ## Date
 
@@ -140,26 +143,25 @@ host the same mix of `maintainer-run` (seed corpus, no sidecar) and
 
 `validate_submission.py` and `generate_corpus_inventory.py` exist on
 `develop` (the canonical home) and are vendored to `published-results`
-for self-contained CI. The vendored copies are kept in sync via the
-develop ↔ published-results sync mechanism the parent TODO's W4 will
-land. Until that mechanism exists, **divergence is detected by a
-hash-equality check on develop**:
+for self-contained CI. Sync is automated by
+[`.github/workflows/sync-results-data-to-published.yml`](../../../.github/workflows/sync-results-data-to-published.yml):
+when develop's copy of either script changes, the workflow opens a
+draft mirror PR vs `published-results` carrying the change. Maintainers
+review and flip ready when the develop change is intended to surface on
+the public corpus branch.
 
-- A new pre-merge CI step on develop's `pr.yml` (added as part of the
-  parent TODO's W2 / W4) computes the SHA-256 of develop's
-  `scripts/validate_submission.py` and `scripts/generate_corpus_inventory.py`
-  and compares against the same files fetched from `origin/published-results`.
-- If they differ, the develop PR is annotated with a "vendored copy
-  drift" warning that surfaces the diff and points the maintainer at
-  the parent TODO. The warning is informational, not blocking — the
-  develop PR can still merge — but it ensures drift is never silent.
-- The published-results copies are updated lock-step with develop in
-  the sync mechanism W4 lands, so the warning should normally be a
-  no-op.
+This means `published-results` will normally be at most one mirror PR
+behind develop on the vendored scripts. If a develop PR modifies one
+of the scripts but the mirror PR is left as a draft (e.g. waiting on a
+matching slim-branch contributor PR), divergence is bounded and visible
+in the open-PR list against `published-results`.
 
-In the absence of this gate (i.e. before W2/W4 ship), divergence
-between develop and published-results copies is treated as a
-develop-side bug; develop is authoritative.
+If the workflow itself ever misfires (e.g. detects no drift when there
+is one), the manual recovery is to trigger it via `workflow_dispatch`
+from the develop branch. In the absence of any sync at all, develop
+remains authoritative — `published-results` copies are treated as
+read-only mirrors, and any develop-side bug fix in the validators is
+the canonical fix.
 
 ## Consequences
 
@@ -230,9 +232,13 @@ develop-side bug; develop is authoritative.
 - W3 of the parent TODO mirrors the UAT-20260502 corpus delta (188
   community-submission bundles + 188 manifests + regenerated inventory
   + slim README) onto the post-slim `published-results`.
-- W4 picks a sync mechanism so future develop-side bundle adds (e.g.
-  the next maintainer-run seed-corpus refresh) propagate to
-  `published-results` without manual mirroring.
+- W4 of the parent TODO ships
+  `.github/workflows/sync-results-data-to-published.yml`. The workflow
+  watches develop for changes under the slim-branch allowlist paths
+  (`results-data/bundles/`, the corpus docs, the two vendored
+  validators) and opens a draft mirror PR vs `published-results`. The
+  mirror PR never auto-merges; maintainers review and flip ready when
+  the change is intended to surface on the public corpus branch.
 
 ## Maintenance protocol
 

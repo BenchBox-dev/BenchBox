@@ -2,7 +2,8 @@ id: published-results-slim-down-and-corpus-mirror
 title: "Slim down published-results to corpus-only and mirror UAT-20260502 onto it"
 worktree: main
 priority: "Medium-High"
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-05-03"
 category: "Operations"
 
 deps:
@@ -74,7 +75,7 @@ work:
 - id: w3
   summary: "Mirror the UAT-20260502 188-bundle integration onto slim published-results"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Fork off the slimmed `published-results`, copy the bundle JSONs +
     per-bundle manifests + regenerated `corpus-inventory.json` from the
@@ -88,7 +89,7 @@ work:
 - id: w4
   summary: "Wire develop -> published-results sync (or explorer-build-on-published-results)"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Pick one of:
       a) A scheduled workflow that opens a draft PR mirroring the
