@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from types import ModuleType
 
 import click
 
@@ -150,6 +152,61 @@ def _build_submission_manifest(
     }
 
 
+def _load_submission_validator_module() -> ModuleType:
+    repo_root = Path(__file__).resolve().parents[3]
+    candidate_paths = (
+        repo_root / "scripts" / "validate_submission.py",
+        Path.cwd() / "scripts" / "validate_submission.py",
+    )
+
+    for validator_path in candidate_paths:
+        if not validator_path.is_file():
+            continue
+        spec = importlib.util.spec_from_file_location("_benchbox_submission_validator", validator_path)
+        if spec is None or spec.loader is None:
+            continue
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    locations = ", ".join(str(path) for path in candidate_paths)
+    raise FileNotFoundError(f"scripts/validate_submission.py not found in: {locations}")
+
+
+def _validate_submission_bundle_for_dry_run(ctx: click.Context, source_path: Path) -> None:
+    """Run the same local bundle validator used by published-results CI."""
+
+    try:
+        validator = _load_submission_validator_module()
+        validate_bundles = validator.validate_bundles
+        format_summary = validator.format_summary
+    except Exception as exc:
+        console.print(
+            f"\n[red]Submission validation unavailable:[/red] could not load scripts.validate_submission ({exc})."
+        )
+        console.print("[dim]Run this command from a BenchBox source checkout with the validator script present.[/dim]")
+        ctx.exit(1)
+        return
+
+    try:
+        validation_results = validate_bundles([source_path])
+    except Exception as exc:
+        console.print(f"\n[red]Submission validation failed to run:[/red] {exc}")
+        ctx.exit(1)
+        return
+
+    if not validation_results:
+        console.print(f"\n[red]Submission validation failed:[/red] no bundle file validated for {source_path}.")
+        ctx.exit(1)
+        return
+
+    if any(not result.ok for result in validation_results):
+        console.print("\n[red]Submission validation failed:[/red]")
+        console.print(format_summary(validation_results))
+        ctx.exit(1)
+        return
+
+
 def _dispatch_service_mode(
     ctx: click.Context,
     *,
@@ -170,23 +227,12 @@ def _dispatch_service_mode(
     auth, uploads the canonical bundle, and optionally polls for hosted
     publication status.
 
-    Validation policy (R5 in pass-2 review): this path INTENTIONALLY does
-    not run ``scripts/validate_submission.py`` against the bundle before
-    upload. The hosted ingest service validates server-side; running the
-    develop-tip validator here would couple the Python CLI release cadence
-    to the hosted API's accepted-schema set and create false rejections
-    on legacy clients. The trade-off: contributors pay full upload latency
-    before the service tells them what's wrong.
-
-    The develop side of the contract is now guarded by
-    ``tests/integration/test_hosted_submit_validator_contract.py``: it
-    exercises the bundle layout this code path emits against
-    ``scripts/validate_submission.py`` and fails CI if hosted-submit and
-    develop-validator drift on schema or hash format. Fail-fast local
-    preflight (option 1 in the blind-spot's "suggested next steps") is
-    therefore unblocked but deliberately deferred until the legacy-client
-    cost is understood — see blind-spot
-    ``_project/blind-spots/2026-05-01-103000-hosted-submit-no-local-validate-preflight.md``.
+    Dry-run validation policy: `submit()` runs the same
+    ``scripts/validate_submission.py`` bundle checks used by
+    published-results CI before dispatching into this mode. The real hosted
+    upload still relies on server-side validation so older clients are not
+    blocked by develop-tip validator changes after credentials have already
+    been configured.
 
     Hash contract for the dry-run: the values printed are SHA-256 of the
     on-disk source files as-is. The Phase 2 PR-package path
@@ -573,6 +619,9 @@ def submit(
         for suffix in (".plans.json", ".tuning.json")
         if (p := source_path.with_name(source_path.stem + suffix)).exists()
     ]
+
+    if dry_run:
+        _validate_submission_bundle_for_dry_run(ctx, source_path)
 
     if service_url is not None:
         _dispatch_service_mode(
