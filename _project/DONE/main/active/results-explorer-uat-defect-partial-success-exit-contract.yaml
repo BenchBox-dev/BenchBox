@@ -2,8 +2,9 @@ id: results-explorer-uat-defect-partial-success-exit-contract
 title: "UAT defect: passed cells hide query-level failures"
 worktree: main
 priority: "High"
-status: "In Progress"
+status: "Completed"
 category: "Testing and Quality Assurance"
+completed_date: "2026-05-03"
 
 description: |
   The Results Explorer UAT sweep found cells that were recorded as passed even
