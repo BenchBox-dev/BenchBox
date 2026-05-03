@@ -883,6 +883,13 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             table_name=table_name,
             benchmark=benchmark,
         )
+        dialect = resolve_csv_dialect(
+            data_source or DataSource(source_type="datafusion_csv", tables={}),
+            table_name,
+            file_paths[0],
+            benchmark if benchmark is not None else NO_BENCHMARK,
+        )
+        delimiter = dialect.delimiter
 
         # Get schema information for proper column names
         schema_info = self._table_schemas.get(table_name, {})
@@ -903,21 +910,8 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             # Check if files are in same directory and can use glob
             parent_dir = file_paths[0].parent
             if all(f.parent == parent_dir for f in file_paths):
-                # Use glob pattern based on actual file extension
-                # E.g., table.tbl.1, table.tbl.2 -> table.tbl.*
-                # This preserves the extension to avoid matching unintended files
-                first_file_name = file_paths[0].name
-                # Find the position of the first numeric extension or just use table_name
-                if "." in first_file_name:
-                    # Keep everything up to the last numeric part
-                    base_pattern = (
-                        first_file_name.rsplit(".", 1)[0]
-                        if first_file_name.split(".")[-1].isdigit()
-                        else first_file_name
-                    )
-                    location = str(parent_dir / f"{base_pattern}*")
-                else:
-                    location = str(parent_dir / f"{table_name}*")
+                common_prefix = os.path.commonprefix([f.name for f in file_paths])
+                location = str(parent_dir / f"{common_prefix}*")
                 self.log_very_verbose(f"Using glob pattern for {table_name}: {location}")
             else:
                 # Files in different directories - fall back to first file with warning
@@ -932,7 +926,7 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # Note: DataFusion's CSV reader doesn't have a direct "ignore trailing delimiter" option
         # We need to handle this via schema definition with exact column count
         options = [
-            "'has_header' 'false'",
+            f"'has_header' '{str(dialect.has_header).lower()}'",
             f"'delimiter' '{delimiter}'",
         ]
 

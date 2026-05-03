@@ -174,7 +174,12 @@ class ClickHouseWorkloadMixin:
                 dialect = resolve_csv_dialect(
                     dialect_source, table_name or file_path.stem, file_path, benchmark_instance
                 )
-                return ClickHouseNativeHandler(dialect.delimiter, adapter, benchmark_instance)
+                return ClickHouseNativeHandler(
+                    dialect.delimiter,
+                    adapter,
+                    benchmark_instance,
+                    has_header=dialect.has_header,
+                )
             elif base_ext == ".parquet":
                 # Delimiter is unused for Parquet - file() reads the format natively.
                 # We route through ClickHouseNativeHandler so load_table() uses

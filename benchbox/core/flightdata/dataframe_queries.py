@@ -132,7 +132,7 @@ def delay_by_hour_expression_impl(ctx: DataFrameContext) -> Any:
             & (col("flight_date") >= lit(p["start_date"]))
             & (col("flight_date") < lit(p["end_date"]))
         )
-        .with_columns((col("crs_dep_time") // lit(100)).alias("dep_hour"))
+        .with_columns((col("crs_dep_time") / lit(100)).floor().cast(int).alias("dep_hour"))
         .group_by("dep_hour")
         .agg(
             col("flight_id").count().alias("total_flights"),
@@ -215,7 +215,7 @@ def delay_causes_expression_impl(ctx: DataFrameContext) -> Any:
         & (col("arr_delay") > lit(15))
         & (col("flight_date") >= lit(p["start_date"]))
         & (col("flight_date") < lit(p["end_date"]))
-    ).agg(
+    ).select(
         col("flight_id").count().alias("total_delayed_flights"),
         (col("carrier_delay") > lit(0)).cast(int).sum().alias("carrier_delay_count"),
         col("carrier_delay").filter(col("carrier_delay") > lit(0)).mean().round(2).alias("avg_carrier_delay"),
@@ -642,7 +642,7 @@ def time_of_day_expression_impl(ctx: DataFrameContext) -> Any:
             & (col("flight_date") >= lit(p["start_date"]))
             & (col("flight_date") < lit(p["end_date"]))
         )
-        .with_columns((col("crs_dep_time") // lit(100)).alias("hour_of_day"))
+        .with_columns((col("crs_dep_time") / lit(100)).floor().cast(int).alias("hour_of_day"))
         .group_by("hour_of_day")
         .agg(
             col("flight_id").count().alias("total_flights"),
