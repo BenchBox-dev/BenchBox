@@ -31,6 +31,18 @@ try:
 except ImportError:
     sqlite3 = None
 
+_TPCH_TABLES: frozenset[str] = frozenset(
+    {"customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"}
+)
+
+_TPCH_HELPER_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_lineitem_order_supp_dates "
+    "ON lineitem (l_orderkey, l_suppkey, l_receiptdate, l_commitdate)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_orders_status_order ON orders (o_orderstatus, o_orderkey)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_supplier_nation_supp ON supplier (s_nationkey, s_suppkey)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_nation_name_key ON nation (n_name, n_nationkey)",
+)
+
 
 class SQLiteAdapter(PlatformAdapter):
     """SQLite platform adapter for testing and lightweight usage."""
@@ -298,8 +310,35 @@ class SQLiteAdapter(PlatformAdapter):
             tuning_config=self.unified_tuning_configuration if self.tuning_enabled else None,
         )
         table_stats, loading_time = loader.load()
+        helper_index_time = self._apply_benchmark_helper_indexes(benchmark, connection)
         # DataLoader doesn't provide per-table timings yet
-        return table_stats, loading_time, None
+        return table_stats, loading_time + helper_index_time, None
+
+    def _apply_benchmark_helper_indexes(self, benchmark: Any, connection: Any) -> float:
+        """Apply small SQLite indexes needed to keep local benchmark smoke runs terminating."""
+        if not _is_tpch_benchmark(benchmark):
+            return 0.0
+
+        existing_tables = set(self._get_existing_tables(connection))
+        if not _TPCH_TABLES.issubset(existing_tables):
+            missing = ", ".join(sorted(_TPCH_TABLES - existing_tables))
+            self.log_very_verbose(f"Skipping SQLite TPC-H helper indexes; missing tables: {missing}")
+            return 0.0
+
+        start_time = mono_time()
+        created = 0
+        for statement in _TPCH_HELPER_INDEXES:
+            try:
+                connection.execute(statement)
+                created += 1
+            except Exception as exc:
+                self.logger.warning("SQLite helper index creation failed: %s", exc)
+
+        if created:
+            connection.commit()
+            self.log_verbose(f"Applied {created} SQLite TPC-H helper index(es)")
+
+        return elapsed_seconds(start_time)
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
         """SQLite does not support efficient post-load CTAS sorting in this workflow."""
@@ -419,3 +458,12 @@ class SQLiteAdapter(PlatformAdapter):
     def run_maintenance_test(self, benchmark, **kwargs) -> dict[str, Any]:
         """Run TPC maintenance test (not implemented for SQLite)."""
         raise NotImplementedError("Maintenance test not implemented for SQLite adapter")
+
+
+def _is_tpch_benchmark(benchmark: Any) -> bool:
+    benchmark_id = str(getattr(benchmark, "benchmark_id", "") or getattr(benchmark, "id", "")).lower()
+    if benchmark_id in {"tpch", "tpc-h"}:
+        return True
+    class_name = benchmark.__class__.__name__.lower()
+    display_name = str(getattr(benchmark, "_name", "") or getattr(benchmark, "name", "")).lower()
+    return "tpch" in class_name or "tpc-h" in display_name

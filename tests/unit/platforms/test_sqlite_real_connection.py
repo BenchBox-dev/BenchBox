@@ -98,3 +98,53 @@ class TestSQLiteRealConnection:
         conn.close()
         with pytest.raises(Exception):
             conn.execute("SELECT 1")
+
+
+class _TpchBenchmarkStub:
+    _name = "TPC-H Benchmark"
+
+
+class _OtherBenchmarkStub:
+    _name = "Other Benchmark"
+
+
+def _create_minimal_tpch_tables(connection):
+    connection.execute("CREATE TABLE customer (c_custkey INTEGER)")
+    connection.execute(
+        "CREATE TABLE lineitem (l_orderkey INTEGER, l_suppkey INTEGER, l_receiptdate TEXT, l_commitdate TEXT)"
+    )
+    connection.execute("CREATE TABLE nation (n_name TEXT, n_nationkey INTEGER)")
+    connection.execute("CREATE TABLE orders (o_orderstatus TEXT, o_orderkey INTEGER)")
+    connection.execute("CREATE TABLE part (p_partkey INTEGER)")
+    connection.execute("CREATE TABLE partsupp (ps_partkey INTEGER)")
+    connection.execute("CREATE TABLE region (r_regionkey INTEGER)")
+    connection.execute("CREATE TABLE supplier (s_nationkey INTEGER, s_suppkey INTEGER)")
+    connection.commit()
+
+
+def _index_names(connection) -> set[str]:
+    rows = connection.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()
+    return {row[0] for row in rows}
+
+
+def test_tpch_helper_indexes_are_applied_after_load(adapter, connection):
+    _create_minimal_tpch_tables(connection)
+
+    elapsed = adapter._apply_benchmark_helper_indexes(_TpchBenchmarkStub(), connection)
+
+    assert elapsed >= 0
+    assert {
+        "idx_bb_tpch_lineitem_order_supp_dates",
+        "idx_bb_tpch_orders_status_order",
+        "idx_bb_tpch_supplier_nation_supp",
+        "idx_bb_tpch_nation_name_key",
+    }.issubset(_index_names(connection))
+
+
+def test_tpch_helper_indexes_do_not_apply_to_other_benchmarks(adapter, connection):
+    _create_minimal_tpch_tables(connection)
+
+    elapsed = adapter._apply_benchmark_helper_indexes(_OtherBenchmarkStub(), connection)
+
+    assert elapsed == 0.0
+    assert _index_names(connection) == set()
