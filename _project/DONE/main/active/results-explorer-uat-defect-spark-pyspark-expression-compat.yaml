@@ -1,0 +1,115 @@
+id: results-explorer-uat-defect-spark-pyspark-expression-compat
+title: "UAT defect: Spark and PySpark expression compatibility failures"
+worktree: main
+priority: "Medium-High"
+status: "Completed"
+category: "Testing and Quality Assurance"
+completed_date: "2026-05-03"
+
+description: |
+  Spark SQL and PySpark DataFrame had multiple UAT failures: strict identifier
+  retry issues, missing `dual`, illegal Parquet `TIME(MILLIS,false)`, unresolved
+  TPCHavoc supplier columns, scalar-subquery grouping problems, and read
+  primitives expression failures.
+
+work:
+- id: w1
+  summary: "Cluster Spark/PySpark failures by owning translator, loader, or query family"
+  status: done
+  notes: |
+    UAT log scan from /Users/joe/Developer/benchmark_runs/logs/uat_20260502
+    grouped failures into these owners:
+
+    1. Shared Spark-family schema retry: read/write/transaction primitives fail
+       before load because run_spark_schema_creation_loop extracts a backtick
+       quoted simple identifier (`region`) and rejects it under strict identifier
+       validation. Evidence:
+       - spark_read_primitives_0.01_20260502_203844.log:18
+       - spark_write_primitives_0.01_20260502_203850.log:18
+       - spark_transaction_primitives_0.01_20260502_203859.log:18
+       Owner: benchbox/platforms/_spark_helpers.py and
+       tests/unit/platforms/test_spark_helpers.py. This is the W2 target because
+       it is shared, high-leverage, and narrowly scoped.
+
+    2. PySpark DataFrame Parquet loader/cache conversion: TPC-DS and coffeeshop
+       fail while reading cached Parquet with INT32 TIME(MILLIS,false). Evidence:
+       - pyspark-df_tpcds_0.01_20260502_213449.log:17
+       - pyspark-df_coffeeshop_0.01_20260502_214615.log:11
+       Owner: benchbox/core/dataframe/data_loader.py and
+       benchbox/platforms/dataframe/pyspark_df.py.
+
+    3. Spark SQL TPCHavoc query-family compatibility: scalar subquery grouping
+       and `dual` table references fail inside TPCHavoc variants. Evidence:
+       - spark_tpchavoc_0.01_20260502_205250.log:93
+       - spark_tpchavoc_0.1_20260502_205516.log:1358
+       Owner: benchbox/core/tpchavoc/variant_sets/.
+
+    4. PySpark DataFrame read-primitives expression gaps: array aggregation,
+       array length ordering, map/fulltext type construction, and missing window
+       methods fail at query execution. Evidence:
+       - pyspark-df_read_primitives_0.01_20260502_213500.log:13
+       - pyspark-df_read_primitives_0.01_20260502_213500.log:28
+       - pyspark-df_read_primitives_0.01_20260502_213500.log:144
+       - pyspark-df_read_primitives_0.01_20260502_213500.log:167
+       Owner: benchbox/platforms/dataframe/pyspark_df.py,
+       benchbox/platforms/dataframe/expression_family.py, and
+       benchbox/core/read_primitives/dataframe_queries.py.
+- id: w2
+  summary: "Fix the highest-impact shared Spark/PySpark compatibility cluster"
+  needs: [w1]
+  status: done
+- id: w3
+  summary: "Add regression coverage for the fixed cluster"
+  needs: [w2]
+  status: done
+
+verification:
+- description: "Representative Spark/PySpark smoke for the fixed cluster passes."
+  command: "uv run -- python -m pytest tests -k 'spark or pyspark' -q"
+  expected_output: "targeted Spark/PySpark tests pass"
+- description: "Fast tests remain green."
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all selected tests pass"
+
+must_preserve:
+- "Spark-specific fixes do not change SQL emitted for unrelated platforms."
+- "Optional Spark/PySpark dependencies remain lazy."
+
+anti_patterns:
+- "DO NOT fix by weakening validation globally -- because failures are engine/query-family specific -- keep changes scoped
+  to the owning translator or loader path."
+
+approach: |
+  For W2, fix only the shared Spark-family schema retry cluster by accepting
+  quoted simple Spark identifiers after unquoting them for validation and DROP
+  retry SQL. Preserve rejection for schema-qualified names and unsafe identifier
+  shapes. Do not mix in PySpark Parquet, TPCHavoc, TPC-DS, or read-primitives
+  expression fixes.
+
+  During verification, clean only transient database/result artifacts generated
+  by the work item. Preserve reusable datagen corpora such as tpch_sf*,
+  read_primitives_sf*, tpcds_sf*, and tpchavoc_sf* because primitive benchmarks
+  reuse their underlying source data across SQL and DataFrame runs.
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/_spark_helpers.py"
+  - "tests/unit/platforms/test_spark_helpers.py"
+  - "_project/TODO/main/active/results-explorer-uat-defect-spark-pyspark-expression-compat.yaml"
+  do_not_modify:
+  - "benchbox/core/dataframe/data_loader.py"
+  - "benchbox/platforms/dataframe/pyspark_df.py"
+  - "benchbox/core/tpchavoc/"
+  - "benchbox/core/read_primitives/dataframe_queries.py"
+
+deferred:
+- summary: "PySpark Parquet TIME(MILLIS,false) cache/loader compatibility"
+  reason: "Separate loader/cache conversion owner; do not mix with the shared Spark SQL schema retry fix."
+- summary: "Spark SQL TPCHavoc scalar subquery and dual rewrites"
+  reason: "Query-family-specific SQL compatibility work, not the shared schema retry failure."
+- summary: "PySpark DataFrame read-primitives map/fulltext/window/array expression gaps"
+  reason: "Expression API work spans a different owner and needs its own targeted regression slice."
+
+metadata:
+  tags: [uat, spark, pyspark, compatibility]
+  created_date: "2026-05-03"

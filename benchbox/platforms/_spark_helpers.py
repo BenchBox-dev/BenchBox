@@ -47,6 +47,16 @@ def extract_spark_table_name(statement: str) -> str | None:
     return _extract_table_name(statement)
 
 
+def _unquote_spark_retry_identifier(identifier: str | None) -> str | None:
+    """Return a simple extracted Spark identifier suitable for retry SQL."""
+    if not identifier:
+        return None
+    identifier = identifier.strip()
+    if len(identifier) >= 2 and identifier[0] == identifier[-1] and identifier[0] in {'"', "`"}:
+        identifier = identifier[1:-1]
+    return identifier
+
+
 def normalize_spark_table_name_in_sql(sql: str) -> str:
     """Normalize table names in SQL to lowercase for Spark."""
     return _normalize_table_name_in_sql(sql)
@@ -418,7 +428,8 @@ def run_spark_schema_creation_loop(
             if "already exists" not in error_lower:
                 raise
 
-            table_name = extract_spark_table_name(statement)
+            extracted_table_name = extract_spark_table_name(statement)
+            table_name = _unquote_spark_retry_identifier(extracted_table_name)
             if not (table_name and validate_spark_identifier(table_name)):
                 # Cannot safely recover - re-raise rather than silently
                 # consuming the error and leaving the schema half-built.
@@ -427,7 +438,7 @@ def run_spark_schema_creation_loop(
                 # just the original Spark "already exists" string.
                 raise RuntimeError(
                     "Cannot safely retry CREATE: extracted table name "
-                    f"{table_name!r} from statement {statement[:80]!r} failed "
+                    f"{extracted_table_name!r} from statement {statement[:80]!r} failed "
                     "strict-ASCII identifier validation. Either rename the "
                     "table to match ^[a-zA-Z_][a-zA-Z0-9_]*$ (<=128 chars) or "
                     "drop the conflicting object manually."

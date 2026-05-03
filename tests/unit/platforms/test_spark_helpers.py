@@ -440,6 +440,40 @@ class TestRunSparkSchemaCreationLoop:
         assert any(c.startswith("DROP TABLE IF EXISTS") for c in calls)
         assert sum(1 for c in calls if c.startswith("CREATE TABLE orders")) == 2
 
+    def test_already_exists_with_backtick_identifier_drops_unquoted_safe_name(self) -> None:
+        spark = MagicMock()
+        calls: list[str] = []
+
+        def sql_side_effect(query):
+            calls.append(query)
+            if calls.count(query) == 1 and query.startswith("CREATE TABLE"):
+                raise RuntimeError("[LOCATION_ALREADY_EXISTS] The location for table 'region' already exists.")
+            return MagicMock()
+
+        spark.sql.side_effect = sql_side_effect
+
+        run_spark_schema_creation_loop(
+            spark,
+            ["CREATE TABLE `region` (`r_regionkey` INT)"],
+            lambda s: s,
+            logger=logging.getLogger(__name__),
+        )
+
+        assert "DROP TABLE IF EXISTS region" in calls
+        assert sum(1 for c in calls if c.startswith("CREATE TABLE `region`")) == 2
+
+    def test_backtick_quoted_dotted_identifier_still_fails_validation(self) -> None:
+        spark = MagicMock()
+        spark.sql.side_effect = RuntimeError("Table already exists")
+
+        with pytest.raises(RuntimeError, match="strict-ASCII identifier validation"):
+            run_spark_schema_creation_loop(
+                spark,
+                ["CREATE TABLE `my_schema.tbl` (id INT)"],
+                lambda s: s,
+                logger=logging.getLogger(__name__),
+            )
+
     def test_location_collision_hook_fires_on_location_already_exists(self) -> None:
         """Spark.py uses on_location_collision to rmtree the orphaned warehouse dir."""
         spark = MagicMock()
