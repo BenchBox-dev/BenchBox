@@ -39,7 +39,22 @@ work:
 - id: w2
   summary: "Fix the loader/schema mismatch or classify the corpus as invalid"
   needs: [w1]
-  status: pending
+  status: done
+  notes: |
+    Implemented the loader fix instead of classifying the corpus invalid. DuckDB handler construction now passes the
+    resolved CSV `null_marker` into `DuckDBNativeHandler`. Pipe-delimited DuckDB native loads use `nullstr=''` when
+    the dialect says empty fields are NULL, and use the shared `__NULL__` sentinel when `null_marker` is `None` so
+    empty ClickBench fields remain empty strings. The same sentinel handling was applied to DuckDB external text scans
+    so `CsvDialect.null_marker=None` has one meaning across DuckDB read paths.
+
+    W2 review found and fixed the external-scan gap; no remaining actionable W2 review issues. Verification passed:
+    targeted ruff, ruff format --check, ty check (with the existing optional `vortex` unresolved-import diagnostic),
+    `tests/unit/platforms/base/test_trailing_delimiter_loading.py`, `tests/unit/platforms/test_duckdb_operations.py`,
+    `tests/unit/test_clickbench_csv_loading.py`, the shared-root DuckDB ClickBench SF1 load/power smoke, and the
+    10-worker fast suite. The smoke produced result JSON
+    `/Users/joe/Developer/benchmark_runs/results/clickbench_sf1_duckdb_sql_20260503_030728_b19d7d6d.json`.
+    Run-owned loaded database artifacts under `/Users/joe/Developer/benchmark_runs/databases/clickbench_sf1` were
+    deleted after verification; reusable datagen was preserved.
 - id: w3
   summary: "Add targeted ClickBench DuckDB regression coverage"
   needs: [w2]
@@ -47,7 +62,8 @@ work:
 
 verification:
 - description: "DuckDB ClickBench SF1 load/power smoke reaches a classified terminal result."
-  command: "uv run -- benchbox run --platform duckdb --benchmark clickbench --scale 1.0 --phases load,power --non-interactive"
+  command: "BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs uv run -- benchbox run --platform duckdb --benchmark clickbench
+    --scale 1.0 --phases load,power --non-interactive"
   expected_output: "completed result or explicit classified corpus/schema failure"
 - description: "Fast tests remain green."
   command: "uv run -- python -m pytest -m fast -q"

@@ -985,6 +985,9 @@ class DelimitedFileHandler(FileFormatHandler):
             return total_rows
 
 
+DUCKDB_NO_NULL_CONVERSION_SENTINEL = "__NULL__"
+
+
 class DuckDBNativeHandler(FileFormatHandler):
     """Handler for DuckDB's native read_csv() function.
 
@@ -992,17 +995,19 @@ class DuckDBNativeHandler(FileFormatHandler):
     instead of loading row-by-row.
     """
 
-    def __init__(self, delimiter: str, adapter: Any, benchmark: Any):
+    def __init__(self, delimiter: str, adapter: Any, benchmark: Any, null_marker: str | None = ""):
         """Initialize handler.
 
         Args:
             delimiter: Field delimiter character
             adapter: Platform adapter (for config and dry-run support)
             benchmark: Benchmark instance (for CSV loading config)
+            null_marker: Resolved CSV null marker; ``None`` preserves empty strings.
         """
         self.delimiter_char = delimiter
         self.adapter = adapter
         self.benchmark = benchmark
+        self.null_marker = null_marker
 
     def get_delimiter(self) -> str:
         """Get delimiter for this file format."""
@@ -1030,6 +1035,13 @@ class DuckDBNativeHandler(FileFormatHandler):
                 pass  # Use defaults
 
         return ",\n                                ".join(config_parts)
+
+    def _pipe_nullstr_config(self) -> str:
+        """Return DuckDB nullstr config for pipe-delimited native loads."""
+        null_marker = self.null_marker
+        if null_marker is None:
+            null_marker = DUCKDB_NO_NULL_CONVERSION_SENTINEL
+        return f"nullstr='{escape_sql_string_literal(null_marker)}'"
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
         """Load table using DuckDB's native read_csv() function.
@@ -1069,7 +1081,7 @@ class DuckDBNativeHandler(FileFormatHandler):
                     SELECT {select_cols} FROM read_csv('{escaped_path}',
                         delim='|',
                         header=false,
-                        nullstr='',
+                        {self._pipe_nullstr_config()},
                         ignore_errors=true,
                         null_padding=true,
                         names=[{names_param}]
@@ -1082,7 +1094,7 @@ class DuckDBNativeHandler(FileFormatHandler):
                     SELECT * FROM read_csv('{escaped_path}',
                         delim='|',
                         header=false,
-                        nullstr='',
+                        {self._pipe_nullstr_config()},
                         ignore_errors=true,
                         auto_detect=true
                     )
@@ -1144,7 +1156,7 @@ class DuckDBNativeHandler(FileFormatHandler):
                     SELECT {select_cols} FROM read_csv({paths_array},
                         delim='|',
                         header=false,
-                        nullstr='',
+                        {self._pipe_nullstr_config()},
                         ignore_errors=true,
                         null_padding=true,
                         names=[{names_param}]
@@ -1156,7 +1168,7 @@ class DuckDBNativeHandler(FileFormatHandler):
                     SELECT * FROM read_csv({paths_array},
                         delim='|',
                         header=false,
-                        nullstr='',
+                        {self._pipe_nullstr_config()},
                         ignore_errors=true,
                         auto_detect=true
                     )
@@ -2772,6 +2784,7 @@ __all__ = [
     "DataLoadingError",
     "DataSource",
     "CsvDialect",
+    "DUCKDB_NO_NULL_CONVERSION_SENTINEL",
     "resolve_csv_dialect",
     "prepare_local_load_file",
     "DataSourceResolver",
