@@ -1,14 +1,14 @@
 ---
 id: 2026-05-03-083859-proposals-doc-decidability-gap
 date: 2026-05-03
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "code review of W2 deliverable in TODO results-explorer-uat-methodology-blind-spot-remediation"
 related_paths:
   - _project/handoffs/uat-methodology-w2-proposals.md
   - _project/specs/uat-methodology-blind-spot-remediation.md
 suggested_sweep: "when reviewing proposals/spec docs, add a 'decidability' check beyond the five-axis code rubric: each open question needs a stated default, a stated consequence, and a clear yes-or-no path for the user."
-todo_id: null
+todo_id: code-review-checklist-additions-for-spec-docs
 ---
 
 # Five-axis code review framework misses decidability gaps in proposals docs
@@ -43,3 +43,7 @@ cheaply.
 - [ ] Patch the W2 proposals doc to recommend per-finding tooling vs convention rather than leaving it conditional.
 - [ ] When the W4 design document collates user decisions, ensure each one has default + consequence + recommendation, not just a question.
 - [ ] Consider promoting "decidability check for proposals/spec docs" into the `/code review` skill checklist.
+
+## Triage log
+
+- 2026-05-03: promoted to TODO `code-review-checklist-additions-for-spec-docs`

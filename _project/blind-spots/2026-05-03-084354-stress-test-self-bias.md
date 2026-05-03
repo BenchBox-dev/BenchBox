@@ -1,13 +1,13 @@
 ---
 id: 2026-05-03-084354-stress-test-self-bias
 date: 2026-05-03
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "code review of W3 stress-test in TODO results-explorer-uat-methodology-blind-spot-remediation"
 related_paths:
   - _project/handoffs/uat-methodology-w3-stress-test.md
 suggested_sweep: "when stress-testing proposals against historical cases, separate the 'designer' and 'reviewer' roles, or explicitly include a 'strongest argument against each proposal' section to counter the natural survivorship bias."
-todo_id: null
+todo_id: code-review-checklist-additions-for-spec-docs
 ---
 
 # Self-designed stress-tests survive too easily — proposer bias
@@ -43,3 +43,7 @@ incident or a recurring shape.
 - [ ] Add a "strongest case against each proposal" subsection to the W3 stress-test doc (or fold into W4).
 - [ ] Consider promoting "adversarial framing or independent reviewer for stress-tests" into the /code review and /todo skill checklists.
 - [ ] Sweep recent specs/handoffs for stress-test sections that conclude with universal proposal survival; flag for re-review.
+
+## Triage log
+
+- 2026-05-03: promoted to TODO `code-review-checklist-additions-for-spec-docs`
