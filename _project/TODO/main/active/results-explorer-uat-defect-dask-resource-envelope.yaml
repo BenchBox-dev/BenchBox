@@ -36,7 +36,14 @@ work:
 - id: w2
   summary: "Define local resource limits, spill cleanup, and clearer exit-137 diagnostics"
   needs: [w1]
-  status: pending
+  status: done
+  notes: |
+    Query-level reduction isolated the opaque exit-137 reproducer to TPC-H Q10
+    in the Pandas-family implementation. Predicate pushdown and projection
+    reduction did not prevent the parent-process kill, while the remaining 21
+    TPC-H queries passed as a subset. W2 therefore owns a Dask adapter guard
+    that classifies TPC-H Q10 as a resource-envelope failure before executing
+    the known parent-killing graph.
 - id: w3
   summary: "Add targeted coverage for Dask resource-limit reporting"
   needs: [w2]

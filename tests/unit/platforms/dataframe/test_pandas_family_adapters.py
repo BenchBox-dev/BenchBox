@@ -332,7 +332,7 @@ class TestAdapterModuleAvailability:
 
         if DASK_AVAILABLE:
             assert DaskDataFrameAdapter is not None
-            adapter = DaskDataFrameAdapter()
+            adapter = DaskDataFrameAdapter(use_distributed=False)
             assert adapter.platform_name == "Dask"
         else:
             # Class exists but instantiation fails

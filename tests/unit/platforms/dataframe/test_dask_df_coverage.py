@@ -137,8 +137,9 @@ def test_init_raises_without_dask(monkeypatch):
         mod.DaskDataFrameAdapter()
 
 
-def test_apply_tuning_and_setup_distributed_paths(monkeypatch):
+def test_apply_tuning_and_setup_distributed_paths(monkeypatch, tmp_path):
     adapter = _make_adapter()
+    adapter._configured_spill_directory = tmp_path / "spill"
     fake_config_calls = []
     monkeypatch.setitem(
         sys.modules, "dask", SimpleNamespace(config=SimpleNamespace(set=lambda v: fake_config_calls.append(v)))
@@ -147,7 +148,7 @@ def test_apply_tuning_and_setup_distributed_paths(monkeypatch):
     assert adapter.n_workers == 3
     assert adapter.threads_per_worker == 2
     assert adapter._memory_limit == "2GB"
-    assert len(fake_config_calls) >= 2
+    assert adapter._spill_to_disk is True
 
     adapter.scheduler_address = "tcp://x"
     mod.Client = lambda addr: SimpleNamespace(
@@ -167,6 +168,7 @@ def test_apply_tuning_and_setup_distributed_paths(monkeypatch):
     )
     adapter._setup_distributed()
     assert adapter._cluster is not None
+    assert fake_config_calls
 
 
 def test_close_and_del_cleanup():
