@@ -100,7 +100,7 @@ work:
 - id: w4
   summary: "Open a draft published-results PR and confirm contract CI passes"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Open the PR vs `published-results` (not `develop`, not `main`) as
     **draft**, per project convention for corpus changes. The hosted
