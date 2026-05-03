@@ -77,7 +77,7 @@ work:
 - id: w3
   summary: "Stress-test the proposals against historical UATs"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     For each proposal, replay against:
       - the 2026-04-28 Cowork agent-proxy dry-run
