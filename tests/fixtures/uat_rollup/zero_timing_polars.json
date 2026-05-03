@@ -1,0 +1,34 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "zero-timing-001",
+    "timestamp": "2026-05-02T18:05:00",
+    "total_duration_ms": 5000
+  },
+  "benchmark": {
+    "id": "tpch",
+    "name": "TPC-H",
+    "scale_factor": 0.1,
+    "compliance_class": "official"
+  },
+  "platform": {
+    "name": "Polars",
+    "version": "1.18.0"
+  },
+  "summary": {
+    "queries": {"total": 2, "passed": 2, "failed": 0}
+  },
+  "queries": [
+    {"id": "Q1", "ms": 0, "status": "pass"},
+    {"id": "Q2", "ms": 0, "status": "pass"}
+  ],
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_model_version": "2026.05.0",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable"
+  }
+}
