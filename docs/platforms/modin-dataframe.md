@@ -54,20 +54,21 @@ Modin partitions DataFrames across CPU cores and executes operations in parallel
 # Install Modin with Ray backend (recommended)
 uv add benchbox --extra modin
 
-# Or with pip
-pip install "benchbox[modin]"
-
 # For Dask backend
-pip install "modin[dask]"
+uv add "modin[dask]"
 
 # For Unidist backend (experimental)
-pip install "modin[unidist]"
+uv add "modin[unidist]"
 ```
 
 ### Verify Installation
 
 ```bash
-python -c "import modin.pandas as pd; print(f'Modin ready')"
+# Check package and selected backend without initializing Ray/Dask
+benchbox platforms check modin-df
+
+# Optional import smoke
+uv run -- python -c "import modin.pandas as pd; print('Modin ready')"
 ```
 
 ## Quick Start
@@ -84,6 +85,9 @@ benchbox run --platform modin-df --benchmark tpch --scale 1 \
 benchbox run --platform modin-df --benchmark tpch --scale 1 \
   --platform-option engine=dask
 ```
+
+`benchbox platforms check modin-df` reads `MODIN_ENGINE` (default `ray`) and verifies the corresponding backend
+package is importable. The check does not import `modin.pandas`, start Ray, or create a Dask client.
 
 ## Configuration Options
 
@@ -214,7 +218,7 @@ ray.exceptions.RaySystemError: System error: ...
 ```
 
 **Solutions:**
-1. Ensure Ray is properly installed: `pip install ray`
+1. Ensure Ray is properly installed: `uv add "modin[ray]"`
 2. Initialize Ray manually: `ray.init()`
 3. Check for port conflicts on default Ray ports
 

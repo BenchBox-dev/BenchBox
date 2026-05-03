@@ -27,6 +27,9 @@ uv add pyspark pyarrow
 # Start your LakeSail Sail server (see LakeSail documentation)
 # Default endpoint: sc://localhost:50051
 
+# Check client and endpoint readiness without starting a server
+benchbox platforms check lakesail-df
+
 # Run SQL benchmark
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
@@ -36,7 +39,11 @@ benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 
 ## Configuration
 
-LakeSail Sail connects to a running Sail server via the Spark Connect protocol. No additional authentication is required for local deployments.
+LakeSail Sail connects through the Spark Connect protocol. No additional authentication is required for local deployments.
+`benchbox platforms check lakesail` and `benchbox platforms check lakesail-df` only verify client imports and endpoint
+reachability; they do not instantiate the adapter or start a Sail server. SQL mode can auto-start a local `pysail`
+server when `pysail` is installed and the endpoint is unreachable, but DataFrame mode requires an already-running
+endpoint.
 
 ### Configuration Methods
 
@@ -286,7 +293,7 @@ Failed to connect to LakeSail Sail: Connection refused
 ### PySpark Not Installed
 
 ```
-PySpark not installed. Install with: pip install pyspark pyarrow
+PySpark not installed. Install with: uv add pyspark pyarrow
 ```
 
 **Solutions:**

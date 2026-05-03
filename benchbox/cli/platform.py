@@ -11,11 +11,17 @@ from typing import Any, Optional
 
 import click
 import yaml
+from rich.markup import escape
 from rich.panel import Panel
 from rich.prompt import Confirm, InvalidResponse, Prompt
 from rich.table import Table
 from rich.text import Text
 
+from benchbox.cli.platform_readiness import (
+    PlatformReadinessResult,
+    check_platform_readiness,
+    has_readiness_failures,
+)
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.schemas import LibraryInfo, PlatformInfo
 from benchbox.utils.printing import quiet_console
@@ -46,6 +52,15 @@ PLATFORM_ALIASES: dict[str, str] = {
     "duck": "duckdb",
     # DataFusion
     "fusion": "datafusion",
+    # DataFrame CLI aliases
+    "polars-df": "polars",
+    "pandas-df": "pandas",
+    "pyspark-df": "pyspark",
+    "datafusion-df": "datafusion",
+    "dask-df": "dask",
+    "modin-df": "modin",
+    "cudf-df": "cudf",
+    "lakesail-df": "lakesail",
     # Azure Synapse
     "azure-synapse": "synapse",
     "azuresynapse": "synapse",
@@ -553,6 +568,40 @@ def get_platform_manager() -> PlatformManager:
     return _platform_manager
 
 
+def _readiness_platform_name(requested_platform: str, normalized_platform: str) -> str:
+    """Preserve explicit DataFrame aliases for readiness messages."""
+    requested = requested_platform.lower()
+    return requested if requested.endswith("-df") else normalized_platform
+
+
+def _append_readiness_details(panel_content: list[str], results: tuple[PlatformReadinessResult, ...]) -> None:
+    """Append readiness details to a rich panel content list."""
+    if not results:
+        return
+
+    panel_content.append("\n[bold]Readiness:[/bold]")
+    for result in results:
+        status_text = "Ready" if result.ready else "Environment skip"
+        status_color = "green" if result.ready else "yellow"
+        panel_content.append(f"  [{status_color}]{status_text}:[/{status_color}] {escape(result.summary)}")
+        if result.detail:
+            panel_content.append(f"    [dim]{escape(result.detail)}[/dim]")
+        if result.remediation and not result.ready:
+            panel_content.append(f"    [dim]Fix: {escape(result.remediation)}[/dim]")
+
+
+def _print_readiness_details(results: tuple[PlatformReadinessResult, ...]) -> None:
+    """Print readiness details under a platform check row."""
+    for result in results:
+        label = "ready" if result.ready else "environment skip"
+        color = "green" if result.ready else "yellow"
+        console.print(f"   [{color}]{label}:[/{color}] {escape(result.summary)}")
+        if result.detail:
+            console.print(f"      [dim]{escape(result.detail)}[/dim]")
+        if result.remediation and not result.ready:
+            console.print(f"      [dim]Fix: {escape(result.remediation)}[/dim]")
+
+
 # CLI Commands
 
 
@@ -602,6 +651,7 @@ def platform_status(platform: Optional[str]):
     manager = get_platform_manager()
 
     if platform:
+        requested_platform = platform
         platform = normalize_platform_name(platform)
         # Show detailed status for specific platform
         platforms_info = manager.detect_platforms()
@@ -641,6 +691,9 @@ def platform_status(platform: Optional[str]):
             panel_content.append("\n[bold]Requirements:[/bold]")
             for req in info.requirements:
                 panel_content.append(f"  • {req}")
+
+        readiness_platform = _readiness_platform_name(requested_platform, platform)
+        _append_readiness_details(panel_content, check_platform_readiness(readiness_platform))
 
         console.print(
             Panel(
@@ -794,30 +847,41 @@ def install_platform(platform: str, dry_run: bool):
 @click.option("--enabled-only", is_flag=True, help="Check only enabled platforms")
 def check_platforms(platforms_to_check: tuple, enabled_only: bool):
     """Check platform availability and configuration."""
-    # Normalize platform names (case + aliases)
-    platforms_to_check = tuple(normalize_platform_name(p) for p in platforms_to_check)
     manager = get_platform_manager()
     platforms_info = manager.detect_platforms()
 
     if not platforms_to_check:
-        platforms_to_check = tuple(manager.get_enabled_platforms()) if enabled_only else tuple(platforms_info.keys())
+        selected_platforms = (
+            tuple((p, p) for p in manager.get_enabled_platforms())
+            if enabled_only
+            else tuple((p, p) for p in platforms_info.keys())
+        )
+    else:
+        # Normalize platform names (case + aliases), preserving the requested name for readiness context.
+        selected_platforms = tuple((p, normalize_platform_name(p)) for p in platforms_to_check)
 
-    if not platforms_to_check:
+    if not selected_platforms:
         console.print("[yellow]No platforms to check[/yellow]")
         sys.exit(0)
 
     console.print("[bold cyan]Platform Check Results[/bold cyan]\n")
 
     all_good = True
-    for platform in platforms_to_check:
+    for requested_platform, platform in selected_platforms:
         if platform not in platforms_info:
             console.print(f"[red]❌ {platform}: Unknown platform[/red]")
             all_good = False
             continue
 
         info = platforms_info[platform]
+        readiness_platform = _readiness_platform_name(requested_platform, platform)
+        readiness_results = check_platform_readiness(readiness_platform)
+        readiness_failed = has_readiness_failures(readiness_results)
 
-        if info.enabled and info.available:
+        if info.available and readiness_failed:
+            console.print(f"[yellow]⚠️ {info.display_name}: Environment not ready[/yellow]")
+            all_good = False
+        elif info.enabled and info.available:
             console.print(f"[green]✅ {info.display_name}: Ready[/green]")
         elif info.available:
             console.print(f"[yellow]○ {info.display_name}: Available but disabled[/yellow]")
@@ -825,6 +889,8 @@ def check_platforms(platforms_to_check: tuple, enabled_only: bool):
             console.print(f"[red]❌ {info.display_name}: Missing dependencies[/red]")
             console.print(f"   Install: {info.installation_command}")
             all_good = False
+
+        _print_readiness_details(readiness_results)
 
     if all_good:
         console.print("\n[green]All checked platforms are ready![/green]")

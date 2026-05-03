@@ -32,6 +32,7 @@ from benchbox.cli.platform import (
     platform_status,
     setup_platforms,
 )
+from benchbox.cli.platform_readiness import PlatformReadinessResult
 
 pytestmark = [
     pytest.mark.unit,
@@ -115,6 +116,17 @@ class TestPlatformNameNormalization:
         assert normalize_platform_name("fusion") == "datafusion"
         assert normalize_platform_name("azure-synapse") == "synapse"
         assert normalize_platform_name("azuresynapse") == "synapse"
+
+    def test_normalize_dataframe_platform_aliases(self):
+        """Test DataFrame platform CLI aliases."""
+        assert normalize_platform_name("polars-df") == "polars"
+        assert normalize_platform_name("pandas-df") == "pandas"
+        assert normalize_platform_name("pyspark-df") == "pyspark"
+        assert normalize_platform_name("datafusion-df") == "datafusion"
+        assert normalize_platform_name("dask-df") == "dask"
+        assert normalize_platform_name("modin-df") == "modin"
+        assert normalize_platform_name("cudf-df") == "cudf"
+        assert normalize_platform_name("lakesail-df") == "lakesail"
 
     def test_normalize_canonical_names_unchanged(self):
         """Test that canonical names are not changed."""
@@ -713,6 +725,45 @@ class TestCLICommands:
         assert "DuckDB" in result.output
         assert "High-performance database" in result.output
 
+    @patch("benchbox.cli.platform.check_platform_readiness")
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_platform_status_specific_includes_readiness_details(self, mock_get_manager, mock_check_readiness):
+        """Specific platform status should include side-effect-free readiness diagnostics."""
+        mock_manager = Mock()
+        mock_lib = LibraryInfo(name="pyspark", version="4.1.1", installed=True)
+        mock_manager.detect_platforms.return_value = {
+            "lakesail": PlatformInfo(
+                name="lakesail",
+                display_name="LakeSail Sail",
+                description="Spark Connect",
+                libraries=[mock_lib],
+                available=True,
+                enabled=True,
+                requirements=["pyspark>=3.4.0"],
+                installation_command="uv add pyspark",
+                category="analytical",
+            )
+        }
+        mock_get_manager.return_value = mock_manager
+        mock_check_readiness.return_value = (
+            PlatformReadinessResult(
+                platform="lakesail-df",
+                check="spark_connect_endpoint",
+                status="environment_skip",
+                summary="LakeSail endpoint is not reachable.",
+                remediation="Start a Sail server.",
+            ),
+        )
+
+        result = self.runner.invoke(platform_status, ["lakesail-df"])
+
+        assert result.exit_code == 0
+        assert "LakeSail Sail" in result.output
+        assert "Environment skip" in result.output
+        assert "LakeSail endpoint is not reachable." in result.output
+        assert "Start a Sail server." in result.output
+        mock_check_readiness.assert_called_once_with("lakesail-df")
+
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_platform_status_missing_dependencies_shows_installation_details(self, mock_get_manager):
         """Missing platform details should include import errors and install guidance."""
@@ -1048,6 +1099,45 @@ class TestCLICommands:
         assert "DuckDB: Ready" in result.output
         assert "Missing Platform: Missing dependencies" in result.output
         assert "Some platforms need attention" in result.output
+
+    @patch("benchbox.cli.platform.check_platform_readiness")
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_check_platforms_environment_skip_from_readiness(self, mock_get_manager, mock_check_readiness):
+        """Readiness gaps should be rendered as environment issues and exit non-zero."""
+        mock_manager = Mock()
+        mock_manager.detect_platforms.return_value = {
+            "lakesail": PlatformInfo(
+                name="lakesail",
+                display_name="LakeSail Sail",
+                description="Spark Connect",
+                libraries=[],
+                available=True,
+                enabled=True,
+                requirements=[],
+                installation_command="uv add pyspark",
+                category="analytical",
+            )
+        }
+        mock_get_manager.return_value = mock_manager
+        mock_check_readiness.return_value = (
+            PlatformReadinessResult(
+                platform="lakesail-df",
+                check="spark_connect_endpoint",
+                status="environment_skip",
+                summary="LakeSail endpoint is not reachable.",
+                detail="Benchmark should be skipped until provisioning is complete.",
+                remediation="Start a Sail server.",
+            ),
+        )
+
+        result = self.runner.invoke(check_platforms, ["lakesail-df"])
+
+        assert result.exit_code == 1
+        assert "LakeSail Sail: Environment not ready" in result.output
+        assert "environment skip" in result.output
+        assert "Benchmark should be skipped" in result.output
+        assert "Some platforms need attention" in result.output
+        mock_check_readiness.assert_called_once_with("lakesail-df")
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_check_platforms_enabled_only_with_none_enabled(self, mock_get_manager):

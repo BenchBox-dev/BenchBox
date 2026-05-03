@@ -111,8 +111,8 @@ benchbox compare \
 # Verify installation
 benchbox --version
 
-# If not found, check your PATH or reinstall
-uv pip install benchbox
+# If not found, check your PATH or reinstall for CLI use
+uv tool install benchbox
 ```
 
 ### Platform Dependencies Missing
@@ -122,8 +122,23 @@ uv pip install benchbox
 benchbox check-deps --platform databricks
 
 # Install missing dependencies
-uv pip install "benchbox[databricks]"
+uv add benchbox --extra databricks
 ```
+
+### Local Platform Environment Skips
+
+```bash
+# Check package availability plus local provisioning readiness
+benchbox platforms check clickhouse-server trino lakesail-df modin-df
+
+# Inspect one platform, including endpoint/backend readiness notes
+benchbox platforms status lakesail-df
+benchbox platforms status modin-df
+```
+
+`benchbox platforms check` reports local service ports, LakeSail Spark Connect, and Modin backend gaps as
+environment readiness issues. These checks are bounded probes only; they do not start servers, initialize Ray/Dask,
+or create/drop benchmark databases.
 
 ### Authentication Errors
 
@@ -141,8 +156,8 @@ benchbox platforms check
 ### Permission Denied Errors
 
 ```bash
-# Use user installation
-python -m pip install --user "benchbox[cloud]"
+# Use a user-level CLI installation
+uv tool install benchbox
 
 # Check output directory permissions
 ls -la /path/to/output/directory
