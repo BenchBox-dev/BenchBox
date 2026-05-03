@@ -52,7 +52,7 @@ work:
 - id: w3
   summary: "Add export/submission validation regression coverage"
   needs: [w2]
-  status: pending
+  status: done
 
 verification:
 - description: "Submission validator accepts a local no-cost bundle without cost totals."
