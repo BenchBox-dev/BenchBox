@@ -86,8 +86,9 @@ def _reconstruct_cli_command(
 @click.group("results", invoke_without_command=True)
 @click.option("--limit", type=int, default=10, help="Number of results to show")
 @click.option("--submitted", is_flag=True, help="Show hosted submission history")
+@click.option("--paths", is_flag=True, help="Print copyable result JSON paths for use with submit/export")
 @click.pass_context
-def results(ctx, limit, submitted):
+def results(ctx, limit, submitted, paths):
     """Show exported benchmark results and execution history.
 
     Displays a summary of recent benchmark executions including performance
@@ -96,6 +97,7 @@ def results(ctx, limit, submitted):
     Examples:
         benchbox results              # Show last 10 results
         benchbox results --limit 25   # Show last 25 results
+        benchbox results --paths      # Print exact result paths for benchbox submit
         benchbox results show-cli <file>  # Show CLI command to reproduce a run
     """
     # If no subcommand is invoked, show results summary
@@ -105,6 +107,22 @@ def results(ctx, limit, submitted):
             _show_submitted_results(exporter, limit=limit)
         else:
             exporter.show_results_summary()
+            if paths:
+                _show_result_paths(exporter, limit=limit)
+
+
+def _show_result_paths(exporter: ResultExporter, *, limit: int) -> None:
+    records = exporter.list_results()
+    if not records:
+        return
+
+    shown = records[:limit]
+    console.print(f"\n[bold]Result Paths ({len(shown)} shown)[/bold]")
+    for record in shown:
+        path = record.get("file")
+        if path is not None:
+            console.print(str(path))
+    console.print("[dim]Use with: benchbox submit <path> --output ./submission[/dim]")
 
 
 def _show_submitted_results(exporter: ResultExporter, *, limit: int) -> None:

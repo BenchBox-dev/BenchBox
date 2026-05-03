@@ -31,7 +31,7 @@ work:
     `benchbox results` and update `benchbox submit --help` so users know how to
     discover the paths. Do not add batch hosted upload in this TODO; hosted
     submission stays explicit and one bundle at a time.
-  status: pending
+  status: done
 - id: w3
   summary: "Document and test the contributor-facing path"
   needs: [w2]
@@ -74,6 +74,7 @@ work_unit_owned_files:
   - "benchbox/cli/commands/submit.py"
   - "tests/unit/cli/commands/test_results.py"
   - "tests/unit/cli/commands/test_submit.py"
+  - "_project/TODO/main/active/results-explorer-uat-defect-submission-batch-path-affordances.yaml"
   w3:
   - "docs/reference/cli/results.md"
   - "docs/reference/cli/submit.md"

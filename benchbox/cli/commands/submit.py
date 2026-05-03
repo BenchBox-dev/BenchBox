@@ -517,6 +517,10 @@ def submit(
         # Package most recent result for PR contribution (Phase 2; default)
         benchbox submit --last
 
+        # Print exact result paths, then package one for PR contribution
+        benchbox results --paths
+        benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
+
         # Submit most recent result to the hosted platform (Phase 3)
         benchbox submit --last --service
 

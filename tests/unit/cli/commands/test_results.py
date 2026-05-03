@@ -33,6 +33,39 @@ def test_results_group_without_subcommand_shows_summary(cli_runner, monkeypatch)
     exporter.show_results_summary.assert_called_once_with()
 
 
+def test_results_paths_prints_copyable_result_paths(cli_runner, monkeypatch, tmp_path):
+    results_module = import_module("benchbox.cli.commands.results")
+    result_a = tmp_path / "tpch_duckdb.json"
+    result_b = tmp_path / "tpch_clickhouse.json"
+    exporter = SimpleNamespace(
+        show_results_summary=MagicMock(),
+        list_results=MagicMock(
+            return_value=[
+                {"file": result_a, "timestamp": "2026-05-03T12:00:00"},
+                {"file": result_b, "timestamp": "2026-05-03T11:00:00"},
+            ]
+        ),
+    )
+    prints = []
+    monkeypatch.setattr(results_module, "ResultExporter", lambda: exporter)
+    monkeypatch.setattr(
+        results_module,
+        "console",
+        SimpleNamespace(print=lambda *args, **_kwargs: prints.extend(str(arg) for arg in args)),
+    )
+
+    result = cli_runner.invoke(results, ["--paths", "--limit", "1"])
+
+    assert result.exit_code == 0
+    exporter.show_results_summary.assert_called_once_with()
+    exporter.list_results.assert_called_once_with()
+    printed = "\n".join(prints)
+    assert "Result Paths (1 shown)" in printed
+    assert str(result_a) in printed
+    assert str(result_b) not in printed
+    assert "benchbox submit <path> --output ./submission" in printed
+
+
 def test_results_group_with_submitted_shows_submission_history(cli_runner, monkeypatch, tmp_path):
     results_module = import_module("benchbox.cli.commands.results")
     prints = []
