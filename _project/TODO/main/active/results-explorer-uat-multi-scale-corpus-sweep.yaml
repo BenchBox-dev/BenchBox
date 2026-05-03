@@ -422,7 +422,7 @@ work:
 - id: w6
   summary: "Exercise the Results Explorer against the new corpus"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Once the new SF=0.01/0.1/1.0 corpus is published, exercise the
     Results Explorer end-to-end against it. Capture defects with
@@ -451,6 +451,58 @@ work:
     vs 1.0 for the same platform/benchmark) is the headline thing
     this corpus enables; does the explorer let you actually see it
     cleanly?
+
+    Completion record (2026-05-03):
+      - Built a local explorer UAT corpus from the W5 validator-clean
+        subset without touching `results-data/` or
+        `results-explorer/public/data/`.
+        Source/data root:
+        `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/`.
+      - `benchbox explorer build --data-dir .../source --output
+        .../data --trust-label community-submission --visibility
+        public-self-reported` processed 205 results across 51 cohorts.
+        Output contained `results.duckdb` plus 205 copied bundles.
+      - Snapshot checks: 205 rows in `results`, `platform_index_rows`,
+        `benchmark_rankings`, `result_detail_metrics`, and
+        `short_ids`; 13,146 `benchmark_matrix_cells`; 9,057
+        `query_display_timings`; 26,975 `query_executions`.
+        Platform counts were DataFusion 68, Polars 41, PySpark 34,
+        SQLite 28, Spark 25, DuckDB 9. Scale counts were SF 0.01=70,
+        SF 0.1=63, SF 1.0=72.
+      - Built the explorer app into external dist
+        `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/dist`
+        and served it with `results-explorer/scripts/serve-browser-tests.mjs`
+        pointed at the external data snapshot.
+      - Terminating Playwright smoke used the installed Google Chrome
+        channel and covered desktop Home, desktop Query with Deployment
+        filter, desktop TPC-H benchmark page, and mobile Query filter
+        drawer. All four checks passed with no horizontal overflow.
+        Screenshots and logs are under
+        `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/screenshots/`
+        and
+        `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/logs/`.
+      - Performance marks on the 205-result snapshot: Home `db-init`
+        553.8 ms, `home-leaderboard-data` 571.0 ms,
+        `leaderboard-render-after-data` 17.8 ms; Query `db-init`
+        542.6 ms and `query-workbench-render-after-db` 74.5 ms.
+      - W6 findings for W7 follow-up triage:
+        1. Minor: `benchbox explorer build --help` still documents
+           `manifest.json`, but the current pipeline intentionally
+           deletes legacy JSON manifests and emits only `results.duckdb`
+           plus copied bundles.
+        2. Minor: Query facet accessible labels are easy to match
+           ambiguously; a partial label for Deployment `local` also
+           matches Cost status `not_applicable_local`.
+        3. Minor/corpus limitation: local-only UAT data validates facet
+           rendering/filtering mechanics, but cloud/provider/region and
+           instance facets are `unknown`-only, so cloud/container
+           differentiation still needs a dedicated cloud or provisioned
+           local-service corpus.
+        4. Nit: Home load requests `/results/favicon.svg`, which is a
+           404 under the static test server.
+      - Current cleanup state remained healthy after W6: no loaded
+        benchmark databases under `~/Developer/benchmark_runs/databases/`;
+        W6 generated only external explorer artifacts.
 
 - id: w7
   summary: "Write report, file follow-up TODOs, retire run logs"

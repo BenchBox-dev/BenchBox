@@ -314,3 +314,71 @@ opened as a `published-results` PR until the invalid-bundle clusters are fixed o
 Cleanup carry-forward: preserve reusable generated source data under `~/Developer/benchmark_runs/datagen/`; prune loaded
 database artifacts only after all source/scale consumers have completed. At this point W6 should not require any loaded
 database artifact, because it can build the explorer snapshot from `DATA_DIR/bundles/`.
+
+## W6 Explorer UAT
+
+Status: complete against the validator-clean subset. The explorer was built and smoke-tested from external artifacts only; no
+`results-data/`, `results-explorer/public/data/`, or source code was modified.
+
+Artifacts:
+
+| Artifact | Path / Count |
+| --- | --- |
+| External UAT root | `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid` |
+| Source bundles | `source/bundles/` with 205 bundles |
+| Explorer data snapshot | `data/results.duckdb` plus 205 copied `data/bundles/*.json` |
+| Explorer build log | `logs/explorer_build_20260503.log` |
+| App build log | `logs/results_explorer_build_20260503.log` |
+| Browser smoke log | `logs/playwright_smoke_20260503.log` |
+| Performance log | `logs/performance_marks_20260503.log` and `.json` |
+| Screenshots | `screenshots/desktop-home.png`, `desktop-query-local-filter.png`, `desktop-tpch.png`, `mobile-query-filters.png` |
+
+Snapshot inventory:
+
+| Check | Count |
+| --- | ---: |
+| `results` | 205 |
+| `platform_index_rows` | 205 |
+| `benchmark_rankings` | 205 |
+| `benchmark_matrix_cells` | 13,146 |
+| `result_detail_metrics` | 205 |
+| `query_display_timings` | 9,057 |
+| `query_executions` | 26,975 |
+| `short_ids` | 205 |
+
+Platform/scale coverage:
+
+| Dimension | Counts |
+| --- | --- |
+| Platform | DataFusion 68, Polars 41, PySpark 34, SQLite 28, Spark 25, DuckDB 9 |
+| Scale | SF 0.01 = 70, SF 0.1 = 63, SF 1.0 = 72 |
+| Trust/visibility | 205 `community-submission` / `public-self-reported` |
+| Deployment | 205 `local`; cloud/provider/region/instance facets are `unknown`-only |
+
+Browser smoke:
+
+- Used the existing static server with `--dist-dir` and `--fixture-dir` pointed at the external UAT artifacts.
+- Used installed Google Chrome via Playwright `channel: "chrome"` because the bundled Playwright Chromium binary was not
+  present.
+- Passed terminating checks for desktop Home, desktop Query with Deployment filter, desktop TPC-H benchmark page, and mobile
+  Query filter drawer.
+- Horizontal overflow checks passed at 1440x1000 and 390x844.
+- Performance marks on this snapshot:
+  - Home: `db-init` 553.8 ms, `home-leaderboard-data` 571.0 ms, `leaderboard-render-after-data` 17.8 ms.
+  - Query: `db-init` 542.6 ms, `query-workbench-render-after-db` 74.5 ms.
+
+Explorer/submission UAT findings for W7:
+
+- Minor: `benchbox explorer build --help` still documents `manifest.json`, but the current pipeline deletes legacy JSON
+  manifests and emits only `results.duckdb` plus copied bundles.
+- Minor: Query facet accessible labels are easy to match ambiguously. The Deployment `local` checkbox also partially matches
+  Cost status `not_applicable_local`; exact label `local 205` was required in the smoke script.
+- Minor/corpus limitation: this local-only UAT corpus validates facet rendering/filtering mechanics, but cloud/provider/region
+  and instance facets are `unknown`-only. A dedicated cloud or provisioned local-service corpus is still needed for true
+  cloud/container/region differentiation.
+- Nit: Home load requests `/results/favicon.svg`, which is a 404 under the static test server.
+
+Cleanup state after W6:
+
+- `~/Developer/benchmark_runs/databases/` still had no loaded benchmark database artifacts.
+- W6 generated only external explorer build/smoke artifacts under `~/Developer/benchmark_runs/explorer_uat/`.
