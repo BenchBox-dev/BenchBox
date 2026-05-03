@@ -51,6 +51,13 @@ work:
     needs: [w2, w3]
     status: pending
     notes: "<Optional implementation notes>"
+    # OPTIONAL - for work units with cross-cutting deliverables only.
+    # Pairs a specific exercise with the evidence the final report must
+    # produce. Reviewer convention; no tooling enforcement.
+    # coverage_checklist:
+    #   - id: <slug>
+    #     description: "<what to exercise>"
+    #     evidence_required: "<what the final report must show>"
 
 # Items that are known but explicitly out of scope
 deferred:
@@ -168,10 +175,24 @@ deps:
 success_metrics:
   - "<Measurable success criterion 1>"
   - "<Measurable success criterion 2>"
+  # For submission-flow UATs, name the intended terminal state explicitly
+  # using one of the four-word vocab terms below. Avoids ambiguity when
+  # an agent later infers terminal state from evidence rather than intent.
+  # - "Submission terminal state: <local-stage|cloud-uploaded|draft-pr|merged-to-published-results>"
+  # For corpus-shaped UATs only (>1 captured bundle): track the rate at
+  # which W3-passed cells produce bundles that pass validate_submission.py.
+  # - "Validator-clean rate: >=X% of W3-passed cells pass scripts/validate_submission.py"
 
 open_questions:
   - "<Unresolved question 1?>"
   - "<Unresolved question 2?>"
+  # Object form for gating questions whose resolution changes a deliverable.
+  # `affects` links to the success_metric or work unit at risk; reviewer
+  # attention is the enforcement model (no runtime gate in todo_cli.py done).
+  # - question: "<Object form for gating questions>"
+  #   gating: true
+  #   affects: ["<w-id> success_metric: <which one>"]
+  #   default: "<safe default if unresolved>"
 
 research_value:
   hypothesis: |
