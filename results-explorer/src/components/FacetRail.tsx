@@ -292,7 +292,7 @@ function FacetGroupSection({
                 <span class="inline-flex min-w-0 items-center gap-2">
                   <input
                     type="checkbox"
-                    aria-label={option.displayLabel}
+                    aria-label={formatFacetAccessibleName(group.label, option.displayLabel, option.count)}
                     checked={checked}
                     disabled={option.disabled}
                     onChange={() => onToggle(group.key, option.value)}
@@ -309,6 +309,11 @@ function FacetGroupSection({
       )}
     </section>
   );
+}
+
+function formatFacetAccessibleName(groupLabel: string, optionLabel: string, count?: number): string {
+  const countSuffix = count === undefined ? "" : ` (${count.toLocaleString()})`;
+  return `${groupLabel}: ${optionLabel}${countSuffix}`;
 }
 
 function facetKeyFromChipKey(key: string): string {

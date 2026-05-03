@@ -28,6 +28,8 @@ test.describe("Query workbench", () => {
     await expect(summary).toContainText(/matching result bundle/);
 
     await expect(facetCheckbox(page, "Deployment", "cloud")).toBeVisible();
+    await expect(facetCheckbox(page, "Deployment", "local")).toHaveCount(1);
+    await expect(page.getByRole("checkbox", { name: /^Deployment:\s+local\b/ })).toHaveCount(1);
     await expect(facetCheckbox(page, "Cloud provider", "aws")).toBeVisible();
     await expect(facetCheckbox(page, "Cloud region", "us-east-1")).toBeVisible();
     await expect(facetCheckbox(page, "Instance / warehouse", "m6i.large")).toBeVisible();
@@ -204,7 +206,7 @@ function facetSection(page: Page, label: string): Locator {
 
 function facetCheckbox(page: Page, sectionLabel: string, optionValue: string): Locator {
   return facetSection(page, sectionLabel).getByRole("checkbox", {
-    name: new RegExp(`^${escapeRegExp(optionValue)}\\b`),
+    name: new RegExp(`^${escapeRegExp(sectionLabel)}:\\s+${escapeRegExp(optionValue)}\\b`),
   });
 }
 
