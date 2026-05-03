@@ -175,7 +175,7 @@ work:
 - id: w3
   summary: "Execute the scale ladder with hard 10-minute per-run cap"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     For each viable (platform, benchmark) pair, run the scale ladder
     0.01 -> 0.1 -> 1.0. Stop ascending the ladder for that pair as
@@ -207,6 +207,96 @@ work:
     Run platforms sequentially, never in parallel. Concurrent platform
     runs contaminate each other's timings, defeating the
     corpus-quality goal of this exercise.
+
+    Include reuse-aware database cleanup in the runner. The cleanup
+    boundary is the loaded database artifact, not the generated source
+    data: keep `~/Developer/benchmark_runs/datagen/` directories while
+    later platforms can reuse them, but delete platform-specific loaded
+    database files under `~/Developer/benchmark_runs/databases/` once
+    no remaining cell in the current platform/source group can consume
+    them. In particular, do not delete `tpch_sf*` loaded databases
+    immediately after `tpch`, because `read_primitives`,
+    `write_primitives`, `transaction_primitives`, and `ai_primitives`
+    reuse the TPC-H source data and, depending on the adapter path, can
+    share the same loaded database namespace. Prefer cleanup after the
+    whole platform finishes; if cleanup is needed mid-platform, only do
+    it after all consumers for that source/scale have completed.
+
+    Partial execution record (2026-05-02):
+      - Log directory:
+        `~/Developer/benchmark_runs/logs/uat_20260502/`.
+      - Summary file:
+        `~/Developer/benchmark_runs/logs/uat_20260502/matrix_summary.tsv`.
+      - Sentinel file:
+        `~/Developer/benchmark_runs/logs/uat_20260502/.sweep_start`.
+      - Host had no `timeout`/`gtimeout`; W3 used a Perl
+        process-group timeout wrapper with the required 600-second cap.
+      - Partial result counts before the blocker: 46 passed, 1 failed,
+        1 timed out, 1 blocked-disk.
+      - Completed DuckDB through `vector_search` SF 1.0. Next cell is
+        `duckdb/tpcds_obt` SF 1.0.
+      - Hard blocker: before `duckdb/tpcds_obt` SF 1.0, `df -k
+        ~/Developer/benchmark_runs` reported 41,432,632 KiB available,
+        below the revised 40 GiB cutoff of 41,943,040 KiB. Do not
+        resume W3 until the output volume has enough free space above
+        that cutoff.
+      - User override: do not use the 40 GiB free-space cutoff to stop
+        work. Treat disk free space as telemetry unless available space
+        falls below 5 GiB. Resume from `duckdb/tpcds_obt` SF 1.0 and
+        only stop if free space drops below 5 GiB, a benchmark command
+        actually fails due to disk exhaustion, or another hard runtime
+        failure prevents the sweep driver itself from continuing.
+      - Cleanup override: include reuse-aware cleanup as part of the
+        W3 process so loaded local databases do not grow without
+        bounds. Preserve reusable datagen inputs; prune only loaded DB
+        files at safe reuse boundaries.
+      - The first resume attempt was operator-interrupted to add this
+        cleanup rule. Treat the resulting `duckdb/tpcds_obt` SF 1.0
+        `exit=143` summary row as retriable operator interruption, not
+        a benchmark defect.
+
+    Completion record (2026-05-03):
+      - Completed the full 1,530-cell latest-status candidate matrix:
+        434 passed, 85 failed, 8 timed out, 133 skipped by scale-ladder
+        pruning, and 870 skipped because TCP-backed platforms were not
+        reachable locally.
+      - Attempted 527 real benchmark cells under the 600-second cap.
+        Recorded 434 passed cells. The summary captured 388 unique
+        result JSON paths for those passed cells, and all captured
+        paths exist. The 46 passed cells without captured result paths
+        are early DuckDB rows from before the result-path extractor was
+        improved; W5 should recover those from the logs/result
+        directory before submission.
+      - Log directory:
+        `~/Developer/benchmark_runs/logs/uat_20260502/`.
+      - Summary file:
+        `~/Developer/benchmark_runs/logs/uat_20260502/matrix_summary.tsv`.
+        Interpret this by latest `(platform, benchmark, scale)` row;
+        it contains earlier duplicate retriable rows from the disk
+        cutoff and operator-interruption resumes.
+      - Database cleanup log:
+        `~/Developer/benchmark_runs/logs/uat_20260502/database_cleanup_20260502.log`.
+      - Reuse-aware cleanup preserved reusable datagen and pruned loaded
+        local DB state only at safe boundaries. Notable cleanup actions:
+        DuckDB after TPC-H-source consumers, ClickHouse Local at a
+        mid-platform safe boundary and platform completion, SQLite at
+        mid-platform and platform completion boundaries, and worktree
+        local Spark warehouses after Spark/PySpark had completed.
+      - The malformed ClickHouse Local cleanup log row with empty
+        timestamp/`after_kib` came from a shell variable mistake while
+        recording telemetry; the immediately following
+        `mid-platform-safe-boundary-corrected` row is the valid cleanup
+        record.
+      - Free disk never fell below the user-defined 5 GiB hard stop.
+        Dask temporarily drove free space into the mid-30 GiB range
+        during exit-137 cells, then released the space when the
+        subprocess exited.
+      - W4 should triage by defect cluster, not per-cell: partial
+        success exits with query failures, FlightData SF 1.0 failures,
+        Lakesail missing `pysail`/Sail server, Modin all-fast-fail
+        environment setup, Dask exit-137/resource spikes, Spark/PySpark
+        expression/analysis failures, SQLite slow/timeout behavior,
+        DuckDB ClickBench load failure, and unreachable TCP platforms.
 
 - id: w4
   summary: "Failure triage: fix trivia, log everything else"
