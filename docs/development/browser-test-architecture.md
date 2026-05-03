@@ -117,9 +117,9 @@ touched.
 - `results-data/bundles/` is the public curated source - same prohibition.
 - The pipeline already has a supported data-in / data-out shape:
   `benchbox explorer build --data-dir <in> --output <out>` reads bundles
-  from any directory and writes `results.duckdb` + manifest artifacts to
-  any directory. We do not need a new seam; we need a thin fixture
-  generator that:
+  from any directory and writes `results.duckdb`, `results_schema.json`,
+  and copied bundle downloads to any directory. We do not need a new seam;
+  we need a thin fixture generator that:
   1. Copies canonical schema-v2 bundles (and companion `.plans.json`
      / `.tuning.json` / `<result>.manifest.json` sidecars) from a small
      committed source set under `results-explorer/test-fixtures/source/`

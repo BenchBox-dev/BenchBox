@@ -1,0 +1,76 @@
+id: results-explorer-uat-defect-explorer-build-output-contract-docs
+title: "UAT defect: explorer build help documents stale manifest output"
+worktree: main
+priority: "Medium"
+status: "Completed"
+category: "Developer Experience"
+
+description: |
+  W6 showed that `benchbox explorer build --help` still documents
+  `manifest.json`, but the current pipeline intentionally deletes legacy JSON
+  manifests and emits `results.duckdb` plus copied bundles. This creates a
+  stale contract for anyone building a local Explorer snapshot.
+
+work:
+- id: w1
+  summary: "Audit explorer build help, contract metadata, and docs for stale JSON outputs"
+  status: done
+  notes: |
+    W1 audit evidence:
+    - `uv run -- benchbox explorer build --help` still says `--output` is for "generated artifacts (manifest,
+      details, duckdb)" and lists `manifest.json` as a navigation index.
+    - `benchbox/core/explorer_pipeline/pipeline.py` is the source of truth for current behavior: it deletes legacy
+      `benchmarks/`, `details/`, `compare/`, `manifest.json`, `meta_leaderboard.json`, `short_ids.json`, and
+      `results_schema.json` before rebuilding. `benchbox/core/explorer_pipeline/duckdb_builder.py` then writes the
+      current outputs: `results.duckdb`, auxiliary `results_schema.json`, and copied bundles under
+      `bundles/{result_id}.json`.
+    - `benchbox/core/explorer_pipeline/contract.py` and `results-explorer/scripts/explorer-build-contract.mjs`
+      validate only the command and required flags; they do not encode the expected outputs or removed legacy outputs.
+    - `cd results-explorer && npm run test -- explorer-build-contract` currently fails with "No test files found";
+      the existing terminating contract validator is `cd results-explorer && node scripts/validate-explorer-build-contract.mjs`.
+    - Stale docs found in `docs/development/browser-test-architecture.md` (`results.duckdb` + manifest artifacts) and
+      `docs/reference/threat-model.md` (public read models and tampering risks still name manifest/detail JSONs).
+      Older strategy prose in `docs/development/benchbox-results-platform-strategy.md` intentionally records the migration
+      history and should be left alone unless W2 needs an explicit historical note.
+- id: w2
+  summary: "Update help/docs/tests to match the DuckDB-only read model"
+  needs: [w1]
+  status: done
+
+verification:
+- description: "Explorer build contract validation passes."
+  command: "cd results-explorer && node scripts/validate-explorer-build-contract.mjs"
+  expected_output: "contract validator reports OK"
+- description: "Explorer build help no longer promises removed manifest output."
+  command: "uv run -- benchbox explorer build --help"
+  expected_output: "help documents results.duckdb, results_schema.json, and copied bundles only"
+
+must_preserve:
+- "The pipeline continues to delete stale legacy JSON artifacts."
+- "Existing `results.duckdb` browser loading remains unchanged."
+
+anti_patterns:
+- "DO NOT reintroduce manifest.json only to satisfy help text -- because the app migrated to DuckDB -- update the contract/docs
+  instead."
+
+scope_limit:
+  only_modify:
+  - "_project/TODO/main/active/results-explorer-uat-defect-explorer-build-output-contract-docs.yaml"
+  - "_project/DONE/main/active/results-explorer-uat-defect-explorer-build-output-contract-docs.yaml"
+  - "benchbox/cli/commands/explorer.py"
+  - "benchbox/core/explorer_pipeline/contract.py"
+  - "benchbox/core/explorer_pipeline/models.py"
+  - "results-explorer/scripts/explorer-build-contract.mjs"
+  - "docs/development/browser-test-architecture.md"
+  - "docs/reference/threat-model.md"
+  do_not_modify:
+  - "benchbox/core/explorer_pipeline/pipeline.py"
+  - "benchbox/core/explorer_pipeline/duckdb_builder.py"
+  - "results-explorer/src/db.ts"
+  - "results-explorer/public/data/"
+  - "results-data/bundles/"
+
+metadata:
+  tags: [uat, results-explorer, docs]
+  created_date: "2026-05-03"
+  completed_date: "2026-05-03"

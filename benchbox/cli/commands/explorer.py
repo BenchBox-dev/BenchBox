@@ -34,7 +34,7 @@ def explorer_group() -> None:
     "output_dir",
     required=True,
     type=click.Path(file_okay=False, path_type=Path),
-    help="Output directory for generated artifacts (manifest, details, duckdb).",
+    help="Output directory for results.duckdb, results_schema.json, and copied bundles.",
 )
 @click.option(
     "--trust-label",
@@ -60,9 +60,9 @@ def explorer_build(
     explorer read model, and writes the output to OUTPUT_DIR:
 
     \b
-    - manifest.json          navigation index
-    - results.duckdb         DuckDB-WASM queryable snapshot
-    - bundles/{id}.json      copied source bundles
+    - results.duckdb          DuckDB-WASM queryable snapshot
+    - results_schema.json     column metadata for schema-driven controls
+    - bundles/{id}.json       copied source bundles for download/audit links
 
     Examples:
 
