@@ -197,6 +197,26 @@ class TestValidateBundle:
         assert not vr.ok
         assert any("All query timings are 0ms" in e for e in vr.errors)
 
+    def test_all_zero_failed_and_skipped_timings_fail(self):
+        data = _minimal_bundle()
+        data["summary"]["queries"] = {"total": 3, "passed": 0, "failed": 3}
+        data["queries"] = [
+            {"id": "Q1", "ms": 0, "status": "FAILED"},
+            {"id": "Q2", "ms": 0, "status": "SKIPPED"},
+            {"id": "Q3", "ms": 0, "status": "SUCCESS"},
+        ]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("All query timings are 0ms" in e for e in vr.errors)
+
+    def test_positive_sub_millisecond_timing_passes(self):
+        data = _minimal_bundle()
+        data["queries"] = [{"id": "Q1", "ms": 0.04, "status": "pass"}]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok
+
     def test_negative_query_duration_fails(self):
         data = _minimal_bundle()
         data["queries"][0]["ms"] = -50
