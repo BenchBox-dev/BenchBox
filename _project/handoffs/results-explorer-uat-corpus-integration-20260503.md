@@ -129,14 +129,14 @@ Blocked cohorts (must be excluded from this PR or the gate must be relaxed):
 | ai_primitives × 1.0 | SQLite | 1 |
 | joinorder × 1.0 | SQLite, Spark | 2 |
 | read_primitives × 1.0 | DataFusion, Polars | 3 (DataFusion has SQL+DF modes) |
-| tpcds × 0.01 | DataFusion, Polars | 3 (DataFusion has SQL+DF modes) |
-| tpcds × 0.1 | DataFusion, Polars | 3 (DataFusion has SQL+DF modes) |
-| tpcds × 1.0 | DataFusion, Polars | 3 (DataFusion has SQL+DF modes) |
+| tpcds × 0.01 | DataFusion, Polars | 2 (DF mode only) |
+| tpcds × 0.1 | DataFusion, Polars | 2 (DF mode only) |
+| tpcds × 1.0 | DataFusion, Polars | 2 (DF mode only) |
 | tpchavoc × 1.0 | DataFusion, Polars | 3 (DataFusion has SQL+DF modes) |
 
 **Decision: exclude all 9 blocked cohorts from this PR.** Total exclusion =
-**18 bundles** (3 + 2 + 3 + 3 + 3 + 3 + 1 = double-counted; precise count
-computed at staging time and recorded in the staging log).
+**17 bundles** (3 ai_primitives + 2 joinorder + 3 read_primitives_SF1
++ 6 tpcds + 3 tpchavoc_SF1).
 
 These cohorts will be carried forward as a follow-up TODO once a third
 platform is available — they are *not* defects, just below the depth gate.
@@ -177,7 +177,9 @@ environment / cost data.
 
 **Decision: keep these bundles.** They are warnings, not errors, and the
 per-query timing surface is platform-mode-level missing data, not a defect
-in this capture. The explorer already handles bundles with empty queries[].
+in this capture. The explorer already short-circuits empty `queries[]` —
+see `results-explorer/src/components/DivergingBarChart.tsx:32`,
+`NormalizedSpeedupChart.tsx:44`, and `pages/ResultDetail.tsx:334,382`.
 
 ### Collisions with existing curated entries
 
@@ -199,11 +201,12 @@ convention (e.g. existing curated has both `tpch_sf001_polars_*` and
 
 ### Trust-label resolution
 
-`scripts/generate_corpus_inventory.py` derives the trust label from the
-presence of a `<stem>.manifest.json` sidecar:
+`scripts/generate_corpus_inventory.py:43-52` derives the trust label from
+the presence of a `<stem>.manifest.json` sidecar (or the legacy singleton
+`submission-manifest.json` fallback):
 
-- Sidecar present → `community-submission`
-- Sidecar absent → `maintainer-run`
+- Per-bundle sidecar present **or** legacy singleton present → `community-submission`
+- Neither present → `maintainer-run`
 
 The TODO description mentioned `maintainer-curated`, which is **not an
 existing label** and would constitute "inventing" a new one (forbidden by
@@ -211,6 +214,14 @@ must_preserve). The UAT bundles were submitted via the per-bundle manifest
 flow (PR #95) and so naturally land as `community-submission` once their
 sidecar manifests are copied alongside them. This is the correct label for
 local laptop captures that did not flow through `seed-corpus.yml`.
+
+**Caveat for future maintainers:** the legacy `submission-manifest.json`
+singleton fallback is directory-wide. If a top-level
+`results-data/bundles/submission-manifest.json` were ever introduced, every
+bundle in the directory would silently flip to `community-submission`,
+including the existing 12 maintainer-run entries. The staging plan never
+copies the singleton — only per-bundle sidecars — so this PR cannot trip
+the trap, but it is worth flagging.
 
 **Decision: copy each UAT bundle JSON together with its sibling
 `<stem>.manifest.json` into `results-data/bundles/`. The inventory generator
@@ -220,8 +231,8 @@ will resolve the trust label correctly without any manual labelling.**
 
 1. Compute the include set from `uat_20260502_valid/bundle/`:
    - Start: 205 bundles.
-   - Exclude: every bundle in the 9 blocked cohorts listed above.
-   - Final include count: recorded in the staging log when W3 runs.
+   - Exclude: every bundle in the 9 blocked cohorts listed above (17 bundles).
+   - Final include count: **188 bundles** (205 − 17), confirmed at staging time.
 2. For each included bundle, copy two files into `results-data/bundles/`:
    - `<stem>.json` (the primary bundle)
    - `<stem>.manifest.json` (the sidecar from `submissions/uat_20260502/`)
@@ -236,8 +247,8 @@ will resolve the trust label correctly without any manual labelling.**
 ## Success-metric tracking
 
 - "≥80% of validator-clean bundles land via merged PR" — target 164/205
-  bundles minimum. Plan stages ~185 bundles (excluding only the 9 blocked
-  cohorts), so ~90% on-track.
+  bundles minimum. Plan stages **188 bundles** (excluding only the 17
+  bundles in the 9 blocked cohorts), so **91.7%** on-track.
 - "Cross-scale view renders for ≥3 (platform, benchmark) pairs" — there are
   51 candidates; W5 will pick three from DataFusion or Polars.
 - "Audit matrix filed under `_project/handoffs/`" — this document.
