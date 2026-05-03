@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:00.153579+00:00",
+  "bundle_file": "tpch_skew_sf001_pyspark_df_20260502_215832_e75f78eb.json",
+  "bundle_hash": "11b7f024fcba74c6b5ac015386b2d258bbd686bcfe1784a7d5e161a48331aa78",
+  "companion_hashes": {},
+  "benchmark": "TPC-H Skew",
+  "platform": "PySpark",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

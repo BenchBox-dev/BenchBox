@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:51.596285+00:00",
+  "bundle_file": "datavault_sf01_pyspark_df_20260502_215856_7a32012a.json",
+  "bundle_hash": "98c23a2e53d390500d6a3308957c2b1e55cca884086250048c905eb8d0a62fb3",
+  "companion_hashes": {},
+  "benchmark": "TPC-H Data Vault",
+  "platform": "PySpark",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

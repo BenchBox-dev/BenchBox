@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:53:26.198123+00:00",
+  "bundle_file": "tsbs_devops_sf1_polars_df_20260502_211300_8dc54836.json",
+  "bundle_hash": "9ce7ffb9cdfb6b29aa3691dac4034bb51e3fe9fad7a8a82399f28aa64d090f8e",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "Polars",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

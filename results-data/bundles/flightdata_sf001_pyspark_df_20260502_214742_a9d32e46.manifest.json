@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:48:07.857133+00:00",
+  "bundle_file": "flightdata_sf001_pyspark_df_20260502_214742_a9d32e46.json",
+  "bundle_hash": "333b1304dfb37d900b02954ef7353b7773801dc87cb70ce68a40902426b14e6e",
+  "companion_hashes": {},
+  "benchmark": "Flight Data",
+  "platform": "PySpark",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

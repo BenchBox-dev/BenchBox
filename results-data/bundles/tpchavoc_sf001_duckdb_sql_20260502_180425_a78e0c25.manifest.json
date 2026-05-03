@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:28.411536+00:00",
+  "bundle_file": "tpchavoc_sf001_duckdb_sql_20260502_180425_a78e0c25.json",
+  "bundle_hash": "bb81377f38712599eab96fac18250c70f5fff0e6e71f51528422dc8d05732c77",
+  "companion_hashes": {},
+  "benchmark": "TPC-Havoc",
+  "platform": "DuckDB",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

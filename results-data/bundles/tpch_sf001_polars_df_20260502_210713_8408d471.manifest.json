@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:51:30.735307+00:00",
+  "bundle_file": "tpch_sf001_polars_df_20260502_210713_8408d471.json",
+  "bundle_hash": "8bdb14605425daf990876beb6e04433d03e111bc034ee2a218b7ba648279474e",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "Polars",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

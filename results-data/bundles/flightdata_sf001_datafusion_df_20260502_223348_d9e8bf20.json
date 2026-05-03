@@ -1,0 +1,1361 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "d9e8bf20",
+    "timestamp": "2026-05-02T22:33:48.047670",
+    "total_duration_ms": 334,
+    "query_time_ms": 149,
+    "iterations": 3,
+    "streams": 3
+  },
+  "benchmark": {
+    "id": "flightdata",
+    "name": "Flight Data",
+    "scale_factor": 0.01,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "DataFusion",
+    "version": "53.0.0",
+    "client_version": "unknown",
+    "config": {
+      "execution_mode": "dataframe",
+      "family": "expression",
+      "target_partitions": 10,
+      "batch_size": 8192,
+      "repartition_joins": true,
+      "parquet_pushdown": true,
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/flightdata_sf001",
+      "driver_version_resolved": "53.0.0",
+      "driver_version_actual": "53.0.0",
+      "driver_runtime_strategy": "current-process",
+      "driver_package": "datafusion",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3"
+    },
+    "deployment": {
+      "deployment_type": "dataframe",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "target_partitions": 10,
+      "batch_size": 8192,
+      "repartition_joins": true,
+      "parquet_pushdown": true,
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/flightdata_sf001",
+      "driver_version_resolved": "53.0.0",
+      "driver_version_actual": "53.0.0",
+      "driver_runtime_strategy": "current-process",
+      "memory_limit": "12GB",
+      "options": {
+        "repartition_joins": "true",
+        "parquet_pushdown": "true",
+        "batch_size": "8192",
+        "verbose_level": 0,
+        "verbose_enabled": false,
+        "very_verbose": false,
+        "quiet": false,
+        "verbose": false,
+        "force_recreate": false,
+        "show_query_plans": false,
+        "tuning_enabled": false,
+        "force_upload": false,
+        "capture_plans": false,
+        "strict_plan_capture": false,
+        "execution_mode": "dataframe",
+        "unified_tuning_configuration": {
+          "primary_keys": {
+            "enabled": false,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
+          "foreign_keys": {
+            "enabled": false,
+            "enforce_referential_integrity": true,
+            "on_delete_action": "RESTRICT",
+            "on_update_action": "RESTRICT"
+          },
+          "unique_constraints": {
+            "enabled": false,
+            "ignore_nulls": false
+          },
+          "check_constraints": {
+            "enabled": false,
+            "enforce_on_insert": true,
+            "enforce_on_update": true
+          },
+          "platform_optimizations": {
+            "z_ordering_enabled": false,
+            "liquid_clustering_enabled": false,
+            "databricks_clustering_strategy": "z_order",
+            "sorted_ingestion_mode": "off",
+            "sorted_ingestion_method": "auto",
+            "auto_optimize_enabled": false,
+            "auto_compact_enabled": false,
+            "bloom_filters_enabled": false,
+            "materialized_views_enabled": false
+          }
+        }
+      },
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "execution_mode": "dataframe",
+      "benchmark": "flightdata",
+      "scale_factor": 0.01,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "thread_limit": 8
+    },
+    "raw_metadata": {
+      "driver_package": "datafusion",
+      "driver_version_resolved": "53.0.0",
+      "driver_version_actual": "53.0.0",
+      "driver_runtime_strategy": "current-process",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3"
+    },
+    "driver_actual_version": "53.0.0",
+    "driver_package": "datafusion",
+    "driver_resolved_version": "53.0.0",
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "mode": "dataframe"
+  },
+  "summary": {
+    "queries": {
+      "total": 60,
+      "passed": 3,
+      "failed": 57
+    },
+    "timing": {
+      "total_ms": 149,
+      "avg_ms": 49.7,
+      "min_ms": 49,
+      "max_ms": 50,
+      "geometric_mean_ms": 49.7,
+      "stdev_ms": 0.6
+    },
+    "data": {
+      "rows_loaded": 689079,
+      "load_time_ms": 5.1
+    },
+    "validation": "partial"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 5
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    },
+    "power_test": {
+      "status": "COMPLETED",
+      "duration_ms": 291
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [
+    {
+      "id": "best-routes",
+      "ms": 4,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "busiest-routes",
+      "ms": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "cancellation-rate",
+      "ms": 52,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "carrier-ranking",
+      "ms": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "cascade-delays",
+      "ms": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "day-of-week",
+      "ms": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-by-airport",
+      "ms": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-by-hour",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-causes",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "distance-delay",
+      "ms": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "holiday-impact",
+      "ms": 3,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "hub-connectivity",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "improvement-trend",
+      "ms": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "market-share",
+      "ms": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "ontime-by-carrier",
+      "ms": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "recovery-time",
+      "ms": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "route-reliability",
+      "ms": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "seasonal-trends",
+      "ms": 3,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "time-of-day",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "weather-impact",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "best-routes",
+      "ms": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "busiest-routes",
+      "ms": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "cancellation-rate",
+      "ms": 50,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "carrier-ranking",
+      "ms": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "cascade-delays",
+      "ms": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "day-of-week",
+      "ms": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-by-airport",
+      "ms": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-by-hour",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-causes",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "distance-delay",
+      "ms": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "holiday-impact",
+      "ms": 3,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "hub-connectivity",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "improvement-trend",
+      "ms": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "market-share",
+      "ms": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ontime-by-carrier",
+      "ms": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "recovery-time",
+      "ms": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "route-reliability",
+      "ms": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "seasonal-trends",
+      "ms": 3,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "time-of-day",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "weather-impact",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "best-routes",
+      "ms": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "busiest-routes",
+      "ms": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "cancellation-rate",
+      "ms": 50,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "carrier-ranking",
+      "ms": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "cascade-delays",
+      "ms": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "day-of-week",
+      "ms": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-by-airport",
+      "ms": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-by-hour",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-causes",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "distance-delay",
+      "ms": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "holiday-impact",
+      "ms": 3,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "hub-connectivity",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "improvement-trend",
+      "ms": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "market-share",
+      "ms": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ontime-by-carrier",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "recovery-time",
+      "ms": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "route-reliability",
+      "ms": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "seasonal-trends",
+      "ms": 3,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "time-of-day",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "weather-impact",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "best-routes",
+      "ms": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "busiest-routes",
+      "ms": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "cancellation-rate",
+      "ms": 49,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "carrier-ranking",
+      "ms": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "cascade-delays",
+      "ms": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "day-of-week",
+      "ms": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-by-airport",
+      "ms": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-by-hour",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "delay-causes",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "distance-delay",
+      "ms": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "holiday-impact",
+      "ms": 3,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "hub-connectivity",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "improvement-trend",
+      "ms": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "market-share",
+      "ms": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ontime-by-carrier",
+      "ms": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "recovery-time",
+      "ms": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "route-reliability",
+      "ms": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "seasonal-trends",
+      "ms": 3,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "time-of-day",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "weather-impact",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    }
+  ],
+  "tables": {
+    "airlines": {
+      "rows": 25
+    },
+    "airports": {
+      "rows": 50
+    },
+    "flights": {
+      "rows": 689004,
+      "load_ms": 2
+    }
+  },
+  "cost": {
+    "total_usd": 0,
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-02T22:33:48.044913",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_package": "datafusion",
+    "driver_version_resolved": "53.0.0",
+    "driver_version_actual": "53.0.0",
+    "driver_runtime_strategy": "current-process",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3",
+    "non_interactive": true
+  },
+  "environment": {
+    "platform_runtime": {
+      "runtime_type": "dataframe_process",
+      "collection_status": "partial",
+      "source": "inferred",
+      "engine_host": "host_51e3fb6b450f"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "client_host": {
+      "machine_id": "machine_45d1a3ef31a1728d"
+    }
+  },
+  "errors": [
+    {
+      "phase": "query",
+      "query_id": "best-routes",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "best-routes",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "best-routes",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "best-routes",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "busiest-routes",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "busiest-routes",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "busiest-routes",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "busiest-routes",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "carrier-ranking",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_3\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "carrier-ranking",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_22\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "carrier-ranking",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_41\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "carrier-ranking",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_60\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "cascade-delays",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"late_aircraft_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_6\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "cascade-delays",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"late_aircraft_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_25\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "cascade-delays",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"late_aircraft_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_44\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "cascade-delays",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"late_aircraft_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_63\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "day-of-week",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_7\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "day-of-week",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_26\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "day-of-week",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_45\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "day-of-week",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_64\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-by-airport",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-by-airport",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-by-airport",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-by-airport",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-by-hour",
+      "type": "unsupported operand type(s) for //",
+      "message": "unsupported operand type(s) for //: 'UnifiedExpr' and 'UnifiedExpr'"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-by-hour",
+      "type": "unsupported operand type(s) for //",
+      "message": "unsupported operand type(s) for //: 'UnifiedExpr' and 'UnifiedExpr'"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-by-hour",
+      "type": "unsupported operand type(s) for //",
+      "message": "unsupported operand type(s) for //: 'UnifiedExpr' and 'UnifiedExpr'"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-by-hour",
+      "type": "unsupported operand type(s) for //",
+      "message": "unsupported operand type(s) for //: 'UnifiedExpr' and 'UnifiedExpr'"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-causes",
+      "type": "'UnifiedLazyFrame' object has no attribute 'agg'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'agg'"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-causes",
+      "type": "'UnifiedLazyFrame' object has no attribute 'agg'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'agg'"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-causes",
+      "type": "'UnifiedLazyFrame' object has no attribute 'agg'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'agg'"
+    },
+    {
+      "phase": "query",
+      "query_id": "delay-causes",
+      "type": "'UnifiedLazyFrame' object has no attribute 'agg'",
+      "message": "'UnifiedLazyFrame' object has no attribute 'agg'"
+    },
+    {
+      "phase": "query",
+      "query_id": "distance-delay",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "distance-delay",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "distance-delay",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "distance-delay",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "holiday-impact",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_10\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "holiday-impact",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_29\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "holiday-impact",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_48\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "holiday-impact",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_67\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "hub-connectivity",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "hub-connectivity",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "hub-connectivity",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "hub-connectivity",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "improvement-trend",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_13\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "improvement-trend",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_32\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "improvement-trend",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_51\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "improvement-trend",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_70\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "market-share",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "market-share",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "market-share",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "market-share",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "ontime-by-carrier",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(BinaryExpr(BinaryExpr { left: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" }), op: Gt, right: Literal(Float64(0), None) })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "ontime-by-carrier",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(BinaryExpr(BinaryExpr { left: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" }), op: Gt, right: Literal(Float64(0), None) })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "ontime-by-carrier",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(BinaryExpr(BinaryExpr { left: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" }), op: Gt, right: Literal(Float64(0), None) })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "ontime-by-carrier",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(BinaryExpr(BinaryExpr { left: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" }), op: Gt, right: Literal(Float64(0), None) })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "recovery-time",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "recovery-time",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "recovery-time",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "recovery-time",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"dep_delay\" })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "route-reliability",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "route-reliability",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "route-reliability",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "route-reliability",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Cast(Cast { expr: Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"distance\" }), data_type: Float64 })], distinct: false, filter: None, order_by: [], null_treatment: None } }), Literal(Int32(0), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "seasonal-trends",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_17\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "seasonal-trends",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_36\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "seasonal-trends",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_55\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "seasonal-trends",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"arr_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_74\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "time-of-day",
+      "type": "unsupported operand type(s) for //",
+      "message": "unsupported operand type(s) for //: 'UnifiedExpr' and 'UnifiedExpr'"
+    },
+    {
+      "phase": "query",
+      "query_id": "time-of-day",
+      "type": "unsupported operand type(s) for //",
+      "message": "unsupported operand type(s) for //: 'UnifiedExpr' and 'UnifiedExpr'"
+    },
+    {
+      "phase": "query",
+      "query_id": "time-of-day",
+      "type": "unsupported operand type(s) for //",
+      "message": "unsupported operand type(s) for //: 'UnifiedExpr' and 'UnifiedExpr'"
+    },
+    {
+      "phase": "query",
+      "query_id": "time-of-day",
+      "type": "unsupported operand type(s) for //",
+      "message": "unsupported operand type(s) for //: 'UnifiedExpr' and 'UnifiedExpr'"
+    },
+    {
+      "phase": "query",
+      "query_id": "weather-impact",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"weather_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_19\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "weather-impact",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"weather_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_38\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "weather-impact",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"weather_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_57\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    },
+    {
+      "phase": "query",
+      "query_id": "weather-impact",
+      "type": "DataFusion error",
+      "message": "DataFusion error: Internal error: Invalid aggregate expression 'ScalarFunction(ScalarFunction { func: ScalarUDF { inner: RoundFunc { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Exact { desired_type: Native(LogicalType(Native(Float32), Float32)) }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }, Implicit { desired_type: Native(LogicalType(Native(Int32), Int32)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer], default_casted_type: Int32 } }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Numeric], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None } } }, args: [AggregateFunction(AggregateFunction { func: AggregateUDF { inner: Avg { signature: Signature { type_signature: OneOf([Coercible([Exact { desired_type: Decimal }]), Coercible([Exact { desired_type: Duration }]), Coercible([Implicit { desired_type: Native(LogicalType(Native(Float64), Float64)), implicit_coercion: ImplicitCoercion { allowed_source_types: [Integer, Float], default_casted_type: Float64 } }])]), volatility: Immutable, parameter_names: None }, aliases: [\"mean\"] } }, params: AggregateFunctionParams { args: [Column(Column { relation: Some(Bare { table: \"?table?\" }), name: \"weather_delay\" })], distinct: false, filter: Some(Column(Column { relation: None, name: \"__common_expr_76\" })), order_by: [], null_treatment: None } }), Literal(Int32(2), None)] })'.\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d"
+    }
+  ],
+  "export": {
+    "timestamp": "2026-05-02T22:33:48.418321",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:51:34.267196+00:00",
+  "bundle_file": "tpch_sf001_sqlite_sql_20260502_191208_1df8890c.json",
+  "bundle_hash": "d94584062b89612637b159516a0d58bc6b2ea51a20b6d65f1c44e90938285d25",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "SQLite",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

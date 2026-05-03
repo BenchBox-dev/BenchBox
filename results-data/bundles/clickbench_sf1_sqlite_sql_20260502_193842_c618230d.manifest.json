@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:07.730013+00:00",
+  "bundle_file": "clickbench_sf1_sqlite_sql_20260502_193842_c618230d.json",
+  "bundle_hash": "dd8591835d70e6ab04387146829c3d4c8b9469a8fbd4e163c3cfd7abb8962147",
+  "companion_hashes": {},
+  "benchmark": "ClickBench",
+  "platform": "SQLite",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:49:42.595955+00:00",
+  "bundle_file": "read_primitives_sf01_polars_df_20260502_210844_1cb50efa.json",
+  "bundle_hash": "1c81b7d7c168cf80601fb5adaf4a9249f3016fb977197b59ac2cdb5ae3109753",
+  "companion_hashes": {},
+  "benchmark": "Read Primitives",
+  "platform": "Polars",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

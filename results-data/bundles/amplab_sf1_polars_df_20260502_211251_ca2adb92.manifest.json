@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:46:55.057323+00:00",
+  "bundle_file": "amplab_sf1_polars_df_20260502_211251_ca2adb92.json",
+  "bundle_hash": "47ba60005751f225a7e032c30e5860389d9a430fa3948698d0be25d22e38483d",
+  "companion_hashes": {},
+  "benchmark": "AMPLab",
+  "platform": "Polars",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

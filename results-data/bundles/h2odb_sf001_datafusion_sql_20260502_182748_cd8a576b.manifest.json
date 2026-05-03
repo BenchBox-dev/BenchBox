@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:48:20.704847+00:00",
+  "bundle_file": "h2odb_sf001_datafusion_sql_20260502_182748_cd8a576b.json",
+  "bundle_hash": "ac1076254a45f9da708f72393c05ad595b08d52cad40dd960812fb7e12567cda",
+  "companion_hashes": {},
+  "benchmark": "H2O Database",
+  "platform": "DataFusion",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

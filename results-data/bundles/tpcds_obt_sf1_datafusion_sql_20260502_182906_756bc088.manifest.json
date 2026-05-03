@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:54.302294+00:00",
+  "bundle_file": "tpcds_obt_sf1_datafusion_sql_20260502_182906_756bc088.json",
+  "bundle_hash": "ce3389d72cc74621a40579ee7402991074e30a09a5f5e5ed629f7b61efbc35e8",
+  "companion_hashes": {},
+  "benchmark": "TPC-DS One Big Table",
+  "platform": "DataFusion",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

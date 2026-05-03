@@ -1,0 +1,5988 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "e2b3c755",
+    "timestamp": "2026-05-02T21:37:56.198032",
+    "total_duration_ms": 214852,
+    "query_time_ms": 150544,
+    "iterations": 3,
+    "streams": 3
+  },
+  "benchmark": {
+    "id": "read_primitives",
+    "name": "Read Primitives",
+    "scale_factor": 0.1,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "PySpark",
+    "version": "4.1.1",
+    "client_version": "unknown",
+    "config": {
+      "execution_mode": "dataframe",
+      "family": "expression",
+      "master": "local[*]",
+      "driver_memory": "4g",
+      "shuffle_partitions": 10,
+      "aqe_enabled": true,
+      "working_dir": "/Users/joe/Developer/BenchBox.pool-03",
+      "driver_runtime_strategy": "current-process"
+    },
+    "deployment": {
+      "deployment_type": "dataframe",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "master": "local[*]",
+      "driver_memory": "4g",
+      "shuffle_partitions": 10,
+      "aqe_enabled": true,
+      "working_dir": "/Users/joe/Developer/BenchBox.pool-03",
+      "options": {
+        "verbose_level": 0,
+        "verbose_enabled": false,
+        "very_verbose": false,
+        "quiet": false,
+        "verbose": false,
+        "force_recreate": false,
+        "show_query_plans": false,
+        "tuning_enabled": false,
+        "force_upload": false,
+        "capture_plans": false,
+        "strict_plan_capture": false,
+        "execution_mode": "dataframe",
+        "unified_tuning_configuration": {
+          "primary_keys": {
+            "enabled": false,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
+          "foreign_keys": {
+            "enabled": false,
+            "enforce_referential_integrity": true,
+            "on_delete_action": "RESTRICT",
+            "on_update_action": "RESTRICT"
+          },
+          "unique_constraints": {
+            "enabled": false,
+            "ignore_nulls": false
+          },
+          "check_constraints": {
+            "enabled": false,
+            "enforce_on_insert": true,
+            "enforce_on_update": true
+          },
+          "platform_optimizations": {
+            "z_ordering_enabled": false,
+            "liquid_clustering_enabled": false,
+            "databricks_clustering_strategy": "z_order",
+            "sorted_ingestion_mode": "off",
+            "sorted_ingestion_method": "auto",
+            "auto_optimize_enabled": false,
+            "auto_compact_enabled": false,
+            "bloom_filters_enabled": false,
+            "materialized_views_enabled": false
+          }
+        }
+      },
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "execution_mode": "dataframe",
+      "benchmark": "tpch",
+      "scale_factor": 0.1,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "memory_limit": "12GB",
+      "thread_limit": 8
+    },
+    "raw_metadata": {
+      "driver_runtime_strategy": "current-process"
+    },
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "mode": "dataframe"
+  },
+  "summary": {
+    "queries": {
+      "total": 444,
+      "passed": 402,
+      "failed": 42
+    },
+    "timing": {
+      "total_ms": 150544,
+      "avg_ms": 374.5,
+      "min_ms": 81,
+      "max_ms": 1182,
+      "geometric_mean_ms": 329.2,
+      "stdev_ms": 212.2,
+      "p90_ms": 626,
+      "p95_ms": 827,
+      "p99_ms": 1119
+    },
+    "data": {
+      "rows_loaded": 866602,
+      "load_time_ms": 5291.3
+    },
+    "validation": "partial"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 5291
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    },
+    "power_test": {
+      "status": "COMPLETED",
+      "duration_ms": 209233
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [
+    {
+      "id": "QAPPROX_COUNT_DISTINCT_GROUPBY",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "metadata",
+      "status": "SKIPPED"
+    },
+    {
+      "id": "QAPPROX_COUNT_DISTINCT_SIMPLE",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "metadata",
+      "status": "SKIPPED"
+    },
+    {
+      "id": "QAPPROX_QUANTILES_ARRAY",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "metadata",
+      "status": "SKIPPED"
+    },
+    {
+      "id": "QAPPROX_TOP_K_LINEITEM",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "metadata",
+      "status": "SKIPPED"
+    },
+    {
+      "id": "QLIST_FILTER",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "metadata",
+      "status": "SKIPPED"
+    },
+    {
+      "id": "QLIST_TRANSFORM",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "metadata",
+      "status": "SKIPPED"
+    },
+    {
+      "id": "QOPTIMIZER_EXISTS_TO_SEMIJOIN",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "metadata",
+      "status": "SKIPPED"
+    },
+    {
+      "id": "QOPTIMIZER_IN_TO_EXISTS",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "metadata",
+      "status": "SKIPPED"
+    },
+    {
+      "id": "QOPTIMIZER_SCALAR_SUBQUERY_FLATTENING",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "metadata",
+      "status": "SKIPPED"
+    },
+    {
+      "id": "aggregation_distinct",
+      "ms": 1035,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_distinct_groupby",
+      "ms": 1113,
+      "rows": 4,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_groupby_large",
+      "ms": 868,
+      "rows": 600555,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_groupby_small",
+      "ms": 201,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_materialize",
+      "ms": 339,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_materialize_subquery",
+      "ms": 1500,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_partition",
+      "ms": 540,
+      "rows": 2555,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_selective",
+      "ms": 401,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_simple",
+      "ms": 232,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "any_value_simple",
+      "ms": 323,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "any_value_with_filter",
+      "ms": 145,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "approx_quantile_groupby",
+      "ms": 610,
+      "rows": 7,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_agg_distinct",
+      "ms": 254,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_agg_simple",
+      "ms": 17,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "array_contains",
+      "ms": 359,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_distinct",
+      "ms": 580,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_length",
+      "ms": 97,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "array_min_max",
+      "ms": 323,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_of_struct",
+      "ms": 734,
+      "rows": 50,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_slice",
+      "ms": 389,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_sort",
+      "ms": 288,
+      "rows": 25,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_unnest",
+      "ms": 350,
+      "rows": 800,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "asof_join_basic",
+      "ms": 691,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_four_tables",
+      "ms": 758,
+      "rows": 598,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_three_tables",
+      "ms": 380,
+      "rows": 25,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_two_tables",
+      "ms": 253,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "count_star",
+      "ms": 234,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "decimal_arithmetic",
+      "ms": 303,
+      "rows": 1000,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "empty_build_join",
+      "ms": 423,
+      "rows": 600572,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_broadcast",
+      "ms": 658,
+      "rows": 12431,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_merge",
+      "ms": 618,
+      "rows": 600572,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_shuffle",
+      "ms": 506,
+      "rows": 107999,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_in_list_selective",
+      "ms": 219,
+      "rows": 3,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_non_selective",
+      "ms": 326,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_selective",
+      "ms": 224,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_in_list_selective",
+      "ms": 284,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_non_selective",
+      "ms": 347,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_selective",
+      "ms": 264,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_in_predicate_selective",
+      "ms": 698,
+      "rows": 19009,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_non_selective",
+      "ms": 272,
+      "rows": 588553,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_selective",
+      "ms": 297,
+      "rows": 23670,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_like",
+      "ms": 233,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_non_selective",
+      "ms": 257,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_selective",
+      "ms": 196,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "fulltext_boolean_search",
+      "ms": 8,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "fulltext_phrase_search",
+      "ms": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "fulltext_simple_search",
+      "ms": 267,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_all_complex",
+      "ms": 448,
+      "rows": 220,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_all_simple",
+      "ms": 429,
+      "rows": 4,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_highndv",
+      "ms": 426,
+      "rows": 150000,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_lowndv",
+      "ms": 280,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_pk",
+      "ms": 241,
+      "rows": 15000,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_decimal_highndv",
+      "ms": 567,
+      "rows": 130792,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_decimal_lowndv",
+      "ms": 302,
+      "rows": 11,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "intrinsic_to_date",
+      "ms": 228,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_aggregates",
+      "ms": 317,
+      "rows": 25,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_extract_nested",
+      "ms": 274,
+      "rows": 500,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_extract_simple",
+      "ms": 248,
+      "rows": 1000,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "limit",
+      "ms": 215,
+      "rows": 1000,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "limit_ordered",
+      "ms": 511,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "list_reduce",
+      "ms": 529,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "long_predicate",
+      "ms": 732,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "map_access",
+      "ms": 11,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "map_construction",
+      "ms": 8,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "map_keys_values",
+      "ms": 7,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "max_by_complex",
+      "ms": 1069,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "max_by_simple",
+      "ms": 570,
+      "rows": 25,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "max_by_with_ties",
+      "ms": 1243,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_complex",
+      "ms": 562,
+      "rows": 25,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_simple",
+      "ms": 500,
+      "rows": 25,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_with_ties",
+      "ms": 1204,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_max_runtime_filter",
+      "ms": 509,
+      "rows": 22451,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "olap_cube_analysis",
+      "ms": 586,
+      "rows": 25,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "olap_rollup_analysis",
+      "ms": 707,
+      "rows": 125,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_aggregate_pushdown",
+      "ms": 629,
+      "rows": 9978,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_column_pruning",
+      "ms": 782,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_common_subexpression",
+      "ms": 313,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_constant_folding",
+      "ms": 265,
+      "rows": 1000,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_distinct_elimination",
+      "ms": 318,
+      "rows": 22909,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_groupjoin",
+      "ms": 909,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_join_reordering",
+      "ms": 646,
+      "rows": 9978,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_limit_pushdown",
+      "ms": 487,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_predicate_pushdown",
+      "ms": 428,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_runtime_filter",
+      "ms": 518,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_union_optimization",
+      "ms": 651,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all",
+      "ms": 186,
+      "rows": 15000,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all_desc",
+      "ms": 274,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all_simple",
+      "ms": 335,
+      "rows": 25,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_bigint",
+      "ms": 432,
+      "rows": 150000,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_bigint_expression",
+      "ms": 322,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_decimal16",
+      "ms": 272,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_desc",
+      "ms": 213,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_multi",
+      "ms": 303,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_multicol",
+      "ms": 270,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_shortstrings",
+      "ms": 301,
+      "rows": 4,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_simple",
+      "ms": 234,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "pivot_basic",
+      "ms": 367,
+      "rows": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_aggregation",
+      "ms": 316,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_aggregation_groupby",
+      "ms": 406,
+      "rows": 3,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_costs",
+      "ms": 300,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_subquery",
+      "ms": 535,
+      "rows": 441,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ualify_cume_dist",
+      "ms": 6,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_dense_rank",
+      "ms": 344,
+      "rows": 309,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ualify_lag_lead",
+      "ms": 8,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_ntile",
+      "ms": 6,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_percentile",
+      "ms": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_row_number",
+      "ms": 725,
+      "rows": 29378,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_1mb_rows",
+      "ms": 1129,
+      "rows": 7130,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_full_join_one_to_many_string_with_groupby",
+      "ms": 546,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_inner_join_one_to_many_string_with_groupby",
+      "ms": 556,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_inner_join_union_all_with_groupby",
+      "ms": 902,
+      "rows": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_join",
+      "ms": 823,
+      "rows": 150000,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_left_join_one_to_many_string_with_groupby",
+      "ms": 341,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_correlation",
+      "ms": 290,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_percentiles",
+      "ms": 646,
+      "rows": 4,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_variance_stddev",
+      "ms": 356,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_concat",
+      "ms": 227,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ends_with",
+      "ms": 216,
+      "rows": 4017,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_equal_predicate",
+      "ms": 221,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_equal_predicate_lower",
+      "ms": 512,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_end",
+      "ms": 224,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_multi",
+      "ms": 228,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_start",
+      "ms": 226,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_in_predicate",
+      "ms": 232,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like",
+      "ms": 208,
+      "rows": 1096,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_center",
+      "ms": 210,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_center_insensitive",
+      "ms": 215,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_end",
+      "ms": 223,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_multi",
+      "ms": 215,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_start",
+      "ms": 211,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_starts_with",
+      "ms": 190,
+      "rows": 3283,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_substring",
+      "ms": 197,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "struct_access",
+      "ms": 263,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "struct_construction",
+      "ms": 226,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "timeseries_trend_analysis",
+      "ms": 11,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "topn",
+      "ms": 260,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "topn_aggregate_2columns",
+      "ms": 415,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "topn_ordered_allcols",
+      "ms": 400,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "unpivot_basic",
+      "ms": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "window_growing_frame",
+      "ms": 300,
+      "rows": 1004,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_lead_lag_same_frame",
+      "ms": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "window_moving_frame",
+      "ms": 320,
+      "rows": 22909,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_multiple_orderings",
+      "ms": 266,
+      "rows": 9965,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_rank",
+      "ms": 639,
+      "rows": 11922,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_row_number",
+      "ms": 536,
+      "rows": 385885,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_running_sum",
+      "ms": 356,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_sum",
+      "ms": 268,
+      "rows": 600572,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_unbounded_frame",
+      "ms": 315,
+      "rows": 5066,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_distinct",
+      "ms": 261,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_distinct_groupby",
+      "ms": 550,
+      "rows": 4,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_groupby_large",
+      "ms": 588,
+      "rows": 600555,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_groupby_small",
+      "ms": 88,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_materialize",
+      "ms": 231,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_materialize_subquery",
+      "ms": 1089,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_partition",
+      "ms": 378,
+      "rows": 2555,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_selective",
+      "ms": 290,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_simple",
+      "ms": 201,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "any_value_simple",
+      "ms": 245,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "any_value_with_filter",
+      "ms": 92,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "approx_quantile_groupby",
+      "ms": 354,
+      "rows": 7,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_agg_distinct",
+      "ms": 195,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_agg_simple",
+      "ms": 9,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "array_contains",
+      "ms": 269,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_distinct",
+      "ms": 354,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_length",
+      "ms": 81,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "array_min_max",
+      "ms": 287,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_of_struct",
+      "ms": 595,
+      "rows": 50,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_slice",
+      "ms": 336,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_sort",
+      "ms": 241,
+      "rows": 25,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_unnest",
+      "ms": 240,
+      "rows": 800,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "asof_join_basic",
+      "ms": 509,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_four_tables",
+      "ms": 602,
+      "rows": 598,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_three_tables",
+      "ms": 319,
+      "rows": 25,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_two_tables",
+      "ms": 230,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "count_star",
+      "ms": 232,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "decimal_arithmetic",
+      "ms": 268,
+      "rows": 1000,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "empty_build_join",
+      "ms": 367,
+      "rows": 600572,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_broadcast",
+      "ms": 577,
+      "rows": 12431,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_merge",
+      "ms": 617,
+      "rows": 600572,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_shuffle",
+      "ms": 471,
+      "rows": 107999,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_in_list_selective",
+      "ms": 206,
+      "rows": 3,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_non_selective",
+      "ms": 308,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_selective",
+      "ms": 197,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_in_list_selective",
+      "ms": 255,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_non_selective",
+      "ms": 340,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_selective",
+      "ms": 221,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_in_predicate_selective",
+      "ms": 607,
+      "rows": 19009,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_non_selective",
+      "ms": 245,
+      "rows": 588553,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_selective",
+      "ms": 260,
+      "rows": 23670,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_like",
+      "ms": 212,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_non_selective",
+      "ms": 232,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_selective",
+      "ms": 192,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "fulltext_boolean_search",
+      "ms": 9,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "fulltext_phrase_search",
+      "ms": 4,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "fulltext_simple_search",
+      "ms": 244,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_all_complex",
+      "ms": 387,
+      "rows": 220,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_all_simple",
+      "ms": 395,
+      "rows": 4,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_highndv",
+      "ms": 416,
+      "rows": 150000,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_lowndv",
+      "ms": 254,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_pk",
+      "ms": 219,
+      "rows": 15000,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_decimal_highndv",
+      "ms": 492,
+      "rows": 130792,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_decimal_lowndv",
+      "ms": 287,
+      "rows": 11,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "intrinsic_to_date",
+      "ms": 211,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_aggregates",
+      "ms": 294,
+      "rows": 25,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_extract_nested",
+      "ms": 235,
+      "rows": 500,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_extract_simple",
+      "ms": 234,
+      "rows": 1000,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "limit",
+      "ms": 195,
+      "rows": 1000,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "limit_ordered",
+      "ms": 441,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "list_reduce",
+      "ms": 412,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "long_predicate",
+      "ms": 686,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "map_access",
+      "ms": 8,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "map_construction",
+      "ms": 7,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "map_keys_values",
+      "ms": 7,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "max_by_complex",
+      "ms": 839,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "max_by_simple",
+      "ms": 459,
+      "rows": 25,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "max_by_with_ties",
+      "ms": 1156,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_complex",
+      "ms": 533,
+      "rows": 25,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_simple",
+      "ms": 473,
+      "rows": 25,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_with_ties",
+      "ms": 1147,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_max_runtime_filter",
+      "ms": 503,
+      "rows": 22451,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "olap_cube_analysis",
+      "ms": 566,
+      "rows": 25,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "olap_rollup_analysis",
+      "ms": 680,
+      "rows": 125,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_aggregate_pushdown",
+      "ms": 624,
+      "rows": 9978,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_column_pruning",
+      "ms": 784,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_common_subexpression",
+      "ms": 267,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_constant_folding",
+      "ms": 248,
+      "rows": 1000,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_distinct_elimination",
+      "ms": 282,
+      "rows": 22909,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_groupjoin",
+      "ms": 946,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_join_reordering",
+      "ms": 640,
+      "rows": 9978,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_limit_pushdown",
+      "ms": 483,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_predicate_pushdown",
+      "ms": 419,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_runtime_filter",
+      "ms": 514,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_union_optimization",
+      "ms": 626,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all",
+      "ms": 174,
+      "rows": 15000,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all_desc",
+      "ms": 266,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all_simple",
+      "ms": 327,
+      "rows": 25,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_bigint",
+      "ms": 411,
+      "rows": 150000,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_bigint_expression",
+      "ms": 322,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_decimal16",
+      "ms": 287,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_desc",
+      "ms": 232,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_multi",
+      "ms": 266,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_multicol",
+      "ms": 257,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_shortstrings",
+      "ms": 283,
+      "rows": 4,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_simple",
+      "ms": 223,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "pivot_basic",
+      "ms": 334,
+      "rows": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_aggregation",
+      "ms": 278,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_aggregation_groupby",
+      "ms": 413,
+      "rows": 3,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_costs",
+      "ms": 293,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_subquery",
+      "ms": 482,
+      "rows": 441,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ualify_cume_dist",
+      "ms": 6,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_dense_rank",
+      "ms": 302,
+      "rows": 309,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ualify_lag_lead",
+      "ms": 6,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_ntile",
+      "ms": 6,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_percentile",
+      "ms": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_row_number",
+      "ms": 639,
+      "rows": 29378,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_1mb_rows",
+      "ms": 1072,
+      "rows": 7130,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_full_join_one_to_many_string_with_groupby",
+      "ms": 557,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_inner_join_one_to_many_string_with_groupby",
+      "ms": 530,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_inner_join_union_all_with_groupby",
+      "ms": 898,
+      "rows": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_join",
+      "ms": 747,
+      "rows": 150000,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_left_join_one_to_many_string_with_groupby",
+      "ms": 334,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_correlation",
+      "ms": 270,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_percentiles",
+      "ms": 597,
+      "rows": 4,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_variance_stddev",
+      "ms": 319,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_concat",
+      "ms": 203,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ends_with",
+      "ms": 203,
+      "rows": 4017,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_equal_predicate",
+      "ms": 203,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_equal_predicate_lower",
+      "ms": 211,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_end",
+      "ms": 211,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_multi",
+      "ms": 218,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_start",
+      "ms": 209,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_in_predicate",
+      "ms": 220,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like",
+      "ms": 196,
+      "rows": 1096,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_center",
+      "ms": 214,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_center_insensitive",
+      "ms": 213,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_end",
+      "ms": 208,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_multi",
+      "ms": 204,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_start",
+      "ms": 209,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_starts_with",
+      "ms": 193,
+      "rows": 3283,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_substring",
+      "ms": 198,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "struct_access",
+      "ms": 245,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "struct_construction",
+      "ms": 225,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "timeseries_trend_analysis",
+      "ms": 11,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "topn",
+      "ms": 263,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "topn_aggregate_2columns",
+      "ms": 383,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "topn_ordered_allcols",
+      "ms": 467,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "unpivot_basic",
+      "ms": 4,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "window_growing_frame",
+      "ms": 261,
+      "rows": 1004,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_lead_lag_same_frame",
+      "ms": 9,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "window_moving_frame",
+      "ms": 292,
+      "rows": 22909,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_multiple_orderings",
+      "ms": 253,
+      "rows": 9965,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_rank",
+      "ms": 483,
+      "rows": 11922,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_row_number",
+      "ms": 502,
+      "rows": 385885,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_running_sum",
+      "ms": 332,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_sum",
+      "ms": 247,
+      "rows": 600572,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_unbounded_frame",
+      "ms": 288,
+      "rows": 5066,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_distinct",
+      "ms": 276,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_distinct_groupby",
+      "ms": 612,
+      "rows": 4,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_groupby_large",
+      "ms": 591,
+      "rows": 600555,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_groupby_small",
+      "ms": 81,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_materialize",
+      "ms": 243,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_materialize_subquery",
+      "ms": 1101,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_partition",
+      "ms": 386,
+      "rows": 2555,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_selective",
+      "ms": 277,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_simple",
+      "ms": 192,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "any_value_simple",
+      "ms": 253,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "any_value_with_filter",
+      "ms": 84,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "approx_quantile_groupby",
+      "ms": 422,
+      "rows": 7,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_agg_distinct",
+      "ms": 196,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_agg_simple",
+      "ms": 8,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "array_contains",
+      "ms": 302,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_distinct",
+      "ms": 316,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_length",
+      "ms": 80,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "array_min_max",
+      "ms": 318,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_of_struct",
+      "ms": 562,
+      "rows": 50,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_slice",
+      "ms": 354,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_sort",
+      "ms": 259,
+      "rows": 25,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_unnest",
+      "ms": 223,
+      "rows": 800,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "asof_join_basic",
+      "ms": 482,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_four_tables",
+      "ms": 605,
+      "rows": 598,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_three_tables",
+      "ms": 335,
+      "rows": 25,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_two_tables",
+      "ms": 209,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "count_star",
+      "ms": 191,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "decimal_arithmetic",
+      "ms": 253,
+      "rows": 1000,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "empty_build_join",
+      "ms": 375,
+      "rows": 600572,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_broadcast",
+      "ms": 570,
+      "rows": 12431,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_merge",
+      "ms": 592,
+      "rows": 600572,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_shuffle",
+      "ms": 432,
+      "rows": 107999,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_in_list_selective",
+      "ms": 207,
+      "rows": 3,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_non_selective",
+      "ms": 297,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_selective",
+      "ms": 206,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_in_list_selective",
+      "ms": 264,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_non_selective",
+      "ms": 324,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_selective",
+      "ms": 208,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_in_predicate_selective",
+      "ms": 590,
+      "rows": 19009,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_non_selective",
+      "ms": 259,
+      "rows": 588553,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_selective",
+      "ms": 264,
+      "rows": 23670,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_like",
+      "ms": 193,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_non_selective",
+      "ms": 195,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_selective",
+      "ms": 219,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "fulltext_boolean_search",
+      "ms": 8,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "fulltext_phrase_search",
+      "ms": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "fulltext_simple_search",
+      "ms": 227,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_all_complex",
+      "ms": 378,
+      "rows": 220,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_all_simple",
+      "ms": 363,
+      "rows": 4,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_highndv",
+      "ms": 393,
+      "rows": 150000,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_lowndv",
+      "ms": 265,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_pk",
+      "ms": 202,
+      "rows": 15000,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_decimal_highndv",
+      "ms": 493,
+      "rows": 130792,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_decimal_lowndv",
+      "ms": 284,
+      "rows": 11,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "intrinsic_to_date",
+      "ms": 240,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_aggregates",
+      "ms": 274,
+      "rows": 25,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_extract_nested",
+      "ms": 239,
+      "rows": 500,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_extract_simple",
+      "ms": 213,
+      "rows": 1000,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "limit",
+      "ms": 182,
+      "rows": 1000,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "limit_ordered",
+      "ms": 547,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "list_reduce",
+      "ms": 443,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "long_predicate",
+      "ms": 662,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "map_access",
+      "ms": 7,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "map_construction",
+      "ms": 8,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "map_keys_values",
+      "ms": 7,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "max_by_complex",
+      "ms": 842,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "max_by_simple",
+      "ms": 449,
+      "rows": 25,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "max_by_with_ties",
+      "ms": 1139,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_complex",
+      "ms": 543,
+      "rows": 25,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_simple",
+      "ms": 447,
+      "rows": 25,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_with_ties",
+      "ms": 1182,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_max_runtime_filter",
+      "ms": 468,
+      "rows": 22451,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "olap_cube_analysis",
+      "ms": 538,
+      "rows": 25,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "olap_rollup_analysis",
+      "ms": 731,
+      "rows": 125,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_aggregate_pushdown",
+      "ms": 622,
+      "rows": 9978,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_column_pruning",
+      "ms": 818,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_common_subexpression",
+      "ms": 272,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_constant_folding",
+      "ms": 257,
+      "rows": 1000,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_distinct_elimination",
+      "ms": 289,
+      "rows": 22909,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_groupjoin",
+      "ms": 965,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_join_reordering",
+      "ms": 628,
+      "rows": 9978,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_limit_pushdown",
+      "ms": 467,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_predicate_pushdown",
+      "ms": 409,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_runtime_filter",
+      "ms": 513,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_union_optimization",
+      "ms": 615,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all",
+      "ms": 174,
+      "rows": 15000,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all_desc",
+      "ms": 263,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all_simple",
+      "ms": 325,
+      "rows": 25,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_bigint",
+      "ms": 428,
+      "rows": 150000,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_bigint_expression",
+      "ms": 310,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_decimal16",
+      "ms": 273,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_desc",
+      "ms": 224,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_multi",
+      "ms": 291,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_multicol",
+      "ms": 264,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_shortstrings",
+      "ms": 287,
+      "rows": 4,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_simple",
+      "ms": 219,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "pivot_basic",
+      "ms": 313,
+      "rows": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_aggregation",
+      "ms": 273,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_aggregation_groupby",
+      "ms": 388,
+      "rows": 3,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_costs",
+      "ms": 304,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_subquery",
+      "ms": 470,
+      "rows": 441,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ualify_cume_dist",
+      "ms": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_dense_rank",
+      "ms": 287,
+      "rows": 309,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ualify_lag_lead",
+      "ms": 7,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_ntile",
+      "ms": 6,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_percentile",
+      "ms": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_row_number",
+      "ms": 621,
+      "rows": 29378,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_1mb_rows",
+      "ms": 1076,
+      "rows": 7130,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_full_join_one_to_many_string_with_groupby",
+      "ms": 484,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_inner_join_one_to_many_string_with_groupby",
+      "ms": 506,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_inner_join_union_all_with_groupby",
+      "ms": 896,
+      "rows": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_join",
+      "ms": 718,
+      "rows": 150000,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_left_join_one_to_many_string_with_groupby",
+      "ms": 327,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_correlation",
+      "ms": 293,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_percentiles",
+      "ms": 661,
+      "rows": 4,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_variance_stddev",
+      "ms": 324,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_concat",
+      "ms": 202,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ends_with",
+      "ms": 209,
+      "rows": 4017,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_equal_predicate",
+      "ms": 212,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_equal_predicate_lower",
+      "ms": 202,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_end",
+      "ms": 201,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_multi",
+      "ms": 212,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_start",
+      "ms": 194,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_in_predicate",
+      "ms": 217,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like",
+      "ms": 195,
+      "rows": 1096,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_center",
+      "ms": 213,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_center_insensitive",
+      "ms": 209,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_end",
+      "ms": 204,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_multi",
+      "ms": 204,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_start",
+      "ms": 212,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_starts_with",
+      "ms": 183,
+      "rows": 3283,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_substring",
+      "ms": 194,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "struct_access",
+      "ms": 244,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "struct_construction",
+      "ms": 218,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "timeseries_trend_analysis",
+      "ms": 11,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "topn",
+      "ms": 280,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "topn_aggregate_2columns",
+      "ms": 391,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "topn_ordered_allcols",
+      "ms": 224,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "unpivot_basic",
+      "ms": 4,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "window_growing_frame",
+      "ms": 261,
+      "rows": 1004,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_lead_lag_same_frame",
+      "ms": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "window_moving_frame",
+      "ms": 283,
+      "rows": 22909,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_multiple_orderings",
+      "ms": 237,
+      "rows": 9965,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_rank",
+      "ms": 514,
+      "rows": 11922,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_row_number",
+      "ms": 493,
+      "rows": 385885,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_running_sum",
+      "ms": 310,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_sum",
+      "ms": 233,
+      "rows": 600572,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_unbounded_frame",
+      "ms": 294,
+      "rows": 5066,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_distinct",
+      "ms": 276,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_distinct_groupby",
+      "ms": 613,
+      "rows": 4,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_groupby_large",
+      "ms": 617,
+      "rows": 600555,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_groupby_small",
+      "ms": 82,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_materialize",
+      "ms": 235,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_materialize_subquery",
+      "ms": 1072,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_partition",
+      "ms": 371,
+      "rows": 2555,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_selective",
+      "ms": 286,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "aggregation_simple",
+      "ms": 190,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "any_value_simple",
+      "ms": 224,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "any_value_with_filter",
+      "ms": 88,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "approx_quantile_groupby",
+      "ms": 363,
+      "rows": 7,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_agg_distinct",
+      "ms": 184,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_agg_simple",
+      "ms": 8,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "array_contains",
+      "ms": 270,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_distinct",
+      "ms": 314,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_length",
+      "ms": 90,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "array_min_max",
+      "ms": 277,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_of_struct",
+      "ms": 559,
+      "rows": 50,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_slice",
+      "ms": 368,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_sort",
+      "ms": 237,
+      "rows": 25,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "array_unnest",
+      "ms": 241,
+      "rows": 800,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "asof_join_basic",
+      "ms": 494,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_four_tables",
+      "ms": 594,
+      "rows": 598,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_three_tables",
+      "ms": 317,
+      "rows": 25,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "broadcast_join_two_tables",
+      "ms": 228,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "count_star",
+      "ms": 211,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "decimal_arithmetic",
+      "ms": 239,
+      "rows": 1000,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "empty_build_join",
+      "ms": 362,
+      "rows": 600572,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_broadcast",
+      "ms": 593,
+      "rows": 12431,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_merge",
+      "ms": 547,
+      "rows": 600572,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "exchange_shuffle",
+      "ms": 450,
+      "rows": 107999,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_in_list_selective",
+      "ms": 194,
+      "rows": 3,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_non_selective",
+      "ms": 322,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_bigint_selective",
+      "ms": 196,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_in_list_selective",
+      "ms": 263,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_non_selective",
+      "ms": 365,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_decimal_selective",
+      "ms": 219,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_in_predicate_selective",
+      "ms": 564,
+      "rows": 19009,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_non_selective",
+      "ms": 266,
+      "rows": 588553,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_selective",
+      "ms": 245,
+      "rows": 23670,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_like",
+      "ms": 203,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_non_selective",
+      "ms": 210,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "filter_string_selective",
+      "ms": 201,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "fulltext_boolean_search",
+      "ms": 6,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "fulltext_phrase_search",
+      "ms": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "fulltext_simple_search",
+      "ms": 235,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_all_complex",
+      "ms": 354,
+      "rows": 220,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_all_simple",
+      "ms": 416,
+      "rows": 4,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_highndv",
+      "ms": 396,
+      "rows": 150000,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_lowndv",
+      "ms": 256,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_bigint_pk",
+      "ms": 225,
+      "rows": 15000,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_decimal_highndv",
+      "ms": 485,
+      "rows": 130792,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "groupby_decimal_lowndv",
+      "ms": 283,
+      "rows": 11,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "intrinsic_to_date",
+      "ms": 209,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_aggregates",
+      "ms": 279,
+      "rows": 25,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_extract_nested",
+      "ms": 238,
+      "rows": 500,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "json_extract_simple",
+      "ms": 223,
+      "rows": 1000,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "limit",
+      "ms": 195,
+      "rows": 1000,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "limit_ordered",
+      "ms": 452,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "list_reduce",
+      "ms": 424,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "long_predicate",
+      "ms": 655,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "map_access",
+      "ms": 6,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "map_construction",
+      "ms": 6,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "map_keys_values",
+      "ms": 7,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "max_by_complex",
+      "ms": 827,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "max_by_simple",
+      "ms": 458,
+      "rows": 25,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "max_by_with_ties",
+      "ms": 1119,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_complex",
+      "ms": 533,
+      "rows": 25,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_simple",
+      "ms": 545,
+      "rows": 25,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_by_with_ties",
+      "ms": 1064,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "min_max_runtime_filter",
+      "ms": 534,
+      "rows": 22451,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "olap_cube_analysis",
+      "ms": 541,
+      "rows": 25,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "olap_rollup_analysis",
+      "ms": 640,
+      "rows": 125,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_aggregate_pushdown",
+      "ms": 649,
+      "rows": 9978,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_column_pruning",
+      "ms": 752,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_common_subexpression",
+      "ms": 250,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_constant_folding",
+      "ms": 280,
+      "rows": 1000,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_distinct_elimination",
+      "ms": 268,
+      "rows": 22909,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_groupjoin",
+      "ms": 936,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_join_reordering",
+      "ms": 605,
+      "rows": 9978,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_limit_pushdown",
+      "ms": 452,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_predicate_pushdown",
+      "ms": 394,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_runtime_filter",
+      "ms": 497,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "optimizer_union_optimization",
+      "ms": 624,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all",
+      "ms": 161,
+      "rows": 15000,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all_desc",
+      "ms": 277,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_all_simple",
+      "ms": 308,
+      "rows": 25,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_bigint",
+      "ms": 424,
+      "rows": 150000,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_bigint_expression",
+      "ms": 283,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_decimal16",
+      "ms": 298,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_desc",
+      "ms": 217,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_multi",
+      "ms": 269,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_multicol",
+      "ms": 297,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_shortstrings",
+      "ms": 270,
+      "rows": 4,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "orderby_simple",
+      "ms": 219,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "pivot_basic",
+      "ms": 318,
+      "rows": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_aggregation",
+      "ms": 262,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_aggregation_groupby",
+      "ms": 406,
+      "rows": 3,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_costs",
+      "ms": 295,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "predicate_ordering_subquery",
+      "ms": 489,
+      "rows": 441,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ualify_cume_dist",
+      "ms": 6,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_dense_rank",
+      "ms": 289,
+      "rows": 309,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "ualify_lag_lead",
+      "ms": 6,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_ntile",
+      "ms": 6,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_percentile",
+      "ms": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "ualify_row_number",
+      "ms": 659,
+      "rows": 29378,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_1mb_rows",
+      "ms": 1104,
+      "rows": 7130,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_full_join_one_to_many_string_with_groupby",
+      "ms": 529,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_inner_join_one_to_many_string_with_groupby",
+      "ms": 522,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_inner_join_union_all_with_groupby",
+      "ms": 914,
+      "rows": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_join",
+      "ms": 722,
+      "rows": 150000,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "shuffle_left_join_one_to_many_string_with_groupby",
+      "ms": 307,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_correlation",
+      "ms": 291,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_percentiles",
+      "ms": 674,
+      "rows": 4,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "statistical_variance_stddev",
+      "ms": 326,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_concat",
+      "ms": 206,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ends_with",
+      "ms": 202,
+      "rows": 4017,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_equal_predicate",
+      "ms": 205,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_equal_predicate_lower",
+      "ms": 198,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_end",
+      "ms": 198,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_multi",
+      "ms": 220,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_ilike_predicate_start",
+      "ms": 198,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_in_predicate",
+      "ms": 212,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like",
+      "ms": 193,
+      "rows": 1096,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_center",
+      "ms": 200,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_center_insensitive",
+      "ms": 205,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_end",
+      "ms": 210,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_multi",
+      "ms": 202,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_like_predicate_start",
+      "ms": 197,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_starts_with",
+      "ms": 182,
+      "rows": 3283,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "string_substring",
+      "ms": 195,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "struct_access",
+      "ms": 240,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "struct_construction",
+      "ms": 216,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "timeseries_trend_analysis",
+      "ms": 11,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "topn",
+      "ms": 256,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "topn_aggregate_2columns",
+      "ms": 392,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "topn_ordered_allcols",
+      "ms": 238,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "unpivot_basic",
+      "ms": 4,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "window_growing_frame",
+      "ms": 264,
+      "rows": 1004,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_lead_lag_same_frame",
+      "ms": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "window_moving_frame",
+      "ms": 292,
+      "rows": 22909,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_multiple_orderings",
+      "ms": 236,
+      "rows": 9965,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_rank",
+      "ms": 520,
+      "rows": 11922,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_row_number",
+      "ms": 493,
+      "rows": 385885,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_running_sum",
+      "ms": 323,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_sum",
+      "ms": 246,
+      "rows": 600572,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "window_unbounded_frame",
+      "ms": 262,
+      "rows": 5066,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "QDF_SKIP_SUMMARY",
+      "ms": 0,
+      "rows": 9,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "summary",
+      "status": "SUCCESS"
+    }
+  ],
+  "tables": {
+    "customer": {
+      "rows": 15000,
+      "load_ms": 3547
+    },
+    "lineitem": {
+      "rows": 600572,
+      "load_ms": 413
+    },
+    "nation": {
+      "rows": 25,
+      "load_ms": 58
+    },
+    "orders": {
+      "rows": 150000,
+      "load_ms": 326
+    },
+    "part": {
+      "rows": 20000,
+      "load_ms": 307
+    },
+    "partsupp": {
+      "rows": 80000,
+      "load_ms": 296
+    },
+    "region": {
+      "rows": 5,
+      "load_ms": 50
+    },
+    "supplier": {
+      "rows": 1000,
+      "load_ms": 288
+    }
+  },
+  "cost": {
+    "total_usd": 0,
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-02T21:37:56.158447",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_runtime_strategy": "current-process",
+    "non_interactive": true
+  },
+  "environment": {
+    "platform_runtime": {
+      "runtime_type": "dataframe_process",
+      "collection_status": "partial",
+      "source": "inferred",
+      "engine_host": "host_0a57d94f05f4"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "client_host": {
+      "machine_id": "machine_45d1a3ef31a1728d"
+    }
+  },
+  "errors": [
+    {
+      "phase": "query",
+      "query_id": "QAPPROX_COUNT_DISTINCT_GROUPBY",
+      "type": "Skipped in DataFrame mode (SQL-only primitive)",
+      "message": "Skipped in DataFrame mode (SQL-only primitive)"
+    },
+    {
+      "phase": "query",
+      "query_id": "QAPPROX_COUNT_DISTINCT_SIMPLE",
+      "type": "Skipped in DataFrame mode (SQL-only primitive)",
+      "message": "Skipped in DataFrame mode (SQL-only primitive)"
+    },
+    {
+      "phase": "query",
+      "query_id": "QAPPROX_QUANTILES_ARRAY",
+      "type": "Skipped in DataFrame mode (SQL-only primitive)",
+      "message": "Skipped in DataFrame mode (SQL-only primitive)"
+    },
+    {
+      "phase": "query",
+      "query_id": "QAPPROX_TOP_K_LINEITEM",
+      "type": "Skipped in DataFrame mode (SQL-only primitive)",
+      "message": "Skipped in DataFrame mode (SQL-only primitive)"
+    },
+    {
+      "phase": "query",
+      "query_id": "QLIST_FILTER",
+      "type": "Skipped in DataFrame mode (SQL-only primitive)",
+      "message": "Skipped in DataFrame mode (SQL-only primitive)"
+    },
+    {
+      "phase": "query",
+      "query_id": "QLIST_TRANSFORM",
+      "type": "Skipped in DataFrame mode (SQL-only primitive)",
+      "message": "Skipped in DataFrame mode (SQL-only primitive)"
+    },
+    {
+      "phase": "query",
+      "query_id": "QOPTIMIZER_EXISTS_TO_SEMIJOIN",
+      "type": "Skipped in DataFrame mode (SQL-only primitive)",
+      "message": "Skipped in DataFrame mode (SQL-only primitive)"
+    },
+    {
+      "phase": "query",
+      "query_id": "QOPTIMIZER_IN_TO_EXISTS",
+      "type": "Skipped in DataFrame mode (SQL-only primitive)",
+      "message": "Skipped in DataFrame mode (SQL-only primitive)"
+    },
+    {
+      "phase": "query",
+      "query_id": "QOPTIMIZER_SCALAR_SUBQUERY_FLATTENING",
+      "type": "Skipped in DataFrame mode (SQL-only primitive)",
+      "message": "Skipped in DataFrame mode (SQL-only primitive)"
+    },
+    {
+      "phase": "query",
+      "query_id": "array_agg_simple",
+      "type": "[MISSING_AGGREGATION] The non-aggregating expression \"ps_partkey\" is based on columns which are not participating in the GROUP BY clause.\nAdd the columns or the expression to the GROUP BY, aggregate the expression, or use \"any_value(ps_partkey)\" if you do not care which of the values within a group is returned. SQLSTATE",
+      "message": "[MISSING_AGGREGATION] The non-aggregating expression \"ps_partkey\" is based on columns which are not participating in the GROUP BY clause.\nAdd the columns or the expression to the GROUP BY, aggregate the expression, or use \"any_value(ps_partkey)\" if you do not care which of the values within a group is returned. SQLSTATE: 42803;\nAggregate [ps_suppkey#491L], [ps_suppkey#491L, ps_partkey#490L AS supplied_parts#1210L, count(ps_partkey#490L) AS part_count#1211L]\n+- Union false, false\n   :- Relation [ps_partkey#490L,ps_suppkey#491L,ps_availqty#492L,ps_supplycost#493,ps_comment#494] parquet\n   :- Relation [ps_partkey#495L,ps_suppkey#496L,ps_availqty#497L,ps_supplycost#498,ps_comment#499] parquet\n   :- Relation [ps_partkey#500L,ps_suppkey#501L,ps_availqty#502L,ps_supplycost#503,ps_comment#504] parquet\n   :- Relation [ps_partkey#505L,ps_suppkey#506L,ps_availqty#507L,ps_supplycost#508,ps_comment#509] parquet\n   :- Relation [ps_partkey#510L,ps_suppkey#511L,ps_availqty#512L,ps_supplycost#513,ps_comment#514] parquet\n   :- Relation [ps_partkey#515L,ps_suppkey#516L,ps_availqty#517L,ps_supplycost#518,ps_comment#519] parquet\n   :- Relation [ps_partkey#520L,ps_suppkey#521L,ps_availqty#522L,ps_supplycost#523,ps_comment#524] parquet\n   :- Relation [ps_partkey#525L,ps_suppkey#526L,ps_availqty#527L,ps_supplycost#528,ps_comment#529] parquet\n   :- Relation [ps_partkey#530L,ps_suppkey#531L,ps_availqty#532L,ps_supplycost#533,ps_comment#534] parquet\n   +- Relation [ps_partkey#535L,ps_suppkey#536L,ps_availqty#537L,ps_supplycost#538,ps_comment#539] parquet\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "array_agg_simple",
+      "type": "[MISSING_AGGREGATION] The non-aggregating expression \"ps_partkey\" is based on columns which are not participating in the GROUP BY clause.\nAdd the columns or the expression to the GROUP BY, aggregate the expression, or use \"any_value(ps_partkey)\" if you do not care which of the values within a group is returned. SQLSTATE",
+      "message": "[MISSING_AGGREGATION] The non-aggregating expression \"ps_partkey\" is based on columns which are not participating in the GROUP BY clause.\nAdd the columns or the expression to the GROUP BY, aggregate the expression, or use \"any_value(ps_partkey)\" if you do not care which of the values within a group is returned. SQLSTATE: 42803;\nAggregate [ps_suppkey#491L], [ps_suppkey#491L, ps_partkey#490L AS supplied_parts#8426L, count(ps_partkey#490L) AS part_count#8427L]\n+- Union false, false\n   :- Relation [ps_partkey#490L,ps_suppkey#491L,ps_availqty#492L,ps_supplycost#493,ps_comment#494] parquet\n   :- Relation [ps_partkey#495L,ps_suppkey#496L,ps_availqty#497L,ps_supplycost#498,ps_comment#499] parquet\n   :- Relation [ps_partkey#500L,ps_suppkey#501L,ps_availqty#502L,ps_supplycost#503,ps_comment#504] parquet\n   :- Relation [ps_partkey#505L,ps_suppkey#506L,ps_availqty#507L,ps_supplycost#508,ps_comment#509] parquet\n   :- Relation [ps_partkey#510L,ps_suppkey#511L,ps_availqty#512L,ps_supplycost#513,ps_comment#514] parquet\n   :- Relation [ps_partkey#515L,ps_suppkey#516L,ps_availqty#517L,ps_supplycost#518,ps_comment#519] parquet\n   :- Relation [ps_partkey#520L,ps_suppkey#521L,ps_availqty#522L,ps_supplycost#523,ps_comment#524] parquet\n   :- Relation [ps_partkey#525L,ps_suppkey#526L,ps_availqty#527L,ps_supplycost#528,ps_comment#529] parquet\n   :- Relation [ps_partkey#530L,ps_suppkey#531L,ps_availqty#532L,ps_supplycost#533,ps_comment#534] parquet\n   +- Relation [ps_partkey#535L,ps_suppkey#536L,ps_availqty#537L,ps_supplycost#538,ps_comment#539] parquet\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "array_agg_simple",
+      "type": "[MISSING_AGGREGATION] The non-aggregating expression \"ps_partkey\" is based on columns which are not participating in the GROUP BY clause.\nAdd the columns or the expression to the GROUP BY, aggregate the expression, or use \"any_value(ps_partkey)\" if you do not care which of the values within a group is returned. SQLSTATE",
+      "message": "[MISSING_AGGREGATION] The non-aggregating expression \"ps_partkey\" is based on columns which are not participating in the GROUP BY clause.\nAdd the columns or the expression to the GROUP BY, aggregate the expression, or use \"any_value(ps_partkey)\" if you do not care which of the values within a group is returned. SQLSTATE: 42803;\nAggregate [ps_suppkey#491L], [ps_suppkey#491L, ps_partkey#490L AS supplied_parts#15604L, count(ps_partkey#490L) AS part_count#15605L]\n+- Union false, false\n   :- Relation [ps_partkey#490L,ps_suppkey#491L,ps_availqty#492L,ps_supplycost#493,ps_comment#494] parquet\n   :- Relation [ps_partkey#495L,ps_suppkey#496L,ps_availqty#497L,ps_supplycost#498,ps_comment#499] parquet\n   :- Relation [ps_partkey#500L,ps_suppkey#501L,ps_availqty#502L,ps_supplycost#503,ps_comment#504] parquet\n   :- Relation [ps_partkey#505L,ps_suppkey#506L,ps_availqty#507L,ps_supplycost#508,ps_comment#509] parquet\n   :- Relation [ps_partkey#510L,ps_suppkey#511L,ps_availqty#512L,ps_supplycost#513,ps_comment#514] parquet\n   :- Relation [ps_partkey#515L,ps_suppkey#516L,ps_availqty#517L,ps_supplycost#518,ps_comment#519] parquet\n   :- Relation [ps_partkey#520L,ps_suppkey#521L,ps_availqty#522L,ps_supplycost#523,ps_comment#524] parquet\n   :- Relation [ps_partkey#525L,ps_suppkey#526L,ps_availqty#527L,ps_supplycost#528,ps_comment#529] parquet\n   :- Relation [ps_partkey#530L,ps_suppkey#531L,ps_availqty#532L,ps_supplycost#533,ps_comment#534] parquet\n   +- Relation [ps_partkey#535L,ps_suppkey#536L,ps_availqty#537L,ps_supplycost#538,ps_comment#539] parquet\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "array_agg_simple",
+      "type": "[MISSING_AGGREGATION] The non-aggregating expression \"ps_partkey\" is based on columns which are not participating in the GROUP BY clause.\nAdd the columns or the expression to the GROUP BY, aggregate the expression, or use \"any_value(ps_partkey)\" if you do not care which of the values within a group is returned. SQLSTATE",
+      "message": "[MISSING_AGGREGATION] The non-aggregating expression \"ps_partkey\" is based on columns which are not participating in the GROUP BY clause.\nAdd the columns or the expression to the GROUP BY, aggregate the expression, or use \"any_value(ps_partkey)\" if you do not care which of the values within a group is returned. SQLSTATE: 42803;\nAggregate [ps_suppkey#491L], [ps_suppkey#491L, ps_partkey#490L AS supplied_parts#22790L, count(ps_partkey#490L) AS part_count#22791L]\n+- Union false, false\n   :- Relation [ps_partkey#490L,ps_suppkey#491L,ps_availqty#492L,ps_supplycost#493,ps_comment#494] parquet\n   :- Relation [ps_partkey#495L,ps_suppkey#496L,ps_availqty#497L,ps_supplycost#498,ps_comment#499] parquet\n   :- Relation [ps_partkey#500L,ps_suppkey#501L,ps_availqty#502L,ps_supplycost#503,ps_comment#504] parquet\n   :- Relation [ps_partkey#505L,ps_suppkey#506L,ps_availqty#507L,ps_supplycost#508,ps_comment#509] parquet\n   :- Relation [ps_partkey#510L,ps_suppkey#511L,ps_availqty#512L,ps_supplycost#513,ps_comment#514] parquet\n   :- Relation [ps_partkey#515L,ps_suppkey#516L,ps_availqty#517L,ps_supplycost#518,ps_comment#519] parquet\n   :- Relation [ps_partkey#520L,ps_suppkey#521L,ps_availqty#522L,ps_supplycost#523,ps_comment#524] parquet\n   :- Relation [ps_partkey#525L,ps_suppkey#526L,ps_availqty#527L,ps_supplycost#528,ps_comment#529] parquet\n   :- Relation [ps_partkey#530L,ps_suppkey#531L,ps_availqty#532L,ps_supplycost#533,ps_comment#534] parquet\n   +- Relation [ps_partkey#535L,ps_suppkey#536L,ps_availqty#537L,ps_supplycost#538,ps_comment#539] parquet\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "array_length",
+      "type": "An error occurred while calling o14153.count.\n",
+      "message": "An error occurred while calling o14153.count.\n: org.apache.spark.SparkException: [INTERNAL_ERROR] Cannot generate code for expression: input[0, int, false] DESC NULLS LAST SQLSTATE: XX000\n\tat org.apache.spark.SparkException$.internalError(SparkException.scala:92)\n\tat org.apache.spark.SparkException$.internalError(SparkException.scala:96)\n\tat org.apache.spark.sql.errors.QueryExecutionErrors$.cannotGenerateCodeForExpressionError(QueryExecutionErrors.scala:71)\n\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode(Expression.scala:433)\n\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode$(Expression.scala:432)\n\tat org.apache.spark.sql.catalyst.expressions.SortOrder.doGenCode(SortOrder.scala:63)\n\tat org.apache.spark.sql.catalyst.expressions.Expression.$anonfun$genCode$3(Expression.scala:229)\n\tat scala.Option.getOrElse(Option.scala:201)\n\tat org.apache.spark.sql.catalyst.expressions.Expression.genCode(Expression.scala:224)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.$anonfun$createOrderKeys$1(GenerateOrdering.scala:77)\n\tat scala.collection.immutable.Vector1.map(Vector.scala:2141)\n\tat scala.collection.immutable.Vector1.map(Vector.scala:386)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.createOrderKeys(GenerateOrdering.scala:77)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.genComparisons(GenerateOrdering.scala:86)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:147)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:37)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.CodeGenerator.generate(CodeGenerator.scala:1415)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:190)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:187)\n\tat org.apache.spark.sql.execution.TakeOrderedAndProjectExec.doExecute(limit.scala:349)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\tat org.apache.spark.sql.execution.InputAdapter.inputRDD(WholeStageCodegenExec.scala:533)\n\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs(WholeStageCodegenExec.scala:461)\n\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs$(WholeStageCodegenExec.scala:460)\n\tat org.apache.spark.sql.execution.InputAdapter.inputRDDs(WholeStageCodegenExec.scala:504)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\tat org.apache.spark.sql.execution.WholeStageCodegenExec.doExecute(WholeStageCodegenExec.scala:763)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.getTryWithCallerStacktrace(Utils.scala:1453)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\tat org.apache.spark.sql.execution.SparkPlan.getByteArrayRdd(SparkPlan.scala:378)\n\tat org.apache.spark.sql.execution.SparkPlan.executeCollect(SparkPlan.scala:459)\n\tat org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec.$anonfun$executeCollect$1(AdaptiveSparkPlanExec.scala:396)\n\tat org.apache.spark.sql.execution.adaptive.ResultQueryStageExec.$anonfun$doMaterialize$1(QueryStageExec.scala:328)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$4(SQLExecution.scala:335)\n\tat org.apache.spark.sql.execution.SQLExecution$.withSessionTagsApplied(SQLExecution.scala:285)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$3(SQLExecution.scala:333)\n\tat org.apache.spark.JobArtifactSet$.withActiveJobArtifactState(JobArtifactSet.scala:94)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$2(SQLExecution.scala:329)\n\tat java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)\n\tat java.base/java.lang.Thread.run(Thread.java:840)\n\tSuppressed: org.apache.spark.util.Utils$OriginalTryStackTraceException: Full stacktrace of original doTryWithCallerStacktrace caller\n\t\tat org.apache.spark.SparkException$.internalError(SparkException.scala:92)\n\t\tat org.apache.spark.SparkException$.internalError(SparkException.scala:96)\n\t\tat org.apache.spark.sql.errors.QueryExecutionErrors$.cannotGenerateCodeForExpressionError(QueryExecutionErrors.scala:71)\n\t\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode(Expression.scala:433)\n\t\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode$(Expression.scala:432)\n\t\tat org.apache.spark.sql.catalyst.expressions.SortOrder.doGenCode(SortOrder.scala:63)\n\t\tat org.apache.spark.sql.catalyst.expressions.Expression.$anonfun$genCode$3(Expression.scala:229)\n\t\tat scala.Option.getOrElse(Option.scala:201)\n\t\tat org.apache.spark.sql.catalyst.expressions.Expression.genCode(Expression.scala:224)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.$anonfun$createOrderKeys$1(GenerateOrdering.scala:77)\n\t\tat scala.collection.immutable.Vector1.map(Vector.scala:2141)\n\t\tat scala.collection.immutable.Vector1.map(Vector.scala:386)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.createOrderKeys(GenerateOrdering.scala:77)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.genComparisons(GenerateOrdering.scala:86)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:147)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:37)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.CodeGenerator.generate(CodeGenerator.scala:1415)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:190)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:187)\n\t\tat org.apache.spark.sql.execution.TakeOrderedAndProjectExec.doExecute(limit.scala:349)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\t\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\t\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\t\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\t\tat org.apache.spark.sql.execution.InputAdapter.inputRDD(WholeStageCodegenExec.scala:533)\n\t\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs(WholeStageCodegenExec.scala:461)\n\t\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs$(WholeStageCodegenExec.scala:460)\n\t\tat org.apache.spark.sql.execution.InputAdapter.inputRDDs(WholeStageCodegenExec.scala:504)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\t\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\t\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\t\tat org.apache.spark.sql.execution.WholeStageCodegenExec.doExecute(WholeStageCodegenExec.scala:763)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\t... 19 more\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "array_length",
+      "type": "An error occurred while calling o5221.count.\n",
+      "message": "An error occurred while calling o5221.count.\n: org.apache.spark.SparkException: [INTERNAL_ERROR] Cannot generate code for expression: input[0, int, false] DESC NULLS LAST SQLSTATE: XX000\n\tat org.apache.spark.SparkException$.internalError(SparkException.scala:92)\n\tat org.apache.spark.SparkException$.internalError(SparkException.scala:96)\n\tat org.apache.spark.sql.errors.QueryExecutionErrors$.cannotGenerateCodeForExpressionError(QueryExecutionErrors.scala:71)\n\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode(Expression.scala:433)\n\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode$(Expression.scala:432)\n\tat org.apache.spark.sql.catalyst.expressions.SortOrder.doGenCode(SortOrder.scala:63)\n\tat org.apache.spark.sql.catalyst.expressions.Expression.$anonfun$genCode$3(Expression.scala:229)\n\tat scala.Option.getOrElse(Option.scala:201)\n\tat org.apache.spark.sql.catalyst.expressions.Expression.genCode(Expression.scala:224)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.$anonfun$createOrderKeys$1(GenerateOrdering.scala:77)\n\tat scala.collection.immutable.Vector1.map(Vector.scala:2141)\n\tat scala.collection.immutable.Vector1.map(Vector.scala:386)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.createOrderKeys(GenerateOrdering.scala:77)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.genComparisons(GenerateOrdering.scala:86)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:147)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:37)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.CodeGenerator.generate(CodeGenerator.scala:1415)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:190)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:187)\n\tat org.apache.spark.sql.execution.TakeOrderedAndProjectExec.doExecute(limit.scala:349)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\tat org.apache.spark.sql.execution.InputAdapter.inputRDD(WholeStageCodegenExec.scala:533)\n\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs(WholeStageCodegenExec.scala:461)\n\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs$(WholeStageCodegenExec.scala:460)\n\tat org.apache.spark.sql.execution.InputAdapter.inputRDDs(WholeStageCodegenExec.scala:504)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\tat org.apache.spark.sql.execution.WholeStageCodegenExec.doExecute(WholeStageCodegenExec.scala:763)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.getTryWithCallerStacktrace(Utils.scala:1453)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\tat org.apache.spark.sql.execution.SparkPlan.getByteArrayRdd(SparkPlan.scala:378)\n\tat org.apache.spark.sql.execution.SparkPlan.executeCollect(SparkPlan.scala:459)\n\tat org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec.$anonfun$executeCollect$1(AdaptiveSparkPlanExec.scala:396)\n\tat org.apache.spark.sql.execution.adaptive.ResultQueryStageExec.$anonfun$doMaterialize$1(QueryStageExec.scala:328)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$4(SQLExecution.scala:335)\n\tat org.apache.spark.sql.execution.SQLExecution$.withSessionTagsApplied(SQLExecution.scala:285)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$3(SQLExecution.scala:333)\n\tat org.apache.spark.JobArtifactSet$.withActiveJobArtifactState(JobArtifactSet.scala:94)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$2(SQLExecution.scala:329)\n\tat java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)\n\tat java.base/java.lang.Thread.run(Thread.java:840)\n\tSuppressed: org.apache.spark.util.Utils$OriginalTryStackTraceException: Full stacktrace of original doTryWithCallerStacktrace caller\n\t\tat org.apache.spark.SparkException$.internalError(SparkException.scala:92)\n\t\tat org.apache.spark.SparkException$.internalError(SparkException.scala:96)\n\t\tat org.apache.spark.sql.errors.QueryExecutionErrors$.cannotGenerateCodeForExpressionError(QueryExecutionErrors.scala:71)\n\t\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode(Expression.scala:433)\n\t\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode$(Expression.scala:432)\n\t\tat org.apache.spark.sql.catalyst.expressions.SortOrder.doGenCode(SortOrder.scala:63)\n\t\tat org.apache.spark.sql.catalyst.expressions.Expression.$anonfun$genCode$3(Expression.scala:229)\n\t\tat scala.Option.getOrElse(Option.scala:201)\n\t\tat org.apache.spark.sql.catalyst.expressions.Expression.genCode(Expression.scala:224)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.$anonfun$createOrderKeys$1(GenerateOrdering.scala:77)\n\t\tat scala.collection.immutable.Vector1.map(Vector.scala:2141)\n\t\tat scala.collection.immutable.Vector1.map(Vector.scala:386)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.createOrderKeys(GenerateOrdering.scala:77)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.genComparisons(GenerateOrdering.scala:86)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:147)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:37)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.CodeGenerator.generate(CodeGenerator.scala:1415)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:190)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:187)\n\t\tat org.apache.spark.sql.execution.TakeOrderedAndProjectExec.doExecute(limit.scala:349)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\t\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\t\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\t\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\t\tat org.apache.spark.sql.execution.InputAdapter.inputRDD(WholeStageCodegenExec.scala:533)\n\t\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs(WholeStageCodegenExec.scala:461)\n\t\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs$(WholeStageCodegenExec.scala:460)\n\t\tat org.apache.spark.sql.execution.InputAdapter.inputRDDs(WholeStageCodegenExec.scala:504)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\t\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\t\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\t\tat org.apache.spark.sql.execution.WholeStageCodegenExec.doExecute(WholeStageCodegenExec.scala:763)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\t... 19 more\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "array_length",
+      "type": "An error occurred while calling o750.count.\n",
+      "message": "An error occurred while calling o750.count.\n: org.apache.spark.SparkException: [INTERNAL_ERROR] Cannot generate code for expression: input[0, int, false] DESC NULLS LAST SQLSTATE: XX000\n\tat org.apache.spark.SparkException$.internalError(SparkException.scala:92)\n\tat org.apache.spark.SparkException$.internalError(SparkException.scala:96)\n\tat org.apache.spark.sql.errors.QueryExecutionErrors$.cannotGenerateCodeForExpressionError(QueryExecutionErrors.scala:71)\n\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode(Expression.scala:433)\n\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode$(Expression.scala:432)\n\tat org.apache.spark.sql.catalyst.expressions.SortOrder.doGenCode(SortOrder.scala:63)\n\tat org.apache.spark.sql.catalyst.expressions.Expression.$anonfun$genCode$3(Expression.scala:229)\n\tat scala.Option.getOrElse(Option.scala:201)\n\tat org.apache.spark.sql.catalyst.expressions.Expression.genCode(Expression.scala:224)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.$anonfun$createOrderKeys$1(GenerateOrdering.scala:77)\n\tat scala.collection.immutable.Vector1.map(Vector.scala:2141)\n\tat scala.collection.immutable.Vector1.map(Vector.scala:386)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.createOrderKeys(GenerateOrdering.scala:77)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.genComparisons(GenerateOrdering.scala:86)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:147)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:37)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.CodeGenerator.generate(CodeGenerator.scala:1415)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:190)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:187)\n\tat org.apache.spark.sql.execution.TakeOrderedAndProjectExec.doExecute(limit.scala:349)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\tat org.apache.spark.sql.execution.InputAdapter.inputRDD(WholeStageCodegenExec.scala:533)\n\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs(WholeStageCodegenExec.scala:461)\n\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs$(WholeStageCodegenExec.scala:460)\n\tat org.apache.spark.sql.execution.InputAdapter.inputRDDs(WholeStageCodegenExec.scala:504)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\tat org.apache.spark.sql.execution.WholeStageCodegenExec.doExecute(WholeStageCodegenExec.scala:763)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.getTryWithCallerStacktrace(Utils.scala:1453)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\tat org.apache.spark.sql.execution.SparkPlan.getByteArrayRdd(SparkPlan.scala:378)\n\tat org.apache.spark.sql.execution.SparkPlan.executeCollect(SparkPlan.scala:459)\n\tat org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec.$anonfun$executeCollect$1(AdaptiveSparkPlanExec.scala:396)\n\tat org.apache.spark.sql.execution.adaptive.ResultQueryStageExec.$anonfun$doMaterialize$1(QueryStageExec.scala:328)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$4(SQLExecution.scala:335)\n\tat org.apache.spark.sql.execution.SQLExecution$.withSessionTagsApplied(SQLExecution.scala:285)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$3(SQLExecution.scala:333)\n\tat org.apache.spark.JobArtifactSet$.withActiveJobArtifactState(JobArtifactSet.scala:94)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$2(SQLExecution.scala:329)\n\tat java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)\n\tat java.base/java.lang.Thread.run(Thread.java:840)\n\tSuppressed: org.apache.spark.util.Utils$OriginalTryStackTraceException: Full stacktrace of original doTryWithCallerStacktrace caller\n\t\tat org.apache.spark.SparkException$.internalError(SparkException.scala:92)\n\t\tat org.apache.spark.SparkException$.internalError(SparkException.scala:96)\n\t\tat org.apache.spark.sql.errors.QueryExecutionErrors$.cannotGenerateCodeForExpressionError(QueryExecutionErrors.scala:71)\n\t\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode(Expression.scala:433)\n\t\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode$(Expression.scala:432)\n\t\tat org.apache.spark.sql.catalyst.expressions.SortOrder.doGenCode(SortOrder.scala:63)\n\t\tat org.apache.spark.sql.catalyst.expressions.Expression.$anonfun$genCode$3(Expression.scala:229)\n\t\tat scala.Option.getOrElse(Option.scala:201)\n\t\tat org.apache.spark.sql.catalyst.expressions.Expression.genCode(Expression.scala:224)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.$anonfun$createOrderKeys$1(GenerateOrdering.scala:77)\n\t\tat scala.collection.immutable.Vector1.map(Vector.scala:2141)\n\t\tat scala.collection.immutable.Vector1.map(Vector.scala:386)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.createOrderKeys(GenerateOrdering.scala:77)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.genComparisons(GenerateOrdering.scala:86)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:147)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:37)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.CodeGenerator.generate(CodeGenerator.scala:1415)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:190)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:187)\n\t\tat org.apache.spark.sql.execution.TakeOrderedAndProjectExec.doExecute(limit.scala:349)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\t\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\t\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\t\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\t\tat org.apache.spark.sql.execution.InputAdapter.inputRDD(WholeStageCodegenExec.scala:533)\n\t\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs(WholeStageCodegenExec.scala:461)\n\t\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs$(WholeStageCodegenExec.scala:460)\n\t\tat org.apache.spark.sql.execution.InputAdapter.inputRDDs(WholeStageCodegenExec.scala:504)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\t\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\t\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\t\tat org.apache.spark.sql.execution.WholeStageCodegenExec.doExecute(WholeStageCodegenExec.scala:763)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\t... 19 more\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "array_length",
+      "type": "An error occurred while calling o9687.count.\n",
+      "message": "An error occurred while calling o9687.count.\n: org.apache.spark.SparkException: [INTERNAL_ERROR] Cannot generate code for expression: input[0, int, false] DESC NULLS LAST SQLSTATE: XX000\n\tat org.apache.spark.SparkException$.internalError(SparkException.scala:92)\n\tat org.apache.spark.SparkException$.internalError(SparkException.scala:96)\n\tat org.apache.spark.sql.errors.QueryExecutionErrors$.cannotGenerateCodeForExpressionError(QueryExecutionErrors.scala:71)\n\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode(Expression.scala:433)\n\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode$(Expression.scala:432)\n\tat org.apache.spark.sql.catalyst.expressions.SortOrder.doGenCode(SortOrder.scala:63)\n\tat org.apache.spark.sql.catalyst.expressions.Expression.$anonfun$genCode$3(Expression.scala:229)\n\tat scala.Option.getOrElse(Option.scala:201)\n\tat org.apache.spark.sql.catalyst.expressions.Expression.genCode(Expression.scala:224)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.$anonfun$createOrderKeys$1(GenerateOrdering.scala:77)\n\tat scala.collection.immutable.Vector1.map(Vector.scala:2141)\n\tat scala.collection.immutable.Vector1.map(Vector.scala:386)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.createOrderKeys(GenerateOrdering.scala:77)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.genComparisons(GenerateOrdering.scala:86)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:147)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:37)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.CodeGenerator.generate(CodeGenerator.scala:1415)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:190)\n\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:187)\n\tat org.apache.spark.sql.execution.TakeOrderedAndProjectExec.doExecute(limit.scala:349)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\tat org.apache.spark.sql.execution.InputAdapter.inputRDD(WholeStageCodegenExec.scala:533)\n\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs(WholeStageCodegenExec.scala:461)\n\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs$(WholeStageCodegenExec.scala:460)\n\tat org.apache.spark.sql.execution.InputAdapter.inputRDDs(WholeStageCodegenExec.scala:504)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\tat org.apache.spark.sql.execution.WholeStageCodegenExec.doExecute(WholeStageCodegenExec.scala:763)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.getTryWithCallerStacktrace(Utils.scala:1453)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\tat org.apache.spark.sql.execution.SparkPlan.getByteArrayRdd(SparkPlan.scala:378)\n\tat org.apache.spark.sql.execution.SparkPlan.executeCollect(SparkPlan.scala:459)\n\tat org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec.$anonfun$executeCollect$1(AdaptiveSparkPlanExec.scala:396)\n\tat org.apache.spark.sql.execution.adaptive.ResultQueryStageExec.$anonfun$doMaterialize$1(QueryStageExec.scala:328)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$4(SQLExecution.scala:335)\n\tat org.apache.spark.sql.execution.SQLExecution$.withSessionTagsApplied(SQLExecution.scala:285)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$3(SQLExecution.scala:333)\n\tat org.apache.spark.JobArtifactSet$.withActiveJobArtifactState(JobArtifactSet.scala:94)\n\tat org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$2(SQLExecution.scala:329)\n\tat java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)\n\tat java.base/java.lang.Thread.run(Thread.java:840)\n\tSuppressed: org.apache.spark.util.Utils$OriginalTryStackTraceException: Full stacktrace of original doTryWithCallerStacktrace caller\n\t\tat org.apache.spark.SparkException$.internalError(SparkException.scala:92)\n\t\tat org.apache.spark.SparkException$.internalError(SparkException.scala:96)\n\t\tat org.apache.spark.sql.errors.QueryExecutionErrors$.cannotGenerateCodeForExpressionError(QueryExecutionErrors.scala:71)\n\t\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode(Expression.scala:433)\n\t\tat org.apache.spark.sql.catalyst.expressions.Unevaluable.doGenCode$(Expression.scala:432)\n\t\tat org.apache.spark.sql.catalyst.expressions.SortOrder.doGenCode(SortOrder.scala:63)\n\t\tat org.apache.spark.sql.catalyst.expressions.Expression.$anonfun$genCode$3(Expression.scala:229)\n\t\tat scala.Option.getOrElse(Option.scala:201)\n\t\tat org.apache.spark.sql.catalyst.expressions.Expression.genCode(Expression.scala:224)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.$anonfun$createOrderKeys$1(GenerateOrdering.scala:77)\n\t\tat scala.collection.immutable.Vector1.map(Vector.scala:2141)\n\t\tat scala.collection.immutable.Vector1.map(Vector.scala:386)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.createOrderKeys(GenerateOrdering.scala:77)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.genComparisons(GenerateOrdering.scala:86)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:147)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering$.create(GenerateOrdering.scala:37)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.CodeGenerator.generate(CodeGenerator.scala:1415)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:190)\n\t\tat org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering.<init>(GenerateOrdering.scala:187)\n\t\tat org.apache.spark.sql.execution.TakeOrderedAndProjectExec.doExecute(limit.scala:349)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$execute$1(SparkPlan.scala:201)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeQuery$1(SparkPlan.scala:260)\n\t\tat org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n\t\tat org.apache.spark.sql.execution.SparkPlan.executeQuery(SparkPlan.scala:257)\n\t\tat org.apache.spark.sql.execution.SparkPlan.execute(SparkPlan.scala:197)\n\t\tat org.apache.spark.sql.execution.InputAdapter.inputRDD(WholeStageCodegenExec.scala:533)\n\t\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs(WholeStageCodegenExec.scala:461)\n\t\tat org.apache.spark.sql.execution.InputRDDCodegen.inputRDDs$(WholeStageCodegenExec.scala:460)\n\t\tat org.apache.spark.sql.execution.InputAdapter.inputRDDs(WholeStageCodegenExec.scala:504)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\t\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs(AggregateCodegenSupport.scala:91)\n\t\tat org.apache.spark.sql.execution.aggregate.AggregateCodegenSupport.inputRDDs$(AggregateCodegenSupport.scala:90)\n\t\tat org.apache.spark.sql.execution.aggregate.HashAggregateExec.inputRDDs(HashAggregateExec.scala:51)\n\t\tat org.apache.spark.sql.execution.WholeStageCodegenExec.doExecute(WholeStageCodegenExec.scala:763)\n\t\tat org.apache.spark.sql.execution.SparkPlan.$anonfun$executeRDD$1(SparkPlan.scala:188)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1392)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\t... 19 more\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "fulltext_boolean_search",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "fulltext_boolean_search",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "fulltext_boolean_search",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "fulltext_boolean_search",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "fulltext_phrase_search",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "fulltext_phrase_search",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "fulltext_phrase_search",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "fulltext_phrase_search",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "map_access",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_access",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_access",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_access",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_construction",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_construction",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_construction",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_construction",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_keys_values",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_keys_values",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_keys_values",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "map_keys_values",
+      "type": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE",
+      "message": "\n[UNSUPPORTED_DATATYPE] Unsupported data type \"STR\". SQLSTATE: 0A000 (line 1, pos 0)\n\n== SQL ==\nstr\n^^^\n"
+    },
+    {
+      "phase": "query",
+      "query_id": "timeseries_trend_analysis",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "timeseries_trend_analysis",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "timeseries_trend_analysis",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "timeseries_trend_analysis",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_cume_dist",
+      "type": "PySparkDataFrameAdapter does not implement window_cume_dist",
+      "message": "PySparkDataFrameAdapter does not implement window_cume_dist"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_cume_dist",
+      "type": "PySparkDataFrameAdapter does not implement window_cume_dist",
+      "message": "PySparkDataFrameAdapter does not implement window_cume_dist"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_cume_dist",
+      "type": "PySparkDataFrameAdapter does not implement window_cume_dist",
+      "message": "PySparkDataFrameAdapter does not implement window_cume_dist"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_cume_dist",
+      "type": "PySparkDataFrameAdapter does not implement window_cume_dist",
+      "message": "PySparkDataFrameAdapter does not implement window_cume_dist"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_lag_lead",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_lag_lead",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_lag_lead",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_lag_lead",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_ntile",
+      "type": "PySparkDataFrameAdapter does not implement window_ntile",
+      "message": "PySparkDataFrameAdapter does not implement window_ntile"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_ntile",
+      "type": "PySparkDataFrameAdapter does not implement window_ntile",
+      "message": "PySparkDataFrameAdapter does not implement window_ntile"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_ntile",
+      "type": "PySparkDataFrameAdapter does not implement window_ntile",
+      "message": "PySparkDataFrameAdapter does not implement window_ntile"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_ntile",
+      "type": "PySparkDataFrameAdapter does not implement window_ntile",
+      "message": "PySparkDataFrameAdapter does not implement window_ntile"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_percentile",
+      "type": "PySparkDataFrameAdapter does not implement window_percent_rank",
+      "message": "PySparkDataFrameAdapter does not implement window_percent_rank"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_percentile",
+      "type": "PySparkDataFrameAdapter does not implement window_percent_rank",
+      "message": "PySparkDataFrameAdapter does not implement window_percent_rank"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_percentile",
+      "type": "PySparkDataFrameAdapter does not implement window_percent_rank",
+      "message": "PySparkDataFrameAdapter does not implement window_percent_rank"
+    },
+    {
+      "phase": "query",
+      "query_id": "ualify_percentile",
+      "type": "PySparkDataFrameAdapter does not implement window_percent_rank",
+      "message": "PySparkDataFrameAdapter does not implement window_percent_rank"
+    },
+    {
+      "phase": "query",
+      "query_id": "unpivot_basic",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "unpivot_basic",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "unpivot_basic",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "unpivot_basic",
+      "type": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type.",
+      "message": "[NOT_DATATYPE_OR_STR] Argument `dataType` should be a DataType or str, got type."
+    },
+    {
+      "phase": "query",
+      "query_id": "window_lead_lag_same_frame",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "window_lead_lag_same_frame",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "window_lead_lag_same_frame",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    },
+    {
+      "phase": "query",
+      "query_id": "window_lead_lag_same_frame",
+      "type": "PySparkDataFrameAdapter does not implement window_lag",
+      "message": "PySparkDataFrameAdapter does not implement window_lag"
+    }
+  ],
+  "export": {
+    "timestamp": "2026-05-02T21:41:31.089710",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

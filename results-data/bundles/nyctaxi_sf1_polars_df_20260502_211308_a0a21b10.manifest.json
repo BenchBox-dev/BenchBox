@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:49:24.879357+00:00",
+  "bundle_file": "nyctaxi_sf1_polars_df_20260502_211308_a0a21b10.json",
+  "bundle_hash": "dc1590342f5a99554543f404c82bb205a13f0ec6a2080db0558afac1da3f95ab",
+  "companion_hashes": {},
+  "benchmark": "NYC Taxi",
+  "platform": "Polars",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

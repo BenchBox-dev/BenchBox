@@ -1,0 +1,668 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "5a803e74",
+    "timestamp": "2026-05-02T21:12:03.750932",
+    "total_duration_ms": 7,
+    "query_time_ms": 2,
+    "iterations": 1,
+    "streams": 0
+  },
+  "benchmark": {
+    "id": "metadata_primitives",
+    "name": "Metadata",
+    "scale_factor": 1.0,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "Polars",
+    "version": "1.40.0",
+    "client_version": "unknown",
+    "config": {
+      "execution_mode": "dataframe",
+      "family": "expression",
+      "streaming": false,
+      "rechunk": true,
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/metadata_primitives_sf1",
+      "driver_package": "polars",
+      "driver_version_resolved": "1.40.0",
+      "driver_version_actual": "1.40.0",
+      "driver_runtime_strategy": "current-process",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3"
+    },
+    "deployment": {
+      "deployment_type": "dataframe",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "streaming": false,
+      "rechunk": true,
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/metadata_primitives_sf1",
+      "options": {
+        "streaming": "false",
+        "rechunk": "true",
+        "verbose_level": 0,
+        "verbose_enabled": false,
+        "very_verbose": false,
+        "quiet": false,
+        "verbose": false,
+        "force_recreate": false,
+        "show_query_plans": false,
+        "tuning_enabled": false,
+        "force_upload": false,
+        "capture_plans": false,
+        "strict_plan_capture": false,
+        "execution_mode": "dataframe",
+        "unified_tuning_configuration": {
+          "primary_keys": {
+            "enabled": false,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
+          "foreign_keys": {
+            "enabled": false,
+            "enforce_referential_integrity": true,
+            "on_delete_action": "RESTRICT",
+            "on_update_action": "RESTRICT"
+          },
+          "unique_constraints": {
+            "enabled": false,
+            "ignore_nulls": false
+          },
+          "check_constraints": {
+            "enabled": false,
+            "enforce_on_insert": true,
+            "enforce_on_update": true
+          },
+          "platform_optimizations": {
+            "z_ordering_enabled": false,
+            "liquid_clustering_enabled": false,
+            "databricks_clustering_strategy": "z_order",
+            "sorted_ingestion_mode": "off",
+            "sorted_ingestion_method": "auto",
+            "auto_optimize_enabled": false,
+            "auto_compact_enabled": false,
+            "bloom_filters_enabled": false,
+            "materialized_views_enabled": false
+          }
+        }
+      },
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "execution_mode": "dataframe",
+      "benchmark": "metadata_primitives",
+      "scale_factor": 1.0,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "memory_limit": "12GB",
+      "thread_limit": 8
+    },
+    "raw_metadata": {
+      "driver_package": "polars",
+      "driver_version_resolved": "1.40.0",
+      "driver_version_actual": "1.40.0",
+      "driver_runtime_strategy": "current-process",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3"
+    },
+    "driver_actual_version": "1.40.0",
+    "driver_package": "polars",
+    "driver_resolved_version": "1.40.0",
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "mode": "dataframe"
+  },
+  "summary": {
+    "queries": {
+      "total": 48,
+      "passed": 48,
+      "failed": 0
+    },
+    "timing": {
+      "total_ms": 2,
+      "avg_ms": 0.0,
+      "min_ms": 0,
+      "max_ms": 2,
+      "stdev_ms": 0.3,
+      "p90_ms": 0,
+      "p95_ms": 0,
+      "p99_ms": 2
+    },
+    "validation": "passed"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "status": "SKIPPED"
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    },
+    "power_test": {
+      "status": "COMPLETED",
+      "duration_ms": 2
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [
+    {
+      "id": "df_list_columns_region",
+      "ms": 0,
+      "rows": 3,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_list_columns_nation",
+      "ms": 0,
+      "rows": 4,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_list_columns_supplier",
+      "ms": 0,
+      "rows": 7,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_list_columns_part",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_list_columns_partsupp",
+      "ms": 0,
+      "rows": 5,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_list_columns_customer",
+      "ms": 0,
+      "rows": 8,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_list_columns_orders",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_list_columns_lineitem",
+      "ms": 0,
+      "rows": 16,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_dtypes_region",
+      "ms": 0,
+      "rows": 3,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_dtypes_nation",
+      "ms": 0,
+      "rows": 4,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_dtypes_supplier",
+      "ms": 0,
+      "rows": 7,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_dtypes_part",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_dtypes_partsupp",
+      "ms": 0,
+      "rows": 5,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_dtypes_customer",
+      "ms": 0,
+      "rows": 8,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_dtypes_orders",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_dtypes_lineitem",
+      "ms": 0,
+      "rows": 16,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_schema_region",
+      "ms": 0,
+      "rows": 3,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_schema_nation",
+      "ms": 0,
+      "rows": 4,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_schema_supplier",
+      "ms": 0,
+      "rows": 7,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_schema_part",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_schema_partsupp",
+      "ms": 0,
+      "rows": 5,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_schema_customer",
+      "ms": 0,
+      "rows": 8,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_schema_orders",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_get_schema_lineitem",
+      "ms": 0,
+      "rows": 16,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_describe_stats_region",
+      "ms": 2,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_describe_stats_nation",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_describe_stats_supplier",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_describe_stats_part",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_describe_stats_partsupp",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_describe_stats_customer",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_describe_stats_orders",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_describe_stats_lineitem",
+      "ms": 0,
+      "rows": 9,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_row_count_region",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_row_count_nation",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_row_count_supplier",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_row_count_part",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_row_count_partsupp",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_row_count_customer",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_row_count_orders",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_row_count_lineitem",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_column_count_region",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_column_count_nation",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_column_count_supplier",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_column_count_part",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_column_count_partsupp",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_column_count_customer",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_column_count_orders",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "df_column_count_lineitem",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    }
+  ],
+  "cost": {
+    "total_usd": 0,
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-02T21:12:03.720391",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_package": "polars",
+    "driver_version_resolved": "1.40.0",
+    "driver_version_actual": "1.40.0",
+    "driver_runtime_strategy": "current-process",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3",
+    "non_interactive": true
+  },
+  "environment": {
+    "platform_runtime": {
+      "runtime_type": "dataframe_process",
+      "collection_status": "partial",
+      "source": "inferred",
+      "engine_host": "host_c99c12bbf816"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "client_host": {
+      "machine_id": "machine_45d1a3ef31a1728d"
+    }
+  },
+  "export": {
+    "timestamp": "2026-05-02T21:12:03.773978",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}
