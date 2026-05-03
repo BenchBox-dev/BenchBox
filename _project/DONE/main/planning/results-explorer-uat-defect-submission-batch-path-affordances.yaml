@@ -2,7 +2,7 @@ id: results-explorer-uat-defect-submission-batch-path-affordances
 title: "UAT defect: submission flow lacks batch and exact-path affordances"
 worktree: main
 priority: "Medium"
-status: "In Progress"
+status: "Completed"
 category: "Developer Experience"
 
 description: |
@@ -113,3 +113,4 @@ anti_patterns:
 metadata:
   tags: [uat, submission-flow, cli-ux]
   created_date: "2026-05-03"
+completed_date: "2026-05-03"
