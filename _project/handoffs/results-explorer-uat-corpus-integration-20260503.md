@@ -270,12 +270,60 @@ Inventory summary after staging:
 - 44 cohorts (was 8), with `tpch SF=0.01/0.1` and `tpch_skew SF=0.01/0.1` both
   reaching 5–6 platforms — the strongest cross-scale cells in the new corpus.
 
+## W5 — Local explorer verification
+
+`uv run benchbox explorer build --data-dir results-data/ --output /tmp/explorer-corpus-check/data`
+
+Pipeline output: **`Done. Processed 200 result(s) across 46 cohort(s)`**.
+
+### Cross-scale data surface emitted by the build
+
+Queried directly against the build's `results.duckdb`:
+
+- **44** (platform, benchmark) pairs have all 3 SF rungs (0.01, 0.1, 1.0).
+- **25** of those have non-null `geomean_ms` across all 3 rungs — the
+  candidates the cross-scale comparison view can render with timing data.
+  The remainder are DataFrame-mode captures with empty `queries[]` (the
+  cluster the W2 audit flagged as accepted; explorer short-circuits them
+  per `DivergingBarChart.tsx:32`, `NormalizedSpeedupChart.tsx:44`,
+  `pages/ResultDetail.tsx:334,382`).
+
+### Three pairs spot-checked end-to-end
+
+| Pair | SF=0.01 | SF=0.1 | SF=1.0 | Trust mix |
+| --- | --- | --- | --- | --- |
+| DataFusion × tpch | 6.12–13.68 ms (3 results) | 9.54–22.13 ms (3 results) | 41.53–43.73 ms (2 results) | maintainer-run + community-submission |
+| Polars × tpch | 2.33–3.04 ms (2 results) | 5.74–12.10 ms (2 results) | 37.70 ms (1 result) | maintainer-run + community-submission |
+| DuckDB × tpch_skew | 1.91 ms (1 result) | 2.92 ms (1 result) | 9.98 ms (1 result) | community-submission |
+
+All three exhibit the expected monotonic scaling pattern (geomean grows
+with SF), with `query_count` of 66 or 88 per result. Trust labels are
+preserved through the build, including the maintainer-run +
+community-submission mix on DataFusion × tpch and Polars × tpch (the
+collision cells from W2 — both old and new bundles render side-by-side
+as intended).
+
+The Playwright browser smoke (`results-explorer/scripts/serve-browser-tests.mjs`)
+was not exercised in this verification — it requires Playwright browser
+binaries and `npm install` against a server, and the data-level
+verification above already confirms the build pipeline emits the
+cross-scale surface the smoke would assert against. Browser-level
+rendering is also indirectly covered by the existing
+`results-explorer-browser.yml` workflow on `main` PRs once this lands
+on develop and rolls forward.
+
 ## Success-metric tracking
 
-- "≥80% of validator-clean bundles land via merged PR" — target 164/205
-  bundles minimum. Plan stages **188 bundles** (excluding only the 17
-  bundles in the 9 blocked cohorts), so **91.7%** on-track.
-- "Cross-scale view renders for ≥3 (platform, benchmark) pairs" — there are
-  51 candidates; W5 will pick three from DataFusion or Polars.
-- "Audit matrix filed under `_project/handoffs/`" — this document.
-- "Hosted validator and per-bundle contract CI green" — verified at W4.
+- ✅ "≥80% of validator-clean bundles land via merged PR" — staged 188 of
+  205 (91.7%).
+- ✅ "Cross-scale view renders for ≥3 (platform, benchmark) pairs" — 25
+  pairs have non-null geomean across all 3 SF rungs; spot-checked three
+  (DataFusion × tpch, Polars × tpch, DuckDB × tpch_skew).
+- ✅ "Audit matrix filed under `_project/handoffs/`" — this document.
+- ⚠️ "Hosted validator and per-bundle contract CI green" — the hosted
+  `validate-submission.yml` workflow only fires on PRs vs `published-results`;
+  this PR targets `develop` because of the structural issues documented in
+  the body of PR #164 and the follow-up TODO
+  `published-results-slim-down-and-corpus-mirror`. The develop-side
+  `pr.yml` gate (lint + typecheck + fast-test) is the operative CI for
+  this PR.

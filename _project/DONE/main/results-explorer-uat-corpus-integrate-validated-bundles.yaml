@@ -2,7 +2,8 @@ id: results-explorer-uat-corpus-integrate-validated-bundles
 title: "Integrate the UAT-20260502 validated corpus into results-data"
 worktree: main
 priority: "High"
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-05-03"
 category: "Testing and Quality Assurance"
 
 deps:
@@ -111,7 +112,7 @@ work:
 - id: w5
   summary: "Verify explorer ingests the new corpus locally before flipping the PR ready"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Run `benchbox explorer build --data-dir results-data/ --output
     /tmp/explorer-corpus-check/data` and exercise the resulting snapshot
