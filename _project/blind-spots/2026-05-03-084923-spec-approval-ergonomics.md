@@ -1,13 +1,13 @@
 ---
 id: 2026-05-03-084923-spec-approval-ergonomics
 date: 2026-05-03
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "code review of W4 design document in TODO results-explorer-uat-methodology-blind-spot-remediation"
 related_paths:
   - _project/specs/uat-methodology-blind-spot-remediation.md
 suggested_sweep: "extend the /code review checklist for spec/proposal docs that have a user-approval gate to include 'approval ergonomics': what does the user do to accept, partially accept, reject; what cascades."
-todo_id: null
+todo_id: code-review-checklist-additions-for-spec-docs
 ---
 
 # Approval-gate specs need explicit approval protocols, not just open questions
@@ -42,3 +42,7 @@ as follows: ..." — closes the gap cheaply.
 
 - [ ] Add an "Approval protocol" preamble to W4's Section 5.
 - [ ] Consider adding "approval ergonomics" to the /code review checklist for proposal/spec docs with user-approval gates.
+
+## Triage log
+
+- 2026-05-03: promoted to TODO `code-review-checklist-additions-for-spec-docs`
