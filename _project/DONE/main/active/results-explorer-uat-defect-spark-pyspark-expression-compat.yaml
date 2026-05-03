@@ -2,8 +2,9 @@ id: results-explorer-uat-defect-spark-pyspark-expression-compat
 title: "UAT defect: Spark and PySpark expression compatibility failures"
 worktree: main
 priority: "Medium-High"
-status: "In Progress"
+status: "Completed"
 category: "Testing and Quality Assurance"
+completed_date: "2026-05-03"
 
 description: |
   Spark SQL and PySpark DataFrame had multiple UAT failures: strict identifier
