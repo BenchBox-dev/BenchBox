@@ -1,0 +1,45 @@
+id: results-explorer-uat-defect-submit-dry-run-validation-parity
+title: "UAT defect: submit dry-run misses hosted submission validation errors"
+worktree: main
+priority: "Medium-High"
+status: "Not Started"
+category: "Developer Experience"
+
+description: |
+  `benchbox submit --dry-run` exited 0 for
+  `amplab_sf001_clickhouse_local_sql_20260502_185809_f2e17de5.json`, but the
+  same packaged bundle later failed `scripts/validate_submission.py` because of
+  the normalized-cost contract. This contradicts the hosted-results contract
+  text that says dry-run runs client-side validations.
+
+work:
+- id: w1
+  summary: "Compare submit dry-run validation with scripts/validate_submission.py"
+  status: pending
+- id: w2
+  summary: "Make dry-run fail on the same publish-blocking bundle errors"
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Add CLI regression coverage for dry-run validation parity"
+  needs: [w2]
+  status: pending
+
+verification:
+- description: "Dry-run rejects a known invalid bundle with the same validator error class."
+  command: "uv run -- python -m pytest tests -k 'submit and dry_run and validation' -q"
+  expected_output: "selected submit dry-run validation tests pass"
+- description: "Submission validator still accepts valid bundles."
+  command: "uv run -- python scripts/validate_submission.py results-data/bundles"
+  expected_output: "valid committed bundles pass"
+
+must_preserve:
+- "Dry-run remains offline/local and does not upload results."
+- "Valid result dry-runs still show the PR-ready package preview."
+
+anti_patterns:
+- "DO NOT duplicate divergent validation logic -- because drift caused this defect -- share or call the same validation rules where practical."
+
+metadata:
+  tags: [uat, submission-flow, dry-run]
+  created_date: "2026-05-03"
