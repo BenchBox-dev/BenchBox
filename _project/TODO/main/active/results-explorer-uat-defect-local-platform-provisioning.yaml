@@ -1,0 +1,97 @@
+id: results-explorer-uat-defect-local-platform-provisioning
+title: "UAT defect: local platform provisioning readiness is unclear"
+worktree: main
+priority: "Medium"
+status: "In Progress"
+category: "Developer Experience"
+
+description: |
+  The UAT sweep skipped 870 TCP-backed SQL cells because local service ports were
+  unreachable. Lakesail also failed every first-rung cell due missing `pysail`
+  and no Sail server at `sc://localhost:50051`, and Modin failed immediately due
+  missing runtime dependencies. These are environment/provisioning issues, not
+  benchmark query failures, but the local user path does not make that boundary
+  obvious enough.
+
+work:
+- id: w1
+  summary: "Inventory exact provisioning checks for TCP services, Lakesail, and Modin"
+  status: done
+  notes: |
+    Inventory findings:
+    - TCP-backed local services are currently encoded only in `scripts/local_stress_test.sh`, not in the reusable
+      `benchbox platforms check/status` path. The 15 service platforms are `clickhouse-server:localhost:9000`,
+      `cedardb:localhost:5435`, `starrocks:localhost:19030`, `postgresql:localhost:5432`,
+      `presto:localhost:18081`, `trino:localhost:18080`, `databend:localhost:8000`,
+      `doris:localhost:19031`, `influxdb:localhost:8181`, `pg-duckdb:localhost:5432`,
+      `pg-mooncake:localhost:5432`, `timescaledb:localhost:5432`, `questdb:localhost:8812`,
+      `singlestore:localhost:13306`, and `velox:localhost:50051`. PostgreSQL-family platforms share
+      `localhost:5432` but must stay separate readiness results because they represent different provisioned
+      services/schemas.
+    - `benchbox platforms check` currently reports package availability only; it does not probe configured
+      service endpoints, so a platform can look "ready" before a local server is listening.
+    - LakeSail SQL and DataFrame modes both require the PySpark client plus a Sail Spark Connect endpoint at
+      `sc://localhost:50051` by default. The SQL adapter can auto-start a local `pysail` server when `pysail` is
+      installed and the endpoint is unreachable, but readiness diagnostics must not instantiate the adapter or
+      trigger that managed subprocess path. LakeSail DataFrame mode connects to an already-running endpoint.
+    - Modin readiness is more than importing `modin`: the default Ray backend must also import `ray`, and the Dask
+      backend must import `dask`. Probing must not start a Ray cluster or mutate runtime state.
+- id: w2
+  summary: "Add or improve readiness diagnostics and documentation"
+  needs: [w1]
+  status: pending
+  notes: |
+    Work-unit-owned files before editing:
+    - `benchbox/cli/platform_readiness.py` (new side-effect-free readiness probes)
+    - `benchbox/cli/platform.py` (surface readiness diagnostics from `benchbox platforms check/status`)
+    - `docs/reference/cli/workflows.md`
+    - `docs/platforms/quick-reference.md`
+    - `docs/platforms/lakesail.md`
+    - `docs/platforms/modin-dataframe.md`
+- id: w3
+  summary: "Verify unreachable/missing-runtime paths are classified as environment skips"
+  needs: [w2]
+  status: pending
+  notes: |
+    Work-unit-owned files before editing:
+    - `tests/unit/cli/test_platform_readiness.py` (new targeted readiness unit coverage)
+    - `tests/unit/cli/test_platform.py` (CLI command rendering/exit-code coverage if needed)
+
+approach: |
+  Add a small, reusable readiness layer for local provisioning checks and wire it into existing platform CLI
+  diagnostics. Keep checks side-effect-free: import/package discovery and bounded localhost TCP probes only.
+  Do not instantiate adapters, start services, initialize Ray, or create/drop databases. Treat missing services
+  and missing optional runtimes as environment readiness gaps, not benchmark failures.
+
+verification:
+- description: "Platform readiness/help checks terminate and classify missing services cleanly."
+  command: "uv run -- python -m pytest tests/unit/cli/test_platform_readiness.py tests/unit/cli/test_platform.py -k 'platform
+    and readiness' -q"
+  expected_output: "selected readiness tests pass"
+- description: "Fast tests remain green."
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all selected tests pass"
+
+must_preserve:
+- "The CLI must not start, stop, or mutate local services without explicit user action."
+- "Missing optional runtimes remain non-fatal to base BenchBox installs."
+
+anti_patterns:
+- "DO NOT turn missing TCP services into benchmark failures -- because the benchmark was never run -- classify them as local
+  environment readiness gaps."
+
+scope_limit:
+  only_modify:
+  - "benchbox/cli/platform_readiness.py"
+  - "benchbox/cli/platform.py"
+  - "tests/unit/cli/test_platform_readiness.py"
+  - "tests/unit/cli/test_platform.py"
+  - "docs/reference/cli/workflows.md"
+  - "docs/platforms/quick-reference.md"
+  - "docs/platforms/lakesail.md"
+  - "docs/platforms/modin-dataframe.md"
+  - "_project/TODO/main/active/results-explorer-uat-defect-local-platform-provisioning.yaml"
+
+metadata:
+  tags: [uat, provisioning, local-platforms]
+  created_date: "2026-05-03"
