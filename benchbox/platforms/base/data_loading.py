@@ -1885,17 +1885,19 @@ class ClickHouseNativeHandler(FileFormatHandler):
     with support for both server and local modes.
     """
 
-    def __init__(self, delimiter: str, adapter: Any, benchmark: Any):
+    def __init__(self, delimiter: str, adapter: Any, benchmark: Any, *, has_header: bool = False):
         """Initialize handler.
 
         Args:
             delimiter: Field delimiter character
             adapter: Platform adapter (for mode and config)
             benchmark: Benchmark instance (for CSV loading config)
+            has_header: Whether CSV input files include a header row.
         """
         self.delimiter_char = delimiter
         self.adapter = adapter
         self.benchmark = benchmark
+        self.has_header = has_header
 
     def get_delimiter(self) -> str:
         """Get delimiter for this file format."""
@@ -1911,7 +1913,7 @@ class ClickHouseNativeHandler(FileFormatHandler):
             Dictionary with CSV loading configuration (delimiter, format, etc.)
         """
         # Default configuration for ClickHouse
-        config = {"delimiter": self.delimiter_char, "format": "CSV"}
+        config = {"delimiter": self.delimiter_char, "format": "CSVWithNames" if self.has_header else "CSV"}
 
         # Check if benchmark provides CSV loading configuration
         if hasattr(self.benchmark, "get_csv_loading_config"):
@@ -1920,10 +1922,15 @@ class ClickHouseNativeHandler(FileFormatHandler):
                 if benchmark_config_list:
                     # Parse DuckDB-style config list into ClickHouse config
                     for config_item in benchmark_config_list:
-                        if "delim=" in config_item:
+                        normalized_item = config_item.lower()
+                        if "delim=" in normalized_item:
                             # Extract delimiter: delim='|' -> delimiter = '|'
                             delim_part = config_item.split("delim=")[1].strip("'\"")
                             config["delimiter"] = delim_part
+                        elif "header=true" in normalized_item:
+                            config["format"] = "CSVWithNames"
+                        elif "header=false" in normalized_item:
+                            config["format"] = "CSV"
             except Exception:
                 pass  # Use defaults
 
@@ -1961,17 +1968,18 @@ class ClickHouseNativeHandler(FileFormatHandler):
                 # files via auto-detection of .zst file extensions in file().
                 csv_config = self._get_csv_loading_config(validated_table)
                 delimiter = csv_config["delimiter"]
+                csv_format = csv_config["format"]
 
                 if delimiter == ",":
                     load_query = f"""
                         INSERT INTO {validated_table}
-                        SELECT * FROM file('{escaped_path}', 'CSV')
+                        SELECT * FROM file('{escaped_path}', '{csv_format}')
                     """
                 else:
                     escaped_delimiter = escape_sql_string_literal(delimiter)
                     load_query = f"""
                         INSERT INTO {validated_table}
-                        SELECT * FROM file('{escaped_path}', 'CSV')
+                        SELECT * FROM file('{escaped_path}', '{csv_format}')
                         SETTINGS format_csv_delimiter='{escaped_delimiter}'
                     """
 
@@ -2031,12 +2039,13 @@ class ClickHouseNativeHandler(FileFormatHandler):
         else:
             csv_config = self._get_csv_loading_config(validated_table)
             delimiter = csv_config["delimiter"]
+            csv_format = csv_config["format"]
             if delimiter == ",":
-                insert_sql = f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', 'CSV')"
+                insert_sql = f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', '{csv_format}')"
             else:
                 escaped_delimiter = escape_sql_string_literal(delimiter)
                 insert_sql = (
-                    f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', 'CSV')"
+                    f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', '{csv_format}')"
                     f" SETTINGS format_csv_delimiter='{escaped_delimiter}'"
                 )
 

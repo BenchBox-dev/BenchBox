@@ -7,12 +7,13 @@ populated metadata, and backwards-compat with no manifest (table_metadata={}).
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
-from benchbox.platforms.base.data_loading import DataSource, DataSourceResolver
+from benchbox.platforms.base.data_loading import ClickHouseNativeHandler, DataSource, DataSourceResolver
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -148,3 +149,26 @@ def test_table_metadata_injected_when_benchmark_tables_wins(tmp_path: Path) -> N
     assert source is not None
     assert source.source_type == "benchmark_tables"
     assert source.table_metadata.get("customer", {}).get("csv_has_header") is True
+
+
+def test_clickhouse_native_handler_uses_csv_with_names_for_headered_csv(tmp_path: Path) -> None:
+    """Manifest header metadata should select ClickHouse's header-aware CSV reader."""
+    connection = _FakeClickHouseConnection()
+    handler = ClickHouseNativeHandler(",", adapter=object(), benchmark=object(), has_header=True)
+
+    handler.load_table("flights", tmp_path / "flights.csv", connection, object(), logging.getLogger(__name__))
+
+    load_queries = [query for query in connection.queries if "file(" in query]
+    assert load_queries
+    assert "CSVWithNames" in load_queries[0]
+
+
+class _FakeClickHouseConnection:
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
+    def execute(self, query: str):
+        self.queries.append(query)
+        if "COUNT(*)" in query:
+            return [(0,)]
+        return []

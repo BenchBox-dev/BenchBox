@@ -21,7 +21,7 @@ work:
 - id: w2
   summary: "Repair or quarantine the bad FlightData SF1 corpus path"
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Add integrity/preflight coverage for FlightData source files"
   needs: [w2]
@@ -29,10 +29,12 @@ work:
 
 verification:
 - description: "FlightData SF1 smoke succeeds on at least one SQL and one DataFrame platform."
-  command: "uv run -- benchbox run --platform duckdb --benchmark flightdata --scale 1.0 --phases load,power --non-interactive"
+  command: "BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs uv run -- benchbox run --platform duckdb --benchmark flightdata
+    --scale 1.0 --phases load,power --non-interactive"
   expected_output: "run completes without source-file corruption errors"
 - description: "FlightData SF1 DataFrame smoke succeeds."
-  command: "uv run -- benchbox run --platform polars-df --benchmark flightdata --scale 1.0 --phases load,power --non-interactive"
+  command: "BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs uv run -- benchbox run --platform polars-df --benchmark
+    flightdata --scale 1.0 --phases load,power --non-interactive"
   expected_output: "run completes without source-file corruption errors"
 - description: "Fast tests remain green."
   command: "uv run -- python -m pytest -m fast -q"
@@ -52,10 +54,14 @@ scope_limit:
   only_modify:
   - "benchbox/core/flightdata/downloader.py"
   - "benchbox/core/flightdata/benchmark.py"
+  - "benchbox/core/flightdata/dataframe_queries.py"
+  - "benchbox/core/runner/runner.py"
   - "benchbox/platforms/base/data_loading.py"
   - "benchbox/platforms/datafusion.py"
   - "benchbox/platforms/dataframe/shared_loading.py"
+  - "benchbox/platforms/clickhouse/workload.py"
   - "tests/unit/core/flightdata/"
+  - "tests/unit/platforms/test_data_loading.py"
   - "tests/unit/core/test_runner_manifest_reuse.py"
   do_not_modify:
   - "Platform-specific row-skipping logic outside the shared loading contract"

@@ -1524,7 +1524,11 @@ def _check_table_directory_collisions(output_dir: Any, tables: dict) -> bool:
         if not table_dir.is_dir():
             continue
         all_entries = _collect_all_entries(table_data)
-        if not any(e.get("path") == table_name for e in all_entries):
+        recorded_prefix = f"{table_name}/"
+        if not any(
+            str(e.get("path", "")).rstrip("/") == table_name or str(e.get("path", "")).startswith(recorded_prefix)
+            for e in all_entries
+        ):
             logger.warning(
                 "Datagen cache rejected: directory '%s/' collides with table "
                 "name but is not recorded in manifest. Regenerating.",

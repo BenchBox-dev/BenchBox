@@ -25,10 +25,13 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import calendar
+import contextlib
 import csv
 import io
+import json
 import logging
 import random
+import shutil
 import urllib.error
 import urllib.request
 import zipfile
@@ -36,8 +39,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from benchbox.core.manifest_utils import write_generator_manifest
 from benchbox.utils.compression_mixin import CompressionMixin
+from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
 logger = logging.getLogger(__name__)
@@ -53,6 +56,9 @@ FIRST_AVAILABLE_YEAR = 1987
 LAST_AVAILABLE_YEAR = 2024
 APPROXIMATE_MONTHLY_FLIGHTS = 600_000  # ~600K flights per month in recent years
 MONTHS_PER_SCALE_FACTOR = 41
+FLIGHTS_SHARD_ROW_TARGET = 1_000_000
+FLIGHTS_SHARD_DIRNAME = "flights"
+FLIGHTS_SHARD_PREFIX = "flights_"
 
 # BTS CSV field names (subset used in BenchBox schema)
 BTS_FIELD_NAMES = [
@@ -168,6 +174,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         self.output_dir = Path(output_dir)
         self.seed = seed if seed is not None else 42
         self.force_redownload = force_redownload
+        self.logger = logger
         verbosity_settings = compute_verbosity(verbose, quiet)
         self.apply_verbosity(verbosity_settings)
         self._rng = random.Random(self.seed)
@@ -181,8 +188,9 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             "total_flights": 0,
         }
         self._table_row_counts: dict[str, int] = {}
+        self._table_file_row_counts: dict[Path, int] = {}
 
-    def download(self) -> dict[str, Path]:
+    def download(self) -> dict[str, Path | list[Path]]:
         """Download or generate flight data and reference tables.
 
         Returns:
@@ -201,19 +209,62 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         if not airports_path.exists() or self.force_redownload:
             self._copy_reference_file("airports.csv", airports_path)
 
-        # Download/generate flight data
-        if not flights_path.exists() or self.force_redownload:
-            self._generate_flights_csv(flights_path)
+        if airlines_path.exists() and airlines_path not in self._table_file_row_counts:
+            self._record_existing_csv_file("airlines", airlines_path)
+        if airports_path.exists() and airports_path not in self._table_file_row_counts:
+            self._record_existing_csv_file("airports", airports_path)
+
+        flight_files = self._ensure_flights_data(flights_path)
 
         table_files = {
-            "flights": flights_path,
+            "flights": flight_files,
             "airlines": airlines_path,
             "airports": airports_path,
         }
-        if self._table_row_counts:
-            write_generator_manifest(
-                self, "flightdata", table_files, self._table_row_counts, metadata={"csv_has_header": True}
-            )
+        if self._table_file_row_counts:
+            self._write_manifest(table_files)
+        return table_files
+
+    def repair_reusable_layout(self) -> dict[str, Path | list[Path]] | None:
+        """Repair a reusable FlightData cache when its source layout is loader-hostile.
+
+        Older SF1 caches used a single large zstd-compressed ``flights.csv.zst``.
+        The file can be byte-valid while still failing several native readers.
+        Replacing it with manifest-tracked CSV shards keeps the reusable corpus
+        deterministic without forcing a network redownload.
+        """
+        if not self._should_use_sharded_flights():
+            return None
+
+        if self._existing_flight_shards():
+            return None
+
+        legacy_path = self._find_legacy_single_flights_path()
+        if legacy_path is None:
+            return None
+
+        self.log_verbose(f"Repairing FlightData cache layout by sharding {legacy_path.name}")
+        shard_paths = self._split_existing_flights_file(legacy_path)
+        if not shard_paths:
+            return None
+
+        airlines_path = self._existing_reference_path("airlines")
+        airports_path = self._existing_reference_path("airports")
+        if airlines_path is None or airports_path is None:
+            return None
+
+        self._record_existing_csv_file("airlines", airlines_path)
+        self._record_existing_csv_file("airports", airports_path)
+        table_files: dict[str, Path | list[Path]] = {
+            "flights": shard_paths,
+            "airlines": airlines_path,
+            "airports": airports_path,
+        }
+        self._write_manifest(table_files)
+
+        with contextlib.suppress(OSError):
+            legacy_path.unlink()
+
         return table_files
 
     def _copy_reference_file(self, filename: str, dest: Path) -> None:
@@ -229,11 +280,84 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             # Subtract 1 for the header row
             table_name = dest.name.split(".")[0]
             self._table_row_counts[table_name] = max(0, row_count - 1)
+            self._table_file_row_counts[dest] = max(0, row_count - 1)
             self.log_verbose(f"Copied reference data: {filename}")
         else:
             logger.warning(f"Reference file not found: {src}")
 
-    def _generate_flights_csv(self, output_path: Path) -> None:
+    def _ensure_flights_data(self, flights_path: Path) -> Path | list[Path]:
+        """Return the active flights source files, generating or repairing when needed."""
+        if self.force_redownload:
+            self._remove_flights_outputs(flights_path)
+
+        if self._should_use_sharded_flights():
+            shard_paths = self._existing_flight_shards()
+            if shard_paths and not self.force_redownload:
+                for shard_path in shard_paths:
+                    self._record_existing_csv_file("flights", shard_path)
+                return shard_paths
+
+            repaired = self.repair_reusable_layout()
+            if repaired and isinstance(repaired.get("flights"), list):
+                return repaired["flights"]
+
+            return self._generate_flights_shards()
+
+        if not flights_path.exists():
+            self._generate_flights_csv(flights_path)
+        elif flights_path not in self._table_file_row_counts:
+            self._record_existing_csv_file("flights", flights_path)
+        return flights_path
+
+    def _should_use_sharded_flights(self) -> bool:
+        """Return True when FlightData volume should avoid a single large CSV stream."""
+        return self._num_months >= MONTHS_PER_SCALE_FACTOR
+
+    def _remove_flights_outputs(self, flights_path: Path) -> None:
+        """Remove stale FlightData fact outputs before force regeneration."""
+        with contextlib.suppress(OSError):
+            flights_path.unlink()
+        for candidate in self.output_dir.glob("flights.csv.*"):
+            with contextlib.suppress(OSError):
+                candidate.unlink()
+        shutil.rmtree(self._flights_shard_dir(), ignore_errors=True)
+
+    def _flights_shard_dir(self) -> Path:
+        return self.output_dir / FLIGHTS_SHARD_DIRNAME
+
+    def _existing_flight_shards(self) -> list[Path]:
+        shard_dir = self._flights_shard_dir()
+        if not shard_dir.is_dir():
+            return []
+        return sorted(path for path in shard_dir.glob(f"{FLIGHTS_SHARD_PREFIX}*.csv*") if path.is_file())
+
+    def _existing_reference_path(self, table_name: str) -> Path | None:
+        for candidate in sorted(self.output_dir.glob(f"{table_name}.csv*")):
+            if candidate.is_file():
+                return candidate
+        return None
+
+    def _find_legacy_single_flights_path(self) -> Path | None:
+        manifest_path = self.output_dir / "_datagen_manifest.json"
+        if manifest_path.exists():
+            with contextlib.suppress(Exception):
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                flights_data = manifest.get("tables", {}).get("flights")
+                formats = flights_data.get("formats", {}) if isinstance(flights_data, dict) else {}
+                entries = [entry for fmt_entries in formats.values() for entry in (fmt_entries or [])]
+                if len(entries) == 1:
+                    rel = entries[0].get("path")
+                    if rel:
+                        path = self.output_dir / rel
+                        if path.is_file() and path.name.startswith("flights.csv"):
+                            return path
+
+        for candidate in sorted(self.output_dir.glob("flights.csv*")):
+            if candidate.is_file():
+                return candidate
+        return None
+
+    def _generate_flights_csv(self, output_path: Path) -> int:
         """Generate flights CSV by downloading BTS data or using synthetic fallback.
 
         Args:
@@ -284,7 +408,183 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                 self._stats["total_flights"] += rows_written
 
         self._table_row_counts["flights"] = self._stats["total_flights"]
+        self._table_file_row_counts[output_path] = self._stats["total_flights"]
         self.log_verbose(f"Wrote {self._stats['total_flights']:,} flights to {output_path}")
+        return self._stats["total_flights"]
+
+    def _generate_flights_shards(self) -> list[Path]:
+        """Generate one deterministic flights CSV shard per source month."""
+        self.log_verbose(f"Generating sharded flight data for {self._num_months} months (SF={self.scale_factor})")
+        shard_dir = self._flights_shard_dir()
+        shutil.rmtree(shard_dir, ignore_errors=True)
+        shard_dir.mkdir(parents=True, exist_ok=True)
+
+        shard_paths: list[Path] = []
+        flight_id = 1
+        for shard_index, (year, month) in enumerate(self._months, start=1):
+            shard_name = self.get_compressed_filename(f"{FLIGHTS_SHARD_PREFIX}{shard_index:04d}_{year}_{month:02d}.csv")
+            shard_path = shard_dir / shard_name
+            rows_written = self._write_flights_shard(shard_path, year, month, flight_id)
+            flight_id += rows_written
+            self._stats["total_flights"] += rows_written
+            self._table_file_row_counts[shard_path] = rows_written
+            shard_paths.append(shard_path)
+
+        self._table_row_counts["flights"] = self._stats["total_flights"]
+        self.log_verbose(f"Wrote {self._stats['total_flights']:,} flights across {len(shard_paths)} shards")
+        return shard_paths
+
+    def _write_flights_shard(self, shard_path: Path, year: int, month: int, flight_id: int) -> int:
+        with self.open_output_file(shard_path, "wt") as f:
+            writer = csv.writer(f)
+            writer.writerow(self._flight_header())
+            return self._process_month(writer, year, month, flight_id)
+
+    @staticmethod
+    def _flight_header() -> list[str]:
+        """Return the CSV header matching FLIGHT_SCHEMA columns."""
+        return [
+            "flight_id",
+            "flight_date",
+            "year",
+            "month",
+            "day_of_month",
+            "day_of_week",
+            "reporting_airline",
+            "flight_number",
+            "origin",
+            "dest",
+            "crs_dep_time",
+            "dep_time",
+            "dep_delay",
+            "crs_arr_time",
+            "arr_time",
+            "arr_delay",
+            "cancelled",
+            "cancellation_code",
+            "diverted",
+            "crs_elapsed_time",
+            "actual_elapsed_time",
+            "air_time",
+            "distance",
+            "carrier_delay",
+            "weather_delay",
+            "nas_delay",
+            "security_delay",
+            "late_aircraft_delay",
+        ]
+
+    def _split_existing_flights_file(self, legacy_path: Path) -> list[Path]:
+        """Split an existing single FlightData CSV into loader-friendly shards."""
+        staging_dir = self.output_dir / ".flights-shards.tmp"
+        final_dir = self._flights_shard_dir()
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        staging_dir.mkdir(parents=True, exist_ok=True)
+
+        shard_paths: list[Path] = []
+        shard_counts: dict[Path, int] = {}
+        shard_index = 0
+        rows_in_shard = 0
+        target_cm: Any = None
+        target_f: Any = None
+        writer: csv.writer | None = None
+
+        def close_target() -> None:
+            nonlocal target_cm, target_f, writer, rows_in_shard
+            if target_cm is not None:
+                target_cm.__exit__(None, None, None)
+            target_cm = None
+            target_f = None
+            writer = None
+            rows_in_shard = 0
+
+        def open_target(header: list[str]) -> tuple[csv.writer, Path]:
+            nonlocal target_cm, target_f, shard_index, rows_in_shard
+            shard_index += 1
+            shard_name = self.get_compressed_filename(f"{FLIGHTS_SHARD_PREFIX}{shard_index:04d}.csv")
+            shard_path = staging_dir / shard_name
+            target_cm = self.open_output_file(shard_path, "wt")
+            target_f = target_cm.__enter__()
+            shard_writer = csv.writer(target_f)
+            shard_writer.writerow(header)
+            rows_in_shard = 0
+            shard_paths.append(shard_path)
+            shard_counts[shard_path] = 0
+            return shard_writer, shard_path
+
+        try:
+            with self._open_existing_csv_for_read(legacy_path) as source:
+                reader = csv.reader(source)
+                header = next(reader, self._flight_header())
+                current_path: Path | None = None
+                for row in reader:
+                    if writer is None or rows_in_shard >= FLIGHTS_SHARD_ROW_TARGET:
+                        close_target()
+                        writer, current_path = open_target(header)
+                    writer.writerow(row)
+                    rows_in_shard += 1
+                    assert current_path is not None
+                    shard_counts[current_path] += 1
+                    self._stats["total_flights"] += 1
+        finally:
+            close_target()
+
+        shutil.rmtree(final_dir, ignore_errors=True)
+        staging_dir.replace(final_dir)
+
+        final_paths: list[Path] = []
+        final_counts: dict[Path, int] = {}
+        for shard_path in shard_paths:
+            final_path = final_dir / shard_path.name
+            final_paths.append(final_path)
+            final_counts[final_path] = shard_counts[shard_path]
+            self._table_file_row_counts[final_path] = shard_counts[shard_path]
+
+        self._table_row_counts["flights"] = sum(final_counts.values())
+        return final_paths
+
+    def _open_existing_csv_for_read(self, path: Path) -> Any:
+        compression_type = self.compression_manager.detect_compression(path)
+        compressor = self.compression_manager.get_compressor(compression_type)
+        return compressor.open_for_read(path, "rt")
+
+    def _record_existing_csv_file(self, table_name: str, path: Path) -> None:
+        if path in self._table_file_row_counts:
+            return
+        row_count = self._count_csv_rows(path)
+        self._table_row_counts[table_name] = self._table_row_counts.get(table_name, 0) + row_count
+        self._table_file_row_counts[path] = row_count
+
+    def _count_csv_rows(self, path: Path) -> int:
+        with self._open_existing_csv_for_read(path) as f:
+            return max(0, sum(1 for _ in f) - 1)
+
+    def _write_manifest(self, table_files: dict[str, Path | list[Path]]) -> None:
+        manifest = DataGenerationManifest(
+            output_dir=self.output_dir,
+            benchmark="flightdata",
+            scale_factor=self.scale_factor,
+            compression=resolve_compression_metadata(self),
+            parallel=1,
+            seed=self.seed,
+            formats=["csv"],
+        )
+        metadata = {
+            "csv_delimiter": ",",
+            "csv_has_header": True,
+            "csv_null_marker": None,
+        }
+        for table_name, paths_or_path in table_files.items():
+            paths = paths_or_path if isinstance(paths_or_path, list) else [paths_or_path]
+            for path in paths:
+                manifest.add_entry(
+                    table_name,
+                    path,
+                    row_count=self._table_file_row_counts.get(path, 0),
+                    format="csv",
+                    metadata=metadata,
+                )
+        manifest.write()
 
     def _process_month(self, writer: csv.writer, year: int, month: int, start_id: int) -> int:
         """Attempt to download BTS data for one month, fall back to synthetic.

@@ -518,3 +518,53 @@ def test_multi_format_tracked_directory_not_flagged_as_collision(
     dummy.generate_data.assert_not_called()
     out = capsys.readouterr().out
     assert "Reusing benchmark data" in out
+
+
+def test_shards_inside_table_named_directory_not_flagged_as_collision(
+    tmp_path: Path, benchmark_config: BenchmarkConfig, capsys: pytest.CaptureFixture[str]
+):
+    """A table directory is recorded when manifest entries live beneath it."""
+    shard_dir = tmp_path / "lineitem"
+    shard_dir.mkdir()
+    shard = shard_dir / "part-0001.csv"
+    shard.write_text("1,sample\n")
+
+    manifest = {
+        "benchmark": "tpcds",
+        "scale_factor": 0.01,
+        "compression": {"enabled": False, "type": None, "level": None},
+        "parallel": 1,
+        "created_at": "2025-01-01T00:00:00Z",
+        "generator_version": "test",
+        "format_preference": ["csv"],
+        "tables": {
+            "lineitem": {
+                "formats": {
+                    "csv": [
+                        {
+                            "path": "lineitem/part-0001.csv",
+                            "size_bytes": shard.stat().st_size,
+                            "row_count": 1,
+                        }
+                    ]
+                }
+            }
+        },
+    }
+    with (tmp_path / "_datagen_manifest.json").open("w") as fh:
+        json.dump(manifest, fh)
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = None
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is False, "Shards under a table directory should validate and reuse"
+    dummy.generate_data.assert_not_called()
+    assert dummy.tables == {"lineitem": shard}
+    out = capsys.readouterr().out
+    assert "Reusing benchmark data" in out

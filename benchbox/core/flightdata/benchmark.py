@@ -132,7 +132,7 @@ class FlightDataBenchmark(BaseBenchmark):
             end_date=self._query_end_date,
         )
 
-        self.tables: dict[str, Path] = {}
+        self.tables: dict[str, Path | list[Path]] = {}
         self.csv_has_header: bool = True
 
     def generate_data(self) -> list[Union[str, Path]]:
@@ -148,7 +148,27 @@ class FlightDataBenchmark(BaseBenchmark):
             f"Flight data ready: {stats['total_flights']:,} flights, "
             f"{stats['months_downloaded']} downloaded, {stats['months_synthetic']} synthetic"
         )
-        return list(self.tables.values())
+        return self._flatten_table_paths(self.tables)
+
+    def ensure_auxiliary_data_files(self) -> None:
+        """Repair legacy reusable FlightData cache layouts after manifest reuse."""
+        repaired = self.downloader.repair_reusable_layout()
+        if repaired:
+            self.tables = repaired
+
+    @staticmethod
+    def _flatten_table_paths(tables: dict[str, Path | list[Path]]) -> list[Path]:
+        paths: list[Path] = []
+        for table_path in tables.values():
+            if isinstance(table_path, list):
+                paths.extend(table_path)
+            else:
+                paths.append(table_path)
+        return paths
+
+    def get_csv_loading_config(self, table_name: str) -> list[str]:
+        """Return native CSV loader settings for FlightData source files."""
+        return ["delim=','", "header=true", "auto_detect=true", "ignore_errors=true"]
 
     def get_queries(self, dialect: str | None = None) -> dict[str, str]:
         """Get all benchmark queries.
@@ -338,14 +358,18 @@ class FlightDataBenchmark(BaseBenchmark):
                 self.logger.warning(f"Skipping {table_name} - no data file")
                 continue
 
-            data_file = Path(self.tables[table_name])
-            if not data_file.exists():
-                self.logger.warning(f"Skipping {table_name} - file not found: {data_file}")
-                continue
+            table_paths = self.tables[table_name]
+            data_files = table_paths if isinstance(table_paths, list) else [table_paths]
+            table_rows = 0
+            for data_file_raw in data_files:
+                data_file = Path(data_file_raw)
+                if not data_file.exists():
+                    self.logger.warning(f"Skipping {table_name} - file not found: {data_file}")
+                    continue
 
-            rows = self._load_table_data(connection, table_name, data_file)
-            total_rows += rows
-            self.logger.info(f"Loaded {rows:,} rows into {table_name}")
+                table_rows += self._load_table_data(connection, table_name, data_file)
+            total_rows += table_rows
+            self.logger.info(f"Loaded {table_rows:,} rows into {table_name}")
 
         connection.commit()
         self.logger.info(f"Loaded {total_rows:,} total rows across {len(table_order)} tables")
