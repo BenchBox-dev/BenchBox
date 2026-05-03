@@ -179,6 +179,35 @@ terminal-state additions (its `verification` block names "PR is merged"
 unambiguously, but `success_metrics` and prose don't say so). Don't
 retrofit Completed UATs.
 
+## 2.5 Strongest argument for dropping each remediation
+
+Adversarial framing inserted at the spec level so a user reading only
+this document sees both the recommendation and the counter-case (full
+analysis in W3 stress-test handoff):
+
+- **Drop Finding 1's coverage_checklist?** "It's a glorified checklist
+  that duplicates what a competent W7 reviewer already does. The
+  2026-05-02 W7 reviewer caught the cross-scale gap during the L2 audit
+  step *of this very review* — without the checklist." Counter: the L2
+  audit caught it post-hoc. The checklist front-loads the obligation.
+- **Drop Finding 2's validator-clean rate?** "It's downstream of
+  underlying contract bugs (normalised cost, zero query timings); the
+  rate is a symptom, not a cause. Filing the contract-bug TODOs already
+  addresses the failure; the rate metric is decorative." Counter: a
+  sweep that produces a 45% invalid corpus still ships a misleading W3
+  success count. The rate makes the discrepancy visible at the same
+  time as the success count.
+- **Drop Finding 3's terminal-state vocab + gating questions?**
+  "Solvable by clearer prose. `gating: true` is achievable by moving
+  the question into `must_preserve` or `description`. The proposal adds
+  structure for a problem solvable by better authoring discipline."
+  Counter: 'better authoring discipline' is exactly what the parent
+  UAT had and the gap still happened. The structured `affects:` link
+  is the part prose alone cannot replicate.
+
+None of these counter-cases overrode the recommendation, but the user
+should see them when deciding.
+
 ## 3. Template diff preview
 
 No textual diff against `_project/TODO_ENTRY_TEMPLATE.yaml` is mandatory
@@ -257,9 +286,21 @@ TODOs filed in W5; this diff preview is for user review.
 
 ## 5. Open questions for the user
 
-Each question below has a stated default and a stated consequence.
-The W4 deliverable is ready to ship as-is on the defaults; user input
-overrides where indicated.
+**Approval protocol.** Reply yes/no per question (or "accept defaults"
+to take all four defaults). Anything not addressed defaults to the
+"Default" line below. Partial-acceptance cascades:
+- Reject Q1 wholesale → W5 cancelled; close this TODO with the spec as
+  the deliverable.
+- Reject any one finding via Q1 → corresponding implementation TODO in
+  Section 6 is dropped from W5; the other two proceed.
+- Reject Q2 → skip the `external-contributor-submission-dry-run`
+  retrofit; everything else unchanged.
+- Choose "three TODOs" on Q3 → file the optional
+  `uat-template-coverage-checklist-tooling` in addition.
+- Choose "now" on Q4 → file the optional `uat-template-subtemplate-extract`.
+
+Each question below has a stated default, stated consequence, and (where
+relevant) a recommendation:
 
 1. **Accept all three remediations with W3 scoping refinements?**
    - Default: yes (W3 stress-test concluded all three survive).
@@ -327,11 +368,13 @@ If user picks "promote subtemplate now":
 - `_project/handoffs/uat-methodology-w3-stress-test.md` — replay
   against three historical UATs plus adversarial "argument for
   dropping" framing per proposal.
-- Source blind-spot files: `_project/blind-spots/2026-05-03-08192{0,1,2}-*.md`
-- Review-time blind-spot findings produced by this work (recorded but
-  not yet swept):
+- Source blind-spot findings (the three UAT-methodology gaps this plan
+  addresses): `_project/blind-spots/2026-05-03-08192{0,1,2}-*.md`
+- **Meta-findings** produced *during* this work (recorded but not yet
+  swept; about how the work was reviewed, not about the source UAT):
   `_project/blind-spots/2026-05-03-083859-proposals-doc-decidability-gap.md`,
-  `_project/blind-spots/2026-05-03-084354-stress-test-self-bias.md`
+  `_project/blind-spots/2026-05-03-084354-stress-test-self-bias.md`,
+  `_project/blind-spots/2026-05-03-084923-spec-approval-ergonomics.md`
 - 2026-05-02 sweep retrospective:
   `_project/handoffs/results-explorer-uat-retrospective-20260502.md`
 - Parent UAT TODO (Completed):
