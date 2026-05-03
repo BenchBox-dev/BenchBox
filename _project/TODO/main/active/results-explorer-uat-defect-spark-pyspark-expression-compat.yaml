@@ -56,7 +56,7 @@ work:
 - id: w2
   summary: "Fix the highest-impact shared Spark/PySpark compatibility cluster"
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Add regression coverage for the fixed cluster"
   needs: [w2]
