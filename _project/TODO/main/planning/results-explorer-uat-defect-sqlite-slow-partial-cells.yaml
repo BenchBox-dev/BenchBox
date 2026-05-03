@@ -1,0 +1,45 @@
+id: results-explorer-uat-defect-sqlite-slow-partial-cells
+title: "UAT defect: SQLite slow cells and partial-result handling"
+worktree: main
+priority: "Medium"
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  SQLite had several UAT failures and timeouts in TPC-H-source workloads, TPC-DS
+  OBT exited 137, and some cells returned passed status while query-level
+  failures were present. This should be separated from the shared partial-success
+  status contract because SQLite also has platform-specific performance and
+  compatibility behavior to classify.
+
+work:
+- id: w1
+  summary: "Separate SQLite platform defects from the shared partial-success contract"
+  status: pending
+- id: w2
+  summary: "Fix or document the highest-impact SQLite-specific timeout/partial cluster"
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Add SQLite-specific regression or skip classification coverage"
+  needs: [w2]
+  status: pending
+
+verification:
+- description: "SQLite smoke terminates with correct pass/fail/skip classification."
+  command: "uv run -- benchbox run --platform sqlite --benchmark tpch --scale 0.01 --phases load,power --non-interactive"
+  expected_output: "completed result or explicit classified failure"
+- description: "Fast tests remain green."
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all selected tests pass"
+
+must_preserve:
+- "SQLite adapter remains dependency-light and local-only."
+- "Shared status-contract fixes are not duplicated in SQLite-specific code."
+
+anti_patterns:
+- "DO NOT mask SQLite query failures as successful benchmark cells -- because Explorer publication depends on honest status."
+
+metadata:
+  tags: [uat, sqlite, partial-results]
+  created_date: "2026-05-03"

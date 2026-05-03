@@ -2,7 +2,8 @@ id: results-explorer-uat-multi-scale-corpus-sweep
 title: "Results Explorer UAT: multi-scale, multi-platform corpus sweep"
 worktree: main
 priority: "Medium-High"
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-05-03"
 category: "Testing and Quality Assurance"
 
 deps:
@@ -507,7 +508,7 @@ work:
 - id: w7
   summary: "Write report, file follow-up TODOs, retire run logs"
   needs: [w4, w5, w6]
-  status: pending
+  status: done
   notes: |
     Produce a single report (delivered in chat to the user) with:
       1. Run matrix summary -- table of (platform x scale) cells per
@@ -533,6 +534,32 @@ work:
     Save the run logs directory
     (`~/Developer/benchmark_runs/logs/uat_<YYYYMMDD>/`) for ~30 days,
     then prune. Do not check logs into the repo.
+
+    Completion record (2026-05-03):
+      - Filed 14 follow-up TODOs under `_project/TODO/main/planning/`
+        for the above-nit UAT clusters:
+        `results-explorer-uat-defect-partial-success-exit-contract`,
+        `results-explorer-uat-defect-flightdata-sf1-corpus-integrity`,
+        `results-explorer-uat-defect-dask-resource-envelope`,
+        `results-explorer-uat-defect-spark-pyspark-expression-compat`,
+        `results-explorer-uat-defect-local-platform-provisioning`,
+        `results-explorer-uat-defect-sqlite-slow-partial-cells`,
+        `results-explorer-uat-defect-duckdb-clickbench-load`,
+        `results-explorer-uat-defect-normalized-cost-unavailable-bundles`,
+        `results-explorer-uat-defect-zero-query-timing-bundles`,
+        `results-explorer-uat-defect-submit-dry-run-validation-parity`,
+        `results-explorer-uat-defect-submission-batch-path-affordances`,
+        `results-explorer-uat-defect-explorer-build-output-contract-docs`,
+        `results-explorer-uat-defect-query-facet-label-ambiguity`,
+        and `results-explorer-uat-defect-environment-facet-cloud-coverage`.
+      - Retained run logs and external explorer UAT artifacts under
+        `~/Developer/benchmark_runs/logs/uat_20260502/` and
+        `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/`.
+        Do not check those artifacts into the repo. Prune them after
+        roughly 30 days once follow-up TODO owners no longer need
+        per-run evidence.
+      - Verified the follow-up TODO YAML files and dependency graph
+        before marking W7 done.
 
 verification:
 - description: "Run logs directory exists with at least one log per attempted (platform, benchmark, scale) cell. Drop a sentinel

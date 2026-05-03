@@ -1,0 +1,44 @@
+id: results-explorer-uat-defect-normalized-cost-unavailable-bundles
+title: "UAT defect: submitted bundles emit cost totals with unavailable cost status"
+worktree: main
+priority: "High"
+status: "Not Started"
+category: "Core Functionality"
+
+description: |
+  W5 full-package validation rejected many bundles because `cost.total_usd` was
+  present while `cost_status` was `unavailable`. The validation log reported 134
+  occurrences of this normalized-cost contract error. These bundles were excluded
+  from the validator-clean Explorer UAT subset.
+
+work:
+- id: w1
+  summary: "Trace normalized-cost emission for local and unavailable-cost results"
+  status: pending
+- id: w2
+  summary: "Align bundle export with the hosted-results cost contract"
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Add export/submission validation regression coverage"
+  needs: [w2]
+  status: pending
+
+verification:
+- description: "Submission validator accepts a local no-cost bundle without cost totals."
+  command: "uv run -- python scripts/validate_submission.py results-data/bundles"
+  expected_output: "no normalized-cost unavailable errors"
+- description: "Fast tests remain green."
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all selected tests pass"
+
+must_preserve:
+- "Normalized cost remains present for genuinely normalized cloud-cost results."
+- "Local results remain visibly cost-unavailable rather than pretending to be zero-cost cloud runs."
+
+anti_patterns:
+- "DO NOT set unavailable costs to 0 USD -- because that creates false leaderboard semantics -- omit totals or mark them using the explicit unavailable payload."
+
+metadata:
+  tags: [uat, submission, normalized-cost]
+  created_date: "2026-05-03"

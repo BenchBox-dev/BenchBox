@@ -1,0 +1,45 @@
+id: results-explorer-uat-defect-environment-facet-cloud-coverage
+title: "UAT defect: local corpus cannot validate cloud and runtime environment facets"
+worktree: main
+priority: "Medium"
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  W6 validated environment facet rendering/filtering mechanics, but the local
+  validator-clean corpus had 205 `deployment_class=local` rows and
+  `unknown`-only cloud provider, cloud region, and instance/warehouse facets.
+  That means the Results Explorer still lacks UAT coverage for true cloud,
+  container, embedded, region, and compute-shape differentiation.
+
+work:
+- id: w1
+  summary: "Define the minimal cloud/provisioned-local corpus needed for environment facet UAT"
+  status: pending
+- id: w2
+  summary: "Generate or stage safe fixture rows covering cloud/container/runtime facets"
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Run terminating Explorer browser smoke against the facet-coverage corpus"
+  needs: [w2]
+  status: pending
+
+verification:
+- description: "Explorer snapshot contains non-unknown environment facet values."
+  command: "uv run -- benchbox explorer build --data-dir results-data --output /tmp/benchbox-explorer-facet-smoke"
+  expected_output: "snapshot includes cloud/provider/region or provisioned runtime facet rows"
+- description: "Browser smoke validates environment facet filtering without npm dev server."
+  command: "cd results-explorer && npm run test:e2e:chromium -- --grep Query"
+  expected_output: "Query/environment facet browser coverage passes"
+
+must_preserve:
+- "No live cloud run is started without explicit approval and cost awareness."
+- "Trust labels distinguish synthetic fixtures, community submissions, and maintainer runs."
+
+anti_patterns:
+- "DO NOT fake public cloud results as maintainer-curated benchmark records -- because that corrupts corpus trust -- use fixture-only rows or clearly labeled submissions."
+
+metadata:
+  tags: [uat, results-explorer, environment-facets, cloud]
+  created_date: "2026-05-03"

@@ -382,3 +382,78 @@ Cleanup state after W6:
 
 - `~/Developer/benchmark_runs/databases/` still had no loaded benchmark database artifacts.
 - W6 generated only external explorer build/smoke artifacts under `~/Developer/benchmark_runs/explorer_uat/`.
+
+## W7 Follow-Up TODOs And Final Report
+
+Filed follow-up TODOs:
+
+| Cluster | TODO |
+| --- | --- |
+| Passed cells hiding query failures | `results-explorer-uat-defect-partial-success-exit-contract` |
+| FlightData SF1 corpus/loader failures | `results-explorer-uat-defect-flightdata-sf1-corpus-integrity` |
+| Dask resource spikes / exit 137 | `results-explorer-uat-defect-dask-resource-envelope` |
+| Spark/PySpark expression compatibility | `results-explorer-uat-defect-spark-pyspark-expression-compat` |
+| Lakesail/Modin/TCP local provisioning | `results-explorer-uat-defect-local-platform-provisioning` |
+| SQLite slow/partial cells | `results-explorer-uat-defect-sqlite-slow-partial-cells` |
+| DuckDB ClickBench load failure | `results-explorer-uat-defect-duckdb-clickbench-load` |
+| Cost totals with unavailable cost status | `results-explorer-uat-defect-normalized-cost-unavailable-bundles` |
+| All-zero query timings | `results-explorer-uat-defect-zero-query-timing-bundles` |
+| Submit dry-run validation parity | `results-explorer-uat-defect-submit-dry-run-validation-parity` |
+| Submit batch/path affordances | `results-explorer-uat-defect-submission-batch-path-affordances` |
+| Explorer build output contract docs | `results-explorer-uat-defect-explorer-build-output-contract-docs` |
+| Query facet accessible-label ambiguity | `results-explorer-uat-defect-query-facet-label-ambiguity` |
+| Environment/cloud facet coverage gap | `results-explorer-uat-defect-environment-facet-cloud-coverage` |
+
+### Final Report
+
+Run matrix summary:
+
+- Candidate cells: 1,530.
+- Real attempted terminal cells: 527.
+- Latest-status outcomes: 434 passed, 85 failed, 8 timed out at 600 seconds, 133 skipped by scale-ladder pruning, and 870
+  skipped because TCP-backed local services were unreachable.
+- Captured result JSON paths: 388, all present on disk. The 46 early DuckDB passed cells without captured paths predate the
+  extractor improvement and remain recoverable from logs/results if needed.
+
+Submitted results:
+
+- Attempted 388 captured result paths through `benchbox submit --output`.
+- Packaged 376 bundles; refused 12 TPC-DS results via compliance guardrails.
+- Full package validation failed with 188 errors / 212 warnings across 171 failing bundles.
+- Validator-clean subset for Explorer UAT contains 205 bundles and 205 manifests.
+- No hosted upload, no irreversible publish, and no `results-data/` PR was opened from this run.
+
+Fixes applied during the run:
+
+- No benchmark, adapter, datagen, platform, Results Explorer, or result-corpus fixes were applied. This TODO was intentionally
+  observational.
+- Operational cleanup was added during W3: reusable datagen was preserved, while loaded local databases and Spark warehouses
+  were pruned at safe reuse boundaries. Post-W6, no loaded database artifacts remained under
+  `~/Developer/benchmark_runs/databases/`.
+
+Deferred failures:
+
+- Environment/provisioning: 870 TCP-backed skipped cells, Lakesail missing `pysail`/Sail server, and Modin missing runtime
+  setup.
+- Resource/too-slow: Dask exit 137/resource spikes and eight 600-second timeouts.
+- Engineering defects: partial-success exits, FlightData SF1 corpus integrity, Spark/PySpark expression/Parquet/TPCHavoc
+  issues, SQLite slow/partial behavior, DuckDB ClickBench load nullability, normalized-cost invalid bundles, and all-zero query
+  timing bundles.
+
+Explorer and submission UAT findings:
+
+- Submission dry-run does not run the same publish-blocking validations as `scripts/validate_submission.py`.
+- Submission flow lacks a first-class batch path and exact-result-path affordance.
+- Explorer build help/docs still mention removed `manifest.json` output.
+- Query facets render and filter correctly on the 205-row corpus, but accessible labels can be ambiguous across similarly
+  named facet values.
+- Local-only corpus validates rendering mechanics but not true cloud/provider/region/compute-shape differentiation.
+- The static server returns 404 for `/results/favicon.svg`; this is a nit and no TODO was filed solely for it.
+
+Environment notes:
+
+- Host had Docker reachable, no running containers, 10 CPU cores, and sufficient disk under the user-defined 5 GiB hard stop.
+- Free space is telemetry unless it falls below 5 GiB. Database cleanup, not a 40 GiB cutoff, is the control for bounded disk
+  growth.
+- Run logs stay external under `~/Developer/benchmark_runs/logs/uat_20260502/`; browser UAT artifacts stay under
+  `~/Developer/benchmark_runs/explorer_uat/uat_20260502_valid/`. Keep for roughly 30 days, then prune.

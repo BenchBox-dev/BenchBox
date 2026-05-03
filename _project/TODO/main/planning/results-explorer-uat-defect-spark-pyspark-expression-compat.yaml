@@ -1,0 +1,44 @@
+id: results-explorer-uat-defect-spark-pyspark-expression-compat
+title: "UAT defect: Spark and PySpark expression compatibility failures"
+worktree: main
+priority: "Medium-High"
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  Spark SQL and PySpark DataFrame had multiple UAT failures: strict identifier
+  retry issues, missing `dual`, illegal Parquet `TIME(MILLIS,false)`, unresolved
+  TPCHavoc supplier columns, scalar-subquery grouping problems, and read
+  primitives expression failures.
+
+work:
+- id: w1
+  summary: "Cluster Spark/PySpark failures by owning translator, loader, or query family"
+  status: pending
+- id: w2
+  summary: "Fix the highest-impact shared Spark/PySpark compatibility cluster"
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Add regression coverage for the fixed cluster"
+  needs: [w2]
+  status: pending
+
+verification:
+- description: "Representative Spark/PySpark smoke for the fixed cluster passes."
+  command: "uv run -- python -m pytest tests -k 'spark or pyspark' -q"
+  expected_output: "targeted Spark/PySpark tests pass"
+- description: "Fast tests remain green."
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all selected tests pass"
+
+must_preserve:
+- "Spark-specific fixes do not change SQL emitted for unrelated platforms."
+- "Optional Spark/PySpark dependencies remain lazy."
+
+anti_patterns:
+- "DO NOT fix by weakening validation globally -- because failures are engine/query-family specific -- keep changes scoped to the owning translator or loader path."
+
+metadata:
+  tags: [uat, spark, pyspark, compatibility]
+  created_date: "2026-05-03"
