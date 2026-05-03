@@ -94,6 +94,16 @@ benchbox platforms list
 benchbox platforms status databricks
 ```
 
+**Check local provisioning readiness before a run:**
+```bash
+benchbox platforms check clickhouse-server trino lakesail-df modin-df
+benchbox platforms status lakesail-df
+```
+
+The readiness check reports unreachable local service ports, LakeSail Spark Connect endpoints, and missing Modin
+backend packages as environment readiness gaps. It does not start services, initialize Ray/Dask, or mutate benchmark
+databases.
+
 **Install missing libraries for a platform (guided):**
 ```bash
 benchbox platforms install bigquery

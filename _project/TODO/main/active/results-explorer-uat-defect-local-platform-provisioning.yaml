@@ -39,7 +39,7 @@ work:
 - id: w2
   summary: "Add or improve readiness diagnostics and documentation"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Work-unit-owned files before editing:
     - `benchbox/cli/platform_readiness.py` (new side-effect-free readiness probes)
@@ -48,6 +48,11 @@ work:
     - `docs/platforms/quick-reference.md`
     - `docs/platforms/lakesail.md`
     - `docs/platforms/modin-dataframe.md`
+    Process cleanup:
+    - Check free space before and after verification. If available space is below 40GB, remove loaded local database
+      artifacts under `benchmark_runs/databases/` when present, but preserve reusable generated data under
+      `benchmark_runs/datagen/` because TPC-H and derived/read-primitive runs can reuse it. Stop only if available
+      space falls below 5GB.
 - id: w3
   summary: "Verify unreachable/missing-runtime paths are classified as environment skips"
   needs: [w2]
