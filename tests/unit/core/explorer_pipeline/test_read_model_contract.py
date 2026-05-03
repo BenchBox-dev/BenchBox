@@ -237,7 +237,14 @@ class TestDisplayGeomean:
 
 
 class TestRankingEligibility:
-    def _make_entry(self, trust_label: str, visibility: str) -> ManifestEntry:
+    def _make_entry(
+        self,
+        trust_label: str,
+        visibility: str,
+        *,
+        validation_status: str | None = None,
+        failed_query_count: int = 0,
+    ) -> ManifestEntry:
         return ManifestEntry(
             result_id="x",
             benchmark="tpch",
@@ -250,6 +257,8 @@ class TestRankingEligibility:
             query_count=22,
             trust_label=trust_label,
             visibility=visibility,
+            validation_status=validation_status,
+            failed_query_count=failed_query_count,
         )
 
     def test_maintainer_run_public_curated_is_eligible(self) -> None:
@@ -274,6 +283,14 @@ class TestRankingEligibility:
         entry = self._make_entry("maintainer-run", "public-self-reported")
         assert is_ranking_eligible(entry) is False
 
+    def test_partial_query_failure_count_is_not_ranking_eligible(self) -> None:
+        entry = self._make_entry("maintainer-run", "public-curated", failed_query_count=1)
+        assert is_ranking_eligible(entry) is False
+
+    def test_partial_validation_status_is_not_ranking_eligible(self) -> None:
+        entry = self._make_entry("maintainer-run", "public-curated", validation_status="partial")
+        assert is_ranking_eligible(entry) is False
+
     def test_ranking_eligible_visibilities_constant(self) -> None:
         assert "public-curated" in RANKING_ELIGIBLE_VISIBILITIES
         assert "public-verified" in RANKING_ELIGIBLE_VISIBILITIES
@@ -294,6 +311,8 @@ class TestSelectCanonicalRow:
         run_date: str,
         trust_label: str = "maintainer-run",
         visibility: str = "public-curated",
+        failed_query_count: int = 0,
+        validation_status: str | None = None,
     ) -> ManifestEntry:
         return ManifestEntry(
             result_id=f"x-{run_date}",
@@ -307,6 +326,8 @@ class TestSelectCanonicalRow:
             query_count=22,
             trust_label=trust_label,
             visibility=visibility,
+            failed_query_count=failed_query_count,
+            validation_status=validation_status,
         )
 
     def test_returns_none_for_empty_list(self) -> None:
@@ -343,6 +364,16 @@ class TestSelectCanonicalRow:
         non_eligible_newest = self._make_entry("2026-12-01", "community-submission", "public-self-reported")
         result = select_canonical_row([eligible_older, eligible_newer, non_eligible_newest])
         assert result is eligible_newer  # newest eligible, not newest overall
+
+    def test_clean_row_wins_over_newer_partial_query_failure(self) -> None:
+        clean_older = self._make_entry("2026-01-01")
+        partial_newer = self._make_entry(
+            "2026-12-01",
+            failed_query_count=1,
+            validation_status="partial",
+        )
+        result = select_canonical_row([partial_newer, clean_older])
+        assert result is clean_older
 
     def test_deterministic_when_date_and_eligibility_tied(self) -> None:
         """Result must not depend on input order when all keys except result_id tie."""

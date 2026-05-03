@@ -97,6 +97,25 @@ def test_submit_creates_output_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert (out_dir / "CONTRIBUTING.md").exists()
 
 
+def test_submit_refuses_partial_query_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / "tpch_duckdb_partial.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    partial = _fake_result()
+    partial.total_queries = 2
+    partial.successful_queries = 1
+    partial.failed_queries = 1
+    partial.validation_status = "PARTIAL"
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (partial, {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    assert result.exit_code == 1
+    assert "not a clean pass" in result.output
+    assert "1 failed query" in result.output
+    assert not out_dir.exists()
+
+
 # ---------------------------------------------------------------------------
 # 4b. Packaged CONTRIBUTING.md aligns with canonical docs/contributing-results.md
 #     (regression for dry-run-followup-package-canonical-contributing)

@@ -72,7 +72,7 @@ work:
 - id: w3
   summary: "Add regression coverage for mixed pass/fail query outcomes"
   needs: [w2]
-  status: pending
+  status: done
 
 verification:
 - description: "Targeted regression test proves query-level failures do not publish as clean passes."
