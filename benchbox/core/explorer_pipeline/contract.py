@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-EXPLORER_BUILD_CONTRACT_VERSION = "1"
+EXPLORER_BUILD_CONTRACT_VERSION = "2"
 
 EXPLORER_BUILD_CONTRACT = {
     "version": EXPLORER_BUILD_CONTRACT_VERSION,
@@ -13,6 +13,21 @@ EXPLORER_BUILD_CONTRACT = {
         "--trust-label",
         "--visibility",
     ],
+    "outputs": {
+        "required": [
+            "results.duckdb",
+            "results_schema.json",
+            "bundles/{result_id}.json",
+        ],
+        "removed_legacy": [
+            "manifest.json",
+            "benchmarks/",
+            "details/",
+            "compare/",
+            "meta_leaderboard.json",
+            "short_ids.json",
+        ],
+    },
 }
 
 __all__ = [

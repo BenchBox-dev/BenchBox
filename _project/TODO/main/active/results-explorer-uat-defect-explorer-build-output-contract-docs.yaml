@@ -35,7 +35,7 @@ work:
 - id: w2
   summary: "Update help/docs/tests to match the DuckDB-only read model"
   needs: [w1]
-  status: pending
+  status: done
 
 verification:
 - description: "Explorer build contract validation passes."
@@ -50,7 +50,8 @@ must_preserve:
 - "Existing `results.duckdb` browser loading remains unchanged."
 
 anti_patterns:
-- "DO NOT reintroduce manifest.json only to satisfy help text -- because the app migrated to DuckDB -- update the contract/docs instead."
+- "DO NOT reintroduce manifest.json only to satisfy help text -- because the app migrated to DuckDB -- update the contract/docs
+  instead."
 
 scope_limit:
   only_modify:

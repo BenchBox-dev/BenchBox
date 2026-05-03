@@ -86,7 +86,7 @@ RANKING_ELIGIBLE_TRUST_LABELS: frozenset[str] = frozenset(
 
 
 class ManifestEntry(BaseModel):
-    """One row in manifest.json - the nav index for the explorer."""
+    """One result row in the explorer browser read model."""
 
     result_id: str
     benchmark: str
@@ -121,7 +121,7 @@ class ManifestEntry(BaseModel):
 
 
 class QueryTiming(BaseModel):
-    """Per-query timing stored in a detail JSON file."""
+    """Per-query timing stored in the browser detail read model."""
 
     query_id: str
     duration_ms: float
@@ -140,7 +140,7 @@ class QueryDisplayTiming(BaseModel):
 
 
 class DetailResult(BaseModel):
-    """Full detail for a single result, written to details/{result_id}.json."""
+    """Full detail for a single result, used to populate DuckDB detail tables."""
 
     result_id: str
     benchmark: str
