@@ -221,3 +221,36 @@ Cluster these before filing follow-up defect TODOs:
   600-second cap.
 - TCP-backed SQL platforms: 15 platforms were skipped-unreachable because local ports were not listening; classify as local
   environment, not benchmark defects.
+
+## W4 Failure Triage
+
+Status: classified. No trivial config/syntax fix was applied in W4. The failures either require environment provisioning
+(`pysail`, Modin backend, TCP services), exceed the 600-second/local-resource budget, or require benchmark/platform code changes
+that are explicitly out of scope for this UAT TODO.
+
+| Bucket | Rows | Classification | Representative evidence |
+| --- | ---: | --- | --- |
+| TCP SQL platforms unreachable | 870 skipped | Environment | 15 TCP-backed platforms had closed local ports; no benchmark command was attempted. |
+| Lakesail | 22 failed, 36 pruned | Environment | `lakesail_tpch_0.01_20260502_183842.log:8`: missing `pysail` and no Sail server at `sc://localhost:50051`. |
+| Modin DataFrame | 20 failed, 32 pruned | Environment | `modin-df_tpch_0.01_20260502_212808.log:1`: platform unavailable due missing dependencies. |
+| Dask resource exits | 5 exit-137 failures | Environment/resource budget | Summary rows show exit 137 for TPC-H, TPC-DS SF 0.1, read primitives SF 1.0, FlightData, and TPCHavoc. |
+| 600-second timeouts | 8 timed out | Deferred too slow | DuckDB FlightData/TPCHavoc, ClickHouse Local read primitives, SQLite read/write/TPCHavoc, PySpark TPCHavoc, Dask ClickBench. |
+| FlightData corpus/loader failures | 8 failed, 1 timed out | Deferred engineering | `datafusion_flightdata_1.0_20260502_182841.log:13`, `clickhouse-local_flightdata_1.0_20260502_185846.log:15`, and `polars-df_flightdata_1.0_20260502_211319.log:8` all point to truncated/incomplete `flightdata_1.0/flights.csv.zst`. |
+| Partial-success cells | multiple passed rows | Deferred engineering | `spark_tpchavoc_0.1_20260502_205516.log:5910` reports 203 passed and 17 failed queries despite a passed cell; `pandas-df_read_primitives_1.0_20260502_211633.log:145` reports completed with failures. |
+| Spark/PySpark compatibility | 15 failed, 1 timed out | Deferred engineering | `spark_read_primitives_0.01_20260502_203844.log:18` strict identifier retry failure; `pyspark-df_tpcds_0.01_20260502_213449.log:17` illegal Parquet `TIME(MILLIS,false)`. |
+| SQLite compatibility/perf | 5 failed, 3 timed out | Deferred engineering | `sqlite_tpcds_obt_1.0_20260502_200038.log` ended with summary `exit=137`; several SQLite cells returned passed status with query-level failures. |
+| DuckDB ClickBench load | 1 failed | Deferred engineering | `duckdb_clickbench_1.0_20260502_164814.log:10` reports `NOT NULL constraint failed: hits.Referer`. |
+| DataFrame transaction primitives | 4 failed | Expected unsupported surface / deferred UX | `datafusion-df_transaction_primitives_0.01_20260502_223256.log:8` says transaction primitives require ACID support. |
+
+Follow-up TODO candidates for W7:
+
+- `results-explorer-uat-defect-partial-success-exit-contract`: passed cells must not hide query-level failures.
+- `results-explorer-uat-defect-flightdata-sf1-corpus-integrity`: repair or quarantine the truncated FlightData SF 1.0 corpus.
+- `results-explorer-uat-defect-dask-resource-envelope`: define Dask resource limits, spill cleanup, and exit-137 reporting.
+- `results-explorer-uat-defect-spark-pyspark-expression-compat`: group Spark/PySpark expression, Parquet, and TPCHavoc failures.
+- `results-explorer-uat-defect-local-platform-provisioning`: document or automate Lakesail, Modin, and TCP service readiness.
+- `results-explorer-uat-defect-sqlite-slow-partial-cells`: classify SQLite timeout and partial-result behavior.
+- `results-explorer-uat-defect-duckdb-clickbench-load`: ClickBench `Referer` NOT NULL load failure.
+
+No W4 changes were made to benchmark queries, dialect adapters, datagen, platform implementations, or the generated result
+corpus.

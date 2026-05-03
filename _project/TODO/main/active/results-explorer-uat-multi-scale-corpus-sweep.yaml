@@ -301,7 +301,7 @@ work:
 - id: w4
   summary: "Failure triage: fix trivia, log everything else"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     When a run fails, classify in this order. Do NOT spend more than
     ~5 minutes per failure on the first two buckets before deferring.
@@ -331,6 +331,20 @@ work:
     queries, dialect adapters, datagen code, or platform
     implementations to make a run pass. The corpus is only valuable
     if it reflects real platform behavior.
+
+    Completion record (2026-05-03):
+      - Classified W3 failures into environment, resource-budget,
+        too-slow, and deferred-engineering buckets in the retrospective
+        handoff under "W4 Failure Triage".
+      - Applied no trivial fixes. The apparent fixable items
+        (`pysail`, Modin dependencies, TCP services) require explicit
+        environment provisioning and would change the UAT surface; they
+        are logged for follow-up instead.
+      - Did not modify benchmark queries, dialect adapters, datagen,
+        platform code, or result corpus files.
+      - Filed no follow-up TODOs yet; per this item's work breakdown,
+        W7 owns creating `_project/TODO/main/planning/results-explorer-uat-defect-*.yaml`
+        entries from these clusters.
 
 - id: w5
   summary: "Submit results through the BenchBox submission flow"
