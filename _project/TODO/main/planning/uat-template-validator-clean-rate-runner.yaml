@@ -65,7 +65,7 @@ work:
 - id: w3
   summary: "Add a fast unit test using fixture bundles"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Fixtures: a small dir with one valid bundle, one
     normalized-cost-error bundle, one zero-timing-error bundle. Assert
