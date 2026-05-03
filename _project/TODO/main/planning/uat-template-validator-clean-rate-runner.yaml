@@ -28,7 +28,7 @@ description: |
 work:
 - id: w1
   summary: "Decide implementation surface: runner step inside benchbox vs post-sweep helper script"
-  status: pending
+  status: done
   notes: |
     Two viable shapes:
       a. New phase / option on `benchbox run` that emits a per-cell
@@ -101,8 +101,10 @@ approach: |
   (`submission_validation_20260502.log`).
 
 anti_patterns:
-- "DO NOT modify `benchbox run` — because the runner step is meant to be opt-in for sweep-shape UATs only — implement as a standalone helper script."
-- "DO NOT change `scripts/validate_submission.py` — because the validator contract is the source of truth — wrap it via subprocess or import its public API."
+- "DO NOT modify `benchbox run` — because the runner step is meant to be opt-in for sweep-shape UATs only — implement as a
+  standalone helper script."
+- "DO NOT change `scripts/validate_submission.py` — because the validator contract is the source of truth — wrap it via subprocess
+  or import its public API."
 - "DO NOT add a new dependency — because the existing scripts dir is dependency-light — stick to stdlib + what's already imported."
 
 scope_limit:
@@ -124,7 +126,8 @@ success_metrics:
 
 deferred:
 - summary: "Pre-submission validation gate inside `benchbox run`"
-  reason: "Discussed in the spec; out of scope here. Adding it would change run-time behaviour and risks producing different W3 pass counts than the historical baseline. File separately if the runner step proves insufficient."
+  reason: "Discussed in the spec; out of scope here. Adding it would change run-time behaviour and risks producing different
+    W3 pass counts than the historical baseline. File separately if the runner step proves insufficient."
 
 metadata:
   tags:
