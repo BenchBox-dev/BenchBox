@@ -2,7 +2,7 @@ id: results-explorer-uat-corpus-integrate-validated-bundles
 title: "Integrate the UAT-20260502 validated corpus into results-data"
 worktree: main
 priority: "High"
-status: "Not Started"
+status: "In Progress"
 category: "Testing and Quality Assurance"
 
 deps:
@@ -45,7 +45,7 @@ description: |
 work:
 - id: w1
   summary: "Re-validate the staged 376-bundle package against current contracts"
-  status: pending
+  status: done
   notes: |
     The staged package lives at
     `~/Developer/benchmark_runs/submissions/uat_20260502/`. Run
@@ -66,7 +66,7 @@ work:
 - id: w2
   summary: "Audit the validator-clean set for corpus-quality balance"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Build a coverage matrix from the now-clean bundle set:
       - cells per (platform, benchmark, scale)
@@ -129,7 +129,8 @@ verification:
 - description: "Per-bundle contract validator passes against results-data after staging."
   command: "uv run -- python scripts/validate_submission.py results-data/bundles"
   expected_output: "0 errors"
-- description: "Explorer build ingests the new corpus and the cross-scale comparison view renders for at least 3 (platform, benchmark) pairs."
+- description: "Explorer build ingests the new corpus and the cross-scale comparison view renders for at least 3 (platform,
+    benchmark) pairs."
   command: "manual"
   expected_output: "screenshots captured under explorer_uat verification logs"
 
@@ -149,10 +150,14 @@ approach: |
   reviewable, not buried in commit messages.
 
 anti_patterns:
-- "DO NOT regenerate or re-run benchmarks during this task -- because re-running invalidates the audit trail tying bundles to the 2026-05-02 sweep -- use the existing on-disk submission package as the source of truth."
-- "DO NOT commit the full 376-bundle set blindly because the validator now passes -- because some failures encode platform-level signals worth keeping visible -- review per-bundle and document exclusions."
-- "DO NOT enable auto-merge on the published-results PR -- because corpus changes get human review, not the auto-merge backstop -- open as draft and flip to ready manually."
-- "DO NOT modify benchbox/, results-explorer/, or scripts/ to make a bundle pass -- because that conflates curation with engineering -- if a bundle still fails, exclude it and file a defect TODO."
+- "DO NOT regenerate or re-run benchmarks during this task -- because re-running invalidates the audit trail tying bundles
+  to the 2026-05-02 sweep -- use the existing on-disk submission package as the source of truth."
+- "DO NOT commit the full 376-bundle set blindly because the validator now passes -- because some failures encode platform-level
+  signals worth keeping visible -- review per-bundle and document exclusions."
+- "DO NOT enable auto-merge on the published-results PR -- because corpus changes get human review, not the auto-merge backstop
+  -- open as draft and flip to ready manually."
+- "DO NOT modify benchbox/, results-explorer/, or scripts/ to make a bundle pass -- because that conflates curation with engineering
+  -- if a bundle still fails, exclude it and file a defect TODO."
 
 scope_limit:
   only_modify:
@@ -172,13 +177,18 @@ success_metrics:
 - "Hosted validator and per-bundle contract CI green on the published-results PR before flipping to ready-for-review."
 
 open_questions:
-- "Does the post-fix re-validation reveal still-open defect clusters that the 14 follow-up TODOs missed? If so, file a new defect TODO before integrating around them."
-- "Should the integration prefer the validator-clean 205-bundle subset (already on disk) or rebuild from the full 376-bundle set after re-validation? Default: rebuild from the full set so newly-validating bundles are picked up, but spot-check the 205 subset for parity first."
-- "Do any of the 51 cohorts have so few cells post-curation that they should be excluded entirely rather than published as sparse rows? Decide a per-cohort minimum cell count before staging."
+- "Does the post-fix re-validation reveal still-open defect clusters that the 14 follow-up TODOs missed? If so, file a new
+  defect TODO before integrating around them."
+- "Should the integration prefer the validator-clean 205-bundle subset (already on disk) or rebuild from the full 376-bundle
+  set after re-validation? Default: rebuild from the full set so newly-validating bundles are picked up, but spot-check the
+  205 subset for parity first."
+- "Do any of the 51 cohorts have so few cells post-curation that they should be excluded entirely rather than published as
+  sparse rows? Decide a per-cohort minimum cell count before staging."
 
 deferred:
 - summary: "Cloud-platform corpus integration (Snowflake / BigQuery / Redshift / Athena / Databricks)"
-  reason: "The 2026-05-02 sweep was local-only by design; cloud rows are the scope of a separate `results-explorer-uat-cloud-corpus` if/when the explorer's cloud-facet surface is ready to be tested under load."
+  reason: "The 2026-05-02 sweep was local-only by design; cloud rows are the scope of a separate `results-explorer-uat-cloud-corpus`
+    if/when the explorer's cloud-facet surface is ready to be tested under load."
 - summary: "Throughput-phase corpus expansion"
   reason: "The sweep only ran load,power phases. Throughput bundles belong in a separate sweep and are out of scope here."
 
