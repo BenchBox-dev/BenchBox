@@ -1128,7 +1128,8 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
 
             # Compute if lazy (Dask)
             if hasattr(result_df, "compute"):
-                result_df = result_df.compute()
+                compute = getattr(self, "compute", None)
+                result_df = compute(result_df) if callable(compute) else result_df.compute()
 
             # Get row count
             row_count = self.get_row_count(result_df)
@@ -1219,7 +1220,8 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             # Compute if lazy (Dask) - track as collect phase
             if hasattr(result_df, "compute"):
                 profile_ctx.start_collect()
-                result_df = result_df.compute()
+                compute = getattr(self, "compute", None)
+                result_df = compute(result_df) if callable(compute) else result_df.compute()
                 profile_ctx.end_collect()
 
             # Get row count

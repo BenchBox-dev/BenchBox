@@ -1663,17 +1663,24 @@ try:
             name="threads_per_worker",
             help="Threads per worker process",
             parser=int,
-            default="1",
         ),
         PlatformOptionSpec(
             name="use_distributed",
             help="Use distributed scheduler (enables dashboard)",
             parser=parse_bool,
-            default="false",
+            default=True,
         ),
         PlatformOptionSpec(
             name="scheduler_address",
             help="Connect to existing scheduler (e.g., 'tcp://...')",
+        ),
+        PlatformOptionSpec(
+            name="memory_limit",
+            help="Memory limit per local Dask worker (e.g., '4GB')",
+        ),
+        PlatformOptionSpec(
+            name="spill_directory",
+            help="Directory for Dask spill files; explicit directories are not deleted by close()",
         ),
     )
 

@@ -128,6 +128,13 @@ def _make_adapter():
     adapter.verbose = False
     adapter.working_dir = "."
     adapter._memory_limit = None
+    adapter._spill_to_disk = False
+    adapter._configured_spill_directory = None
+    adapter._spill_directory = None
+    adapter._owns_spill_directory = False
+    adapter._n_workers_configured = False
+    adapter._threads_per_worker_configured = False
+    adapter._memory_limit_configured = False
     return adapter
 
 
@@ -137,8 +144,9 @@ def test_init_raises_without_dask(monkeypatch):
         mod.DaskDataFrameAdapter()
 
 
-def test_apply_tuning_and_setup_distributed_paths(monkeypatch):
+def test_apply_tuning_and_setup_distributed_paths(monkeypatch, tmp_path):
     adapter = _make_adapter()
+    adapter._configured_spill_directory = tmp_path / "spill"
     fake_config_calls = []
     monkeypatch.setitem(
         sys.modules, "dask", SimpleNamespace(config=SimpleNamespace(set=lambda v: fake_config_calls.append(v)))
@@ -147,7 +155,7 @@ def test_apply_tuning_and_setup_distributed_paths(monkeypatch):
     assert adapter.n_workers == 3
     assert adapter.threads_per_worker == 2
     assert adapter._memory_limit == "2GB"
-    assert len(fake_config_calls) >= 2
+    assert adapter._spill_to_disk is True
 
     adapter.scheduler_address = "tcp://x"
     mod.Client = lambda addr: SimpleNamespace(
@@ -167,6 +175,119 @@ def test_apply_tuning_and_setup_distributed_paths(monkeypatch):
     )
     adapter._setup_distributed()
     assert adapter._cluster is not None
+    assert fake_config_calls
+
+
+def test_local_resource_envelope_defaults_are_capped(monkeypatch):
+    adapter = _make_adapter()
+    adapter.use_distributed = True
+    defaults = SimpleNamespace(
+        parallelism=SimpleNamespace(worker_count=8, threads_per_worker=6),
+        memory=SimpleNamespace(memory_limit="12GB", spill_to_disk=True),
+    )
+
+    import benchbox.core.dataframe.tuning as tuning
+
+    monkeypatch.setattr(tuning, "get_smart_defaults", lambda platform: defaults)
+    adapter._apply_local_resource_envelope_defaults()
+
+    assert adapter.n_workers == 2
+    assert adapter.threads_per_worker == 2
+    assert adapter._memory_limit == "2GB"
+    assert adapter._spill_to_disk is True
+
+
+def test_local_resource_envelope_preserves_explicit_values(monkeypatch):
+    adapter = _make_adapter()
+    adapter.use_distributed = True
+    adapter.n_workers = 4
+    adapter.threads_per_worker = 3
+    adapter._memory_limit = "6GB"
+    adapter._n_workers_configured = True
+    adapter._threads_per_worker_configured = True
+    adapter._memory_limit_configured = True
+    defaults = SimpleNamespace(
+        parallelism=SimpleNamespace(worker_count=8, threads_per_worker=6),
+        memory=SimpleNamespace(memory_limit="12GB", spill_to_disk=True),
+    )
+
+    import benchbox.core.dataframe.tuning as tuning
+
+    monkeypatch.setattr(tuning, "get_smart_defaults", lambda platform: defaults)
+    adapter._apply_local_resource_envelope_defaults()
+
+    assert adapter.n_workers == 4
+    assert adapter.threads_per_worker == 3
+    assert adapter._memory_limit == "6GB"
+    assert adapter._spill_to_disk is True
+
+
+def test_spill_directory_cleanup_only_removes_owned_run_dir(tmp_path):
+    adapter = _make_adapter()
+    adapter.working_dir = tmp_path
+    owned_spill = adapter._resolve_spill_directory()
+    (owned_spill / "spill.bin").write_text("temporary", encoding="utf-8")
+
+    adapter._cleanup_owned_spill_directory()
+
+    assert not owned_spill.exists()
+    assert not (tmp_path / ".benchbox-dask-spill").exists()
+
+    explicit_spill = tmp_path / "explicit-spill"
+    explicit_adapter = _make_adapter()
+    explicit_adapter._configured_spill_directory = explicit_spill
+    assert explicit_adapter._resolve_spill_directory() == explicit_spill
+
+    explicit_adapter._cleanup_owned_spill_directory()
+
+    assert explicit_spill.exists()
+
+
+def test_resource_envelope_diagnostic_wraps_exit_137():
+    adapter = _make_adapter()
+
+    diagnostic = adapter._resource_envelope_diagnostic("compute", RuntimeError("exit code 137"))
+
+    assert diagnostic is not None
+    assert "Dask resource-envelope failure during compute" in diagnostic
+    assert "exit code 137" in diagnostic
+    assert "use_distributed=False" in diagnostic
+
+
+def test_resource_envelope_diagnostic_ignores_unrelated_errors():
+    adapter = _make_adapter()
+
+    assert adapter._resource_envelope_diagnostic("compute", RuntimeError("bad column")) is None
+
+
+def test_tpch_q10_guard_and_skip_result_classification():
+    adapter = _make_adapter()
+    query = SimpleNamespace(query_id="Q10", query_name="Returned Item Reporting")
+
+    result = adapter.execute_query(SimpleNamespace(), query)
+    assert result["status"] == "FAILED"
+    assert "Dask resource-envelope failure before query execution" in result["error"]
+    assert "exit 137" in result["error"]
+
+    benchmark = SimpleNamespace(name="TPC-H Benchmark")
+    skip_query_ids = adapter._collect_skip_query_ids(benchmark)
+    skipped = adapter._build_skipped_results(skip_query_ids)
+
+    q10_skip = next(item for item in skipped if item["query_id"] == "Q10")
+    assert q10_skip["status"] == "SKIPPED"
+    assert q10_skip["dask_resource_envelope_guarded"] is True
+    assert "Dask resource-envelope guard" in q10_skip["error"]
+
+
+def test_profiled_tpch_q10_guard_returns_failure_profile():
+    adapter = _make_adapter()
+    query = SimpleNamespace(query_id="Q10", query_name="Returned Item Reporting")
+
+    result, profile = adapter.execute_query_profiled(SimpleNamespace(), query)
+
+    assert result["status"] == "FAILED"
+    assert profile.query_id == "Q10"
+    assert profile.metrics["resource_envelope_guarded"] is True
 
 
 def test_close_and_del_cleanup():
