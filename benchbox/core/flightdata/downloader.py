@@ -515,9 +515,13 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         try:
             with self._open_existing_csv_for_read(legacy_path) as source:
                 reader = csv.reader(source)
-                header = next(reader, self._flight_header())
+                header = next(reader, None)
+                if header is None:
+                    raise ValueError(f"FlightData source file {legacy_path} is empty")
+                self._validate_flights_header(header, legacy_path)
                 current_path: Path | None = None
-                for row in reader:
+                for line_number, row in enumerate(reader, start=2):
+                    self._validate_flight_row_width(row, line_number, legacy_path, len(header))
                     if writer is None or rows_in_shard >= FLIGHTS_SHARD_ROW_TARGET:
                         close_target()
                         writer, current_path = open_target(header)
@@ -526,6 +530,9 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                     assert current_path is not None
                     shard_counts[current_path] += 1
                     self._stats["total_flights"] += 1
+        except Exception:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise
         finally:
             close_target()
 
@@ -551,13 +558,41 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
     def _record_existing_csv_file(self, table_name: str, path: Path) -> None:
         if path in self._table_file_row_counts:
             return
-        row_count = self._count_csv_rows(path)
+        row_count = self._count_flight_csv_rows(path) if table_name == "flights" else self._count_csv_rows(path)
         self._table_row_counts[table_name] = self._table_row_counts.get(table_name, 0) + row_count
         self._table_file_row_counts[path] = row_count
 
     def _count_csv_rows(self, path: Path) -> int:
         with self._open_existing_csv_for_read(path) as f:
             return max(0, sum(1 for _ in f) - 1)
+
+    def _count_flight_csv_rows(self, path: Path) -> int:
+        with self._open_existing_csv_for_read(path) as f:
+            reader = csv.reader(f)
+            header = next(reader, None)
+            if header is None:
+                raise ValueError(f"FlightData source file {path} is empty")
+            self._validate_flights_header(header, path)
+            row_count = 0
+            for line_number, row in enumerate(reader, start=2):
+                self._validate_flight_row_width(row, line_number, path, len(header))
+                row_count += 1
+            return row_count
+
+    def _validate_flights_header(self, header: list[str], path: Path) -> None:
+        expected = self._flight_header()
+        if header != expected:
+            raise ValueError(
+                f"FlightData source file {path} has invalid header: expected {len(expected)} columns "
+                f"{expected!r}, found {len(header)} columns {header!r}"
+            )
+
+    @staticmethod
+    def _validate_flight_row_width(row: list[str], line_number: int, path: Path, expected_columns: int) -> None:
+        if len(row) != expected_columns:
+            raise ValueError(
+                f"FlightData source file {path} row {line_number} has {len(row)} columns; expected {expected_columns}"
+            )
 
     def _write_manifest(self, table_files: dict[str, Path | list[Path]]) -> None:
         manifest = DataGenerationManifest(

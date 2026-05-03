@@ -346,6 +346,55 @@ class TestDataGeneration:
         entries = manifest["tables"]["flights"]["formats"]["csv"]
         assert [entry["row_count"] for entry in entries] == [2, 2, 1]
 
+    def test_legacy_large_single_flight_file_with_bad_width_is_rejected(self, tmp_path, monkeypatch):
+        """Legacy repair should fail before publishing malformed FlightData shards."""
+        monkeypatch.setattr("benchbox.core.flightdata.downloader.FLIGHTS_SHARD_ROW_TARGET", 2)
+        downloader = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path, seed=42, verbose=1)
+        downloader._num_months = MONTHS_PER_SCALE_FACTOR
+
+        legacy_path = tmp_path / "flights.csv"
+        _write_csv(legacy_path, FlightDataDownloader._flight_header(), [_flight_row(1)[:-1]])
+
+        with pytest.raises(ValueError, match="row 2 has 27 columns; expected 28"):
+            downloader.repair_reusable_layout()
+
+        assert legacy_path.exists()
+        assert not (tmp_path / "flights").exists()
+        assert not (tmp_path / ".flights-shards.tmp").exists()
+
+    def test_empty_legacy_large_single_flight_file_is_rejected(self, tmp_path):
+        """Empty legacy sources should not leave staged shard directories behind."""
+        downloader = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path, seed=42, verbose=1)
+        downloader._num_months = MONTHS_PER_SCALE_FACTOR
+        legacy_path = tmp_path / "flights.csv"
+        legacy_path.write_text("", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="is empty"):
+            downloader.repair_reusable_layout()
+
+        assert legacy_path.exists()
+        assert not (tmp_path / "flights").exists()
+        assert not (tmp_path / ".flights-shards.tmp").exists()
+
+    def test_existing_flight_shard_with_bad_width_is_rejected(self, tmp_path):
+        """Shard reuse should validate FlightData rows before writing a fresh manifest."""
+        shard_dir = tmp_path / "flights"
+        shard_dir.mkdir()
+        _write_csv(shard_dir / "flights_0001.csv", FlightDataDownloader._flight_header(), [_flight_row(1)[:-1]])
+        _write_csv(tmp_path / "airlines.csv", ["code", "name"], [["AA", "American"]])
+        _write_csv(
+            tmp_path / "airports.csv",
+            ["code", "name", "city", "state", "latitude", "longitude"],
+            [["ATL", "Atlanta", "Atlanta", "GA", "33.64", "-84.43"]],
+        )
+        downloader = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path, seed=42, verbose=1)
+        downloader._num_months = MONTHS_PER_SCALE_FACTOR
+
+        with pytest.raises(ValueError, match="row 2 has 27 columns; expected 28"):
+            downloader.download()
+
+        assert not (tmp_path / "_datagen_manifest.json").exists()
+
     def test_csv_loading_config_declares_headered_comma_csv(self):
         """Native loaders should receive FlightData's real CSV dialect."""
         bm = FlightDataBenchmark(scale_factor=0.01)
