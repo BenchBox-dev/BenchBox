@@ -128,6 +128,18 @@ work:
         With that capacity, the observed host processes are acceptable
         for proceeding with the sequential UAT sweep.
 
+    Active disk policy update (2026-05-03):
+      - User superseded the earlier ~40 GiB cutoff. Do not stop work
+        because available space is below 40 GiB. Treat that as
+        telemetry only.
+      - Stop only if `df -h ~/Developer/benchmark_runs` shows less
+        than 5 GiB available, a command fails due to disk exhaustion,
+        or another hard runtime failure blocks progress.
+      - Keep reuse-aware cleanup active: preserve reusable generated
+        source data under `~/Developer/benchmark_runs/datagen/`, and
+        prune loaded database artifacts only after every benchmark that
+        can reuse that source/scale has completed.
+
 - id: w2
   summary: "Build the run matrix from the registry (do not hardcode)"
   needs: [w1]
@@ -349,7 +361,7 @@ work:
 - id: w5
   summary: "Submit results through the BenchBox submission flow"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Discover the exact submission entrypoint yourself. Likely
     candidates: `benchbox submit`, `benchbox results`,
@@ -368,6 +380,44 @@ work:
         performed (see `external-contributor-submission-dry-run`
         updates 2026-04-28 / 2026-04-29) and whether the issues they
         surfaced still reproduce.
+
+    Completion record (2026-05-03):
+      - Exercised the Phase 2 local PR-package submission flow. No
+        hosted `--service` upload was attempted, no irreversible
+        publish action was run, and no `results-data/` PR was opened
+        from the full staged set.
+      - Submission artifacts:
+        `~/Developer/benchmark_runs/logs/uat_20260502/submission_paths_20260502.txt`,
+        `~/Developer/benchmark_runs/logs/uat_20260502/submission_packaging_20260502.log`,
+        `~/Developer/benchmark_runs/logs/uat_20260502/submission_validation_20260502.log`,
+        and
+        `~/Developer/benchmark_runs/logs/uat_20260502/submission_validation_valid_20260502.log`.
+      - Attempted 388 captured result paths. `benchbox submit --output`
+        packaged 376 bundles and refused 12 TPC-DS results via
+        compliance guardrails: eight `unofficial_subscale` and four
+        `unofficial_nonstandard`.
+      - Full package validation reported `Validated 376 bundle(s): 188
+        error(s), 212 warning(s)`. The 171 failing bundles clustered
+        around normalized-cost contract errors and all-zero query
+        timings.
+      - Built validator-clean subset
+        `~/Developer/benchmark_runs/submissions/uat_20260502_valid`
+        with 205 bundles and 205 manifests. Validation reported
+        `Validated 205 bundle(s): 0 error(s), 126 warning(s)`.
+      - `benchbox submit --dry-run` exited 0 for a ClickHouse Local
+        result that later failed `scripts/validate_submission.py` on
+        the normalized-cost contract, so dry-run validation coverage is
+        incomplete relative to the hosted-results contract text.
+      - W6 should exercise the explorer against the validator-clean
+        subset or a derived `DATA_DIR/bundles/` copy. Do not copy the
+        full staged package into `results-data/`, and do not open a
+        `published-results` PR until invalid-bundle clusters are fixed
+        or deliberately filtered.
+      - Current cleanup state: the W3 reuse-aware cleanup left no
+        loaded database artifacts under
+        `~/Developer/benchmark_runs/databases/`. W6 should use the
+        staged bundles only and should not generate or load new
+        benchmark databases.
 
 - id: w6
   summary: "Exercise the Results Explorer against the new corpus"

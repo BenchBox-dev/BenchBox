@@ -201,6 +201,9 @@ Cleanup log: `~/Developer/benchmark_runs/logs/uat_20260502/database_cleanup_2026
   fell below the user-defined 5 GiB hard stop.
 - Ignore the malformed ClickHouse Local cleanup row with empty timestamp/`after_kib`; the immediately following
   `mid-platform-safe-boundary-corrected` row is the valid cleanup record.
+- Post-W5 cleanup recheck found no remaining loaded database artifacts under `~/Developer/benchmark_runs/databases/`. The
+  remaining UAT steps should operate from submitted bundles and explorer snapshots, not by generating or loading more
+  benchmark databases.
 
 ### W4 Triage Inputs
 
@@ -254,3 +257,60 @@ Follow-up TODO candidates for W7:
 
 No W4 changes were made to benchmark queries, dialect adapters, datagen, platform implementations, or the generated result
 corpus.
+
+## W5 Submission Flow
+
+Status: Phase 2 PR-package flow exercised. No hosted `--service` upload was attempted, and no `results-data/` PR was opened
+from the full staged set because local submission validation rejects too many bundles.
+
+Entrypoints checked:
+
+- `benchbox submit --help`: primary submission path. Default `--output` mode creates a local PR-ready package; `--service`
+  is opt-in hosted upload.
+- `benchbox publish --help`: storage copy/history tool, not the community submission path.
+- `benchbox results --help`: result discovery/history.
+- `benchbox explorer build --help`: can build an explorer data snapshot from any `DATA_DIR/bundles/` directory, which makes a
+  local W6 UAT possible against a staged valid subset.
+
+Submission artifacts:
+
+| Artifact | Path / Count |
+| --- | --- |
+| Captured result paths attempted | 388 |
+| Full package output | `~/Developer/benchmark_runs/submissions/uat_20260502` |
+| Full package log | `~/Developer/benchmark_runs/logs/uat_20260502/submission_packaging_20260502.log` |
+| Successfully packaged bundles | 376 bundles + 376 manifests |
+| CLI-refused results | 12 |
+| Full-package validation log | `~/Developer/benchmark_runs/logs/uat_20260502/submission_validation_20260502.log` |
+| Validator-clean subset | `~/Developer/benchmark_runs/submissions/uat_20260502_valid` |
+| Validator-clean subset count | 205 bundles + 205 manifests |
+| Valid-subset validation log | `~/Developer/benchmark_runs/logs/uat_20260502/submission_validation_valid_20260502.log` |
+
+Validation outcomes:
+
+- Full staged package: `scripts/validate_submission.py` reported `Validated 376 bundle(s): 188 error(s), 212 warning(s)`.
+- Valid subset: `scripts/validate_submission.py` reported `Validated 205 bundle(s): 0 error(s), 126 warning(s)`.
+- The 12 CLI refusals were all TPC-DS compliance guardrails: eight `unofficial_subscale` and four `unofficial_nonstandard`
+  TPC-DS results.
+- The 171 validator-failing packaged bundles had two dominant error types:
+  - 134 occurrences: `cost.total_usd` present while `cost_status` is `unavailable`.
+  - 54 occurrences: all query timings are `0ms`.
+
+Submission-flow friction:
+
+- A guessed result filename fails clearly with `Path ... does not exist`; contributors still need a reliable "copy exact path"
+  affordance from results history or the matrix summary.
+- `benchbox submit --dry-run` exited 0 for
+  `amplab_sf001_clickhouse_local_sql_20260502_185809_f2e17de5.json`, but the same bundle later failed
+  `scripts/validate_submission.py` due the normalized-cost contract. This contradicts the hosted-results contract text that
+  dry-run runs client-side validations.
+- The real `--output` package flow is clear and prints `PR target: published-results`, which fixes the older generated
+  `CONTRIBUTING.md` branch-target ambiguity noted in the April dry-runs.
+- Batch submission is not built in; W5 had to loop one result at a time over captured paths.
+
+W6 should use the validator-clean subset for local explorer UAT. The full corpus should not be copied into `results-data/` or
+opened as a `published-results` PR until the invalid-bundle clusters are fixed or filtered deliberately.
+
+Cleanup carry-forward: preserve reusable generated source data under `~/Developer/benchmark_runs/datagen/`; prune loaded
+database artifacts only after all source/scale consumers have completed. At this point W6 should not require any loaded
+database artifact, because it can build the explorer snapshot from `DATA_DIR/bundles/`.
