@@ -38,7 +38,7 @@ work:
   notes: |
     Document the exact-path discovery path in contributor-facing CLI docs and
     run the focused CLI tests plus terminating help commands.
-  status: pending
+  status: done
 
 approach: |
   Implement the narrower exact-path affordance rather than batch submission.
