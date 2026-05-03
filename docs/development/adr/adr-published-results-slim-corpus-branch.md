@@ -92,6 +92,41 @@ in the slim-down.
   `uv.lock`, etc. — develop's tooling is irrelevant to a corpus-only
   branch.
 
+### Validator invocation contract
+
+`validate_submission.py` and `generate_corpus_inventory.py` are
+stdlib-only Python (`hashlib`, `json`, `sys`, `argparse`, `pathlib`,
+`decimal`, `collections`, `datetime` — no `benchbox.*` imports). They
+do not need any project metadata to run.
+
+The current `validate-submission.yml` invokes them via
+`uv run -- python scripts/<script>.py`, which expects a `pyproject.toml`
+in the working directory. To keep `published-results` slim **and** keep
+CI working on day one, the slim-down changes the workflow on
+`published-results` to invoke the validators with `uv run --no-project
+--python 3.11 -- python scripts/<script>.py`. The `--no-project` flag
+tells `uv` not to look for or install a project; `--python 3.11` pins
+the Python version (the develop-side workflow today gets this from
+`actions/setup-python@v5` and an unpinned `uv run`, which is fragile
+even there).
+
+This means `pyproject.toml` and `uv.lock` are **not** added to the
+allowlist and stay excluded. The on-branch copy of
+`validate-submission.yml` is the one that has to change; that change
+is part of W2 of the parent TODO (it lands together with the
+orphan-branch reset).
+
+### Python version pinning
+
+`.python-version` is **not** in the allowlist because it does not
+exist in the develop tree today. After the slim-down, the Python
+version `validate-submission.yml` runs against is pinned by the
+workflow file itself (`actions/setup-python@v5` with
+`python-version: "3.11"` and the matching `--python 3.11` flag passed
+to `uv run --no-project`). If a future change adds a
+`.python-version` file to develop, the slim-branch maintenance plan
+needs to be updated to mirror it.
+
 ### Trust labels
 
 The trust-label resolver in `scripts/generate_corpus_inventory.py`
@@ -101,15 +136,30 @@ contract. After the slim-down, `published-results` will continue to
 host the same mix of `maintainer-run` (seed corpus, no sidecar) and
 `community-submission` (manifest sidecar present) entries.
 
-### Vendored scripts: source of truth
+### Vendored scripts: source of truth and divergence detection
 
 `validate_submission.py` and `generate_corpus_inventory.py` exist on
 `develop` (the canonical home) and are vendored to `published-results`
 for self-contained CI. The vendored copies are kept in sync via the
 develop ↔ published-results sync mechanism the parent TODO's W4 will
-land. Until that mechanism exists, divergence between develop and
-published-results copies is treated as a develop-side bug — develop is
-authoritative.
+land. Until that mechanism exists, **divergence is detected by a
+hash-equality check on develop**:
+
+- A new pre-merge CI step on develop's `pr.yml` (added as part of the
+  parent TODO's W2 / W4) computes the SHA-256 of develop's
+  `scripts/validate_submission.py` and `scripts/generate_corpus_inventory.py`
+  and compares against the same files fetched from `origin/published-results`.
+- If they differ, the develop PR is annotated with a "vendored copy
+  drift" warning that surfaces the diff and points the maintainer at
+  the parent TODO. The warning is informational, not blocking — the
+  develop PR can still merge — but it ensures drift is never silent.
+- The published-results copies are updated lock-step with develop in
+  the sync mechanism W4 lands, so the warning should normally be a
+  no-op.
+
+In the absence of this gate (i.e. before W2/W4 ship), divergence
+between develop and published-results copies is treated as a
+develop-side bug; develop is authoritative.
 
 ## Consequences
 
@@ -160,6 +210,17 @@ authoritative.
    worse than either endpoint — contributors would still see drift,
    and incremental cleanup PRs are bigger maintainer toil than a
    one-time orphan-branch reset.
+5. **Drop `uv run` from `validate-submission.yml` and call `python3
+   scripts/<script>.py` directly.** Stronger expression of slim intent
+   than the chosen approach: the validators are stdlib-only, so plain
+   `python3` works without `uv`, `pyproject.toml`, or `uv.lock`.
+   *Considered but not chosen* because the project-wide convention
+   (`CLAUDE.md` / `AGENTS.md`) is "always use `uv` for Python execution"
+   and breaking that convention on a single workflow file would be
+   surprising for maintainers. The chosen approach (`uv run --no-project
+   --python 3.11`) preserves the convention while still keeping the
+   slim branch free of project metadata. If the convention ever
+   changes, this alternative becomes the natural follow-up.
 
 ## Operational footprint
 
